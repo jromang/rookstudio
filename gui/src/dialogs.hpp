@@ -49,6 +49,7 @@ class Dialogs {
         EngineOption,  // a file or a folder for a UCI option (EvalFile, SyzygyPath)
         ConsoleLog,    // the engine console's log
         BoardPgn,      // a PGN file for the Board page
+        SaveBoardPgn,  // the Board page's game saved as a PGN file
         EngineLogo,
         PieceFolder,
         MachineKey,         // a remote machine's key file (Settings)

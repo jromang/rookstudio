@@ -421,6 +421,7 @@ class App {
     void loadPgnGame(int index);
     void readOnBoard(const std::string& text, const std::string& name);  // a FEN, a PGN, moves
     void pasteOnBoard();
+    void saveBoardPgn();  // asks where, then writes the game with its variations and notes
     void drawPgnGames();
     void openPositionEditor();
     void drawPositionEditor(float size);

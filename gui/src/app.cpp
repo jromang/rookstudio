@@ -1,5 +1,6 @@
 #include "app.hpp"
 
+#include "board_text.hpp"
 #include "engine_hub.hpp"
 
 #include <algorithm>
@@ -1512,6 +1513,16 @@ void App::handleDialogs() {
                 break;
             case Dialogs::Purpose::BoardPgn:
                 openBoardPgn(std::filesystem::path(path));
+                break;
+            case Dialogs::Purpose::SaveBoardPgn:
+                try {
+                    tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
+                    board_.message       = trf("Saved in {}", path);
+                    board_.message_error = false;
+                } catch (const std::exception& e) {
+                    board_.message       = trf("Cannot write {}: {}", path, e.what());
+                    board_.message_error = true;
+                }
                 break;
             case Dialogs::Purpose::MachineKey:
             case Dialogs::Purpose::MachineProgram:

@@ -9,6 +9,8 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include <study/pgn_reader.hpp>
+#include <study/pgn_writer.hpp>
 #include <tour/chess_text.hpp>
 #include <tour/pgn_file.hpp>
 
@@ -90,16 +92,6 @@ std::array<char, 64> placement(std::string_view fen) {
         }
     }
     return squares;
-}
-
-// A score as fastchess writes it in a comment: the mover's, in pawns, a mate in plies.
-std::string commentScore(const fastchess::Score& score) {
-    if (score.type == fastchess::ScoreType::MATE) {
-        const int64_t plies = score.value > 0 ? score.value * 2 - 1 : -score.value * 2;
-        return fmt::format("{}M{}", score.value > 0 ? "+" : "-", plies);
-    }
-    if (score.value == 0) return "0.00";
-    return fmt::format("{:+.2f}", static_cast<double>(score.value) / 100.0);
 }
 
 }  // namespace
@@ -257,201 +249,12 @@ std::string gamePgn(const ReplayGame& game, bool chess960) { return gamePgn(Game
 std::string gamePgn(const GameTree& tree, bool chess960) { return gamePgn(tree, chess960, nullptr); }
 
 std::string gamePgn(const GameTree& tree, bool chess960, const std::function<std::string(int)>& annotate) {
-    const auto& game = tree.main;
-    const auto tag = [](const std::string& name, const std::string& value) {
-        return fmt::format("[{} \"{}\"]\n", name, tour::pgnTagValue(value));
-    };
-    const auto value = [&](const char* name, const char* fallback) {
-        const auto v = game.header(name);
-        return v.empty() ? std::string(fallback) : v;
-    };
-    const std::string result = game.result.empty() ? "*" : game.result;
-    const std::string start  = game.start_fen.empty() ? std::string(chess::constants::STARTPOS) : game.start_fen;
-
-    std::string out;
-    out += tag("Event", value("Event", "?"));
-    out += tag("Site", value("Site", "?"));
-    out += tag("Date", value("Date", "????.??.??"));
-    out += tag("Round", value("Round", "-"));
-    out += tag("White", value("White", "?"));
-    out += tag("Black", value("Black", "?"));
-    out += tag("Result", result);
-    static constexpr std::string_view written[] = {"Event", "Site",   "Date",  "Round", "White",
-                                                   "Black", "Result", "SetUp", "FEN",   "PlyCount"};
-    for (const auto& [name, v] : game.headers) {
-        if (std::find(std::begin(written), std::end(written), name) != std::end(written)) continue;
-        if (name == "Variant" && chess960) continue;
-        out += tag(name, v);
-    }
-    if (chess960) out += tag("Variant", "Chess960");
-    if (chess960 || start != chess::constants::STARTPOS) {
-        out += tag("SetUp", "1");
-        out += tag("FEN", start);
-    }
-    out += tag("PlyCount", std::to_string(game.moves.size()));
-    out += "\n";
-
-    // The moves, lines of at most 80 characters.
-    chess::Board board;
-    board.set960(chess960);
-    board.setFen(start);
-    std::string line;
-    const auto put = [&](const std::string& word) {
-        if (!line.empty() && line.size() + 1 + word.size() > 80) {
-            out += line + "\n";
-            line.clear();
-        }
-        line += (line.empty() ? "" : " ") + word;
-    };
-    // A line's moves from absolute ply `base`, each followed by the variations that replace it.
-    const std::function<void(int, int, chess::Board)> write = [&](int which, int base, chess::Board at) {
-        const auto& moves = which < 0 ? game.moves : tree.variations[static_cast<std::size_t>(which)].moves;
-        bool number       = true;
-        for (std::size_t i = 0; i < moves.size(); ++i) {
-            const auto& m = moves[i];
-            const int ply = base + static_cast<int>(i);
-            if (at.sideToMove() == chess::Color::WHITE)
-                put(fmt::format("{}.", at.fullMoveNumber()));
-            else if (number)
-                put(fmt::format("{}...", at.fullMoveNumber()));
-            number = false;
-            // A move and its comment on the same line, as other readers expect them.
-            auto move = chess::uci::moveToSan(at, m.move);
-            if (m.book) {
-                move += " {book}";
-            } else if (m.score) {
-                move += " {" + commentScore(*m.score) + "/" + std::to_string(m.depth);
-                if (m.time_ms >= 0) move += fmt::format(" {:.3f}s", static_cast<double>(m.time_ms) / 1000.0);
-                move += "}";
-            }
-            if (which < 0 && annotate) {
-                if (const auto extra = annotate(ply + 1); !extra.empty()) move += " " + extra;
-            }
-            put(move);
-            for (std::size_t v = 0; v < tree.variations.size(); ++v) {
-                const auto& var = tree.variations[v];
-                if (var.parent != which || var.from != ply || var.moves.empty()) continue;
-                put("(");
-                write(static_cast<int>(v), ply, at);
-                put(")");
-                number = true;
-            }
-            at.makeMove<true>(m.move);
-        }
-    };
-    write(-1, 0, board);
-    put(result);
-    out += line + "\n\n";
-    // No space inside the brackets.
-    for (const auto& [from, to] :
-         {std::pair<std::string, std::string>{"( ", "("}, {" )", ")"}, {"(\n", "("}, {"\n)", ")"}}) {
-        for (auto at = out.find(from); at != std::string::npos; at = out.find(from, at))
-            out.replace(at, from.size(), to);
-    }
-    return out;
+    return study::writePgnGame(tree, study::PgnWriteOptions{chess960, annotate});
 }
 
-std::vector<Variation> readVariations(const std::string& pgn, const ReplayGame& main, bool chess960) {
-    GameTree tree{main, {}};
-    // The moves' text: after the tags.
-    std::size_t at = 0;
-    while (at < pgn.size()) {
-        const auto eol = pgn.find('\n', at);
-        const auto line =
-            trim(std::string_view(pgn).substr(at, eol == std::string::npos ? std::string::npos : eol - at));
-        if (!line.empty() && line.front() != '[') break;
-        if (eol == std::string::npos) return {};
-        at = eol + 1;
-    }
-    struct Where {
-        int line = -1;
-        int ply  = 0;
-        chess::Board board, before;  // the position, and the one before the last move
-        bool moved = false;
-    };
-    chess::Board start;
-    start.set960(chess960);
-    start.setFen(main.start_fen.empty() ? std::string(chess::constants::STARTPOS) : main.start_fen);
-    Where here{-1, 0, start, start, false};
-    std::vector<Where> stack;
-    while (at < pgn.size()) {
-        const char c = pgn[at];
-        if (std::isspace(static_cast<unsigned char>(c))) {
-            ++at;
-        } else if (c == '{') {
-            const auto end = pgn.find('}', at);
-            at             = end == std::string::npos ? pgn.size() : end + 1;
-        } else if (c == ';') {
-            const auto end = pgn.find('\n', at);
-            at             = end == std::string::npos ? pgn.size() : end + 1;
-        } else if (c == '(') {
-            ++at;
-            stack.push_back(here);
-            if (!here.moved || here.line == -2) {
-                here.line = -2;  // a variation before any move, or in one skipped: skipped
-                continue;
-            }
-            const int from = here.ply - 1;
-            tree.variations.push_back({ownerOf(tree, here.line, from), from, {}});
-            here = Where{static_cast<int>(tree.variations.size()) - 1, from, here.before, here.before, false};
-        } else if (c == ')') {
-            ++at;
-            if (stack.empty()) continue;
-            here = stack.back();
-            stack.pop_back();
-        } else {
-            auto end = at;
-            while (end < pgn.size() && !std::isspace(static_cast<unsigned char>(pgn[end])) && pgn[end] != '(' &&
-                   pgn[end] != ')' && pgn[end] != '{' && pgn[end] != ';')
-                ++end;
-            std::string word = pgn.substr(at, end - at);
-            at               = end;
-            // Numbers, results and annotations are not moves.
-            while (!word.empty() && std::isdigit(static_cast<unsigned char>(word.front()))) {
-                const auto dot = word.find('.');
-                if (dot == std::string::npos) break;
-                const auto rest = word.find_first_not_of('.', dot);
-                word            = rest == std::string::npos ? std::string() : word.substr(rest);
-            }
-            if (word.empty() || word.front() == '$' || word == "*" || word == "1-0" || word == "0-1" ||
-                word == "1/2-1/2" || std::isdigit(static_cast<unsigned char>(word.front())))
-                continue;
-            while (!word.empty() && (word.back() == '!' || word.back() == '?')) word.pop_back();
-            if (here.line == -2) continue;
-            chess::Move move = chess::Move::NO_MOVE;
-            try {
-                move = chess::uci::parseSan(here.board, word);
-            } catch (...) {
-            }
-            if (move == chess::Move::NO_MOVE) {
-                here.line = here.line < 0 ? -1 : -2;  // what follows in this line cannot be played
-                if (here.line == -1) break;
-                continue;
-            }
-            if (here.line >= 0) {
-                ReplayMove m;
-                m.move  = move;
-                m.san   = chess::uci::moveToSan(here.board, move);
-                m.mover = here.board.sideToMove();
-                tree.variations[static_cast<std::size_t>(here.line)].moves.push_back(std::move(m));
-            }
-            here.before = here.board;
-            here.board.makeMove<true>(move);
-            here.ply++;
-            here.moved = true;
-        }
-    }
-    // Those with no move left out, the others renumbered.
-    std::vector<int> index(tree.variations.size(), -1);
-    std::vector<Variation> kept;
-    for (std::size_t v = 0; v < tree.variations.size(); ++v) {
-        const auto& var = tree.variations[v];
-        if (var.moves.empty() || (var.parent >= 0 && index[static_cast<std::size_t>(var.parent)] < 0)) continue;
-        index[v] = static_cast<int>(kept.size());
-        kept.push_back(var);
-        if (kept.back().parent >= 0) kept.back().parent = index[static_cast<std::size_t>(var.parent)];
-    }
-    return kept;
+std::vector<Variation> readVariations(const std::string& pgn, const ReplayGame& /*main*/, bool /*chess960*/) {
+    auto read = study::readPgnGame(pgn);
+    return read.tree ? std::move(read.tree->variations) : std::vector<Variation>{};
 }
 
 }  // namespace fcg

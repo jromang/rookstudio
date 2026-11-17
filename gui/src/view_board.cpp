@@ -705,6 +705,7 @@ void App::drawBoardPage() {
             if (const int to = judgedPly(ImGui::GetIO().KeyShift ? -1 : 1); to >= 0) showBoardLine(-1, to);
         }
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
+        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) saveBoardPgn();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
     if (keys && !b.editor && ImGui::IsKeyPressed(ImGuiKey_X, false) && !ImGui::GetIO().KeyCtrl)
@@ -858,6 +859,13 @@ void App::loadPgnGame(int index) {
     board_back_       = back;
     b.tree.variations = readVariations(*text, b.tree.main, chess960);  // those of the file, kept
     b.message.clear();
+}
+
+void App::saveBoardPgn() {
+    const auto& main = board_.tree.main;
+    const auto white = main.header("White"), black = main.header("Black");
+    const auto name = white.empty() && black.empty() ? std::string("game") : fileNameOf(white + " - " + black);
+    dialogs_.saveFile(Dialogs::Purpose::SaveBoardPgn, {{"PGN", "pgn"}}, (storage_.root() / (name + ".pgn")).string());
 }
 
 void App::readOnBoard(const std::string& text, const std::string& name) {

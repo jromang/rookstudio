@@ -547,7 +547,9 @@ moves when it is let go.
   squares) and Chess960. The FEN below follows the board, and a FEN typed there sets it. *Done* is offered once the
   position can be played, and puts it on the board.
 - *Copy PGN* (at the right of the moves' tabs) copies the game shown, with its tags, its moves (the engines' scores
-  as comments when it has them) and its variations.
+  as comments when it has them) and its variations. Ctrl+S, or *Save the game as PGN…* in the command palette,
+  writes the same to a file. The comments, symbols ($1 or !?), arrows and coloured squares, clocks and evaluations
+  of an opened PGN file are kept, and written back as they were read.
 - **The board**: the buttons under it and ← → Home End go through the moves, and F (or the last button) turns it
   over; a click on a piece and on a square plays a move (a pawn that promotes asks for its piece). *Copy FEN* copies
   the position.
@@ -653,7 +655,7 @@ analyses and its graph. The moves show the variations in brackets after the move
 click on a move goes there, and *Back to the game* returns to the position the variation leaves. A right click on a
 variation's move promotes it (it becomes the line it branches from, whose moves after it become the variation),
 deletes it with those branching from it, or copies it. *Copy PGN* writes the variations, and those of an opened PGN
-file are read (comments, numbers, annotations and results skipped; a move that cannot be played ends its variation
+file are read, nested to any depth, with their comments and symbols (a move that cannot be played ends its variation
 only). The graph, the analyses and the judgements are the game's; on a variation, the graph marks where it leaves the
 game.
 

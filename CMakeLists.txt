@@ -185,6 +185,27 @@ if(FCG_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
+# Study layer: games and their PGN, databases (no UI)
+# ---------------------------------------------------------------------------
+
+file(GLOB FCG_STUDY_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/src/study/*.cpp)
+add_library(fcg_study STATIC ${FCG_STUDY_SOURCES})
+target_compile_features(fcg_study PUBLIC cxx_std_20)
+target_include_directories(fcg_study PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/study/src)
+target_compile_options(fcg_study PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_study PUBLIC fcg_tournament)
+
+if(FCG_BUILD_TESTS)
+    file(GLOB FCG_STUDY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/tests/*.cpp)
+    add_executable(fcg-study-tests ${FCG_STUDY_TEST_SOURCES})
+    target_include_directories(fcg-study-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests)
+    target_link_libraries(fcg-study-tests PRIVATE fcg_study)
+    if(WIN32)
+        target_link_options(fcg-study-tests PRIVATE -static -static-libgcc -static-libstdc++)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # GUI
 # ---------------------------------------------------------------------------
 
@@ -493,7 +514,7 @@ if(FCG_BUILD_GUI)
     )
     target_compile_options(fcg_lib PRIVATE -Wall -Wextra)
     target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}${FCG_VERSION_SUFFIX}")
-    target_link_libraries(fcg_lib PUBLIC fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2 tinygettext fcg_md4c)
+    target_link_libraries(fcg_lib PUBLIC fcg_study fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2 tinygettext fcg_md4c)
     if(WIN32)
         target_link_libraries(fcg_lib PUBLIC ws2_32)
     endif()
@@ -554,8 +575,9 @@ if(FCG_BUILD_GUI)
     if(FCG_FUZZ)
         # What others send the program: a web request, the tunnel server's text, a TLCS datagram, a PGN book (to
         # Polyglot), an EPD book or suite; and what fastchess' own readers take of them through the program: a PGN
-        # book, an engine's info line. Each target fuzz_<name> from fuzz/<name>.cpp, its seeds in fuzz/corpus/<name>.
-        foreach(name web_request tunnel_text tlcs_message pgn_book epd_book app_pgn engine_info)
+        # book, an engine's info line; and a game's PGN as the study layer reads and writes it. Each target fuzz_<name>
+        # from fuzz/<name>.cpp, its seeds in fuzz/corpus/<name>.
+        foreach(name web_request tunnel_text tlcs_message pgn_book epd_book app_pgn engine_info pgn_reader)
             add_executable(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
                                         ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
             target_link_libraries(fuzz_${name} PRIVATE fcg_lib)
@@ -569,7 +591,7 @@ endif()
 if(FCG_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
-        set(FCG_TEST_PROGRAMS fcg-tournament-tests)
+        set(FCG_TEST_PROGRAMS fcg-tournament-tests fcg-study-tests)
         if(FCG_BUILD_GUI)
             list(PREPEND FCG_TEST_PROGRAMS fastchess-gui-tests)
         endif()

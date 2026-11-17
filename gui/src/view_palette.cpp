@@ -441,6 +441,10 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         page_ = Page::Board;
         pasteOnBoard();
     });
+    add(TR("Save the game as PGN…"), TR("Board"), [this] {
+        page_ = Page::Board;
+        saveBoardPgn();
+    });
     add(TR("Edit the position"), TR("Board"), [this] {
         page_ = Page::Board;
         openPositionEditor();

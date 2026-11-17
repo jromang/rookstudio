@@ -281,7 +281,10 @@ std::vector<std::unique_ptr<ByteSource>> openSources(const fs::path& file) {
         in.read(reinterpret_cast<char*>(magic.data()), magic.size());
     }
     std::vector<std::unique_ptr<ByteSource>> out;
-    if (le(magic.data(), 4) == 0xFD2FB528) {
+    // A zstd frame, or a skippable frame before one: Lichess's files begin with one (pzstd's, which gives the
+    // size of each frame for decoding them in parallel).
+    const auto first = le(magic.data(), 4);
+    if (first == 0xFD2FB528 || (first & 0xFFFFFFF0) == 0x184D2A50) {
         out.push_back(std::make_unique<ZstdSource>(file));
     } else if (magic[0] == 0x1F && magic[1] == 0x8B) {
         out.push_back(std::make_unique<InflateSource>(file, file.filename().string(), false, 0, ~uint64_t{0}));

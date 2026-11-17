@@ -157,7 +157,10 @@ TEST_CASE("import: the same games whatever the workers, the pieces and the compr
             CHECK(summaries(importFile(data("games.pgn"), threads, piece).games) == expected);
         }
     }
-    for (const std::string name : {"games.pgn.zst", "games.pgn.gz", "games.zip", "stored.zip"}) {
+    // games-frames.pgn.zst: two frames, each after a skippable frame giving its size, as pzstd writes them (and
+    // Lichess's monthly files are).
+    for (const std::string name :
+         {"games.pgn.zst", "games-frames.pgn.zst", "games.pgn.gz", "games.zip", "stored.zip"}) {
         CAPTURE(name);
         const auto other = importFile(data(name), 4);
         CHECK(other.report.error.empty());

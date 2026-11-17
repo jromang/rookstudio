@@ -59,4 +59,33 @@ Searched searched(const Position& pos, const EngineLine& line) {
     return out;
 }
 
+Standing standingOf(double expected) noexcept {
+    if (expected < 10.0) return Standing::Lost;
+    if (expected < 30.0) return Standing::ClearlyWorse;
+    if (expected < 45.0) return Standing::SlightlyWorse;
+    if (expected <= 55.0) return Standing::Balanced;
+    if (expected <= 70.0) return Standing::SlightlyBetter;
+    if (expected <= 90.0) return Standing::ClearlyBetter;
+    return Standing::Winning;
+}
+
+uint8_t positionNag(double white_expected) noexcept {
+    switch (standingOf(white_expected)) {
+        case Standing::Balanced:
+            return 10;
+        case Standing::SlightlyBetter:
+            return 14;
+        case Standing::SlightlyWorse:
+            return 15;
+        case Standing::ClearlyBetter:
+            return 16;
+        case Standing::ClearlyWorse:
+            return 17;
+        case Standing::Winning:
+            return 18;
+        default:
+            return 19;
+    }
+}
+
 }  // namespace fcg::commentary

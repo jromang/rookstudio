@@ -50,6 +50,13 @@ enum class Phase : uint8_t { Opening, Middlegame, Endgame };
 
 enum class Judgment : uint8_t { Inaccuracy, Mistake, Blunder };
 
+// How a side stands, from its expected score: the seven steps annotators tell apart.
+enum class Standing : uint8_t { Lost, ClearlyWorse, SlightlyWorse, Balanced, SlightlyBetter, ClearlyBetter, Winning };
+// From the expected score in percent of the side described.
+[[nodiscard]] Standing standingOf(double expected) noexcept;
+// The position symbol White's expected score deserves (=, ⩲, ±, +− and their mirrors), by the same steps.
+[[nodiscard]] uint8_t positionNag(double white_expected) noexcept;
+
 // The review's verdict on one move.
 struct MoveReport {
     Color mover = Color::White;
@@ -76,6 +83,8 @@ struct MoveReport {
     bool plan = false;
 
     [[nodiscard]] double loss() const noexcept { return win_before > win_after ? win_before - win_after : 0.0; }
+    // A move worth a word: a mistake, an only move, a turning point or a plan.
+    [[nodiscard]] bool isNotable() const noexcept { return judgment.has_value() || only_move || key || plan; }
 };
 
 }  // namespace fcg::commentary

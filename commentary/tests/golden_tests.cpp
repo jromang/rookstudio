@@ -1,6 +1,7 @@
 // The port held to the Rust prototype on its held-out cases: for each move, what its briefs list (the position, the
 // move in each language's notation, the facts the move achieves, what punishes it, what the better move would have
-// done, the template comment) must come out the same. See data/README.md for how the reference files were made.
+// done, the template comment, the prompt its language model gets) must come out the same. See data/README.md for how
+// the reference files were made.
 //
 // FCG_GOLDEN_CASES and FCG_GOLDEN_BRIEFS point the tests at a larger corpus kept out of the repository, made the same
 // way: a local check of the branches the held-out cases do not reach.
@@ -17,10 +18,12 @@
 
 #include <json.hpp>
 
+#include <commentary/brief.hpp>
 #include <commentary/case.hpp>
 #include <commentary/comment.hpp>
 #include <commentary/gather.hpp>
 #include <commentary/notation.hpp>
+#include <commentary/openings.hpp>
 #include <study/sources.hpp>
 
 using namespace fcg::commentary;
@@ -48,7 +51,7 @@ void eachLine(const fs::path& file, Each each) {
 }
 
 // What a brief of the prototype says about a move, in one language.
-struct Brief {
+struct Reference {
     std::string fen, played, prompt;
     std::optional<std::string> templ;
     std::vector<std::string> achieves, punished_by, missed;
@@ -57,9 +60,9 @@ struct Brief {
 struct Corpus {
     bool held_out = true;  // the corpus in the repository
     std::vector<Case> cases;
-    std::map<std::pair<std::string, std::string>, Brief> briefs;  // by case id and language code
+    std::map<std::pair<std::string, std::string>, Reference> briefs;  // by case id and language code
 
-    const Brief& brief(const std::string& id, const std::string& lang) const {
+    const Reference& brief(const std::string& id, const std::string& lang) const {
         const auto it = briefs.find({id, lang});
         REQUIRE_MESSAGE(it != briefs.end(), "no brief for " << id << " (" << lang << ")");
         return it->second;
@@ -75,7 +78,7 @@ const Corpus& goldenCorpus() {
         eachLine(out.held_out ? data("cases-heldout.jsonl.zst") : fs::path(cases),
                  [&](const nlohmann::json& j) { out.cases.push_back(Case::fromJson(j)); });
         eachLine(out.held_out ? data("briefs-heldout.jsonl.zst") : fs::path(briefs), [&](const nlohmann::json& j) {
-            Brief b;
+            Reference b;
             b.fen         = j.at("fen").get<std::string>();
             b.played      = j.at("played").get<std::string>();
             b.prompt      = j.at("prompt").get<std::string>();
@@ -178,6 +181,34 @@ TEST_CASE("golden: the comments the prototype's templates write on its held-out 
     }
     for (const auto& [code, n] : counts)
         MESSAGE(code << ": " << n.first << " comments compared, " << n.second << " differ");
+    CHECK(counts["en"].second == 0);
+    CHECK(counts["fr"].second == 0);
+}
+
+TEST_CASE("golden: the prompts the prototype gives its language model on its held-out cases") {
+    const auto& corpus = goldenCorpus();
+    std::map<std::string, std::pair<int, int>> counts;  // per language: compared, wrong
+    for (const auto& c : corpus.cases) {
+        std::string error;
+        // The opening names, as the prototype's tool gives them.
+        const auto replayed = replay(c, &error, &openingName);
+        REQUIRE_MESSAGE(replayed, error);
+        const auto ctx = replayed->context();
+        for (const auto& [lang, code, letters] : LANGUAGES) {
+            const auto& b           = corpus.brief(c.id, code);
+            const auto ours         = Brief(ctx, lang, letters).prompt;
+            auto& [compared, wrong] = counts[code];
+            ++compared;
+            if (ours == b.prompt) continue;
+            if (++wrong <= 4)
+                FAIL_CHECK(c.id << " (" << code << "), " << moveText(replayed->before, replayed->played, letters)
+                                << ":\n-- ours:\n"
+                                << ours << "\n-- the prototype's:\n"
+                                << b.prompt);
+        }
+    }
+    for (const auto& [code, n] : counts)
+        MESSAGE(code << ": " << n.first << " prompts compared, " << n.second << " differ");
     CHECK(counts["en"].second == 0);
     CHECK(counts["fr"].second == 0);
 }

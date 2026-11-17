@@ -35,7 +35,8 @@ rookstudio-dataset briefs cases-heldout-confirmed.jsonl --out briefs.jsonl --lan
 zstd -19 briefs.jsonl -o briefs-heldout.jsonl.zst
 ```
 
-`golden_tests.cpp` holds the port to them.
+`golden_tests.cpp` holds the port to them: the facts, the template comments, and the prompts, which the port makes with
+the opening names of `commentary/data/openings.tsv` as the prototype's tool does.
 
 A larger corpus made the same way (the prototype's training cases, kept out of the repository) checks the branches the
 held-out cases do not reach:

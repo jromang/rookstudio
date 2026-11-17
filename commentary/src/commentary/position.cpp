@@ -626,6 +626,80 @@ std::optional<Move> Position::parseUci(std::string_view text) const {
     return std::nullopt;
 }
 
+std::optional<Move> Position::parseSan(std::string_view text) const {
+    while (!text.empty() && (text.back() == '+' || text.back() == '#' || text.back() == '!' || text.back() == '?'))
+        text.remove_suffix(1);
+    const auto moves = legalMoves();
+    const auto one   = [&](auto matches) -> std::optional<Move> {
+        std::optional<Move> found;
+        for (const auto& m : moves) {
+            if (!matches(m)) continue;
+            if (found) return std::nullopt;
+            found = m;
+        }
+        return found;
+    };
+    if (text == "O-O" || text == "O-O-O") {
+        const auto side = text.size() == 3 ? CastlingSide::KingSide : CastlingSide::QueenSide;
+        return one([&](const Move& m) { return m.isCastle() && m.castlingSide() == side; });
+    }
+    const auto role_of = [](char c) -> std::optional<Role> {
+        switch (c) {
+            case 'N':
+                return Role::Knight;
+            case 'B':
+                return Role::Bishop;
+            case 'R':
+                return Role::Rook;
+            case 'Q':
+                return Role::Queen;
+            case 'K':
+                return Role::King;
+            default:
+                return std::nullopt;
+        }
+    };
+    Role role = Role::Pawn;
+    if (!text.empty() && role_of(text.front())) {
+        role = *role_of(text.front());
+        text.remove_prefix(1);
+    }
+    std::optional<Role> promotion;
+    if (const auto eq = text.find('='); eq != std::string_view::npos) {
+        if (eq + 2 != text.size() || !role_of(text[eq + 1])) return std::nullopt;
+        promotion = role_of(text[eq + 1]);
+        text      = text.substr(0, eq);
+    } else if (role == Role::Pawn && !text.empty() && role_of(text.back())) {
+        promotion = role_of(text.back());
+        text.remove_suffix(1);
+    }
+    if (text.size() < 2) return std::nullopt;
+    const char f = text[text.size() - 2], r = text[text.size() - 1];
+    if (f < 'a' || f > 'h' || r < '1' || r > '8') return std::nullopt;
+    const auto to = square(static_cast<File>(f - 'a'), static_cast<Rank>(r - '1'));
+    text.remove_suffix(2);
+    bool capture = false;
+    if (!text.empty() && text.back() == 'x') {
+        capture = true;
+        text.remove_suffix(1);
+    }
+    std::optional<File> from_file;
+    std::optional<Rank> from_rank;
+    for (const char c : text) {
+        if (c >= 'a' && c <= 'h' && !from_file && !from_rank)
+            from_file = static_cast<File>(c - 'a');
+        else if (c >= '1' && c <= '8' && !from_rank)
+            from_rank = static_cast<Rank>(c - '1');
+        else
+            return std::nullopt;
+    }
+    return one([&](const Move& m) {
+        return !m.isCastle() && m.role() == role && m.to() == to && m.promotion() == promotion &&
+               m.isCapture() == capture && (!from_file || fileOf(m.from()) == *from_file) &&
+               (!from_rank || rankOf(m.from()) == *from_rank);
+    });
+}
+
 std::string Position::san(const Move& m) const {
     if (m.isCastle()) return m.castlingSide() == CastlingSide::KingSide ? "O-O" : "O-O-O";
     std::string out;

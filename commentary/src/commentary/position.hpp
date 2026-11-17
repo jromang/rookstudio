@@ -318,6 +318,9 @@ class Position {
     [[nodiscard]] std::string fen() const;
     // A move in UCI ("e2e4", "e7e8q", castling "e1g1" or "e1h1"): the legal move it names, if one.
     [[nodiscard]] std::optional<Move> parseUci(std::string_view uci) const;
+    // A move in SAN, with English piece letters ("Nbd7", "exd5", "e8=Q", "O-O"), its check sign or marks allowed: the
+    // one legal move it names, none when it names none or several (shakmaty's San::to_move).
+    [[nodiscard]] std::optional<Move> parseSan(std::string_view san) const;
     // SAN, with "+" or "#" after a move that checks or mates (shakmaty's SanPlus).
     [[nodiscard]] std::string sanPlus(const Move& m) const;
     // SAN without them.

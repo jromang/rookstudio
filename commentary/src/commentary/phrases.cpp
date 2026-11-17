@@ -6,6 +6,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include "formation.hpp"
+#include "text.hpp"
 
 namespace fcg::commentary {
 
@@ -20,48 +21,6 @@ const char* frenchKind(phrases_detail::Kind kind, uint8_t n);
 const Phrasebook& phrasebook(Lang lang) { return lang == Lang::Fr ? frenchPhrasebook() : englishPhrasebook(); }
 
 namespace {
-
-// One code point of UTF-8 text from `at`, and its length.
-std::pair<char32_t, std::size_t> decode(std::string_view s, std::size_t at = 0) {
-    const auto c = static_cast<unsigned char>(s[at]);
-    if (c < 0x80) return {c, 1};
-    if ((c >> 5) == 6 && at + 1 < s.size())
-        return {static_cast<char32_t>(((c & 0x1F) << 6) | (static_cast<unsigned char>(s[at + 1]) & 0x3F)), 2};
-    if ((c >> 4) == 14 && at + 2 < s.size())
-        return {static_cast<char32_t>(((c & 0x0F) << 12) | ((static_cast<unsigned char>(s[at + 1]) & 0x3F) << 6) |
-                                      (static_cast<unsigned char>(s[at + 2]) & 0x3F)),
-                3};
-    return {c, 1};
-}
-
-std::string encode(char32_t c) {
-    std::string out;
-    if (c < 0x80) {
-        out += static_cast<char>(c);
-    } else if (c < 0x800) {
-        out += static_cast<char>(0xC0 | (c >> 6));
-        out += static_cast<char>(0x80 | (c & 0x3F));
-    } else {
-        out += static_cast<char>(0xE0 | (c >> 12));
-        out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
-        out += static_cast<char>(0x80 | (c & 0x3F));
-    }
-    return out;
-}
-
-char32_t upper(char32_t c) {
-    if (c >= 'a' && c <= 'z') return c - 32;
-    if (c >= 0xE0 && c <= 0xFE && c != 0xF7) return c - 0x20;
-    if (c == 0x153) return 0x152;  // œ
-    return c;
-}
-
-char32_t lower(char32_t c) {
-    if (c >= 'A' && c <= 'Z') return c + 32;
-    if (c >= 0xC0 && c <= 0xDE && c != 0xD7) return c + 0x20;
-    if (c == 0x152) return 0x153;
-    return c;
-}
 
 std::array<std::pair<phrases_detail::Kind, uint8_t>, 5> wonItems(const Trade& t, uint8_t exchanges) {
     using phrases_detail::Kind;
@@ -80,14 +39,14 @@ std::array<std::pair<phrases_detail::Kind, uint8_t>, 5> gaveItems(const Trade& t
 
 std::string capitalize(std::string text) {
     if (text.empty()) return text;
-    const auto [c, n] = decode(text);
-    return encode(upper(c)) + text.substr(n);
+    const auto [c, n] = text::decode(text);
+    return text::encode(text::upper(c)) + text.substr(n);
 }
 
 std::string lowerFirst(std::string_view sentence) {
     if (sentence.empty()) return {};
-    const auto [c, n] = decode(sentence);
-    return encode(lower(c)) + std::string(sentence.substr(n));
+    const auto [c, n] = text::decode(sentence);
+    return text::encode(text::lower(c)) + std::string(sentence.substr(n));
 }
 
 const char* sideName(Color color, Lang lang) {

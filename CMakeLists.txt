@@ -248,7 +248,15 @@ endif()
 # ---------------------------------------------------------------------------
 
 file(GLOB FCG_COMMENTARY_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src/commentary/*.cpp)
-add_library(fcg_commentary STATIC ${FCG_COMMENTARY_SOURCES})
+# The opening names (Lichess's chess-openings, CC0), embedded as a byte array.
+set(FCG_OPENINGS_CPP ${CMAKE_CURRENT_BINARY_DIR}/generated/lichess_openings.cpp)
+add_custom_command(
+    OUTPUT ${FCG_OPENINGS_CPP}
+    COMMAND ${CMAKE_COMMAND} -DIN=${CMAKE_CURRENT_SOURCE_DIR}/commentary/data/openings.tsv -DOUT=${FCG_OPENINGS_CPP}
+            -DSYMBOL=lichess_openings -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_binary.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/data/openings.tsv ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_binary.cmake
+    COMMENT "Embedding the opening names")
+add_library(fcg_commentary STATIC ${FCG_COMMENTARY_SOURCES} ${FCG_OPENINGS_CPP})
 target_compile_features(fcg_commentary PUBLIC cxx_std_20)
 target_include_directories(fcg_commentary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src)
 target_compile_options(fcg_commentary PRIVATE -Wall -Wextra)

@@ -18,3 +18,21 @@ shakmaty-ref < tools/port/shakmaty-ref/positions.txt > hand.jsonl
 shakmaty-ref < games.txt > games.jsonl   # then each position kept once (by its board, turn, rights and en passant)
 cat hand.jsonl games.jsonl | zstd -19 > shakmaty-positions.jsonl.zst
 ```
+
+## cases-heldout.jsonl.zst, briefs-heldout.jsonl.zst
+
+The prototype's held-out commentary cases: 294 moves of Lichess games of January 2013 (CC0), each with what its facts
+are computed from (the moves from the start, the review's verdict, the engine's lines before and after the move, and
+the answers the engine gave to the questions the detectors asked it), as `rookstudio-dataset cases` and `confirm`
+wrote them (`cases-heldout-confirmed.jsonl`). No human comment, no theory text.
+
+The briefs are what the prototype (`jromang/rookstudio-rust` at 69471b2) makes of each case, in English and in French:
+the position, the move in each language's notation, the facts it achieves, what punishes it, what the better move would
+have done, the prompt its language model gets and the comment its templates write:
+
+```sh
+rookstudio-dataset briefs cases-heldout-confirmed.jsonl --out briefs.jsonl --lang both   # no tablebases
+zstd -19 briefs.jsonl -o briefs-heldout.jsonl.zst
+```
+
+`golden_tests.cpp` holds the port to them.

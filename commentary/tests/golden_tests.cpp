@@ -8,6 +8,8 @@
 
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <map>
@@ -277,14 +279,19 @@ TEST_CASE("golden: the review of each case's move, made again from the engine li
         };
         const auto theirs_judgment =
             r.contains("judgment") ? std::optional<std::string>(r.at("judgment").get<std::string>()) : std::nullopt;
-        if (again.win_before != r.at("win_before").get<double>()) differ.push_back("win_before");
-        if (again.win_after != r.at("win_after").get<double>()) differ.push_back("win_after");
-        if (again.accuracy != r.at("accuracy").get<double>()) differ.push_back("accuracy");
+        // To the bit with glibc, as the prototype ran; within a trillionth elsewhere, whose exp() may differ in the
+        // last bit (mingw-w64).
+        const auto same = [](double ours, double theirs) {
+            return std::abs(ours - theirs) <= 1e-12 * std::max(1.0, std::abs(theirs));
+        };
+        if (!same(again.win_before, r.at("win_before").get<double>())) differ.push_back("win_before");
+        if (!same(again.win_after, r.at("win_after").get<double>())) differ.push_back("win_after");
+        if (!same(again.accuracy, r.at("accuracy").get<double>())) differ.push_back("accuracy");
         if (again.cp_loss != r.at("cp_loss").get<int32_t>()) differ.push_back("cp_loss");
         if (judgment_name(again_judgment) != theirs_judgment) differ.push_back("judgment");
         if (again.played_best != r.at("played_best").get<bool>()) differ.push_back("played_best");
         if (again.only_move != r.at("only_move").get<bool>()) differ.push_back("only_move");
-        if (again.only_gap != r.at("only_gap").get<double>()) differ.push_back("only_gap");
+        if (!same(again.only_gap, r.at("only_gap").get<double>())) differ.push_back("only_gap");
         if (again.key != r.at("key").get<bool>()) differ.push_back("key");
         ++compared;
         if (differ.empty()) continue;

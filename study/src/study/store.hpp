@@ -53,6 +53,9 @@ struct HeaderRow {
 };
 
 [[nodiscard]] uint32_t packDate(std::string_view pgn_date);
+// A game's key for finding duplicates: a hash of its event, site, round, players, date, start, moves and result.
+// Two rounds of a tournament with the same moves are two games.
+[[nodiscard]] uint64_t duplicateKey(const ImportedGame& game);
 [[nodiscard]] std::string dateText(uint32_t date);  // "2026.11.17", "1972.??.??"
 [[nodiscard]] uint16_t packEco(std::string_view eco);
 [[nodiscard]] std::string ecoText(uint16_t eco);
@@ -64,7 +67,15 @@ class Snapshot {
     [[nodiscard]] uint64_t games() const noexcept { return games_; }
     [[nodiscard]] uint64_t generation() const noexcept { return generation_; }
     [[nodiscard]] HeaderRow row(GameId id) const;
+    // The ids of a game's names, for the filters and sorts that read names once.
+    struct NameIds {
+        uint32_t white = 0, black = 0, event = 0, site = 0, round = 0;
+    };
+    [[nodiscard]] NameIds rowIds(GameId id) const;
     [[nodiscard]] std::span<const uint8_t> moves(GameId id) const;
+    // What tells a game from another: its event, site, round, players, date, start, moves and result
+    // (duplicateKey()).
+    [[nodiscard]] uint64_t key(GameId id) const;
     // Everything kept of a game: its tags in their order of import less those of the columns (which come first),
     // its moves, its text when annotated or damaged, its clocks and evaluations.
     [[nodiscard]] ImportedGame game(GameId id) const;
@@ -92,9 +103,14 @@ class Database {
     static std::shared_ptr<Database> open(const std::filesystem::path& dir);
 
     [[nodiscard]] std::shared_ptr<const Snapshot> snapshot() const;
+    struct Appended {
+        uint64_t added      = 0;
+        uint64_t duplicates = 0;  // left out: a game it has, the same in all that duplicateKey() reads
+    };
     // The games added, in segments of at most SEGMENT_GAMES, committed together: after a crash the database has all
-    // of them or none. Throws std::runtime_error when the disk refuses; the database is then as before.
-    void append(std::vector<ImportedGame> games);
+    // of them or none. A game the database already has, or the batch had before it, is left out unless
+    // `keep_duplicates`. Throws std::runtime_error when the disk refuses; the database is then as before.
+    Appended append(std::vector<ImportedGame> games, bool keep_duplicates = false);
     [[nodiscard]] const std::filesystem::path& folder() const noexcept { return dir_; }
 
     explicit Database(const std::filesystem::path& dir);  // use create() or open()
@@ -108,7 +124,9 @@ class Database {
     mutable std::mutex mutex_;
     std::shared_ptr<const Snapshot> current_;
     std::unordered_map<std::string, uint32_t> name_ids_;  // filled at the first append
-    bool names_indexed_    = false;
+    bool names_indexed_ = false;
+    std::vector<uint64_t> known_keys_;  // the games' keys, sorted, filled at the first append that skips duplicates
+    bool keys_indexed_     = false;
     uint64_t next_segment_ = 1;
 };
 

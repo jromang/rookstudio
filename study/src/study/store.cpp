@@ -50,6 +50,7 @@ enum Column : int {
     ECO,
     FLAGS,   // u16
     RESULT,  // u8
+    KEY,     // u64: duplicateKey()
     MOVES,   // u64, n + 1 offsets
     ANNEX,   // u64, n + 1 offsets
     COLUMNS
@@ -62,6 +63,7 @@ std::size_t columnBytes(int column, std::size_t n) {
     if (column <= PLIES) return 4 * n;
     if (column <= FLAGS) return 2 * n;
     if (column == RESULT) return n;
+    if (column == KEY) return 8 * n;
     return 8 * (n + 1);
 }
 
@@ -246,6 +248,31 @@ std::string ecoText(uint16_t eco) {
 
 void setCommitFaultHook(std::function<void(std::string_view)> hook) { g_fault_hook = std::move(hook); }
 
+uint64_t duplicateKey(const ImportedGame& game) {
+    // FNV-1a over the parts, each ended by a byte no text holds.
+    uint64_t h     = 0xcbf29ce484222325ULL;
+    const auto mix = [&](std::string_view bytes) {
+        for (const unsigned char c : bytes) h = (h ^ c) * 0x100000001b3ULL;
+        h = (h ^ 0xFF) * 0x100000001b3ULL;
+    };
+    const auto tag = [&](std::string_view name) -> std::string_view {
+        for (const auto& [k, v] : game.tags) {
+            if (k == name) return v;
+        }
+        return {};
+    };
+    mix(tag("Event"));
+    mix(tag("Site"));
+    mix(tag("Round"));
+    mix(tag("White"));
+    mix(tag("Black"));
+    mix(tag("Date"));
+    mix(game.start_fen);
+    mix(std::string_view(reinterpret_cast<const char*>(game.moves.data()), game.moves.size()));
+    mix(std::string_view(&game.result, 1));
+    return h;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 
 std::pair<const Segment*, std::size_t> Snapshot::locate(GameId id) const {
@@ -281,6 +308,17 @@ HeaderRow Snapshot::row(GameId id) const {
     row.flags        = segment->value<uint16_t>(FLAGS, i);
     row.result       = static_cast<char>(segment->value<uint8_t>(RESULT, i));
     return row;
+}
+
+Snapshot::NameIds Snapshot::rowIds(GameId id) const {
+    const auto [segment, i] = locate(id);
+    return {segment->value<uint32_t>(WHITE, i), segment->value<uint32_t>(BLACK, i), segment->value<uint32_t>(EVENT, i),
+            segment->value<uint32_t>(SITE, i), segment->value<uint32_t>(ROUND, i)};
+}
+
+uint64_t Snapshot::key(GameId id) const {
+    const auto [segment, i] = locate(id);
+    return segment->value<uint64_t>(KEY, i);
 }
 
 std::span<const uint8_t> Snapshot::moves(GameId id) const {
@@ -436,9 +474,32 @@ uint32_t Database::nameId(const std::string& name, std::vector<std::string>& add
     return id;
 }
 
-void Database::append(std::vector<ImportedGame> games) {
-    if (games.empty()) return;
+Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates) {
+    Appended appended;
     std::lock_guard lock(mutex_);
+    if (!keep_duplicates) {
+        if (!keys_indexed_) {
+            known_keys_.reserve(current_->games_);
+            for (GameId id = 0; id < current_->games_; ++id) known_keys_.push_back(current_->key(id));
+            std::sort(known_keys_.begin(), known_keys_.end());
+            keys_indexed_ = true;
+        }
+        std::vector<uint64_t> batch;
+        std::size_t kept = 0;
+        for (std::size_t i = 0; i < games.size(); ++i) {
+            const auto key = duplicateKey(games[i]);
+            if (std::binary_search(known_keys_.begin(), known_keys_.end(), key) ||
+                std::find(batch.begin(), batch.end(), key) != batch.end()) {
+                ++appended.duplicates;
+                continue;
+            }
+            batch.push_back(key);
+            if (kept != i) games[kept] = std::move(games[i]);
+            ++kept;
+        }
+        games.resize(kept);
+    }
+    if (games.empty()) return appended;
     if (!names_indexed_) {
         for (uint32_t id = 0; id < current_->names_; ++id) name_ids_.emplace(std::string(current_->name(id)), id);
         names_indexed_ = true;
@@ -516,6 +577,7 @@ void Database::append(std::vector<ImportedGame> games) {
                 if (!g.evals.empty()) flags |= GAME_EVALS;
                 put(FLAGS, k, flags);
                 put(RESULT, k, static_cast<uint8_t>(g.result));
+                put(KEY, k, duplicateKey(g));
                 put(MOVES, k, static_cast<uint64_t>(moves.size()));
                 moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
                 put(ANNEX, k, static_cast<uint64_t>(annex.size()));
@@ -604,6 +666,12 @@ void Database::append(std::vector<ImportedGame> games) {
     }
     next_segment_ += made.size();
     current_ = std::move(snap);
+    if (keys_indexed_) {
+        for (const auto& g : games) known_keys_.push_back(duplicateKey(g));
+        std::sort(known_keys_.begin(), known_keys_.end());
+    }
+    appended.added = games.size();
+    return appended;
 }
 
 }  // namespace fcg::study

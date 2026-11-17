@@ -115,8 +115,15 @@ TEST_CASE("store: a reader's snapshot outlives the commits after it; names share
     const auto first = db->snapshot();
     db->append(std::vector<ImportedGame>(games.begin() + 60, games.end()));
     const auto middle = db->snapshot();
-    db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 6));
+    // Six games it has already: left out, unless kept on purpose.
+    const auto again = db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 6));
+    CHECK(again.added == 0);
+    CHECK(again.duplicates == 6);
+    CHECK(db->snapshot()->games() == 120);
+    const auto kept = db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 6), true);
+    CHECK(kept.added == 6);
     const auto last = db->snapshot();
+    CHECK(last->key(120) == last->key(0));
     CHECK(first->games() == 60);
     CHECK(last->games() == 126);
     CHECK(last->generation() == first->generation() + 2);

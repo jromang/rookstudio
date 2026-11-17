@@ -1,13 +1,8 @@
 name: Fuzzing
 
+# A private repository counts its minutes: the fuzzers run once a week and by hand (gh workflow run fuzz.yml -R
+# jromang/rookstudio), not at every push, until the repository is public.
 on:
-  push:
-    branches: ["gui"]
-    # Not for a change of the documentation alone.
-    paths: ["**", "!**.md", "!docs/**"]
-  pull_request:
-    branches: ["gui"]
-    paths: ["**", "!**.md", "!docs/**"]
   schedule:
     - cron: "11 4 * * 3"
   workflow_dispatch:

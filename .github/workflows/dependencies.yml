@@ -2,9 +2,9 @@ name: Dependencies
 
 on:
   push:
-    branches: ["gui"]
+    branches: ["main"]
   pull_request:
-    branches: ["gui"]
+    branches: ["main"]
   schedule:
     # Weekly: new vulnerabilities are published for unchanged pins too.
     - cron: "41 4 * * 1"

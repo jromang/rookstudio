@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   secrets:
+    # From the day the repository is public (Coverity Scan is for open source).
+    if: ${{ !github.event.repository.private }}
     name: Coverity Scan's secrets
     runs-on: ubuntu-latest
     outputs:

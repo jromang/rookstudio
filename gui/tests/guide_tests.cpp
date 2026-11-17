@@ -11,6 +11,7 @@
 
 #include "guide.hpp"
 #include "markdown.hpp"
+#include "strict_translations.hpp"
 #include "zip.hpp"
 
 using namespace fcg;
@@ -165,19 +166,30 @@ TEST_CASE("guide: every translation is complete and up to date with the English 
         REQUIRE(tr);
         std::set<std::string> anchors;
         for (const auto& h : tr->headings) anchors.insert(h.anchor);
-        int last = -1;
+        int last = -1, pending = 0;
+        const bool strict = test::strictTranslations();
         for (std::size_t i = 1; i < en->headings.size(); ++i) {
             const auto& e = en->headings[i];
             CAPTURE(e.id);
+            // A section missing or stale is shown in English (the next test case); it fails only when every
+            // translation must be there (strict_translations.hpp).
             const int t = tr->byId(e.id);
-            CHECK(t >= 0);
-            if (t < 0) continue;
+            if (t < 0) {
+                ++pending;
+                if (strict) CHECK(t >= 0);
+                continue;
+            }
             const auto& h = tr->headings[static_cast<std::size_t>(t)];
             CHECK(t > last);  // in the English order
             last = t;
             CHECK(h.level == e.level);
             // Made from the English text as it is now.
-            CHECK(h.stamp == guide::hex8(guide::fnv1a(guide::sectionText(en->text, e))));
+            const bool current = h.stamp == guide::hex8(guide::fnv1a(guide::sectionText(en->text, e)));
+            if (!current) {
+                ++pending;
+                if (strict) CHECK(current);
+                continue;
+            }
             CHECK(guide::shown(code, i).fallback == guide::Fallback::None);
             // Commands, files and options as in English.
             const auto en_body = sectionBody(*en, e);
@@ -191,6 +203,7 @@ TEST_CASE("guide: every translation is complete and up to date with the English 
             }
             CHECK(rawTags(tr_body).empty());
         }
+        if (pending > 0) MESSAGE(pending << " sections wait for their translation");
         // No section that is no English one.
         for (std::size_t t = 1; t < tr->headings.size(); ++t) {
             CAPTURE(tr->headings[t].title);

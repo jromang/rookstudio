@@ -4,7 +4,18 @@ cmake_minimum_required(VERSION 3.24)
 # project(), where CMake reads it; nothing elsewhere. A universal binary: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64".
 set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "The oldest macOS version the programs run on")
 
-project(fastchess_gui VERSION 0.6.6 LANGUAGES C CXX)
+project(fastchess_gui VERSION 0.7.0 LANGUAGES C CXX)
+
+# A preview's version carries a suffix (0.7.0-preview.1). Built for a tag, it is read from the tag, whose number must
+# be the project's: a tag v0.7.1-preview.1 on a 0.7.0 tree stops the build.
+set(FCG_VERSION_SUFFIX "" CACHE STRING "Appended to the version the program shows, as -preview.1")
+if(FCG_VERSION_SUFFIX STREQUAL "" AND "$ENV{GITHUB_REF_TYPE}" STREQUAL "tag")
+    if("$ENV{GITHUB_REF_NAME}" MATCHES "^v${PROJECT_VERSION}(-.+)$")
+        set(FCG_VERSION_SUFFIX "${CMAKE_MATCH_1}")
+    elseif(NOT "$ENV{GITHUB_REF_NAME}" STREQUAL "v${PROJECT_VERSION}")
+        message(FATAL_ERROR "The tag $ENV{GITHUB_REF_NAME} does not name version ${PROJECT_VERSION}")
+    endif()
+endif()
 
 option(FCG_BUILD_GUI "Build the fastchess-gui desktop application" ON)
 option(FCG_BUILD_TESTS "Build the fastchess-gui unit tests" ON)
@@ -481,7 +492,7 @@ if(FCG_BUILD_GUI)
         ${qrcodegen_SOURCE_DIR}/cpp
     )
     target_compile_options(fcg_lib PRIVATE -Wall -Wextra)
-    target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}")
+    target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}${FCG_VERSION_SUFFIX}")
     target_link_libraries(fcg_lib PUBLIC fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2 tinygettext fcg_md4c)
     if(WIN32)
         target_link_libraries(fcg_lib PUBLIC ws2_32)

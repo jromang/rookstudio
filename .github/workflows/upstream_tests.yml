@@ -3,10 +3,10 @@ name: Upstream fastchess tests
 # fastchess' own tests, of app/ as vendored: app/ changes only when fastchess is merged in.
 on:
   push:
-    branches: ["gui"]
+    branches: ["main"]
     paths: ["app/**", ".github/workflows/upstream_tests.yml"]
   pull_request:
-    branches: ["gui"]
+    branches: ["main"]
     paths: ["app/**", ".github/workflows/upstream_tests.yml"]
   workflow_dispatch:
 

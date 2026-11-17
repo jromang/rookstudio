@@ -185,6 +185,35 @@ if(FCG_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------------------
+# What the study layer's imports decompress: zstd (decompression only) and zlib (inflate only)
+# ---------------------------------------------------------------------------
+
+include(FetchContent)
+FetchContent_Declare(zstd
+    GIT_REPOSITORY https://github.com/facebook/zstd.git
+    GIT_TAG v1.5.7
+    SOURCE_SUBDIR fcg-no-cmake
+    GIT_SHALLOW TRUE)
+FetchContent_Declare(zlib
+    GIT_REPOSITORY https://github.com/madler/zlib.git
+    GIT_TAG v1.3.2
+    SOURCE_SUBDIR fcg-no-cmake
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(zstd zlib)
+
+# The decoder alone, in C, without its assembly (one source set on every system) or threads.
+file(GLOB FCG_ZSTD_SOURCES ${zstd_SOURCE_DIR}/lib/common/*.c ${zstd_SOURCE_DIR}/lib/decompress/*.c)
+add_library(fcg_zstd STATIC ${FCG_ZSTD_SOURCES})
+target_include_directories(fcg_zstd SYSTEM PUBLIC ${zstd_SOURCE_DIR}/lib)
+target_compile_definitions(fcg_zstd PRIVATE ZSTD_DISABLE_ASM=1 ZSTD_LEGACY_SUPPORT=0 XXH_NAMESPACE=FCG_ZSTD_)
+add_library(fcg_zlib STATIC
+    ${zlib_SOURCE_DIR}/inflate.c ${zlib_SOURCE_DIR}/inftrees.c ${zlib_SOURCE_DIR}/inffast.c
+    ${zlib_SOURCE_DIR}/adler32.c ${zlib_SOURCE_DIR}/crc32.c ${zlib_SOURCE_DIR}/zutil.c)
+target_include_directories(fcg_zlib SYSTEM PUBLIC ${zlib_SOURCE_DIR})
+target_compile_definitions(fcg_zlib PRIVATE Z_PREFIX)
+target_compile_definitions(fcg_zlib INTERFACE Z_PREFIX)
+
+# ---------------------------------------------------------------------------
 # Study layer: games and their PGN, databases (no UI)
 # ---------------------------------------------------------------------------
 
@@ -193,13 +222,15 @@ add_library(fcg_study STATIC ${FCG_STUDY_SOURCES})
 target_compile_features(fcg_study PUBLIC cxx_std_20)
 target_include_directories(fcg_study PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/study/src)
 target_compile_options(fcg_study PRIVATE -Wall -Wextra)
-target_link_libraries(fcg_study PUBLIC fcg_tournament)
+target_link_libraries(fcg_study PUBLIC fcg_tournament PRIVATE fcg_zstd fcg_zlib)
 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_STUDY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/tests/*.cpp)
     add_executable(fcg-study-tests ${FCG_STUDY_TEST_SOURCES})
     target_include_directories(fcg-study-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests)
     target_link_libraries(fcg-study-tests PRIVATE fcg_study)
+    # Its files (compressed games) read from the sources, or from FCG_SOURCE_DIR (the CI's tests on another machine).
+    target_compile_definitions(fcg-study-tests PRIVATE FCG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     if(WIN32)
         target_link_options(fcg-study-tests PRIVATE -static -static-libgcc -static-libstdc++)
     endif()

@@ -102,6 +102,34 @@
     },
     {
       "type": "library",
+      "bom-ref": "fetchcontent:zstd",
+      "name": "zstd",
+      "version": "1.5.7",
+      "description": "Decompression of .zst game files: the decoder alone, in C.",
+      "purl": "pkg:github/facebook/zstd@v1.5.7",
+      "licenses": [{ "expression": "BSD-3-Clause OR GPL-2.0-only" }],
+      "externalReferences": [{ "type": "vcs", "url": "https://github.com/facebook/zstd.git" }],
+      "properties": [
+        { "name": "fastchess-gui:pin", "value": "v1.5.7" },
+        { "name": "fastchess-gui:commit", "value": "f8745da6ff1ad1e7bab384bd1f9d742439278e99" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "fetchcontent:zlib",
+      "name": "zlib",
+      "version": "1.3.2",
+      "description": "Decompression of .gz and .zip game files: inflate alone.",
+      "purl": "pkg:github/madler/zlib@v1.3.2",
+      "licenses": [{ "license": { "id": "Zlib" } }],
+      "externalReferences": [{ "type": "vcs", "url": "https://github.com/madler/zlib.git" }],
+      "properties": [
+        { "name": "fastchess-gui:pin", "value": "v1.3.2" },
+        { "name": "fastchess-gui:commit", "value": "da607da739fa6047df13e66a2af6b8bec7c2a498" }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "fetchcontent:lucide",
       "name": "lucide-static",
       "version": "1.59.0",

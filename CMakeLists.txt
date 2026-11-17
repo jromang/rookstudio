@@ -244,6 +244,29 @@ if(FCG_STUDY_BENCH)
 endif()
 
 # ---------------------------------------------------------------------------
+# Commentary: the assistant's facts, comments and review, ported from the Rust prototype (no UI)
+# ---------------------------------------------------------------------------
+
+file(GLOB FCG_COMMENTARY_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src/commentary/*.cpp)
+add_library(fcg_commentary STATIC ${FCG_COMMENTARY_SOURCES})
+target_compile_features(fcg_commentary PUBLIC cxx_std_20)
+target_include_directories(fcg_commentary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src)
+target_compile_options(fcg_commentary PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_commentary PUBLIC fcg_tournament)
+
+if(FCG_BUILD_TESTS)
+    file(GLOB FCG_COMMENTARY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/tests/*.cpp)
+    add_executable(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES})
+    target_include_directories(fcg-commentary-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests)
+    # fcg_study reads the compressed reference files.
+    target_link_libraries(fcg-commentary-tests PRIVATE fcg_commentary fcg_study)
+    target_compile_definitions(fcg-commentary-tests PRIVATE FCG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    if(WIN32)
+        target_link_options(fcg-commentary-tests PRIVATE -static -static-libgcc -static-libstdc++)
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # GUI
 # ---------------------------------------------------------------------------
 
@@ -629,7 +652,7 @@ endif()
 if(FCG_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
-        set(FCG_TEST_PROGRAMS fcg-tournament-tests fcg-study-tests)
+        set(FCG_TEST_PROGRAMS fcg-tournament-tests fcg-study-tests fcg-commentary-tests)
         if(FCG_BUILD_GUI)
             list(PREPEND FCG_TEST_PROGRAMS fastchess-gui-tests)
         endif()

@@ -96,7 +96,7 @@ jobs:
         # once there make their waits too short). fastchess' own tests run when app/ changes (upstream_tests.yml).
         run: |
           python3 tools/run_tests.py -j $(( $(nproc) * 2 )) build/fastchess-gui-tests build/fcg-tournament-tests \
-            build/fcg-study-tests
+            build/fcg-study-tests build/fcg-commentary-tests
 
       - name: The window drawn without OpenGL
         # SDL's software renderer, what a machine without OpenGL 3.2 gets: the program starts, draws its Settings page
@@ -177,7 +177,8 @@ jobs:
       - name: Build
         run: |
           ccache -z
-          cmake --build build-asan --target fastchess-gui-tests fcg-tournament-tests fcg-study-tests
+          cmake --build build-asan --target fastchess-gui-tests fcg-tournament-tests fcg-study-tests \
+            fcg-commentary-tests
           ccache -s
 
       - name: Compiler cache saved
@@ -202,7 +203,7 @@ jobs:
         run: |
           mkdir -p "${RUNNER_TEMP}/sanitizers"
           python3 tools/run_tests.py -j $(nproc) build-asan/fastchess-gui-tests build-asan/fcg-tournament-tests \
-            build-asan/fcg-study-tests
+            build-asan/fcg-study-tests build-asan/fcg-commentary-tests
 
       - name: Sanitizer reports
         if: always()
@@ -278,6 +279,7 @@ jobs:
             build-win/fastchess-gui-tests.exe
             build-win/fcg-tournament-tests.exe
             build-win/fcg-study-tests.exe
+            build-win/fcg-commentary-tests.exe
             build-win/fcg_random_mover.exe
 
   windows-tests:
@@ -298,7 +300,7 @@ jobs:
           FCG_SOURCE_DIR: ${{ github.workspace }}
         run: >-
           python tools/run_tests.py -j ([int]$env:NUMBER_OF_PROCESSORS * 2) bin\fastchess-gui-tests.exe
-          bin\fcg-tournament-tests.exe bin\fcg-study-tests.exe
+          bin\fcg-tournament-tests.exe bin\fcg-study-tests.exe bin\fcg-commentary-tests.exe
 
   macos:
     name: macOS build and tests
@@ -357,7 +359,7 @@ jobs:
         # Side by side, each test case in a process of its own (tools/run_tests.py), two per processor.
         run: |
           python3 tools/run_tests.py -j $(( $(sysctl -n hw.ncpu) * 2 )) build/fastchess-gui-tests \
-            build/fcg-tournament-tests build/fcg-study-tests
+            build/fcg-tournament-tests build/fcg-study-tests build/fcg-commentary-tests
 
       - name: Package
         run: |

@@ -70,6 +70,8 @@ random_mover
 *.pgn
 *.epd
 UHO*
+# The study layer's test games
+!study/tests/data/*
 
 # Build
 tmp

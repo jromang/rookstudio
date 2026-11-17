@@ -1,0 +1,1139 @@
+[Event "Rated Blitz game 0"]
+[Site "https://lichess.org/abc00000"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player535"]
+[Black "player425"]
+[Result "1-0"]
+[WhiteElo "1821"]
+[BlackElo "1948"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 1"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "1"]
+[White "White297"]
+[Black "Black179"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "2"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 3"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 4"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous259"]
+[Black "Unknown881"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 6"]
+[Site "https://lichess.org/abc00006"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player656"]
+[Black "player867"]
+[Result "1-0"]
+[WhiteElo "2601"]
+[BlackElo "2683"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 7"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "7"]
+[White "White412"]
+[Black "Black141"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "8"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 9"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 10"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous339"]
+[Black "Unknown553"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 12"]
+[Site "https://lichess.org/abc00012"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player655"]
+[Black "player71"]
+[Result "1-0"]
+[WhiteElo "1833"]
+[BlackElo "2039"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 13"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "13"]
+[White "White84"]
+[Black "Black520"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "14"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 15"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 16"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous919"]
+[Black "Unknown771"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 18"]
+[Site "https://lichess.org/abc00018"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player52"]
+[Black "player983"]
+[Result "1-0"]
+[WhiteElo "2177"]
+[BlackElo "1967"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 19"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "19"]
+[White "White594"]
+[Black "Black793"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "20"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 21"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 22"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous198"]
+[Black "Unknown766"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 24"]
+[Site "https://lichess.org/abc00024"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player546"]
+[Black "player567"]
+[Result "1-0"]
+[WhiteElo "1465"]
+[BlackElo "1712"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 25"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "25"]
+[White "White675"]
+[Black "Black315"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "26"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 27"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 28"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous20"]
+[Black "Unknown479"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 30"]
+[Site "https://lichess.org/abc00030"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player486"]
+[Black "player649"]
+[Result "1-0"]
+[WhiteElo "1310"]
+[BlackElo "2692"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 31"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "31"]
+[White "White204"]
+[Black "Black318"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "32"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 33"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 34"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous975"]
+[Black "Unknown983"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 36"]
+[Site "https://lichess.org/abc00036"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player188"]
+[Black "player201"]
+[Result "1-0"]
+[WhiteElo "1714"]
+[BlackElo "1508"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 37"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "37"]
+[White "White693"]
+[Black "Black114"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "38"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 39"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 40"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous708"]
+[Black "Unknown790"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 42"]
+[Site "https://lichess.org/abc00042"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player674"]
+[Black "player414"]
+[Result "1-0"]
+[WhiteElo "2183"]
+[BlackElo "1353"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 43"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "43"]
+[White "White556"]
+[Black "Black88"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "44"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 45"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 46"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous403"]
+[Black "Unknown845"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 48"]
+[Site "https://lichess.org/abc00048"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player568"]
+[Black "player418"]
+[Result "1-0"]
+[WhiteElo "2256"]
+[BlackElo "2483"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 49"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "49"]
+[White "White456"]
+[Black "Black80"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "50"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 51"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 52"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous582"]
+[Black "Unknown532"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 54"]
+[Site "https://lichess.org/abc00054"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player915"]
+[Black "player853"]
+[Result "1-0"]
+[WhiteElo "1873"]
+[BlackElo "2384"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 55"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "55"]
+[White "White174"]
+[Black "Black953"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "56"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 57"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 58"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous96"]
+[Black "Unknown532"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 60"]
+[Site "https://lichess.org/abc00060"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player11"]
+[Black "player197"]
+[Result "1-0"]
+[WhiteElo "2379"]
+[BlackElo "2641"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 61"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "61"]
+[White "White567"]
+[Black "Black784"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "62"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 63"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 64"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous9"]
+[Black "Unknown847"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 66"]
+[Site "https://lichess.org/abc00066"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player771"]
+[Black "player337"]
+[Result "1-0"]
+[WhiteElo "1632"]
+[BlackElo "1306"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 67"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "67"]
+[White "White274"]
+[Black "Black101"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "68"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 69"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 70"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous931"]
+[Black "Unknown840"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 72"]
+[Site "https://lichess.org/abc00072"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player550"]
+[Black "player841"]
+[Result "1-0"]
+[WhiteElo "2755"]
+[BlackElo "1654"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 73"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "73"]
+[White "White889"]
+[Black "Black665"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "74"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 75"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 76"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous366"]
+[Black "Unknown356"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 78"]
+[Site "https://lichess.org/abc00078"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player840"]
+[Black "player999"]
+[Result "1-0"]
+[WhiteElo "2053"]
+[BlackElo "2030"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 79"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "79"]
+[White "White935"]
+[Black "Black8"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "80"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 81"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 82"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous330"]
+[Black "Unknown121"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 84"]
+[Site "https://lichess.org/abc00084"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player552"]
+[Black "player858"]
+[Result "1-0"]
+[WhiteElo "1698"]
+[BlackElo "2212"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 85"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "85"]
+[White "White842"]
+[Black "Black291"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "86"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 87"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 88"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous517"]
+[Black "Unknown999"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 90"]
+[Site "https://lichess.org/abc00090"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player804"]
+[Black "player301"]
+[Result "1-0"]
+[WhiteElo "1370"]
+[BlackElo "2092"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 91"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "91"]
+[White "White449"]
+[Black "Black541"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "92"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 93"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 94"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous823"]
+[Black "Unknown895"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 96"]
+[Site "https://lichess.org/abc00096"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player68"]
+[Black "player632"]
+[Result "1-0"]
+[WhiteElo "1683"]
+[BlackElo "1545"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 97"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "97"]
+[White "White924"]
+[Black "Black729"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "98"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 99"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 100"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous962"]
+[Black "Unknown249"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 102"]
+[Site "https://lichess.org/abc00102"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player515"]
+[Black "player196"]
+[Result "1-0"]
+[WhiteElo "1962"]
+[BlackElo "1214"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 103"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "103"]
+[White "White651"]
+[Black "Black126"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "104"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 105"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 106"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous348"]
+[Black "Unknown929"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 108"]
+[Site "https://lichess.org/abc00108"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player330"]
+[Black "player153"]
+[Result "1-0"]
+[WhiteElo "1506"]
+[BlackElo "2722"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 109"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "109"]
+[White "White273"]
+[Black "Black316"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "110"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 111"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 112"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous920"]
+[Black "Unknown813"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1
+
+[Event "Rated Blitz game 114"]
+[Site "https://lichess.org/abc00114"]
+[Date "2026.11.16"]
+[Round "-"]
+[White "player222"]
+[Black "player219"]
+[Result "1-0"]
+[WhiteElo "2315"]
+[BlackElo "1956"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.17] [%clk 0:03:00] } 1... e5 { [%eval 0.19] [%clk 0:03:00] } 2. Nf3 { [%eval 0.13] [%clk 0:02:59] }
+2... Nc6 { [%eval 0.2] [%clk 0:02:58] } 3. Bc4 { [%eval 0.0] [%clk 0:02:58] } 3... Nd4 { [%eval 0.85] [%clk
+0:02:55] } 4. Nxe5 { [%eval -2.5] [%clk 0:02:50] } 4... Qg5 { [%eval -2.48] [%clk 0:02:54] } 5. Nxf7 { [%eval #-3]
+[%clk 0:02:40] } 1-0
+
+[Event "Training 115"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "115"]
+[White "White860"]
+[Black "Black745"]
+[Result "*"]
+
+{A short game.} 1. e4 {[%csl Gd4][%cal Ge2e4] The most popular.} 1... c5 $1 (1... e5 $10 {Classical.} 2. Nf3
+(2. f4 exf4) 2... Nc6) 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 $146 6. Bg5 *
+
+[Event "Gaia releases"]
+[Site "?"]
+[Date "2026.11.17"]
+[Round "116"]
+[White "Gaia 4.4.3"]
+[Black "Gaia 4.3.2"]
+[Result "1/2-1/2"]
+
+1. d4 {book} d5 {book} 2. c4 {+0.35/18 0.512s} e6 {-0.30/17 0.498s} 3. Nc3 {+0.41/19 0.533s} Nf6
+{-0.28/18 0.501s, Draw by adjudication} 1/2-1/2
+
+[Event "Chess960 117"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "r4k1r/pppppppp/8/8/8/8/PPPPPPPP/R4K1R w HAha - 0 1"]
+[Result "0-1"]
+
+1. O-O O-O 2. Rad1 Rad8 0-1
+
+[Event "Broken 118"]
+[Result "*"]
+
+1. e4 e5 2. Ke3 Nc6 *
+
+[White "Anonymous890"]
+[Black "Unknown583"]
+[Result "0-1"]
+
+1. f3 e5 2. g4 Qh4# 0-1

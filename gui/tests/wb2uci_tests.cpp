@@ -490,7 +490,9 @@ TEST_CASE("wb2uci: a Chess960 tournament of WinBoard engines through the adapter
     setup.tc_inc_s         = 0.1;
     setup.chess960         = true;  // no book: the 960 starting positions
     setup.concurrency_auto = false;
-    setup.concurrency      = 3;
+    // Three, or as many as the machine has (two on the build service's runners of a private repository): fastchess
+    // refuses a concurrency beyond its hardware threads.
+    setup.concurrency      = std::clamp(static_cast<int>(std::thread::hardware_concurrency()), 1, 3);
     setup.affinity         = false;
     setup.notify           = false;
 

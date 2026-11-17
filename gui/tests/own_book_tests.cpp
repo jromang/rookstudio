@@ -3,6 +3,7 @@
 
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -225,7 +226,9 @@ TEST_CASE("own book: a round robin with the same engine twice and a WinBoard eng
     setup.tc_base_s        = 10;
     setup.tc_inc_s         = 0.1;
     setup.concurrency_auto = false;
-    setup.concurrency      = 3;
+    // Three, or as many as the machine has (two on the build service's runners of a private repository): fastchess
+    // refuses a concurrency beyond its hardware threads.
+    setup.concurrency      = std::clamp(static_cast<int>(std::thread::hardware_concurrency()), 1, 3);
     setup.affinity         = false;
     setup.notify           = false;
 

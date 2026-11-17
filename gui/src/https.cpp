@@ -2,9 +2,14 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <optional>
+#include <thread>
+#include <vector>
 
 #include <mbedtls/error.h>
 #include <mbedtls/net_sockets.h>
@@ -13,6 +18,8 @@
 #include <psa/crypto.h>
 
 #include <fmt/include/fmt/format.h>
+
+#include <tour/files.hpp>
 
 #include "net.hpp"
 #include "tls_roots.hpp"
@@ -250,6 +257,30 @@ class Connection {
         }
     }
 
+    // Up to `size` bytes, waiting `wait_ms` at most for the first: their number, 0 once the server closed, -1 when
+    // nothing came in time, -2 on an error. A TLS read that times out leaves the connection unusable, so the socket
+    // is awaited instead, and a record that has begun to come is read whole (within the timeout of open()).
+    int receiveSome(unsigned char* buffer, std::size_t size, uint32_t wait_ms) {
+        if (!tls_) {
+            const int n = mbedtls_net_recv_timeout(&net_, buffer, size, wait_ms);
+            if (n > 0) return n;
+            if (n == 0 || n == MBEDTLS_ERR_NET_CONN_RESET) return 0;
+            return n == MBEDTLS_ERR_SSL_TIMEOUT || n == MBEDTLS_ERR_SSL_WANT_READ ? -1 : -2;
+        }
+        if (mbedtls_ssl_get_bytes_avail(&ssl_) == 0 && mbedtls_ssl_check_pending(&ssl_) == 0) {
+            const int ready = mbedtls_net_poll(&net_, MBEDTLS_NET_POLL_READ, wait_ms);
+            if (ready == 0) return -1;
+            if (ready < 0) return -2;
+        }
+        const int n = mbedtls_ssl_read(&ssl_, buffer, size);
+        if (n > 0) return n;
+        if (n == 0 || n == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || n == MBEDTLS_ERR_NET_CONN_RESET) return 0;
+        if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE ||
+            n == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET)
+            return -1;  // a record that was not data
+        return -2;
+    }
+
    private:
     // Asks the proxy for a tunnel to the server, through which TLS then goes as it would directly, the server's name
     // in its handshake. An error message, empty once the tunnel is open.
@@ -446,6 +477,517 @@ HttpResult httpRequest(const HttpRequest& request) {
     const auto headers = lower(answer.substr(0, headers_end));
     result.body        = answer.substr(headers_end + 4);
     if (headers.find("\r\ntransfer-encoding: chunked") != std::string::npos) result.body = unchunk(result.body);
+    return result;
+}
+
+namespace {
+
+// The URL a redirection's Location names, from the URL that answered.
+std::string resolveLocation(const Url& from, std::string_view location) {
+    if (location.rfind("https://", 0) == 0 || location.rfind("http://", 0) == 0) return std::string(location);
+    const std::string scheme = from.tls ? "https:" : "http:";
+    if (location.rfind("//", 0) == 0) return scheme + std::string(location);
+    const bool usual_port = from.port == (from.tls ? "443" : "80");
+    const auto origin     = scheme + "//" + from.host + (usual_port ? "" : ":" + from.port);
+    if (!location.empty() && location.front() == '/') return origin + std::string(location);
+    auto folder = from.path.substr(0, from.path.find('?'));
+    folder      = folder.substr(0, folder.rfind('/') + 1);
+    return origin + folder + std::string(location);
+}
+
+bool redirection(int status) {
+    return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+}
+
+// One request, its answer given to `stream`; when `follow` and the answer is a redirection that names where to, its
+// target in `location` instead, the body left unread.
+HttpResult streamOnce(const HttpRequest& request, const Url& url, const HttpStream& stream, bool follow,
+                      std::string& location) {
+    HttpResult result;
+    const auto proxy = url.tls ? proxyFor(url.host) : std::nullopt;
+    if (proxy && !proxy->error.empty()) {
+        result.error = proxy->error;
+        return result;
+    }
+    Connection connection;
+    if (auto error = connection.open(url, proxy, request.timeout_s * 1000); !error.empty()) {
+        result.error = std::move(error);
+        return result;
+    }
+    std::string head =
+        fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url.path, url.host, USER_AGENT);
+    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
+    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
+    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
+    if (request.method != "GET" || !request.body.empty()) {
+        head += fmt::format("Content-Length: {}\r\n", request.body.size());
+    }
+    head += "Connection: close\r\n\r\n";
+    if (!connection.send(head) || !connection.send(request.body)) {
+        result.error = "the request could not be sent to " + url.host;
+        return result;
+    }
+
+    const auto idle    = std::chrono::seconds(std::max(1, stream.idle_s));
+    const auto stopped = [&] { return stream.cancel && stream.cancel->load(std::memory_order_relaxed); };
+    auto last          = std::chrono::steady_clock::now();
+    std::vector<unsigned char> buffer(std::size_t{1} << 16);
+
+    // The status line and the headers.
+    std::string answer;
+    std::size_t end = std::string::npos;
+    while (end == std::string::npos) {
+        if (stopped()) {
+            result.error = "cancelled";
+            return result;
+        }
+        const int n = connection.receiveSome(buffer.data(), buffer.size(), 250);
+        if (n > 0) {
+            answer.append(reinterpret_cast<const char*>(buffer.data()), static_cast<std::size_t>(n));
+            last = std::chrono::steady_clock::now();
+            end  = answer.find("\r\n\r\n");
+            if (end == std::string::npos && answer.size() > (std::size_t{1} << 20)) {
+                result.error = "not an HTTP answer from " + url.host;
+                return result;
+            }
+        } else if (n == 0 || n == -2) {
+            result.error = "no answer from " + url.host;
+            return result;
+        } else if (std::chrono::steady_clock::now() - last > idle) {
+            result.error = "no answer from " + url.host + " in time";
+            return result;
+        }
+    }
+    const std::string_view head_in(answer.data(), end);
+    const auto space = head_in.find(' ');
+    int status       = 0;
+    if (head_in.rfind("HTTP/", 0) != 0 || space == std::string_view::npos ||
+        std::from_chars(head_in.data() + space + 1, head_in.data() + head_in.size(), status).ec != std::errc()) {
+        result.error = "not an HTTP answer from " + url.host;
+        return result;
+    }
+    result.status = status;
+    if (follow && redirection(status)) {
+        if (const auto to = httpHeader(head_in, "Location"); to && !to->empty()) {
+            location = resolveLocation(url, *to);
+            return result;
+        }
+    }
+    if (stream.on_head && !stream.on_head(status, head_in)) return result;
+
+    // The body: chunked, of a length given, or up to the end of the connection.
+    const auto encoding = httpHeader(head_in, "Transfer-Encoding");
+    const bool chunked  = encoding && lower(*encoding).find("chunked") != std::string::npos;
+    std::optional<uint64_t> length;
+    if (const auto value = httpHeader(head_in, "Content-Length"); value && !chunked) {
+        uint64_t v = 0;
+        if (std::from_chars(value->data(), value->data() + value->size(), v).ec == std::errc()) length = v;
+    }
+    if (length && *length == 0) return result;
+    if (status == 204 || status == 304 || request.method == "HEAD") return result;
+    uint64_t received = 0;
+    ChunkDecoder chunks;
+    bool more          = true;  // the body goes on
+    const auto deliver = [&](std::string_view data) {
+        if (data.empty()) return;
+        if (chunked) {
+            if (!chunks.feed(data, [&](std::string_view piece) { return !stream.on_data || stream.on_data(piece); })) {
+                if (chunks.failed()) result.error = "a badly chunked answer from " + url.host;
+                more = false;
+                return;
+            }
+            more = !chunks.done();
+            return;
+        }
+        if (length)
+            data = data.substr(0, static_cast<std::size_t>(std::min<uint64_t>(data.size(), *length - received)));
+        received += data.size();
+        if (!data.empty() && stream.on_data && !stream.on_data(data)) more = false;
+        if (length && received >= *length) more = false;
+    };
+    deliver(std::string_view(answer).substr(end + 4));
+    while (more) {
+        if (stopped()) {
+            result.error = "cancelled";
+            return result;
+        }
+        const int n = connection.receiveSome(buffer.data(), buffer.size(), 250);
+        if (n > 0) {
+            last = std::chrono::steady_clock::now();
+            deliver(std::string_view(reinterpret_cast<const char*>(buffer.data()), static_cast<std::size_t>(n)));
+        } else if (n == 0) {
+            if ((chunked && !chunks.done()) || (length && received < *length)) {
+                result.error = "the answer of " + url.host + " was cut short";
+            }
+            return result;
+        } else if (n == -2) {
+            result.error = "the connection to " + url.host + " failed";
+            return result;
+        } else if (std::chrono::steady_clock::now() - last > idle) {
+            result.error = fmt::format("nothing from {} for {} s", url.host, stream.idle_s);
+            return result;
+        }
+    }
+    return result;
+}
+
+}  // namespace
+
+std::optional<std::string> httpHeader(std::string_view head, std::string_view name) {
+    std::size_t at = head.find("\r\n");  // the status line left out
+    while (at != std::string_view::npos) {
+        const auto start = at + 2;
+        auto stop        = head.find("\r\n", start);
+        const auto line  = head.substr(start, stop == std::string_view::npos ? std::string_view::npos : stop - start);
+        const auto colon = line.find(':');
+        if (colon == name.size() && std::equal(name.begin(), name.end(), line.begin(), [](char a, char b) {
+                return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+            })) {
+            auto value = line.substr(colon + 1);
+            while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) value.remove_prefix(1);
+            while (!value.empty() && (value.back() == ' ' || value.back() == '\t')) value.remove_suffix(1);
+            return std::string(value);
+        }
+        at = stop;
+    }
+    return std::nullopt;
+}
+
+HttpResult httpStream(const HttpRequest& request, const HttpStream& stream) {
+    HttpRequest current = request;
+    auto url            = parseUrl(current.url);
+    for (int hop = 0;; ++hop) {
+        if (!url) {
+            HttpResult result;
+            result.error = "not an http or https URL: " + current.url;
+            return result;
+        }
+        std::string location;
+        auto result = streamOnce(current, *url, stream, hop < stream.redirects, location);
+        if (location.empty()) return result;
+        const auto next = parseUrl(location);
+        if (!next) {
+            result.error = "redirected to " + location + ", which is no http or https URL";
+            return result;
+        }
+        if (url->tls && !next->tls) {
+            result.error = "redirected from https to http (" + location + "): refused";
+            return result;
+        }
+        // The token goes to the site it was made for only.
+        if (next->host != url->host || next->port != url->port) {
+            current.token.clear();
+            std::erase_if(current.headers, [](const auto& header) {
+                return lower(header.first) == "authorization" || lower(header.first) == "cookie";
+            });
+        }
+        if (result.status == 303 || ((result.status == 301 || result.status == 302) && current.method == "POST")) {
+            current.method = "GET";
+            current.body.clear();
+            current.content_type.clear();
+        }
+        current.url = location;
+        url         = next;
+    }
+}
+
+bool ChunkDecoder::feed(std::string_view in, const std::function<bool(std::string_view)>& out) {
+    while (!in.empty() && state_ != State::Done) {
+        if (state_ == State::Data) {
+            const auto take = static_cast<std::size_t>(std::min<uint64_t>(left_, in.size()));
+            const auto data = in.substr(0, take);
+            in.remove_prefix(take);
+            left_ -= take;
+            if (left_ == 0) state_ = State::DataEnd;
+            if (!out(data)) return false;
+            continue;
+        }
+        // A line: a chunk's size, the end of its data, or one of the trailer's.
+        const auto eol = in.find('\n');
+        line_.append(in.substr(0, eol));
+        if (line_.size() > 4096) {
+            failed_ = true;
+            return false;
+        }
+        if (eol == std::string_view::npos) return true;
+        in.remove_prefix(eol + 1);
+        if (!line_.empty() && line_.back() == '\r') line_.pop_back();
+        if (state_ == State::Size) {
+            const std::string_view size = std::string_view(line_).substr(0, line_.find(';'));  // extensions left out
+            uint64_t value              = 0;
+            const auto [p, ec]          = std::from_chars(size.data(), size.data() + size.size(), value, 16);
+            if (size.empty() || ec != std::errc() || p != size.data() + size.size()) {
+                failed_ = true;
+                return false;
+            }
+            left_  = value;
+            state_ = value == 0 ? State::Trailer : State::Data;
+        } else if (state_ == State::DataEnd) {
+            if (!line_.empty()) {
+                failed_ = true;
+                return false;
+            }
+            state_ = State::Size;
+        } else if (line_.empty()) {
+            state_ = State::Done;  // the blank line that ends the trailer
+        }
+        line_.clear();
+    }
+    return true;
+}
+
+bool LineSplitter::feed(std::string_view data) {
+    pending_.append(data);
+    std::size_t start = 0;
+    for (auto eol = pending_.find('\n'); eol != std::string::npos; eol = pending_.find('\n', start)) {
+        std::string_view line(pending_.data() + start, eol - start);
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+        start = eol + 1;
+        if (!line.empty() && !on_line_(line)) {
+            pending_.erase(0, start);
+            return false;
+        }
+    }
+    pending_.erase(0, start);
+    return true;
+}
+
+bool LineSplitter::flush() {
+    std::string line;
+    line.swap(pending_);
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    return line.empty() || on_line_(line);
+}
+
+std::string sha256File(const std::filesystem::path& file) {
+    if (psa_crypto_init() != PSA_SUCCESS) return {};
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return {};
+    psa_hash_operation_t operation = PSA_HASH_OPERATION_INIT;
+    if (psa_hash_setup(&operation, PSA_ALG_SHA_256) != PSA_SUCCESS) return {};
+    std::vector<char> buffer(std::size_t{1} << 20);
+    while (in) {
+        in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        const auto n = static_cast<std::size_t>(in.gcount());
+        if (n > 0 && psa_hash_update(&operation, reinterpret_cast<const uint8_t*>(buffer.data()), n) != PSA_SUCCESS) {
+            psa_hash_abort(&operation);
+            return {};
+        }
+    }
+    if (in.bad()) {
+        psa_hash_abort(&operation);
+        return {};
+    }
+    uint8_t digest[32];
+    std::size_t size = 0;
+    if (psa_hash_finish(&operation, digest, sizeof(digest), &size) != PSA_SUCCESS || size != sizeof(digest)) return {};
+    std::string out;
+    for (const auto b : digest) out += fmt::format("{:02x}", b);
+    return out;
+}
+
+Download httpDownload(const std::string& url, const std::filesystem::path& file, DownloadProgress* progress,
+                      const std::atomic<bool>* cancel, std::string_view sha256) {
+    namespace fs = std::filesystem;
+    Download out;
+    std::error_code ec;
+    if (file.has_parent_path()) fs::create_directories(file.parent_path(), ec);
+    const auto part = fs::path(file).concat(".part");
+    const auto tag  = fs::path(file).concat(".part.tag");  // what tells the file on the server has not changed
+    // A second try only when the part kept turned out to be of another file.
+    for (int attempt = 0;; ++attempt) {
+        uint64_t have = fs::is_regular_file(part, ec) ? fs::file_size(part, ec) : 0;
+        if (ec) have = 0;
+        HttpRequest request;
+        request.url       = url;
+        request.method    = "GET";
+        request.timeout_s = 30;
+        if (have > 0) {
+            request.headers.emplace_back("Range", fmt::format("bytes={}-", have));
+            std::string validator;
+            std::ifstream in(tag);
+            if (std::getline(in, validator) && !validator.empty()) request.headers.emplace_back("If-Range", validator);
+        }
+        bool other_file = false;
+        out             = Download{};
+        std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(nullptr, &std::fclose);
+        HttpStream stream;
+        stream.cancel  = cancel;
+        stream.on_head = [&](int status, std::string_view head) {
+            // "bytes 100-199/200", or "bytes */200" with a 416.
+            uint64_t from = 0, total = 0;
+            bool ranged = false;
+            if (const auto range = httpHeader(head, "Content-Range"); range && range->rfind("bytes ", 0) == 0) {
+                const auto slash = range->find('/');
+                if (slash != std::string::npos) {
+                    ranged = true;
+                    if ((*range)[6] != '*') std::from_chars(range->data() + 6, range->data() + range->size(), from);
+                    std::from_chars(range->data() + slash + 1, range->data() + range->size(), total);
+                }
+            }
+            if (status == 206 && have > 0) {
+                if (!ranged || from != have) {
+                    other_file = true;
+                    return false;
+                }
+                out.resumed = true;
+                f.reset(tour::openFile(part, "ab"));
+            } else if (status == 200) {
+                have  = 0;  // the whole file, from its start
+                total = 0;
+                if (const auto length = httpHeader(head, "Content-Length")) {
+                    std::from_chars(length->data(), length->data() + length->size(), total);
+                }
+                // A strong ETag, or the file's date, to resume from later.
+                auto validator = httpHeader(head, "ETag");
+                if (validator && validator->rfind("W/", 0) == 0) validator.reset();
+                if (!validator) validator = httpHeader(head, "Last-Modified");
+                if (validator) {
+                    std::ofstream(tag, std::ios::trunc) << *validator << '\n';
+                } else {
+                    fs::remove(tag, ec);
+                }
+                f.reset(tour::openFile(part, "wb"));
+            } else if (status == 416 && have > 0) {
+                // Nothing after what was kept: the whole file when it is its size, else the file has changed.
+                other_file = !ranged || total != have;
+                return false;
+            } else {
+                out.error = fmt::format("the server answered {} for {}", status, url);
+                return false;
+            }
+            if (!f) {
+                out.error = "cannot write " + part.string();
+                return false;
+            }
+            if (progress) {
+                progress->size  = total;
+                progress->bytes = have;
+            }
+            return true;
+        };
+        stream.on_data = [&](std::string_view data) {
+            if (std::fwrite(data.data(), 1, data.size(), f.get()) != data.size()) {
+                out.error = "cannot write " + part.string() + " (is the disk full?)";
+                return false;
+            }
+            have += data.size();
+            if (progress) progress->bytes = have;
+            return true;
+        };
+        const auto result = httpStream(request, stream);
+        const bool closed = !f || std::fclose(f.release()) == 0;
+        if (other_file) {
+            fs::remove(part, ec);
+            fs::remove(tag, ec);
+            if (attempt == 0) continue;
+            out.error = "the server does not send the rest of " + url + " as asked";
+            return out;
+        }
+        if (out.error.empty()) out.error = result.error;
+        if (out.error.empty() && result.status == 0) out.error = "no answer for " + url;
+        if (out.error.empty() && !closed) out.error = "cannot write " + part.string();
+        out.bytes = have;
+        if (!out.error.empty()) return out;  // the part kept: the next call goes on from there
+        break;
+    }
+    if (!sha256.empty()) {
+        std::string want(sha256);
+        for (auto& c : want) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (sha256File(part) != want) {
+            fs::remove(part, ec);
+            fs::remove(tag, ec);
+            out.error = "the file downloaded from " + url + " is not the one expected: its SHA-256 differs";
+            return out;
+        }
+    }
+    fs::rename(part, file, ec);
+    if (ec) {
+        out.error = "cannot rename " + part.string() + ": " + ec.message();
+        return out;
+    }
+    fs::remove(tag, ec);
+    out.ok = true;
+    return out;
+}
+
+HostGate& HostGate::instance() {
+    static HostGate gate;
+    return gate;
+}
+
+HostGate::Host& HostGate::host(const std::string& name) {
+    std::lock_guard lock(mutex_);
+    auto& h = hosts_[name];
+    if (!h) h = std::make_unique<Host>();
+    return *h;
+}
+
+std::unique_lock<std::timed_mutex> HostGate::turn(const std::string& name, const std::atomic<bool>* cancel) {
+    auto& h = host(name);
+    std::unique_lock lock(h.turn, std::defer_lock);
+    while (!lock.try_lock_for(std::chrono::milliseconds(100))) {
+        if (cancel && cancel->load()) return lock;
+    }
+    if (!waitPause(name, cancel)) lock.unlock();
+    return lock;
+}
+
+bool HostGate::waitPause(const std::string& name, const std::atomic<bool>* cancel) {
+    for (;;) {
+        const auto left = pausedFor(name);
+        if (left.count() == 0) return true;
+        if (cancel && cancel->load()) return false;
+        std::this_thread::sleep_for(std::min(left, std::chrono::milliseconds(100)));
+    }
+}
+
+void HostGate::tooMany(const std::string& name) {
+    auto& h = host(name);
+    std::lock_guard lock(mutex_);
+    h.until = std::chrono::steady_clock::now() + pause_;
+}
+
+std::chrono::milliseconds HostGate::pausedFor(const std::string& name) const {
+    std::lock_guard lock(mutex_);
+    const auto it = hosts_.find(name);
+    if (it == hosts_.end()) return std::chrono::milliseconds(0);
+    const auto left =
+        std::chrono::duration_cast<std::chrono::milliseconds>(it->second->until - std::chrono::steady_clock::now());
+    return std::max(std::chrono::milliseconds(0), left + std::chrono::milliseconds(left.count() > 0 ? 1 : 0));
+}
+
+void HostGate::setPause(std::chrono::milliseconds pause) {
+    std::lock_guard lock(mutex_);
+    pause_ = pause;
+}
+
+HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* cancel) {
+    const auto url = parseUrl(request.url);
+    if (!url) return httpRequest(request);
+    auto& gate      = HostGate::instance();
+    const auto lock = gate.turn(url->host, cancel);
+    if (!lock.owns_lock()) {
+        HttpResult result;
+        result.error = "cancelled";
+        return result;
+    }
+    auto result = httpRequest(request);
+    if (result.status == 429) gate.tooMany(url->host);
+    return result;
+}
+
+HttpResult politeStream(const HttpRequest& request, const HttpStream& stream) {
+    const auto url = parseUrl(request.url);
+    if (!url) return httpStream(request, stream);
+    auto& gate = HostGate::instance();
+    if (!gate.waitPause(url->host, stream.cancel)) {
+        HttpResult result;
+        result.error = "cancelled";
+        return result;
+    }
+    auto result = httpStream(request, stream);
+    if (result.status == 429) gate.tooMany(url->host);
     return result;
 }
 

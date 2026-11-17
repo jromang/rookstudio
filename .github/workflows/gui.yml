@@ -63,7 +63,7 @@ jobs:
 
       - name: Compiler cache
         # What the last runs compiled (the dependencies above all): only what changed is compiled again.
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: .ccache
           key: ccache-linux-${{ github.run_id }}
@@ -80,6 +80,15 @@ jobs:
           ccache -z
           cmake --build build
           ccache -s
+
+      - name: Compiler cache saved
+        # Even when a later step fails or the run is cancelled: a cold build costs a private repository's
+        # minutes again.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-linux-${{ github.run_id }}
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py): they mostly wait, so two per
@@ -145,7 +154,7 @@ jobs:
 
       - name: Compiler cache
         # What the last runs compiled (the dependencies above all): only what changed is compiled again.
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: .ccache
           key: ccache-sanitizers-${{ github.run_id }}
@@ -167,6 +176,15 @@ jobs:
           ccache -z
           cmake --build build-asan --target fastchess-gui-tests fcg-tournament-tests fcg-study-tests
           ccache -s
+
+      - name: Compiler cache saved
+        # Even when a later step fails or the run is cancelled: a cold build costs a private repository's
+        # minutes again.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-sanitizers-${{ github.run_id }}
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py), one per processor: instrumented,
@@ -222,7 +240,7 @@ jobs:
 
       - name: Compiler cache
         # What the last runs compiled (the dependencies above all): only what changed is compiled again.
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: .ccache
           key: ccache-windows-${{ github.run_id }}
@@ -238,6 +256,15 @@ jobs:
           ccache -z
           cmake --build build-win
           ccache -s
+
+      - name: Compiler cache saved
+        # Even when a later step fails or the run is cancelled: a cold build costs a private repository's
+        # minutes again.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-windows-${{ github.run_id }}
 
       - uses: actions/upload-artifact@v7
         with:
@@ -290,7 +317,7 @@ jobs:
 
       - name: Compiler cache
         # What the last runs compiled (the dependencies above all): only what changed is compiled again.
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: .ccache
           key: ccache-macos-${{ github.run_id }}
@@ -304,6 +331,15 @@ jobs:
           ccache -z
           cmake --build build
           ccache -s
+
+      - name: Compiler cache saved
+        # Even when a later step fails or the run is cancelled: a cold build costs a private repository's
+        # minutes again.
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-macos-${{ github.run_id }}
 
       - name: Universal binaries
         run: |

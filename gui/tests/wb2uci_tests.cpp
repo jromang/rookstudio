@@ -331,7 +331,9 @@ TEST_CASE("wb2uci: tournaments of WinBoard engines (protocol 1 and 2) and a UCI 
     RunController run;
     std::vector<GameRecord> games;
     std::vector<fastchess::Stats> stats;
-    REQUIRE(run.start(setup, engines, topologyFromCores({{0, 0}, {0, 1}, {0, 2}, {0, 3}}), root).empty());
+    const auto started = run.start(setup, engines, topologyFromCores({{0, 0}, {0, 1}, {0, 2}, {0, 3}}), root);
+    INFO(started);  // why it did not start, when it did not
+    REQUIRE(started.empty());
     const auto end = std::chrono::steady_clock::now() + 120s;
     while (run.state() != RunController::State::Finished && std::chrono::steady_clock::now() < end) {
         run.update();
@@ -495,7 +497,9 @@ TEST_CASE("wb2uci: a Chess960 tournament of WinBoard engines through the adapter
     RunController run;
     std::vector<GameRecord> games;
     std::vector<fastchess::Stats> stats;
-    REQUIRE(run.start(setup, engines, topologyFromCores({{0, 0}, {0, 1}, {0, 2}, {0, 3}}), root).empty());
+    const auto started = run.start(setup, engines, topologyFromCores({{0, 0}, {0, 1}, {0, 2}, {0, 3}}), root);
+    INFO(started);  // why it did not start, when it did not
+    REQUIRE(started.empty());
     const auto end = std::chrono::steady_clock::now() + 120s;
     while (run.state() != RunController::State::Finished && std::chrono::steady_clock::now() < end) {
         run.update();

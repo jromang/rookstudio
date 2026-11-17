@@ -357,13 +357,29 @@ std::optional<Position> Position::fromFen(std::string_view fen, std::string* err
     };
     if (fields.size() > 4 && !number(fields[4], p.halfmoves_)) return fail("bad halfmove clock");
     if (fields.size() > 5 && (!number(fields[5], p.fullmoves_) || p.fullmoves_ == 0)) return fail("bad move number");
-    // A legal position: one king each, no pawn on the back ranks, the side not to move not in check.
-    if ((p.board_.kings() & p.board_.white()).count() != 1 || (p.board_.kings() & p.board_.black()).count() != 1)
-        return fail("not one king each");
-    if ((p.board_.pawns() & Bitboard(Bitboard::BACKRANKS)).any()) return fail("a pawn on a back rank");
-    if (p.board_.attacksTo(*p.board_.kingOf(!p.turn_), p.turn_, p.board_.occupied()).any())
-        return fail("the side not to move is in check");
+    if (const auto why = p.illegal()) return fail(why);
     return p;
+}
+
+std::optional<Position> Position::fromBoard(const Board& board, Color turn, std::string* error) {
+    Position p;
+    p.board_ = board;
+    p.turn_  = turn;
+    if (const auto why = p.illegal()) {
+        if (error) *error = why;
+        return std::nullopt;
+    }
+    return p;
+}
+
+const char* Position::illegal() const noexcept {
+    // One king each, no pawn on the back ranks, the side not to move not in check.
+    if ((board_.kings() & board_.white()).count() != 1 || (board_.kings() & board_.black()).count() != 1)
+        return "not one king each";
+    if ((board_.pawns() & Bitboard(Bitboard::BACKRANKS)).any()) return "a pawn on a back rank";
+    if (board_.attacksTo(*board_.kingOf(!turn_), turn_, board_.occupied()).any())
+        return "the side not to move is in check";
+    return nullptr;
 }
 
 Position Position::initial() {

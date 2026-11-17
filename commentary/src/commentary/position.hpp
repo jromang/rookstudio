@@ -274,6 +274,10 @@ class Position {
     // Standard castling; none when the FEN is not one of a legal position, `error` then saying why.
     [[nodiscard]] static std::optional<Position> fromFen(std::string_view fen, std::string* error = nullptr);
     [[nodiscard]] static Position initial();
+    // A position of these pieces with `turn` to move, no castling rights and no en passant square; none when it is not
+    // a legal one (shakmaty's from_setup), `error` then saying why.
+    [[nodiscard]] static std::optional<Position> fromBoard(const Board& board, Color turn,
+                                                           std::string* error = nullptr);
 
     [[nodiscard]] const Board& board() const noexcept { return board_; }
     [[nodiscard]] Color turn() const noexcept { return turn_; }
@@ -323,6 +327,8 @@ class Position {
 
    private:
     void generate(std::vector<Move>& moves) const;
+    // Why the position cannot be one of a game; null when it can.
+    [[nodiscard]] const char* illegal() const noexcept;
 
     Board board_;
     Color turn_ = Color::White;

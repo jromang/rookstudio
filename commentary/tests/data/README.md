@@ -36,3 +36,11 @@ zstd -19 briefs.jsonl -o briefs-heldout.jsonl.zst
 ```
 
 `golden_tests.cpp` holds the port to them.
+
+A larger corpus made the same way (the prototype's training cases, kept out of the repository) checks the branches the
+held-out cases do not reach:
+
+```sh
+rookstudio-dataset briefs cases.jsonl --out briefs.jsonl --lang both
+FCG_GOLDEN_CASES=cases.jsonl FCG_GOLDEN_BRIEFS=briefs.jsonl build/fcg-commentary-tests -tc='golden*'
+```

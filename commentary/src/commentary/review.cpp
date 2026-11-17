@@ -238,6 +238,12 @@ std::optional<Move> MainLine::moveTo(std::size_t ply) const {
     return moves_[ply - 1];
 }
 
+std::optional<GameEnd> gameEnd(const Position& pos) {
+    if (pos.isCheckmate()) return GameEnd::checkmate(!pos.turn());
+    if (pos.isStalemate() || pos.isInsufficientMaterial()) return GameEnd::draw();
+    return std::nullopt;
+}
+
 std::vector<Phase> phases(std::span<const Position> positions) {
     // Queens, rooks, bishops and knights of both sides.
     const auto majors_and_minors = [](const Board& b) { return (b.occupied() & ~b.pawns() & ~b.kings()).count(); };

@@ -39,6 +39,10 @@ class MainLine {
     std::vector<Position> positions_;
 };
 
+// How a game ends in a position, when it does: mate, or a draw by stalemate or too little material (shakmaty's
+// outcome; the fifty-move rule and repetitions need the game's history).
+[[nodiscard]] std::optional<GameEnd> gameEnd(const Position& pos);
+
 // The engine's analyses of the main line's positions, by index; a position not analyzed yet has none.
 using Analyses = std::vector<std::optional<PositionAnalysis>>;
 

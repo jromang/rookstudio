@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -70,6 +71,18 @@ uint64_t replayedKey(const ImportedGame& g) {
     return board.key();
 }
 
+// A text with its lines ended by "\n", as a game's text is kept.
+std::string unixLines(std::string_view text) {
+    std::string out;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] != '\r')
+            out += text[i];
+        else if (i + 1 == text.size() || text[i + 1] != '\n')
+            out += '\n';
+    }
+    return out;
+}
+
 }  // namespace
 
 TEST_CASE("import: a game's tags, moves, clocks and evaluations, and what makes its text kept") {
@@ -102,7 +115,7 @@ TEST_CASE("import: a game's tags, moves, clocks and evaluations, and what makes 
     ImportedGame annotated;
     REQUIRE(readImportedGame(games[1], annotated));
     CHECK(annotated.annotated);
-    CHECK(annotated.text == games[1]);
+    CHECK(annotated.text == unixLines(games[1]));
     CHECK(annotated.plies == 11);
 
     ImportedGame tournament;
@@ -120,7 +133,7 @@ TEST_CASE("import: a game's tags, moves, clocks and evaluations, and what makes 
     REQUIRE(readImportedGame(games[4], broken));
     CHECK(broken.damaged);
     CHECK(broken.plies == 2);
-    CHECK(broken.text == games[4]);
+    CHECK(broken.text == unixLines(games[4]));
 
     ImportedGame anonymous;
     REQUIRE(readImportedGame(games[5], anonymous));
@@ -144,12 +157,24 @@ TEST_CASE("import: the same games whatever the workers, the pieces and the compr
             CHECK(summaries(importFile(data("games.pgn"), threads, piece).games) == expected);
         }
     }
-    for (const char* name : {"games.pgn.zst", "games.pgn.gz", "games.zip", "stored.zip"}) {
+    for (const std::string name : {"games.pgn.zst", "games.pgn.gz", "games.zip", "stored.zip"}) {
         CAPTURE(name);
         const auto other = importFile(data(name), 4);
         CHECK(other.report.error.empty());
         CHECK(summaries(other.games) == expected);
     }
+    // The same file with Windows line ends ("\r\n").
+    std::ifstream in(data("games.pgn"), std::ios::binary);
+    const std::string unix_text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string windows_text;
+    for (const char c : unix_text) {
+        if (c == '\r') continue;  // a checkout that has them already
+        if (c == '\n') windows_text += '\r';
+        windows_text += c;
+    }
+    const auto crlf = fs::temp_directory_path() / "games-crlf.pgn";
+    std::ofstream(crlf, std::ios::binary) << windows_text;
+    CHECK(summaries(importFile(crlf, 4).games) == expected);
 }
 
 TEST_CASE("import: cancelled between batches, and a file that cannot be read") {

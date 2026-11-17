@@ -138,6 +138,21 @@ std::size_t lastGameStart(std::string_view text) {
     return std::string_view::npos;
 }
 
+// A game's text as it is kept, its lines ended by "\n" whatever the file's: a file written on Windows and its copy
+// with Unix line ends make the same database.
+std::string keptText(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] != '\r') {
+            out += text[i];
+        } else if (i + 1 == text.size() || text[i + 1] != '\n') {
+            out += '\n';  // a line ended by "\r" alone
+        }
+    }
+    return out;
+}
+
 }  // namespace
 
 bool readImportedGame(std::string_view text, ImportedGame& out) {
@@ -173,7 +188,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
             out.start_fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(out.start_fen),
             out.chess960)) {
         out.damaged = true;
-        out.text    = std::string(text);
+        out.text    = keptText(text);
         return true;
     }
     int depth    = 0;
@@ -217,7 +232,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
     }
     if (!out.clocks.empty()) out.clocks.resize(out.plies, -1);
     if (!out.evals.empty()) out.evals.resize(out.plies, ImportedGame::NO_EVAL);
-    if (out.annotated || out.damaged) out.text = std::string(text);
+    if (out.annotated || out.damaged) out.text = keptText(text);
     return true;
 }
 

@@ -92,8 +92,11 @@ jobs:
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py): they mostly wait, so two per
-        # processor. fastchess' own tests run when app/ changes (upstream_tests.yml).
-        run: python3 tools/run_tests.py -j 8 build/fastchess-gui-tests build/fcg-tournament-tests build/fcg-study-tests
+        # processor, counted on the runner (a public repository's has four, a private one's two: twice as many tests at
+        # once there make their waits too short). fastchess' own tests run when app/ changes (upstream_tests.yml).
+        run: |
+          python3 tools/run_tests.py -j $(( $(nproc) * 2 )) build/fastchess-gui-tests build/fcg-tournament-tests \
+            build/fcg-study-tests
 
       - name: The window drawn without OpenGL
         # SDL's software renderer, what a machine without OpenGL 3.2 gets: the program starts, draws its Settings page
@@ -198,7 +201,7 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ runner.temp }}/sanitizers/report
         run: |
           mkdir -p "${RUNNER_TEMP}/sanitizers"
-          python3 tools/run_tests.py -j 4 build-asan/fastchess-gui-tests build-asan/fcg-tournament-tests \
+          python3 tools/run_tests.py -j $(nproc) build-asan/fastchess-gui-tests build-asan/fcg-tournament-tests \
             build-asan/fcg-study-tests
 
       - name: Sanitizer reports
@@ -290,10 +293,12 @@ jobs:
           path: bin
 
       - name: Tests
-        # Side by side, each test case in a process of its own (tools/run_tests.py).
+        # Side by side, each test case in a process of its own (tools/run_tests.py), two per processor of the runner.
         env:
           FCG_SOURCE_DIR: ${{ github.workspace }}
-        run: python tools/run_tests.py -j 8 bin\fastchess-gui-tests.exe bin\fcg-tournament-tests.exe bin\fcg-study-tests.exe
+        run: >-
+          python tools/run_tests.py -j ([int]$env:NUMBER_OF_PROCESSORS * 2) bin\fastchess-gui-tests.exe
+          bin\fcg-tournament-tests.exe bin\fcg-study-tests.exe
 
   macos:
     name: macOS build and tests
@@ -350,7 +355,9 @@ jobs:
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py), two per processor.
-        run: python3 tools/run_tests.py -j 6 build/fastchess-gui-tests build/fcg-tournament-tests build/fcg-study-tests
+        run: |
+          python3 tools/run_tests.py -j $(( $(sysctl -n hw.ncpu) * 2 )) build/fastchess-gui-tests \
+            build/fcg-tournament-tests build/fcg-study-tests
 
       - name: Package
         run: |

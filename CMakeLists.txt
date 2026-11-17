@@ -22,6 +22,7 @@ option(FCG_BUILD_TESTS "Build the fastchess-gui unit tests" ON)
 option(FCG_STATIC_RUNTIME "Link libstdc++ and libgcc statically on Linux (release binaries)" OFF)
 option(FCG_FUZZ "Build the libFuzzer targets in fuzz/ (clang), everything with AddressSanitizer and UBSan" OFF)
 option(FCG_CCACHE "Compile through ccache when it is installed" ON)
+option(FCG_STUDY_BENCH "Build fcg-study-bench, the study store measured on large files (never in the CI)" OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -234,6 +235,12 @@ if(FCG_BUILD_TESTS)
     if(WIN32)
         target_link_options(fcg-study-tests PRIVATE -static -static-libgcc -static-libstdc++)
     endif()
+endif()
+
+if(FCG_STUDY_BENCH)
+    add_executable(fcg-study-bench ${CMAKE_CURRENT_SOURCE_DIR}/study/bench/main.cpp)
+    target_link_libraries(fcg-study-bench PRIVATE fcg_study)
+    target_compile_options(fcg-study-bench PRIVATE -Wall -Wextra)
 endif()
 
 # ---------------------------------------------------------------------------

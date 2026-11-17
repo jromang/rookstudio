@@ -1,0 +1,149 @@
+# The study layer: games, PGN and databases
+
+`study/` is the library under the Chess space: the game model, the PGN reader and writer, and the databases. It has no
+user interface (`fcg_study`, tested by `fcg-study-tests`, measured by `fcg-study-bench`).
+
+## PGN
+
+- `pgn_lexer` cuts PGN text into tokens without copying it.
+- `pgn_reader` builds a `GameTree`: the moves, the variations, the comments before and after a move, the symbols (NAGs
+  and `!` `?` glyphs), the graphics (`[%cal]`, `[%csl]`), the clocks and evaluations, and the commands it does not know,
+  kept as they were. Text not in UTF-8 is read as Windows-1252.
+- `pgn_writer` writes a tree back. Reading what it wrote gives the same tree, and writing what it read changes nothing
+  more: a random mutation campaign of 600 000 texts and a fuzzer (`fuzz/pgn_reader.cpp`) hold it to that.
+
+## The board and the move codes
+
+`ScanBoard` is a board made for reading games fast: SAN parsed against it, moves played on it, and each move given a
+code. The legal moves of a position are numbered in an order that only depends on the position, piece by piece; a
+move's code is its rank in that order, one byte when the position has 256 legal moves or fewer (every real game), two
+otherwise. Decoding a code needs no move generation: the code's piece and target are found by counting the pieces'
+moves. A million random games (355 M plies, Chess960 and set-up positions among them) decode to the moves chess.hpp
+plays, and the Polyglot key of each position (`zobrist.hpp`) is the one of the Polyglot books.
+
+## Import
+
+`importGames` reads a PGN file, plain or compressed (`.zst`, including Lichess's files made of frames after skippable
+frames, `.gz`, `.zip` of `.pgn` entries, zip64 included), cut into pieces at the start of a game, read by several
+workers, and given back in the file's order. The memory it holds stays bounded whatever the file's size. A game's text
+is kept when it has comments, symbols or variations, or could not be read whole (damaged), its lines ended by `\n`
+whatever the file's.
+
+`importInto` adds a file's games to a database, committed every 262 144 games: a crash or a cancel keeps what was
+committed, and the same file imported again adds only what is missing.
+
+## Databases
+
+A database is a folder:
+
+```
+Name.fcgdb/
+  manifest.json   {"format":"rookstudio-database","version":1,"generation":N,"segments":[{name,games,names}]}
+  tournament.lock held while a program writes to it (flock: released when the program ends, however it ends)
+  seg-NNNNNN/     a segment, written whole and never changed:
+    cols.bin      the header columns
+    moves.bin     the move codes, one byte a ply
+    annex.bin     what only some games have
+    names.bin     the names this segment adds
+```
+
+### Columns
+
+`cols.bin` holds, after a 32-byte header, one column after another, each 8-byte aligned:
+
+| Column | Bytes a game |
+|---|---|
+| White, Black, Event, Site, Round, Annotator, TimeControl | 4 each: a name's id |
+| Date (year << 9, month << 5, day; 0 for a part not known) | 4 |
+| Plies | 4 |
+| White's rating, Black's rating, ECO (1 + A00..E99), flags | 2 each |
+| Result | 1 |
+| Key (for the duplicates) | 8 |
+| Offsets in moves.bin and annex.bin | 8 each |
+
+69 bytes a game. Names are kept once for the whole database: each segment's `names.bin` holds the names it adds, the
+ids counting on from the segments before it.
+
+### Annex
+
+A game's annex record is a byte of the parts it has, then each part: its start position (FEN), its other tags, its
+text, its clocks (zigzag differences from the clock two plies before, varints), its evaluations.
+
+### Commits
+
+An append writes its segments, syncs them, then writes the new manifest beside the old one, syncs it and renames it
+over the old one: the rename is the only commit. A database opened after a crash is the one of its last manifest;
+what a commit cut short left (a segment the manifest does not name, a `.tmp` file) is removed. The tests stop a commit
+at each of its steps (`setCommitFaultHook`) and check that the database reopens with all of the commit or none of it,
+and goes on.
+
+A reader holds a `Snapshot`: the segments it maps stay valid while later commits add others.
+
+### Duplicates
+
+A game's key is a hash of its event, site, round, players, date, start position, moves and result. An append leaves out
+a game whose key the database has, or a game before it in the same append, unless asked to keep them. Two rounds of a
+tournament with the same moves are two games.
+
+### Views
+
+A view is the list of a snapshot's game ids that pass a filter, in the order of a column: the game list pages through
+it with no query per page. A filter folds each name once (letter case and Latin accents left out) into a bit for each
+word it looks for, then checks each game in a few operations on its columns, on all cores. A sort reads one column,
+names by their rank in alphabetical order, and sorts it four bytes at a time (stable; descending without reversing
+the games of one key).
+
+## Benchmark
+
+`fcg-study-bench` measures the store on real files. It is built with `-DFCG_STUDY_BENCH=ON` and never runs in the CI:
+the files are large, and some are not ours to share.
+
+```sh
+cmake -B build -DFCG_STUDY_BENCH=ON && cmake --build build --target fcg-study-bench
+build/fcg-study-bench import <games> <database> [--threads N]   # a database that does not exist is made
+build/fcg-study-bench query <database>                         # open, first rows, sorts, filters
+build/fcg-study-bench decode <database>                        # every game replayed from its codes
+build/fcg-study-bench crash <games> <database> [--kills N]     # imports killed (SIGKILL) at random moments
+```
+
+### Results
+
+Measured on 2026-11-17 on an AMD Ryzen 9 9950X (16 cores, 32 threads), an NVMe disk, Linux. The reference database is
+a PGN export of a commercial database of 11 741 260 games (8.1 GB), kept on that machine only; the month of Lichess
+games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332 games).
+
+| Measure | Threshold | Result |
+|---|---|---|
+| Decoding, one core | ≥ 25 M plies/s | 36.6 M plies/s (920 M plies of 11.7 M games in 25 s); 617 M plies/s on 32 threads |
+| Import of 12 M games, 8 cores | ≤ 6 min | 15.4 s with the file in the page cache, 20.8 s read from the disk (534 MB/s) |
+| First rows (open, view of all, 50 rows) | ≤ 150 ms | 17 ms |
+| Sort of 11.7 M games | ≤ 1 s | 75 to 255 ms (the first sort by a name ranks the names) |
+| Filters | — | 5 to 14 ms |
+| Imports killed (SIGKILL) at 1 000 random moments | the database always reopens | always reopened, every game replayed, nothing left over; then an import not killed has every game |
+| Opening tree, warm | ≤ 5 ms | with the tree index (#23) |
+| Position search; pattern search | ≤ 1 s; ≤ 4 s | with the searches (#15) |
+| A tournament beside an import | no loss on time | with the import's place among the tasks (#13) |
+
+- On disk, the 11.7 M games take 2.16 GB (184 bytes a game); the commercial program's own files take 12.15 GB.
+- Memory, opened: the list of all games holds 124 MB of the process's own memory, at most 359 MB after a sort; the
+  pages of the mapped files count besides, and the system takes them back when it needs them. To do with the game
+  list (#13): a list of all games needs no ids, and four-byte ids would halve a sorted one.
+- Memory, importing: at most 1.5 GB on 8 threads, 1.95 GB on 32 (14.4 s); commits of 131 072 games instead of
+  262 144 save 240 MB and double the segments.
+- The Lichess month: 0.4 s, 38.5 MB on disk, 5 470 names.
+
+### What the benchmark changed
+
+- Lichess's `.zst` files begin with a skippable frame, so they were read as text: 20 067 damaged "games" instead of
+  121 332. A skippable frame now marks a zstd file.
+- Duplicates within one append were looked for in quadratic time, and the known keys sorted again at each commit:
+  now sorted once, then merged.
+- A name was looked for in every segment, and filters read whole rows, names included: now a binary search, and
+  filters read the numbers only.
+- Decoding counted the side's codes again at each ply: the counts are now kept as the pieces move (8.7 to 36.6 M plies
+  a second).
+- Lichess's sites, each game's own address, added a name for each game (126 802 names for 121 332 games): kept in the
+  annex now.
+- A program killed in a commit left its new manifest, not renamed yet, and a database killed while it was being made
+  could be neither opened nor made again: both are now cleared.
+- The import's memory grew with the machine's cores: now bounded to 24 pieces in flight, those being read included.

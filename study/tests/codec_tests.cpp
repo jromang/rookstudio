@@ -72,11 +72,26 @@ std::string random960(std::mt19937& random) {
     return black + "/pppppppp/8/8/8/8/PPPPPPPP/" + white + " w " + rights + " - 0 1";
 }
 
+// The codes of the side to move counted again from its pieces: what the board keeps as they come and go.
+int countedCodes(const ScanBoard& board) {
+    const int side = board.sideToMove();
+    int count      = 1;
+    for (int kind = PAWN; kind <= KING; ++kind) {
+        for (uint64_t b = board.pieces(side, kind); b; b &= b - 1) {
+            const int square  = __builtin_ctzll(b);
+            const int rank    = side == WHITE_SIDE ? square / 8 : 7 - square / 8;
+            const int codes[] = {rank == 6 ? 12 : 4, 8, 14, 14, 28, 10};
+            count += codes[kind];
+        }
+    }
+    return count;
+}
+
 }  // namespace
 
 TEST_CASE("codec: random games, standard and Chess960, the same as chess.hpp at every ply") {
     std::mt19937 random(20261117);
-    long plies = 0, nulls = 0, promotions = 0, castlings = 0, en_passant = 0;
+    long plies = 0, nulls = 0, promotions = 0, castlings = 0, en_passant = 0, miscounted = 0;
     std::vector<std::vector<int>> games;
     std::vector<std::string> starts;
     for (int game = 0; game < 1200; ++game) {
@@ -125,6 +140,7 @@ TEST_CASE("codec: random games, standard and Chess960, the same as chess.hpp at 
             castlings += (coded.flags & (MOVE_SHORT_CASTLE | MOVE_LONG_CASTLE)) != 0;
             en_passant += (coded.flags & MOVE_EN_PASSANT) != 0;
             ours.play(coded);
+            miscounted += ours.codeCount() != countedCodes(ours);
             board.makeMove<false>(move);
             REQUIRE(samePosition(ours, board));
             ++plies;
@@ -132,6 +148,7 @@ TEST_CASE("codec: random games, standard and Chess960, the same as chess.hpp at 
     }
     MESSAGE(plies << " plies, " << nulls << " null moves, " << promotions << " promotions, " << castlings
                   << " castlings, " << en_passant << " en passant captures");
+    CHECK(miscounted == 0);
     CHECK(promotions > 100);
     CHECK(castlings > 100);
     CHECK(en_passant > 3);

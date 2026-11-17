@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 
@@ -248,6 +249,37 @@ std::string ecoText(uint16_t eco) {
 
 void setCommitFaultHook(std::function<void(std::string_view)> hook) { g_fault_hook = std::move(hook); }
 
+DatabaseImport importInto(Database& db, const std::filesystem::path& file, const ImportOptions& options,
+                          ImportProgress& progress, std::atomic<bool>& cancel, bool keep_duplicates,
+                          std::size_t commit_games) {
+    DatabaseImport out;
+    std::vector<ImportedGame> pending;
+    const auto commit = [&] {
+        if (pending.empty() || !out.error.empty()) return;
+        try {
+            const auto appended = db.append(std::move(pending), keep_duplicates);
+            out.added += appended.added;
+            out.duplicates += appended.duplicates;
+            ++out.commits;
+        } catch (const std::exception& e) {
+            out.error = e.what();
+            cancel    = true;  // the rest of the file would have nowhere to go
+        }
+        pending.clear();
+    };
+    out.read = importGames(file, options, progress, cancel, [&](std::vector<ImportedGame>&& batch) {
+        if (!out.error.empty()) return;
+        if (pending.empty()) {
+            pending = std::move(batch);
+        } else {
+            pending.insert(pending.end(), std::make_move_iterator(batch.begin()), std::make_move_iterator(batch.end()));
+        }
+        if (pending.size() >= commit_games) commit();
+    });
+    commit();
+    return out;
+}
+
 uint64_t duplicateKey(const ImportedGame& game) {
     // FNV-1a over the parts, each ended by a byte no text holds.
     uint64_t h     = 0xcbf29ce484222325ULL;
@@ -284,8 +316,12 @@ std::pair<const Segment*, std::size_t> Snapshot::locate(GameId id) const {
 
 std::string_view Snapshot::name(uint32_t id) const {
     // The segment that added it: the last whose first name is at most id among those that added some.
-    for (std::size_t s = segments_.size(); s-- > 0;) {
-        if (segments_[s]->nameCount() > 0 && first_name_[s] <= id) return segments_[s]->name(id - first_name_[s]);
+    auto s =
+        static_cast<std::size_t>(std::upper_bound(first_name_.begin(), first_name_.end(), id) - first_name_.begin());
+    while (s-- > 0) {
+        if (segments_[s]->nameCount() == 0) continue;
+        const auto at = id - first_name_[s];
+        return at < segments_[s]->nameCount() ? segments_[s]->name(at) : std::string_view{};
     }
     return {};
 }
@@ -300,14 +336,33 @@ HeaderRow Snapshot::row(GameId id) const {
     row.round        = name(segment->value<uint32_t>(ROUND, i));
     row.annotator    = name(segment->value<uint32_t>(ANNOTATOR, i));
     row.time_control = name(segment->value<uint32_t>(TIME_CONTROL, i));
-    row.date         = segment->value<uint32_t>(DATE, i);
-    row.plies        = segment->value<uint32_t>(PLIES, i);
-    row.white_elo    = segment->value<uint16_t>(WHITE_ELO, i);
-    row.black_elo    = segment->value<uint16_t>(BLACK_ELO, i);
-    row.eco          = segment->value<uint16_t>(ECO, i);
-    row.flags        = segment->value<uint16_t>(FLAGS, i);
-    row.result       = static_cast<char>(segment->value<uint8_t>(RESULT, i));
+    const auto n     = numbers(id);
+    row.date         = n.date;
+    row.plies        = n.plies;
+    row.white_elo    = n.white_elo;
+    row.black_elo    = n.black_elo;
+    row.eco          = n.eco;
+    row.flags        = n.flags;
+    row.result       = n.result;
     return row;
+}
+
+HeaderNumbers Snapshot::numbers(GameId id) const {
+    const auto [segment, i] = locate(id);
+    HeaderNumbers n;
+    n.date      = segment->value<uint32_t>(DATE, i);
+    n.plies     = segment->value<uint32_t>(PLIES, i);
+    n.white_elo = segment->value<uint16_t>(WHITE_ELO, i);
+    n.black_elo = segment->value<uint16_t>(BLACK_ELO, i);
+    n.eco       = segment->value<uint16_t>(ECO, i);
+    n.flags     = segment->value<uint16_t>(FLAGS, i);
+    n.result    = static_cast<char>(segment->value<uint8_t>(RESULT, i));
+    return n;
+}
+
+GameMoves Snapshot::gameMoves(GameId id) const {
+    const auto [segment, i] = locate(id);
+    return {segment->moves(i), segment->value<uint32_t>(PLIES, i), segment->value<uint16_t>(FLAGS, i)};
 }
 
 Snapshot::NameIds Snapshot::rowIds(GameId id) const {
@@ -369,6 +424,12 @@ ImportedGame Snapshot::game(GameId id) const {
             auto value = getText(p, end);
             g.tags.emplace_back(std::move(name), std::move(value));
         }
+        // A site kept in the annex (an address) back in its place, after the event.
+        if (r.site.empty()) {
+            const auto site =
+                std::find_if(g.tags.begin(), g.tags.end(), [](const auto& t) { return t.first == "Site"; });
+            if (site != g.tags.end()) std::rotate(g.tags.begin() + (r.event.empty() ? 0 : 1), site, site + 1);
+        }
     }
     if (parts & ANNEX_TEXT) g.text = getText(p, end);
     if (parts & ANNEX_CLOCKS) {
@@ -394,7 +455,15 @@ Database::Database(const fs::path& dir) : dir_(dir), lock_(dir) {}
 std::shared_ptr<Database> Database::create(const fs::path& dir) {
     std::error_code ec;
     if (fs::exists(dir / MANIFEST, ec)) throw std::runtime_error(dir.string() + " already holds a database");
-    if (fs::exists(dir, ec) && !fs::is_empty(dir, ec)) throw std::runtime_error(dir.string() + " is not empty");
+    // Empty, or holding only what a program killed while it made a database there left: its lock and its first
+    // manifest not renamed yet, cleared once the lock is taken.
+    for (const auto& entry : fs::directory_iterator(dir, ec)) {
+        const auto name = entry.path().filename().string();
+        const bool left =
+            name == "tournament.lock" || (name.size() > 4 && name.compare(name.size() - 4, 4, ".tmp") == 0);
+        if (!left) throw std::runtime_error(dir.string() + " is not empty");
+    }
+    ec.clear();
     fs::create_directories(dir, ec);
     if (ec) throw std::runtime_error("cannot create the folder " + dir.string());
     auto db = std::make_shared<Database>(dir);
@@ -446,16 +515,22 @@ void Database::load() {
         std::sscanf(name.c_str(), "seg-%llu", &number);
         next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
     }
-    // What a commit cut short left: segments the manifest does not name. A number such a leftover holds is not used
-    // again, should it not go.
+    // What a commit cut short left: segments the manifest does not name, and the new manifest not yet renamed over
+    // the old one (a killed program leaves it). A number such a leftover segment holds is not used again, should it
+    // not go.
     std::error_code ec;
     for (const auto& entry : fs::directory_iterator(dir_, ec)) {
-        const auto name = entry.path().filename().string();
-        if (name.rfind("seg-", 0) != 0) continue;
-        unsigned long long number = 0;
-        if (std::sscanf(name.c_str(), "seg-%llu", &number) == 1)
-            next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
-        if (std::find(named.begin(), named.end(), name) == named.end()) fs::remove_all(entry.path(), ec);
+        const auto name      = entry.path().filename().string();
+        const bool temporary = name.size() > 4 && name.compare(name.size() - 4, 4, ".tmp") == 0;
+        if (name.rfind("seg-", 0) == 0) {
+            unsigned long long number = 0;
+            if (std::sscanf(name.c_str(), "seg-%llu", &number) == 1)
+                next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
+            if (temporary || std::find(named.begin(), named.end(), name) == named.end())
+                fs::remove_all(entry.path(), ec);
+        } else if (temporary) {
+            fs::remove_all(entry.path(), ec);
+        }
     }
     std::lock_guard lock(mutex_);
     current_ = std::move(snap);
@@ -477,6 +552,9 @@ uint32_t Database::nameId(const std::string& name, std::vector<std::string>& add
 Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates) {
     Appended appended;
     std::lock_guard lock(mutex_);
+    // Each game's key, made once: for the duplicates, the key column and the keys known after.
+    std::vector<uint64_t> keys(games.size());
+    for (std::size_t i = 0; i < games.size(); ++i) keys[i] = duplicateKey(games[i]);
     if (!keep_duplicates) {
         if (!keys_indexed_) {
             known_keys_.reserve(current_->games_);
@@ -484,20 +562,31 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
             std::sort(known_keys_.begin(), known_keys_.end());
             keys_indexed_ = true;
         }
-        std::vector<uint64_t> batch;
+        // Left out: a game whose key the database has, or a game before it in the batch. Sorted by key, then by
+        // place, the first of a key comes first.
+        std::vector<std::pair<uint64_t, std::size_t>> order(games.size());
+        for (std::size_t i = 0; i < games.size(); ++i) order[i] = {keys[i], i};
+        std::sort(order.begin(), order.end());
+        std::vector<char> left_out(games.size(), 0);
+        for (std::size_t j = 0; j < order.size(); ++j) {
+            const auto [key, i] = order[j];
+            if ((j > 0 && order[j - 1].first == key) || std::binary_search(known_keys_.begin(), known_keys_.end(), key))
+                left_out[i] = 1;
+        }
         std::size_t kept = 0;
         for (std::size_t i = 0; i < games.size(); ++i) {
-            const auto key = duplicateKey(games[i]);
-            if (std::binary_search(known_keys_.begin(), known_keys_.end(), key) ||
-                std::find(batch.begin(), batch.end(), key) != batch.end()) {
+            if (left_out[i]) {
                 ++appended.duplicates;
                 continue;
             }
-            batch.push_back(key);
-            if (kept != i) games[kept] = std::move(games[i]);
+            if (kept != i) {
+                games[kept] = std::move(games[i]);
+                keys[kept]  = keys[i];
+            }
             ++kept;
         }
         games.resize(kept);
+        keys.resize(kept);
     }
     if (games.empty()) return appended;
     if (!names_indexed_) {
@@ -534,7 +623,11 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
                 std::vector<std::pair<std::string, std::string>> others;
                 for (const auto& [tag, value] : g.tags) {
                     const auto column = std::find(NAME_TAGS.begin(), NAME_TAGS.end(), tag);
-                    if (column != NAME_TAGS.end()) {
+                    // A site that is the game's own address (Lichess's) would add a name for each game: kept in
+                    // the annex with the other tags.
+                    const bool own_address =
+                        tag == "Site" && (value.rfind("https://", 0) == 0 || value.rfind("http://", 0) == 0);
+                    if (column != NAME_TAGS.end() && !own_address) {
                         auto& slot = names[static_cast<std::size_t>(column - NAME_TAGS.begin())];
                         if (slot.empty()) {
                             slot = value;
@@ -577,7 +670,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
                 if (!g.evals.empty()) flags |= GAME_EVALS;
                 put(FLAGS, k, flags);
                 put(RESULT, k, static_cast<uint8_t>(g.result));
-                put(KEY, k, duplicateKey(g));
+                put(KEY, k, keys[from + k]);
                 put(MOVES, k, static_cast<uint64_t>(moves.size()));
                 moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
                 put(ANNEX, k, static_cast<uint64_t>(annex.size()));
@@ -667,8 +760,11 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
     next_segment_ += made.size();
     current_ = std::move(snap);
     if (keys_indexed_) {
-        for (const auto& g : games) known_keys_.push_back(duplicateKey(g));
-        std::sort(known_keys_.begin(), known_keys_.end());
+        // Merged in: a sort of the new keys only, however many the database has.
+        const auto before = static_cast<std::ptrdiff_t>(known_keys_.size());
+        known_keys_.insert(known_keys_.end(), keys.begin(), keys.end());
+        std::sort(known_keys_.begin() + before, known_keys_.end());
+        std::inplace_merge(known_keys_.begin(), known_keys_.begin() + before, known_keys_.end());
     }
     appended.added = games.size();
     return appended;

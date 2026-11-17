@@ -20,6 +20,27 @@ inline int sideOf(uint8_t piece) noexcept { return (piece - 1) / 6; }
 // Polyglot's numbering: black pawn 0, white pawn 1, black knight 2, … white king 11.
 inline int polyglotPiece(int side, int kind) noexcept { return 2 * kind + (side == WHITE_SIDE ? 1 : 0); }
 
+// The codes of a piece: a pawn's four (one step, two steps, two captures), twelve on the rank before it promotes (three
+// ways, four promotions), a knight's eight jumps, a bishop's or a rook's fourteen targets, a queen's twenty-eight, a
+// king's eight steps and two castlings.
+int pieceCodes(int side, int kind, int square) noexcept {
+    switch (kind) {
+        case PAWN: {
+            const int rank = side == WHITE_SIDE ? rankOf(square) : 7 - rankOf(square);
+            return rank == 6 ? 12 : 4;
+        }
+        case KNIGHT:
+            return 8;
+        case BISHOP:
+        case ROOK:
+            return 14;
+        case QUEEN:
+            return 28;
+        default:
+            return 10;
+    }
+}
+
 inline uint64_t rookAttacks(int square, uint64_t occupied) noexcept {
     return chess::attacks::rook(chess::Square(square), chess::Bitboard(occupied)).getBits();
 }
@@ -137,6 +158,8 @@ void ScanBoard::put(int square, int side, int kind) noexcept {
     bb_[side][kind] |= bit(square);
     occ_[side] |= bit(square);
     if (kind == KING) king_[side] = static_cast<uint8_t>(square);
+    size_[square] = static_cast<uint8_t>(pieceCodes(side, kind, square));
+    codes_[side] += size_[square];
     key_ ^= zobrist::piece(polyglotPiece(side, kind), square);
 }
 
@@ -146,6 +169,8 @@ void ScanBoard::remove(int square) noexcept {
     board_[square] = 0;
     bb_[side][kind] &= ~bit(square);
     occ_[side] &= ~bit(square);
+    codes_[side] -= size_[square];
+    size_[square] = 0;
     key_ ^= zobrist::piece(polyglotPiece(side, kind), square);
 }
 
@@ -169,29 +194,9 @@ uint64_t ScanBoard::epKey() const noexcept {
     return (beside & bb_[stm_][PAWN]) ? zobrist::enPassant(fileOf(ep_)) : 0;
 }
 
-int ScanBoard::codeSize(int square) const noexcept {
-    switch (kindOf(board_[square])) {
-        case PAWN: {
-            const int rank = stm_ == WHITE_SIDE ? rankOf(square) : 7 - rankOf(square);
-            return rank == 6 ? 12 : 4;
-        }
-        case KNIGHT:
-            return 8;
-        case BISHOP:
-        case ROOK:
-            return 14;
-        case QUEEN:
-            return 28;
-        default:
-            return 10;
-    }
-}
+int ScanBoard::codeSize(int square) const noexcept { return size_[square]; }
 
-int ScanBoard::codeCount() const noexcept {
-    int count = 1;  // the null move
-    for (uint64_t own = occ_[stm_]; own; own &= own - 1) count += codeSize(lowest(own));
-    return count;
-}
+int ScanBoard::codeCount() const noexcept { return 1 + codes_[stm_]; }  // the null move's, and the pieces'
 
 int ScanBoard::encode(const CodedMove& move) const noexcept {
     if (move.flags & MOVE_NULL) return codeCount() - 1;

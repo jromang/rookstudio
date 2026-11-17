@@ -74,6 +74,8 @@ class ScanBoard {
 
     uint64_t bb_[2][6]{};
     uint64_t occ_[2]{};
+    int codes_[2]{};      // the codes of each side's pieces, kept as they come and go
+    uint8_t size_[64]{};  // the codes of the piece on each square
     uint8_t board_[64]{};
     uint8_t king_[2]{};
     int8_t rook_[2][2] = {{-1, -1}, {-1, -1}};  // the castling rooks' squares: [side][short, long], -1 no right

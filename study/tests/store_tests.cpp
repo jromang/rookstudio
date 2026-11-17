@@ -99,6 +99,12 @@ TEST_CASE("store: games written, read back as they were imported, and again once
         CHECK((snap->row(3).flags & GAME_CHESS960) != 0);
         CHECK((snap->row(4).flags & GAME_DAMAGED) != 0);
         CHECK(snap->moves(0).size() == 9);
+        // Lichess's sites, each game's own address, are no names: in the annex, given back in their place.
+        CHECK(row.site.empty());
+        const auto first = snap->game(0);
+        REQUIRE(first.tags.size() > 2);
+        CHECK(first.tags[1] == std::pair<std::string, std::string>{"Site", "https://lichess.org/abc00000"});
+        for (uint32_t n = 0; n < snap->names(); ++n) CHECK(snap->name(n).rfind("https://", 0) != 0);
     }
     auto db         = Database::open(dir);
     const auto snap = db->snapshot();
@@ -122,16 +128,26 @@ TEST_CASE("store: a reader's snapshot outlives the commits after it; names share
     CHECK(db->snapshot()->games() == 120);
     const auto kept = db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 6), true);
     CHECK(kept.added == 6);
+    const auto after_kept = db->snapshot();
+    // A game twice in one batch, new to the database: added once.
+    auto fresh = games[0];
+    for (auto& [tag, value] : fresh.tags) {
+        if (tag == "Event") value += " (again)";
+    }
+    const auto twice = db->append({fresh, fresh});
+    CHECK(twice.added == 1);
+    CHECK(twice.duplicates == 1);
     const auto last = db->snapshot();
     CHECK(last->key(120) == last->key(0));
     CHECK(first->games() == 60);
-    CHECK(last->games() == 126);
-    CHECK(last->generation() == first->generation() + 2);
+    CHECK(last->games() == 127);
+    CHECK(last->generation() == first->generation() + 3);
     // The first snapshot reads its games as before.
     for (std::size_t i = 0; i < 60; ++i) sameGame(first->game(i), games[i]);
     for (std::size_t i = 0; i < 6; ++i) sameGame(last->game(120 + i), games[i]);
-    // Names already in the database are not added again: six games seen before add none.
-    CHECK(last->names() == middle->names());
+    // Names already in the database are not added again: six games seen before add none, the new event one.
+    CHECK(after_kept->names() == middle->names());
+    CHECK(last->names() == middle->names() + 1);
     CHECK(last->row(120).event == first->row(0).event);
 }
 
@@ -182,6 +198,40 @@ TEST_CASE("store: a crash at any step of a commit leaves the database as it was,
     }
 }
 
+TEST_CASE("store: what a killed program left is cleared when the database opens") {
+    const auto games = fixtureGames();
+    const auto dir   = freshFolder("store-killed.fcgdb");
+    {
+        auto db = Database::create(dir);
+        db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 30));
+    }
+    // A program killed in a commit leaves its new manifest not renamed yet, and a segment the manifest does not name.
+    std::ofstream(dir / "manifest.json.tmp") << "{\"format\":\"rookstudio-database\"";
+    fs::create_directories(dir / "seg-000009");
+    std::ofstream(dir / "seg-000009" / "cols.bin") << "half";
+    auto db = Database::open(dir);
+    CHECK(db->snapshot()->games() == 30);
+    CHECK_FALSE(fs::exists(dir / "manifest.json.tmp"));
+    CHECK_FALSE(fs::exists(dir / "seg-000009"));
+    // Killed while it made a database: its lock and its first manifest are all there is, and a database can be made
+    // there.
+    const auto unborn = freshFolder("store-unborn.fcgdb");
+    fs::create_directories(unborn);
+    std::ofstream(unborn / "tournament.lock") << "";
+    std::ofstream(unborn / "manifest.json.tmp") << "{";
+    CHECK_THROWS(Database::open(unborn));
+    CHECK(Database::create(unborn)->snapshot()->games() == 0);
+    CHECK_FALSE(fs::exists(unborn / "manifest.json.tmp"));
+    const auto taken = freshFolder("store-taken");
+    fs::create_directories(taken);
+    std::ofstream(taken / "notes.txt") << "mine";
+    CHECK_THROWS(Database::create(taken));
+    // The next segment does not take the leftover's number again.
+    db->append(std::vector<ImportedGame>(games.begin() + 30, games.end()));
+    CHECK(fs::exists(dir / "seg-000010"));
+    CHECK(Database::open(dir)->snapshot()->games() == games.size());
+}
+
 TEST_CASE("store: a disk that refuses leaves the database as before; what is no database is refused") {
     const auto games = fixtureGames();
     const auto dir   = freshFolder("store-refused.fcgdb");
@@ -208,4 +258,52 @@ TEST_CASE("store: a disk that refuses leaves the database as before; what is no 
     CHECK(packDate("yesterday") == 0);
     CHECK(ecoText(packEco("B90")) == "B90");
     CHECK(packEco("Z99") == 0);
+}
+
+TEST_CASE("store: a file imported into a database, committed as it goes; cancelled or refused, it keeps what it had") {
+    const auto games = fixtureGames();
+    const auto dir   = freshFolder("store-import.fcgdb");
+    auto db          = Database::create(dir);
+    std::atomic<bool> go_on{false};
+    ImportProgress progress;
+    auto got = importInto(*db, data("games.pgn"), ImportOptions{2, 4096}, progress, go_on, false, 50);
+    CHECK(got.error.empty());
+    CHECK(got.read.games == 120);
+    CHECK(got.added == 120);
+    CHECK(got.commits >= 2);
+    REQUIRE(db->snapshot()->games() == 120);
+    for (std::size_t i = 0; i < games.size(); ++i) sameGame(db->snapshot()->game(i), games[i]);
+    // Again, from another copy of the file: nothing added.
+    ImportProgress again;
+    got = importInto(*db, data("games.pgn.zst"), ImportOptions{2, 4096}, again, go_on);
+    CHECK(got.added == 0);
+    CHECK(got.duplicates == 120);
+
+    // Cancelled at once: what was read is committed, and the next import adds the rest, in the file's order.
+    auto other = Database::create(freshFolder("store-import-cancelled.fcgdb"));
+    std::atomic<bool> stop{true};
+    ImportProgress first;
+    got = importInto(*other, data("games.pgn"), ImportOptions{2, 4096}, first, stop, false, 50);
+    CHECK(got.read.cancelled);
+    CHECK(other->snapshot()->games() < 120);
+    ImportProgress rest;
+    got = importInto(*other, data("games.pgn"), ImportOptions{2, 4096}, rest, go_on, false, 50);
+    REQUIRE(other->snapshot()->games() == 120);
+    for (std::size_t i = 0; i < games.size(); ++i) sameGame(other->snapshot()->game(i), games[i]);
+
+    // The disk refuses the second commit: said, and the first kept.
+    auto refused  = Database::create(freshFolder("store-import-refused.fcgdb"));
+    int committed = 0;
+    setCommitFaultHook([&](std::string_view step) {
+        if (step == "manifest written") ++committed;
+        if (committed == 1 && step == "write moves.bin") throw std::runtime_error("disk full");
+    });
+    ImportProgress full;
+    got = importInto(*refused, data("games.pgn"), ImportOptions{2, 4096}, full, go_on, false, 50);
+    setCommitFaultHook({});
+    CHECK(got.error == "disk full");
+    CHECK(got.commits == 1);
+    CHECK(refused->snapshot()->games() == got.added);
+    CHECK(got.added >= 50);
+    CHECK(got.added < 120);
 }

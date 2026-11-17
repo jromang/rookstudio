@@ -164,7 +164,7 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
         }
         for (std::size_t id = from; id < to; ++id) {
             if ((id & 0xFFFF) == 0 && cancel && cancel->load(std::memory_order_relaxed)) return;
-            const auto row = snapshot->row(id);
+            const auto row = snapshot->numbers(id);
             if (filter.result && row.result != filter.result) continue;
             if (filter.annotated && !(row.flags & GAME_ANNOTATED)) continue;
             if (filter.elo_min && (row.white_elo < filter.elo_min || row.black_elo < filter.elo_min)) continue;
@@ -212,7 +212,7 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
                                                               : ids.round;
                 key                 = names->rank[name];
             } else {
-                const auto row = snapshot->row(id);
+                const auto row = snapshot->numbers(id);
                 switch (sort) {
                     case SortBy::Date:
                         key = row.date;

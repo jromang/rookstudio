@@ -10,6 +10,7 @@
 //     seg-NNNNNN/     cols.bin (the header columns), moves.bin (the moves' codes), annex.bin (FEN, other tags, the
 //                     text of annotated or damaged games, clocks, evaluations), names.bin (the names it adds)
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -52,6 +53,24 @@ struct HeaderRow {
     char result        = '*';
 };
 
+// A game's numbers, without its names: what filters and sorts read of every game.
+struct HeaderNumbers {
+    uint32_t date      = 0;
+    uint32_t plies     = 0;
+    uint16_t white_elo = 0;
+    uint16_t black_elo = 0;
+    uint16_t eco       = 0;
+    uint16_t flags     = 0;
+    char result        = '*';
+};
+
+// A game's move codes, what replaying it needs (a game with a start position of its own: GAME_FEN).
+struct GameMoves {
+    std::span<const uint8_t> codes;
+    uint32_t plies = 0;
+    uint16_t flags = 0;
+};
+
 [[nodiscard]] uint32_t packDate(std::string_view pgn_date);
 // A game's key for finding duplicates: a hash of its event, site, round, players, date, start, moves and result.
 // Two rounds of a tournament with the same moves are two games.
@@ -67,6 +86,8 @@ class Snapshot {
     [[nodiscard]] uint64_t games() const noexcept { return games_; }
     [[nodiscard]] uint64_t generation() const noexcept { return generation_; }
     [[nodiscard]] HeaderRow row(GameId id) const;
+    [[nodiscard]] HeaderNumbers numbers(GameId id) const;
+    [[nodiscard]] GameMoves gameMoves(GameId id) const;
     // The ids of a game's names, for the filters and sorts that read names once.
     struct NameIds {
         uint32_t white = 0, black = 0, event = 0, site = 0, round = 0;
@@ -129,6 +150,22 @@ class Database {
     bool keys_indexed_     = false;
     uint64_t next_segment_ = 1;
 };
+
+struct DatabaseImport {
+    ImportReport read;  // what reading the file gave
+    uint64_t added      = 0;
+    uint64_t duplicates = 0;
+    uint64_t commits    = 0;
+    std::string error;  // why the disk refused; the games committed before stay
+};
+
+// The games of `file` (PGN, .zst, .gz, .zip) added to `db`, committed every `commit_games` games and at the end: a
+// crash or a cancel keeps what was committed, and importing the file again adds the rest only (the duplicates are
+// left out, unless `keep_duplicates`). `cancel` stops the reading within a tenth of a second, what was read being
+// committed; importInto sets it itself when the disk refuses (`error` then says why).
+DatabaseImport importInto(Database& db, const std::filesystem::path& file, const ImportOptions& options,
+                          ImportProgress& progress, std::atomic<bool>& cancel, bool keep_duplicates = false,
+                          std::size_t commit_games = std::size_t{1} << 18);
 
 // For the tests: called at each step of a commit with its name; an exception thrown from it stops the commit there,
 // as a crash would. Empty: none.

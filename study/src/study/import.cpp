@@ -286,7 +286,8 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
     std::condition_variable work, ready;
     std::deque<std::pair<uint64_t, std::string>> todo;
     std::map<uint64_t, std::vector<ImportedGame>> done;
-    uint64_t pieces = 0;  // made by the reader
+    uint64_t pieces     = 0;  // made by the reader
+    std::size_t working = 0;  // pieces a worker reads now
     bool read_all   = false;
     bool stop       = false;
     std::string error;
@@ -300,6 +301,7 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
                 if (stop || (todo.empty() && read_all)) return;
                 job = std::move(todo.front());
                 todo.pop_front();
+                ++working;
             }
             work.notify_all();  // room for the reader
             std::vector<ImportedGame> games;
@@ -311,6 +313,7 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
             {
                 std::lock_guard lock(mutex);
                 done.emplace(job.first, std::move(games));
+                --working;
             }
             ready.notify_all();
         }
@@ -321,9 +324,11 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
         std::vector<char> buffer(1 << 20);
         const auto give = [&](std::string text) {
             std::unique_lock lock(mutex);
-            // No more than two pieces a worker waiting or read and not given yet: the memory stays bounded
-            // whatever the file's size.
-            work.wait(lock, [&] { return stop || todo.size() + done.size() < static_cast<std::size_t>(3 * threads); });
+            // No more than three pieces a worker, and 24 in all, waiting, being read, or read and not given yet: the
+            // memory stays bounded whatever the file's size and the machine's cores (24 pieces keep 8 workers busy,
+            // and more workers wait on the commits anyway).
+            const auto most = std::min<std::size_t>(static_cast<std::size_t>(3 * threads), 24);
+            work.wait(lock, [&] { return stop || todo.size() + working + done.size() < most; });
             if (stop) return false;
             todo.emplace_back(pieces++, std::move(text));
             lock.unlock();

@@ -38,10 +38,22 @@ zstd -19 briefs.jsonl -o briefs-heldout.jsonl.zst
 `golden_tests.cpp` holds the port to them: the facts, the template comments, and the prompts, which the port makes with
 the opening names of `commentary/data/openings.tsv` as the prototype's tool does.
 
+## reviews-heldout.jsonl.zst
+
+The review of each held-out case's move made again by the prototype's present rules, from the engine lines the case
+keeps (`rookstudio-dataset rescore`), the cases it no longer singles out left out; of each, its id and review only:
+
+```sh
+rookstudio-dataset rescore cases-heldout-confirmed.jsonl rescored.jsonl
+# keep {"id", "review"} of each line, then
+zstd -19 reviews.jsonl -o reviews-heldout.jsonl.zst
+```
+
 A larger corpus made the same way (the prototype's training cases, kept out of the repository) checks the branches the
 held-out cases do not reach:
 
 ```sh
 rookstudio-dataset briefs cases.jsonl --out briefs.jsonl --lang both
-FCG_GOLDEN_CASES=cases.jsonl FCG_GOLDEN_BRIEFS=briefs.jsonl build/fcg-commentary-tests -tc='golden*'
+FCG_GOLDEN_CASES=cases.jsonl FCG_GOLDEN_BRIEFS=briefs.jsonl FCG_GOLDEN_REVIEWS=reviews.jsonl \
+    build/fcg-commentary-tests -tc='golden*'
 ```

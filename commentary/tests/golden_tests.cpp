@@ -3,8 +3,8 @@
 // done, the template comment, the prompt its language model gets) must come out the same. See data/README.md for how
 // the reference files were made.
 //
-// FCG_GOLDEN_CASES and FCG_GOLDEN_BRIEFS point the tests at a larger corpus kept out of the repository, made the same
-// way: a local check of the branches the held-out cases do not reach.
+// FCG_GOLDEN_CASES, FCG_GOLDEN_BRIEFS and FCG_GOLDEN_REVIEWS point the tests at a larger corpus kept out of the
+// repository, made the same way: a local check of the branches the held-out cases do not reach.
 
 #include <doctest/doctest.hpp>
 
@@ -24,6 +24,7 @@
 #include <commentary/gather.hpp>
 #include <commentary/notation.hpp>
 #include <commentary/openings.hpp>
+#include <commentary/review.hpp>
 #include <study/sources.hpp>
 
 using namespace fcg::commentary;
@@ -211,4 +212,92 @@ TEST_CASE("golden: the prompts the prototype gives its language model on its hel
         MESSAGE(code << ": " << n.first << " prompts compared, " << n.second << " differ");
     CHECK(counts["en"].second == 0);
     CHECK(counts["fr"].second == 0);
+}
+
+TEST_CASE("golden: the review of each case's move, made again from the engine lines it keeps") {
+    // The prototype's `rescore`: each case reviewed again by the present rules, those still worth a comment kept.
+    const char* env = std::getenv("FCG_GOLDEN_REVIEWS");
+    std::map<std::string, nlohmann::json> rescored;
+    eachLine(env ? fs::path(env) : data("reviews-heldout.jsonl.zst"),
+             [&](const nlohmann::json& j) { rescored[j.at("id").get<std::string>()] = j.at("review"); });
+    const auto& corpus = goldenCorpus();
+    int compared = 0, wrong = 0, dropped = 0;
+    for (const auto& c : corpus.cases) {
+        const auto replayed = replay(c);
+        REQUIRE(replayed);
+        const auto& old = c.review;
+        // As the prototype's Case::reviewed_again: the case as it was when its lines do not allow a review.
+        auto again          = old;
+        auto again_judgment = replayed->report.judgment;
+        auto after          = replayed->before;
+        after.playUnchecked(replayed->played);
+        // How a game ends in a position, when it does: shakmaty's outcome().
+        std::optional<GameEnd> end;
+        if (after.isCheckmate())
+            end = GameEnd::checkmate(!after.turn());
+        else if (after.isStalemate() || after.isInsufficientMaterial())
+            end = GameEnd::draw();
+        std::optional<PositionAnalysis> a_after;
+        if (replayed->reply)
+            a_after = PositionAnalysis{{*replayed->reply}, std::nullopt};
+        else if (end)
+            a_after = PositionAnalysis::ended(*end);
+        std::optional<Weighed> weighed;
+        if (replayed->best && a_after) {
+            PositionAnalysis a_before{{*replayed->best}, std::nullopt};
+            if (replayed->second) a_before.lines.push_back(*replayed->second);
+            weighed = weigh(a_before, *a_after, replayed->before.turn(), replayed->played);
+        }
+        if (weighed) {
+            const bool forced    = takesBackTheOnlyWay(replayed->before, replayed->previous, replayed->played);
+            again_judgment       = old.book ? std::nullopt : weighed->judgment;
+            const bool only_move = weighed->only && weighed->played_best && !old.book && !forced;
+            again.win_before     = weighed->win_before;
+            again.win_after      = weighed->win_after;
+            again.accuracy       = weighed->accuracy;
+            again.cp_loss        = weighed->cp_loss;
+            again.played_best    = weighed->played_best;
+            again.only_move      = only_move;
+            // Without the second line, the lead over it is as the case had it.
+            if (c.second) again.only_gap = weighed->only_gap;
+            again.key = old.key && (again_judgment || only_move);
+        }
+        const bool worth = again_judgment || again.only_move || again.key || again.plan || again.novelty;
+        const auto it    = rescored.find(c.id);
+        if (it == rescored.end()) {
+            ++dropped;
+            CHECK_MESSAGE(!worth, c.id << ": still worth a comment, the prototype left it out");
+            continue;
+        }
+        const auto& r = it->second;
+        std::vector<std::string> differ;
+        const auto judgment_name = [](std::optional<Judgment> j) -> std::optional<std::string> {
+            if (!j) return std::nullopt;
+            return *j == Judgment::Blunder ? "blunder" : *j == Judgment::Mistake ? "mistake" : "inaccuracy";
+        };
+        const auto theirs_judgment =
+            r.contains("judgment") ? std::optional<std::string>(r.at("judgment").get<std::string>()) : std::nullopt;
+        if (again.win_before != r.at("win_before").get<double>()) differ.push_back("win_before");
+        if (again.win_after != r.at("win_after").get<double>()) differ.push_back("win_after");
+        if (again.accuracy != r.at("accuracy").get<double>()) differ.push_back("accuracy");
+        if (again.cp_loss != r.at("cp_loss").get<int32_t>()) differ.push_back("cp_loss");
+        if (judgment_name(again_judgment) != theirs_judgment) differ.push_back("judgment");
+        if (again.played_best != r.at("played_best").get<bool>()) differ.push_back("played_best");
+        if (again.only_move != r.at("only_move").get<bool>()) differ.push_back("only_move");
+        if (again.only_gap != r.at("only_gap").get<double>()) differ.push_back("only_gap");
+        if (again.key != r.at("key").get<bool>()) differ.push_back("key");
+        ++compared;
+        if (differ.empty()) continue;
+        if (++wrong <= 4) {
+            std::string fields;
+            for (const auto& d : differ) fields += " " + d;
+            FAIL_CHECK(c.id << ":" << fields << "\n  ours: " << again.win_before << " -> " << again.win_after
+                            << ", accuracy " << again.accuracy << ", cp " << again.cp_loss
+                            << "\n  the prototype's: " << r.dump());
+        }
+    }
+    MESSAGE(compared << " moves reviewed again, " << wrong << " differ; " << dropped
+                     << " no longer worth a comment, as the prototype finds");
+    CHECK(wrong == 0);
+    if (!env) CHECK(compared == 254);
 }

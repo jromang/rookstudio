@@ -59,6 +59,34 @@ Searched searched(const Position& pos, const EngineLine& line) {
     return out;
 }
 
+double winPercentFor(int32_t white_cp, Color side) noexcept {
+    return side == Color::White ? winPercent(white_cp) : 100.0 - winPercent(white_cp);
+}
+
+std::optional<int32_t> PositionAnalysis::whiteCp() const noexcept {
+    if (end) return end->winner ? (*end->winner == Color::White ? CP_CAP : -CP_CAP) : 0;
+    if (const auto* b = best()) return b->whiteCp();
+    return std::nullopt;
+}
+
+std::optional<double> PositionAnalysis::whiteExpected() const noexcept {
+    if (end) return end->winner ? (*end->winner == Color::White ? 100.0 : 0.0) : 50.0;
+    if (const auto* b = best()) return b->whiteExpected();
+    return std::nullopt;
+}
+
+bool PositionAnalysis::isExact() const noexcept {
+    const auto* b = best();
+    return end.has_value() || (b && b->isExact());
+}
+
+bool PositionAnalysis::hasMate(Color side) const noexcept {
+    if (end && end->winner) return *end->winner == side;
+    const auto* b = best();
+    if (b && b->score.kind == Score::Kind::Mate) return (b->score.value > 0) == (side == Color::White);
+    return false;
+}
+
 Standing standingOf(double expected) noexcept {
     if (expected < 10.0) return Standing::Lost;
     if (expected < 30.0) return Standing::ClearlyWorse;

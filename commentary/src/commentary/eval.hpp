@@ -4,6 +4,7 @@
 // crates/analysis: eval.rs, phase.rs and the move report of report.rs).
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -42,6 +43,35 @@ struct EngineLine {
 }
 // The chances between people, in percent, for the side whose centipawns these are (lichess formula).
 [[nodiscard]] double winPercent(int32_t cp) noexcept;
+// `winPercent` seen from `side`, given White's centipawns.
+[[nodiscard]] double winPercentFor(int32_t white_cp, Color side) noexcept;
+// How a game ended in a position, when it did.
+struct GameEnd {
+    std::optional<Color> winner;  // the side that mated; none for a draw
+    [[nodiscard]] static GameEnd checkmate(Color winner) noexcept { return {winner}; }
+    [[nodiscard]] static GameEnd draw() noexcept { return {}; }
+    bool operator==(const GameEnd&) const = default;
+};
+// An analyzed position: the engine's lines, best first, or the end of the game.
+struct PositionAnalysis {
+    std::vector<EngineLine> lines;
+    std::optional<GameEnd> end;
+
+    [[nodiscard]] static PositionAnalysis ended(GameEnd end) { return {{}, end}; }
+    [[nodiscard]] const EngineLine* best() const noexcept { return lines.empty() ? nullptr : &lines[0]; }
+    [[nodiscard]] const EngineLine* second() const noexcept { return lines.size() < 2 ? nullptr : &lines[1]; }
+    // White's evaluation in centipawns, capped; mates and finished games at the cap.
+    [[nodiscard]] std::optional<int32_t> whiteCp() const noexcept;
+    // White's expected score in percent (EngineLine::whiteExpected); a finished game counts for what it is.
+    [[nodiscard]] std::optional<double> whiteExpected() const noexcept;
+    // The outcome is known exactly: the game is over, or the best line is the tablebases'.
+    [[nodiscard]] bool isExact() const noexcept;
+    // `side` has mated, or has a forced mate in the best line.
+    [[nodiscard]] bool hasMate(Color side) const noexcept;
+    // `side` is mated, or gets mated in the best line.
+    [[nodiscard]] bool isMated(Color side) const noexcept { return hasMate(!side); }
+    bool operator==(const PositionAnalysis&) const = default;
+};
 // An engine line from `pos`, its score turned to the side to move: what the oracle answers.
 [[nodiscard]] Searched searched(const Position& pos, const EngineLine& line);
 
@@ -59,6 +89,8 @@ enum class Standing : uint8_t { Lost, ClearlyWorse, SlightlyWorse, Balanced, Sli
 
 // The review's verdict on one move.
 struct MoveReport {
+    // The move's place in the main line, from 1: the index of the position after it.
+    std::size_t ply = 0;
     Color mover = Color::White;
     Phase phase = Phase::Opening;
     // The mover's expected score before and after the move, in percent, as the engine sees it.

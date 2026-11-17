@@ -165,6 +165,11 @@ struct Piece {
     constexpr bool operator==(const Piece&) const noexcept = default;
 };
 
+namespace attacks {
+// What a piece attacks from `s` with `occupied` the squares in the way (shakmaty's attacks::attacks).
+[[nodiscard]] Bitboard of(Piece p, Square s, Bitboard occupied) noexcept;
+}  // namespace attacks
+
 class Board {
    public:
     [[nodiscard]] static Board empty() noexcept { return {}; }
@@ -301,6 +306,9 @@ class Position {
     [[nodiscard]] bool isGameOver() const { return legalMoves().empty() || isInsufficientMaterial(); }
 
     void playUnchecked(const Move& m) noexcept;
+    // The same position with the other side to move, the en passant square dropped (a null move); none when the side to
+    // move is in check, which would leave the other side in check (shakmaty's swap_turn).
+    [[nodiscard]] std::optional<Position> swappedTurn() const;
 
     // FEN, the en passant square only when a capture there is legal.
     [[nodiscard]] std::string fen() const;

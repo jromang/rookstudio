@@ -98,6 +98,22 @@ Bitboard king(Square s) noexcept { return bb(chess::attacks::king(cs(s))); }
 Bitboard between(Square a, Square b) noexcept { return Bitboard(lines().between[index(a)][index(b)]); }
 Bitboard ray(Square a, Square b) noexcept { return Bitboard(lines().ray[index(a)][index(b)]); }
 bool aligned(Square a, Square b, Square c) noexcept { return ray(a, b).contains(c); }
+Bitboard of(Piece p, Square s, Bitboard occupied) noexcept {
+    switch (p.role) {
+        case Role::Pawn:
+            return pawn(p.color, s);
+        case Role::Knight:
+            return knight(s);
+        case Role::Bishop:
+            return bishop(s, occupied);
+        case Role::Rook:
+            return rook(s, occupied);
+        case Role::Queen:
+            return queen(s, occupied);
+        default:
+            return king(s);
+    }
+}
 }  // namespace attacks
 
 Board Board::initial() noexcept {
@@ -529,6 +545,14 @@ void Position::playUnchecked(const Move& m) noexcept {
     }
     if (color == Color::Black) ++fullmoves_;
     turn_ = !color;
+}
+
+std::optional<Position> Position::swappedTurn() const {
+    if (isCheck()) return std::nullopt;
+    Position p = *this;
+    p.turn_    = !turn_;
+    p.ep_.reset();
+    return p;
 }
 
 std::string Position::fen() const {

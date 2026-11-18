@@ -3,3 +3,6 @@ app/third_party/gzip/*
 app/fmt/gzip/*
 app/doctest/gzip/*
 
+# Data, written as it reads best: the engine catalogue, the releases the tests read
+gui/assets/*.json
+gui/tests/data/*.json

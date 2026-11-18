@@ -1,0 +1,943 @@
+{
+ "gaia": [
+  {
+   "tag_name": "v4.4.4",
+   "published_at": "2026-11-18T06:38:32Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "gaiachess-android-neon",
+     "state": "uploaded",
+     "size": 118024760,
+     "digest": "sha256:eaa4ccdce47cc261fc72a719b7e32b8beaf32a6cd5238be2ff27cb41e663fa08",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-android-neon"
+    },
+    {
+     "name": "gaiachess-linux-compat",
+     "state": "uploaded",
+     "size": 120890560,
+     "digest": "sha256:cdab166b6021c8de3be7abc367422b64d04285aaefc60fa2df9d663cd6cb1fc9",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-linux-compat"
+    },
+    {
+     "name": "gaiachess-linux-neon",
+     "state": "uploaded",
+     "size": 118911776,
+     "digest": "sha256:9739f13b99b9d25bbd566dd5df519a4e83645903f9056d78d425bdda96b90179",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-linux-neon"
+    },
+    {
+     "name": "gaiachess-linux-universal",
+     "state": "uploaded",
+     "size": 120087152,
+     "digest": "sha256:f0b76019d44d3595c32f6ba0aec843523149a82dbf2ed97065f2897f570cb39e",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-linux-universal"
+    },
+    {
+     "name": "gaiachess-macos-apple-silicon",
+     "state": "uploaded",
+     "size": 119386512,
+     "digest": "sha256:5d6a122db07e3d9ebcafbfb93819444dca31b864b48187597675a2d51e6f0b4f",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-macos-apple-silicon"
+    },
+    {
+     "name": "gaiachess-web.zip",
+     "state": "uploaded",
+     "size": 115588140,
+     "digest": "sha256:9a86cc3d8d59ec5aecbdee5e9051c0ec341a0a20eb11aeae7a824d4f5152249b",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-web.zip"
+    },
+    {
+     "name": "gaiachess-windows-compat.exe",
+     "state": "uploaded",
+     "size": 120321536,
+     "digest": "sha256:e8644a6e23ab13fbdf569663da2d976f678531fac2210d6f657ecc4c81c3ccef",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-windows-compat.exe"
+    },
+    {
+     "name": "gaiachess-windows-console.exe",
+     "state": "uploaded",
+     "size": 118710784,
+     "digest": "sha256:655c32ec332d1871023a15afd79f5f779883a4ed383479cfcdcc7db26661c3a1",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-windows-console.exe"
+    },
+    {
+     "name": "gaiachess-windows-universal.exe",
+     "state": "uploaded",
+     "size": 119513088,
+     "digest": "sha256:0c88d812951bd8f8eb179dd4361211af29d11824ea25f1bbd6f983b9baf1125e",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/gaiachess-windows-universal.exe"
+    },
+    {
+     "name": "THIRD-PARTY-LICENSES.txt",
+     "state": "uploaded",
+     "size": 324205,
+     "digest": "sha256:e5c292a29b091a8359755625cbb0d27eab4bfd70f34b3d289cb16c6384266244",
+     "browser_download_url": "https://github.com/jromang/gaiachess/releases/download/v4.4.4/THIRD-PARTY-LICENSES.txt"
+    }
+   ]
+  }
+ ],
+ "stockfish": [
+  {
+   "tag_name": "sf_19",
+   "published_at": "2026-09-05T08:33:17Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "stockfish-android-arm64-universal.tar.gz",
+     "state": "uploaded",
+     "size": 80233187,
+     "digest": "sha256:ebb24051aa4a222b4daaf049b882ecf1163d370c128fe02316602643f4d5e426",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-android-arm64-universal.tar.gz"
+    },
+    {
+     "name": "stockfish-android-armv7-neon.tar.gz",
+     "state": "uploaded",
+     "size": 80008700,
+     "digest": "sha256:47c34963f1cdf4a6af34c1b5294f7a4e2679b3eb52698c324855af2c6486024b",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-android-armv7-neon.tar.gz"
+    },
+    {
+     "name": "stockfish-linux-arm64-universal.tar.gz",
+     "state": "uploaded",
+     "size": 80181250,
+     "digest": "sha256:fe26cfd1d9db4c8af3d21e24d9ff34cacb31c1f940085a7583da11796f2bac01",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-arm64-universal.tar.gz"
+    },
+    {
+     "name": "stockfish-linux-riscv64-universal.tar.gz",
+     "state": "uploaded",
+     "size": 80241608,
+     "digest": "sha256:d4b4d118c003bc669a939d9fb208e3ef6b367730fd79a70dbc278b18475df3d1",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-riscv64-universal.tar.gz"
+    },
+    {
+     "name": "stockfish-linux-x86-64-universal.tar.gz",
+     "state": "uploaded",
+     "size": 81388977,
+     "digest": "sha256:9defc0d4e55d49c65a6d042f3e571a39fcea499ade6dbe741b53b8c65e03611f",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz"
+    },
+    {
+     "name": "stockfish-macos-universal.tar.gz",
+     "state": "uploaded",
+     "size": 82323876,
+     "digest": "sha256:a1f0e3bcc5a6927a11fe6fc8e54a779754645f3c2bae2cf13420fd1957adaa77",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-macos-universal.tar.gz"
+    },
+    {
+     "name": "stockfish-windows-arm64-universal.zip",
+     "state": "uploaded",
+     "size": 80190536,
+     "digest": "sha256:8372ad3f0d7276deb2c70f801f541ec7db463219fc6d9c7592864e542aa4f401",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-windows-arm64-universal.zip"
+    },
+    {
+     "name": "stockfish-windows-x86-64-universal.zip",
+     "state": "uploaded",
+     "size": 81431614,
+     "digest": "sha256:3c8bf1f9ea66a09350a40df4f632288285ac206d99f33ab5842c408fc30b48a7",
+     "browser_download_url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-windows-x86-64-universal.zip"
+    }
+   ]
+  }
+ ],
+ "triumviratus": [
+  {
+   "tag_name": "v8.1",
+   "published_at": "2026-11-07T12:49:15Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "nn-consilium-plebis.nnue",
+     "state": "uploaded",
+     "size": 255695275,
+     "digest": "sha256:b069fc089421bdf2dfcc5d7ea4de2345d7af4795cd996373c07d5f5cf67e0670",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/nn-consilium-plebis.nnue"
+    },
+    {
+     "name": "SHA256SUMS.txt",
+     "state": "uploaded",
+     "size": 196,
+     "digest": "sha256:a269ae0d242269e39291b435a119ff22ecdd3b959d652e4058b68783207ce7e4",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/SHA256SUMS.txt"
+    },
+    {
+     "name": "SHA256SUMS_linux.txt",
+     "state": "uploaded",
+     "size": 386,
+     "digest": "sha256:6b8b67685a73b22a246cc2906f23eb04d9fdd5b8c2b548bde638002c1f4c7b57",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/SHA256SUMS_linux.txt"
+    },
+    {
+     "name": "SHA256SUMS_macos.txt",
+     "state": "uploaded",
+     "size": 186,
+     "digest": "sha256:92a94ba6a132a2609cade7f5c3b72d147feaf77faf210d873be334257b595328",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/SHA256SUMS_macos.txt"
+    },
+    {
+     "name": "Triumviratus_8.1_linux_avx2",
+     "state": "uploaded",
+     "size": 258904808,
+     "digest": "sha256:057273f29ad508116d0dc616a5ebdb89a1e5f094c5e9998b60b28e26505e7f02",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_linux_avx2"
+    },
+    {
+     "name": "Triumviratus_8.1_linux_avx2-nopext",
+     "state": "uploaded",
+     "size": 258925280,
+     "digest": "sha256:0a425015d138faf5fda32a61a8961c10a499109048c51c834c84d7432ef86273",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_linux_avx2-nopext"
+    },
+    {
+     "name": "Triumviratus_8.1_linux_avx512",
+     "state": "uploaded",
+     "size": 258990504,
+     "digest": "sha256:e1bb3b84c1fc0211bac341b6a3ce61f237d8d824e52b975c4fb7e04fe437fdb8",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_linux_avx512"
+    },
+    {
+     "name": "Triumviratus_8.1_linux_sse41",
+     "state": "uploaded",
+     "size": 258774152,
+     "digest": "sha256:fb33b190e2a0e8b2afadcae796048ec91de4024af9269aef0c9a314e093ce068",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_linux_sse41"
+    },
+    {
+     "name": "Triumviratus_8.1_macos_arm",
+     "state": "uploaded",
+     "size": 258191320,
+     "digest": "sha256:593fd0203d35871dbfd0df3e2c823428099b4882d641a6bc98e7ca12cb9ecd3f",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_macos_arm"
+    },
+    {
+     "name": "Triumviratus_8.1_macos_x86",
+     "state": "uploaded",
+     "size": 256435248,
+     "digest": "sha256:c571949e1f25a99d56cd3a5fac0aa73c4724bc98f63269ec28ccfd19871908fa",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_macos_x86"
+    },
+    {
+     "name": "Triumviratus_8.1_windows_universal.exe",
+     "state": "uploaded",
+     "size": 258870272,
+     "digest": "sha256:62d5604c059649a40b425f306e30f955cb7dd4196ad1b90ce17415d9129df04e",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1/Triumviratus_8.1_windows_universal.exe"
+    }
+   ]
+  },
+  {
+   "tag_name": "v8.1-possolver",
+   "published_at": "2026-11-07T13:26:55Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "SHA256SUMS.txt",
+     "state": "uploaded",
+     "size": 425,
+     "digest": "sha256:9245a9b6080bfe55a9a8a7a38e30f82a78cc01b79d4ad29604a3dfd7682aee64",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1-possolver/SHA256SUMS.txt"
+    },
+    {
+     "name": "Triumviratus_8.1_PosSolver_linux_avx2",
+     "state": "uploaded",
+     "size": 258925272,
+     "digest": "sha256:c79d5eb19f12f2986f319d16de545bf2f48d305a1b4f1b8f96ca5181da63ad68",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1-possolver/Triumviratus_8.1_PosSolver_linux_avx2"
+    },
+    {
+     "name": "Triumviratus_8.1_PosSolver_macos_arm",
+     "state": "uploaded",
+     "size": 258190920,
+     "digest": "sha256:9c22a1d114c58310dec4bfb5762d7a521a99701038d7e1a9812a4c7f33bb19a1",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1-possolver/Triumviratus_8.1_PosSolver_macos_arm"
+    },
+    {
+     "name": "Triumviratus_8.1_PosSolver_macos_x86",
+     "state": "uploaded",
+     "size": 256444408,
+     "digest": "sha256:f3fd329f9f5686773fc9754404c404876f735fea81499687ff6a25d145bc8fa1",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1-possolver/Triumviratus_8.1_PosSolver_macos_x86"
+    },
+    {
+     "name": "Triumviratus_8.1_PosSolver_windows_universal.exe",
+     "state": "uploaded",
+     "size": 258875904,
+     "digest": "sha256:26c8b7221ab9e89c01bc497b0903f1f4d2db86efe9e28cf238d63afc6f13815a",
+     "browser_download_url": "https://github.com/Tors3/Triumviratus/releases/download/v8.1-possolver/Triumviratus_8.1_PosSolver_windows_universal.exe"
+    }
+   ]
+  }
+ ],
+ "reckless": [
+  {
+   "tag_name": "v0.9.0",
+   "published_at": "2026-03-01T05:31:59Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "reckless-linux-avx2",
+     "state": "uploaded",
+     "size": 65004440,
+     "digest": "sha256:09ba1634faaffec55d237a7efecfb27d5152f6f1400f24dd63af9bde00a054f6",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-linux-avx2"
+    },
+    {
+     "name": "reckless-linux-avx512",
+     "state": "uploaded",
+     "size": 65024880,
+     "digest": "sha256:0da69d9b7086bf5efe98602554769d83abe72adb2c2e92f189dc2af45e3dcd70",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-linux-avx512"
+    },
+    {
+     "name": "reckless-linux-generic",
+     "state": "uploaded",
+     "size": 64964984,
+     "digest": "sha256:a165c726227593a0364e4d52d9a5a635f1b6e2481d559f043b4563957fda8685",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-linux-generic"
+    },
+    {
+     "name": "reckless-macos",
+     "state": "uploaded",
+     "size": 65329264,
+     "digest": "sha256:b50eeea3519e7da0e583a255d9d9f86096c513384818e7f01b983c14026a6a0b",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-macos"
+    },
+    {
+     "name": "reckless-windows-avx2.exe",
+     "state": "uploaded",
+     "size": 64664576,
+     "digest": "sha256:b74ead5648cfa7a7a9f51d04566cf00f56dcf90dacd1252990906223bf1891b8",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-windows-avx2.exe"
+    },
+    {
+     "name": "reckless-windows-avx512.exe",
+     "state": "uploaded",
+     "size": 64681472,
+     "digest": "sha256:f486cf26b746b4385180db0a26318b143725a7c70490a49fa22f8bbc40d0673f",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-windows-avx512.exe"
+    },
+    {
+     "name": "reckless-windows-generic.exe",
+     "state": "uploaded",
+     "size": 64625664,
+     "digest": "sha256:26f4eb1382fb1b3fff5fa599545ec38a9e6375bf48df3f3038b7cb5a7e685c34",
+     "browser_download_url": "https://github.com/codedeliveryservice/Reckless/releases/download/v0.9.0/reckless-windows-generic.exe"
+    }
+   ]
+  }
+ ],
+ "plentychess": [
+  {
+   "tag_name": "b-v8.0.0",
+   "published_at": "2026-06-27T13:59:52Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "PlentyChess-8.0.0-android-neon",
+     "state": "uploaded",
+     "size": 57121720,
+     "digest": "sha256:19ccfa96dcba3d4a5d06a63381a70f807800c9a6a70c877311c37badb298d3d0",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-android-neon"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-avx2",
+     "state": "uploaded",
+     "size": 53608928,
+     "digest": "sha256:bd3e811ee696cb602d716c48601b3298dd1944624d71ed6f1e1db86c0f0980ee",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-avx2"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-avx512",
+     "state": "uploaded",
+     "size": 53581184,
+     "digest": "sha256:b1d56cebe5a0b54b1006f94cb49709829b56bd008a94430b778f50c43142104a",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-avx512"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-avx512vbmi2",
+     "state": "uploaded",
+     "size": 53576224,
+     "digest": "sha256:73737b1fb3b84f1d7c921fcee9a967f5414af4feebc08205fca5f616e8231602",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-avx512vbmi2"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-bmi2",
+     "state": "uploaded",
+     "size": 53602208,
+     "digest": "sha256:42ecf34dfb60c628921b67704cc0364b4444f5dfccfac7ea1d644ec5da27d904",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-bmi2"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-fma",
+     "state": "uploaded",
+     "size": 53538936,
+     "digest": "sha256:ab5accaccc21844dc619a01e5ae3ecb4da7963e68faab5bcdde5f684bffe5cb4",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-fma"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-generic",
+     "state": "uploaded",
+     "size": 53545768,
+     "digest": "sha256:60e552dfc6274f5bbf1ada171f721ec5e7c08019a031844c542d4e12c91f6f64",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-generic"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-neon",
+     "state": "uploaded",
+     "size": 53519432,
+     "digest": "sha256:8d996c32ea3252c0cb46e336b7a1d9cd0ce5a8888ed6f91a027bda66e271e814",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-neon"
+    },
+    {
+     "name": "PlentyChess-8.0.0-linux-ssse3",
+     "state": "uploaded",
+     "size": 53544488,
+     "digest": "sha256:9440bedfd5373c5dc00b01e90b4a7acfb50057207b756f60690ccf2ba796d37f",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-linux-ssse3"
+    },
+    {
+     "name": "PlentyChess-8.0.0-macos-neon",
+     "state": "uploaded",
+     "size": 53909160,
+     "digest": "sha256:50c626206b8cff74c11c830bf583560abb96f9ea6b3f0a3c490f98dc46770b21",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-macos-neon"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-avx2.exe",
+     "state": "uploaded",
+     "size": 53943296,
+     "digest": "sha256:64a3b305da9c17eab8d628f699d41149e0013ffd6d4cc10cceb5808d98a292e2",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-avx2.exe"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-avx512.exe",
+     "state": "uploaded",
+     "size": 53935104,
+     "digest": "sha256:9bfb9608cdf089fe59c9adbbb99558032540f318f5bb2f4d98ff0edfbcee3329",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-avx512.exe"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-avx512vbmi2.exe",
+     "state": "uploaded",
+     "size": 53929984,
+     "digest": "sha256:93a132013f7a208a202442d702dc1daf2bc04e0201b5580509e6c4703ea5a552",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-avx512vbmi2.exe"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-bmi2.exe",
+     "state": "uploaded",
+     "size": 53932544,
+     "digest": "sha256:4515ea009c81c633dc10837869967848117f68ac19283ce8cc086dc0da684d62",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-bmi2.exe"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-fma.exe",
+     "state": "uploaded",
+     "size": 55201792,
+     "digest": "sha256:66a49808e99c6f9c3c3f8bdcf4eddb7768f8bb62a30a3ac692e3d57a739bd000",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-fma.exe"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-generic.exe",
+     "state": "uploaded",
+     "size": 55205376,
+     "digest": "sha256:a29fb8be1edb4bc961290bda03d06acc38a4ed35c2cf9ab235c7c8db0da38ad6",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-generic.exe"
+    },
+    {
+     "name": "PlentyChess-8.0.0-windows-ssse3.exe",
+     "state": "uploaded",
+     "size": 55205376,
+     "digest": "sha256:a95688cb63dc01d914d525a9611a5b853c81a5b1d75456ce374d6e1c25715343",
+     "browser_download_url": "https://github.com/Yoshie2000/PlentyChess/releases/download/b-v8.0.0/PlentyChess-8.0.0-windows-ssse3.exe"
+    }
+   ]
+  }
+ ],
+ "pawnocchio": [
+  {
+   "tag_name": "v2.0.1",
+   "published_at": "2026-06-29T14:29:35Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "pawnocchio-2.0.1-linux-aarch64",
+     "state": "uploaded",
+     "size": 70081928,
+     "digest": "sha256:42861edbb8d959b62326d011a8da907fcb752afb1ff089ab33569a52d288c835",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-aarch64"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-aarch64-dotprod",
+     "state": "uploaded",
+     "size": 70081928,
+     "digest": "sha256:cef955673ed86d6c99628afc4af9086cc1802a27ae19329e73ba0d634fb6be1a",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-aarch64-dotprod"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-aarch64-modern",
+     "state": "uploaded",
+     "size": 70080168,
+     "digest": "sha256:af3c7da44d2f0c39a7fd345e505790df0bd1021afe32ba73d83ddab731553c0c",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-aarch64-modern"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64",
+     "state": "uploaded",
+     "size": 70204336,
+     "digest": "sha256:b9d7ad6bfd19603c1673765c427a7312a9d93554eb941b09183645a3f7028f77",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_v2",
+     "state": "uploaded",
+     "size": 70192464,
+     "digest": "sha256:f4ef2da5d50f3292c5794300ae34f6a035bdb9605891ddf0049d651dbfd6637d",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_v2"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_v3",
+     "state": "uploaded",
+     "size": 70186576,
+     "digest": "sha256:4c8b88c2d1f8140b738a3dbbfe65837dbe8c5ff0357f89b54031e003fa4b8fcd",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_v3"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_v4",
+     "state": "uploaded",
+     "size": 70181712,
+     "digest": "sha256:8dc496da52f968b5eae9cf7c7aa9421928877e4ff9114064f06943da096f861b",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_v4"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_znver1",
+     "state": "uploaded",
+     "size": 70138112,
+     "digest": "sha256:94fcf4483b0771bd4edf501e67345d19184378f3310758fc0564d90ef1fc0754",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_znver1"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_znver2",
+     "state": "uploaded",
+     "size": 70138256,
+     "digest": "sha256:79dfb001cca365bf532eb3b917e20596aaa80c46c17a3643296eff5df186eaf8",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_znver2"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_znver3",
+     "state": "uploaded",
+     "size": 70207808,
+     "digest": "sha256:3cb86471d3f9b462ba095fab7ea4125df458b811161da1dbf5df3222d58988f3",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_znver3"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_znver4",
+     "state": "uploaded",
+     "size": 70278816,
+     "digest": "sha256:4e711621ad3e7809ae94e9f70030acbc947c2e7fa6dff8789abb8b99e3d59368",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_znver4"
+    },
+    {
+     "name": "pawnocchio-2.0.1-linux-x86_64_znver5",
+     "state": "uploaded",
+     "size": 70278816,
+     "digest": "sha256:9492fc6ea8695749599e52d9ba417b333875d0da7c409105678d55f63a3947df",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-linux-x86_64_znver5"
+    },
+    {
+     "name": "pawnocchio-2.0.1-macos-aarch64-apple_m1",
+     "state": "uploaded",
+     "size": 70109848,
+     "digest": "sha256:712e3c97af34cd0aecf57bdad31c88310391fb5421eb496d0004ec7239e4d865",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-macos-aarch64-apple_m1"
+    },
+    {
+     "name": "pawnocchio-2.0.1-macos-x86_64",
+     "state": "uploaded",
+     "size": 70023331,
+     "digest": "sha256:9d64aa5102f5c46239582beb6ce33f507c2311b59e85f4889658bb64e71b4bb3",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-macos-x86_64"
+    },
+    {
+     "name": "pawnocchio-2.0.1-macos-x86_64_v2",
+     "state": "uploaded",
+     "size": 70015092,
+     "digest": "sha256:cd9825b37ec8ad7a3f2af29f767f0ad8d038551e52c1336df795d291685427e1",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-macos-x86_64_v2"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-aarch64-dotprod.exe",
+     "state": "uploaded",
+     "size": 70228992,
+     "digest": "sha256:280c95a23e03c3c99d0da620df9a52e4808e6f72dfdcc1698c86b280d7bc93bb",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-aarch64-dotprod.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-aarch64-modern.exe",
+     "state": "uploaded",
+     "size": 70226944,
+     "digest": "sha256:57a97e6b6007950c1f99743a3b8592d9f49b2d1e45ecacebcc6f71dd211b09fa",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-aarch64-modern.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-aarch64.exe",
+     "state": "uploaded",
+     "size": 70228992,
+     "digest": "sha256:4788313fe073ed8e725c0e37613fe099106984e1dfe5f3f82fff31898131c37c",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-aarch64.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64.exe",
+     "state": "uploaded",
+     "size": 70419456,
+     "digest": "sha256:9dd8180d92b0084edb7ff889d3669deef3e617be6824a739f852bc0a822636b6",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_v2.exe",
+     "state": "uploaded",
+     "size": 70412800,
+     "digest": "sha256:8e6d8fef6100c3218b3754d1a1e5f2d1f9c0977accff407a44aec07b115132f4",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_v2.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_v3.exe",
+     "state": "uploaded",
+     "size": 70415872,
+     "digest": "sha256:b43061a1fce6ae8eb83ddda3d16e19019aa4d76ade90a28cfb3120207a5a2187",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_v3.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_v4.exe",
+     "state": "uploaded",
+     "size": 70408192,
+     "digest": "sha256:02fe4856c6e1957430cc9a9b6e04e7f7d5605879c9824c70953fe3ee6bddcbc2",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_v4.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_znver1.exe",
+     "state": "uploaded",
+     "size": 70372864,
+     "digest": "sha256:be206903e207e9904a59c2ad3aeeb62174aafb038e03d77b6bddb481818390e1",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_znver1.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_znver2.exe",
+     "state": "uploaded",
+     "size": 70371840,
+     "digest": "sha256:2fc3f76191be7289a4f7052327e7a2a61ceab6625d64a535f9724e594880006d",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_znver2.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_znver3.exe",
+     "state": "uploaded",
+     "size": 70434304,
+     "digest": "sha256:4429c97c11aa6b2cf65dc7e0606c92ad88b2e735de0d469bedc66100773d419c",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_znver3.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_znver4.exe",
+     "state": "uploaded",
+     "size": 70505984,
+     "digest": "sha256:55e355e7d7a3ac837693d4467c2a8ff2426eba1a6ea58d4e477de5ee01a7d470",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_znver4.exe"
+    },
+    {
+     "name": "pawnocchio-2.0.1-windows-x86_64_znver5.exe",
+     "state": "uploaded",
+     "size": 70505984,
+     "digest": "sha256:56136d3cef9793c9e9fa053ae6a7898ba67c29df17d92f27b8106196ad77563c",
+     "browser_download_url": "https://github.com/JonathanHallstrom/pawnocchio/releases/download/v2.0.1/pawnocchio-2.0.1-windows-x86_64_znver5.exe"
+    }
+   ]
+  }
+ ],
+ "coda": [
+  {
+   "tag_name": "v0.9.5",
+   "published_at": "2026-10-21T23:05:09Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "coda-0.9.5-linux-aarch64",
+     "state": "uploaded",
+     "size": 98024416,
+     "digest": "sha256:b03389e63a7044527b1adec149fc5ea35fdb96e9554162962693b9be689ff90c",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-linux-aarch64"
+    },
+    {
+     "name": "coda-0.9.5-linux-aarch64.sha256",
+     "state": "uploaded",
+     "size": 91,
+     "digest": "sha256:fa8721fc345b089945496104ddc718c34997c5fe7afbab8312fca39595b6d427",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-linux-aarch64.sha256"
+    },
+    {
+     "name": "coda-0.9.5-linux-x86-64-v2",
+     "state": "uploaded",
+     "size": 98475488,
+     "digest": "sha256:435d906fe309345f88f010e3e3a51ceab8fcae829863ba1c614285d912c7c48a",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-linux-x86-64-v2"
+    },
+    {
+     "name": "coda-0.9.5-linux-x86-64-v2.sha256",
+     "state": "uploaded",
+     "size": 93,
+     "digest": "sha256:92455282ce3255d44e26ef72ec916bb4a3731136cf2cdd1f169488b05da4538f",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-linux-x86-64-v2.sha256"
+    },
+    {
+     "name": "coda-0.9.5-linux-x86-64-v3",
+     "state": "uploaded",
+     "size": 98475488,
+     "digest": "sha256:2c5c5b257001fdde1381d6c4c18ebb78c7554eeb0468806c30c3c11c4e2f0230",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-linux-x86-64-v3"
+    },
+    {
+     "name": "coda-0.9.5-linux-x86-64-v3.sha256",
+     "state": "uploaded",
+     "size": 93,
+     "digest": "sha256:4178614d791265338e940bdb48794469338142a2583e222c7a34837e3ccc33ea",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-linux-x86-64-v3.sha256"
+    },
+    {
+     "name": "coda-0.9.5-macos-aarch64",
+     "state": "uploaded",
+     "size": 98571808,
+     "digest": "sha256:e17d0383c426d65d7a7e022ce27f29b69460e0a81de1b537848ccd6035cec7c8",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-macos-aarch64"
+    },
+    {
+     "name": "coda-0.9.5-macos-aarch64.sha256",
+     "state": "uploaded",
+     "size": 91,
+     "digest": "sha256:85e721cd8c020b38c46a3828f8f89d52f36c68ce29bb17ef1b54c5c87808c114",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-macos-aarch64.sha256"
+    },
+    {
+     "name": "coda-0.9.5-windows-x86-64-v3.exe",
+     "state": "uploaded",
+     "size": 98266112,
+     "digest": "sha256:cb296cdc0d301b537223f8cc789a2f2aa6c788215c7047ace78ec5d7599c92db",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-windows-x86-64-v3.exe"
+    },
+    {
+     "name": "coda-0.9.5-windows-x86-64-v3.exe.sha256",
+     "state": "uploaded",
+     "size": 99,
+     "digest": "sha256:2a8f1197de0e60cc3eb475f14710eabf3355bf7a7b0f0427f147fb2eb99f9c08",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/coda-0.9.5-windows-x86-64-v3.exe.sha256"
+    },
+    {
+     "name": "THIRD_PARTY_LICENSES.md",
+     "state": "uploaded",
+     "size": 135049,
+     "digest": "sha256:d90853ca9dfa4fa557beb04e3162a34f8be72f6cc41a3b0e42be1ef42ef4d05c",
+     "browser_download_url": "https://github.com/adamtwiss/coda/releases/download/v0.9.5/THIRD_PARTY_LICENSES.md"
+    }
+   ]
+  }
+ ],
+ "cinder": [
+  {
+   "tag_name": "v0.6.1",
+   "published_at": "2026-08-16T20:17:28Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "cinder-v0.6.1-linux-avx2",
+     "state": "uploaded",
+     "size": 92700344,
+     "digest": "sha256:16b7c6ca425a64027d036e3109e9e3d2f93bfe1568e95b523fd3d1fd3e602869",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-linux-avx2"
+    },
+    {
+     "name": "cinder-v0.6.1-linux-avx512",
+     "state": "uploaded",
+     "size": 92424360,
+     "digest": "sha256:3a92b37316e295d8dbea0df2d0a2d688aa90859e3b269e72b1d866e6503f3b64",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-linux-avx512"
+    },
+    {
+     "name": "cinder-v0.6.1-linux-neon",
+     "state": "uploaded",
+     "size": 92672344,
+     "digest": "sha256:0986d97a5000c357fbe35fad4d85c9e01b515310c497f69640b94ae6a869a36c",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-linux-neon"
+    },
+    {
+     "name": "cinder-v0.6.1-linux-sse4",
+     "state": "uploaded",
+     "size": 92930104,
+     "digest": "sha256:118cc2458b25870c0f94c9bbc5ff3b0bac43735550855029e3b6ba5c0f13c9c1",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-linux-sse4"
+    },
+    {
+     "name": "cinder-v0.6.1-mac-neon",
+     "state": "uploaded",
+     "size": 93217744,
+     "digest": "sha256:42ce05c1fffda14d116824beb28d4a2d0092a09678b86f6ea708b8fae98934d7",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-mac-neon"
+    },
+    {
+     "name": "cinder-v0.6.1-windows-avx2.exe",
+     "state": "uploaded",
+     "size": 92520448,
+     "digest": "sha256:d6d152f44bdfd4b5b5f114cf4733b57cca5e6f341a98b3fa5dbd46dfcea1eb82",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-windows-avx2.exe"
+    },
+    {
+     "name": "cinder-v0.6.1-windows-avx512.exe",
+     "state": "uploaded",
+     "size": 92238336,
+     "digest": "sha256:2703cd471de0e54938bbedfaf870334c848c5285276a52f94480d1d43b55bddc",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-windows-avx512.exe"
+    },
+    {
+     "name": "cinder-v0.6.1-windows-neon.exe",
+     "state": "uploaded",
+     "size": 92389888,
+     "digest": "sha256:aba6aadc43ea74d87021382a0efafd16e81df90b9096597213b48cc9843d72cb",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-windows-neon.exe"
+    },
+    {
+     "name": "cinder-v0.6.1-windows-sse4.exe",
+     "state": "uploaded",
+     "size": 92746240,
+     "digest": "sha256:00f2f258763c3bd51d9f6dc65555df20d9f59e52eea3c6f5e74ab943ac5ade7b",
+     "browser_download_url": "https://github.com/brunocodutra/cinder/releases/download/v0.6.1/cinder-v0.6.1-windows-sse4.exe"
+    }
+   ]
+  }
+ ],
+ "stormphrax": [
+  {
+   "tag_name": "v8.0.0",
+   "published_at": "2026-06-27T14:06:08Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "stormphrax-8.0.0-apple-m1",
+     "state": "uploaded",
+     "size": 57057112,
+     "digest": "sha256:5e6078f102af5bdd69e1b38ae7843581717fb42f2d0fe8d75f20ef8d097b3207",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-apple-m1"
+    },
+    {
+     "name": "stormphrax-8.0.0-avx2-bmi2",
+     "state": "uploaded",
+     "size": 56785872,
+     "digest": "sha256:01aa7cfa6135a5ddd24ad80a85945b0b1c310d7f1f3fb41e3bea4951f38ef8f7",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-avx2-bmi2"
+    },
+    {
+     "name": "stormphrax-8.0.0-avx2-bmi2.exe",
+     "state": "uploaded",
+     "size": 57000448,
+     "digest": "sha256:baf96b2a32c338f0bd3daa89f2fb6e7f6d0584e11843e52101d4b83128f8523c",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-avx2-bmi2.exe"
+    },
+    {
+     "name": "stormphrax-8.0.0-avx512",
+     "state": "uploaded",
+     "size": 56790072,
+     "digest": "sha256:52fca8502216c16e71349b189ceccd06cd325f7e268cfd405c7a8e76ecf99592",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-avx512"
+    },
+    {
+     "name": "stormphrax-8.0.0-avx512.exe",
+     "state": "uploaded",
+     "size": 56997888,
+     "digest": "sha256:7f276680e1afbdb859a19eef0b17f8ee9326c7e76127a674c608564f0a123614",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-avx512.exe"
+    },
+    {
+     "name": "stormphrax-8.0.0-zen2",
+     "state": "uploaded",
+     "size": 56721168,
+     "digest": "sha256:ecee60443f1a6c098654048e941f068b59b2e506a09194f22ce0d10546bfbc4f",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-zen2"
+    },
+    {
+     "name": "stormphrax-8.0.0-zen2.exe",
+     "state": "uploaded",
+     "size": 56961536,
+     "digest": "sha256:29189c74ac1b19a5b3d79e589bf04159e1eabb79915ccf505f63879ccff0a27a",
+     "browser_download_url": "https://github.com/Ciekce/Stormphrax/releases/download/v8.0.0/stormphrax-8.0.0-zen2.exe"
+    }
+   ]
+  }
+ ],
+ "viridithas": [
+  {
+   "tag_name": "v20.0.0",
+   "published_at": "2026-06-27T13:59:34Z",
+   "draft": false,
+   "prerelease": false,
+   "assets": [
+    {
+     "name": "viridithas-20-linux-aarch64-dotprod",
+     "state": "uploaded",
+     "size": 56430832,
+     "digest": "sha256:aa1b92ceb9183fa693607ed19b91e024b659ecec8a449884bdaa2ada0efc373e",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-linux-aarch64-dotprod"
+    },
+    {
+     "name": "viridithas-20-linux-aarch64-generic",
+     "state": "uploaded",
+     "size": 56430832,
+     "digest": "sha256:d8870b63517c7033754728b53130a0749cbc96d46d83fbbb2b4a448191044ea9",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-linux-aarch64-generic"
+    },
+    {
+     "name": "viridithas-20-linux-x86-64-v3",
+     "state": "uploaded",
+     "size": 57800608,
+     "digest": "sha256:eb53de2fde546f3ba294407e3e8986dc3859bb1818f2ef4cf2fd85d077779973",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-linux-x86-64-v3"
+    },
+    {
+     "name": "viridithas-20-linux-x86-64-v4",
+     "state": "uploaded",
+     "size": 57814624,
+     "digest": "sha256:226d650fc73a7a7c6cef56a495e55a1e8ea8b68d89fc2257c3c2c968c729ab17",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-linux-x86-64-v4"
+    },
+    {
+     "name": "viridithas-20-macos-aarch64",
+     "state": "uploaded",
+     "size": 56911872,
+     "digest": "sha256:9ab84379f0241d94f926666eef8385ab032c585bb3055f27a3fbae423b75fd41",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-macos-aarch64"
+    },
+    {
+     "name": "viridithas-20-win-x86-64-v3.exe",
+     "state": "uploaded",
+     "size": 56549376,
+     "digest": "sha256:c7fa86b2b46fe1c34b0ea3715ad3b4a61d3d984ec63d50b1d6b4f187332fbc51",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-win-x86-64-v3.exe"
+    },
+    {
+     "name": "viridithas-20-win-x86-64-v4.exe",
+     "state": "uploaded",
+     "size": 56553984,
+     "digest": "sha256:b31bcce42ccd5c52d73276e51f921267e4c5fc8df7fd89ded3b4e1db948077ee",
+     "browser_download_url": "https://github.com/cosmobobak/viridithas/releases/download/v20.0.0/viridithas-20-win-x86-64-v4.exe"
+    }
+   ]
+  }
+ ]
+}

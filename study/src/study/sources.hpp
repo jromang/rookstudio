@@ -7,8 +7,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace fcg::study {
@@ -31,5 +33,11 @@ class ByteSource {
 // The sources of a file: one, or one for each PGN file of a zip archive, in the archive's order. The kind is told by
 // the first bytes, whatever the file's name. Throws std::runtime_error when it cannot be opened or read.
 [[nodiscard]] std::vector<std::unique_ptr<ByteSource>> openSources(const std::filesystem::path& file);
+
+// The files of a zip archive whose names `wanted` takes (directories end with '/'), in the archive's order, read as
+// openSources() reads its PGN files: for other files of an archive, an engine's program in its release's. Throws
+// std::runtime_error when the file is not a zip archive or cannot be read.
+[[nodiscard]] std::vector<std::unique_ptr<ByteSource>> zipFiles(
+    const std::filesystem::path& file, const std::function<bool(std::string_view name)>& wanted);
 
 }  // namespace fcg::study

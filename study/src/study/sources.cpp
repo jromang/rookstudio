@@ -186,8 +186,9 @@ bool endsWithPgn(std::string name) {
     return name.size() > 4 && name.compare(name.size() - 4, 4, ".pgn") == 0;
 }
 
-// The PGN files of a zip archive, by its central directory (zip64 included).
-std::vector<std::unique_ptr<ByteSource>> zipSources(const fs::path& file) {
+// The files of a zip archive that `wanted` takes, by its central directory (zip64 included).
+std::vector<std::unique_ptr<ByteSource>> zipSources(const fs::path& file,
+                                                    const std::function<bool(std::string_view)>& wanted) {
     auto in         = openFile(file);
     const auto size = fs::file_size(file);
     const auto tail = std::min<uint64_t>(size, 65536 + 22);
@@ -252,7 +253,7 @@ std::vector<std::unique_ptr<ByteSource>> zipSources(const fs::path& file) {
             x += 4 + length;
         }
         p += 46 + name_length + extra_length + note_length;
-        if (!endsWithPgn(name)) continue;
+        if (!wanted(name)) continue;
         // The entry's data: after its local header, whose name and extra field may differ from the directory's.
         std::array<unsigned char, 30> header{};
         in.seekg(static_cast<std::streamoff>(local));
@@ -274,6 +275,11 @@ std::vector<std::unique_ptr<ByteSource>> zipSources(const fs::path& file) {
 
 }  // namespace
 
+std::vector<std::unique_ptr<ByteSource>> zipFiles(const fs::path& file,
+                                                  const std::function<bool(std::string_view name)>& wanted) {
+    return zipSources(file, wanted);
+}
+
 std::vector<std::unique_ptr<ByteSource>> openSources(const fs::path& file) {
     std::array<unsigned char, 4> magic{};
     {
@@ -289,7 +295,7 @@ std::vector<std::unique_ptr<ByteSource>> openSources(const fs::path& file) {
     } else if (magic[0] == 0x1F && magic[1] == 0x8B) {
         out.push_back(std::make_unique<InflateSource>(file, file.filename().string(), false, 0, ~uint64_t{0}));
     } else if (le(magic.data(), 4) == 0x04034b50 || le(magic.data(), 4) == 0x06054b50) {
-        out = zipSources(file);
+        out = zipSources(file, [](std::string_view name) { return endsWithPgn(std::string(name)); });
     } else {
         out.push_back(std::make_unique<PlainSource>(file));
     }

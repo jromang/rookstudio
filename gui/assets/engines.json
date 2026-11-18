@@ -1,0 +1,292 @@
+{
+  "format": 1,
+  "about": "The engines the engine picker offers, read by the program (docs/design/engine-picker.md). For each engine: its GitHub repository, its releases' tags and, by platform, its files from the fastest to the safest, each a regular expression of the whole file name ({ver}: a version) with what the processor must run (cpu_features.hpp, engine_catalogue.cpp). The program takes the first file the processor runs in the newest release that has one.",
+  "engines": [
+    {
+      "id": "gaia",
+      "name": "Gaia",
+      "repo": "jromang/gaiachess",
+      "licence": "GPL-3.0-or-later",
+      "tag": "v?{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "gaiachess-linux-universal", "needs": "v3"},
+          {"asset": "gaiachess-linux-compat", "needs": "x86-64"}
+        ],
+        "linux-arm64": [
+          {"asset": "gaiachess-linux-neon", "needs": "arm64"}
+        ],
+        "windows-x64": [
+          {"asset": "gaiachess-windows-console\\.exe", "needs": "v3"},
+          {"asset": "gaiachess-windows-compat\\.exe", "needs": "x86-64"}
+        ],
+        "macos-arm64": [
+          {"asset": "gaiachess-macos-apple-silicon", "needs": "arm64"}
+        ]
+      }
+    },
+    {
+      "id": "stockfish",
+      "name": "Stockfish",
+      "repo": "official-stockfish/Stockfish",
+      "licence": "GPL-3.0-or-later",
+      "tag": "sf_{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "stockfish-linux-x86-64-universal\\.tar\\.gz", "needs": "x86-64",
+           "inside": "stockfish/stockfish-linux-x86-64-universal"}
+        ],
+        "linux-arm64": [
+          {"asset": "stockfish-linux-arm64-universal\\.tar\\.gz", "needs": "arm64",
+           "inside": "stockfish/stockfish-linux-arm64-universal"}
+        ],
+        "windows-x64": [
+          {"asset": "stockfish-windows-x86-64-universal\\.zip", "needs": "x86-64",
+           "inside": "stockfish/stockfish-windows-x86-64-universal\\.exe"}
+        ],
+        "windows-arm64": [
+          {"asset": "stockfish-windows-arm64-universal\\.zip", "needs": "arm64",
+           "inside": "stockfish/stockfish-windows-arm64-universal\\.exe"}
+        ],
+        "macos-arm64": [
+          {"asset": "stockfish-macos-universal\\.tar\\.gz", "needs": "arm64",
+           "inside": "stockfish/stockfish-macos-universal"}
+        ],
+        "macos-x64": [
+          {"asset": "stockfish-macos-universal\\.tar\\.gz", "needs": "x86-64",
+           "inside": "stockfish/stockfish-macos-universal"}
+        ]
+      }
+    },
+    {
+      "id": "triumviratus",
+      "name": "Triumviratus",
+      "repo": "Tors3/Triumviratus",
+      "licence": "GPL-3.0",
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "Triumviratus_{ver}_linux_avx512", "needs": "v4"},
+          {"asset": "Triumviratus_{ver}_linux_avx2", "needs": "v3-fastpext"},
+          {"asset": "Triumviratus_{ver}_linux_avx2-nopext", "needs": "v3"},
+          {"asset": "Triumviratus_{ver}_linux_sse41", "needs": "sse41-popcnt"}
+        ],
+        "windows-x64": [
+          {"asset": "Triumviratus_{ver}_windows_universal\\.exe", "needs": "sse41-popcnt"}
+        ],
+        "macos-arm64": [
+          {"asset": "Triumviratus_{ver}_macos_arm", "needs": "arm64"}
+        ],
+        "macos-x64": [
+          {"asset": "Triumviratus_{ver}_macos_x86", "needs": "v3"}
+        ]
+      }
+    },
+    {
+      "id": "reckless",
+      "name": "Reckless",
+      "repo": "codedeliveryservice/Reckless",
+      "licence": "AGPL-3.0",
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "reckless-linux-avx512", "needs": "v4-icl"},
+          {"asset": "reckless-linux-avx2", "needs": "v3"},
+          {"asset": "reckless-linux-generic", "needs": "x86-64"}
+        ],
+        "windows-x64": [
+          {"asset": "reckless-windows-avx512\\.exe", "needs": "v4-icl"},
+          {"asset": "reckless-windows-avx2\\.exe", "needs": "v3"},
+          {"asset": "reckless-windows-generic\\.exe", "needs": "x86-64"}
+        ],
+        "macos-arm64": [
+          {"asset": "reckless-macos", "needs": "arm64"}
+        ]
+      }
+    },
+    {
+      "id": "plentychess",
+      "name": "PlentyChess",
+      "repo": "Yoshie2000/PlentyChess",
+      "licence": "GPL-3.0",
+      "tag": "b-v?{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "PlentyChess-{ver}-linux-avx512vbmi2", "needs": "v4-icl"},
+          {"asset": "PlentyChess-{ver}-linux-avx512vnni", "needs": "v4-vnni"},
+          {"asset": "PlentyChess-{ver}-linux-avx512", "needs": "v4"},
+          {"asset": "PlentyChess-{ver}-linux-bmi2", "needs": "v3-fastpext"},
+          {"asset": "PlentyChess-{ver}-linux-avx2", "needs": "v3"},
+          {"asset": "PlentyChess-{ver}-linux-fma", "needs": "fma"},
+          {"asset": "PlentyChess-{ver}-linux-ssse3", "needs": "ssse3"},
+          {"asset": "PlentyChess-{ver}-linux-generic", "needs": "x86-64"}
+        ],
+        "linux-arm64": [
+          {"asset": "PlentyChess-{ver}-linux-neon", "needs": "arm64"}
+        ],
+        "windows-x64": [
+          {"asset": "PlentyChess-{ver}-windows-avx512vbmi2\\.exe", "needs": "v4-icl"},
+          {"asset": "PlentyChess-{ver}-windows-avx512vnni\\.exe", "needs": "v4-vnni"},
+          {"asset": "PlentyChess-{ver}-windows-avx512\\.exe", "needs": "v4"},
+          {"asset": "PlentyChess-{ver}-windows-bmi2\\.exe", "needs": "v3-fastpext"},
+          {"asset": "PlentyChess-{ver}-windows-avx2\\.exe", "needs": "v3"},
+          {"asset": "PlentyChess-{ver}-windows-fma\\.exe", "needs": "fma"},
+          {"asset": "PlentyChess-{ver}-windows-ssse3\\.exe", "needs": "ssse3"},
+          {"asset": "PlentyChess-{ver}-windows-generic\\.exe", "needs": "x86-64"}
+        ],
+        "macos-arm64": [
+          {"asset": "PlentyChess-{ver}-macos-neon", "needs": "arm64"}
+        ]
+      }
+    },
+    {
+      "id": "pawnocchio",
+      "name": "pawnocchio",
+      "repo": "JonathanHallstrom/pawnocchio",
+      "licence": "GPL-3.0",
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "pawnocchio-{ver}-linux-x86_64_znver5", "needs": "zen5"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_znver4", "needs": "zen4"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_znver3", "needs": "zen3"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_znver2", "needs": "zen2"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_znver1", "needs": "zen1"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_v4", "needs": "v4"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_v3", "needs": "v3"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64_v2", "needs": "v2"},
+          {"asset": "pawnocchio-{ver}-linux-x86_64", "needs": "x86-64"}
+        ],
+        "linux-arm64": [
+          {"asset": "pawnocchio-{ver}-linux-aarch64-modern", "needs": "arm64-i8mm"},
+          {"asset": "pawnocchio-{ver}-linux-aarch64-dotprod", "needs": "arm64-dotprod"},
+          {"asset": "pawnocchio-{ver}-linux-aarch64", "needs": "arm64"}
+        ],
+        "windows-x64": [
+          {"asset": "pawnocchio-{ver}-windows-x86_64_znver5\\.exe", "needs": "zen5"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_znver4\\.exe", "needs": "zen4"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_znver3\\.exe", "needs": "zen3"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_znver2\\.exe", "needs": "zen2"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_znver1\\.exe", "needs": "zen1"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_v4\\.exe", "needs": "v4"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_v3\\.exe", "needs": "v3"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64_v2\\.exe", "needs": "v2"},
+          {"asset": "pawnocchio-{ver}-windows-x86_64\\.exe", "needs": "x86-64"}
+        ],
+        "windows-arm64": [
+          {"asset": "pawnocchio-{ver}-windows-aarch64-modern\\.exe", "needs": "arm64-i8mm"},
+          {"asset": "pawnocchio-{ver}-windows-aarch64-dotprod\\.exe", "needs": "arm64-dotprod"},
+          {"asset": "pawnocchio-{ver}-windows-aarch64\\.exe", "needs": "arm64"}
+        ],
+        "macos-arm64": [
+          {"asset": "pawnocchio-{ver}-macos-aarch64-apple_m1", "needs": "arm64"}
+        ],
+        "macos-x64": [
+          {"asset": "pawnocchio-{ver}-macos-x86_64_v2", "needs": "v2"},
+          {"asset": "pawnocchio-{ver}-macos-x86_64", "needs": "x86-64"}
+        ]
+      }
+    },
+    {
+      "id": "coda",
+      "name": "Coda",
+      "repo": "adamtwiss/coda",
+      "licence": "GPL-3.0-or-later",
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "coda-{ver}-linux-x86-64-v3", "needs": "v3"},
+          {"asset": "coda-{ver}-linux-x86-64-v2", "needs": "v2"}
+        ],
+        "linux-arm64": [
+          {"asset": "coda-{ver}-linux-aarch64", "needs": "arm64"}
+        ],
+        "windows-x64": [
+          {"asset": "coda-{ver}-windows-x86-64-v3\\.exe", "needs": "v3"}
+        ],
+        "macos-arm64": [
+          {"asset": "coda-{ver}-macos-aarch64", "needs": "arm64"}
+        ]
+      }
+    },
+    {
+      "id": "cinder",
+      "name": "Cinder",
+      "repo": "brunocodutra/cinder",
+      "licence": "GPL-3.0",
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "cinder-v{ver}-linux-avx512", "needs": "v4-icl"},
+          {"asset": "cinder-v{ver}-linux-avx2", "needs": "v3"},
+          {"asset": "cinder-v{ver}-linux-sse4", "needs": "v2"}
+        ],
+        "linux-arm64": [
+          {"asset": "cinder-v{ver}-linux-neon", "needs": "arm64-dotprod"}
+        ],
+        "windows-x64": [
+          {"asset": "cinder-v{ver}-windows-avx512\\.exe", "needs": "v4-icl"},
+          {"asset": "cinder-v{ver}-windows-avx2\\.exe", "needs": "v3"},
+          {"asset": "cinder-v{ver}-windows-sse4\\.exe", "needs": "v2"}
+        ],
+        "windows-arm64": [
+          {"asset": "cinder-v{ver}-windows-neon\\.exe", "needs": "arm64-dotprod"}
+        ],
+        "macos-arm64": [
+          {"asset": "cinder-v{ver}-mac-neon", "needs": "arm64"}
+        ]
+      }
+    },
+    {
+      "id": "stormphrax",
+      "name": "Stormphrax",
+      "repo": "Ciekce/Stormphrax",
+      "licence": "GPL-3.0",
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "stormphrax-{ver}-avx512", "needs": "v4-icl"},
+          {"asset": "stormphrax-{ver}-avx2-bmi2", "needs": "v3-fastpext"},
+          {"asset": "stormphrax-{ver}-zen2", "needs": "zen12"}
+        ],
+        "windows-x64": [
+          {"asset": "stormphrax-{ver}-avx512\\.exe", "needs": "v4-icl"},
+          {"asset": "stormphrax-{ver}-avx2-bmi2\\.exe", "needs": "v3-fastpext"},
+          {"asset": "stormphrax-{ver}-zen2\\.exe", "needs": "zen12"}
+        ],
+        "macos-arm64": [
+          {"asset": "stormphrax-{ver}-apple-m1", "needs": "arm64"}
+        ]
+      }
+    },
+    {
+      "id": "viridithas",
+      "name": "Viridithas",
+      "repo": "cosmobobak/viridithas",
+      "licence": "MIT",
+      "licence_from": {"21": "AGPL-3.0-only"},
+      "tag": "v{ver}",
+      "files": {
+        "linux-x64": [
+          {"asset": "viridithas(-{ver})?-linux-x86[-_]64-v4", "needs": "v4-icl"},
+          {"asset": "viridithas(-{ver})?-linux-x86[-_]64-v3", "needs": "v3"},
+          {"asset": "viridithas(-{ver})?-linux-x86[-_]64-v2", "needs": "v2"},
+          {"asset": "viridithas(-{ver})?-linux-x86[-_]64-v1", "needs": "x86-64"}
+        ],
+        "linux-arm64": [
+          {"asset": "viridithas(-{ver})?(-linux)?-aarch64-dotprod", "needs": "arm64-dotprod"},
+          {"asset": "viridithas(-{ver})?(-linux)?-aarch64(-generic)?", "needs": "arm64"}
+        ],
+        "windows-x64": [
+          {"asset": "viridithas(-{ver})?-win(dows)?-x86[-_]64-v4\\.exe", "needs": "v4-icl"},
+          {"asset": "viridithas(-{ver})?-win(dows)?-x86[-_]64-v3\\.exe", "needs": "v3"},
+          {"asset": "viridithas(-{ver})?-win(dows)?-x86[-_]64-v2\\.exe", "needs": "v2"},
+          {"asset": "viridithas(-{ver})?-win(dows)?-x86[-_]64-v1\\.exe", "needs": "x86-64"}
+        ],
+        "macos-arm64": [
+          {"asset": "viridithas(-{ver})?-macos-aarch64", "needs": "arm64"}
+        ]
+      }
+    }
+  ]
+}

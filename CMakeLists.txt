@@ -750,12 +750,24 @@ if(FCG_BUILD_GUI)
         COMMENT "Embedding the guide"
         VERBATIM)
 
+    # The engines the engine picker offers (gui/assets/engines.json), embedded: the copy the program reads when it
+    # has not read a newer one.
+    set(FCG_ENGINES_CPP ${CMAKE_CURRENT_BINARY_DIR}/generated/engine_catalogue.cpp)
+    add_custom_command(
+        OUTPUT ${FCG_ENGINES_CPP}
+        COMMAND ${CMAKE_COMMAND} -DIN=${CMAKE_CURRENT_SOURCE_DIR}/gui/assets/engines.json -DOUT=${FCG_ENGINES_CPP}
+                -DSYMBOL=engine_catalogue -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_binary.cmake
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gui/assets/engines.json ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_binary.cmake
+        COMMENT "Embedding the engine catalogue"
+        VERBATIM)
+
     file(GLOB FCG_GUI_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/*.cpp)
     list(REMOVE_ITEM FCG_GUI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/main.cpp)
 
     # Everything except main(), so the unit tests can link it too.
     add_library(fcg_lib STATIC ${FCG_GUI_SOURCES} ${FCG_BOARD3D_SOURCES} ${FCG_ASSET_CPP} ${FCG_FONT_CPPS}
-                ${FCG_BOARD3D_CPPS} ${FCG_PO_CPP} ${FCG_DOC_CPP} ${qrcodegen_SOURCE_DIR}/cpp/qrcodegen.cpp)
+                ${FCG_BOARD3D_CPPS} ${FCG_PO_CPP} ${FCG_DOC_CPP} ${FCG_ENGINES_CPP}
+                ${qrcodegen_SOURCE_DIR}/cpp/qrcodegen.cpp)
     target_compile_features(fcg_lib PUBLIC cxx_std_20)
     target_include_directories(fcg_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/gui/src)
     # Header-only libraries compiled in our files: their warnings are not ours to fix.

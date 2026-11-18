@@ -62,6 +62,9 @@ random_mover
 # Config files
 *.json
 !sbom/*.cdx.json
+# The engine picker's catalogue, and the releases its tests read
+!gui/assets/engines.json
+!gui/tests/data/*.json
 
 # Scripts
 *.bat

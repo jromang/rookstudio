@@ -560,10 +560,10 @@ std::string nagText(uint8_t nag) {
             return "=";
         case 13:
             return "∞";
-        case 14:
-            return "⩲";
+        case 14:  // the font may not have it
+            return ImGui::GetFont()->IsGlyphInFont(0x2A72) ? "⩲" : "+=";
         case 15:
-            return "⩱";
+            return ImGui::GetFont()->IsGlyphInFont(0x2A71) ? "⩱" : "=+";
         case 16:
             return "±";
         case 17:
@@ -994,6 +994,9 @@ void App::drawBoardPage() {
         b.preview_hovered = false;
     }
     if (b.preview && !b.preview->hover && b.preview->at != b.ply) b.preview.reset();
+    // The prototype M2: ! and ? read as typed whatever the keyboard's layout, SDL's text input on while the page has
+    // the keys (a text field's own ends it, and it comes back after).
+    if (protoM2() && keys && !b.editor && !SDL_TextInputActive(window_)) SDL_StartTextInput(window_);
     if (keys && !b.editor) {
         const int before = b.ply;
         b.ply = stepPly(navKeys(b.flip), b.ply, total);

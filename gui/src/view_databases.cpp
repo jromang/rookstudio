@@ -307,22 +307,41 @@ void App::drawGameList() {
                              db_filter_.size());
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("Ctrl+L");
+    ImGui::SameLine();
+    if (ui::iconButton("db_search", ui::Icon::Search, db_search_open_ ? TR("Close the search") : TR("Search")) ||
+        ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_F))
+        db_search_open_ = !db_search_open_;
+    ImGui::SameLine(0, px(4));
+    ImGui::TextDisabled("Ctrl+F");
 
     // The view, made again in the background when what it shows changed.
-    const auto of = fmt::format("{}|{}|{}|{}|{}", s.entries()[index].folder.string(), snapshot->generation(),
-                                db_filter_.data(), static_cast<int>(db_sort_), db_descending_);
+    const auto& p = db_search_;
+    const auto of =
+        fmt::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(),
+                    snapshot->generation(), db_filter_.data(), static_cast<int>(db_sort_), db_descending_,
+                    p.player.data(), p.opponent.data(), p.event.data(), p.side, p.year_from.data(), p.year_to.data(),
+                    p.eco_from.data(), p.eco_to.data(), p.elo_min.data(), static_cast<int>(p.result),
+                    p.position ? db_position_of_ + (db_position_ready_ ? "+" : "-") : std::string());
     if (db_view_of_ != of && (!db_view_job_ || db_view_job_->of != of)) {
         if (db_view_job_) *db_view_job_->cancel = true;
         ViewJob job;
         job.of            = of;
         job.cancel        = std::make_shared<std::atomic<bool>>(false);
         job.started       = std::chrono::steady_clock::now();
-        const auto filter = quickFilter(db_filter_.data());
-        job.done          = std::async(std::launch::async,
-                                       [snapshot, filter, sort = db_sort_, down = db_descending_, cancel = job.cancel] {
-                                  return study::makeView(snapshot, filter, sort, down, 0, cancel.get());
-                                       });
-        db_view_job_      = std::move(job);
+        const auto filter = listFilter();
+        // The games through the position, once found: the others left out of the view.
+        std::optional<std::vector<study::GameId>> through;
+        if (db_search_.position && db_position_ready_) through = db_position_;
+        job.done     = std::async(std::launch::async, [snapshot, filter, sort = db_sort_, down = db_descending_,
+                                                       cancel = job.cancel, through = std::move(through)] {
+            auto view = study::makeView(snapshot, filter, sort, down, 0, cancel.get());
+            if (through)
+                std::erase_if(view.ids, [&](study::GameId id) {
+                    return !std::binary_search(through->begin(), through->end(), id);
+                });
+            return view;
+        });
+        db_view_job_ = std::move(job);
     }
     if (db_view_job_ && db_view_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         auto view = db_view_job_->done.get();
@@ -440,9 +459,11 @@ void App::drawGameList() {
     }
     ImGui::SameLine(0, px(14));
 
-    // The game chosen: its players, its moves, Open.
+    // The game chosen: its players, its moves, Open; or the search panel.
     ImGui::BeginChild("##db_preview", ImVec2(0, 0), ImGuiChildFlags_Borders);
-    if (!ids.empty()) {
+    if (db_search_open_) {
+        drawSearchPanel(snapshot);
+    } else if (!ids.empty()) {
         const auto id  = ids[db_row_];
         const auto row = snap->row(id);
         ImGui::PushTextWrapPos();
@@ -470,6 +491,144 @@ void App::drawGameList() {
     }
     ImGui::EndChild();
     if (open) openListedGame(db_row_);
+}
+
+study::Filter App::listFilter() const {
+    auto f         = quickFilter(db_filter_.data());
+    const auto& p  = db_search_;
+    const auto add = [](std::string& to, const char* words) {
+        if (*words) to += (to.empty() ? "" : " ") + std::string(words);
+    };
+    if (p.side == 1)
+        add(f.white, p.player.data());
+    else if (p.side == 2)
+        add(f.black, p.player.data());
+    else
+        add(f.player, p.player.data());
+    if (p.side == 1)
+        add(f.black, p.opponent.data());
+    else if (p.side == 2)
+        add(f.white, p.opponent.data());
+    else
+        add(f.words, p.opponent.data());
+    add(f.words, p.event.data());
+    const int from = std::atoi(p.year_from.data()), to = std::atoi(p.year_to.data());
+    if (from > 0) f.date_from = study::packDate(fmt::format("{:04d}.01.01", from));
+    if (to > 0) f.date_to = study::packDate(fmt::format("{:04d}.12.31", to));
+    const auto eco = [](const char* code, char fill) {
+        std::string c(code);
+        if (c.empty()) return uint16_t{0};
+        c[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(c[0])));
+        while (c.size() < 3) c += fill;
+        return study::packEco(c);
+    };
+    if (p.eco_from[0]) f.eco_from = eco(p.eco_from.data(), '0');
+    if (p.eco_to[0] || p.eco_from[0]) f.eco_to = eco(p.eco_to[0] ? p.eco_to.data() : p.eco_from.data(), '9');
+    if (const int elo = std::atoi(p.elo_min.data()); elo > 0) f.elo_min = static_cast<uint16_t>(std::min(elo, 4000));
+    if (p.result) f.result = p.result;
+    return f;
+}
+
+void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot) {
+    auto& p = db_search_;
+    ImGui::TextUnformatted(TR("Search"));
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("the list follows at each letter"));
+    const float label_w = px(96);
+    const auto label    = [&](const char* text) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(text);
+        ImGui::SameLine(label_w);
+    };
+    const auto field = [&](const char* text, const char* id, std::array<char, 64>& buffer) {
+        label(text);
+        ImGui::SetNextItemWidth(-1);
+        ImGui::InputText(id, buffer.data(), buffer.size());
+    };
+    field(TR("Player"), "##s_player", p.player);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + label_w);
+    ImGui::SetNextItemWidth(-1);
+    const char* sides[] = {TR("Either colour"), TR("White"), TR("Black")};
+    ImGui::Combo("##s_side", &p.side, sides, 3);
+    field(TR("Opponent"), "##s_opponent", p.opponent);
+    field(TR("Event"), "##s_event", p.event);
+    // The years, the ECO codes, the ratings, the result.
+    label(TR("Years"));
+    ImGui::SetNextItemWidth(px(60));
+    ImGui::InputText("##s_from", p.year_from.data(), p.year_from.size(), ImGuiInputTextFlags_CharsDecimal);
+    ImGui::SameLine();
+    ImGui::TextUnformatted("–");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(px(60));
+    ImGui::InputText("##s_to", p.year_to.data(), p.year_to.size(), ImGuiInputTextFlags_CharsDecimal);
+    label(TR("ECO code"));
+    ImGui::SetNextItemWidth(px(52));
+    ImGui::InputText("##s_eco_from", p.eco_from.data(), p.eco_from.size(), ImGuiInputTextFlags_CharsUppercase);
+    ImGui::SameLine();
+    ImGui::TextUnformatted("–");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(px(52));
+    ImGui::InputText("##s_eco_to", p.eco_to.data(), p.eco_to.size(), ImGuiInputTextFlags_CharsUppercase);
+    label(TR("Elo"));
+    ImGui::SetNextItemWidth(px(60));
+    ImGui::InputText("##s_elo", p.elo_min.data(), p.elo_min.size(), ImGuiInputTextFlags_CharsDecimal);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("at least, both players"));
+    label(TR("Result"));
+    const char* results[] = {TR("All"), "1-0", "½-½", "0-1"};
+    const char values[]   = {0, '1', '=', '0'};
+    int result            = static_cast<int>(std::find(std::begin(values), std::end(values), p.result) - values);
+    ImGui::SetNextItemWidth(px(100));
+    if (ImGui::Combo("##s_result", &result, results, 4)) p.result = values[result];
+    ImGui::Separator();
+
+    // The Board page's position: the games that reach it, found in the background.
+    ImGui::Checkbox(TR("The Board page's position"), &p.position);
+    if (p.position) {
+        const auto fen = boardFen();
+        const auto of  = fmt::format("{}|{}", snapshot->generation(), fen);
+        if (of != db_position_of_) {
+            db_position_search_.reset();
+            db_position_ready_ = false;
+            db_position_.clear();
+            db_position_of_ = of;
+            study::ScanBoard board;
+            if (board.setFen(fen, board_.chess960))
+                db_position_search_ = std::make_unique<study::Search>(snapshot, study::PositionQuery{board});
+        }
+        if (db_position_search_ && !db_position_ready_ && db_position_search_->done()) {
+            for (const auto& hit : db_position_search_->hits()) db_position_.push_back(hit.id);
+            std::sort(db_position_.begin(), db_position_.end());
+            db_position_.erase(std::unique(db_position_.begin(), db_position_.end()), db_position_.end());
+            db_position_ready_ = true;
+        }
+        ImGui::PushTextWrapPos();
+        const auto shown =
+            board_.ply > 0 ? trf("After {}.", boardMoveLabel(board_.ply)) : std::string(TR("The start position."));
+        ImGui::TextDisabled("%s", shown.c_str());
+        if (!db_position_ready_ && db_position_search_) {
+            const auto total = std::max<uint64_t>(1, db_position_search_->total());
+            ImGui::ProgressBar(static_cast<float>(db_position_search_->searched()) / static_cast<float>(total),
+                               ImVec2(-1, 0));
+        } else {
+            ImGui::TextUnformatted(trn("{} game reaches it", "{} games reach it",
+                                       static_cast<int>(std::min<std::size_t>(db_position_.size(), 1000000000)),
+                                       ui::exactCount(db_position_.size()))
+                                       .c_str());
+        }
+        ImGui::TextDisabled("%s", TR("The games that cannot reach it (their pawns, their material) are left out "
+                                     "without being replayed."));
+        ImGui::PopTextWrapPos();
+    } else if (db_position_search_ || !db_position_of_.empty()) {
+        db_position_search_.reset();
+        db_position_of_.clear();
+        db_position_ready_ = false;
+    }
+    ImGui::Separator();
+    if (ImGui::Button(TR("Clear everything"))) {
+        p = SearchFields{};
+        db_filter_.fill(0);
+    }
 }
 
 }  // namespace fcg

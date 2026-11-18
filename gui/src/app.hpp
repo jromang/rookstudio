@@ -18,6 +18,7 @@
 #include <matchmaking/stats.hpp>
 
 #include <study/query.hpp>
+#include <study/search.hpp>
 #include "board_3d.hpp"
 #include "board_nav.hpp"
 #include "board_page.hpp"
@@ -264,6 +265,25 @@ class App {
     std::optional<ViewJob> db_view_job_;
     double db_view_ms_  = 0;
     std::size_t db_row_ = 0;
+    // The search panel beside the list (M1, board 3; Ctrl+F): its header fields, and the Board page's position, whose
+    // games a search finds in the background. The list follows them.
+    void drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot);
+    [[nodiscard]] study::Filter listFilter() const;  // the quick filter's words with the panel's fields
+    bool db_search_open_ = false;
+    struct SearchFields {
+        std::array<char, 64> player{}, opponent{}, event{};
+        int side = 0;  // the player: 0 either colour, 1 White, 2 Black
+        std::array<char, 5> year_from{}, year_to{};
+        std::array<char, 4> eco_from{}, eco_to{};
+        std::array<char, 5> elo_min{};
+        char result   = 0;
+        bool position = false;  // the games through the Board page's position
+    };
+    SearchFields db_search_;
+    std::unique_ptr<study::Search> db_position_search_;
+    std::string db_position_of_;              // what it searches: the database's snapshot and the position
+    std::vector<study::GameId> db_position_;  // the games it found, sorted
+    bool db_position_ready_ = false;
     void drawOpeningsPage();  // the repertoires (the tournament's Openings tab is drawOpenings)
     Space space_       = Space::Engines;
     Page engines_page_ = Page::Home;  // the page each space comes back to

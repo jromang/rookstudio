@@ -300,6 +300,14 @@ void App::frame() {
             db_selected_ = 0;
             db_list_     = true;
             if (w.size() > 15) std::snprintf(db_filter_.data(), db_filter_.size(), "%s", w.substr(15).c_str());
+        } else if (w == "databases-search" || w == "databases-search-position") {
+            // The first database's games with the search panel; its position searched.
+            page_               = Page::Databases;
+            db_selected_        = 0;
+            db_list_            = true;
+            db_search_open_     = true;
+            db_search_.position = w == "databases-search-position";
+            std::snprintf(db_search_.year_from.data(), db_search_.year_from.size(), "2020");
         } else if (w.rfind("databases-import=", 0) == 0) {  // databases-import=FILE: into a new database named after it
             page_ = Page::Databases;
             importIntoDatabase(-1, std::filesystem::path(w.substr(17)));

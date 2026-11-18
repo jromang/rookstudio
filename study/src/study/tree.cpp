@@ -811,6 +811,7 @@ std::shared_ptr<const Tree> Tree::open(const fs::path& folder) {
     auto tree        = std::make_shared<Tree>();
     tree->name_      = j.value("folder", "");
     tree->games_     = j.value("games", uint64_t{0});
+    tree->edits_     = j.value("edits", uint64_t{0});
     tree->plies_     = j.value("plies", 0u);
     const auto dir   = folder / tree->name_;
     tree->order_     = MappedFile(dir / "order.bin");
@@ -884,7 +885,7 @@ std::optional<Tree::Record> Tree::record(uint64_t key) const {
 
 std::optional<TreeAnswer> Tree::at(const Snapshot& snapshot, uint64_t key) const {
     auto r = record(key);
-    if (!r || snapshot.games() < games_) return std::nullopt;
+    if (!r || stale(snapshot)) return std::nullopt;
     if (r->numbers) return std::move(r->numbers);
     std::map<int, TreeStats> by;
     for (const auto& run : r->runs) {
@@ -900,7 +901,7 @@ std::optional<TreeAnswer> Tree::at(const Snapshot& snapshot, uint64_t key) const
 std::vector<TreeGame> Tree::gamesAt(const Snapshot& snapshot, uint64_t key) const {
     std::vector<TreeGame> out;
     const auto r = record(key);
-    if (!r || snapshot.games() < games_) return out;
+    if (!r || stale(snapshot)) return out;
     for (const auto& run : r->runs) {
         for (uint64_t j = run.start; j < run.start + run.count; ++j) {
             const GameId id = load<uint32_t>(order_.data() + HEADER + j * 4);
@@ -914,7 +915,7 @@ std::vector<TreeGame> Tree::gamesAt(const Snapshot& snapshot, uint64_t key) cons
 std::vector<TreeGame> Tree::gamesWith(const Snapshot& snapshot, uint64_t key, int code) const {
     std::vector<TreeGame> out;
     const auto r = record(key);
-    if (!r || snapshot.games() < games_) return out;
+    if (!r || stale(snapshot)) return out;
     const auto idAt   = [&](uint64_t j) -> GameId { return load<uint32_t>(order_.data() + HEADER + j * 4); };
     const auto codeOf = [&](uint64_t j, uint32_t depth) {
         const auto m = snapshot.gameMoves(idAt(j));
@@ -952,6 +953,7 @@ std::vector<TreeGame> Tree::gamesWith(const Snapshot& snapshot, uint64_t key, in
 
 std::optional<uint32_t> Tree::novelty(const Snapshot& snapshot, const ScanBoard& start,
                                       std::span<const int> line) const {
+    if (stale(snapshot)) return std::nullopt;
     if (!record(start.key())) return 0;
     ScanBoard board = start;
     // A single game known to reach the line's position, and the ply it reaches it at.
@@ -1023,7 +1025,8 @@ TreeBuilt buildTree(const Database& db, const Snapshot& snapshot, const TreeOpti
                                {"games", snapshot.games()},
                                {"plies", std::min(options.plies, MAX_PLIES)},
                                {"positions", out.positions},
-                               {"generation", snapshot.generation()}};
+                               {"generation", snapshot.generation()},
+                               {"edits", snapshot.editsGeneration()}};
         tour::replaceFile(dir / TREE_JSON, j.dump(1));
         for (const auto& entry : fs::directory_iterator(dir, ec)) {
             const auto other = entry.path().filename().string();

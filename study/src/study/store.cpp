@@ -585,7 +585,8 @@ void Database::load() {
         next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
     }
     // The edits it names: the games replaced and those deleted.
-    const auto edits = manifest.value("edits", std::string());
+    const auto edits        = manifest.value("edits", std::string());
+    snap->edits_generation_ = manifest.value("edits_generation", uint64_t{0});
     if (!edits.empty()) {
         std::ifstream in(dir_ / edits, std::ios::binary);
         const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -816,7 +817,8 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             edits_written = editsName(current_->generation_ + 1);
             writeFile(dir_ / edits_written,
                       editsBytes(replaced ? *replaced : current_->replaced_, deleted ? *deleted : current_->deleted_));
-            manifest["edits"] = edits_written;
+            manifest["edits"]            = edits_written;
+            manifest["edits_generation"] = current_->generation_ + 1;
         }
         manifest["generation"] = current_->generation_ + 1;
         step("write manifest");
@@ -848,6 +850,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         snap->segments_.push_back(std::make_shared<const Segment>(dir_ / made[s], counts[s].first, counts[s].second));
         snap->names_ += counts[s].second;
     }
+    if (replaced || deleted) snap->edits_generation_ = snap->generation_;
     if (replaced) snap->replaced_ = *replaced;
     if (deleted) {
         snap->deleted_       = *deleted;

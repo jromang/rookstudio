@@ -143,3 +143,27 @@ TEST_CASE("edits: a crash at any step of a replacement leaves the game as it was
         CHECK(db->snapshot()->key(2) == duplicateKey(games[6]));
     }
 }
+
+TEST_CASE("edits: an opening tree built before a game was replaced answers nothing until built again") {
+    auto db = database("edits-tree", randomGames(10, 21, 6));
+    TreeProgress progress;
+    std::atomic<bool> cancel{false};
+    REQUIRE(buildTree(*db, *db->snapshot(), {}, progress, cancel).error.empty());
+    ScanBoard start;
+    REQUIRE(start.setFen(chess::constants::STARTPOS, false));
+    auto tree = Tree::open(db->folder());
+    CHECK_FALSE(tree->stale(*db->snapshot()));
+    CHECK(tree->at(*db->snapshot(), start.key()));
+    // Games added: the tree still answers for those it covers.
+    db->append(randomGames(3, 22, 6), true);
+    CHECK_FALSE(tree->stale(*db->snapshot()));
+    CHECK(tree->at(*db->snapshot(), start.key())->total.games == 10);
+    // A game replaced: stale.
+    db->replace(0, randomGames(1, 23, 6)[0]);
+    CHECK(tree->stale(*db->snapshot()));
+    CHECK_FALSE(tree->at(*db->snapshot(), start.key()));
+    REQUIRE(buildTree(*db, *db->snapshot(), {}, progress, cancel).error.empty());
+    tree = Tree::open(db->folder());
+    CHECK_FALSE(tree->stale(*db->snapshot()));
+    CHECK(tree->at(*db->snapshot(), start.key())->total.games == 13);
+}

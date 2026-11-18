@@ -87,6 +87,9 @@ class Snapshot {
    public:
     [[nodiscard]] uint64_t games() const noexcept { return games_; }
     [[nodiscard]] uint64_t generation() const noexcept { return generation_; }
+    // The generation of the last commit that replaced or deleted games (0: none): what was built from the games
+    // before, an opening tree, may no longer hold.
+    [[nodiscard]] uint64_t editsGeneration() const noexcept { return edits_generation_; }
     [[nodiscard]] HeaderRow row(GameId id) const;
     [[nodiscard]] HeaderNumbers numbers(GameId id) const;
     [[nodiscard]] GameMoves gameMoves(GameId id) const;
@@ -129,7 +132,8 @@ class Snapshot {
     std::vector<uint32_t> first_name_;                      // of each segment
     std::vector<Version> replaced_;                         // by id
     std::vector<uint64_t> deleted_;                         // a bit a game
-    uint64_t deleted_count_ = 0;
+    uint64_t deleted_count_    = 0;
+    uint64_t edits_generation_ = 0;
     uint64_t games_      = 0;
     uint32_t names_      = 0;
     uint64_t generation_ = 0;

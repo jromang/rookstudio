@@ -85,6 +85,10 @@ class Tree {
     [[nodiscard]] uint32_t plies() const noexcept { return plies_; }
     [[nodiscard]] uint64_t positions() const noexcept { return positions_; }  // those kept
     [[nodiscard]] const std::string& folderName() const noexcept { return name_; }
+    // Games were replaced or deleted since it was built: it answers nothing for that snapshot, built again.
+    [[nodiscard]] bool stale(const Snapshot& snapshot) const noexcept {
+        return snapshot.editsGeneration() != edits_ || snapshot.games() < games_;
+    }
 
     // The games that reach a position (its Polyglot key) in their first plies(): none when fewer than two do. The
     // snapshot holds the tree's games (a later one of the same database does).
@@ -125,6 +129,7 @@ class Tree {
     MappedFile order_, keys_, index_, records_;
     uint64_t ordered_   = 0;  // the games order.bin holds
     uint64_t games_     = 0;
+    uint64_t edits_     = 0;  // the database's edits generation it was built at
     uint32_t plies_     = 0;
     uint64_t positions_ = 0;
     std::string name_;

@@ -391,11 +391,12 @@ void App::drawReviewCurve() {
     // The move under the pointer, a dot first: its tooltip, and where a click or a drag goes.
     if (hovered || active) {
         const ImVec2 m  = ImGui::GetIO().MousePos;
-        const Dot* near = nullptr;
+        // (Not "near": Windows' headers make it a macro.)
+        const Dot* under = nullptr;
         for (const auto& d : dots)
-            if (std::hypot(d.at.x - m.x, d.at.y - m.y) <= px(8)) near = &d;
-        const int ply = near
-                            ? near->ply
+            if (std::hypot(d.at.x - m.x, d.at.y - m.y) <= px(8)) under = &d;
+        const int ply = under
+                            ? under->ply
                             : std::clamp(static_cast<int>(std::lround((m.x - p0.x - pad) / std::max(1.0f, w - 2 * pad) *
                                                                       static_cast<float>(plies))),
                                          0, plies);
@@ -405,7 +406,7 @@ void App::drawReviewCurve() {
             if (ply > 0) tip += judgementMark(judgement(ply));
             if (const float v = win_at(ply); std::isfinite(v))
                 tip += " · " + trf("White's chances {} %", static_cast<int>(std::lround(v * 100.0f)));
-            if (near && review_moments_of_ == board_commentary_of_) {
+            if (under && review_moments_of_ == board_commentary_of_) {
                 for (const auto& [at, text] : review_moments_)
                     if (static_cast<int>(at) == ply) tip += "\n" + text;
             }

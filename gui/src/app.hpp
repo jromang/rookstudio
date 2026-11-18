@@ -512,6 +512,7 @@ class App {
     void boardCommentDone();
     void boardToast(std::string text);
     void drawBoardNagBar();
+    void drawMoveField();  // the move being typed, played by Enter (the Chess space)
     // The threads the running tournament's games use now, about: its games times the larger thread count of its
     // engines.
     [[nodiscard]] int tournamentThreads() const;

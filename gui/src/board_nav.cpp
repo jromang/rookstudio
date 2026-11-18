@@ -42,11 +42,11 @@ void FollowedPly::step(NavStep step, int total) noexcept {
     if (step != NavStep::None) show(stepPly(step, shown(total), total), total);
 }
 
-NavStep navKeys(bool& flip) {
+NavStep navKeys(bool& flip, bool flip_key) {
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput || io.KeyCtrl || io.KeyAlt || io.KeySuper) return NavStep::None;
     if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return NavStep::None;
-    if (ImGui::IsKeyPressed(ImGuiKey_F, false)) flip = !flip;
+    if (flip_key && ImGui::IsKeyPressed(ImGuiKey_F, false)) flip = !flip;
     if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) return NavStep::Previous;
     if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) return NavStep::Next;
     if (ImGui::IsKeyPressed(ImGuiKey_Home, false)) return NavStep::First;

@@ -225,7 +225,7 @@ struct BoardPage {
     [[nodiscard]] bool humanGame() const { return match && match_state.running && match_state.you.has_value(); }
     [[nodiscard]] bool humanTurn() const { return humanGame() && match_state.thinking == match_state.you; }
 
-    // The prototype of the notation written in place and of the marks (the mockups M2, FCG_PROTO_M2).
+    // The Chess space's notation written in place and its marks (mockup M2).
     std::optional<chess::Square> mark_from;   // 2D: the right button pressed on this square, a mark being drawn
     std::optional<chess::Square> mark_hover;  // the square under the pointer meanwhile
     MoveNotes start_notes;                    // the marks of the start position
@@ -246,6 +246,10 @@ struct BoardPage {
     double nag_time = 0;               // when the last of them was
     std::string toast;                 // a change said for a moment over the moves
     double toast_time = -100;
+    // The move being typed (the Chess space): opened by its first letter, played by Enter, Escape closing it.
+    std::optional<std::array<char, 16>> move_typed;
+    bool move_focus = false;  // the field takes the keys on its next frame
+    std::string move_error;
 };
 
 }  // namespace fcg

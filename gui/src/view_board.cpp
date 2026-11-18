@@ -32,6 +32,67 @@ namespace fcg {
 
 namespace {
 
+// A letter a move can begin with: a file, a piece (English or French letters), castling.
+bool moveStart(ImWchar c) {
+    return (c >= 'a' && c <= 'h') || c == 'K' || c == 'Q' || c == 'R' || c == 'B' || c == 'N' || c == 'O' || c == '0' ||
+           c == 'C' || c == 'F' || c == 'T' || c == 'D';
+}
+
+// The French letters of the pieces (R D T F C) and the English ones (K Q R B N).
+char frenchPiece(char english) {
+    switch (english) {
+        case 'K':
+            return 'R';
+        case 'Q':
+            return 'D';
+        case 'R':
+            return 'T';
+        case 'B':
+            return 'F';
+        case 'N':
+            return 'C';
+        default:
+            return english;
+    }
+}
+
+char englishPiece(char french) {
+    switch (french) {
+        case 'R':
+            return 'K';
+        case 'D':
+            return 'Q';
+        case 'T':
+            return 'R';
+        case 'F':
+            return 'B';
+        case 'C':
+            return 'N';
+        default:
+            return french;
+    }
+}
+
+// A SAN as the interface writes it: French letters in French ("Cf3", "e8=D").
+std::string shownSan(std::string san, bool french) {
+    if (!french || san.empty()) return san;
+    if (std::isupper(static_cast<unsigned char>(san[0])) && san[0] != 'O') san[0] = frenchPiece(san[0]);
+    if (const auto eq = san.find('='); eq != std::string::npos && eq + 1 < san.size())
+        san[eq + 1] = frenchPiece(san[eq + 1]);
+    return san;
+}
+
+// What was typed as an English SAN: French letters read as French in French, "0-0" as "O-O".
+std::string englishSan(std::string typed, bool french) {
+    for (auto& c : typed)
+        if (c == '0') c = 'O';
+    if (!french || typed.empty()) return typed;
+    if (std::isupper(static_cast<unsigned char>(typed[0])) && typed[0] != 'O') typed[0] = englishPiece(typed[0]);
+    if (const auto eq = typed.find('='); eq != std::string::npos && eq + 1 < typed.size())
+        typed[eq + 1] = englishPiece(typed[eq + 1]);
+    return typed;
+}
+
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 // The best line's first move strong, the others lighter.
@@ -129,7 +190,8 @@ void App::saveBoardSettings() { (void)writeJson(storage_.root() / "board.json", 
 bool App::boardKey() {
     if (board_key_taken_) return false;
     const auto& io = ImGui::GetIO();
-    if (io.WantTextInput || io.KeyCtrl || io.KeyAlt || io.KeySuper) return false;
+    // A, or Alt+A in the Chess space, where A begins a move.
+    if (io.WantTextInput || io.KeyCtrl || io.KeySuper || io.KeyAlt != chessBoard()) return false;
     if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return false;
     if (!ImGui::IsKeyPressed(ImGuiKey_A, false)) return false;
     board_key_taken_ = true;
@@ -737,6 +799,7 @@ void App::boardTypeNag(char sign) {
 void App::boardEditKeys() {
     auto& b        = board_;
     const auto& io = ImGui::GetIO();
+    if (io.WantTextInput) return;  // a field has the keys: the move typed, a comment
     if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt &&
         (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
         boardComment(io.KeyShift);
@@ -764,8 +827,84 @@ void App::boardEditKeys() {
         b.ply  = std::clamp(b.ply, 0, static_cast<int>(b.game.moves.size()));
         boardToast(line < 0 ? TR("The main line now · Ctrl+Z undoes it") : TR("Variation moved up · Ctrl+Z undoes it"));
     }
-    for (const ImWchar c : io.InputQueueCharacters)
-        if (c == '!' || c == '?') boardTypeNag(static_cast<char>(c));
+    for (const ImWchar c : io.InputQueueCharacters) {
+        if (c == '!' || c == '?') {
+            boardTypeNag(static_cast<char>(c));
+        } else if (!b.move_typed && !io.KeyCtrl && !io.KeyAlt && moveStart(c)) {
+            b.move_typed.emplace();
+            (*b.move_typed)[0] = static_cast<char>(c);
+            b.move_focus       = true;
+            b.move_error.clear();
+        }
+    }
+}
+
+void App::drawMoveField() {
+    auto& b = board_;
+    if (!b.move_typed) return;
+    const bool french = i18n::language() == i18n::Language::French;
+    const auto board  = boardAt(b.game, b.chess960, b.ply);
+    // Focused, the field would select its text, which the next letter would replace: the cursor after it instead.
+    static bool cursor_at_end = false;
+    if (b.move_focus) {
+        ImGui::SetKeyboardFocusHere();
+        b.move_focus  = false;
+        cursor_at_end = true;
+    }
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
+    const bool enter = ImGui::InputTextWithHint(
+        "##move_typed", TR("A move"), b.move_typed->data(), b.move_typed->size(),
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways,
+        [](ImGuiInputTextCallbackData* data) {
+            auto* at_end = static_cast<bool*>(data->UserData);
+            if (*at_end) {
+                data->CursorPos = data->SelectionStart = data->SelectionEnd = data->BufTextLen;
+                *at_end                                                     = false;
+            }
+            return 0;
+        },
+        &cursor_at_end);
+    if (ImGui::IsItemDeactivated() && !enter && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        b.move_typed.reset();
+        return;
+    }
+    // The legal moves it may be, as the notation writes them.
+    const std::string typed = b.move_typed->data();
+    std::vector<std::pair<std::string, chess::Move>> matches;
+    chess::Movelist legal;
+    chess::movegen::legalmoves(legal, board);
+    for (const auto& m : legal) {
+        const auto san = chess::uci::moveToSan(board, m);
+        if (shownSan(san, french).rfind(typed, 0) == 0 || san.rfind(typed, 0) == 0) matches.push_back({san, m});
+    }
+    if (enter) {
+        std::optional<chess::Move> move;
+        try {
+            auto san = englishSan(typed, french);
+            std::erase_if(san, [](char c) { return c == '!' || c == '?'; });  // a symbol typed after it
+            const auto m = chess::uci::parseSan(board, san);
+            if (m != chess::Move::NO_MOVE) move = m;
+        } catch (...) {
+        }
+        if (!move && matches.size() == 1) move = matches[0].second;  // what was typed names one move only
+        if (move) {
+            b.move_typed.reset();
+            boardPlay(*move);
+            return;
+        }
+        b.move_error = TR("Not a legal move here");
+        b.move_focus = true;
+    }
+    ImGui::SameLine();
+    if (!b.move_error.empty()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", b.move_error.c_str());
+    } else {
+        std::string hint;
+        for (std::size_t i = 0; i < matches.size() && i < 8; ++i)
+            hint += (i ? " · " : "") + shownSan(matches[i].first, french);
+        if (matches.size() > 8) hint += " …";
+        ImGui::TextDisabled("%s", matches.empty() ? TR("No legal move begins so") : hint.c_str());
+    }
 }
 
 void App::drawBoardNagBar() {
@@ -999,7 +1138,8 @@ void App::drawBoardPage() {
     if (chessBoard() && keys && !b.editor && !SDL_TextInputActive(window_)) SDL_StartTextInput(window_);
     if (keys && !b.editor) {
         const int before = b.ply;
-        b.ply = stepPly(navKeys(b.flip), b.ply, total);
+        b.ply            = stepPly(navKeys(b.flip, !chessBoard()), b.ply, total);
+        if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_F)) b.flip = !b.flip;
         if (b.ply != before) b.preview.reset();
         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             if (b.preview)
@@ -1007,7 +1147,8 @@ void App::drawBoardPage() {
             else
                 b.selected.reset();
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_N, false) && !ImGui::GetIO().KeyCtrl) {
+        if (ImGui::IsKeyPressed(ImGuiKey_N, false) && !ImGui::GetIO().KeyCtrl &&
+            ImGui::GetIO().KeyAlt == chessBoard()) {
             if (const int to = judgedPly(ImGui::GetIO().KeyShift ? -1 : 1); to >= 0) showBoardLine(-1, to);
         }
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
@@ -1015,9 +1156,10 @@ void App::drawBoardPage() {
         if (chessBoard()) boardEditKeys();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
-    if (keys && !b.editor && ImGui::IsKeyPressed(ImGuiKey_X, false) && !ImGui::GetIO().KeyCtrl)
-        setBoardThreat(!b.threat_on);
-    if (keys && !b.editor && ImGui::IsKeyPressed(ImGuiKey_G, false) && !ImGui::GetIO().KeyCtrl) {
+    // The letters are the Engines space's keys; the Chess space's under Alt, its letters beginning moves.
+    const bool letter_keys = !ImGui::GetIO().KeyCtrl && ImGui::GetIO().KeyAlt == chessBoard();
+    if (keys && !b.editor && ImGui::IsKeyPressed(ImGuiKey_X, false) && letter_keys) setBoardThreat(!b.threat_on);
+    if (keys && !b.editor && ImGui::IsKeyPressed(ImGuiKey_G, false) && letter_keys) {
         if (b.reviewing())
             cancelGameReview();
         else
@@ -2172,7 +2314,10 @@ void App::drawBoardMoves(float height) {
 
     // This move under the moves and the table; the review is about the whole game.
     const float strip = b.ply > 0 && b.ply <= total && b.game_tab != 3 ? thisMoveHeight() : 0.0f;
-    if (chessBoard() && b.game_tab == 0) drawBoardNagBar();
+    if (chessBoard() && b.game_tab == 0) {
+        drawMoveField();
+        drawBoardNagBar();
+    }
     ImGui::BeginChild("##board_moves", ImVec2(0, -strip), ImGuiChildFlags_Borders);
     std::optional<ui::TopicRegion> moves_region(
         std::in_place, b.tree.variations.empty() ? guide::topics::BoardMoves : guide::topics::Variations);

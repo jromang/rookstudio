@@ -32,9 +32,10 @@ class FollowedPly {
     std::optional<int> held_;
 };
 
-// The step the keys ask for this frame: the left and right arrows, Home and End; F turns `flip` over. Nothing while a
-// text field or a popup has the keys, or with Ctrl, Alt or Super held.
-NavStep navKeys(bool& flip);
+// The step the keys ask for this frame: the left and right arrows, Home and End; F turns `flip` over, unless
+// `flip_key` is false (the Chess space, where F begins a move and Alt+F turns the board). Nothing while a text field
+// or a popup has the keys, or with Ctrl, Alt or Super held.
+NavStep navKeys(bool& flip, bool flip_key = true);
 
 // The height the row of buttons takes under a board.
 [[nodiscard]] float boardNavHeight();

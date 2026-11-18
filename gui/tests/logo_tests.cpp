@@ -13,7 +13,7 @@
 using namespace fcg;
 namespace fs = std::filesystem;
 
-TEST_CASE("logo: a blue tile with rounded corners, the pawn in white, the hand cut out") {
+TEST_CASE("logo: a blue tile with rounded corners, the rook in white, its battlements") {
     const int size = 72;
     const auto px  = logo::icon(size);
     REQUIRE(px.size() == size * size * 4);
@@ -22,13 +22,14 @@ TEST_CASE("logo: a blue tile with rounded corners, the pawn in white, the hand c
     const auto* tile = at(size / 2, 3);
     CHECK(tile[3] == 255);
     CHECK(tile[2] == 222);  // the light theme's accent
-    // The base of the pawn (grid y 19.6 to 22 of 24, on the middle 2/3 of the tile).
+    // The base of the rook (grid y 19.4 to 22 of 24, on the middle 2/3 of the tile), white.
     const auto grid  = [&](float g) { return static_cast<int>(size / 6.0f + g * size * 2 / 3 / 24); };
     const auto* base = at(size / 2, grid(20.8f));
     CHECK(base[0] == 255);
     CHECK(base[1] == 255);
-    // The pivot of the hand, in the middle of the head, is the tile's colour.
-    CHECK(at(grid(12), grid(7.6f))[0] == 47);
+    // A merlon is white, the gap between two the tile's colour.
+    CHECK(at(grid(12), grid(4))[0] == 255);
+    CHECK(at(grid(10), grid(4))[0] == 47);
 }
 
 TEST_CASE("logo: the Windows icon is the logo drawn (FCG_UPDATE_ICON=1 writes it)") {

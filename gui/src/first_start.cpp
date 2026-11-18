@@ -1,0 +1,253 @@
+#include "first_start.hpp"
+
+#include <algorithm>
+#include <cstdlib>
+#include <fstream>
+#include <system_error>
+
+#include <imgui.h>
+#include <json.hpp>
+
+#include "i18n.hpp"
+#include "logo.hpp"
+#include "ui.hpp"
+
+namespace fs = std::filesystem;
+
+namespace fcg::first {
+
+namespace {
+
+float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
+
+std::optional<nlohmann::json> readJson(const fs::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return std::nullopt;
+    try {
+        return nlohmann::json::parse(in);
+    } catch (const nlohmann::json::exception&) {
+        return std::nullopt;
+    }
+}
+
+int listed(const fs::path& file) {
+    const auto json = readJson(file);
+    return json && json->is_array() ? static_cast<int>(json->size()) : 0;
+}
+
+// The tournaments folder of a profile, as its settings.json names it: its own runs folder unless another was chosen.
+fs::path tournamentsFolder(const fs::path& profile) {
+    if (const auto settings = readJson(profile / "settings.json"); settings && settings->is_object()) {
+        const auto dir = settings->value("tournaments_dir", std::string{});
+        if (!dir.empty() && fs::path(dir).is_absolute()) return fs::path(dir);
+    }
+    return profile / "runs";
+}
+
+}  // namespace
+
+bool fresh(const fs::path& profile) {
+    const auto settings = readJson(profile / "settings.json");
+    return !settings || !settings->is_object() || !settings->contains("space");
+}
+
+fs::path legacyProfile(const fs::path& own) {
+    const auto usable = [](const fs::path& dir) {
+        std::error_code ec;
+        return fs::is_regular_file(dir / "engines.json", ec) || fs::is_regular_file(dir / "setup.json", ec) ||
+               fs::is_regular_file(dir / "settings.json", ec);
+    };
+    if (const char* env = std::getenv("FCG_LEGACY_PROFILE"); env && *env)
+        return usable(env) ? fs::path(env) : fs::path();
+    auto folder = own;
+    if (!folder.has_filename()) folder = folder.parent_path();  // ".../rookstudio/"
+    const auto legacy = folder.parent_path() / "fastchess" / "fastchess-gui";
+    return usable(legacy) ? legacy : fs::path();
+}
+
+bool copied(const fs::path& relative) {
+    const auto name = relative.filename().string();
+    if (relative == "running.json" || relative == "queue.json" || relative == "imgui.ini") return false;
+    const auto ext = relative.extension().string();
+    return ext != ".log" && ext != ".sock" && ext != ".lock" && name != "control.json";
+}
+
+ProfileSummary summarize(const fs::path& profile) {
+    ProfileSummary out;
+    std::error_code ec;
+    out.engines  = listed(profile / "engines.json");
+    out.books    = listed(profile / "books.json");
+    out.settings = fs::is_regular_file(profile / "settings.json", ec);
+    for (fs::directory_iterator it(tournamentsFolder(profile), ec), end; !ec && it != end; it.increment(ec))
+        if (it->is_directory(ec)) ++out.tournaments;
+    ec.clear();
+    for (fs::recursive_directory_iterator it(profile, fs::directory_options::skip_permission_denied, ec), end;
+         !ec && it != end; it.increment(ec)) {
+        const auto relative = fs::relative(it->path(), profile, ec);
+        if (!copied(relative)) {
+            if (it->is_directory(ec)) it.disable_recursion_pending();
+            continue;
+        }
+        if (it->is_regular_file(ec)) out.bytes += it->file_size(ec);
+    }
+    return out;
+}
+
+bool copyProfile(const fs::path& from, const fs::path& to, std::string& error, std::atomic<uint64_t>* done) {
+    std::error_code ec;
+    fs::create_directories(to, ec);
+    for (fs::recursive_directory_iterator it(from, fs::directory_options::skip_permission_denied, ec), end; it != end;
+         it.increment(ec)) {
+        if (ec) break;
+        const auto relative = fs::relative(it->path(), from, ec);
+        if (ec) break;
+        if (!copied(relative)) {
+            if (it->is_directory(ec)) it.disable_recursion_pending();
+            continue;
+        }
+        const auto target = to / relative;
+        if (it->is_directory(ec)) {
+            fs::create_directories(target, ec);
+        } else if (it->is_regular_file(ec)) {
+            fs::copy_file(it->path(), target, fs::copy_options::overwrite_existing, ec);
+            if (!ec && done) *done += it->file_size(ec);
+        }
+        if (ec) break;
+    }
+    if (ec) {
+        error = ec.message();
+        return false;
+    }
+    return true;
+}
+
+bool drawPage(Page& page) {
+    const auto* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    constexpr auto flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(32), px(28)));
+    ImGui::Begin("##first_start", nullptr, flags);
+    ImGui::PopStyleVar();
+
+    bool chosen       = false;
+    const float width = std::min(ImGui::GetContentRegionAvail().x, px(900));
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), (ImGui::GetWindowWidth() - width) * 0.5f));
+    ImGui::BeginGroup();
+
+    // The logo, the welcome, the language.
+    {
+        const auto pos   = ImGui::GetCursorScreenPos();
+        const float size = px(44);
+        logo::draw(ImGui::GetWindowDrawList(), pos, size, ui::ACCENT, IM_COL32_WHITE);
+        ImGui::Dummy(ImVec2(size, size));
+        ImGui::SameLine(0, px(14));
+        ImGui::BeginGroup();
+        ui::pageTitle(TR("Welcome to RookStudio"));
+        ImGui::TextDisabled("%s", TR("What do you want to do first?"));
+        ImGui::EndGroup();
+        ImGui::SameLine(width - px(220));
+        ImGui::SetNextItemWidth(px(220));
+        const auto& current = i18n::info(i18n::language());
+        if (ImGui::BeginCombo("##language", current.name)) {
+            for (const auto& l : i18n::languages()) {
+                if (ImGui::Selectable(l.name, l.language == current.language)) {
+                    i18n::setLanguage(l.language);
+                    page.language = l.code;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+    ImGui::Dummy(ImVec2(0, px(18)));
+
+    // The two spaces, side by side.
+    const float card_w = (width - px(16)) * 0.5f;
+    const auto card    = [&](const char* id, bool chess, ui::Icon icon, const char* title, const char* text,
+                             const char* where) {
+        const bool on = page.chess == chess;
+        ImGui::PushStyleColor(ImGuiCol_Border, on ? ImGui::ColorConvertU32ToFloat4(ui::ACCENT)
+                                                  : ImGui::GetStyleColorVec4(ImGuiCol_Border));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, on ? 2.0f : 1.0f);
+        ImGui::BeginChild(id, ImVec2(card_w, px(190)), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
+        const auto top = ImGui::GetCursorScreenPos();
+        ui::drawIcon(ImGui::GetWindowDrawList(), icon, ImVec2(top.x + px(14), top.y + px(14)), px(26),
+                     on ? ui::ACCENT : ImGui::GetColorU32(ImGuiCol_TextDisabled));
+        ImGui::Dummy(ImVec2(0, px(34)));
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.2f);
+        ImGui::TextUnformatted(title);
+        ImGui::PopFont();
+        ImGui::PushTextWrapPos(card_w - px(16));
+        ImGui::TextDisabled("%s", text);
+        ImGui::PopTextWrapPos();
+        ImGui::SetCursorPosY(px(190) - ImGui::GetTextLineHeightWithSpacing() - px(10));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", where);
+        // The whole card is the button.
+        ImGui::SetCursorScreenPos(ImGui::GetWindowPos());
+        if (ImGui::InvisibleButton("##pick", ImGui::GetWindowSize())) page.chess = chess;
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+    };
+    card("##engines", false, ui::Icon::Trophy, TR("Test engines"),
+         TR("Tournaments and matches, SPRT, opening suites, ratings, remote machines: fastchess-gui as you know it."),
+         TR("Engines space · Ctrl+1"));
+    ImGui::SameLine(0, px(16));
+    card("##chess", true, ui::Icon::Board, TR("Study, analyse, play"),
+         TR("Game databases, annotated notation, opening tree, Lichess, an assistant that comments on your "
+            "machine."),
+         TR("Chess space · Ctrl+2"));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
+    ImGui::TextDisabled("%s", TR("Both spaces stay one click away: the switch at the top of the rail, or Ctrl+1 and "
+                                 "Ctrl+2. Nothing is fixed by this choice."));
+    ImGui::PopTextWrapPos();
+    ImGui::Dummy(ImVec2(0, px(14)));
+
+    // fastchess-gui's profile, to copy.
+    if (!page.legacy.empty()) {
+        ui::beginCard("first_legacy", ImVec2(width, 0));
+        ImGui::TextUnformatted(TR("A fastchess-gui profile is on this machine"));
+        const auto& s = page.summary;
+        ImGui::TextDisabled("%s",
+                            trf("{}, {}, {} and your settings.", trn("{} engine", "{} engines", s.engines, s.engines),
+                                trn("{} book", "{} books", s.books, s.books),
+                                trn("{} tournament", "{} tournaments", s.tournaments, s.tournaments))
+                                .c_str());
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width - px(32));
+        ImGui::TextDisabled("%s", TR("RookStudio can copy it: fastchess-gui stays as it is and can keep running "
+                                     "beside."));
+        ImGui::PopTextWrapPos();
+        ui::endCard();
+        ImGui::Dummy(ImVec2(0, px(10)));
+    }
+
+    // Start.
+    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+    const char* go   = page.legacy.empty() ? TR("Continue") : TR("Copy and continue");
+    const float go_w = ImGui::CalcTextSize(go).x + px(28);
+    float row        = go_w;
+    if (!page.legacy.empty()) row += ImGui::CalcTextSize(TR("Start without")).x + px(28) + px(10);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + width - row);
+    if (!page.legacy.empty()) {
+        if (ImGui::Button(TR("Start without"))) {
+            page.copy = false;
+            chosen    = true;
+        }
+        ImGui::SameLine(0, px(10));
+    }
+    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+    if (ImGui::Button(go) || enter) {
+        page.copy = !page.legacy.empty();
+        chosen    = true;
+    }
+    ImGui::PopStyleColor(2);
+    ImGui::SameLine(0, px(8));
+    ImGui::TextDisabled("%s", TR("Enter"));
+
+    ImGui::EndGroup();
+    ImGui::End();
+    return chosen;
+}
+
+}  // namespace fcg::first

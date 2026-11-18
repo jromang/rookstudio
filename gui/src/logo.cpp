@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <map>
 
 #include <stb_image_write.h>
@@ -10,7 +11,7 @@ namespace fcg::logo {
 
 namespace {
 
-// The pawn on a 24 x 24 grid; on the tile it takes 24/36 of the width, centred.
+// The rook on a 24 x 24 grid; on the tile it takes 24/36 of the width, centred.
 constexpr float GRID     = 24.0f;
 constexpr float GLYPH    = 24.0f / 36.0f;
 constexpr float ROUNDING = 10.0f / 36.0f;
@@ -18,13 +19,12 @@ constexpr float ROUNDING = 10.0f / 36.0f;
 struct Rect {
     float x0, y0, x1, y1, r;
 };
-constexpr Rect CROWN   = {11.0f, 1.2f, 13.0f, 2.9f, 0.5f};  // the stopwatch's button
-constexpr Rect COLLAR  = {8.4f, 12.4f, 15.6f, 14.0f, 0.8f};
-constexpr Rect BASE    = {6.0f, 19.6f, 18.0f, 22.0f, 1.0f};
-constexpr float HEAD_X = 12.0f, HEAD_Y = 7.6f, HEAD_R = 4.2f;
-constexpr ImVec2 BODY[4] = {{9.8f, 14.4f}, {14.2f, 14.4f}, {15.9f, 19.0f}, {8.1f, 19.0f}};
-// Cut out of the head: the hand, and its pivot.
-constexpr float HAND_X = 14.3f, HAND_Y = 5.6f, HAND_W = 0.75f, PIVOT_R = 0.9f;
+constexpr Rect BASE       = {5.6f, 19.4f, 18.4f, 22.0f, 1.0f};
+constexpr Rect RING       = {6.4f, 7.2f, 17.6f, 9.8f, 0.6f};  // under the battlements
+constexpr Rect MERLONS[3] = {
+    {6.4f, 2.6f, 9.0f, 7.6f, 0.5f}, {10.7f, 2.6f, 13.3f, 7.6f, 0.5f}, {15.0f, 2.6f, 17.6f, 7.6f, 0.5f}};
+// The tower, a little wider at its foot.
+constexpr ImVec2 BODY[4] = {{8.2f, 9.6f}, {15.8f, 9.6f}, {16.8f, 19.6f}, {7.2f, 19.6f}};
 
 bool inRect(const Rect& b, float x, float y) {
     if (x < b.x0 || x > b.x1 || y < b.y0 || y > b.y1) return false;
@@ -39,17 +39,10 @@ bool inBody(float x, float y) {
     return x >= BODY[0].x + t * (BODY[3].x - BODY[0].x) && x <= BODY[1].x + t * (BODY[2].x - BODY[1].x);
 }
 
-float distanceToHand(float x, float y) {
-    const float dx = HAND_X - HEAD_X, dy = HAND_Y - HEAD_Y;
-    const float t = std::clamp(((x - HEAD_X) * dx + (y - HEAD_Y) * dy) / (dx * dx + dy * dy), 0.0f, 1.0f);
-    return std::hypot(x - (HEAD_X + t * dx), y - (HEAD_Y + t * dy));
-}
-
 // (x, y) on the grid.
 bool inGlyph(float x, float y) {
-    const float head = std::hypot(x - HEAD_X, y - HEAD_Y);
-    if (head <= HEAD_R) return head > PIVOT_R && distanceToHand(x, y) > HAND_W;
-    return inRect(CROWN, x, y) || inRect(COLLAR, x, y) || inBody(x, y) || inRect(BASE, x, y);
+    return inRect(BASE, x, y) || inRect(RING, x, y) || inBody(x, y) ||
+           std::any_of(std::begin(MERLONS), std::end(MERLONS), [&](const Rect& m) { return inRect(m, x, y); });
 }
 
 void append(std::vector<uint8_t>& out, uint32_t value, int bytes) {
@@ -80,19 +73,14 @@ void draw(ImDrawList* dl, ImVec2 min, float size, ImU32 tile, ImU32 glyph) {
     const float k = size * GLYPH / GRID;
     const ImVec2 o(min.x + size * (1 - GLYPH) / 2, min.y + size * (1 - GLYPH) / 2);
     const auto at   = [&](float x, float y) { return ImVec2(o.x + x * k, o.y + y * k); };
-    const auto rect = [&](const Rect& b, ImU32 c) { dl->AddRectFilled(at(b.x0, b.y0), at(b.x1, b.y1), c, b.r * k); };
+    const auto rect = [&](const Rect& b) { dl->AddRectFilled(at(b.x0, b.y0), at(b.x1, b.y1), glyph, b.r * k); };
 
-    rect(CROWN, glyph);
-    dl->AddCircleFilled(at(HEAD_X, HEAD_Y), HEAD_R * k, glyph, 48);
-    rect(COLLAR, glyph);
+    for (const auto& m : MERLONS) rect(m);
+    rect(RING);
     const ImVec2 body[4] = {at(BODY[0].x, BODY[0].y), at(BODY[1].x, BODY[1].y), at(BODY[2].x, BODY[2].y),
                             at(BODY[3].x, BODY[3].y)};
     dl->AddConvexPolyFilled(body, 4, glyph);
-    rect(BASE, glyph);
-    // The hand and its pivot, in the tile's colour, with round ends.
-    dl->AddLine(at(HEAD_X, HEAD_Y), at(HAND_X, HAND_Y), tile, 2 * HAND_W * k);
-    dl->AddCircleFilled(at(HAND_X, HAND_Y), HAND_W * k, tile, 12);
-    dl->AddCircleFilled(at(HEAD_X, HEAD_Y), PIVOT_R * k, tile, 12);
+    rect(BASE);
 }
 
 std::vector<uint8_t> icon(int size) {

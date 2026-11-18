@@ -1,10 +1,12 @@
 // fastchess-gui: a small desktop front end for the fastchess tournament manager.
 
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -45,12 +47,14 @@
 #include "app.hpp"
 #include "child_process.hpp"
 #include "console.hpp"
+#include "engine_relay.hpp"
 #include "engines.hpp"
+#include "first_start.hpp"
 #include "headless.hpp"
-#include "machines.hpp"
 #include "i18n.hpp"
 #include "local_socket.hpp"
 #include "logo.hpp"
+#include "machines.hpp"
 #include "portable.hpp"
 #include "renderer.hpp"
 #include "report.hpp"
@@ -58,7 +62,6 @@
 #include "storage.hpp"
 #include "topology.hpp"
 #include "ui.hpp"
-#include "engine_relay.hpp"
 #include "wb2uci.hpp"
 #include "window_place.hpp"
 
@@ -363,6 +366,97 @@ fs::path profileFolder(const Args& args, const std::string& executable) {
     return path;
 }
 
+// The first start's page (first_start.hpp) until its choice is made, then fastchess-gui's profile copied if asked,
+// the language and the space kept in the profile. With --focus first-start and screenshots, the page only, for the
+// screenshots: false then, as when the window was closed first.
+bool runFirstStart(SDL_Window* window, const fs::path& own, const Args& args, bool system_profile) {
+    fcg::first::Page page;
+    page.own = own;
+    if (system_profile || std::getenv("FCG_LEGACY_PROFILE")) page.legacy = fcg::first::legacyProfile(own);
+    if (!page.legacy.empty()) page.summary = fcg::first::summarize(page.legacy);
+    page.chess = page.legacy.empty();  // fastchess-gui's users arrive in the Engines space
+
+    const auto started = std::chrono::steady_clock::now();
+    auto shots         = args.shots;
+    const auto frame   = [&](const std::function<bool()>& draw) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            ImGui_ImplSDL3_ProcessEvent(&event);
+            if (event.type == SDL_EVENT_QUIT ||
+                (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)))
+                return std::optional<bool>(false);
+        }
+        fcg::render::newFrame();
+        ImGui::NewFrame();
+        const bool done = draw();
+        ImGui::Render();
+        int fb_w = 0, fb_h = 0;
+        SDL_GetWindowSizeInPixels(window, &fb_w, &fb_h);
+        fcg::render::draw(fb_w, fb_h);
+        if (!shots.empty()) {
+            const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+            bool all_taken       = true;
+            for (auto& shot : shots) {
+                if (!shot.taken && elapsed >= shot.at) {
+                    shot.taken = true;
+                    fcg::render::screenshot(shot.file, fb_w, fb_h);
+                }
+                all_taken &= shot.taken;
+            }
+            if (all_taken) return std::optional<bool>(false);
+        }
+        fcg::render::present();
+        std::this_thread::sleep_for(std::chrono::milliseconds(33));
+        return done ? std::optional<bool>(true) : std::nullopt;
+    };
+    for (;;) {
+        const auto chosen = frame([&] { return fcg::first::drawPage(page); });
+        if (chosen) {
+            if (!*chosen) return false;
+            break;
+        }
+    }
+
+    // The copy, its progress drawn while it goes.
+    if (page.copy.value_or(false)) {
+        std::atomic<uint64_t> written{0};
+        std::atomic<bool> finished{false};
+        std::string error;
+        bool ok = false;
+        std::thread copier([&] {
+            ok       = fcg::first::copyProfile(page.legacy, page.own, error, &written);
+            finished = true;
+        });
+        while (!finished) {
+            const auto closed = frame([&] {
+                const auto* viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+                                               viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+                                        ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                ImGui::Begin("##copying", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+                ImGui::TextUnformatted(TR("Copying fastchess-gui's profile…"));
+                const double total = std::max<double>(1.0, static_cast<double>(page.summary.bytes));
+                ImGui::ProgressBar(static_cast<float>(std::min(1.0, static_cast<double>(written) / total)),
+                                   ImVec2(ImGui::GetFontSize() * 20, 0));
+                ImGui::End();
+                return false;
+            });
+            if (closed && !*closed) break;  // the copy finishes before the program ends
+        }
+        copier.join();
+        if (!ok) fcg::Console::instance().add(fcg::trf("The copy of fastchess-gui's profile stopped: {}", error), true);
+    }
+
+    fcg::Storage profile(page.own);
+    if (!page.language.empty()) {
+        auto setup     = profile.loadSetup();
+        setup.language = page.language;
+        profile.saveSetup(setup);
+    }
+    profile.setSpace(page.chess ? "chess" : "engines");
+    return true;
+}
+
 // --attach <folder>: what comes on the standard input goes to the tournament process's socket, and what it sends to the
 // standard output, until either side ends. 0 when it ended, 2 when nothing listens.
 int attachTo(const std::string& folder) {
@@ -565,6 +659,19 @@ int run(const Args& args, int argc, char** argv) {
     ImPlot::GetStyle().PlotPadding = ImVec2(6, 6);
 
     fcg::render::initBackends();
+
+    // The first start: the language, the space to begin in, fastchess-gui's profile copied. Not for a tournament
+    // started at launch nor scripted screenshots, unless they ask for this page.
+    if ((fcg::first::fresh(storage.root()) && args.shots.empty() && !args.autostart) || args.focus == "first-start") {
+        if (!runFirstStart(window, storage.root(), args, args.profile.empty() && !fcg::portable::active())) {
+            fcg::render::shutdown();
+            ImPlot::DestroyContext();
+            ImGui::DestroyContext();
+            SDL_Quit();
+            return 0;
+        }
+        storage = fcg::Storage(storage.root());  // what the copy brought, its tournaments folder among it
+    }
 
     fcg::AppOptions options;
     options.autostart    = args.autostart;

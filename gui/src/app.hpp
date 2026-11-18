@@ -810,6 +810,12 @@ class App {
     void drawAssistantFirstUse();
     void askQuestion(const std::string& text);
     void pollQuestions();  // once a frame: the answers that came, the assistant's download and unloading
+    // Settings › Assistant (M5, board 5): where it stands, its model, where it runs, when it unloads.
+    void drawAssistantSettings(float label);
+    // What the assistant is doing, for the home's « In progress »: its download, its model loaded; empty otherwise.
+    [[nodiscard]] std::string assistantStatus() const;
+    // The running tournament whose engines use the GPU, by its name; empty when none.
+    [[nodiscard]] std::string gpuTournament() const;
     // An answer put in the notation, on the move it was asked after: the assistant's comment when the move had none,
     // added to the user's own otherwise.
     void addAssistantComment(const std::string& text, int line, int ply, const std::string& fen);

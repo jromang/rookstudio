@@ -211,6 +211,7 @@ void App::askQuestion(const std::string& text) {
 
 void App::pollQuestions() {
     if (!assistant_) return;
+    assistant_->setGpuTaken(gpuTournament());
     assistant_->poll();
     pollBoardComments();
     for (auto& q : questions_)
@@ -398,6 +399,149 @@ void App::drawBoardQuestions() {
                                      "tables establish, shown under the answer, and names only legal moves."));
         ImGui::PopTextWrapPos();
     }
+}
+
+}  // namespace fcg
+
+namespace fcg {
+
+std::string App::gpuTournament() const {
+    for (const auto& r : runs_) {
+        const auto* t = r.run->tournament();
+        if (!r.run->running() || !t) continue;
+        const bool gpu = r.run->remote() ? r.run->inFlight().gpus > 0
+                                         : std::any_of(t->spec().participants.begin(), t->spec().participants.end(),
+                                                       [](const auto& p) { return p.gpu; });
+        if (gpu) return t->spec().name;
+    }
+    return {};
+}
+
+std::string App::assistantStatus() const {
+    if (!assistant_) return {};
+    const auto& a = *assistant_;
+    using S       = AssistantService::State;
+    switch (a.state()) {
+        case S::Downloading: {
+            const auto total = std::max<uint64_t>(1, a.recommended().size);
+            return trf("Downloading the assistant's model: {} %", a.downloaded() * 100 / total);
+        }
+        case S::Loading:
+            return TR("The local assistant: loading its model");
+        case S::Ready:
+            return a.onGpu() ? TR("The local assistant: ready (GPU)") : TR("The local assistant: ready (processor)");
+        default:
+            return {};
+    }
+}
+
+void App::drawAssistantSettings(float label) {
+    if (!assistant_) return;
+    auto& a          = *assistant_;
+    bool changed     = false;
+    using S          = AssistantService::State;
+    const auto state = a.state();
+
+    ui::label(TR("Assistant"), label);
+    ImGui::BeginGroup();
+    ImGui::PushTextWrapPos();
+    // Where it stands, and the gesture that goes with it (M5, board 5).
+    switch (state) {
+        case S::NoModel:
+            ImGui::TextUnformatted(TR("No model on this machine: the Questions tab of the Board page offers it."));
+            break;
+        case S::Downloading:
+            ImGui::TextUnformatted(assistantStatus().c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Cancel"))) a.cancelDownload();
+            break;
+        case S::Unloaded:
+            ImGui::TextUnformatted(TR("Not loaded: the next question or comment loads it, in a few seconds."));
+            break;
+        case S::Loading:
+            ImGui::TextUnformatted(TR("Loading its model…"));
+            break;
+        case S::Ready:
+            ImGui::TextUnformatted(trf("Ready · {}", a.devices()).c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Unload"))) a.unload();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("Its process ends and gives its memory back; the next question loads it "
+                                           "again."));
+            break;
+        case S::Failed:
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               trf("The model could not be loaded: {}", a.failure()).c_str());
+            break;
+    }
+    if (a.gpuFailed()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           TR("The graphics driver failed the model: it runs on the processor since. The details are "
+                              "in the log."));
+        if (ImGui::SmallButton(TR("Try the GPU again"))) a.retryGpu();
+    }
+    if (!a.gpuTaken().empty() && a.settings().gpu) {
+        ImGui::TextDisabled("%s", trf("The tournament « {} » uses the GPU: the assistant answers on the processor "
+                                      "meanwhile, in about 3 seconds.",
+                                      a.gpuTaken())
+                                      .c_str());
+        if (ImGui::SmallButton(TR("Take the GPU anyway"))) a.takeGpuAnyway();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("An engine that computes on the GPU keeps the priority: sharing it would skew "
+                                       "its results."));
+    }
+    ImGui::PopTextWrapPos();
+    ImGui::EndGroup();
+
+    // Its model: the catalogue's, or a GGUF file of the disk.
+    ui::label(TR("Its model"), label);
+    ImGui::BeginGroup();
+    ImGui::PushTextWrapPos();
+    if (a.settings().model_file.empty()) {
+        ImGui::TextUnformatted(trf("RookStudio commentary v11 · {}{}", formatBytes(a.recommended().size),
+                                   a.installed() ? std::string() : std::string(" · ") + TR("not downloaded"))
+                                   .c_str());
+        if (!a.installed() && !a.downloading()) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton(a.partlyDownloaded() ? TR("Resume the download") : TR("Download"))) a.download();
+        }
+    } else {
+        ImGui::TextUnformatted(a.settings().model_file.c_str());
+        if (!a.knowsComments())
+            ImGui::TextDisabled("%s", TR("It answers the questions, but it has not learnt RookStudio's comments: "
+                                         "those stay the templates'."));
+        if (ImGui::SmallButton(TR("Back to RookStudio's model"))) {
+            a.unload();
+            a.settings().model_file.clear();
+            changed = true;
+        }
+        ImGui::SameLine();
+    }
+    if (ImGui::SmallButton(TR("A GGUF file of the disk…")))
+        dialogs_.openFile(Dialogs::Purpose::AssistantModel, {{"GGUF", "gguf"}});
+    ImGui::PopTextWrapPos();
+    ImGui::EndGroup();
+
+    // Where it runs, and for how long it stays.
+    ui::label(TR("It runs on"), label);
+    int where = a.settings().gpu ? 0 : 1;
+    if (ImGui::RadioButton(TR("The GPU, when there is one to use"), &where, 0)) changed = true;
+    ImGui::SameLine();
+    if (ImGui::RadioButton(TR("The processor"), &where, 1)) changed = true;
+    if (changed && a.settings().gpu != (where == 0)) {
+        a.settings().gpu = where == 0;
+        a.unload();  // loaded again where it now runs
+    }
+    ui::label(TR("Unloaded after"), label);
+    int minutes = a.settings().unload_minutes;
+    ImGui::SetNextItemWidth(px(110));
+    if (ImGui::InputInt("##unload_minutes", &minutes, 5, 15)) {
+        a.settings().unload_minutes = std::clamp(minutes, 0, 24 * 60);
+        changed                     = true;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("minutes without serving; 0: kept until Unload"));
+    if (changed) a.saveSettings();
 }
 
 }  // namespace fcg

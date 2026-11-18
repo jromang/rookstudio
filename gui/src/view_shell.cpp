@@ -918,6 +918,14 @@ void App::drawSettings() {
     bool changed      = false;
     const float label = px(220);
 
+    // The current space's settings first: in the Chess space, the assistant's (M5, board 5).
+    if (space_ == Space::Chess) {
+        drawAssistantSettings(label);
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
     ui::label(TR("Language"), label);
     ui::topic(guide::topics::Language);
     ImGui::SetNextItemWidth(px(220));
@@ -1081,6 +1089,12 @@ void App::drawSettings() {
     if (software != software_at_launch_) {
         ImGui::SameLine();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("Applies at the next launch."));
+    }
+    if (space_ != Space::Chess) {
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        drawAssistantSettings(label);
     }
 
     if (changed) saveSetupSoon();

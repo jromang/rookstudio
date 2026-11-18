@@ -46,6 +46,11 @@ class AssistantService final : public commentary::Model {
     [[nodiscard]] const AssistantModel& recommended() const;
     [[nodiscard]] std::filesystem::path modelPath() const;
     [[nodiscard]] bool installed() const;  // its file is there, whole
+    // The model is one of the catalogue's, which learnt RookStudio's comments; another GGUF file answers the
+    // questions, the comments staying the templates' (M5, board 5).
+    [[nodiscard]] bool knowsComments() const;
+    // Part of the recommended model is there, from a download that stopped: the next one resumes it.
+    [[nodiscard]] bool partlyDownloaded() const;
 
     // The recommended model downloaded into the profile, resumed where an earlier try stopped, checked at its end.
     void download();
@@ -60,6 +65,16 @@ class AssistantService final : public commentary::Model {
     [[nodiscard]] std::string devices() const;  // where the model runs, as its process named it
     [[nodiscard]] std::string failure() const;  // why it could not load
     void unload();                              // its process ended: its memory, and the GPU's, freed
+    // The GPU failed the model (its driver fell): it runs on the processor since. Trying again unloads it, and the
+    // next request loads it on the GPU.
+    [[nodiscard]] bool gpuFailed() const;
+    void retryGpu();
+    // A tournament whose engines use the GPU is running (its name; empty when none): the model loads on the processor
+    // meanwhile, unless the user takes the GPU anyway (M5, board 5).
+    void setGpuTaken(const std::string& tournament);
+    [[nodiscard]] const std::string& gpuTaken() const noexcept { return gpu_taken_; }
+    void takeGpuAnyway();
+    [[nodiscard]] bool onGpu() const;  // loaded with its layers on the GPU
     // Once a frame: a download that ended, the model unloaded after unload_minutes unused.
     void poll();
 
@@ -75,6 +90,11 @@ class AssistantService final : public commentary::Model {
     std::unique_ptr<AssistantProcess> process_;
     std::atomic<bool> loading_{false};
     std::atomic<bool> unload_asked_{false};  // Unload while a request held the model: done once it is answered
+    std::string gpu_taken_;                  // the window's thread's
+    std::atomic<bool> gpu_busy_{false};      // gpu_taken_ not empty, and the GPU not taken anyway
+    std::atomic<bool> gpu_anyway_{false};
+    std::atomic<bool> loaded_on_gpu_{false};
+    std::atomic<bool> gpu_failed_{false};
     std::string failure_, devices_;
     std::chrono::steady_clock::time_point last_use_{};
     std::future<Download> download_;

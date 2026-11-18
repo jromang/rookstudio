@@ -4,6 +4,27 @@
 
 #ifdef FCG_ASSISTANT
 #    include "assistant_process.hpp"
+#else
+namespace fcg {
+// Built without the assistant's runtime: no model ever loads.
+class AssistantProcess {
+   public:
+    bool start(const std::string&, const std::filesystem::path&, int, std::string& error) {
+        error = "this program was built without the assistant";
+        return false;
+    }
+    std::optional<commentary::Generation> generate(const commentary::Request&, std::string* error) {
+        if (error) *error = "this program was built without the assistant";
+        return std::nullopt;
+    }
+    bool running() { return false; }
+    [[nodiscard]] bool gpuFailed() const noexcept { return false; }
+    [[nodiscard]] const std::string& devices() const noexcept { return devices_; }
+
+   private:
+    std::string devices_;
+};
+}  // namespace fcg
 #endif
 
 namespace fcg {
@@ -41,6 +62,42 @@ bool AssistantService::installed() const {
     return std::filesystem::is_regular_file(settings_.model_file, ec);
 }
 
+bool AssistantService::knowsComments() const {
+    if (settings_.model_file.empty()) return true;
+    const auto name = std::filesystem::path(settings_.model_file).filename().string();
+    for (const auto& m : assistantModels())
+        if (name == m.file) return true;
+    return false;
+}
+
+bool AssistantService::partlyDownloaded() const {
+    std::error_code ec;
+    auto part = modelFile(profile_, recommended());
+    part += ".part";
+    return std::filesystem::is_regular_file(part, ec);
+}
+
+bool AssistantService::gpuFailed() const { return gpu_failed_; }
+
+void AssistantService::retryGpu() {
+    gpu_failed_ = false;
+    unload();
+}
+
+void AssistantService::setGpuTaken(const std::string& tournament) {
+    if (tournament.empty()) gpu_anyway_ = false;  // asked for that tournament only
+    gpu_taken_ = tournament;
+    gpu_busy_  = !tournament.empty() && !gpu_anyway_;
+}
+
+void AssistantService::takeGpuAnyway() {
+    gpu_anyway_ = true;
+    gpu_busy_   = false;
+    unload();  // loaded again on the GPU at the next request
+}
+
+bool AssistantService::onGpu() const { return loaded_on_gpu_; }
+
 void AssistantService::download() {
     if (downloading()) return;
     progress_ = std::make_shared<DownloadProgress>();
@@ -73,9 +130,7 @@ AssistantService::State AssistantService::state() const {
     if (loading_) return State::Loading;
     std::unique_lock lock(mutex_, std::try_to_lock);
     if (!lock) return State::Ready;  // a request holds it: the model is loaded and answers
-#ifdef FCG_ASSISTANT
     if (process_ && process_->running()) return State::Ready;
-#endif
     return failure_.empty() ? State::Unloaded : State::Failed;
 }
 
@@ -98,6 +153,7 @@ void AssistantService::unload() {
     }
     unload_asked_ = false;
     process_.reset();
+    loaded_on_gpu_ = false;
     failure_.clear();
 }
 
@@ -116,21 +172,23 @@ void AssistantService::poll() {
         speed_at_    = now;
     }
     if (unload_asked_) unload();
-    // Unloaded by itself after so long unused (M5, board 5).
-    if (settings_.unload_minutes > 0 && last_use_.time_since_epoch().count() != 0 &&
-        now - last_use_ > std::chrono::minutes(settings_.unload_minutes)) {
+    // Unloaded by itself after so long unused (M5, board 5); a request under way holds the lock, and the model.
+    if (settings_.unload_minutes > 0) {
         std::unique_lock lock(mutex_, std::try_to_lock);
-#ifdef FCG_ASSISTANT
-        if (lock && process_) process_.reset();
-#endif
+        if (lock && process_ && now - last_use_ > std::chrono::minutes(settings_.unload_minutes)) {
+            process_.reset();
+            loaded_on_gpu_ = false;
+        }
     }
 }
 
 std::optional<commentary::Generation> AssistantService::generate(const commentary::Request& request,
                                                                  std::string* error) {
-#ifdef FCG_ASSISTANT
     std::lock_guard lock(mutex_);  // one request at a time, as the model answers them
     last_use_ = std::chrono::steady_clock::now();
+    // On the GPU when it is wanted and free; a model loaded where it no longer should be is loaded again.
+    const bool want_gpu = settings_.gpu && !gpu_busy_ && !gpu_failed_;
+    if (process_ && process_->running() && loaded_on_gpu_ && !want_gpu) process_.reset();
     if (!process_ || !process_->running()) {
         if (!installed()) {
             if (error) *error = "the assistant's model is not on this machine";
@@ -139,7 +197,7 @@ std::optional<commentary::Generation> AssistantService::generate(const commentar
         loading_     = true;
         auto process = std::make_unique<AssistantProcess>();
         std::string why;
-        const bool ok = process->start(program_, modelPath(), settings_.gpu ? 999 : 0, why);
+        const bool ok = process->start(program_, modelPath(), want_gpu ? 999 : 0, why);
         loading_      = false;
         if (!ok) {
             failure_ = why;
@@ -147,17 +205,23 @@ std::optional<commentary::Generation> AssistantService::generate(const commentar
             return std::nullopt;
         }
         failure_.clear();
-        devices_ = process->devices();
-        process_ = std::move(process);
+        devices_    = process->devices();
+        gpu_failed_ = process->gpuFailed();
+        // On the GPU only when its process found one to use: a program built without a GPU backend, or a machine
+        // without a GPU, runs it on the processor whatever was asked.
+        loaded_on_gpu_ = want_gpu && !process->gpuFailed() &&
+                         (devices_.find("GPU") != std::string::npos || devices_.find("Vulkan") != std::string::npos);
+        process_       = std::move(process);
     }
     auto answer = process_->generate(request, error);
-    last_use_   = std::chrono::steady_clock::now();
+    // A GPU that failed while it answered: the model runs on the processor since (AssistantProcess).
+    if (process_->gpuFailed() && loaded_on_gpu_) {
+        gpu_failed_    = true;
+        loaded_on_gpu_ = false;
+        devices_       = process_->devices();
+    }
+    last_use_ = std::chrono::steady_clock::now();
     return answer;
-#else
-    (void)request;
-    if (error) *error = "this program was built without the assistant";
-    return std::nullopt;
-#endif
 }
 
 }  // namespace fcg

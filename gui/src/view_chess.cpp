@@ -13,6 +13,7 @@
 #include <study/linked.hpp>
 
 #include "app.hpp"
+#include "assistant_service.hpp"
 #include "board_view.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
@@ -212,9 +213,10 @@ void App::drawChessHome() {
     ImGui::Dummy(ImVec2(0, px(6)));
     drawLichessHomeCard();
 
-    // What runs: the game's analysis, the position's, an import.
+    // What runs: the game's analysis, the position's, an import, the assistant (M5, board 1).
     const bool importing = job != nullptr;
-    if (b.reviewing() || b.analysing || importing) {
+    const auto assistant = assistantStatus();
+    if (b.reviewing() || b.analysing || importing || !assistant.empty()) {
         ImGui::Dummy(ImVec2(0, px(6)));
         ui::beginCard("chess_running");
         ImGui::TextUnformatted(TR("In progress"));
@@ -237,6 +239,16 @@ void App::drawChessHome() {
             ImGui::TextUnformatted(trf("Import of {}", job->file.filename().string()).c_str());
             ImGui::SameLine();
             ImGui::ProgressBar(share, ImVec2(px(160), 0));
+        }
+        if (!assistant.empty()) {
+            ImGui::TextUnformatted(assistant.c_str());
+            if (assistant_->state() == AssistantService::State::Ready) {
+                ImGui::SameLine();
+                if (ImGui::SmallButton(TR("Unload"))) assistant_->unload();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", TR("Its process ends and gives its memory back; the next question loads "
+                                               "it again."));
+            }
         }
         ui::endCard();
     }

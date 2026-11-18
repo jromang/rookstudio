@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <functional>
 #include <type_traits>
 
 #include "attack.hpp"
@@ -30,10 +31,34 @@ void append(std::vector<Fact>& to, std::optional<Fact> more) {
     if (more) to.push_back(std::move(*more));
 }
 
+// Removing facts from a vector or reordering them move-assigns them, and the variant's move assignment grows with the
+// square of its alternatives once inlined: with std::erase_if and a lambda of its own at each call, vector::erase and
+// std::stable_sort, gcc took 10 GB and wrote 35 MB of code for this file. The helpers below move facts by construction
+// only, in one place.
+[[gnu::noinline]] void dropIf(std::vector<Fact>& facts, const std::function<bool(const Fact&)>& drop) {
+    std::vector<Fact> kept;
+    kept.reserve(facts.size());
+    for (auto& f : facts)
+        if (!drop(f)) kept.push_back(std::move(f));
+    facts = std::move(kept);
+}
+
+void dropAt(std::vector<Fact>& facts, std::vector<Fact>::const_iterator at) {
+    const auto index = static_cast<std::size_t>(at - facts.cbegin());
+    std::size_t i    = 0;
+    dropIf(facts, [&](const Fact&) { return i++ == index; });
+}
+
 // The most telling first, facts of the same weight in the order they came (Rust's stable sort_by_key).
-void bySalience(std::vector<Fact>& facts) {
-    std::stable_sort(facts.begin(), facts.end(),
-                     [](const Fact& a, const Fact& b) { return salience(a) > salience(b); });
+[[gnu::noinline]] void bySalience(std::vector<Fact>& facts) {
+    std::vector<std::pair<uint32_t, std::size_t>> order;
+    order.reserve(facts.size());
+    for (std::size_t i = 0; i < facts.size(); ++i) order.emplace_back(salience(facts[i]), i);
+    std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    std::vector<Fact> sorted;
+    sorted.reserve(facts.size());
+    for (const auto& [weight, i] : order) sorted.push_back(std::move(facts[i]));
+    facts = std::move(sorted);
 }
 
 // The facts good for `side`, most telling first, each kind of fact once.
@@ -75,11 +100,11 @@ std::optional<Fact> zugzwangOf(const MoveContext& ctx, const Position& start, st
 std::vector<Fact> weighed(std::vector<Fact> facts, const Position& start, std::span<const Move> moves,
                           const EngineLine* line, Color side) {
     if (!line) {
-        std::erase_if(facts, [](const Fact& f) { return is<fact::Sacrifice>(f) || is<fact::Initiative>(f); });
+        dropIf(facts, [](const Fact& f) { return is<fact::Sacrifice>(f) || is<fact::Initiative>(f); });
         return facts;
     }
     const double win = forSide(line->whiteExpected(), side);
-    if (win < 50.0) std::erase_if(facts, [](const Fact& f) { return is<fact::Sacrifice>(f); });
+    if (win < 50.0) dropIf(facts, [](const Fact& f) { return is<fact::Sacrifice>(f); });
     if (win < HOLDS) {
         for (auto& f : facts) {
             if (const auto* i = std::get_if<fact::Initiative>(&f)) f = Fact{fact::Counterplay{i->side}};
@@ -96,7 +121,7 @@ std::vector<Fact> withCauses(std::vector<Fact> punishment) {
     const bool lost   = std::any_of(punishment.begin(), punishment.end(), isConcrete);
     const bool tactic = std::any_of(punishment.begin(), punishment.end(),
                                     [](const Fact& f) { return salience(f) >= TACTIC && !isCause(f); });
-    std::erase_if(punishment, [&](const Fact& f) {
+    dropIf(punishment, [&](const Fact& f) {
         if (is<fact::Unguards>(f) || is<fact::Neglects>(f)) return !lost;
         if (is<fact::OpensLine>(f)) return !(lost || tactic);
         return false;
@@ -112,7 +137,7 @@ std::vector<Fact> retaken(const MoveContext& ctx, std::vector<Fact> found) {
     const auto due = ctx.previous->capture();
     if (!due) return found;
     const auto square = ctx.played.to();
-    std::erase_if(found, [&](const Fact& f) {
+    dropIf(found, [&](const Fact& f) {
         const auto* h = std::get_if<fact::Hanging>(&f);
         return h && h->piece.square == square;
     });
@@ -122,7 +147,7 @@ std::vector<Fact> retaken(const MoveContext& ctx, std::vector<Fact> found) {
     });
     if (counted != found.end()) {
         const int32_t pawns = std::get<fact::WinsMaterial>(*counted).pawns;
-        found.erase(counted);
+        dropAt(found, counted);
         if (pawns > value(*due))
             found.push_back(Fact{fact::WinsMaterial{mover, pawns - value(*due), std::nullopt, std::nullopt}});
     }
@@ -163,15 +188,15 @@ std::vector<Fact> billed(const Position& before, const Move& played, std::option
     if (reply.empty()) return found;
     const auto& answer = reply.front();
     const auto& was    = before.board();
-    std::erase_if(found, [&](const Fact& f) {
+    dropIf(found, [&](const Fact& f) {
         const auto* t = std::get_if<fact::ThreatensCapture>(&f);
         return t && Placed::at(was, t->target.square) == t->target && see(was, t->target.square, !mover) > 0;
     });
     // A pawn the king could not catch before the move either is not running because of it.
-    std::erase_if(found, [&](const Fact& f) { return is<fact::Outruns>(f) && outruns(before, answer.from()); });
+    dropIf(found, [&](const Fact& f) { return is<fact::Outruns>(f) && outruns(before, answer.from()); });
     // A piece that took and is taken back was traded, not left en prise.
     if (played.isCapture() && answer.isCapture() && answer.to() == played.to()) {
-        std::erase_if(found, [&](const Fact& f) {
+        dropIf(found, [&](const Fact& f) {
             const auto* h = std::get_if<fact::Hanging>(&f);
             return h && h->piece.square == answer.to();
         });
@@ -201,7 +226,7 @@ std::vector<Fact> billed(const Position& before, const Move& played, std::option
             std::find_if(found.begin(), found.end(), [](const Fact& f) { return is<fact::WinsMaterial>(f); });
         if (counted != found.end()) {
             const auto w = std::get<fact::WinsMaterial>(*counted);
-            found.erase(counted);
+            dropAt(found, counted);
             if (w.side != mover) {
                 lost  = w.pawns;
                 trade = w.trade;
@@ -344,7 +369,7 @@ MoveFacts gather(const MoveContext& ctx) {
         append(found, zugzwangOf(ctx, before, line, ctx.reply));
         found = weighed(std::move(found), before, line, ctx.reply, mover);
         // A pawn already out of the king's reach before the move only runs on.
-        std::erase_if(found, [&](const Fact& f) { return is<fact::Outruns>(f) && outruns(before, ctx.played.from()); });
+        dropIf(found, [&](const Fact& f) { return is<fact::Outruns>(f) && outruns(before, ctx.played.from()); });
         // The only move may be so because a piece under attack had to step away.
         if (ctx.report->only_move) append(found, saved(before, ctx.played));
         facts.achieves = goodFor(retaken(ctx, std::move(found)), mover);
@@ -357,7 +382,7 @@ MoveFacts gather(const MoveContext& ctx) {
             f2 = weighed(std::move(f2), tried, other->rest, other->second, !mover);
             f2 = billed(before, other->alt, ctx.previous, ctx.best, other->rest, std::move(f2));
             f2 = withCauses(goodFor(std::move(f2), !mover));
-            std::erase_if(f2, [](const Fact& f) { return is<fact::Luft>(f); });
+            dropIf(f2, [](const Fact& f) { return is<fact::Luft>(f); });
             // Worth telling when the other move loses something outright, and the move played does not simply mate.
             const bool loses =
                 std::any_of(f2.begin(), f2.end(), [](const Fact& f) { return isConcrete(f) || salience(f) >= TACTIC; });
@@ -384,7 +409,7 @@ MoveFacts gather(const MoveContext& ctx) {
         append(punishment, exact);
         append(punishment, std::move(answer));
         append(punishment, std::move(damage));
-        std::erase_if(punishment, [](const Fact& f) { return is<fact::Luft>(f); });
+        dropIf(punishment, [](const Fact& f) { return is<fact::Luft>(f); });
         facts.punished_by = withCauses(goodFor(std::move(punishment), !mover));
         if (ctx.best && (ctx.best->moves.empty() || ctx.best->moves.front() != ctx.played)) {
             const auto& best = *ctx.best;
@@ -396,7 +421,7 @@ MoveFacts gather(const MoveContext& ctx) {
             const std::optional<Move> first =
                 best.moves.empty() ? std::nullopt : std::optional<Move>(best.moves.front());
             if (isRecapture(ctx.previous, first))
-                std::erase_if(missed, [](const Fact& f) { return is<fact::WinsMaterial>(f) || is<fact::Hanging>(f); });
+                dropIf(missed, [](const Fact& f) { return is<fact::WinsMaterial>(f) || is<fact::Hanging>(f); });
             // What the better move does about the answer to the move played.
             if (first && ctx.reply && !ctx.reply->moves.empty())
                 append(missed, remedies(before, ctx.played, *first, ctx.reply->moves.front(), ctx.previous));
@@ -410,7 +435,7 @@ MoveFacts gather(const MoveContext& ctx) {
         // only the game going on: a passing threat or a small change in the structure is not what the move is faulted
         // for.
         if (facts.missedChance()) {
-            std::erase_if(facts.punished_by,
+            dropIf(facts.punished_by,
                           [](const Fact& f) { return !(salience(f) >= NOTABLE && !is<fact::ThreatensCapture>(f)); });
         }
     }

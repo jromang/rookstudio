@@ -93,24 +93,9 @@ jobs:
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCG_STATIC_RUNTIME=ON -DFCG_ASSISTANT_VULKAN=${VULKAN}
 
       - name: Build
-        # As many compilations as processors (ninja runs two more), with 8 GB of swap beside the runner's 3: a private
-        # repository's runner has two processors and 7.9 GB. On Ubuntu 26.04 the runner ran out of memory four times
-        # about 20 minutes into this build, its service stopped with the build.
         run: |
-          free -m
-          sudo fallocate -l 8G /mnt/fcg-swap && sudo chmod 600 /mnt/fcg-swap && sudo mkswap /mnt/fcg-swap >/dev/null &&
-            sudo swapon /mnt/fcg-swap || echo "no swap file added"
-          swapon --show
-          # The memory and the swap every 20 seconds, in this log, and past 3 GB the three largest processes: the
-          # runner died with 7.8 GB and the 3 GB of swap it had used up, 19 minutes in, the steps that ended then using
-          # less than 1 GB each.
-          ( while sleep 20; do
-              used=$(free -m | awk '/^Mem:/{print $3}')
-              free -m | awk '/^Mem:/{m=$3"/"$2} /^Swap:/{s=$3"/"$2} END{print "[memory] used " m " MB, swap " s " MB"}'
-              if [ "$used" -gt 3000 ]; then ps -eo rss=,args= --sort=-rss | head -3 | cut -c1-220 | sed 's/^/[memory]   /'; fi
-            done ) &
           ccache -z
-          cmake --build build -j "$(nproc)"
+          cmake --build build
           ccache -s
 
       - name: Compiler cache saved

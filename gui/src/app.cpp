@@ -51,6 +51,9 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     recognizeProfiles(setup_, profiles_);
     i18n::setLanguage(i18n::resolve(setup_.language));
     loadAppearance();
+    // The prototype of the mockups M2: the right button marks in 3D as in A or B.
+    if (const char* proto = std::getenv("FCG_PROTO_M2"); proto && *proto)
+        proto_m2_ = *proto == 'b' || *proto == 'B' ? Board3d::Marks::B : Board3d::Marks::A;
 
     // The guide panel: its width kept, the `?` of the titles and the messages opening it, links in the browser.
     {

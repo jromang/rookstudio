@@ -210,6 +210,8 @@ void drawBoard(const PieceAtlas& atlas, const std::array<chess::Piece, 64>& piec
                                 decor.last_move_colour, 0.0f, 0, decor.last_move_frame);
                 }
             }
+            for (const auto& tint : decor.tints)
+                if (tint.square == square) dl->AddRectFilled(p0, p1, tint.colour);
             if (decor.selected && *decor.selected == square) dl->AddRectFilled(p0, p1, SELECTED);
             if (decor.drop && *decor.drop == square) dl->AddRectFilled(p0, p1, BOARD_DROP);
             if (check && *check == square) {
@@ -288,6 +290,20 @@ void drawBoard(const PieceAtlas& atlas, const std::array<chess::Piece, 64>& piec
                     0, 0, 3.0f);
 
     ImGui::Dummy(ImVec2(size + (bar ? evalBarSpace(size) : 0.0f), size));
+}
+
+ImU32 markColour(char colour, bool square) {
+    const int alpha = square ? 125 : 205;
+    switch (colour) {
+        case 'R':
+            return IM_COL32(200, 40, 40, alpha);
+        case 'B':
+            return IM_COL32(30, 95, 205, alpha);
+        case 'Y':
+            return IM_COL32(230, 160, 0, alpha);
+        default:
+            return IM_COL32(25, 135, 45, alpha);
+    }
 }
 
 void drawDraggedPiece(const PieceAtlas& atlas, chess::Piece piece, float size) {

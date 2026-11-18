@@ -99,6 +99,25 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
             x = o.x, y += lh, ++line, line_started = false;
             continue;
         }
+        if (it.kind == NotationItem::Kind::Field) {
+            if (line_started) y += lh, ++line;
+            const float fx = o.x + it.indent;
+            ImGui::SetCursorScreenPos(ImVec2(fx, y + px(1)));
+            ImGui::SetNextItemWidth(std::max(px(80), o.x + room - fx));
+            if (it.field_focus) ImGui::SetKeyboardFocusHere();
+            if (it.colour) ImGui::PushStyleColor(ImGuiCol_Text, it.colour);
+            ImGui::InputTextWithHint("##field", it.text.c_str(), it.field, it.field_size);
+            if (it.colour) ImGui::PopStyleColor();
+            if (ImGui::IsItemDeactivated()) {
+                if (ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+                    ev.field_cancelled = true;
+                else
+                    ev.field_done = true;
+            }
+            y += std::max(lh, ImGui::GetFrameHeight() + px(4));
+            x = o.x, ++line, line_started = false;
+            continue;
+        }
         std::optional<Figurine> fig;
         const float w = measure(it, fig);
         // A move number stays with its move: wrapped together.
@@ -169,6 +188,7 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
         }
     }
     if (cut) dl->AddText(font, fs, ImVec2(std::min(x, o.x + room - ImGui::CalcTextSize("…").x), y), ui::MUTED, "…");
+    ImGui::SetCursorScreenPos(o);
     ImGui::Dummy(ImVec2(room, y + lh - o.y));
     ImGui::PopID();
     return ev;

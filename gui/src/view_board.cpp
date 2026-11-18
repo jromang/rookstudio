@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <functional>
 #include <sstream>
@@ -506,10 +507,312 @@ void App::pollGameReview() {
 
 void App::boardPlay(chess::Move move) {
     // A move where the game went another way starts a variation; the game stays as it came.
-    auto& b              = board_;
+    auto& b                = board_;
+    const auto moves_count = [&] {
+        std::size_t n = b.tree.main.moves.size();
+        for (const auto& v : b.tree.variations) n += v.moves.size() + 1;
+        return n;
+    };
+    const std::size_t was = moves_count(), variations = b.tree.variations.size();
+    std::optional<BoardPage::Snapshot> before;
+    if (protoM2()) before = boardSnapshot();
     const auto [line, p] = playInTree(b.tree, b.chess960, b.line, b.ply, move);
     b.game               = lineOf(b.tree, line);
     showBoardLine(line, p);
+    if (before && moves_count() != was) {
+        boardChanged(std::move(*before));
+        if (b.tree.variations.size() > variations)
+            boardToast(TR("Variation added · Ctrl+Z takes it away · Alt+↑ makes it the main line"));
+    }
+}
+
+namespace {
+
+// The colour of the mark the right button draws: green; Shift (or Ctrl) red, Alt blue, both yellow, as on Lichess.
+char markColourKey() {
+    const auto& io = ImGui::GetIO();
+    if (io.KeyShift && io.KeyAlt) return 'Y';
+    if (io.KeyShift || io.KeyCtrl) return 'R';
+    if (io.KeyAlt) return 'B';
+    return 'G';
+}
+
+bool moveNag(uint8_t nag) { return nag >= 1 && nag <= 9; }
+
+// A symbol as the notation shows it.
+std::string nagText(uint8_t nag) {
+    switch (nag) {
+        case 1:
+            return "!";
+        case 2:
+            return "?";
+        case 3:
+            return "!!";
+        case 4:
+            return "??";
+        case 5:
+            return "!?";
+        case 6:
+            return "?!";
+        case 7:
+            return "□";
+        case 10:
+            return "=";
+        case 13:
+            return "∞";
+        case 14:
+            return "⩲";
+        case 15:
+            return "⩱";
+        case 16:
+            return "±";
+        case 17:
+            return "∓";
+        case 18:
+            return "+−";
+        case 19:
+            return "−+";
+        case 22:
+        case 23:
+            return "⨀";
+        case 146:
+            return "N";
+        default:
+            return fmt::format("${}", nag);
+    }
+}
+
+ImU32 nagColour(uint8_t nag) {
+    switch (nag) {
+        case 1:
+            return IM_COL32(40, 150, 70, 255);
+        case 2:
+            return IM_COL32(230, 120, 30, 255);
+        case 3:
+            return IM_COL32(26, 165, 160, 255);
+        case 4:
+            return IM_COL32(210, 50, 50, 255);
+        case 5:
+            return IM_COL32(80, 130, 215, 255);
+        case 6:
+            return IM_COL32(200, 155, 30, 255);
+        default:
+            return 0;
+    }
+}
+
+}  // namespace
+
+BoardPage::Snapshot App::boardSnapshot() const {
+    const auto& b = board_;
+    return {b.tree, b.start_notes, b.line, b.ply};
+}
+
+void App::boardChanged(BoardPage::Snapshot before) {
+    auto& b = board_;
+    b.undo.push_back(std::move(before));
+    if (b.undo.size() > 200) b.undo.erase(b.undo.begin());
+    b.redo.clear();
+}
+
+void App::boardUndo(bool redo) {
+    auto& b    = board_;
+    auto& from = redo ? b.redo : b.undo;
+    if (from.empty()) return;
+    (redo ? b.undo : b.redo).push_back(boardSnapshot());
+    auto s = std::move(from.back());
+    from.pop_back();
+    b.tree        = std::move(s.tree);
+    b.start_notes = std::move(s.start_notes);
+    b.comment_edit.reset();
+    b.line = s.line >= -1 && s.line < static_cast<int>(b.tree.variations.size()) ? s.line : -1;
+    b.game = lineOf(b.tree, b.line);
+    b.ply  = std::clamp(s.ply, 0, static_cast<int>(b.game.moves.size()));
+    b.selected.reset();
+    b.preview.reset();
+    boardToast(redo ? TR("Change made again") : TR("Change undone · Ctrl+Y makes it again"));
+}
+
+MoveNotes* App::boardNotes() {
+    auto& b = board_;
+    return b.ply == 0 ? &b.start_notes : notesAt(b.tree, b.line, b.ply);
+}
+
+void App::boardMark(chess::Square from, chess::Square to) {
+    auto& b           = board_;
+    const auto before = boardSnapshot();
+    MoveNotes* notes  = boardNotes();
+    if (!notes) return;
+    toggleMark(*notes, markColourKey(), from.index(), to.index());
+    boardChanged(before);
+    b.game = lineOf(b.tree, b.line);
+}
+
+void App::boardClearMarks() {
+    auto& b          = board_;
+    MoveNotes* notes = boardNotes();
+    if (!notes || (notes->arrows.empty() && notes->squares.empty())) return;
+    auto before = boardSnapshot();
+    notes->arrows.clear();
+    notes->squares.clear();
+    boardChanged(std::move(before));
+    b.game = lineOf(b.tree, b.line);
+    boardToast(TR("Marks cleared · Ctrl+Z brings them back"));
+}
+
+void App::boardToast(std::string text) {
+    board_.toast      = std::move(text);
+    board_.toast_time = ImGui::GetTime();
+}
+
+void App::boardComment(bool before) {
+    auto& b = board_;
+    if (b.ply <= 0) return;
+    const MoveNotes* notes = notesAt(b.tree, b.line, b.ply);
+    if (!notes) return;
+    BoardPage::CommentEdit e;
+    e.line   = ownerOf(b.tree, b.line, b.ply - 1);
+    e.ply    = b.ply;
+    e.before = before;
+    std::snprintf(e.text.data(), e.text.size(), "%s", (before ? notes->before : notes->after).c_str());
+    b.comment_edit = e;
+}
+
+void App::boardCommentDone() {
+    auto& b = board_;
+    if (!b.comment_edit) return;
+    const auto e = *b.comment_edit;
+    b.comment_edit.reset();
+    std::string text = e.text.data();
+    const auto first = text.find_first_not_of(" \t");
+    text             = first == std::string::npos ? "" : text.substr(first, text.find_last_not_of(" \t") - first + 1);
+    auto before      = boardSnapshot();
+    MoveNotes* notes = notesAt(b.tree, e.line, e.ply);
+    if (!notes) return;
+    auto& slot = e.before ? notes->before : notes->after;
+    if (slot == text) return;
+    slot = text;
+    boardChanged(std::move(before));
+    b.game = lineOf(b.tree, b.line);
+}
+
+void App::boardSetNag(uint8_t nag) {
+    auto& b = board_;
+    if (b.ply <= 0) return;
+    auto before      = boardSnapshot();
+    MoveNotes* notes = notesAt(b.tree, b.line, b.ply);
+    if (!notes) return;
+    toggleNag(notes->nags, nag);
+    boardChanged(std::move(before));
+    b.game = lineOf(b.tree, b.line);
+}
+
+void App::boardTypeNag(char sign) {
+    auto& b = board_;
+    if (b.ply <= 0) return;
+    const double now                                              = ImGui::GetTime();
+    const bool pair                                               = b.nag_typed.size() == 1 && now - b.nag_time < 0.8;
+    b.nag_typed                                                   = pair ? b.nag_typed + sign : std::string(1, sign);
+    b.nag_time                                                    = now;
+    static constexpr std::pair<std::string_view, uint8_t> signs[] = {{"!", 1},  {"?", 2},  {"!!", 3},
+                                                                     {"??", 4}, {"!?", 5}, {"?!", 6}};
+    uint8_t nag                                                   = 0;
+    for (const auto& [text, n] : signs)
+        if (text == b.nag_typed) nag = n;
+    if (nag == 0) return;
+    auto before      = boardSnapshot();
+    MoveNotes* notes = notesAt(b.tree, b.line, b.ply);
+    if (!notes) return;
+    if (pair) {
+        // The second sign of a pair: the pair's symbol for the first's, in the same change.
+        std::erase_if(notes->nags, moveNag);
+        toggleNag(notes->nags, nag);
+    } else {
+        toggleNag(notes->nags, nag);
+        boardChanged(std::move(before));
+    }
+    b.game = lineOf(b.tree, b.line);
+}
+
+void App::boardEditKeys() {
+    auto& b        = board_;
+    const auto& io = ImGui::GetIO();
+    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt &&
+        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
+        boardComment(io.KeyShift);
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) boardUndo(false);
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) ||
+        ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z))
+        boardUndo(true);
+    if (b.ply > 0 && ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+        auto before            = boardSnapshot();
+        const auto [line, ply] = truncateAt(b.tree, b.line, b.ply);
+        boardChanged(std::move(before));
+        b.line = line;
+        b.game = lineOf(b.tree, line);
+        b.ply  = std::clamp(ply, 0, static_cast<int>(b.game.moves.size()));
+        b.selected.reset();
+        boardToast(TR("Moves deleted · Ctrl+Z brings them back"));
+    }
+    if (const int owner = b.ply > 0 ? ownerOf(b.tree, b.line, b.ply - 1) : -1;
+        owner >= 0 && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_UpArrow)) {
+        auto before    = boardSnapshot();
+        const int line = promoteVariation(b.tree, owner);
+        boardChanged(std::move(before));
+        b.line = line;
+        b.game = lineOf(b.tree, line);
+        b.ply  = std::clamp(b.ply, 0, static_cast<int>(b.game.moves.size()));
+        boardToast(line < 0 ? TR("The main line now · Ctrl+Z undoes it") : TR("Variation moved up · Ctrl+Z undoes it"));
+    }
+    for (const ImWchar c : io.InputQueueCharacters)
+        if (c == '!' || c == '?') boardTypeNag(static_cast<char>(c));
+}
+
+void App::drawBoardNagBar() {
+    auto& b                = board_;
+    const MoveNotes* notes = b.ply > 0 && b.ply <= static_cast<int>(b.game.moves.size())
+                                 ? &b.game.moves[static_cast<std::size_t>(b.ply - 1)].notes
+                                 : nullptr;
+    struct Sign {
+        uint8_t nag;
+        const char* tip;
+    };
+    static const Sign signs[] = {{1, N_("Good move")},
+                                 {2, N_("Mistake")},
+                                 {3, N_("Brilliant move")},
+                                 {4, N_("Blunder")},
+                                 {5, N_("Interesting move")},
+                                 {6, N_("Dubious move")},
+                                 {7, N_("Only move")},
+                                 {146, N_("Novelty")},
+                                 {10, N_("Equal position")},
+                                 {13, N_("Unclear position")},
+                                 {14, N_("White is slightly better")},
+                                 {16, N_("White is better")},
+                                 {18, N_("White is winning")},
+                                 {15, N_("Black is slightly better")},
+                                 {17, N_("Black is better")},
+                                 {19, N_("Black is winning")}};
+    ImGui::BeginDisabled(!notes);
+    for (std::size_t i = 0; i < std::size(signs); ++i) {
+        const auto& s = signs[i];
+        const bool on = notes && std::find(notes->nags.begin(), notes->nags.end(), s.nag) != notes->nags.end();
+        if (i > 0) ImGui::SameLine(0, i == 8 ? px(12) : px(2));
+        if (on) ImGui::PushStyleColor(ImGuiCol_Button, ui::ACCENT);
+        ImGui::PushID(static_cast<int>(i));
+        if (ImGui::Button(nagText(s.nag).c_str(), ImVec2(px(30), 0))) boardSetNag(s.nag);
+        ImGui::PopID();
+        if (on) ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", TR(s.tip));
+    }
+    ImGui::EndDisabled();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("%s", TR("Enter: a comment after the move · Shift+Enter: before it · ! and ?: symbols · Del: "
+                                "the moves from here · Alt+↑: the variation up · Ctrl+Z, Ctrl+Y · the right button "
+                                "on the board: arrows and squares (Shift red, Alt blue, both yellow)"));
+    ImGui::PopStyleColor();
+    if (ImGui::GetTime() - b.toast_time < 4.0)
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", b.toast.c_str());
 }
 
 void App::boardMove(chess::Move move) {
@@ -706,6 +1009,7 @@ void App::drawBoardPage() {
         }
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) saveBoardPgn();
+        if (protoM2()) boardEditKeys();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
     if (keys && !b.editor && ImGui::IsKeyPressed(ImGuiKey_X, false) && !ImGui::GetIO().KeyCtrl)
@@ -1267,6 +1571,20 @@ void App::drawBoardColumn(float size) {
                 decor.arrows.push_back({moves.front(), IM_COL32(205, 40, 40, 200)});
         }
     }
+    // The marks of the move shown, and the arrow being drawn (the prototype M2).
+    if (protoM2()) {
+        const MoveNotes& notes = b.ply > 0 ? b.game.moves[static_cast<std::size_t>(b.ply - 1)].notes : b.start_notes;
+        for (const auto& a : notes.arrows)
+            if (a.from >= 0 && a.to >= 0)
+                decor.arrows.push_back(
+                    {chess::Move::make<chess::Move::NORMAL>(chess::Square(a.from), chess::Square(a.to)),
+                     markColour(a.colour, false)});
+        for (const auto& s : notes.squares)
+            if (s.from >= 0) decor.tints.push_back({chess::Square(s.from), markColour(s.colour, true)});
+        if (b.mark_from && b.mark_hover && *b.mark_hover != *b.mark_from)
+            decor.arrows.push_back({chess::Move::make<chess::Move::NORMAL>(*b.mark_from, *b.mark_hover),
+                                    (markColour(markColourKey(), false) & ~IM_COL32_A_MASK) | IM_COL32(0, 0, 0, 120)});
+    }
     if (b.ply > 0) {
         const auto& m = b.game.moves[static_cast<std::size_t>(b.ply - 1)];
         // The move's judgement on its square.
@@ -1312,7 +1630,14 @@ void App::drawBoardColumn(float size) {
     }
     const ImVec2 top = ImGui::GetCursorScreenPos();
     if (appearance::current().board3d.on && board3d_.available()) {
+        board3d_.setMarks(proto_m2_);
         const auto input = board3d_.draw(shown, size, decor);
+        if (protoM2() && !line_board) {
+            b.mark_from  = input.marking;
+            b.mark_hover = input.hovered;
+            if (input.marked) boardMark(input.marked->first, input.marked->second);
+            if (input.clicked && !b.selected && board.at(*input.clicked) == chess::Piece::NONE) boardClearMarks();
+        }
         if (line_board && (input.clicked || input.right_click)) {
             b.preview.reset();
         } else {
@@ -1324,6 +1649,19 @@ void App::drawBoardColumn(float size) {
         const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
         const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
                    right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+        // The right button: a square's mark where it is released on the square it pressed, an arrow elsewhere.
+        if (protoM2() && !line_board) {
+            if (right && hover) b.mark_from = hover;
+            if (b.mark_from) {
+                b.mark_hover = hover;
+                if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    if (hover) boardMark(*b.mark_from, *hover);
+                    b.mark_from.reset();
+                    b.mark_hover.reset();
+                }
+            }
+            if (left && hover && !b.selected && board.at(*hover) == chess::Piece::NONE) boardClearMarks();
+        }
         if (line_board && (left || right)) {
             b.preview.reset();
         } else {
@@ -1826,6 +2164,7 @@ void App::drawBoardMoves(float height) {
 
     // This move under the moves and the table; the review is about the whole game.
     const float strip = b.ply > 0 && b.ply <= total && b.game_tab != 3 ? thisMoveHeight() : 0.0f;
+    if (protoM2() && b.game_tab == 0) drawBoardNagBar();
     ImGui::BeginChild("##board_moves", ImVec2(0, -strip), ImGuiChildFlags_Borders);
     std::optional<ui::TopicRegion> moves_region(
         std::in_place, b.tree.variations.empty() ? guide::topics::BoardMoves : guide::topics::Variations);
@@ -1841,6 +2180,33 @@ void App::drawBoardMoves(float height) {
         const int owner     = b.ply > 0 ? ownerOf(b.tree, b.line, b.ply - 1) : -2;
         const ImU32 var_col = ImGui::GetColorU32(ImGuiCol_Text, 0.62f);
         std::vector<NotationItem> items;
+        // The prototype M2: the comments, word by word, and the field where one is written.
+        const bool proto        = protoM2();
+        const ImU32 comment_col = IM_COL32(52, 146, 92, 255);
+        const auto words        = [&](const std::string& text, float indent) {
+            std::istringstream in(text);
+            for (std::string word; in >> word;) {
+                NotationItem w;
+                w.kind   = NotationItem::Kind::Text;
+                w.text   = std::move(word);
+                w.colour = comment_col;
+                w.indent = indent;
+                items.push_back(std::move(w));
+            }
+        };
+        const auto field = [&](float indent) {
+            auto& e = *b.comment_edit;
+            NotationItem f;
+            f.kind        = NotationItem::Kind::Field;
+            f.field       = e.text.data();
+            f.field_size  = e.text.size();
+            f.field_focus = e.focus;
+            f.text        = e.before ? TR("A comment before the move · Enter keeps it, Esc leaves it")
+                                     : TR("A comment after the move · Enter keeps it, Esc leaves it");
+            f.colour      = comment_col;
+            f.indent      = indent;
+            items.push_back(std::move(f));
+        };
         int last_book = -1;
         for (int i = 0; i < static_cast<int>(main.moves.size()) && main.moves[static_cast<std::size_t>(i)].book; ++i)
             last_book = i;
@@ -1851,6 +2217,15 @@ void App::drawBoardMoves(float height) {
             for (std::size_t i = 0; i < moves.size(); ++i) {
                 const auto& m = moves[i];
                 const int ply = base + static_cast<int>(i);  // the position before it
+                const bool editing =
+                    proto && b.comment_edit && b.comment_edit->line == line && b.comment_edit->ply == ply + 1;
+                if (proto && editing && b.comment_edit->before) {
+                    field(px(10) * static_cast<float>(depth));
+                    number = true;
+                } else if (proto && !m.notes.before.empty()) {
+                    words(m.notes.before, px(10) * static_cast<float>(depth));
+                    number = true;
+                }
                 if (at.sideToMove() == chess::Color::WHITE || number) {
                     NotationItem n;
                     n.kind = NotationItem::Kind::Number;
@@ -1873,7 +2248,30 @@ void App::drawBoardMoves(float height) {
                         item.mark_colour = judgementColour(j);
                     }
                 }
+                if (proto) {
+                    for (const uint8_t nag : m.notes.nags) {
+                        if (nag < 1 || nag > 6) continue;
+                        item.mark        = nagText(nag);
+                        item.mark_colour = nagColour(nag);
+                    }
+                }
                 items.push_back(std::move(item));
+                if (proto) {
+                    for (const uint8_t nag : m.notes.nags) {
+                        if (nag >= 1 && nag <= 6) continue;
+                        NotationItem sign;
+                        sign.kind = NotationItem::Kind::Text;
+                        sign.text = nagText(nag);
+                        items.push_back(std::move(sign));
+                    }
+                    if (editing && !b.comment_edit->before) {
+                        field(px(10) * static_cast<float>(depth));
+                        number = true;
+                    } else if (!m.notes.after.empty()) {
+                        words(m.notes.after, px(10) * static_cast<float>(depth));
+                        number = true;
+                    }
+                }
                 if (line < 0 && ply == last_book && last_book + 1 < static_cast<int>(main.moves.size())) {
                     NotationItem book;
                     book.kind   = NotationItem::Kind::Text;
@@ -1901,6 +2299,7 @@ void App::drawBoardMoves(float height) {
                 at.makeMove<true>(m.move);
             }
         };
+        if (proto && !main.pre_comment.empty()) words(main.pre_comment, 0);
         emit(-1, 0, boardAt(main, b.chess960, 0), 0);
         if (!main.result.empty() && main.result != "*") {
             NotationItem result;
@@ -1917,6 +2316,9 @@ void App::drawBoardMoves(float height) {
             if (ev.current_min->y < top || ev.current_max->y > bottom)
                 ImGui::SetScrollY(ImGui::GetScrollY() + ev.current_min->y - top - ImGui::GetWindowHeight() * 0.35f);
         }
+        if (ev.field_done) boardCommentDone();
+        if (ev.field_cancelled) b.comment_edit.reset();
+        if (b.comment_edit) b.comment_edit->focus = false;
         if (ev.clicked >= 0) {
             showBoardLine(ev.clicked / 100000 - 1, ev.clicked % 100000);
             b.preview.reset();

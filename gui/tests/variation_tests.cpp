@@ -230,3 +230,75 @@ TEST_CASE("tablebases: each position's result, with fastchess' 3-piece tables") 
     // Without folders, nothing known.
     CHECK(tablebaseResults(game, false, "")[0] == -2);
 }
+
+TEST_CASE("variations: the moves from one taken away; a variation's first, the variation; an alternative carries on") {
+    GameTree tree{gameOf("e4 e5 Nf3 Nc6 Bb5 a6"), {}};
+    playInTree(tree, false, -1, 2, moveAt(tree.main, 2, "f1c4"));       // 0: 2.Bc4 instead of 2.Nf3
+    playInTree(tree, false, -1, 4, moveAt(tree.main, 4, "d2d4"));       // 1: 3.d4 instead of 3.Bb5
+    playInTree(tree, false, 1, 5, moveAt(lineOf(tree, 1), 5, "e5d4"));  // 3...exd4 in it
+    REQUIRE(tree.variations.size() == 2);
+
+    SUBCASE("in the game, from 3.Bb5: 3.d4 carries the game on") {
+        const auto [line, ply] = truncateAt(tree, -1, 5);
+        CHECK(line == -1);
+        CHECK(ply == 4);
+        CHECK(sans(tree.main) == std::vector<std::string>{"e4", "e5", "Nf3", "Nc6", "d4", "exd4"});
+        REQUIRE(tree.variations.size() == 1);
+        CHECK(sans(lineOf(tree, 0)) == std::vector<std::string>{"e4", "e5", "Bc4"});
+    }
+    SUBCASE("in the game, from 2.Nf3: 2.Bc4 carries it on, 3.d4 went with the moves") {
+        const auto [line, ply] = truncateAt(tree, -1, 3);
+        CHECK(line == -1);
+        CHECK(ply == 2);
+        CHECK(sans(tree.main) == std::vector<std::string>{"e4", "e5", "Bc4"});
+        CHECK(tree.variations.empty());
+    }
+    SUBCASE("in a variation, from its second move") {
+        const auto [line, ply] = truncateAt(tree, 1, 6);
+        CHECK(line == 1);
+        CHECK(ply == 5);
+        CHECK(sans(lineOf(tree, 1)) == std::vector<std::string>{"e4", "e5", "Nf3", "Nc6", "d4"});
+    }
+    SUBCASE("a variation's first move: the variation") {
+        const auto [line, ply] = truncateAt(tree, 0, 3);
+        CHECK(line == -1);
+        CHECK(ply == 2);
+        REQUIRE(tree.variations.size() == 1);
+        CHECK(sans(lineOf(tree, 0)) == std::vector<std::string>{"e4", "e5", "Nf3", "Nc6", "d4", "exd4"});
+        CHECK(sans(tree.main) == std::vector<std::string>{"e4", "e5", "Nf3", "Nc6", "Bb5", "a6"});
+    }
+    SUBCASE("the start: nothing") {
+        CHECK(truncateAt(tree, -1, 0) == std::pair{-1, 0});
+        CHECK(tree.main.moves.size() == 6);
+    }
+}
+
+TEST_CASE("variations: a move's notes found from any line holding it; marks and symbols toggled") {
+    GameTree tree{gameOf("e4 e5 Nf3"), {}};
+    playInTree(tree, false, -1, 2, moveAt(tree.main, 2, "f1c4"));  // 0: 2.Bc4
+    CHECK(notesAt(tree, -1, 0) == nullptr);
+    CHECK(notesAt(tree, -1, 4) == nullptr);
+    CHECK(notesAt(tree, 0, 1) == &tree.main.moves[0].notes);  // 1.e4, seen from the variation
+    CHECK(notesAt(tree, 0, 3) == &tree.variations[0].moves[0].notes);
+    CHECK(notesAt(tree, -1, 3) == &tree.main.moves[2].notes);
+
+    MoveNotes notes;
+    toggleMark(notes, 'G', 12, 28);  // e2e4
+    toggleMark(notes, 'R', 35, 35);  // d5
+    CHECK(notes.arrows == std::vector<BoardMark>{{'G', 12, 28}});
+    CHECK(notes.squares == std::vector<BoardMark>{{'R', 35, -1}});
+    toggleMark(notes, 'B', 12, 28);  // another colour: recoloured
+    CHECK(notes.arrows == std::vector<BoardMark>{{'B', 12, 28}});
+    toggleMark(notes, 'B', 12, 28);  // the same: gone
+    CHECK(notes.arrows.empty());
+
+    toggleNag(notes.nags, 146);
+    toggleNag(notes.nags, 14);
+    toggleNag(notes.nags, 1);
+    CHECK(notes.nags == std::vector<uint8_t>{1, 14, 146});
+    toggleNag(notes.nags, 5);   // one judgement of the move
+    toggleNag(notes.nags, 16);  // one of the position
+    CHECK(notes.nags == std::vector<uint8_t>{5, 16, 146});
+    toggleNag(notes.nags, 5);
+    CHECK(notes.nags == std::vector<uint8_t>{16, 146});
+}

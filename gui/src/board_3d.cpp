@@ -100,6 +100,7 @@ board3d::Overlay overlayOf(const BoardDecor& decor, const std::array<chess::Piec
         o.addTint(decor.last_move->from().index(), colours.highlight);
         o.addTint(displayedTarget(*decor.last_move).index(), colours.highlight);
     }
+    for (const auto& tint : decor.tints) o.addTint(tint.square.index(), tint.colour);
     if (decor.selected) o.addTint(decor.selected->index(), BOARD_SELECTED);
     if (decor.drop) o.addTint(decor.drop->index(), BOARD_DROP);
     using Mark = board3d::Overlay::Mark;
@@ -161,7 +162,8 @@ void Board3d::setView(float yaw, float pitch) {
 
 bool Board3d::moving() const {
     const auto now = std::chrono::steady_clock::now();
-    return renderer_ && (now - last_move_ < STILL_AFTER || now - turn_start_ < TURN_TIME || right_down_);
+    return renderer_ &&
+           (now - last_move_ < STILL_AFTER || now - turn_start_ < TURN_TIME || right_down_ || middle_down_);
 }
 
 Board3d::Input Board3d::draw(const chess::Board& board, float size, const BoardDecor& decor) {
@@ -188,19 +190,59 @@ Board3d::Input Board3d::draw(const std::array<chess::Piece, 64>& pieces, float s
     ImGuiIO& io    = ImGui::GetIO();
 
     // The mouse: the wheel nearer or farther, the right button held turning round, the middle one back to the start.
-    if (ImGui::IsItemHovered() && ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY) && io.MouseWheel != 0.0f)
-        zoom_ = std::clamp(zoom_ * std::pow(0.9f, io.MouseWheel), 0.4f, 1.6f);
-    if (ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) right_down_ = true, dragged_ = false;
-    if (right_down_ && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
-        dragged_ = true;
+    // The square under the pointer, as the last image showed the board.
+    const auto square_under = [&]() -> std::optional<chess::Square> {
+        const ImVec2 m = io.MousePos;
+        if (m.x < p0.x || m.x >= p1.x || m.y < p0.y || m.y >= p1.y) return std::nullopt;
+        const int square = board3d::squareAt(
+            board3d::rayAt(board3d::viewOf(r.camera(), 1.0f), (m.x - p0.x) / size * 2 - 1, 1 - (m.y - p0.y) / size * 2),
+            r.pieces(), r.shapes());
+        if (square < 0) return std::nullopt;
+        return chess::Square(square);
+    };
+    const auto turn = [&] {
         yaw_offset_ -= io.MouseDelta.x * 0.006f;
         pitch_ = std::clamp(pitch_ + io.MouseDelta.y * 0.004f, 0.25f, 1.55f);
+    };
+    if (ImGui::IsItemHovered() && ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY) && io.MouseWheel != 0.0f)
+        zoom_ = std::clamp(zoom_ * std::pow(0.9f, io.MouseWheel), 0.4f, 1.6f);
+    if (ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        if (const auto square = marks_ != Marks::Off ? square_under() : std::nullopt)
+            mark_from_ = square;
+        else if (marks_ != Marks::B)
+            right_down_ = true, dragged_ = false;
+    }
+    if (right_down_ && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
+        dragged_ = true;
+        turn();
     }
     if (right_down_ && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
         input.right_click = !dragged_ && ImGui::IsItemHovered();
         right_down_       = false;
     }
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Middle)) yaw_offset_ = 0, pitch_ = DEFAULT_PITCH, zoom_ = 1;
+    if (mark_from_) {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+            input.marking = mark_from_;
+        } else {
+            // Released beside the board: nothing.
+            if (const auto to = square_under()) input.marked = std::pair{*mark_from_, *to};
+            mark_from_.reset();
+        }
+    }
+    if (marks_ == Marks::Off) {
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Middle)) yaw_offset_ = 0, pitch_ = DEFAULT_PITCH, zoom_ = 1;
+    } else {
+        if (ImGui::IsItemActivated() && ImGui::IsMouseClicked(ImGuiMouseButton_Middle))
+            middle_down_ = true, middle_dragged_ = false;
+        if (middle_down_ && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+            middle_dragged_ = true;
+            turn();
+        }
+        if (middle_down_ && !ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+            if (!middle_dragged_ && ImGui::IsItemHovered()) yaw_offset_ = 0, pitch_ = DEFAULT_PITCH, zoom_ = 1;
+            middle_down_ = false;
+        }
+    }
 
     // Flipped: half a turn, always the same way round.
     if (!placed_ || decor.flipped != flipped_) {

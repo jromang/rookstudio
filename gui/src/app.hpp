@@ -408,6 +408,21 @@ class App {
     // put down.
     void boardPointer(const chess::Board& board, std::optional<chess::Square> press, std::optional<chess::Square> hover,
                       bool right);
+    // The prototype of the notation written in place and of the marks (the mockups M2, FCG_PROTO_M2=a or b).
+    [[nodiscard]] bool protoM2() const { return proto_m2_ != Board3d::Marks::Off; }
+    [[nodiscard]] BoardPage::Snapshot boardSnapshot() const;
+    void boardChanged(BoardPage::Snapshot before);  // a change made: undone back to `before`
+    void boardUndo(bool redo);
+    [[nodiscard]] MoveNotes* boardNotes();  // those of the move shown, the start position's at its start
+    void boardMark(chess::Square from, chess::Square to);
+    void boardClearMarks();
+    void boardEditKeys();
+    void boardTypeNag(char sign);
+    void boardSetNag(uint8_t nag);
+    void boardComment(bool before);  // the field opened on the move shown
+    void boardCommentDone();
+    void boardToast(std::string text);
+    void drawBoardNagBar();
     // The threads the running tournament's games use now, about: its games times the larger thread count of its
     // engines.
     [[nodiscard]] int tournamentThreads() const;
@@ -895,6 +910,7 @@ class App {
     Dialogs dialogs_;
     PieceAtlas atlas_;
     Board3d board3d_;  // the Board page's, when appearance::current().board3d.on
+    Board3d::Marks proto_m2_ = Board3d::Marks::Off;
 
     // Data copied from the observer of the current (or last) run.
     std::vector<GameRecord> games_;

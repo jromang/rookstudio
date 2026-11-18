@@ -57,6 +57,16 @@ struct BoardArrow {
     bool dashed  = false;  // a move expected rather than found: a shaft in dashes
 };
 
+// A square coloured over the board, as a person marks one ([%csl]).
+struct BoardTint {
+    chess::Square square;
+    ImU32 colour = 0;
+};
+
+// The colour of a person's mark ([%cal], [%csl]): G green, R red, Y yellow, B blue, as Lichess draws them; a square's
+// lighter than an arrow's.
+[[nodiscard]] ImU32 markColour(char colour, bool square);
+
 // A mark on a square's corner: a move's judgement (?!, ?, ??) on the square it went to.
 struct BoardBadge {
     chess::Square square;
@@ -73,6 +83,7 @@ struct BoardDecor {
     ImU32 last_move_colour = IM_COL32(255, 210, 70, 255);
     float eval_white       = 0.5f;   // fraction of the eval bar that is white, < 0 hides the bar
     std::vector<BoardArrow> arrows;  // drawn in order, over the pieces
+    std::vector<BoardTint> tints;    // squares a person marked, over the last move's
     std::optional<BoardBadge> badge;        // over everything, at the square's top right corner
     std::optional<ImU32> frame;             // a frame around the board: a line shown on it rather than the game
     std::optional<chess::Square> selected;  // a piece picked up, to move it

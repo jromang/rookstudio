@@ -111,6 +111,19 @@ int removeVariation(GameTree& tree, int line);
 // either follow their moves. Returns that line.
 int promoteVariation(GameTree& tree, int line);
 
+// The notes of the move that leads to position `ply` of `line`; none at the start.
+[[nodiscard]] MoveNotes* notesAt(GameTree& tree, int line, int ply);
+// Takes away the move that leads to position `ply` of `line` and those after it in its line, with the variations
+// branching from them; the whole variation for its first move. An alternative to the first move taken away carries
+// the line on. The line and ply shown after.
+std::pair<int, int> truncateAt(GameTree& tree, int line, int ply);
+// A symbol on a move, or off it when it has it: one judgement of the move (!, ?, ...: $1 to $9) and one of the
+// position ($10 to $19) at most.
+void toggleNag(std::vector<uint8_t>& nags, uint8_t nag);
+// An arrow (from != to) or a square's mark in a colour (G, R, Y, B) on a move: off when it has the same, recoloured
+// when it has it in another colour.
+void toggleMark(MoveNotes& notes, char colour, int from, int to);
+
 // The legal moves of the piece on `from`, the target squares as the board shows them (castling on the king's square).
 [[nodiscard]] std::vector<chess::Move> movesFrom(const chess::Board& board, chess::Square from);
 
@@ -249,6 +262,28 @@ struct BoardPage {
     // The user plays the game being played, and it is their move.
     [[nodiscard]] bool humanGame() const { return match && match_state.running && match_state.you.has_value(); }
     [[nodiscard]] bool humanTurn() const { return humanGame() && match_state.thinking == match_state.you; }
+
+    // The prototype of the notation written in place and of the marks (the mockups M2, FCG_PROTO_M2).
+    std::optional<chess::Square> mark_from;   // 2D: the right button pressed on this square, a mark being drawn
+    std::optional<chess::Square> mark_hover;  // the square under the pointer meanwhile
+    MoveNotes start_notes;                    // the marks of the start position
+    struct CommentEdit {
+        int line = -1, ply = 0;  // the move leading to position `ply` of `line`
+        bool before = false;     // the comment before the move, else after it
+        std::array<char, 2048> text{};
+        bool focus = true;  // the field takes the keys on its first frame
+    };
+    std::optional<CommentEdit> comment_edit;
+    struct Snapshot {
+        GameTree tree;
+        MoveNotes start_notes;
+        int line = -1, ply = 0;
+    };
+    std::vector<Snapshot> undo, redo;  // the game before each change, and the changes undone
+    std::string nag_typed;             // ! and ? typed in a row on a move
+    double nag_time = 0;               // when the last of them was
+    std::string toast;                 // a change said for a moment over the moves
+    double toast_time = -100;
 };
 
 }  // namespace fcg

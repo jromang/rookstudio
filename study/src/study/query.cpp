@@ -1,5 +1,7 @@
 #include "query.hpp"
 
+#include "background.hpp"
+
 #include <algorithm>
 #include <map>
 #include <mutex>
@@ -43,7 +45,12 @@ void parallel(std::size_t n, int threads, F&& f) {
         return;
     }
     std::vector<std::thread> pool;
-    for (std::size_t p = 0; p < parts; ++p) pool.emplace_back([&, p] { f(n * p / parts, n * (p + 1) / parts, p); });
+    const Inherited inherited;
+    for (std::size_t p = 0; p < parts; ++p)
+        pool.emplace_back([&, p, inherited] {
+            inherited.apply();
+            f(n * p / parts, n * (p + 1) / parts, p);
+        });
     for (auto& t : pool) t.join();
 }
 

@@ -190,6 +190,13 @@ cross many move orders, a fifth of the novelties came earlier than a recount for
   threads), a smaller database seconds. Until a new build is done, the tree answers for the games it covers
   (`Tree::games()`).
 
+## Beside the tournaments
+
+A thread that calls `enterBackground()` runs at the lowest priority (a niceness of 19 on Linux, the lowest thread
+priority on Windows, the utility class on macOS), and so does every thread the library starts from it: the import's
+readers and workers, the opening tree's, the searches', the lists'. The window starts the study's long work from such a
+thread, so that the engines of a running tournament, processes of their own, keep the machine first.
+
 ## Benchmark
 
 `fcg-study-bench` measures the store on real files. It is built with `-DFCG_STUDY_BENCH=ON` and never runs in the CI:

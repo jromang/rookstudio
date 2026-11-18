@@ -16,6 +16,7 @@
 #include <json.hpp>
 #include <tour/files.hpp>
 
+#include "background.hpp"
 #include "scan_board.hpp"
 
 #ifndef _WIN32
@@ -150,7 +151,12 @@ void forParts(std::size_t n, std::size_t parts, F&& f) {
         return;
     }
     std::vector<std::thread> pool;
-    for (std::size_t p = 0; p < parts; ++p) pool.emplace_back([&, p] { f(n * p / parts, n * (p + 1) / parts, p); });
+    const Inherited inherited;
+    for (std::size_t p = 0; p < parts; ++p)
+        pool.emplace_back([&, p, inherited] {
+            inherited.apply();
+            f(n * p / parts, n * (p + 1) / parts, p);
+        });
     for (auto& t : pool) t.join();
 }
 
@@ -177,7 +183,10 @@ void parallelSort(std::vector<T>& v, int threads, Less less) {
         std::vector<std::thread> pool;
         for (std::size_t p = 0; p < parts; p += 2 * width) {
             const auto a = at[p], b = at[std::min(parts, p + width)], c = at[std::min(parts, p + 2 * width)];
-            pool.emplace_back([=] { std::merge(src + a, src + b, src + b, src + c, dst + a, less); });
+            pool.emplace_back([=, inherited = Inherited()] {
+                inherited.apply();
+                std::merge(src + a, src + b, src + b, src + c, dst + a, less);
+            });
         }
         for (auto& t : pool) t.join();
         std::swap(src, dst);

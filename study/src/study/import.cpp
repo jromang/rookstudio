@@ -1,5 +1,7 @@
 #include "import.hpp"
 
+#include "background.hpp"
+
 #include <algorithm>
 #include <condition_variable>
 #include <deque>
@@ -383,8 +385,16 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
 
     std::vector<std::thread> pool;
     pool.reserve(static_cast<std::size_t>(threads));
-    for (int i = 0; i < threads; ++i) pool.emplace_back(worker);
-    std::thread reading(reader);
+    const Inherited inherited;
+    for (int i = 0; i < threads; ++i)
+        pool.emplace_back([&worker, inherited] {
+            inherited.apply();
+            worker();
+        });
+    std::thread reading([&reader, inherited] {
+        inherited.apply();
+        reader();
+    });
 
     // The batches given in the file's order.
     for (uint64_t next = 0;;) {

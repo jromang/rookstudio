@@ -1,0 +1,28 @@
+#pragma once
+
+// The study's work beside the tournaments: a thread that enters the background runs at the lowest priority, and so do
+// the threads the study starts from it (imports, the opening tree, searches, lists), so that the engines of a
+// tournament, processes of their own, keep the machine first.
+
+namespace fcg::study {
+
+// Lowers the calling thread, and marks it: the study's threads it starts are lowered too.
+void enterBackground() noexcept;
+// The calling thread entered the background, or was started by one that had.
+[[nodiscard]] bool inBackground() noexcept;
+// The calling thread's priority is the lowest the study asks for, as the system tells it: for the tests.
+[[nodiscard]] bool loweredBySystem() noexcept;
+
+// What a thread the study starts runs first: the background of the thread that starts it, kept.
+class Inherited {
+   public:
+    Inherited() noexcept : background_(inBackground()) {}
+    void apply() const noexcept {
+        if (background_) enterBackground();
+    }
+
+   private:
+    bool background_;
+};
+
+}  // namespace fcg::study

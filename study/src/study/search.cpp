@@ -5,6 +5,7 @@
 
 #include <chess.hpp>
 
+#include "background.hpp"
 #include "signature.hpp"
 
 namespace fcg::study {
@@ -205,7 +206,12 @@ Search::Search(std::shared_ptr<const Snapshot> snapshot, SearchQuery query, int 
     const int machine = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
     const auto count  = std::min<std::size_t>(static_cast<std::size_t>(threads > 0 ? threads : machine), parts_.size());
     threads_.reserve(count);
-    for (std::size_t t = 0; t < count; ++t) threads_.emplace_back([this] { work(); });
+    const Inherited inherited;
+    for (std::size_t t = 0; t < count; ++t)
+        threads_.emplace_back([this, inherited] {
+            inherited.apply();
+            work();
+        });
 }
 
 Search::~Search() {

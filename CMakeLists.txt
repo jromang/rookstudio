@@ -260,7 +260,7 @@ add_library(fcg_commentary STATIC ${FCG_COMMENTARY_SOURCES} ${FCG_OPENINGS_CPP})
 target_compile_features(fcg_commentary PUBLIC cxx_std_20)
 target_include_directories(fcg_commentary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src)
 target_compile_options(fcg_commentary PRIVATE -Wall -Wextra)
-target_link_libraries(fcg_commentary PUBLIC fcg_tournament)
+target_link_libraries(fcg_commentary PUBLIC fcg_tournament fcg_study)
 
 # ---------------------------------------------------------------------------
 # Assistant: the language model runtime (llama.cpp, MIT), run in a child process of the program

@@ -99,7 +99,11 @@ enum class Icon {
     Program,
     File,
     FolderClosed,
-    FolderUp
+    FolderUp,
+    // The Chess space's rail.
+    Home,
+    Database,
+    Openings
 };
 
 // `icon` in a line of text, as wide as the font is high, in `col`.

@@ -74,6 +74,9 @@ const char* App::guideSection() const {
         case Page::Log:
             return Report;
         case Page::Settings:
+        case Page::ChessHome:  // the guide's Chess space comes with the batch of preview 1
+        case Page::Databases:
+        case Page::Openings:
             break;
     }
     return Window;
@@ -505,6 +508,12 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     if (replay_) add(TR("Analyse the game shown"), name, [this] { analyseReplay(); });
     add(TR("Test suites"), "", page(Page::Suites));
     add(TR("Ratings"), "", page(Page::Ratings));
+    // The spaces, and the Chess space's pages: a command of the other space takes it there.
+    add(TR("The Engines space"), "Ctrl+1", [this] { switchSpace(Space::Engines); });
+    add(TR("The Chess space"), "Ctrl+2", [this] { switchSpace(Space::Chess); });
+    add(TR("Home"), TR("Chess"), page(Page::ChessHome));
+    add(TR("Databases"), TR("Chess"), page(Page::Databases));
+    add(TR("Openings: repertoires"), TR("Chess"), page(Page::Openings));
     const auto ratings_tab = [&](const char* label, int index) {
         add(shown(label), TR("Ratings"), [this, index, go = page(Page::Ratings)] {
             go();

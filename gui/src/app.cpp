@@ -51,6 +51,11 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     recognizeProfiles(setup_, profiles_);
     i18n::setLanguage(i18n::resolve(setup_.language));
     loadAppearance();
+    // The space shown last, on its home page.
+    if (storage_.space() == "chess") {
+        space_ = Space::Chess;
+        page_  = Page::ChessHome;
+    }
 
     // The guide panel: its width kept, the `?` of the titles and the messages opening it, links in the browser.
     {
@@ -285,6 +290,12 @@ void App::frame() {
             sprt_calc_open_ = true;
         } else if (w == "engines")
             page_ = Page::Engines;
+        else if (w == "chess-home")
+            page_ = Page::ChessHome;
+        else if (w == "databases")
+            page_ = Page::Databases;
+        else if (w == "openings")
+            page_ = Page::Openings;
         else if (w.rfind("engines-remote-picker", 0) == 0) {
             // The first machine's files, as Add, A program on <machine>, shows them; engines-remote-picker=PATH: from
             // the folder of PATH there.

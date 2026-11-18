@@ -331,6 +331,12 @@ const char* glyph(Icon icon) {
             return "\uE0D7";  // folder
         case Icon::FolderUp:
             return "\uE33D";  // folder-up
+        case Icon::Home:
+            return "\uE0F5";  // house
+        case Icon::Database:
+            return "\uE0AD";  // database
+        case Icon::Openings:
+            return "\uE28D";  // git-fork
     }
     return "";
 }

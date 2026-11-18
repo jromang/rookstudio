@@ -77,6 +77,10 @@ class Storage {
     [[nodiscard]] GuideSettings guideSettings() const;
     void setGuideSettings(const GuideSettings& guide) const;
 
+    // The space shown last, "engines" or "chess" (settings.json); empty until the first start's choice.
+    [[nodiscard]] std::string space() const;
+    void setSpace(const std::string& space) const;
+
     // How the boards look and sound (settings.json): colours, pieces, move sounds.
     [[nodiscard]] appearance::Settings appearance() const;
     void setAppearance(const appearance::Settings& settings) const;

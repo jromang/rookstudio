@@ -300,6 +300,14 @@ void Storage::setGuideSettings(const GuideSettings& guide) const {
     save(root_ / "settings.json", settings);
 }
 
+std::string Storage::space() const { return setting(settings(), "space", std::string{}); }
+
+void Storage::setSpace(const std::string& space) const {
+    auto settings     = this->settings();
+    settings["space"] = space;
+    save(root_ / "settings.json", settings);
+}
+
 void Storage::setUpdateSettings(const update::Settings& updates) const {
     auto settings                     = this->settings();
     settings["check_new_version"]     = updates.enabled;

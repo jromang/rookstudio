@@ -199,8 +199,44 @@ class App {
         Clock::time_point last_active{};  // the last frame its game was being played (shownSlots)
     };
 
-    enum class Page { Home, NewMatch, Tournament, Engines, Books, Board, Suites, Ratings, Log, Settings };
+    enum class Page {
+        Home,
+        NewMatch,
+        Tournament,
+        Engines,
+        Books,
+        Board,
+        Suites,
+        Ratings,
+        Log,
+        Settings,
+        // The Chess space's own pages.
+        ChessHome,
+        Databases,
+        Openings
+    };
     enum class Tab { Overview, Standings, Bracket, Schedule, Live, Games, Openings, Broadcast };
+
+    // The program's two spaces, each with its rail: the engines' (tournaments, books, suites, ratings: fastchess-gui
+    // as it was) and the players' (games, databases, openings). The Board, Engines and Settings pages are in both.
+    enum class Space { Engines, Chess };
+    [[nodiscard]] static bool chessPage(Page page) noexcept;   // a page of the Chess space alone
+    [[nodiscard]] static bool sharedPage(Page page) noexcept;  // Board, Engines, Settings
+    // To the other space, on the page it showed last (Ctrl+1, Ctrl+2, the switch at the top of the rail).
+    void switchSpace(Space to);
+    // The space follows the page shown: a page of the other space alone, set by a command or a notice, takes it there.
+    void followPage();
+    void drawSpaceSwitch(float width);
+    [[nodiscard]] float spaceSwitchHeight() const;
+    void drawEnginesRail(float width, float button);
+    void drawChessRail(float width, float button);
+    void drawBoardRailButton(float width, float button);  // in both rails, with its analysis's dot
+    void drawChessHome();                                 // view_chess.cpp
+    void drawDatabases();
+    void drawOpeningsPage();  // the repertoires (the tournament's Openings tab is drawOpenings)
+    Space space_       = Space::Engines;
+    Page engines_page_ = Page::Home;  // the page each space comes back to
+    Page chess_page_   = Page::ChessHome;
 
     // shell
     void drawShell();

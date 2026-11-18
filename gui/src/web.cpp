@@ -379,7 +379,7 @@ constexpr const char* DARK_COLOURS =
 // The page: its styles (the dark colours and the pieces put in where marked), its script, nothing from elsewhere.
 constexpr const char* PAGE = R"HTML(<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fastchess-gui live</title>
+<title>RookStudio live</title>
 <script>try{const t=localStorage.getItem('fcg-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>
 :root{color-scheme:light;--bg:#f4f5f7;--card:#fff;--text:#1b1e24;--muted:#626976;--line:#e0e3e8;--soft:#eef0f3;--light:#dee3e6;--dark:#8ca2ad;--accent:#2f6fde;--win:#1d7f4e;--loss:#c03b33;--ew:#6ea8de;--eb:#ed994d;--book:#8a6a12}
@@ -455,7 +455,7 @@ dialog{background:var(--card);color:var(--text);border:1px solid var(--line);bor
 @media (max-width:600px){header,main{padding-left:12px;padding-right:12px}main{padding-top:12px}.games{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}.clock{font-size:21px;min-width:80px}.eval{font-size:26px}}
 /*PIECES*//*EXTRA_STYLES*/
 </style></head><body>
-<header><div><h1 id="name">fastchess-gui</h1><div class="muted small" id="progress"></div></div>
+<header><div><h1 id="name">RookStudio</h1><div class="muted small" id="progress"></div></div>
 <div class="tools"><!--LINKS--><button id="notation" type="button" title="Moves in letters or figurines"></button><button id="theme" type="button" title="Light or dark, or as the system says"></button><span id="download"></span></div></header>
 <main><div class="stage none" id="stage">
 <section class="side" id="boardcol"><div><div class="player" id="ptop"></div>
@@ -638,7 +638,7 @@ function follow(s){return s.games.find(x=>x.number===selected)||s.games.find(x=>
 function shown(g){return view===null?g.moves.length:Math.min(view,g.moves.length)}
 function render(s){last=s;
  document.getElementById('notation').textContent='Moves: '+(figurines?'♘\uFE0Ef3':'Nf3');
- document.getElementById('name').textContent=s.name||'fastchess-gui';document.title=s.name||'fastchess-gui';
+ document.getElementById('name').textContent=s.name||'RookStudio';document.title=s.name||'RookStudio';
  document.getElementById('progress').textContent=[s.teams?teamScore(s,false):'',`${s.played}${s.total?' / '+s.total:''} games${s.finished?' · finished':''}`,FORMATS[s.format],s.time_control].filter(x=>x).join(' · ');
  document.getElementById('download').innerHTML=s.pgn?`<a href="games.pgn" download="${esc(s.pgn)}">Download the games (PGN)</a>`:'';
  const g=follow(s);if(!g||g.number!==viewGame){view=null;viewGame=g?g.number:null}
@@ -710,7 +710,7 @@ document.getElementById('copyclose').addEventListener('click',()=>document.getEl
 document.addEventListener('keydown',e=>{if(e.altKey||e.ctrlKey||e.metaKey||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)||document.getElementById('copybox').open)return;
  const a={ArrowLeft:'prev',ArrowRight:'next',f:'flip',F:'flip'}[e.key];if(!a)return;e.preventDefault();if(a==='flip'){flipped=!flipped;redraw()}else step(a)});
 async function refresh(){try{const text=await (await fetch('state.json',{cache:'no-store'})).text();if(text!==lastText){lastText=text;render(JSON.parse(text))}}
- catch(e){document.getElementById('progress').textContent='Waiting for fastchess-gui…'}}
+ catch(e){document.getElementById('progress').textContent='Waiting for RookStudio…'}}
 refresh();setInterval(refresh,1000);
 </script></body></html>
 )HTML";

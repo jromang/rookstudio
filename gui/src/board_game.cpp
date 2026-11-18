@@ -303,8 +303,8 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
 
         ReplayGame game;
         game.start_fen = setup.fen;
-        game.headers   = {{"Event", "fastchess-gui board game"}, {"Site", "?"},         {"Date", today()},
-                          {"Round", std::to_string(g + 1)},      {"White", white_name}, {"Black", black_name}};
+        game.headers   = {{"Event", "RookStudio board game"}, {"Site", "?"},         {"Date", today()},
+                          {"Round", std::to_string(g + 1)},   {"White", white_name}, {"Black", black_name}};
         if (pgnTimeControl(clocks[0]) == pgnTimeControl(clocks[1])) {
             game.headers.emplace_back("TimeControl", pgnTimeControl(clocks[0]));
         } else {

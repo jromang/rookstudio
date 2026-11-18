@@ -135,7 +135,7 @@ TEST_CASE("lichess: the same tags in progress and finished, clocks sent once, ro
     CHECK(done.key == live.key);
     CHECK(done.finished);
     const auto all = done.pgn(0);
-    CHECK(all.rfind("[Event \"Test\"]\n[Site \"fastchess-gui\"]\n[Round \"2\"]", 0) == 0);
+    CHECK(all.rfind("[Event \"Test\"]\n[Site \"RookStudio\"]\n[Round \"2\"]", 0) == 0);
     CHECK(all.find("GameDuration") == std::string::npos);
     CHECK(all.find("\n\n1. e4 {[%clk 0:00:59]} e5 {[%clk 0:00:58]} 2. Nf3 {[%clk 0:00:57]} Nc6 1-0\n\n") !=
           std::string::npos);

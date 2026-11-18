@@ -37,11 +37,11 @@ TEST_CASE("new version: versions compared number by number") {
 TEST_CASE("new version: GitHub's answer read") {
     const auto r = parseRelease(R"({
         "tag_name": "v0.6.0", "name": "Version 0.6.0", "draft": false, "prerelease": false,
-        "html_url": "https://github.com/jromang/fastchess-gui/releases/tag/v0.6.0",
+        "html_url": "https://github.com/jromang/rookstudio/releases/tag/v0.6.0",
         "body": "## What changes\n\n- Several tournaments at once.\n"})");
     REQUIRE(r.has_value());
     CHECK(r->version == "0.6.0");
-    CHECK(r->url == "https://github.com/jromang/fastchess-gui/releases/tag/v0.6.0");
+    CHECK(r->url == "https://github.com/jromang/rookstudio/releases/tag/v0.6.0");
     CHECK(r->notes.find("Several tournaments") != std::string::npos);
 
     // A page elsewhere is not opened: the releases' page instead.
@@ -101,7 +101,7 @@ TEST_CASE("new version: what settings.json keeps") {
 
     s.enabled   = true;
     s.checked   = 1'800'000'000;
-    s.latest    = Release{"0.6.0", "## Notes", "https://github.com/jromang/fastchess-gui/releases/tag/v0.6.0"};
+    s.latest    = Release{"0.6.0", "## Notes", "https://github.com/jromang/rookstudio/releases/tag/v0.6.0"};
     s.dismissed = "0.5.10";
     storage.setUpdateSettings(s);
     const auto read = storage.updateSettings();
@@ -132,5 +132,5 @@ TEST_CASE("new version: GitHub's API trusted, its latest release read (FCG_NET_T
     REQUIRE(answer.has_value());
     REQUIRE_MESSAGE(answer->release.has_value(), answer->error);
     CHECK(compareVersions(answer->release->version, "0.5.0") > 0);
-    CHECK(answer->release->url.rfind("https://github.com/jromang/fastchess-gui/", 0) == 0);
+    CHECK(answer->release->url.rfind("https://github.com/jromang/rookstudio/", 0) == 0);
 }

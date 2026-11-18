@@ -808,7 +808,7 @@ void Adapter::thinking(const std::string& line) {
 
 int run(const std::vector<std::string>& args) {
     if (args.empty()) {
-        std::fprintf(stderr, "usage: fastchess-gui --wb2uci ENGINE [ARGS...]\n");
+        std::fprintf(stderr, "usage: rookstudio --wb2uci ENGINE [ARGS...]\n");
         return 2;
     }
 

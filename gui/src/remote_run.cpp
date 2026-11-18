@@ -260,7 +260,7 @@ void RemoteRun::update() {
             if (gone || std::chrono::steady_clock::now() > connect_until_) {
                 connecting_     = false;
                 error_          = gone ? std::string(TR("The tournament's process ended as it started: see its log "
-                                                        "(fastchess-gui.log in its folder)."))
+                                                        "(rookstudio.log in its folder)."))
                                        : std::string(TR("The connection with the tournament's process was lost."));
                 state_          = State::Finished;
                 info_.finished  = Clock::now();

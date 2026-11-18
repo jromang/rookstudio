@@ -33,6 +33,6 @@
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>fastchess-gui shows the games being played to the programs and browsers of your local network that ask for them (the TLCS broadcast, the web page).</string>
+    <string>RookStudio shows the games being played to the programs and browsers of your local network that ask for them (the TLCS broadcast, the web page).</string>
 </dict>
 </plist>

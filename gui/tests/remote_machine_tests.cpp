@@ -209,7 +209,7 @@ ssh::MockServer::Command linuxBox(const fs::path& root, const std::string& comma
         reply.out =
             "os=Linux\narch=x86_64\nrelease=6.8.0\nthreads=16\nmemory_kb=65536000\ndisk_kb=104857600\n"
             "home=/home/tester\n";
-        if (fs::exists(root / "fastchess-gui/fastchess-gui")) reply.out += "fastchess-gui 0.5.9\nprotocol 1\n";
+        if (fs::exists(root / "rookstudio/rookstudio")) reply.out += "RookStudio 0.5.9\nprotocol 1\n";
     } else if (inner.find("sha256sum") != std::string::npos) {
         const auto file = quotedAfter(inner, "sha256sum");
         const auto hash = sha256File(root / fs::path(file).relative_path());
@@ -239,7 +239,7 @@ ssh::MockServer::Command linuxBox(const fs::path& root, const std::string& comma
             reply.status = 1;
         }
     } else if (inner.find("--version") != std::string::npos) {
-        reply.out = "fastchess-gui 0.5.9\nprotocol 1\n";
+        reply.out = "RookStudio 0.5.9\nprotocol 1\n";
     } else if (inner.find("exec '/engines/mock'") != std::string::npos) {
         reply.talk = [](const std::string& input, bool closed, bool& ended) {
             std::string out;
@@ -283,7 +283,7 @@ TEST_CASE("Machines: arguments quoted for a POSIX shell, cmd and PowerShell") {
     CHECK(psQuote("it's") == "it''s");
 }
 
-TEST_CASE("Machines: the shell told by echo %OS%, key=value lines, fastchess-gui's --version") {
+TEST_CASE("Machines: the shell told by echo %OS%, key=value lines, the program's --version") {
     CHECK(shellFromEcho("Windows_NT\r\n") == RemoteShell::Cmd);
     CHECK(shellFromEcho("%OS%\n") == RemoteShell::Posix);
     CHECK(shellFromEcho("") == RemoteShell::Unknown);
@@ -293,11 +293,11 @@ TEST_CASE("Machines: the shell told by echo %OS%, key=value lines, fastchess-gui
     CHECK(v.at("threads") == "16");
     CHECK(v.count("bad key") == 0);
 
-    CHECK(parseVersion("fastchess-gui 0.5.9\nprotocol 1\n") == std::pair<std::string, int>("0.5.9", 1));
-    CHECK(parseVersion("fastchess-gui 0.6.0\r\n") == std::pair<std::string, int>("0.6.0", 0));
+    CHECK(parseVersion("RookStudio 0.5.9\nprotocol 1\n") == std::pair<std::string, int>("0.5.9", 1));
+    CHECK(parseVersion("RookStudio 0.6.0\r\n") == std::pair<std::string, int>("0.6.0", 0));
     // Something else answering, or the window of an old version that does not know --version.
-    CHECK(parseVersion("bash: fastchess-gui: command not found\nprotocol 1").first.empty());
-    CHECK(parseVersion("fastchess-gui [--profile DIR]\n").first.empty());
+    CHECK(parseVersion("bash: rookstudio: command not found\nprotocol 1").first.empty());
+    CHECK(parseVersion("rookstudio [--profile DIR]\n").first.empty());
 }
 
 TEST_CASE("Machines: the probes' answers read, for Linux, macOS and Windows") {
@@ -336,7 +336,7 @@ TEST_CASE("Machines: the probes' answers read, for Linux, macOS and Windows") {
     // The probes quote the folder for their shell; cmd cannot take some names at all.
     CHECK(posixProbe("my folder").find("'\\''my folder'\\''") != std::string::npos);
     REQUIRE(windowsProbe("D:\\fcg").has_value());
-    CHECK(windowsProbe("D:\\fcg")->find("if exist \"D:\\fcg\\fastchess-gui.exe\"") != std::string::npos);
+    CHECK(windowsProbe("D:\\fcg")->find("if exist \"D:\\fcg\\rookstudio.exe\"") != std::string::npos);
     CHECK_FALSE(windowsProbe("100%").has_value());
 }
 
@@ -365,13 +365,13 @@ TEST_CASE("Machines: SHA-256 as sha256sum, shasum and certutil print it; startin
 TEST_CASE("Machines: SFTP's paths, a remote path's folder and name") {
     CHECK(sftpPath("C:\\Engines\\sf.exe") == "/C:/Engines/sf.exe");
     CHECK(sftpPath("/opt/sf") == "/opt/sf");
-    CHECK(sftpPath("fastchess-gui/books") == "fastchess-gui/books");
+    CHECK(sftpPath("rookstudio/books") == "rookstudio/books");
     CHECK(remoteParent("/opt/sf/stockfish") == "/opt/sf");
     CHECK(remoteParent("C:\\Engines\\sf.exe") == "C:\\Engines");
     CHECK(remoteParent("/stockfish") == "/");
     CHECK(remoteParent("stockfish").empty());
     CHECK(remoteName("C:\\Engines\\sf.exe") == "sf.exe");
-    CHECK(remoteJoin("fastchess-gui", "books") == "fastchess-gui/books");
+    CHECK(remoteJoin("rookstudio", "books") == "rookstudio/books");
     CHECK(remoteJoin("/", "x") == "/x");
     CHECK(remoteJoin("", "x") == "x");
 }
@@ -416,7 +416,7 @@ TEST_CASE("Machines: kept in machines.json without secrets, read back as written
     CHECK(b.address() == "chess@box.example.org:2222");
     CHECK(b.booksDir() == "/srv/fcg/books");
     CHECK(b.syzygyDir() == "/data/syzygy");
-    CHECK(b.programPath() == "/srv/fcg/fastchess-gui");
+    CHECK(b.programPath() == "/srv/fcg/rookstudio");
     CHECK(b.coreBudget() == 30);
     CHECK(b.memoryBudget() == 65536 * 8 / 10);  // none chosen: 80 % of what the test found
 
@@ -425,7 +425,7 @@ TEST_CASE("Machines: kept in machines.json without secrets, read back as written
     fresh.system.threads = 16;
     CHECK(fresh.coreBudget() == 15);
     fresh.system.shell = RemoteShell::Cmd;
-    CHECK(fresh.programPath() == "fastchess-gui\\fastchess-gui.exe");
+    CHECK(fresh.programPath() == "rookstudio\\rookstudio.exe");
     CHECK_FALSE(incompleteMachine(fresh).empty());
     fresh.host = "h";
     fresh.user = "u";
@@ -442,7 +442,7 @@ TEST_CASE("Machines: kept in machines.json without secrets, read back as written
 
 TEST_CASE("Machines: the program installed is this one for the same system, the one chosen for another") {
     const auto dir  = freshDir("install-choice");
-    const auto self = dir / "fastchess-gui";
+    const auto self = dir / "rookstudio";
     Machine m;
     std::string error;
     CHECK(programToInstall(m, self, error).empty());  // not tested yet
@@ -458,8 +458,8 @@ TEST_CASE("Machines: the program installed is this one for the same system, the 
     m.system.arch = "AMD64";
     error.clear();
     CHECK(programToInstall(m, self, error).empty());
-    CHECK(error.find("fastchess-gui") != std::string::npos);
-    m.program = (dir / "fastchess-gui.exe").string();
+    CHECK(error.find("RookStudio") != std::string::npos);
+    m.program = (dir / "rookstudio.exe").string();
     error.clear();
     CHECK(programToInstall(m, self, error).empty());  // chosen, but not there
     writeFile(m.program, "MZ");
@@ -832,9 +832,9 @@ TEST_CASE("SSH client: SFTP folders, files, renames over a file, a copy each way
     SshClient client;
     REQUIRE(client.connect(loopbackTarget(dir)));
 
-    CHECK(client.makeDirs("fastchess-gui/books"));
-    CHECK(client.makeDirs("fastchess-gui/books"));  // there already
-    CHECK(fs::is_directory(root / "fastchess-gui/books"));
+    CHECK(client.makeDirs("rookstudio/books"));
+    CHECK(client.makeDirs("rookstudio/books"));  // there already
+    CHECK(fs::is_directory(root / "rookstudio/books"));
     CHECK_FALSE(client.stat("nothing").has_value());
     CHECK(client.error().kind == SshError::Kind::NotFound);
 
@@ -842,34 +842,34 @@ TEST_CASE("SSH client: SFTP folders, files, renames over a file, a copy each way
     for (int i = 0; i < 200000; ++i) content += static_cast<char>('a' + i % 26);
     writeFile(dir / "book.epd", content);
     uint64_t last = 0;
-    CHECK(client.upload(dir / "book.epd", "fastchess-gui/books/book.epd", [&](uint64_t done, uint64_t total) {
+    CHECK(client.upload(dir / "book.epd", "rookstudio/books/book.epd", [&](uint64_t done, uint64_t total) {
         CHECK(total == content.size());
         last = done;
         return true;
     }));
     CHECK(last == content.size());
-    CHECK(readFile(root / "fastchess-gui/books/book.epd") == content);
-    CHECK_FALSE(fs::exists(root / "fastchess-gui/books/book.epd.part"));
-    const auto st = client.stat("fastchess-gui/books/book.epd");
+    CHECK(readFile(root / "rookstudio/books/book.epd") == content);
+    CHECK_FALSE(fs::exists(root / "rookstudio/books/book.epd.part"));
+    const auto st = client.stat("rookstudio/books/book.epd");
     REQUIRE(st);
     CHECK(st->size == content.size());
     CHECK(st->regular);
 
     // Again, over the file there: replaced.
     writeFile(dir / "book.epd", "short");
-    CHECK(client.upload(dir / "book.epd", "fastchess-gui/books/book.epd"));
-    CHECK(readFile(root / "fastchess-gui/books/book.epd") == "short");
+    CHECK(client.upload(dir / "book.epd", "rookstudio/books/book.epd"));
+    CHECK(readFile(root / "rookstudio/books/book.epd") == "short");
 
-    const auto listing = client.list("fastchess-gui/books");
+    const auto listing = client.list("rookstudio/books");
     REQUIRE(listing);
     REQUIRE(listing->size() == 1);
     CHECK((*listing)[0].name == "book.epd");
 
-    CHECK(client.download("fastchess-gui/books/book.epd", dir / "back.epd"));
+    CHECK(client.download("rookstudio/books/book.epd", dir / "back.epd"));
     CHECK(readFile(dir / "back.epd") == "short");
-    CHECK(client.setPermissions("fastchess-gui/books/book.epd", 0755));
-    CHECK(client.remove("fastchess-gui/books/book.epd"));
-    CHECK(client.remove("fastchess-gui/books/book.epd"));  // gone already
+    CHECK(client.setPermissions("rookstudio/books/book.epd", 0755));
+    CHECK(client.remove("rookstudio/books/book.epd"));
+    CHECK(client.remove("rookstudio/books/book.epd"));  // gone already
     CHECK(client.realPath(".").has_value());
     CHECK(server.error().empty());
     fs::remove_all(dir);
@@ -945,19 +945,19 @@ TEST_CASE("Machine jobs: the test finds the system, Install copies the program a
         m.system = *result.system;
     }
     // Install: this program for Linux x86-64, any file standing for it here.
-    writeFile(dir / "fastchess-gui", "#!/bin/sh\necho program\n");
+    writeFile(dir / "rookstudio", "#!/bin/sh\necho program\n");
     JobState state;
     JobResult result;
     SshClient client;
     REQUIRE(client.connect(targetOf(m, dir, "")));
-    installProgram(client, m, dir / "fastchess-gui", state, result);
+    installProgram(client, m, dir / "rookstudio", state, result);
     REQUIRE_MESSAGE(result.ok, result.error.message);
-    CHECK(readFile(root / "fastchess-gui/fastchess-gui") == "#!/bin/sh\necho program\n");
+    CHECK(readFile(root / "rookstudio/rookstudio") == "#!/bin/sh\necho program\n");
     REQUIRE(result.system);
     CHECK(result.system->fcg_version == "0.5.9");
     CHECK(result.system->fcg_protocol == 1);
 #ifndef _WIN32
-    CHECK((fs::status(root / "fastchess-gui/fastchess-gui").permissions() & fs::perms::owner_exec) != fs::perms::none);
+    CHECK((fs::status(root / "rookstudio/rookstudio").permissions() & fs::perms::owner_exec) != fs::perms::none);
 #endif
     CHECK(server.error().empty());
     fs::remove_all(dir);
@@ -1060,9 +1060,9 @@ TEST_CASE("Machine jobs: books and tablebases compared, the missing ones pushed,
     writeFile(here / "syzygy/KRvK.rtbw", std::string(80, 'r'));
     // On the machine already: one table the same, one cut short, and a book of the same name and size but another
     // content.
-    writeFile(root / "fastchess-gui/syzygy/KQvK.rtbw", std::string(80, 'w'));
-    writeFile(root / "fastchess-gui/syzygy/KRvK.rtbw", std::string(16, 'r'));
-    writeFile(root / "fastchess-gui/books/UHO.epd", std::string(5000, 'f'));
+    writeFile(root / "rookstudio/syzygy/KQvK.rtbw", std::string(80, 'w'));
+    writeFile(root / "rookstudio/syzygy/KRvK.rtbw", std::string(16, 'r'));
+    writeFile(root / "rookstudio/books/UHO.epd", std::string(5000, 'f'));
 
     ssh::MockServer::Options options;
     options.root = root;
@@ -1099,8 +1099,8 @@ TEST_CASE("Machine jobs: books and tablebases compared, the missing ones pushed,
     pushFiles(client, m, files, state, pushed);
     REQUIRE_MESSAGE(pushed.ok, pushed.error.message);
     CHECK(state.bytes_done == files.bytesToPush());
-    CHECK(readFile(root / "fastchess-gui/books/UHO.epd") == std::string(5000, 'e'));
-    CHECK(fs::file_size(root / "fastchess-gui/syzygy/KRvK.rtbw") == 80);
+    CHECK(readFile(root / "rookstudio/books/UHO.epd") == std::string(5000, 'e'));
+    CHECK(fs::file_size(root / "rookstudio/syzygy/KRvK.rtbw") == 80);
 
     JobResult again;
     checkFiles(client, m, request, state, again);
@@ -1216,15 +1216,15 @@ TEST_CASE("Machine runs: the tournament as the machine plays it, its engines, bo
 TEST_CASE("Machine runs: the commands that start a tournament there and reach its process, for sh and cmd") {
     auto m = linuxMachine();
     CHECK(unSh(*remoteStartCommand(m, "/home/tester/fcg/tournaments/t")) ==
-          "'/home/tester/fcg/fastchess-gui' --profile '/home/tester/fcg/profile' --run "
+          "'/home/tester/fcg/rookstudio' --profile '/home/tester/fcg/profile' --run "
           "'/home/tester/fcg/tournaments/t' --detach");
     CHECK(unSh(*remoteAttachCommand(m, "/home/tester/fcg/tournaments/t")) ==
-          "exec '/home/tester/fcg/fastchess-gui' --attach '/home/tester/fcg/tournaments/t'");
+          "exec '/home/tester/fcg/rookstudio' --attach '/home/tester/fcg/tournaments/t'");
     m.system.shell = RemoteShell::Cmd;
     m.system.home  = "C:\\Users\\tester";
     CHECK(machineFolder(m) == "C:\\Users\\tester\\fcg");
     CHECK(*remoteAttachCommand(m, "C:\\Users\\tester\\fcg/tournaments/t") ==
-          "\"C:\\Users\\tester\\fcg\\fastchess-gui.exe\" --attach \"C:\\Users\\tester\\fcg\\tournaments\\t\"");
+          "\"C:\\Users\\tester\\fcg\\rookstudio.exe\" --attach \"C:\\Users\\tester\\fcg\\tournaments\\t\"");
     CHECK_FALSE(remoteStartCommand(m, "C:\\100%").has_value());
 }
 
@@ -1240,7 +1240,7 @@ TEST_CASE("Machine runs: where a tournament plays, kept in its folder here") {
     fs::remove_all(dir);
 }
 
-TEST_CASE("Machine runs: prepared and started there, refused without fastchess-gui, an engine or a book") {
+TEST_CASE("Machine runs: prepared and started there, refused without the program, an engine or a book") {
     const auto dir  = freshDir("start");
     const auto root = dir / "home";
     const auto here = dir / "here";
@@ -1249,7 +1249,7 @@ TEST_CASE("Machine runs: prepared and started there, refused without fastchess-g
     writeFile(here / "openings.epd", "positions");
     writeFile(here / "tournament.lock", "1");
     writeFile(root / "opt/alpha", "binary");
-    writeFile(root / "home/tester/fcg/fastchess-gui", "program");
+    writeFile(root / "home/tester/fcg/rookstudio", "program");
     std::vector<std::string> commands;
     ssh::MockServer::Options options;
     options.root = root;

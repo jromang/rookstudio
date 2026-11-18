@@ -15,8 +15,8 @@
 namespace fcg::update {
 
 // GitHub's API for the latest release (drafts and pre-releases left out), and the page of the releases.
-inline constexpr const char* LATEST_API    = "https://api.github.com/repos/jromang/fastchess-gui/releases/latest";
-inline constexpr const char* RELEASES_PAGE = "https://github.com/jromang/fastchess-gui/releases";
+inline constexpr const char* LATEST_API    = "https://api.github.com/repos/jromang/rookstudio/releases/latest";
+inline constexpr const char* RELEASES_PAGE = "https://github.com/jromang/rookstudio/releases";
 
 struct Release {
     std::string version;  // as tagged, without the "v": "0.6.0"

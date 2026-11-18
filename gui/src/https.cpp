@@ -56,7 +56,7 @@ std::optional<Url> parseUrl(std::string_view url) {
 }
 
 // GitHub's API refuses a request without one.
-constexpr const char* USER_AGENT = "fastchess-gui/" FCG_VERSION;
+constexpr const char* USER_AGENT = "RookStudio/" FCG_VERSION " (+https://github.com/jromang/rookstudio)";
 
 // A server that answers at all connects in far less.
 constexpr int CONNECT_TIMEOUT_MS = 10000;

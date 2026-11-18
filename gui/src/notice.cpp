@@ -120,8 +120,8 @@ Fix setMarginFix(int milliseconds) {
 }
 
 Fix enterPassphraseFix(const std::string& machine_id) {
-    auto f = make(Fix::Kind::EnterPassphrase, TR("Enter it now…"),
-                  TR("Kept in memory until fastchess-gui ends, never saved."));
+    auto f =
+        make(Fix::Kind::EnterPassphrase, TR("Enter it now…"), TR("Kept in memory until RookStudio ends, never saved."));
     f.path = machine_id;
     return f;
 }

@@ -644,7 +644,7 @@ BuiltRun buildRun(const MatchSetup& setup, const std::vector<EngineEntry>& engin
             static_cast<fastchess::config::TbAdjudication::ResultType>(std::clamp(setup.tb_result, 1, 3));
     }
 
-    t.pgn.event_name     = setup.pgn_event.empty() ? "fastchess-gui" : setup.pgn_event;
+    t.pgn.event_name     = setup.pgn_event.empty() ? "RookStudio" : setup.pgn_event;
     t.pgn.site           = "?";
     t.pgn.track_nodes    = setup.pgn_nodes;
     t.pgn.track_seldepth = setup.pgn_seldepth;

@@ -388,7 +388,7 @@ int runHeadless(const std::string& target, const Storage& storage, const CpuTopo
     if (control.mode != ControlOptions::Mode::None) return runControlled(target, storage, broadcast, control);
 
     // The version first: what a log of the run, sent with a bug report, must tell.
-    std::printf("fastchess-gui %s\n", FCG_VERSION);
+    std::printf("RookStudio %s\n", FCG_VERSION);
     std::fflush(stdout);
     std::unique_ptr<tour::TournamentState> state;
     BroadcastSettings settings;
@@ -616,7 +616,7 @@ int runHeadless(const std::string& target, const Storage& storage, const CpuTopo
         return 1;
     }
     if (!state->finished()) {
-        std::printf("Stopped. Resume with: fastchess-gui --run \"%s\"\n", state->dir().string().c_str());
+        std::printf("Stopped. Resume with: rookstudio --run \"%s\"\n", state->dir().string().c_str());
         return 3;
     }
     std::printf("Finished (%s).\n", state->finishReason().c_str());
@@ -670,7 +670,7 @@ int runControlled(const std::string& target, const Storage& storage, const Headl
     const fs::path dir(target);
     // The channel first: from now on nothing else may write to the standard output, which goes to the log.
     std::error_code ec;
-    const auto log_file = fs::is_directory(dir, ec) ? dir / "fastchess-gui.log" : storage.root() / "fastchess-gui.log";
+    const auto log_file = fs::is_directory(dir, ec) ? dir / "rookstudio.log" : storage.root() / "rookstudio.log";
     control::Hello hello;
     hello.version = FCG_VERSION;
     hello.dir     = fs::absolute(dir).lexically_normal().string();
@@ -697,7 +697,7 @@ int runControlled(const std::string& target, const Storage& storage, const Headl
     console.setListener([&channel](const Console::Line& line) {
         channel->send("log", {{"text", line.text}, {"warning", line.warning}});
     });
-    console.add(fmt::format("fastchess-gui {}: {} plays here (process {})", FCG_VERSION, hello.dir, hello.pid));
+    console.add(fmt::format("RookStudio {}: {} plays here (process {})", FCG_VERSION, hello.dir, hello.pid));
     const auto console_mark = console.added();
 
     control::End end;

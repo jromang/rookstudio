@@ -767,9 +767,15 @@ if(FCG_BUILD_GUI)
         set_source_files_properties(${FCG_PLATFORM_SOURCES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
     endif()
 
-    # On macOS an application bundle, fastchess-gui.app.
+    # The program, rookstudio (RookStudio.app on macOS); its target keeps fastchess-gui's name, for its releases to
+    # merge.
     add_executable(fastchess-gui WIN32 MACOSX_BUNDLE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/main.cpp
                    ${FCG_PLATFORM_SOURCES})
+    if(APPLE)
+        set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME RookStudio)
+    else()
+        set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME rookstudio)
+    endif()
     target_link_libraries(fastchess-gui PRIVATE fcg_lib)
     if(WIN32)
         target_link_options(fastchess-gui PRIVATE -static -static-libgcc -static-libstdc++)
@@ -777,8 +783,8 @@ if(FCG_BUILD_GUI)
     if(APPLE)
         set_target_properties(fastchess-gui PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/mac/Info.plist.in
-            MACOSX_BUNDLE_BUNDLE_NAME fastchess-gui
-            MACOSX_BUNDLE_GUI_IDENTIFIER io.github.jromang.fastchess-gui
+            MACOSX_BUNDLE_BUNDLE_NAME RookStudio
+            MACOSX_BUNDLE_GUI_IDENTIFIER io.github.jromang.rookstudio
             MACOSX_BUNDLE_ICON_FILE fastchess-gui.icns
             MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
             MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION})

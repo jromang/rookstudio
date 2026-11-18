@@ -42,7 +42,7 @@ TEST_CASE("report: the issue's address, its fields filled") {
     facts.log      = {"fastchess-gui 0.5.9 — 4 physical cores, 8 threads", "! Cannot start the match: x & y = 100%"};
     const auto url = report::issueUrl(facts);
 
-    CHECK(url.rfind("https://github.com/jromang/fastchess-gui/issues/new?template=bug_report.yml&", 0) == 0);
+    CHECK(url.rfind("https://github.com/jromang/rookstudio/issues/new?template=bug_report.yml&", 0) == 0);
     CHECK(param(url, "version") == "fastchess-gui 0.5.9");
     CHECK(param(url, "system") == facts.system);
     CHECK(param(url, "log") == facts.log[0] + "\n" + facts.log[1] + "\n");

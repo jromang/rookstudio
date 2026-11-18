@@ -168,23 +168,23 @@ Args parseArgs(int argc, char** argv) {
         else if (a == "--version") {
             // Read by the window on a remote machine (see machines.hpp): the version, and the protocol of the
             // channel its tournaments are followed through.
-            std::printf("fastchess-gui %s\nprotocol %d\n", FCG_VERSION, fcg::REMOTE_PROTOCOL);
+            std::printf("RookStudio %s\nprotocol %d\n", FCG_VERSION, fcg::REMOTE_PROTOCOL);
             std::exit(0);
         } else if (a == "--help" || a == "-h") {
             std::printf(
-                "fastchess-gui [--profile DIR] [--autostart] [--size WxH] [--software]\n"
+                "rookstudio [--profile DIR] [--autostart] [--size WxH] [--software]\n"
                 "              [--shot FILE.png[@WINDOW[@SECONDS]]]... [--select-game N] [--focus WINDOW]\n"
                 "              [--quit-after SECONDS]\n"
-                "fastchess-gui [--profile DIR] --run TOURNAMENT_FOLDER|SETUP.json   (no window)\n"
+                "rookstudio [--profile DIR] --run TOURNAMENT_FOLDER|SETUP.json   (no window)\n"
                 "              [--tlcs UDP_PORT [--tlcs-lanes]] [--web TCP_PORT] [--live-files [DIR]]\n"
                 "              [--lichess ROUND_URL|ROUND_ID|new]   (token in FCG_LICHESS_TOKEN)\n"
                 "              [--tunnel [localhost.run|ssh://USER@HOST[:PORT][/REMOTE_PORT]]]\n"
                 "                  (the web page on the internet through an SSH tunnel; --web's port, else 8080)\n"
                 "              [--control stdio|socket] [--detach] [--allowance THREADS:MEMORY_MB:GPUS:ONE]\n"
                 "                  (driven by the window: its control channel; --detach plays on in the background)\n"
-                "fastchess-gui --attach TOURNAMENT_FOLDER   (the control channel of the process playing it, on the\n"
+                "rookstudio --attach TOURNAMENT_FOLDER   (the control channel of the process playing it, on the\n"
                 "              standard input and output)\n"
-                "fastchess-gui --version   (the version, and the protocol of the remote machines)\n");
+                "rookstudio --version   (the version, and the protocol of the remote machines)\n");
             std::exit(0);
         }
     }
@@ -254,12 +254,11 @@ int fatal(const std::string& what, bool sdl_error = true) {
         {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT | SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "OK"},
         {0, 1, report_label.c_str()},
     };
-    const SDL_MessageBoxData box = {
-        SDL_MESSAGEBOX_ERROR, nullptr, "fastchess-gui", message.c_str(), 2, buttons, nullptr};
+    const SDL_MessageBoxData box = {SDL_MESSAGEBOX_ERROR, nullptr, "RookStudio", message.c_str(), 2, buttons, nullptr};
     int pressed = 0;
     if (SDL_ShowMessageBox(&box, &pressed) && pressed == 1) {
         fcg::report::Facts facts;
-        facts.version     = "fastchess-gui " FCG_VERSION;
+        facts.version     = "RookStudio " FCG_VERSION;
         const char* video = SDL_GetCurrentVideoDriver();
         facts.system      = "System: " + fcg::report::systemName() + "\nDisplay: " + (video ? video : "?");
         facts.seen        = "At startup: " + message;
@@ -358,7 +357,7 @@ fs::path profileFolder(const Args& args, const std::string& executable) {
         fcg::portable::setBase(folder);
         return folder / fcg::portable::DATA_FOLDER;
     }
-    char* pref      = SDL_GetPrefPath("fastchess", "fastchess-gui");
+    char* pref      = SDL_GetPrefPath("", "rookstudio");
     const auto path = pref ? fs::path(pref) : fs::path(".");
     SDL_free(pref);
     return path;
@@ -464,7 +463,7 @@ int run(const Args& args, int argc, char** argv) {
         // Marked as playing in the profile, as the window marks those it lets play on: it connects to it when it opens.
         storage.setRunningMarker(fcg::RunningMarker{fs::absolute(target).lexically_normal().string()});
         std::printf(
-            "%s plays in the background (process %lld). fastchess-gui --attach \"%s\" talks with it; the window "
+            "%s plays in the background (process %lld). rookstudio --attach \"%s\" talks with it; the window "
             "shows it when it opens.\n",
             target.c_str(), static_cast<long long>(child.pid()), target.c_str());
         return 0;
@@ -511,7 +510,7 @@ int run(const Args& args, int argc, char** argv) {
     }
 
     // Drawn with OpenGL 3.2, or by SDL's renderer where it is missing or when software rendering is asked for.
-    SDL_Window* window = fcg::render::open("fastchess-gui " FCG_VERSION, opening.w, opening.h,
+    SDL_Window* window = fcg::render::open("RookStudio " FCG_VERSION, opening.w, opening.h,
                                            SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY,
                                            args.software || storage.softwareRendering());
     if (!window) return fatal(fcg::render::failure(), false);
@@ -540,7 +539,7 @@ int run(const Args& args, int argc, char** argv) {
 
     useBookCache(storage);
     const auto ini_path = storage.iniFile().string();
-    fcg::Console::instance().logTo(storage.root() / "fastchess-gui.log");
+    fcg::Console::instance().logTo(storage.root() / "rookstudio.log");
     fcg::render::logPath();
 
     IMGUI_CHECKVERSION();
@@ -708,7 +707,7 @@ int main(int argc, char** argv) {
         const auto message = fcg::trf("Error: {}", e.what());
         std::fprintf(stderr, "%s\n", message.c_str());
         if (args.run.empty() && args.attach.empty())
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "fastchess-gui", message.c_str(), nullptr);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "RookStudio", message.c_str(), nullptr);
         return 1;
     }
 }

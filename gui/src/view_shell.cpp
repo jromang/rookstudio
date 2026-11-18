@@ -1070,7 +1070,7 @@ void App::drawSettings() {
 // Version, and the new ones
 
 void App::copyVersion() {
-    ImGui::SetClipboardText(fmt::format("fastchess-gui {} ({})", FCG_VERSION, SDL_GetPlatform()).c_str());
+    ImGui::SetClipboardText(fmt::format("RookStudio {} ({})", FCG_VERSION, SDL_GetPlatform()).c_str());
 }
 
 void App::startUpdateCheck(bool asked) {
@@ -1098,7 +1098,7 @@ void App::pollUpdateCheck() {
 
 void App::drawVersionSettings() {
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("fastchess-gui " FCG_VERSION);
+    ImGui::TextUnformatted("RookStudio " FCG_VERSION);
     ImGui::SameLine();
     if (ImGui::Button(TR("Copy##version"))) copyVersion();
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("The version and the system, for a bug report."));
@@ -1151,9 +1151,9 @@ std::string App::systemReport() const {
 
 void App::reportProblem(const std::string& seen) {
     report::Facts facts;
-    facts.version  = "fastchess-gui " FCG_VERSION;
+    facts.version  = "RookStudio " FCG_VERSION;
     facts.system   = systemReport();
-    facts.log      = report::lastLines(storage_.root() / "fastchess-gui.log", 80);
+    facts.log      = report::lastLines(storage_.root() / "rookstudio.log", 80);
     facts.seen     = seen;
     const auto url = report::issueUrl(facts);
     if (!SDL_OpenURL(url.c_str())) {
@@ -1182,7 +1182,7 @@ void App::drawUpdateNotice() {
     if (!release) return;
     ui::beginCard("update_notice");
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(trf("fastchess-gui {} is out (this is {}).", release->version, FCG_VERSION).c_str());
+    ImGui::TextUnformatted(trf("RookStudio {} is out (this is {}).", release->version, FCG_VERSION).c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Download page"))) SDL_OpenURL(release->url.c_str());
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", release->url.c_str());

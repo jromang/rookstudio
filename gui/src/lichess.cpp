@@ -19,7 +19,7 @@ std::string headers(const std::string& event, uint32_t round, const std::string&
     const auto tag = [](const char* name, const std::string& value) {
         return fmt::format("[{} \"{}\"]\n", name, tour::pgnTagValue(value));
     };
-    std::string out = tag("Event", event) + tag("Site", "fastchess-gui") + tag("Round", std::to_string(round)) +
+    std::string out = tag("Event", event) + tag("Site", "RookStudio") + tag("Round", std::to_string(round)) +
                       tag("White", white) + tag("Black", black) + tag("Result", result);
     if (white_elo > 0) out += tag("WhiteElo", std::to_string(white_elo));
     if (black_elo > 0) out += tag("BlackElo", std::to_string(black_elo));
@@ -310,7 +310,7 @@ bool LichessRelay::Session::prepare() {
         const auto r = post("/broadcast/new", "application/x-www-form-urlencoded",
                             formEncode({{"name", name},
                                         {"visibility", settings_.listed ? "public" : "unlisted"},
-                                        {"markdown", "Engine games played with fastchess-gui."}}));
+                                        {"markdown", "Engine games played with RookStudio."}}));
         std::string error;
         if (r.status == 200) {
             try {

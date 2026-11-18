@@ -580,7 +580,7 @@ void GuideView::link(const std::string& target, const Section& from) {
         const auto start = path.rfind('/', at == 0 ? 0 : at - 1);
         path.erase(start == std::string::npos ? 0 : start + 1, at + 4 - (start == std::string::npos ? 0 : start + 1));
     }
-    open_url(fmt::format("https://github.com/jromang/fastchess-gui/blob/v{}/{}", FCG_VERSION, path));
+    open_url(fmt::format("https://github.com/jromang/rookstudio/blob/v{}/{}", FCG_VERSION, path));
 }
 
 ImTextureID GuideView::picture(const std::string& src, int* w, int* h) {

@@ -254,7 +254,7 @@ std::string describeSystem(const RemoteSystem& system) {
 std::string describeFormat(const ProgramFormat& f) {
     switch (f.kind) {
         case ProgramFormat::Kind::Unknown:
-            return TR("a program of a format fastchess-gui does not know");
+            return TR("a program of a format RookStudio does not know");
         case ProgramFormat::Kind::Script:
             return f.interpreter.empty() ? std::string(TR("a script")) : trf("a script for {}", f.interpreter);
         case ProgramFormat::Kind::Windows:
@@ -283,7 +283,7 @@ Suitability programSuits(const ProgramFormat& f, const RemoteSystem& system, con
     switch (f.kind) {
         case ProgramFormat::Kind::Unknown:
             return {L::Warning,
-                    trf("The program of {} is not a Windows, Linux or macOS program fastchess-gui knows, nor a script: "
+                    trf("The program of {} is not a Windows, Linux or macOS program RookStudio knows, nor a script: "
                         "copied all the same, the check after the copy tells whether it runs on {}.",
                         engine, machine)};
         case ProgramFormat::Kind::Script:

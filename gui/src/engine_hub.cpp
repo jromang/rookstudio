@@ -188,7 +188,7 @@ struct EngineHub::Impl {
             std::lock_guard<std::mutex> lock(mutex);
             const auto it = allowed.find(hello->key);
             if (it == allowed.end()) {
-                finish(s, relay::Frame::Failure, TR("fastchess-gui was not asked to start this engine on a machine."));
+                finish(s, relay::Frame::Failure, TR("RookStudio was not asked to start this engine on a machine."));
                 return;
             }
             s.engine = it->second;

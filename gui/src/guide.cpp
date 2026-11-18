@@ -422,7 +422,7 @@ std::string url(std::string_view code, std::string_view id) {
             }
         }
     }
-    return fmt::format("https://github.com/jromang/fastchess-gui/blob/v{}/docs/{}#{}", FCG_VERSION, file, anchor);
+    return fmt::format("https://github.com/jromang/rookstudio/blob/v{}/docs/{}#{}", FCG_VERSION, file, anchor);
 }
 
 std::string currentCode() {

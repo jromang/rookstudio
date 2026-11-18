@@ -171,14 +171,14 @@ bool socketAddress(const std::string& endpoint, sockaddr_un& addr) {
 
 std::string endpointFor(const fs::path& dir) {
 #ifdef _WIN32
-    return "\\\\.\\pipe\\fastchess-gui-" + folderKey(dir);
+    return "\\\\.\\pipe\\rookstudio-" + folderKey(dir);
 #else
     const auto in_folder = (fs::absolute(dir) / "control.sock").string();
     if (in_folder.size() < 100) return in_folder;
     // Too long for a Unix socket's address: in the user's runtime folder, named after the tournament's.
     const char* runtime = std::getenv("XDG_RUNTIME_DIR");
     fs::path base       = runtime && *runtime ? fs::path(runtime) : fs::temp_directory_path();
-    base /= "fastchess-gui";
+    base /= "rookstudio";
     std::error_code ec;
     fs::create_directories(base, ec);
     ::chmod(base.c_str(), 0700);

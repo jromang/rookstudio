@@ -149,7 +149,7 @@ struct Machine {
     std::string key_file;  // on this computer
     // The machine's folder for fastchess-gui, its tournaments, books and tablebases: relative to the user's home
     // folder, or absolute.
-    std::string folder = "fastchess-gui";
+    std::string folder = "rookstudio";
     std::string books_dir;   // empty: <folder>/books
     std::string syzygy_dir;  // empty: <folder>/syzygy
     // A fastchess-gui for the machine's system when it is not this one's (a Windows machine from Linux): a file here.

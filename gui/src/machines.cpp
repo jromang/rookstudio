@@ -150,7 +150,7 @@ std::map<std::string, std::string> keyValues(const std::string& output) {
 std::pair<std::string, int> parseVersion(const std::string& output) {
     std::string version;
     int protocol           = 0;
-    constexpr auto PROGRAM = std::string_view("fastchess-gui ");
+    constexpr auto PROGRAM = std::string_view("RookStudio ");
     std::size_t start      = 0;
     while (start < output.size()) {
         auto end = output.find('\n', start);
@@ -213,7 +213,7 @@ void readWindowsProbe(const std::string& output, RemoteSystem& system) {
 
 std::string posixProbe(const std::string& folder) {
     const auto dir = shQuote(folder);
-    const auto bin = shQuote(folder + "/fastchess-gui");
+    const auto bin = shQuote(folder + "/RookStudio");
     // One line at a time, joined by ';': csh, if it is the user's shell, takes no line break inside quotes.
     return viaSh(
         "echo os=$(uname -s); echo arch=$(uname -m); echo release=$(uname -r); "
@@ -232,7 +232,7 @@ std::string posixProbe(const std::string& folder) {
 }
 
 std::optional<std::string> windowsProbe(const std::string& folder) {
-    const auto exe = cmdQuote(folder + "\\fastchess-gui.exe");
+    const auto exe = cmdQuote(folder + "\\rookstudio.exe");
     if (!exe || folder.find('\'') != std::string::npos) return std::nullopt;
     // Memory and free space through PowerShell (cmd has neither), its command in double quotes for cmd: no double
     // quote nor % inside.
@@ -339,8 +339,8 @@ std::string Machine::booksDir() const { return books_dir.empty() ? remoteJoin(fo
 std::string Machine::syzygyDir() const { return syzygy_dir.empty() ? remoteJoin(folder, "syzygy") : syzygy_dir; }
 
 std::string Machine::programPath() const {
-    if (system.shell == RemoteShell::Cmd) return folder + "\\fastchess-gui.exe";
-    return remoteJoin(folder, "fastchess-gui");
+    if (system.shell == RemoteShell::Cmd) return folder + "\\rookstudio.exe";
+    return remoteJoin(folder, "rookstudio");
 }
 
 int Machine::coreBudget() const {
@@ -426,7 +426,7 @@ void from_json(const nlohmann::json& j, Machine& m) {
     m.user       = j.value("user", std::string());
     m.auth       = j.value("auth", std::string()) == "key" ? SshAuth::KeyFile : SshAuth::Agent;
     m.key_file   = portable::resolved(j.value("key_file", std::string()));
-    m.folder     = j.value("folder", std::string("fastchess-gui"));
+    m.folder     = j.value("folder", std::string("RookStudio"));
     m.books_dir  = j.value("books_dir", std::string());
     m.syzygy_dir = j.value("syzygy_dir", std::string());
     m.program    = portable::resolved(j.value("program", std::string()));
@@ -520,7 +520,7 @@ std::string incompleteMachine(const Machine& machine) {
     if (machine.auth == SshAuth::KeyFile && machine.key_file.empty()) {
         return TR("Choose the key file, or log in with the SSH agent.");
     }
-    if (machine.folder.empty()) return TR("Give the machine's folder for fastchess-gui.");
+    if (machine.folder.empty()) return TR("Give the machine's folder for RookStudio.");
     return {};
 }
 
@@ -534,8 +534,8 @@ fs::path programToInstall(const Machine& machine, const fs::path& self, std::str
     if (!machine.program.empty()) {
         std::error_code ec;
         if (!fs::is_regular_file(machine.program, ec)) {
-            error = trf("{} is not there: choose the fastchess-gui for {} {} again.", machine.program, remote.os,
-                        remote.arch);
+            error =
+                trf("{} is not there: choose the RookStudio for {} {} again.", machine.program, remote.os, remote.arch);
             return {};
         }
         return machine.program;
@@ -543,12 +543,12 @@ fs::path programToInstall(const Machine& machine, const fs::path& self, std::str
     if (remote == thisPlatform()) return self;
     if (remote.os == "Windows") {
         error =
-            trf("The machine runs Windows ({}): download fastchess-gui for Windows from the releases page, then "
-                "choose its fastchess-gui.exe below.",
+            trf("The machine runs Windows ({}): download RookStudio for Windows from the releases page, then "
+                "choose its RookStudio.exe below.",
                 remote.arch);
     } else {
         error =
-            trf("The machine runs {} {}, this computer {} {}: download fastchess-gui for {} {} from the releases "
+            trf("The machine runs {} {}, this computer {} {}: download RookStudio for {} {} from the releases "
                 "page and choose its program below, or install it on the machine yourself, in {}.",
                 remote.os, remote.arch, thisPlatform().os, thisPlatform().arch, remote.os, remote.arch, machine.folder);
     }

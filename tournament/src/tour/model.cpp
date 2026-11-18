@@ -167,7 +167,7 @@ void to_json(nlohmann::json& j, const TournamentSpec& s) {
 
 void from_json(const nlohmann::json& j, TournamentSpec& s) {
     s.version = j.value("version", 1);
-    if (s.version > 5) throw std::runtime_error("this tournament was written by a newer version of fastchess-gui");
+    if (s.version > 5) throw std::runtime_error("this tournament was written by a newer version of RookStudio");
 
     s.name        = j.value("name", std::string{});
     s.format      = j.value("format", Format::Match);

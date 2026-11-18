@@ -52,8 +52,8 @@ std::string summaryOf(const Machine& m) {
     std::string out = s.os + " " + s.arch;
     out += " · " + trn("{} thread", "{} threads", static_cast<uint64_t>(s.threads), s.threads);
     out += " · " + formatMemory(s.memory_mb);
-    out += " · " +
-           (s.fcg_version.empty() ? std::string(TR("fastchess-gui not installed")) : "fastchess-gui " + s.fcg_version);
+    out +=
+        " · " + (s.fcg_version.empty() ? std::string(TR("RookStudio not installed")) : "RookStudio " + s.fcg_version);
     return out;
 }
 
@@ -288,7 +288,7 @@ void App::drawMachineSettings(float label) {
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", TR("A test box, a server or a second PC with an SSH server (on Windows, its built-in "
                                    "OpenSSH Server): the window logs in with your SSH agent or a key file, finds out "
-                                   "the machine, installs fastchess-gui there and copies the books and tablebases. "
+                                   "the machine, installs RookStudio there and copies the books and tablebases. "
                                    "Nothing secret is saved: the key's passphrase is asked once a session."));
     }
     ImGui::SameLine();
@@ -333,7 +333,7 @@ void App::drawMachineCard(std::size_t index) {
         if (ImGui::SmallButton(TR("Test"))) startMachineJob(m.id, MachineJob::Kind::Test);
         ImGui::EndDisabled();
         ImGui::SetItemTooltip("%s", TR("Logs in, then tells the machine's system, threads, memory and free space, and "
-                                       "whether fastchess-gui is installed in its folder."));
+                                       "whether RookStudio is installed in its folder."));
         ImGui::PopID();
         return;
     }
@@ -396,7 +396,7 @@ void App::drawMachineCard(std::size_t index) {
     ImGui::SameLine(px(110));
     editField("##folder", m.folder, field);
     save |= ImGui::IsItemDeactivatedAfterEdit();
-    ImGui::SetItemTooltip("%s", TR("fastchess-gui's folder on the machine, for the program, its tournaments, books and "
+    ImGui::SetItemTooltip("%s", TR("RookStudio's folder on the machine, for the program, its tournaments, books and "
                                    "tablebases: relative to the user's home folder, or absolute (/srv/fcg, D:\\fcg)."));
 
     ImGui::AlignTextToFramePadding();
@@ -425,14 +425,14 @@ void App::drawMachineCard(std::size_t index) {
     ImGui::BeginDisabled(busy);
     if (ImGui::Button(TR("Test the connection"))) startMachineJob(m.id, MachineJob::Kind::Test);
     ImGui::SetItemTooltip("%s", TR("Logs in, then tells the machine's system, threads, memory and free space, and "
-                                   "whether fastchess-gui is installed in its folder."));
+                                   "whether RookStudio is installed in its folder."));
     ImGui::SameLine();
     const bool installed = !m.system.fcg_version.empty();
     const bool current   = installed && m.system.fcg_version == FCG_VERSION && m.system.fcg_protocol == REMOTE_PROTOCOL;
-    if (ImGui::Button(installed ? TR("Update fastchess-gui") : TR("Install fastchess-gui"))) {
+    if (ImGui::Button(installed ? TR("Update RookStudio") : TR("Install RookStudio"))) {
         startMachineJob(m.id, MachineJob::Kind::Install);
     }
-    ImGui::SetItemTooltip("%s", trf("Copies fastchess-gui {} to {} on the machine (resumed if the copy is cut), then "
+    ImGui::SetItemTooltip("%s", trf("Copies RookStudio {} to {} on the machine (resumed if the copy is cut), then "
                                     "checks it starts there.",
                                     FCG_VERSION, m.folder)
                                     .c_str());
@@ -456,12 +456,12 @@ void App::drawMachineCard(std::size_t index) {
     const auto remote = normalizePlatform(m.system.os, m.system.arch);
     if (!m.system.os.empty() && (remote != thisPlatform() || !m.program.empty())) {
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(trf("fastchess-gui for {} {}", remote.os, remote.arch).c_str());
+        ImGui::TextUnformatted(trf("RookStudio for {} {}", remote.os, remote.arch).c_str());
         ImGui::SameLine();
         editField("##program", m.program, px(300));
         save |= ImGui::IsItemDeactivatedAfterEdit();
-        ImGui::SetItemTooltip("%s", TR("This computer's fastchess-gui does not run on the machine's system: download "
-                                       "the release for it and choose its program here (fastchess-gui.exe for "
+        ImGui::SetItemTooltip("%s", TR("This computer's RookStudio does not run on the machine's system: download "
+                                       "the release for it and choose its program here (RookStudio.exe for "
                                        "Windows). Install copies it."));
         ImGui::SameLine();
         if (ImGui::Button(TR("Browse…##program"))) {
@@ -1026,7 +1026,7 @@ void App::drawPassphrasePrompt() {
         return;
     }
     ImGui::TextUnformatted(trf("The passphrase of {}, for {}", machine->key_file, machine->name).c_str());
-    ImGui::TextDisabled("%s", TR("Kept in memory until fastchess-gui ends, never saved."));
+    ImGui::TextDisabled("%s", TR("Kept in memory until RookStudio ends, never saved."));
     if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
     ImGui::SetNextItemWidth(px(320));
     const bool enter = ImGui::InputText("##passphrase", passphrase_input_.data(), passphrase_input_.size(),

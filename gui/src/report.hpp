@@ -13,7 +13,7 @@
 
 namespace fcg::report {
 
-inline constexpr const char* NEW_ISSUE = "https://github.com/jromang/fastchess-gui/issues/new";
+inline constexpr const char* NEW_ISSUE = "https://github.com/jromang/rookstudio/issues/new";
 
 // What goes in the issue. Each field fills the template's field of the same id.
 struct Facts {
@@ -30,7 +30,7 @@ struct Facts {
 // Every byte but letters, digits and -._~ as %XX (UTF-8 kept as its bytes).
 [[nodiscard]] std::string percentEncode(std::string_view text);
 
-// The last `count` lines of a text file, oldest first: of the log, fastchess-gui.log in the profile. Only its end is
+// The last `count` lines of a text file, oldest first: of the log, rookstudio.log in the profile. Only its end is
 // read, however long the session was.
 [[nodiscard]] std::vector<std::string> lastLines(const std::filesystem::path& file, std::size_t count);
 

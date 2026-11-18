@@ -184,7 +184,7 @@ struct Shown {
 [[nodiscard]] std::pair<std::size_t, std::size_t> page(std::size_t english_index);
 
 // The guide on GitHub, for the version that runs, in a language, at the section of an English id:
-// https://github.com/jromang/fastchess-gui/blob/v0.6.0/docs/guide.fr.md#nouveau-tournoi
+// https://github.com/jromang/rookstudio/blob/v0.6.0/docs/guide.fr.md#nouveau-tournoi
 [[nodiscard]] std::string url(std::string_view code, std::string_view id);
 
 // The interface language's code for the guide: "fr", "pt_BR"…, "en".

@@ -532,7 +532,7 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     add(TR("Open the tournaments folder"), TR("Settings"), [this] { ui::openPath(storage_.runsDir()); });
     add(TR("Change the tournaments folder…"), TR("Settings"), [this] { applyFix(changeTournamentsFolderFix()); });
     if (const auto* release = update::notice(updates_, FCG_VERSION)) {
-        add(trf("Download page of fastchess-gui {}", release->version), TR("Settings"),
+        add(trf("Download page of RookStudio {}", release->version), TR("Settings"),
             [url = release->url] { SDL_OpenURL(url.c_str()); });
     }
     add(TR("Software rendering"), TR("Settings"), page(Page::Settings));  // the checkbox and what draws the window

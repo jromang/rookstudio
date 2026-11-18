@@ -680,7 +680,7 @@ class TunnelConnection {
                 // KEXINIT. Without it, what the server sent was not a packet libssh2 could take.
                 if (detail == "Unable to exchange encryption keys") {
                     if (!kexinit_received_) return fail("the server sent a packet that is not valid (" + detail + ")");
-                    return fail(trf("{} has no algorithm in common with fastchess-gui (it needs curve25519-sha256, an "
+                    return fail(trf("{} has no algorithm in common with RookStudio (it needs curve25519-sha256, an "
                                     "RSA host key and AES)",
                                     cfg_.host),
                                 true);

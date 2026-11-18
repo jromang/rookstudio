@@ -285,7 +285,7 @@ SDL_Window* open(const char* title, int width, int height, SDL_WindowFlags flags
         return g.window;
     }
 
-    g.failure = std::string(TR("fastchess-gui cannot draw its window.")) + "\n\nOpenGL 3.2: " + gl_why + "\n" +
+    g.failure = std::string(TR("RookStudio cannot draw its window.")) + "\n\nOpenGL 3.2: " + gl_why + "\n" +
                 TR("SDL renderer") + ": " + sdl_why + "\n\n" +
                 TR("Update the graphics driver, or turn on 3D acceleration in the virtual machine or the remote "
                    "desktop's settings.");

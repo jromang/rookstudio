@@ -64,7 +64,7 @@ std::optional<Release> parseRelease(std::string_view json) {
         }
         // Only a page of the program's own on GitHub is opened.
         const auto url                = j.value("html_url", std::string{});
-        const std::string_view prefix = "https://github.com/jromang/fastchess-gui/";
+        const std::string_view prefix = "https://github.com/jromang/rookstudio/";
         r.url =
             url.rfind(prefix, 0) == 0 && url.find_first_of(" \t\r\n\"<>") == std::string::npos ? url : RELEASES_PAGE;
         return r;

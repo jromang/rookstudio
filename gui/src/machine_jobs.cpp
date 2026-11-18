@@ -185,7 +185,7 @@ RemoteShell detectShell(SshClient& client, const std::string& name, std::string&
         return RemoteShell::Unknown;
     }
     error =
-        trf("{} runs commands with a shell fastchess-gui does not speak (PowerShell?): on Windows, make cmd the SSH "
+        trf("{} runs commands with a shell RookStudio does not speak (PowerShell?): on Windows, make cmd the SSH "
             "server's shell again (remove the value DefaultShell of HKEY_LOCAL_MACHINE\\SOFTWARE\\OpenSSH).",
             name);
     return RemoteShell::Unknown;
@@ -243,14 +243,14 @@ void testMachine(SshClient& client, const Machine& machine, JobState& state, Job
             trf("{} free where its folder {} is.", formatMemory(system.disk_free_mb), machine.folder));
     }
     if (version.empty()) {
-        result.lines.push_back(trf("fastchess-gui is not in {}: Install puts it there.", machine.folder));
+        result.lines.push_back(trf("RookStudio is not in {}: Install puts it there.", machine.folder));
     } else if (protocol != REMOTE_PROTOCOL) {
         result.lines.push_back(
-            trf("fastchess-gui {} is in {}, too old to run tournaments for this window: Update "
+            trf("RookStudio {} is in {}, too old to run tournaments for this window: Update "
                 "replaces it.",
                 version, machine.folder));
     } else {
-        result.lines.push_back(trf("fastchess-gui {} is in {} (protocol {}).", version, machine.folder, protocol));
+        result.lines.push_back(trf("RookStudio {} is in {} (protocol {}).", version, machine.folder, protocol));
     }
     result.system = system;
     result.ok     = true;
@@ -263,7 +263,7 @@ void installProgram(SshClient& client, const Machine& machine, const fs::path& p
     if (m.system.shell == RemoteShell::Unknown) return;
     const bool windows = m.system.shell == RemoteShell::Cmd;
     const auto dir     = sftpPath(m.folder);
-    const auto remote  = remoteJoin(dir, windows ? "fastchess-gui.exe" : "fastchess-gui");
+    const auto remote  = remoteJoin(dir, windows ? "rookstudio.exe" : "rookstudio");
     state.setStep(trf("Making the folder {}…", m.folder));
     if (!client.makeDirs(dir)) {
         result.error = client.error();
@@ -294,7 +294,7 @@ void installProgram(SshClient& client, const Machine& machine, const fs::path& p
     const auto [version, protocol] = parseVersion(out->out);
     if (version.empty()) {
         result.error = {SshError::Kind::Remote,
-                        trf("fastchess-gui was copied to {}, but it does not start there: {}", machineName(m),
+                        trf("RookStudio was copied to {}, but it does not start there: {}", machineName(m),
                             firstLine(out->err.empty() ? out->out : out->err)),
                         {}};
         return;
@@ -302,7 +302,7 @@ void installProgram(SshClient& client, const Machine& machine, const fs::path& p
     m.system.fcg_version  = version;
     m.system.fcg_protocol = protocol;
     result.system         = m.system;
-    result.lines.push_back(trf("fastchess-gui {} installed in {} (protocol {}).", version, m.folder, protocol));
+    result.lines.push_back(trf("RookStudio {} installed in {} (protocol {}).", version, m.folder, protocol));
     result.ok = true;
 }
 

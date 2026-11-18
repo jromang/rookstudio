@@ -399,7 +399,7 @@ TEST_CASE("remote: a tournament on its socket plays on without the window, which
     auto& h = *again;
     // What the window and the process were doing, told only if it failed.
     const auto state_then = [&] {
-        std::ifstream in(dir / "fastchess-gui.log", std::ios::binary);
+        std::ifstream in(dir / "rookstudio.log", std::ios::binary);
         std::string log((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         if (log.size() > 3000) log = log.substr(log.size() - 3000);
         std::size_t on_disk = 0;

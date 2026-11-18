@@ -111,7 +111,7 @@ jobs:
         # README.md's 2.38: a function a newer glibc gave a new version, left out of cmake/glibc_floor.h, or one new
         # since, would ask for more.
         run: |
-          files="build/fastchess-gui build/fastchess $(find build -maxdepth 1 -name '*.so' | sort)"
+          files="build/rookstudio build/fastchess $(find build -maxdepth 1 -name '*.so' | sort)"
           echo "Newest version asked for: $(objdump -T $files | grep -oE 'GLIBC_2\.[0-9]+' | sort -uV | tail -1)"
           newer=$(objdump -T $files | grep -E 'GLIBC_2\.(39|[4-9][0-9])\b' || true)
           if [ -n "$newer" ]; then echo "Newer than glibc 2.38:"; echo "$newer"; exit 1; fi
@@ -128,10 +128,10 @@ jobs:
         # SDL's software renderer, what a machine without OpenGL 3.2 gets: the program starts, draws its Settings page
         # off screen (the offscreen driver --shot picks) and saves it.
         run: |
-          ./build/fastchess-gui --software --profile "${RUNNER_TEMP}/software" --size 1280x800 \
+          ./build/rookstudio --software --profile "${RUNNER_TEMP}/software" --size 1280x800 \
             --shot "${RUNNER_TEMP}/software.png@settings@3"
-          cat "${RUNNER_TEMP}/software/fastchess-gui.log"
-          grep -q "software driver" "${RUNNER_TEMP}/software/fastchess-gui.log"
+          cat "${RUNNER_TEMP}/software/rookstudio.log"
+          grep -q "software driver" "${RUNNER_TEMP}/software/rookstudio.log"
           test -s "${RUNNER_TEMP}/software.png"
           ls -l "${RUNNER_TEMP}/software.png"
 
@@ -139,7 +139,7 @@ jobs:
         with:
           name: linux
           path: |
-            build/fastchess-gui
+            build/rookstudio
             build/fastchess
             build/*.so
 
@@ -313,7 +313,7 @@ jobs:
         with:
           name: windows
           path: |
-            build-win/fastchess-gui.exe
+            build-win/rookstudio.exe
             build-win/fastchess.exe
             build-win/fastchess-gui-tests.exe
             build-win/fcg-tournament-tests.exe
@@ -395,7 +395,7 @@ jobs:
 
       - name: Universal binaries
         run: |
-          for program in build/fastchess-gui.app/Contents/MacOS/fastchess-gui build/fastchess; do
+          for program in build/RookStudio.app/Contents/MacOS/RookStudio build/fastchess; do
             echo "${program}: $(lipo -archs "${program}"), $(vtool -show-build "${program}" | grep -m1 minos)"
             lipo "${program}" -verify_arch arm64 x86_64
           done
@@ -409,16 +409,16 @@ jobs:
       - name: Package
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then version="${GITHUB_REF_NAME}"; else version="${GITHUB_SHA::7}"; fi
-          macos="fastchess-gui-${version}-macos-universal"
+          macos="rookstudio-${version}-macos-universal"
           mkdir -p "dist/${macos}"
           # The application alone, as on Linux and Windows: it carries fastchess built in, and the guide (F1).
-          cp -R build/fastchess-gui.app "dist/${macos}/"
+          cp -R build/RookStudio.app "dist/${macos}/"
           cp README.md LICENSE gui/assets/ATTRIBUTION.md "dist/${macos}/"
           cp -R gui/assets/licenses "dist/${macos}/"
           # Not signed by a developer (that needs an Apple Developer account): signed ad hoc, the whole bundle
           # sealed, which Apple silicon requires. Gatekeeper still asks, at the first start, to allow it.
-          codesign --force --deep --sign - "dist/${macos}/fastchess-gui.app"
-          codesign --verify --deep --strict "dist/${macos}/fastchess-gui.app"
+          codesign --force --deep --sign - "dist/${macos}/RookStudio.app"
+          codesign --verify --deep --strict "dist/${macos}/RookStudio.app"
           # ditto keeps the bundle as it is: permissions, signature, extended attributes.
           ditto -c -k --keepParent "dist/${macos}" "dist/${macos}.zip"
           ls -l dist
@@ -448,26 +448,26 @@ jobs:
           # The guide is built into the program (F1): its Markdown files are not shipped.
           docs="README.md LICENSE gui/assets/ATTRIBUTION.md"
 
-          linux="fastchess-gui-${version}-linux-x86_64"
+          linux="rookstudio-${version}-linux-x86_64"
           mkdir -p "dist/${linux}"
-          cp artifacts/linux/fastchess-gui "dist/${linux}/"
-          chmod +x "dist/${linux}/fastchess-gui"
+          cp artifacts/linux/rookstudio "dist/${linux}/"
+          chmod +x "dist/${linux}/rookstudio"
           # The assistant's language model runtime (llama.cpp), beside the program that runs it.
           cp artifacts/linux/*.so "dist/${linux}/"
           cp ${docs} "dist/${linux}/"
           cp -r gui/assets/licenses "dist/${linux}/"
           tar -C dist -czf "dist/${linux}.tar.gz" "${linux}"
 
-          windows="fastchess-gui-${version}-windows-x86_64"
+          windows="rookstudio-${version}-windows-x86_64"
           mkdir -p "dist/${windows}"
-          cp artifacts/windows/fastchess-gui.exe "dist/${windows}/"
+          cp artifacts/windows/rookstudio.exe "dist/${windows}/"
           cp artifacts/windows/*.dll "dist/${windows}/"
           cp ${docs} "dist/${windows}/"
           cp -r gui/assets/licenses "dist/${windows}/"
           (cd dist && zip -qr "${windows}.zip" "${windows}")
 
           # Packaged on the Mac, the application bundle signed there.
-          cp "artifacts/macos/fastchess-gui-${version}-macos-universal.zip" dist/
+          cp "artifacts/macos/rookstudio-${version}-macos-universal.zip" dist/
 
           (cd dist && sha256sum *.tar.gz *.zip > SHA256SUMS.txt)
           ls -l dist
@@ -480,5 +480,5 @@ jobs:
           if [ -f "$notes" ]; then args=(--notes-file "$notes"); else args=(--generate-notes); fi
           # A preview (v0.7.0-preview.1) is a pre-release: the programs of a release do not offer it.
           if [[ "${GITHUB_REF_NAME}" == *-* ]]; then args+=(--prerelease); fi
-          gh release create "${GITHUB_REF_NAME}" --title "fastchess-gui ${GITHUB_REF_NAME}" "${args[@]}" \
+          gh release create "${GITHUB_REF_NAME}" --title "RookStudio ${GITHUB_REF_NAME}" "${args[@]}" \
             dist/*.tar.gz dist/*.zip dist/SHA256SUMS.txt

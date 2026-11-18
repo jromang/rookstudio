@@ -134,11 +134,11 @@ std::optional<std::pair<Frame, std::string>> FrameReader::next() {
 
 int run(const std::string& key, const std::string& hub, std::function<long(char*, std::size_t)> input,
         const std::function<void(std::string_view)>& output, const std::function<void(std::string_view)>& errors) {
-    const auto say = [&](const std::string& text) { errors("fastchess-gui --remote-engine: " + text + "\n"); };
+    const auto say   = [&](const std::string& text) { errors("rookstudio --remote-engine: " + text + "\n"); };
     const auto where = parseHubEnvironment(hub);
     if (!where) {
         say(std::string("no engine hub in ") + ENV +
-            ": this program is started by fastchess-gui, for an engine that runs on a machine");
+            ": this program is started by RookStudio, for an engine that runs on a machine");
         return 1;
     }
     const auto fd = net::connectTo(LOOPBACK, where->first, CONNECT_TIMEOUT_MS);
@@ -210,7 +210,7 @@ int run(const std::string& key, const std::string& hub, std::function<long(char*
 
 int main(const std::vector<std::string>& args) {
     if (args.size() != 1) {
-        std::fprintf(stderr, "usage: fastchess-gui %s KEY (started by fastchess-gui, not by hand)\n", FLAG);
+        std::fprintf(stderr, "usage: rookstudio %s KEY (started by RookStudio, not by hand)\n", FLAG);
         return 2;
     }
     const char* hub = std::getenv(ENV);

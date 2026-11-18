@@ -1198,7 +1198,7 @@ void App::drawEngines() {
         }
         ui::help(
             TR("WinBoard engines (xboard protocol) are run through a translation to UCI built into "
-               "fastchess-gui. Automatic: found out when the engine is read."));
+               "RookStudio. Automatic: found out when the engine is read."));
         ui::topic(guide::topics::WinBoard);
     }
 
@@ -1598,7 +1598,7 @@ void App::drawConsole() {
 
     if (ImGui::SmallButton(TR("Clear"))) Console::instance().clear();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", TR("Empties the page; the log file, fastchess-gui.log in the profile, keeps the "
+        ImGui::SetTooltip("%s", TR("Empties the page; the log file, rookstudio.log in the profile, keeps the "
                                    "lines."));
     }
     ImGui::SameLine();

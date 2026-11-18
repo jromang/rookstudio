@@ -137,7 +137,7 @@ KeyFileInfo inspectKeyFile(const fs::path& file) {
                              file.string(), file.string());
         }
     } else if (data->find("PRIVATE KEY-----") != std::string::npos) {
-        info.error = trf("{} is in a format fastchess-gui cannot read: convert it with ssh-keygen -p -f \"{}\".",
+        info.error = trf("{} is in a format RookStudio cannot read: convert it with ssh-keygen -p -f \"{}\".",
                          file.string(), file.string());
     } else {
         info.error = trf("{} is not a private key file (the public key ends in .pub; choose the file without it).",
@@ -145,7 +145,7 @@ KeyFileInfo inspectKeyFile(const fs::path& file) {
     }
     if (info.error.empty() && !info.type.empty() && info.type != "ssh-rsa" && info.type != "ssh-ed25519") {
         info.error =
-            trf("{} holds a key of type {}: fastchess-gui logs in with RSA and Ed25519 keys only (make one "
+            trf("{} holds a key of type {}: RookStudio logs in with RSA and Ed25519 keys only (make one "
                 "with ssh-keygen -t ed25519), or with the SSH agent.",
                 file.string(), info.type);
     }
@@ -426,7 +426,7 @@ struct SshClient::Impl {
         if (rc == LIBSSH2_ERROR_TIMEOUT) return false;
         if (rc == LIBSSH2_ERROR_KEX_FAILURE) {
             return fail(SshError::Kind::Network,
-                        trf("{} has no algorithm in common with fastchess-gui (it needs curve25519-sha256, an RSA host "
+                        trf("{} has no algorithm in common with RookStudio (it needs curve25519-sha256, an RSA host "
                             "key and AES): add an RSA host key to its SSH server (ssh-keygen -A).",
                             target.host));
         }

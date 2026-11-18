@@ -32,7 +32,7 @@ void notifyRunFinished(SDL_Window* window, [[maybe_unused]] const std::string& t
                               body.c_str(),
                               nullptr};
 #    else
-        const char* argv[] = {"notify-send", "-a", "fastchess-gui", title.c_str(), body.c_str(), nullptr};
+        const char* argv[] = {"notify-send", "-a", "RookStudio", title.c_str(), body.c_str(), nullptr};
 #    endif
         pid_t pid = 0;
         if (posix_spawnp(&pid, argv[0], nullptr, nullptr, const_cast<char* const*>(argv), environ) == 0) {

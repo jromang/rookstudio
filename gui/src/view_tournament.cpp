@@ -479,7 +479,7 @@ void App::copyStandings(ui::CopyAs as) {
     // In the order shown, the line of the event, the games and the book under it, then the program's name, so that
     // a table posted on a forum is told apart from those of other GUIs.
     const auto& spec  = t->spec();
-    const auto footer = tour::footerLine(spec, shown_, t->totalGames()) + "\nfastchess-gui " FCG_VERSION;
+    const auto footer = tour::footerLine(spec, shown_, t->totalGames()) + "\nRookStudio " FCG_VERSION;
     // A team match: the teams' scores and their engines against each other, rather than a crosstable mostly empty.
     const bool teams = spec.format == tour::Format::TeamMatch;
     std::string text;

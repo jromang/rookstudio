@@ -260,9 +260,10 @@ void App::drawWebChat(bool& changed) {
 void App::drawTunnel(bool& changed) {
     ImGui::Spacing();
     changed |= ImGui::Checkbox(TR("Publish on the internet"), &setup_.broadcast_tunnel);
-    ui::help(TR("While a tournament runs, an SSH tunnel built into fastchess-gui gives the page a public https "
-                "address, without opening a port in the router or installing anything. Only the page is reachable "
-                "that way, read-only."));
+    ui::help(
+        TR("While a tournament runs, an SSH tunnel built into RookStudio gives the page a public https "
+           "address, without opening a port in the router or installing anything. Only the page is reachable "
+           "that way, read-only."));
     ui::topic(guide::topics::Tunnel);
     // Changed only while it is not connected; after an error, to mend it (it starts again once a field is left).
     const auto status = broadcaster_.tunnel();
@@ -402,7 +403,7 @@ void App::lichessTokenField() {
     }
     broadcast_editing_ |= ImGui::IsItemActive();
     if (ImGui::SmallButton(TR("Create a token on lichess…"))) {
-        SDL_OpenURL("https://lichess.org/account/oauth/token/create?scopes[]=study:write&description=fastchess-gui");
+        SDL_OpenURL("https://lichess.org/account/oauth/token/create?scopes[]=study:write&description=RookStudio");
     }
     ImGui::SetItemTooltip("%s", TR("Opens lichess' page for a new personal API token, with the study:write scope it "
                                    "needs: paste the token above."));

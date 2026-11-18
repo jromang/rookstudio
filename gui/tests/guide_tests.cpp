@@ -234,7 +234,7 @@ TEST_CASE("guide: a section missing or stale in a translation is shown in Englis
     CHECK(en->headings[last].level <= 2);
 
     CHECK(guide::url("en", "format") ==
-          std::string("https://github.com/jromang/fastchess-gui/blob/v") + FCG_VERSION + "/docs/guide.md#format");
+          std::string("https://github.com/jromang/rookstudio/blob/v") + FCG_VERSION + "/docs/guide.md#format");
 }
 
 TEST_CASE("markdown: blocks and runs of a guide's text") {

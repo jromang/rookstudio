@@ -352,7 +352,7 @@ struct MatchSetup {
     bool tb_ignore50 = false;
     int tb_result    = 3;  // 1 win/loss, 2 draw, 3 both
 
-    std::string pgn_event = "fastchess-gui";
+    std::string pgn_event = "RookStudio";
     PgnStyle export_style = PgnStyle::ChessBase;
     // The extra fields of the move comments. The charts of the Games tab read them back from the PGN.
     bool pgn_nodes    = true;

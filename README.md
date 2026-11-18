@@ -201,17 +201,17 @@ stb_image_write and the Inter and Lucide fonts are downloaded by CMake at pinned
 # Linux
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-./build/fastchess-gui
+./build/rookstudio
 
 # macOS (Apple clang), a universal application
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 cmake --build build
-open build/fastchess-gui.app
+open build/RookStudio.app
 
 # Windows, cross-compiled from Linux with mingw-w64
 cmake -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
 cmake --build build-win
-# build-win/fastchess-gui.exe is self-contained (it only imports system DLLs)
+# build-win/rookstudio.exe is self-contained (it only imports system DLLs)
 ```
 
 The build also produces `fastchess` (the upstream command line tool, from the same sources),

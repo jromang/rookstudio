@@ -84,7 +84,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     }
 
     Console::instance().add(
-        trf("fastchess-gui {} — {} physical cores, {} threads", FCG_VERSION, topology_.physical, topology_.logical));
+        trf("RookStudio {} — {} physical cores, {} threads", FCG_VERSION, topology_.physical, topology_.logical));
 
     unfinished_ = unfinishedMatch(storage_.runsDir());
     queue_      = storage_.loadQueue();
@@ -544,13 +544,13 @@ void App::frame() {
 
     // The window title tells how the run is going, also when the window is in the background.
     {
-        std::string title = "fastchess-gui " FCG_VERSION;
+        std::string title = "RookStudio " FCG_VERSION;
         if (run_->running()) {
             const auto& info = run_->info();
             title = trf("{} – {} · {} games", run_->paused() ? TR("Paused") : TR("Running"), info.name, games_.size());
             if (info.sprt) title += fmt::format(" · LLR {:.2f}", current_.llr);
         } else if (run_->state() == Run::State::Finished) {
-            title = trf("{} – fastchess-gui", TR("Finished")) + " " FCG_VERSION;
+            title = trf("{} – RookStudio", TR("Finished")) + " " FCG_VERSION;
         }
         // The others playing, after it.
         if (const int others = runsPlaying() - (run_->running() ? 1 : 0); others > 0) {
@@ -645,7 +645,7 @@ void App::drawQuitModal() {
             ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", TR("Each plays on in its own process. The window shows them again at its next "
-                                           "launch; fastchess-gui --attach <folder> talks with one from a terminal."));
+                                           "launch; rookstudio --attach <folder> talks with one from a terminal."));
             }
             if (chosen || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
                 keepRunningAndQuit();

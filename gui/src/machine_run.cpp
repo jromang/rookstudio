@@ -57,8 +57,8 @@ std::string shellPath(RemoteShell shell, std::string path) {
 
 // The files of a tournament's folder that are not its own state: they stay where they are.
 bool keptHere(const std::string& name) {
-    static const std::set<std::string> here = {"tournament.json", "tournament.lock",   "control.json",
-                                               PLACE_FILE,        "fastchess-gui.log", "control.sock"};
+    static const std::set<std::string> here = {"tournament.json", "tournament.lock", "control.json",
+                                               PLACE_FILE,        "rookstudio.log",  "control.sock"};
     return here.count(name) > 0 || name.ends_with(".part");
 }
 
@@ -179,8 +179,7 @@ std::vector<std::string> requiredBooks(const tour::TournamentSpec& remote, const
 std::optional<std::string> remoteStartCommand(const Machine& m, const std::string& remote_dir) {
     const auto shell  = m.system.shell;
     const auto folder = machineFolder(m);
-    const auto program =
-        shell == RemoteShell::Cmd ? folder + "\\fastchess-gui.exe" : remoteJoin(folder, "fastchess-gui");
+    const auto program = shell == RemoteShell::Cmd ? folder + "\\rookstudio.exe" : remoteJoin(folder, "rookstudio");
     const auto profile = remoteJoin(folder, "profile");
     const auto p = quoteFor(shell, shellPath(shell, program)), pr = quoteFor(shell, shellPath(shell, profile)),
                d = quoteFor(shell, shellPath(shell, remote_dir));
@@ -192,8 +191,7 @@ std::optional<std::string> remoteStartCommand(const Machine& m, const std::strin
 std::optional<std::string> remoteAttachCommand(const Machine& m, const std::string& remote_dir) {
     const auto shell  = m.system.shell;
     const auto folder = machineFolder(m);
-    const auto program =
-        shell == RemoteShell::Cmd ? folder + "\\fastchess-gui.exe" : remoteJoin(folder, "fastchess-gui");
+    const auto program = shell == RemoteShell::Cmd ? folder + "\\rookstudio.exe" : remoteJoin(folder, "rookstudio");
     const auto p = quoteFor(shell, shellPath(shell, program)), d = quoteFor(shell, shellPath(shell, remote_dir));
     if (!p || !d) return std::nullopt;
     // exec: the shell steps aside, the channel is the program's own input and output.
@@ -220,8 +218,7 @@ bool startOnMachine(SshClient& client, const Machine& machine, const fs::path& l
 
     // fastchess-gui, in the version that speaks this window's protocol.
     const auto folder = machineFolder(m);
-    const auto program =
-        shell == RemoteShell::Cmd ? folder + "\\fastchess-gui.exe" : remoteJoin(folder, "fastchess-gui");
+    const auto program = shell == RemoteShell::Cmd ? folder + "\\rookstudio.exe" : remoteJoin(folder, "rookstudio");
     const auto quoted  = quoteFor(shell, shellPath(shell, program));
     const auto version = quoted ? client.run(shell == RemoteShell::Cmd ? *quoted + " --version"
                                                                        : viaSh(*quoted + " --version 2>/dev/null"),
@@ -233,12 +230,12 @@ bool startOnMachine(SshClient& client, const Machine& machine, const fs::path& l
     }
     const auto [installed, protocol] = parseVersion(version ? version->out : std::string());
     if (installed.empty()) {
-        error = trf("fastchess-gui is not installed on {}: Install it from Settings > Machines.", name);
+        error = trf("RookStudio is not installed on {}: Install it from Settings > Machines.", name);
         return false;
     }
     if (protocol != REMOTE_PROTOCOL) {
         error =
-            trf("fastchess-gui {} on {} cannot run tournaments for this window: Update it from Settings > "
+            trf("RookStudio {} on {} cannot run tournaments for this window: Update it from Settings > "
                 "Machines.",
                 installed, name);
         return false;

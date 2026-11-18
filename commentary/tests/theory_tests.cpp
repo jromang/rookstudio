@@ -70,6 +70,7 @@ TEST_CASE("theory: the moves many games played, then the first none had") {
     auto t = theoryOf(*ref.tree, ref.snapshot, line({"e2e4", "e7e5", "g1f3", "g8f6", "d2d4"}));
     CHECK(t.book_plies == 3);
     CHECK(t.novelty == 3 + 1);
+    CHECK(t.reached == 2);  // the two games of 2...Nf6, one that stopped there, one with 3.Nxe5
     // With fewer games asked of theory, 2...Nf6 is.
     TheoryOptions two;
     two.book_games = 2;
@@ -94,17 +95,20 @@ TEST_CASE("theory: a single game followed, the game itself, and another copy of 
     auto t = theoryOf(*ref.tree, ref.snapshot, line({"e2e4", "c7c5", "g1f3", "d7d6", "d2d4"}));
     CHECK(t.book_plies == 1);
     CHECK(t.novelty == 4);
+    CHECK(t.reached == 1);
     // The same game of 2020, another copy: its single game of the same year is itself, a novelty at 1...c5.
     TheoryOptions copy;
     copy.year = 2020;
     t         = theoryOf(*ref.tree, ref.snapshot, line({"e2e4", "c7c5", "g1f3", "d7d6", "d2d4"}), copy);
     CHECK(t.novelty == 1);
+    CHECK(t.reached == 5);  // 1.e4 in six games, the copy left out
     // The 1.d4 game reviewed from the database itself: no other game played 1.d4.
     TheoryOptions itself;
     itself.itself = 6;
     t             = theoryOf(*ref.tree, ref.snapshot, line({"d2d4", "d7d5", "c2c4", "e7e6", "b1c3"}), itself);
     CHECK(t.novelty == 0);
     CHECK(t.book_plies == 0);
+    CHECK(t.reached == 6);  // seven games, the one reviewed left out
 }
 
 TEST_CASE("theory: a position another game reached by other moves is no novelty") {

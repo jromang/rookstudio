@@ -84,6 +84,9 @@ struct Opening {
     std::size_t book_plies = 0;
     // The ply of the first move never played before, counted from 0, if any.
     std::optional<std::size_t> novelty;
+    // The database's games that had reached the novelty's position, the one reviewed and its copies left out: what
+    // "new" is measured against.
+    uint64_t reached = 0;
 };
 
 // Reviews the main line from whatever positions are analyzed so far.

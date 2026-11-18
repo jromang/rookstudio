@@ -440,9 +440,15 @@ void App::drawReviewAssistant() {
         if (t.book_plies < board_theory_.book_plies)
             line += " · " + trf("its games played on to {}, an error the engine sees",
                                 boardMoveLabel(static_cast<int>(board_theory_.book_plies)));
-        if (board_theory_.novelty)
-            line += " · " + trf("{} was new: no game had played it",
-                                boardMoveLabel(static_cast<int>(*board_theory_.novelty) + 1));
+        if (board_theory_.novelty) {
+            // Measured against the games that had come so far: a few, or thousands (M5, board 4).
+            const auto move = boardMoveLabel(static_cast<int>(*board_theory_.novelty) + 1);
+            const auto n    = board_theory_.reached;
+            line += " · " + (n == 0 ? trf("{} was new: no game had played it", move)
+                                    : trn("{} was new: the one game that had reached the position played another move",
+                                          "{} was new: none of the {} games that had reached the position played it", n,
+                                          move, ui::exactCount(n)));
+        }
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", line.c_str());
         ImGui::PopTextWrapPos();

@@ -28,15 +28,19 @@ Opening theoryOf(const study::Tree& tree, const std::shared_ptr<const study::Sna
         const auto coded = board.parseSan(line.positions()[ply].san(line.moves()[ply]));
         if (!coded) break;
         const int code = board.encode(*coded);
-        uint64_t games = 0;
+        uint64_t games = 0, reached = 0;
         if (const auto here = tree.at(snap, board.key())) {
             single.reset();
             // A position where every game ended: beyond the games, no novelty.
             if (std::all_of(here->moves.begin(), here->moves.end(),
                             [](const study::TreeMove& m) { return m.code == study::TreeMove::END; }))
                 break;
-            for (const auto& m : here->moves)
+            uint64_t total = 0;
+            for (const auto& m : here->moves) {
+                total += m.stats.games;
                 if (m.code == code) games = m.stats.games;
+            }
+            const uint64_t listed = games;
             if (games > 0 && games <= LISTED) {
                 auto with = tree.gamesWith(snap, board.key(), code);
                 if (options.itself)
@@ -44,12 +48,15 @@ Opening theoryOf(const study::Tree& tree, const std::shared_ptr<const study::Sna
                 games = with.size();
                 if (games == 1) single = study::TreeGame{with[0].id, with[0].ply + 1, code};
             }
+            // The games here: those of the other moves, and those of this one the game reviewed left.
+            reached = total - listed + games;
         } else if (single) {
             // Only that game is here: is the line still its moves?
             const auto m  = snap.gameMoves(single->id);
             const bool on = single->ply < m.plies && single->ply < m.codes.size() && board.codeCount() <= 256 &&
                             m.codes[single->ply] == code;
             games         = on ? 1 : 0;
+            reached       = 1;
             single->ply += 1;
         } else {
             break;  // the tree knows no game here
@@ -59,6 +66,7 @@ Opening theoryOf(const study::Tree& tree, const std::shared_ptr<const study::Sna
         if (games == 0 || another_copy) {
             if (another_copy) copy = single->id;
             out.novelty = ply;
+            out.reached = another_copy ? reached - 1 : reached;
             break;
         }
         if (games >= options.book_games) out.book_plies = ply + 1;

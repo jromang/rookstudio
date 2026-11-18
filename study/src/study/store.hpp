@@ -8,7 +8,8 @@
 //   Name.fcgdb/
 //     manifest.json   the segments, in order, with their games and new names
 //     seg-NNNNNN/     cols.bin (the header columns), moves.bin (the moves' codes), annex.bin (FEN, other tags, the
-//                     text of annotated or damaged games, clocks, evaluations), names.bin (the names it adds)
+//                     text of annotated or damaged games, clocks, evaluations), names.bin (the names it adds),
+//                     sig.bin (the games' signatures, for the searches; not in the first format's segments)
 
 #include <atomic>
 #include <cstdint>
@@ -16,6 +17,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -94,6 +96,8 @@ class Snapshot {
     };
     [[nodiscard]] NameIds rowIds(GameId id) const;
     [[nodiscard]] std::span<const uint8_t> moves(GameId id) const;
+    // What its moves tell the searches (signature.hpp): none in a segment of the first format.
+    [[nodiscard]] std::optional<GameSignature> signature(GameId id) const;
     // What tells a game from another: its event, site, round, players, date, start, moves and result
     // (duplicateKey()).
     [[nodiscard]] uint64_t key(GameId id) const;

@@ -6,6 +6,7 @@
 //   fcg-study-bench decode <database> [--threads N]
 //   fcg-study-bench crash <games> <database> [--kills N]          (not on Windows)
 //   fcg-study-bench tree <database> [--threads N] [--plies N] [--memory MB]
+//   fcg-study-bench search <database> [--threads N]
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -26,6 +27,7 @@
 #include <study/import.hpp>
 #include <study/query.hpp>
 #include <study/scan_board.hpp>
+#include <study/search.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
@@ -553,6 +555,119 @@ int runTree(const Args& a) {
     return 0;
 }
 
+// A search to its end, on every thread: its hits and its time in ms.
+std::pair<std::size_t, double> timed(const std::shared_ptr<const Snapshot>& snap, const SearchQuery& query,
+                                     int threads) {
+    const auto t    = Clock::now();
+    const auto hits = searchAll(snap, query, threads);
+    return {hits.size(), ms(t)};
+}
+
+int runSearch(const Args& a) {
+    if (a.words.size() != 2) return 2;
+    auto db           = Database::open(a.words[1]);
+    const auto snap   = db->snapshot();
+    const int threads = a.threads > 0 ? a.threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    std::printf("search %s: %llu games, %d threads\n", a.words[1].c_str(),
+                static_cast<unsigned long long>(snap->games()), threads);
+    ScanBoard start_board;
+    start_board.setFen(chess::constants::STARTPOS, false);
+
+    // Exact positions of random games, by how far into them.
+    std::mt19937_64 random(7);
+    for (const uint32_t ply : {8u, 16u, 24u, 40u, 60u, 90u}) {
+        std::vector<double> times;
+        std::size_t hits = 0;
+        int asked        = 0;
+        while (asked < 40) {
+            const GameId id = random() % snap->games();
+            const auto game = snap->gameMoves(id);
+            if (game.flags & (GAME_FEN | GAME_CHESS960) || game.plies < ply) continue;
+            ScanBoard board = start_board;
+            for (uint32_t i = 0; i < ply; ++i) board.play(board.decode(game.codes[i]));
+            const auto [found, took] = timed(snap, PositionQuery{board}, threads);
+            times.push_back(took);
+            hits += found;
+            ++asked;
+        }
+        std::printf("position after %u plies: %s; %.1f games found each\n", ply, spread(times).c_str(),
+                    static_cast<double>(hits) / asked);
+    }
+    // One position replayed in every game, without the signatures: what they save.
+    {
+        const GameId id = 12345 % snap->games();
+        const auto game = snap->gameMoves(id);
+        ScanBoard board = start_board;
+        for (uint32_t i = 0; i < std::min<uint32_t>(30, game.plies); ++i) board.play(board.decode(game.codes[i]));
+        const SearchQuery query = PositionQuery{board};
+        std::atomic<uint64_t> next{0}, found{0};
+        const auto t = Clock::now();
+        std::vector<std::thread> pool;
+        for (int k = 0; k < threads; ++k)
+            pool.emplace_back([&] {
+                for (uint64_t g; (g = next++) < snap->games();)
+                    if (searchGame(*snap, g, query, false)) ++found;
+            });
+        for (auto& th : pool) th.join();
+        const double without = ms(t);
+        const auto with      = timed(snap, query, threads);
+        std::printf("a position without the signatures: %.0f ms (%llu games); with them %.1f ms (%zu games)\n", without,
+                    static_cast<unsigned long long>(found.load()), with.second, with.first);
+    }
+    // Material.
+    MaterialQuery rooks;  // rook endings: a rook each, pawns, nothing else
+    for (const int side : {0, 5}) {
+        rooks.high[side + KNIGHT] = rooks.high[side + BISHOP] = rooks.high[side + QUEEN] = 0;
+        rooks.low[side + ROOK] = rooks.high[side + ROOK] = 1;
+    }
+    rooks.plies = 4;
+    MaterialQuery queenless;  // queens off, for 10 plies
+    queenless.high[QUEEN] = queenless.high[5 + QUEEN] = 0;
+    queenless.plies                                   = 10;
+    MaterialQuery bishops;  // the bishop pair against bishop and knight, no queens, 6 plies
+    bishops.low[BISHOP] = bishops.high[BISHOP] = 2;
+    bishops.high[KNIGHT]                       = 0;
+    bishops.low[5 + BISHOP] = bishops.high[5 + BISHOP] = 1;
+    bishops.low[5 + KNIGHT] = bishops.high[5 + KNIGHT] = 1;
+    bishops.high[QUEEN] = bishops.high[5 + QUEEN] = 0;
+    bishops.plies                                 = 6;
+    for (const auto& [name, query] : {std::pair<const char*, MaterialQuery>{"rook endings", rooks},
+                                      {"queens off", queenless},
+                                      {"bishop pair against bishop and knight", bishops}}) {
+        const auto [found, took] = timed(snap, query, threads);
+        std::printf("material, %s: %zu games in %.0f ms\n", name, found, took);
+    }
+    // Patterns.
+    PatternQuery castled;  // White castled short, the king's pawns unmoved
+    castled.men[WHITE_SIDE][KING] = uint64_t{1} << 6;
+    castled.men[WHITE_SIDE][ROOK] = uint64_t{1} << 5;
+    castled.men[WHITE_SIDE][PAWN] = (uint64_t{1} << 13) | (uint64_t{1} << 14) | (uint64_t{1} << 15);
+    PatternQuery maroczy;  // pawns on c4 and e4 against a pawn on d6, no white d-pawn on d4
+    maroczy.men[WHITE_SIDE][PAWN] = (uint64_t{1} << 26) | (uint64_t{1} << 28);
+    maroczy.men[BLACK_SIDE][PAWN] = uint64_t{1} << 43;
+    maroczy.empty                 = uint64_t{1} << 27;
+    PatternQuery corner;  // kings in opposite far corners: every game replayed to its end
+    corner.men[WHITE_SIDE][KING] = uint64_t{1} << 63;
+    corner.men[BLACK_SIDE][KING] = uint64_t{1} << 0;
+    for (const auto& [name, query] : {std::pair<const char*, PatternQuery>{"castled short, pawns unmoved", castled},
+                                      {"Maroczy bind", maroczy},
+                                      {"kings in far corners (every game to its end)", corner}}) {
+        const auto [found, took] = timed(snap, query, threads);
+        std::printf("pattern, %s: %zu games in %.0f ms\n", name, found, took);
+    }
+    // A cancel: how long the threads take to stop.
+    {
+        Search search(snap, corner, threads);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        const auto t = Clock::now();
+        search.cancel();
+        search.wait();
+        std::printf("cancel: stopped in %.2f ms, %llu games searched by then\n", ms(t),
+                    static_cast<unsigned long long>(search.searched()));
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -567,6 +682,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "query") rc = runQuery(a);
         if (a.words[0] == "decode") rc = runDecode(a);
         if (a.words[0] == "tree") rc = runTree(a);
+        if (a.words[0] == "search") rc = runSearch(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

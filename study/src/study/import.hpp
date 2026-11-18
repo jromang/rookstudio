@@ -8,10 +8,13 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include "signature.hpp"
 
 namespace fcg::study {
 
@@ -33,6 +36,8 @@ struct ImportedGame {
     std::vector<int32_t> clocks;  // [%clk] after each ply, in milliseconds, -1 when none; empty when none at all
     std::vector<int16_t> evals;   // [%eval] after each ply, centipawns for White, mates ±(30000 - moves); NO_EVAL none
     static constexpr int16_t NO_EVAL = -32768;
+    // What its moves tell the searches, made as they are read; a database makes it when it is missing.
+    std::optional<GameSignature> signature;
 };
 
 // One game's text into a game. False when it holds no game.

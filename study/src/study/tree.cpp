@@ -611,7 +611,7 @@ class Builder {
     void closeNodes(const std::vector<std::size_t>& made) {
         std::size_t total = 0;
         for (std::size_t p = 0; p < made.size(); ++p) {
-            std::memmove(nodes_.data() + total, nodes_.data() + node_at_[p], made[p] * sizeof(Node));
+            if (made[p] > 0) std::memmove(nodes_.data() + total, nodes_.data() + node_at_[p], made[p] * sizeof(Node));
             total += made[p];
         }
         nodes_.resize(total);

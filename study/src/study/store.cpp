@@ -10,9 +10,11 @@
 #include <memory>
 #include <stdexcept>
 
+#include <chess.hpp>
 #include <json.hpp>
 
 #include "mapped_file.hpp"
+#include "scan_board.hpp"
 
 #ifndef _WIN32
 #    include <fcntl.h>
@@ -26,7 +28,10 @@ namespace fs = std::filesystem;
 namespace {
 
 constexpr std::array<char, 8> MAGIC{'F', 'C', 'G', 'S', 'E', 'G', '1', '\0'};
-constexpr uint32_t VERSION        = 1;
+constexpr uint32_t VERSION        = 2;  // 2: sig.bin, the games' signatures
+constexpr std::size_t SIG_BYTES   = 24;
+constexpr uint8_t SIG_KNOWN       = 1;
+constexpr uint8_t SIG_PROMOTED    = 2;
 constexpr const char* MANIFEST    = "manifest.json";
 constexpr std::size_t HEADER_SIZE = 32;
 
@@ -165,7 +170,8 @@ class Segment {
         const auto* c = cols_.data();
         if (cols_.size() < HEADER_SIZE || std::memcmp(c, MAGIC.data(), MAGIC.size()) != 0)
             throw std::runtime_error(dir.string() + ": not a segment");
-        if (readAt<uint32_t>(c, 8, 0) != VERSION) throw std::runtime_error(dir.string() + ": a newer format");
+        version_ = readAt<uint32_t>(c, 8, 0);
+        if (version_ > VERSION) throw std::runtime_error(dir.string() + ": a newer format");
         games_      = readAt<uint32_t>(c, 12, 0);
         name_count_ = readAt<uint32_t>(c, 16, 0);
         if (games_ != expected_games || name_count_ != expected_names)
@@ -182,6 +188,11 @@ class Segment {
         }
         if (name_offsets_.size() != name_count_ + std::size_t{1})
             throw std::runtime_error(dir.string() + ": damaged names");
+        if (version_ >= 2) {
+            sig_ = MappedFile(dir / "sig.bin");
+            if (sig_.size() != std::size_t{games_} * SIG_BYTES)
+                throw std::runtime_error(dir.string() + ": damaged signatures");
+        }
     }
 
     [[nodiscard]] uint32_t games() const noexcept { return games_; }
@@ -202,9 +213,23 @@ class Segment {
         const auto from = value<uint64_t>(ANNEX, i), to = value<uint64_t>(ANNEX, i + 1);
         return {annex_.data() + from, static_cast<std::size_t>(to - from)};
     }
+    [[nodiscard]] std::optional<GameSignature> signature(std::size_t i) const {
+        if (!sig_.data()) return std::nullopt;  // a segment of the first format
+        const uint8_t* p = sig_.data() + i * SIG_BYTES;
+        if (!(p[21] & SIG_KNOWN)) return std::nullopt;
+        GameSignature g;
+        std::memcpy(g.home.data(), p, 16);
+        for (int j = 0; j < 5; ++j) {
+            g.material[2 * j]     = p[16 + j] & 0x0F;
+            g.material[2 * j + 1] = p[16 + j] >> 4;
+        }
+        g.promoted = (p[21] & SIG_PROMOTED) != 0;
+        return g;
+    }
 
    private:
-    MappedFile cols_, moves_, annex_, names_;
+    MappedFile cols_, moves_, annex_, names_, sig_;
+    uint32_t version_    = 0;
     uint32_t games_      = 0;
     uint32_t name_count_ = 0;
     std::array<std::size_t, COLUMNS + 1> at_{};
@@ -379,6 +404,11 @@ uint64_t Snapshot::key(GameId id) const {
 std::span<const uint8_t> Snapshot::moves(GameId id) const {
     const auto [segment, i] = locate(id);
     return segment->moves(i);
+}
+
+std::optional<GameSignature> Snapshot::signature(GameId id) const {
+    const auto [segment, i] = locate(id);
+    return segment->signature(i);
 }
 
 ImportedGame Snapshot::game(GameId id) const {
@@ -608,7 +638,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
             const std::size_t n     = std::min(SEGMENT_GAMES, games.size() - from);
             const auto names_before = added.size();
             const auto at           = layout(n);
-            std::string cols(at[COLUMNS], '\0'), moves, annex;
+            std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
             std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
             const auto put32 = [&](std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, 4); };
             const auto put   = [&](Column column, std::size_t i, auto v) {
@@ -673,6 +703,22 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
                 put(KEY, k, keys[from + k]);
                 put(MOVES, k, static_cast<uint64_t>(moves.size()));
                 moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
+                auto signature = g.signature;
+                if (!signature) {
+                    ScanBoard start;
+                    if (start.setFen(g.start_fen.empty() ? std::string_view(chess::constants::STARTPOS)
+                                                         : std::string_view(g.start_fen),
+                                     g.chess960))
+                        signature = signatureOf(start, g.moves, g.plies);
+                }
+                if (signature) {
+                    char* out = sig.data() + k * SIG_BYTES;
+                    std::memcpy(out, signature->home.data(), 16);
+                    for (int j = 0; j < 5; ++j)
+                        out[16 + j] = static_cast<char>((signature->material[2 * j] & 0x0F) |
+                                                        (std::min<uint8_t>(signature->material[2 * j + 1], 15) << 4));
+                    out[21] = static_cast<char>(SIG_KNOWN | (signature->promoted ? SIG_PROMOTED : 0));
+                }
                 put(ANNEX, k, static_cast<uint64_t>(annex.size()));
                 uint8_t parts = 0;
                 if (!g.start_fen.empty()) parts |= ANNEX_FEN;
@@ -720,6 +766,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
             writeFile(tmp / "moves.bin", moves);
             writeFile(tmp / "annex.bin", annex);
             writeFile(tmp / "names.bin", names_text);
+            writeFile(tmp / "sig.bin", sig);
             syncFolder(tmp);
             step("rename segment");
             fs::rename(tmp, dir_ / name, ec);

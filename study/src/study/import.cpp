@@ -191,6 +191,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
         out.text    = keptText(text);
         return true;
     }
+    SignatureMaker signature(board);
     int depth    = 0;
     bool stopped = false;
     for (; word.kind != PgnToken::End && word.kind != PgnToken::Result && word.kind != PgnToken::Tag;
@@ -211,6 +212,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
                 const int code = board.encode(*move);
                 if (board.codeCount() > 256) out.moves.push_back(static_cast<uint8_t>(code >> 8));
                 out.moves.push_back(static_cast<uint8_t>(code & 0xFF));
+                signature.before(board, *move, out.plies);
                 board.play(*move);
                 ++out.plies;
                 break;
@@ -230,6 +232,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
                 break;
         }
     }
+    out.signature = signature.finish(board);
     if (!out.clocks.empty()) out.clocks.resize(out.plies, -1);
     if (!out.evals.empty()) out.evals.resize(out.plies, ImportedGame::NO_EVAL);
     if (out.annotated || out.damaged) out.text = keptText(text);

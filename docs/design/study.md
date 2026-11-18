@@ -45,6 +45,7 @@ Name.fcgdb/
     moves.bin     the move codes, one byte a ply
     annex.bin     what only some games have
     names.bin     the names this segment adds
+    sig.bin       the games' signatures, for the searches (not in the first format's segments)
 ```
 
 ### Columns
@@ -92,6 +93,27 @@ it with no query per page. A filter folds each name once (letter case and Latin 
 word it looks for, then checks each game in a few operations on its columns, on all cores. A sort reads one column,
 names by their rank in alphabetical order, and sorts it four bytes at a time (stable; descending without reversing
 the games of one key).
+
+## Signatures
+
+`sig.bin` holds 24 bytes a game: for each pawn's home square, the first ply after which its pawn is gone (255: still
+there, or gone after ply 254), the material at the end (4 bits a count), and whether a pawn was promoted. A pawn never
+comes back to its home square, and a side's pawns and men all told only go down (each kind too, without promotions):
+the pawns a position has on and off their squares bound the plies at which a game can reach it, and its material
+whether the game ever has as much. The importer makes the signatures as it reads the moves (4 % more time, 282 MB for
+11.7 M games); a game added without one gets it from its codes. A database made before them has none, and its games
+are searched by replaying them whole.
+
+## Searches
+
+`Search` looks through a snapshot's games on every core, a thread taking 4 096 games at a time, its hits in the order
+of the games as they come; a cancel stops it between two games. Three queries:
+
+- a position exactly (men, side to move, castling rights, en passant): the signature's plies, then a replay up to them;
+- material: counts within bounds, for a number of plies in a row (an exchange under way is not a material);
+- a pattern: men on squares, empty squares, and a side's pawns exactly those given.
+
+The tests compare each with a replay of every ply of every game, signatures unused.
 
 ## Opening tree
 
@@ -160,6 +182,7 @@ build/fcg-study-bench query <database>                         # open, first row
 build/fcg-study-bench decode <database>                        # every game replayed from its codes
 build/fcg-study-bench crash <games> <database> [--kills N]     # imports killed (SIGKILL) at random moments
 build/fcg-study-bench tree <database> [--plies N] [--memory MB] # the opening tree built, then asked
+build/fcg-study-bench search <database>                        # positions, material, patterns, a cancel
 ```
 
 ### Results
@@ -178,7 +201,9 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 | Imports killed (SIGKILL) at 1 000 random moments | the database always reopens | always reopened, every game replayed, nothing left over; then an import not killed has every game |
 | Opening tree, warm | ≤ 5 ms | 1 µs median, 0.07 ms at most (20 000 positions of random games within 30 plies, and the most played line to 40 plies) |
 | Opening tree, built | — | 15.7 s on 32 threads, 28.5 s on 8 (8 passes); 1.7 GB of its own at most; 537 MB on disk |
-| Position search; pattern search | ≤ 1 s; ≤ 4 s | with the searches (#15) |
+| Position search | ≤ 1 s | 13 to 26 ms median by depth, 0.2 s at most; on 8 threads 27 to 61 ms, 0.6 s at most (240 positions of random games); without the signatures 1.3 s (3.3 s on 8) |
+| Material and pattern search | ≤ 4 s | material 0.3 to 0.7 s, patterns 0.25 to 1.34 s (every game replayed whole); on 8 threads 0.6 to 3.5 s |
+| A search cancelled | ≤ 50 ms | 0.2 ms |
 | A tournament beside an import | no loss on time | with the import's place among the tasks (#13) |
 
 - On disk, the 11.7 M games take 2.16 GB (184 bytes a game); the commercial program's own files take 12.15 GB.

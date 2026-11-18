@@ -46,6 +46,7 @@ std::vector<ImportedGame> randomGames(std::size_t n, uint32_t seed) {
         g.plies     = static_cast<uint32_t>(random() % 150);
         g.annotated = random() % 7 == 0;
         g.moves.assign(g.plies, 0);
+        g.signature = GameSignature{};  // moves of no game: what they would tell the searches is not looked at
         g.text = g.annotated ? "{a comment}" : "";
     }
     return games;

@@ -5,6 +5,7 @@
 //   fcg-study-bench query <database> [--threads N]
 //   fcg-study-bench decode <database> [--threads N]
 //   fcg-study-bench crash <games> <database> [--kills N]          (not on Windows)
+//   fcg-study-bench tree <database> [--threads N] [--plies N] [--memory MB]
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -26,6 +27,7 @@
 #include <study/query.hpp>
 #include <study/scan_board.hpp>
 #include <study/store.hpp>
+#include <study/tree.hpp>
 
 #ifndef _WIN32
 #    include <signal.h>
@@ -95,6 +97,8 @@ struct Args {
     bool keep_duplicates = false;
     bool quiet           = false;
     int kills            = 200;
+    uint32_t plies       = TREE_PLIES;
+    std::size_t memory   = 2048;  // MB
 };
 
 Args parse(int argc, char** argv) {
@@ -112,6 +116,10 @@ Args parse(int argc, char** argv) {
             a.threads = std::stoi(value());
         } else if (word == "--commit") {
             a.commit = std::stoul(value());
+        } else if (word == "--plies") {
+            a.plies = static_cast<uint32_t>(std::stoul(value()));
+        } else if (word == "--memory") {
+            a.memory = std::stoul(value());
         } else if (word == "--kills") {
             a.kills = std::stoi(value());
         } else if (word == "--keep-duplicates") {
@@ -456,6 +464,95 @@ int runCrash(const Args& a, const char* self) {
 }
 #endif
 
+// Latencies, in ms: their median, 99th percentile and largest.
+std::string spread(std::vector<double> v) {
+    if (v.empty()) return "none";
+    std::sort(v.begin(), v.end());
+    char text[96];
+    std::snprintf(text, sizeof text, "median %.3f, p99 %.3f, max %.3f ms", v[v.size() / 2], v[v.size() * 99 / 100],
+                  v.back());
+    return text;
+}
+
+int runTree(const Args& a) {
+    if (a.words.size() != 2) return 2;
+    auto db         = Database::open(a.words[1]);
+    const auto snap = db->snapshot();
+    TreeOptions options;
+    options.threads = a.threads;
+    options.plies   = a.plies;
+    options.memory  = a.memory << 20;
+    TreeProgress progress;
+    std::atomic<bool> cancel{false};
+    const auto start  = Clock::now();
+    const auto built  = buildTree(*db, *snap, options, progress, cancel);
+    const double took = seconds(start);
+    if (!built.error.empty()) {
+        std::fprintf(stderr, "tree: %s\n", built.error.c_str());
+        return 1;
+    }
+    const auto tree = Tree::open(db->folder());
+    uint64_t bytes  = 0;
+    for (const auto& entry : fs::directory_iterator(db->folder() / tree->folderName())) bytes += entry.file_size();
+    std::printf(
+        "tree %s: %llu games, %u plies: %llu positions in %.1f s (%u passes, %.0f MB at most), %.0f MB on disk\n",
+        a.words[1].c_str(), static_cast<unsigned long long>(built.games), tree->plies(),
+        static_cast<unsigned long long>(built.positions), took, built.passes, peakMb(), bytes / 1e6);
+
+    // The main line: from the start, the most played move each time; the first walk cold, the second warm.
+    for (const char* walk : {"first", "again"}) {
+        ScanBoard board;
+        board.setFen(chess::constants::STARTPOS, false);
+        std::vector<double> times;
+        std::string line;
+        for (int ply = 0; ply < 40; ++ply) {
+            const auto t      = Clock::now();
+            const auto answer = tree->at(*snap, board.key());
+            times.push_back(ms(t));
+            if (!answer || answer->moves.empty() || answer->moves[0].code == TreeMove::END) break;
+            if (ply < 12) line += std::to_string(answer->total.games) + " ";
+            board.play(board.decode(answer->moves[0].code));
+        }
+        std::printf("main line (%s): %zu positions, %s; games along it: %s...\n", walk, times.size(),
+                    spread(times).c_str(), line.c_str());
+    }
+
+    // Positions of random games, within their first 30 plies.
+    std::mt19937_64 random(1);
+    std::vector<uint64_t> keys;
+    ScanBoard start_board;
+    start_board.setFen(chess::constants::STARTPOS, false);
+    while (keys.size() < 20000) {
+        const GameId id = random() % snap->games();
+        const auto game = snap->gameMoves(id);
+        if (game.flags & (GAME_FEN | GAME_CHESS960)) continue;
+        const uint32_t ply = static_cast<uint32_t>(random() % 31);
+        if (ply > game.plies) continue;
+        ScanBoard board = start_board;
+        for (uint32_t i = 0; i < ply; ++i) board.play(board.decode(game.codes[i]));
+        keys.push_back(board.key());
+    }
+    for (const char* pass : {"cold", "warm"}) {
+        std::vector<double> times, kept;
+        uint64_t found = 0, games = 0;
+        for (const auto key : keys) {
+            const auto t         = Clock::now();
+            const auto answer    = tree->at(*snap, key);
+            const double took_ms = ms(t);
+            times.push_back(took_ms);
+            if (answer) {
+                ++found;
+                games += answer->total.games;
+                kept.push_back(took_ms);
+            }
+        }
+        std::printf("random positions (%s): %zu, %llu kept (%.0f games each on average); all %s; kept %s\n", pass,
+                    keys.size(), static_cast<unsigned long long>(found), found ? double(games) / found : 0.0,
+                    spread(times).c_str(), spread(kept).c_str());
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -469,6 +566,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "import") rc = runImport(a);
         if (a.words[0] == "query") rc = runQuery(a);
         if (a.words[0] == "decode") rc = runDecode(a);
+        if (a.words[0] == "tree") rc = runTree(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

@@ -93,6 +93,61 @@ word it looks for, then checks each game in a few operations on its columns, on 
 names by their rank in alphabetical order, and sorts it four bytes at a time (stable; descending without reversing
 the games of one key).
 
+## Opening tree
+
+`buildTree` makes a database's opening tree and `Tree` reads it: for a position, the games that reach it in their first
+60 plies (a build option), the moves they play from it and how those games ended. A game counts once in a position,
+where it reaches it first, with the move it plays from there.
+
+### What is kept
+
+Sorted by their moves, games make a trie: the games that open with the same moves follow one another, so the games
+that reach a position by one move order are a run of that order. A position two games or more reach is kept with its
+runs: one for each move order several games share, one for each game that reaches it by an order of its own (a
+transposition, also when only such games reach it). A position a single game reaches is not kept: the runs of the
+position before tell which game played the move that leads there. A position of 256 games or more keeps its moves'
+numbers (games, results, ratings, latest date); the others count their games when asked, 255 at most.
+
+```
+Name.fcgdb/
+  tree.json       {"format":"rookstudio-tree","version":1,"folder":"tree-NNNNNN","games":N,"plies":60,...}
+  tree-NNNNNN/    order.bin    the games' ids in the order of their moves (4 bytes a game)
+                  keys.bin     the kept positions' Polyglot keys, sorted (8 bytes a position)
+                  index.bin    where every 32nd position's record starts
+                  records.bin  a position's games, its runs (first game, length, depth), its moves' numbers if popular
+```
+
+### The build
+
+1. The games sorted by their move codes (one byte a ply, so the order of a trie), and how many codes each shares with
+   the game before it.
+2. Every game replayed along that order from the board of the game before, where the two part: the positions games
+   share by the same moves, and their runs.
+3. The positions a game reaches by moves of its own: whether another game reaches them too is only known once all are
+   counted, so they are gathered and sorted by key, in passes over parts of the keys that fit in the memory given
+   (2 GB by default), each pass replaying the games.
+4. The records written in key order into `tree-NNNNNN.tmp`, synced, renamed, then named in `tree.json`, whose
+   replacement is the commit. The tree before is removed (on Windows, by a later build if it is still mapped).
+
+The tests compare every answer with a recount that replays each game (transpositions, repetitions, duplicates, games
+of their own start), and builds in one pass and in many, on one thread and on several, give the same files.
+
+### Novelties
+
+`novelty` walks a line from the start: a kept position is reached by two games or more; past the last one, the runs
+of the position before give the single game that played the line's move, followed while the line is its moves. The
+first position no game is seen to reach is the novelty. A position a single game reaches by other moves than the
+line's is not seen: the position search (#15) confirms a novelty before a comment states it. Among random lines that
+cross many move orders, a fifth of the novelties came earlier than a recount for that reason.
+
+### Left out, measured
+
+- A Bloom filter over positions a single game reaches, for an instant novelty mark: the reference database has 395 M
+  of them within 60 plies, 0.5 GB at 1 % of false answers, as much as the tree itself.
+- Delta generations for the games added after a build: a whole build of the 11.7 M games takes 16 s (29 s on 8
+  threads), a smaller database seconds. Until a new build is done, the tree answers for the games it covers
+  (`Tree::games()`).
+
 ## Benchmark
 
 `fcg-study-bench` measures the store on real files. It is built with `-DFCG_STUDY_BENCH=ON` and never runs in the CI:
@@ -104,6 +159,7 @@ build/fcg-study-bench import <games> <database> [--threads N]   # a database tha
 build/fcg-study-bench query <database>                         # open, first rows, sorts, filters
 build/fcg-study-bench decode <database>                        # every game replayed from its codes
 build/fcg-study-bench crash <games> <database> [--kills N]     # imports killed (SIGKILL) at random moments
+build/fcg-study-bench tree <database> [--plies N] [--memory MB] # the opening tree built, then asked
 ```
 
 ### Results
@@ -120,7 +176,8 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 | Sort of 11.7 M games | ≤ 1 s | 75 to 255 ms (the first sort by a name ranks the names) |
 | Filters | — | 5 to 14 ms |
 | Imports killed (SIGKILL) at 1 000 random moments | the database always reopens | always reopened, every game replayed, nothing left over; then an import not killed has every game |
-| Opening tree, warm | ≤ 5 ms | with the tree index (#23) |
+| Opening tree, warm | ≤ 5 ms | 1 µs median, 0.07 ms at most (20 000 positions of random games within 30 plies, and the most played line to 40 plies) |
+| Opening tree, built | — | 15.7 s on 32 threads, 28.5 s on 8 (8 passes); 1.7 GB of its own at most; 537 MB on disk |
 | Position search; pattern search | ≤ 1 s; ≤ 4 s | with the searches (#15) |
 | A tournament beside an import | no loss on time | with the import's place among the tasks (#13) |
 
@@ -131,6 +188,9 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 - Memory, importing: at most 1.5 GB on 8 threads, 1.95 GB on 32 (14.4 s); commits of 131 072 games instead of
   262 144 save 240 MB and double the segments.
 - The Lichess month: 0.4 s, 38.5 MB on disk, 5 470 names.
+- The opening tree keeps 15.01 M positions of the 11.7 M games (60 plies): 5.1 M that games share by the same moves
+  (1.55 M of them by several orders), 9.9 M that only games' own moves share. Followed to 40 plies it keeps 14.77 M,
+  to 80 plies 15.05 M; what grows is the work of the build (258 M, 446 M, 578 M positions of single games' moves).
 
 ### What the benchmark changed
 

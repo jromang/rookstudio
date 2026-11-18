@@ -47,6 +47,8 @@ class ScanBoard {
     [[nodiscard]] uint64_t key() const noexcept { return key_; }  // Polyglot's
     [[nodiscard]] int sideToMove() const noexcept { return stm_; }
     [[nodiscard]] int fullMove() const noexcept { return fullmove_; }
+    // The plies since the last capture or pawn move: a position can only be met again within them.
+    [[nodiscard]] int halfmoveClock() const noexcept { return halfmove_; }
     // What stands on a square: 0 nothing, else 1 + kind + 6 for a black piece.
     [[nodiscard]] uint8_t on(int square) const noexcept { return board_[square]; }
     [[nodiscard]] uint64_t pieces(int side, int kind) const noexcept { return bb_[side][kind]; }

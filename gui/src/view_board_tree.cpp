@@ -518,8 +518,10 @@ void App::drawBoardTree() {
     }
     tree_source_       = std::clamp(tree_source_, 0, count - 1);
     const int books_at = together + static_cast<int>(databases.size());
+    std::size_t joined = 0;
+    for (const auto& [name, i] : databases) joined += tree_left_.count(s.entries()[i].folder) ? 0 : 1;
     for (int i = 0; i < count; ++i) {
-        const auto label = i < together   ? trf("My databases · {}", databases.size())
+        const auto label = i < together   ? trf("My databases · {}", joined)
                            : i < books_at ? databases[static_cast<std::size_t>(i - together)].first
                                           : books[static_cast<std::size_t>(i - books_at)]->name;
         if (i > 0) ImGui::SameLine();
@@ -530,6 +532,25 @@ void App::drawBoardTree() {
         }
         if (ImGui::Button(fmt::format("{}##tree_source{}", label, i).c_str())) tree_source_ = i;
         if (on) ImGui::PopStyleColor(2);
+        // My databases: the right button chooses those it adds together (M3, board 3).
+        if (i < together) {
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("The databases together; the right button chooses them"));
+            if (ImGui::BeginPopupContextItem("##my_databases")) {
+                ImGui::TextDisabled("%s", TR("Added together"));
+                for (const auto& [name, index] : databases) {
+                    const auto& folder = s.entries()[index].folder;
+                    bool in            = !tree_left_.count(folder);
+                    if (ImGui::Checkbox(fmt::format("{}##joined_{}", name, folder.string()).c_str(), &in)) {
+                        if (in)
+                            tree_left_.erase(folder);
+                        else
+                            tree_left_.insert(folder);
+                    }
+                }
+                ImGui::EndPopup();
+            }
+        }
     }
 
     // A database whose tree is being built: its progress, and Cancel.
@@ -553,7 +574,8 @@ void App::drawBoardTree() {
     tree_db_ =
         !book && !combined ? static_cast<int>(databases[static_cast<std::size_t>(tree_source_ - together)].second) : -1;
     std::string counts;
-    for (const auto& [name, i] : databases) counts += fmt::format("{},", s.facts(i).games);
+    for (const auto& [name, i] : databases)
+        counts += fmt::format("{}{},", tree_left_.count(s.entries()[i].folder) ? "-" : "", s.facts(i).games);
     const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
     if (of != tree_rows_of_) {
         tree_rows_of_ = of;
@@ -570,6 +592,7 @@ void App::drawBoardTree() {
             std::map<int, std::string> shares;
             for (const auto& [name, i] : databases) {
                 if (!combined && static_cast<int>(i) != tree_db_) continue;
+                if (combined && tree_left_.count(s.entries()[i].folder)) continue;
                 const auto source = s.treeSource(i);
                 const auto one =
                     source && source->tree ? source->tree->at(*source->snapshot, scan.key()) : std::nullopt;

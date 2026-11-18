@@ -663,6 +663,7 @@ class App {
     std::vector<TreeRow> tree_rows_;
     std::string tree_rows_of_;  // the position and the source the rows are of
     int tree_db_      = -1;     // the database the Tree tab shows (the shelf's index); -1: My databases, or a book
+    std::set<std::filesystem::path> tree_left_;  // the databases My databases leaves out (folders), by its menu
     int tree_row_     = -1;     // the row chosen with Up and Down: Enter plays it, * stars it; -1 none
     bool tree_scroll_ = false;  // the row chosen brought into view
     void drawTreeNovelty(std::size_t index);  // where the game's line leaves the database, under the tree's summary

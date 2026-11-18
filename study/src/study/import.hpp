@@ -47,6 +47,15 @@ bool readImportedGame(std::string_view text, ImportedGame& out);
 // not be read), else its tags, its moves in SAN and its result.
 [[nodiscard]] std::string importedPgn(const ImportedGame& game);
 
+// Why a damaged game's moves stop where they do: the move its text has there, which could not be read or is not
+// legal (empty when the text ends there), or a start position (FEN) that is not one, no move being kept then.
+struct Damage {
+    std::string move;        // as written, its glyphs left out
+    bool cut       = false;  // the move is the text's last word: the text was cut in it (the end of a file)
+    bool bad_start = false;
+};
+[[nodiscard]] Damage damageOf(const ImportedGame& game);
+
 // The games of a piece of text, each with its tags and moves: where they start and end.
 [[nodiscard]] std::vector<std::string_view> splitGames(std::string_view text);
 

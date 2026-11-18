@@ -45,9 +45,10 @@ std::vector<ImportedGame> randomGames(std::size_t n, uint32_t seed) {
                                            std::to_string(random() % 10) + std::to_string(random() % 10));
         g.plies     = static_cast<uint32_t>(random() % 150);
         g.annotated = random() % 7 == 0;
+        g.damaged   = random() % 11 == 0;
         g.moves.assign(g.plies, 0);
         g.signature = GameSignature{};  // moves of no game: what they would tell the searches is not looked at
-        g.text = g.annotated ? "{a comment}" : "";
+        g.text      = g.annotated ? "{a comment}" : g.damaged ? "1. e4 e5 2. Ke3" : "";
     }
     return games;
 }
@@ -71,6 +72,7 @@ std::vector<GameId> naive(const Snapshot& snap, const Filter& f, SortBy sort, bo
         const auto r = snap.row(id);
         if (f.result && r.result != f.result) continue;
         if (f.annotated && !(r.flags & GAME_ANNOTATED)) continue;
+        if (f.damaged && !(r.flags & GAME_DAMAGED)) continue;
         if (f.elo_min && (r.white_elo < f.elo_min || r.black_elo < f.elo_min)) continue;
         if ((f.date_from || f.date_to) &&
             (r.date == 0 || (f.date_from && r.date < f.date_from) || (f.date_to && r.date > f.date_to)))
@@ -147,7 +149,7 @@ TEST_CASE("query: views equal a naive filter and sort, whatever the cores") {
     const auto snap = db->snapshot();
     REQUIRE(snap->games() == 5000);
 
-    std::vector<Filter> filters(9);
+    std::vector<Filter> filters(10);
     filters[1].words     = "carlsen";
     filters[2].player    = "rene levy";  // accents left out
     filters[3].white     = "Polgar Judit";
@@ -160,6 +162,8 @@ TEST_CASE("query: views equal a naive filter and sort, whatever the cores") {
     filters[7].annotated = true;
     filters[8].words     = "wijk open 1";
     filters[8].black     = "fischer";
+    filters[9].damaged   = true;
+    filters[9].result    = '0';
 
     for (std::size_t f = 0; f < filters.size(); ++f) {
         for (const auto sort : {SortBy::Number, SortBy::White, SortBy::Black, SortBy::Event, SortBy::Round,

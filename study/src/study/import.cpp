@@ -157,6 +157,39 @@ std::string keptText(std::string_view text) {
 
 }  // namespace
 
+Damage damageOf(const ImportedGame& game) {
+    Damage damage;
+    ScanBoard board;
+    if (!board.setFen(
+            game.start_fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(game.start_fen),
+            game.chess960)) {
+        damage.bad_start = true;
+        return damage;
+    }
+    // The moves of its text outside the variations, as readImportedGame() went through them: the one after those kept.
+    PgnLexer lex(game.text);
+    auto word = lex.next();
+    while (word.kind == PgnToken::Tag) word = lex.next();
+    int depth     = 0;
+    uint32_t seen = 0;
+    for (; word.kind != PgnToken::End && word.kind != PgnToken::Result && word.kind != PgnToken::Tag;
+         word = lex.next()) {
+        if (word.kind == PgnToken::VariationStart) {
+            ++depth;
+        } else if (word.kind == PgnToken::VariationEnd) {
+            if (depth > 0) --depth;
+        } else if (word.kind == PgnToken::San && depth == 0) {
+            if (seen == game.plies) {
+                damage.move = std::string(word.text);
+                damage.cut  = lex.next().kind == PgnToken::End;
+                break;
+            }
+            ++seen;
+        }
+    }
+    return damage;
+}
+
 bool readImportedGame(std::string_view text, ImportedGame& out) {
     out = ImportedGame{};
     PgnLexer lex(text);

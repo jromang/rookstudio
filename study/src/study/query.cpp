@@ -137,7 +137,7 @@ std::string foldText(std::string_view text) {
 
 bool Filter::empty() const noexcept {
     return words.empty() && white.empty() && black.empty() && player.empty() && date_from == 0 && date_to == 0 &&
-           elo_min == 0 && eco_from == 0 && eco_to == 0 && result == 0 && !annotated;
+           elo_min == 0 && eco_from == 0 && eco_to == 0 && result == 0 && !annotated && !damaged;
 }
 
 View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& filter, SortBy sort, bool descending,
@@ -176,6 +176,7 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
             const auto row = snapshot->numbers(id);
             if (filter.result && row.result != filter.result) continue;
             if (filter.annotated && !(row.flags & GAME_ANNOTATED)) continue;
+            if (filter.damaged && !(row.flags & GAME_DAMAGED)) continue;
             if (filter.elo_min && (row.white_elo < filter.elo_min || row.black_elo < filter.elo_min)) continue;
             if ((filter.date_from || filter.date_to) &&
                 (row.date == 0 || (filter.date_from && row.date < filter.date_from) ||

@@ -246,7 +246,33 @@ class App {
     void drawDatabases();
     DatabaseShelf& shelf();  // made at its first use
     // `file` imported into database `index`, or into a new database named after it for -1.
-    void importIntoDatabase(int index, const std::filesystem::path& file);
+    // `pasted`: games of the clipboard written to a file of the program's, removed once imported.
+    void importIntoDatabase(int index, const std::filesystem::path& file, bool pasted = false);
+    void pasteGamesInto(int index);  // the clipboard's games imported into a database
+    // The last import's outcome (mockup M1, board 4), said on its database until another starts or it is closed: what
+    // happened, what was kept, and the gesture that mends it.
+    struct ImportStart {
+        std::filesystem::path folder;
+        uint64_t games = 0, bytes = 0;  // the database's before it
+        bool pasted = false;
+    };
+    std::optional<ImportStart> db_import_start_;
+    struct ImportOutcome {
+        std::filesystem::path folder, file;
+        study::DatabaseImport report;
+        bool pasted     = false;
+        bool disk_full  = false;
+        uint64_t needed = 0;  // the bytes the rest of the file would take, roughly, when the disk was full
+        struct Damaged {
+            study::GameId id = 0;
+            std::string why;
+        };
+        std::vector<Damaged> damaged;  // the first few
+    };
+    std::optional<ImportOutcome> db_outcome_;
+    void drawImportOutcome(std::size_t index);
+    void drawEmptyDatabase(std::size_t index);  // a database of the user's with no game: what to put in it
+    int db_named_frame_ = -1;                   // the frame a name was given with Enter: not the list's Enter too
     void pollDatabases();  // each frame: an import's end said
     std::unique_ptr<DatabaseShelf> shelf_;
     int db_selected_ = -1;
@@ -340,6 +366,7 @@ class App {
             return squares;
         }();
         std::array<bool, 2> only_pawns{};
+        bool damaged = false;  // only the games a move of which could not be read
     };
     static constexpr int8_t kEmptySquare = 12;
     SearchFields db_search_;

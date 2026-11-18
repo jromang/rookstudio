@@ -135,6 +135,9 @@ TEST_CASE("import: a game's tags, moves, clocks and evaluations, and what makes 
     CHECK(broken.plies == 2);
     CHECK(broken.text == unixLines(games[4]));
 
+    CHECK(damageOf(broken).move == "Ke3");  // not a king's move from e1
+    CHECK(!damageOf(broken).bad_start);
+
     ImportedGame anonymous;
     REQUIRE(readImportedGame(games[5], anonymous));
     CHECK(anonymous.plies == 4);
@@ -206,4 +209,26 @@ TEST_CASE("import: cancelled between batches, and a file that cannot be read") {
     std::ofstream(cut, std::ios::binary).write(bytes.data(), static_cast<std::streamsize>(bytes.size() / 2));
     const auto damaged = importFile(cut, 2);
     CHECK(!damaged.report.error.empty());
+}
+
+TEST_CASE("import: why a damaged game's moves stop") {
+    ImportedGame cut;
+    REQUIRE(readImportedGame("[Event \"Cut\"]\n\n1. e4 {fine} (1. d4 d5) e5 2. Nf3 Nc6 3. Bb", cut));
+    CHECK(cut.damaged);
+    CHECK(cut.plies == 4);
+    CHECK(damageOf(cut).move == "Bb");  // a move cut by the end of the file
+    CHECK(damageOf(cut).cut);
+
+    ImportedGame glyph;
+    REQUIRE(readImportedGame("[Event \"Glyph\"]\n\n1. e4 e5 2. Qxf7?! *", glyph));
+    CHECK(glyph.damaged);
+    CHECK(damageOf(glyph).move == "Qxf7");
+    CHECK(!damageOf(glyph).cut);  // the result follows it
+
+    ImportedGame position;
+    REQUIRE(readImportedGame("[Event \"FEN\"]\n[SetUp \"1\"]\n[FEN \"8/8/8 w - - 0 1\"]\n\n1. e4 *", position));
+    CHECK(position.damaged);
+    CHECK(position.plies == 0);
+    CHECK(damageOf(position).bad_start);
+    CHECK(damageOf(position).move.empty());
 }

@@ -7,9 +7,12 @@
 #include <iterator>
 #include <string>
 
+#include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
+
+#include <tour/files.hpp>
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -37,7 +40,7 @@ DatabaseShelf& App::shelf() {
     return *shelf_;
 }
 
-void App::importIntoDatabase(int index, const std::filesystem::path& file) {
+void App::importIntoDatabase(int index, const std::filesystem::path& file, bool pasted) {
     auto& s = shelf();
     if (index < 0 || index >= static_cast<int>(s.entries().size())) {
         try {
@@ -48,18 +51,100 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file) {
         }
     }
     db_selected_ = index;
-    if (!s.startImport(static_cast<std::size_t>(index), file))
+    // What the database had before: the games added, and how much more the rest would take if the disk fills up.
+    ImportStart start;
+    start.folder = s.entries()[static_cast<std::size_t>(index)].folder;
+    start.pasted = pasted;
+    if (const auto db = s.open(static_cast<std::size_t>(index))) start.games = db->snapshot()->games();
+    start.bytes = s.facts(static_cast<std::size_t>(index)).bytes;
+    if (!s.startImport(static_cast<std::size_t>(index), file)) {
         db_message_ = s.import() ? TR("An import runs already: one at a time.") : s.facts(index).error;
-    else
+    } else {
         db_message_.clear();
+        db_outcome_.reset();
+        db_import_start_ = std::move(start);
+    }
+}
+
+void App::pasteGamesInto(int index) {
+    char* clip             = SDL_GetClipboardText();
+    const std::string text = clip ? clip : "";
+    SDL_free(clip);
+    if (study::splitGames(text).empty()) {
+        db_message_ = TR("No game in the clipboard.");
+        return;
+    }
+    std::error_code ec;
+    const auto dir = storage_.root() / "pasted";
+    std::filesystem::create_directories(dir, ec);
+    const auto file = dir / fmt::format("pasted-{}.pgn", std::chrono::system_clock::now().time_since_epoch().count());
+    try {
+        tour::replaceFile(file, text);
+    } catch (const std::exception& e) {
+        db_message_ = e.what();
+        return;
+    }
+    importIntoDatabase(index, file, true);
 }
 
 void App::pollDatabases() {
     if (!shelf_) return;
     const auto* job = shelf_->import();
     if (!job) return;
-    const auto file = job->file.filename().string();
+    const auto file  = job->file.filename().string();
+    const auto path  = job->file;
+    const auto index = job->index;
+    const auto read = job->progress.bytes.load(), total = job->progress.total_bytes;
     if (const auto report = shelf_->finishedImport()) {
+        // The outcome, said on the database: the disk full and what the rest would take, the damaged games and why.
+        ImportOutcome o;
+        o.file           = path;
+        o.report         = *report;
+        const auto start = db_import_start_.value_or(ImportStart{});
+        o.pasted         = start.pasted;
+        if (index < shelf_->entries().size()) {
+            o.folder = shelf_->entries()[index].folder;
+            if (!report->error.empty()) {
+                std::error_code ec;
+                const auto space = std::filesystem::space(o.folder, ec);
+                o.disk_full      = !ec && space.available < (uint64_t{64} << 20);
+                const auto now   = shelf_->facts(index).bytes;
+                if (read > 0 && total > read && now > start.bytes)
+                    o.needed =
+                        static_cast<uint64_t>(static_cast<double>(total - read) *
+                                              static_cast<double>(now - start.bytes) / static_cast<double>(read));
+            }
+            if (report->read.damaged > 0)
+                if (const auto db = shelf_->open(index)) {
+                    const auto snap = db->snapshot();
+                    for (auto id = start.games; id < snap->games() && o.damaged.size() < 3; ++id) {
+                        if (!(snap->numbers(id).flags & study::GAME_DAMAGED)) continue;
+                        const auto game   = snap->game(id);
+                        const auto damage = study::damageOf(game);
+                        const auto kept   = (game.plies + 1) / 2;
+                        std::string why;
+                        if (damage.bad_start)
+                            why = TR("its start position (FEN) is not a position; kept without its moves");
+                        else if (damage.move.empty())
+                            why = trf("its text stops there; kept up to move {}", kept);
+                        else if (damage.cut)
+                            why = trf("its text is cut in « {}{}{} »; kept up to move {}", game.plies / 2 + 1,
+                                      game.plies % 2 ? "…" : ".", damage.move, kept);
+                        else if (kept == 0)
+                            why = trf("« {}.{} » is not a legal move; kept without its moves", 1, damage.move);
+                        else
+                            why = trf("« {}{}{} » is not a legal move; kept up to move {}", game.plies / 2 + 1,
+                                      game.plies % 2 ? "…" : ".", damage.move, kept);
+                        o.damaged.push_back({id, std::move(why)});
+                    }
+                }
+        }
+        if (o.pasted) {
+            std::error_code ec;
+            std::filesystem::remove(path, ec);
+        }
+        db_outcome_ = std::move(o);
+        db_import_start_.reset();
         if (!report->error.empty()) {
             db_message_ =
                 trf("Import stopped: {}. The games committed before stay; importing the file again adds the "
@@ -80,6 +165,92 @@ void App::pollDatabases() {
             db_message_ += ".";
         }
         Console::instance().add(db_message_, !report->error.empty());
+        db_message_.clear();  // said by the banner on the database
+    }
+}
+
+void App::drawEmptyDatabase(std::size_t index) {
+    ui::beginCard("db_empty");
+    ImGui::TextUnformatted(trf("« {} » has no game yet", shelf().entries()[index].name).c_str());
+    ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz or .zip file here, or:"));
+    if (ui::iconButton("db_empty_import", ui::Icon::Folder, TR("Import a file…"))) {
+        db_selected_ = static_cast<int>(index);
+        dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+    }
+    ImGui::SameLine();
+    if (ui::iconButton("db_empty_paste", ui::Icon::Paste, TR("Paste games"))) pasteGamesInto(static_cast<int>(index));
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", TR("The games of the clipboard (a PGN text) imported into it."));
+    ui::endCard();
+}
+
+void App::drawImportOutcome(std::size_t index) {
+    const auto& o    = *db_outcome_;
+    const auto name  = shelf().entries()[index].name;
+    const auto file  = o.pasted ? std::string(TR("the games pasted")) : o.file.filename().string();
+    const auto added = ui::exactCount(o.report.added);
+    ui::beginCard("db_outcome");
+    ImGui::PushTextWrapPos();
+    bool resume = false;
+    if (!o.report.error.empty()) {
+        if (o.disk_full) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("Import stopped: the disk is full."));
+            ImGui::TextUnformatted(
+                trf("The first {} games are in « {} », the database is intact.", added, name).c_str());
+            const auto rest =
+                (o.needed > 0 ? trf("About {} more is needed for the rest. ", formatBytes(o.needed)) : std::string()) +
+                TR("Once room is made, resuming the import adds only the missing games.");
+            ImGui::TextDisabled("%s", rest.c_str());
+        } else {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+                               trf("Import of {} stopped: {}.", file, o.report.error).c_str());
+            ImGui::TextDisabled("%s", trf("The {} games committed before stay; resuming the import adds only the "
+                                          "missing ones.",
+                                          added)
+                                          .c_str());
+        }
+        resume = !o.pasted && ImGui::Button(TR("Resume the import"));
+        ImGui::SameLine();
+        if (ImGui::Button(TR("Open the database's folder"))) ui::openPath(o.folder);
+    } else if (o.report.read.cancelled) {
+        ImGui::TextUnformatted(trf("Import of {} stopped at your request: {} games kept.", file, added).c_str());
+        ImGui::TextDisabled("%s", TR("Resuming it adds only the missing games."));
+        resume = !o.pasted && ImGui::Button(TR("Resume the import"));
+    } else {
+        const auto damaged = o.report.read.damaged;
+        ImGui::TextUnformatted(
+            (damaged > 0 ? trf("Import of {} done: {} games, {} of them damaged.", file, added, ui::exactCount(damaged))
+                         : trf("Import of {} done: {} games added.", file, added))
+                .c_str());
+        if (o.report.duplicates > 0)
+            ImGui::TextDisabled("%s", trn("{} game already there left out.", "{} games already there left out.",
+                                          o.report.duplicates, ui::exactCount(o.report.duplicates))
+                                          .c_str());
+        if (damaged > 0) {
+            ImGui::TextDisabled("%s", TR("Kept up to the move that cannot be read, their text kept as it was."));
+            for (const auto& d : o.damaged)
+                ImGui::BulletText("%s", trf("Game {}: {}.", ui::exactCount(d.id + 1), d.why).c_str());
+            if (damaged > o.damaged.size())
+                ImGui::TextDisabled("%s", trf("and {} more", ui::exactCount(damaged - o.damaged.size())).c_str());
+            if (ImGui::Button(TR("See them in the list"))) {
+                db_search_         = SearchFields{};
+                db_search_.damaged = true;  // said by the search panel, open on its headers
+                db_filter_.fill(0);
+                db_search_open_ = true;
+                search_tab_     = 0;
+                db_list_        = true;
+                db_row_         = 0;
+            }
+            ImGui::SameLine();
+        }
+    }
+    if (ImGui::SmallButton(TR("Close"))) db_outcome_.reset();
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+    ImGui::Dummy(ImVec2(0, px(6)));
+    if (resume) {
+        const auto path = o.file;
+        importIntoDatabase(static_cast<int>(index), path);
     }
 }
 
@@ -134,7 +305,8 @@ void App::drawDatabases() {
             } catch (const std::exception& e) {
                 db_message_ = e.what();
             }
-            db_naming_ = false;
+            db_naming_      = false;
+            db_named_frame_ = ImGui::GetFrameCount();  // its Enter does not open the new database's list
         }
         ImGui::SameLine();
         if (ImGui::Button(TR("Cancel")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) db_naming_ = false;
@@ -246,6 +418,14 @@ void App::drawDatabases() {
     }
     ImGui::Dummy(ImVec2(0, px(6)));
 
+    // The last import's outcome; or, a database of its own with no game, what to put in it (M1, board 4).
+    if (db_outcome_ && db_outcome_->folder == entries[index].folder) {
+        drawImportOutcome(index);
+    } else if (!linked && facts.error.empty() && facts.games == 0 && !(s.import() && s.import()->index == index)) {
+        drawEmptyDatabase(index);
+        ImGui::Dummy(ImVec2(0, px(6)));
+    }
+
     // An import, its progress.
     if (const auto* job = s.import()) {
         ui::beginCard("db_import_card");
@@ -287,7 +467,7 @@ void App::drawDatabases() {
         ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, ImGui::GetID("##db_shelf_keys"));
     }
     if (ui::iconButton("db_open_list", ui::Icon::Contents, TR("Open the list")) ||
-        (!db_naming_ && ImGui::IsKeyPressed(ImGuiKey_Enter, false))) {
+        (!db_naming_ && db_named_frame_ != ImGui::GetFrameCount() && ImGui::IsKeyPressed(ImGuiKey_Enter, false))) {
         db_list_ = true;
         db_row_  = 0;
     }
@@ -414,6 +594,12 @@ void App::drawGameList() {
                         trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(snapshot->games(), 1000000000)),
                             ui::exactCount(snapshot->games() - snapshot->deletedCount()))
                             .c_str());
+    // None yet: what to put in it, in place of an empty list (M1, board 4).
+    if (snapshot->games() == 0 && !s.entries()[index].source && !(s.import() && s.import()->index == index)) {
+        ImGui::Dummy(ImVec2(0, px(8)));
+        drawEmptyDatabase(index);
+        return;
+    }
 
     // The quick filter.
     ImGui::SetNextItemWidth(std::min(px(460), ImGui::GetContentRegionAvail().x));
@@ -439,11 +625,11 @@ void App::drawGameList() {
     if (!db_pattern_job_.of.empty()) narrowing_jobs.push_back(&db_pattern_job_);
     std::string narrowing;
     for (const auto* job : narrowing_jobs) narrowing += job->of + (job->ready ? "+" : "-");
-    const auto of =
-        fmt::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(),
-                    snapshot->generation(), db_filter_.data(), static_cast<int>(db_sort_), db_descending_,
-                    p.player.data(), p.opponent.data(), p.event.data(), p.side, p.year_from.data(), p.year_to.data(),
-                    p.eco_from.data(), p.eco_to.data(), p.elo_min.data(), static_cast<int>(p.result), narrowing);
+    const auto of = fmt::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(),
+                                snapshot->generation(), db_filter_.data(), static_cast<int>(db_sort_), db_descending_,
+                                p.player.data(), p.opponent.data(), p.event.data(), p.side, p.year_from.data(),
+                                p.year_to.data(), p.eco_from.data(), p.eco_to.data(), p.elo_min.data(),
+                                static_cast<int>(p.result), narrowing + (p.damaged ? "|damaged" : ""));
     if (db_view_of_ != of && (!db_view_job_ || db_view_job_->of != of)) {
         if (db_view_job_) *db_view_job_->cancel = true;
         ViewJob job;
@@ -667,6 +853,7 @@ study::Filter App::listFilter() const {
     if (p.eco_to[0] || p.eco_from[0]) f.eco_to = eco(p.eco_to[0] ? p.eco_to.data() : p.eco_from.data(), '9');
     if (const int elo = std::atoi(p.elo_min.data()); elo > 0) f.elo_min = static_cast<uint16_t>(std::min(elo, 4000));
     if (p.result) f.result = p.result;
+    f.damaged = p.damaged;
     return f;
 }
 
@@ -868,6 +1055,11 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         int result            = static_cast<int>(std::find(std::begin(values), std::end(values), p.result) - values);
         ImGui::SetNextItemWidth(px(100));
         if (ImGui::Combo("##s_result", &result, results, 4)) p.result = values[result];
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + label_w);
+        ImGui::Checkbox(TR("Damaged games only"), &p.damaged);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s",
+                              TR("Games a move of which could not be read: kept up to it, their text as it was."));
     } else if (search_tab_ == 1) {
         // The Board page's position: the games that reach it, found in the background.
         const float size = std::min(px(200), ImGui::GetContentRegionAvail().x * 0.5f);

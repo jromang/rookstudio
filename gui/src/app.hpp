@@ -266,11 +266,29 @@ class App {
         struct Damaged {
             study::GameId id = 0;
             std::string why;
+            uint64_t line = 0;  // the line of the file its text starts on, 0 when not known
+            std::string move;   // the move its moves stop at, as written; empty when none
         };
         std::vector<Damaged> damaged;  // the first few
     };
     std::optional<ImportOutcome> db_outcome_;
     void drawImportOutcome(std::size_t index);
+    // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
+    // background, its move shown.
+    struct FileLines {
+        std::filesystem::path file;
+        uint64_t line = 0;
+        std::string move;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::future<std::vector<std::string>> reading;
+        std::vector<std::string> lines;
+        std::string error;
+        bool ready = false;
+    };
+    std::optional<FileLines> db_lines_;
+    void openFileLines(const std::filesystem::path& file, uint64_t line, std::string move);
+    void closeFileLines();
+    void drawFileLines();
     void drawEmptyDatabase(std::size_t index);  // a database of the user's with no game: what to put in it
     int db_named_frame_ = -1;                   // the frame a name was given with Enter: not the list's Enter too
     void pollDatabases();  // each frame: an import's end said

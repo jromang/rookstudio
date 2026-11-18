@@ -211,6 +211,71 @@ TEST_CASE("import: cancelled between batches, and a file that cannot be read") {
     CHECK(!damaged.report.error.empty());
 }
 
+TEST_CASE("import: the line each game starts on, the same in pieces, with Windows line ends and in archives") {
+    // The line of a game is that of its first tag: readLines gives it back, from the file as from its copies.
+    const auto starts_where = [](const fs::path& file, const std::vector<ImportedGame>& games) {
+        std::atomic<bool> go{false};
+        uint64_t before = 0;
+        for (const auto& g : games) {
+            REQUIRE(g.line > before);  // in the file's order
+            before = g.line;
+            if (g.tags.empty()) continue;
+            const auto lines = readLines(file, g.line, 1, go);
+            REQUIRE(lines.size() == 1);
+            CHECK(lines[0].starts_with("[" + g.tags.front().first + " "));
+        }
+    };
+    const auto lines_of = [](const std::vector<ImportedGame>& games) {
+        std::vector<uint64_t> lines;
+        for (const auto& g : games) lines.push_back(g.line);
+        return lines;
+    };
+    const auto whole = importFile(data("games.pgn"), 1, std::size_t{1} << 20);
+    REQUIRE(whole.games.size() == 120);
+    starts_where(data("games.pgn"), whole.games);
+    const auto expected = lines_of(whole.games);
+    // In pieces of 4 KB read by three workers, compressed: the same lines.
+    CHECK(lines_of(importFile(data("games.pgn"), 3).games) == expected);
+    CHECK(lines_of(importFile(data("games.pgn.zst"), 3).games) == expected);
+    CHECK(lines_of(importFile(data("games.pgn.gz"), 3).games) == expected);
+    // With "\r\n": the same lines too, readLines leaving the "\r" out.
+    std::ifstream in(data("games.pgn"), std::ios::binary);
+    const std::string unix_text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string windows_text;
+    for (const char c : unix_text) {
+        if (c == '\r') continue;
+        if (c == '\n') windows_text += '\r';
+        windows_text += c;
+    }
+    const auto crlf = fs::temp_directory_path() / "lines-crlf.pgn";
+    std::ofstream(crlf, std::ios::binary) << windows_text;
+    const auto windows = importFile(crlf, 3);
+    CHECK(lines_of(windows.games) == expected);
+    starts_where(crlf, windows.games);
+    // An archive's members one after the other, for importGames as for readLines.
+    const auto zip = importFile(data("games.zip"), 3);
+    REQUIRE(!zip.games.empty());
+    starts_where(data("games.zip"), zip.games);
+}
+
+TEST_CASE("import: the lines of a file, from a line on") {
+    const auto file = fs::temp_directory_path() / "lines.pgn";
+    const std::string longest(5000, 'x');
+    std::ofstream(file, std::ios::binary) << "a\r\nb\n\nd\n" << longest << "\nlast";
+    std::atomic<bool> go{false};
+    CHECK(readLines(file, 1, 2, go) == std::vector<std::string>{"a", "b"});
+    CHECK(readLines(file, 3, 2, go) == std::vector<std::string>{"", "d"});
+    const auto tail = readLines(file, 5, 10, go);  // fewer than asked: the file ends
+    REQUIRE(tail.size() == 2);
+    CHECK(tail[0] == std::string(4096, 'x') + "…");  // cut after 4 KB
+    CHECK(tail[1] == "last");                        // no line end after it
+    CHECK(readLines(file, 7, 1, go).empty());
+    CHECK(readLines(file, 1, 0, go).empty());
+    std::atomic<bool> stop{true};
+    CHECK(readLines(file, 1, 3, stop).empty());
+    CHECK_THROWS((void)readLines(fs::temp_directory_path() / "no such file.pgn", 1, 1, go));
+}
+
 TEST_CASE("import: why a damaged game's moves stop") {
     ImportedGame cut;
     REQUIRE(readImportedGame("[Event \"Cut\"]\n\n1. e4 {fine} (1. d4 d5) e5 2. Nf3 Nc6 3. Bb", cut));

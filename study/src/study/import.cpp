@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <condition_variable>
+#include <cstring>
 #include <deque>
 #include <map>
 #include <mutex>
@@ -322,7 +323,12 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
 
     std::mutex mutex;
     std::condition_variable work, ready;
-    std::deque<std::pair<uint64_t, std::string>> todo;
+    struct Piece {
+        uint64_t index = 0;
+        uint64_t line  = 1;  // the line of the file it starts on
+        std::string text;
+    };
+    std::deque<Piece> todo;
     std::map<uint64_t, std::vector<ImportedGame>> done;
     uint64_t pieces     = 0;  // made by the reader
     std::size_t working = 0;  // pieces a worker reads now
@@ -332,7 +338,7 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
 
     const auto worker = [&] {
         for (;;) {
-            std::pair<uint64_t, std::string> job;
+            Piece job;
             {
                 std::unique_lock lock(mutex);
                 work.wait(lock, [&] { return stop || !todo.empty() || read_all; });
@@ -343,14 +349,21 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
             }
             work.notify_all();  // room for the reader
             std::vector<ImportedGame> games;
-            for (const auto text : splitGames(job.second)) {
+            uint64_t line       = job.line;
+            const char* counted = job.text.data();  // the lines before it are in `line`
+            for (const auto text : splitGames(job.text)) {
                 if (cancel.load(std::memory_order_relaxed)) break;
+                line += static_cast<uint64_t>(std::count(counted, text.data(), '\n'));
+                counted = text.data();
                 ImportedGame game;
-                if (readImportedGame(text, game)) games.push_back(std::move(game));
+                if (readImportedGame(text, game)) {
+                    game.line = line;
+                    games.push_back(std::move(game));
+                }
             }
             {
                 std::lock_guard lock(mutex);
-                done.emplace(job.first, std::move(games));
+                done.emplace(job.index, std::move(games));
                 --working;
             }
             ready.notify_all();
@@ -358,9 +371,12 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
     };
     const auto reader = [&] {
         uint64_t before = 0;  // the bytes of the sources already read
+        uint64_t line   = 1;  // the line the next piece starts on
         std::string pending;
         std::vector<char> buffer(1 << 20);
         const auto give = [&](std::string text) {
+            const auto first = line;
+            line += static_cast<uint64_t>(std::count(text.begin(), text.end(), '\n'));
             std::unique_lock lock(mutex);
             // No more than three pieces a worker, and 24 in all, waiting, being read, or read and not given yet: the
             // memory stays bounded whatever the file's size and the machine's cores (24 pieces keep 8 workers busy,
@@ -368,7 +384,7 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
             const auto most = std::min<std::size_t>(static_cast<std::size_t>(3 * threads), 24);
             work.wait(lock, [&] { return stop || todo.size() + working + done.size() < most; });
             if (stop) return false;
-            todo.emplace_back(pieces++, std::move(text));
+            todo.push_back(Piece{pieces++, first, std::move(text)});
             lock.unlock();
             work.notify_one();
             ready.notify_all();
@@ -467,6 +483,53 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
     report.cancelled = cancel.load();
     report.error     = error;
     return report;
+}
+
+std::vector<std::string> readLines(const fs::path& file, uint64_t first, std::size_t count,
+                                   const std::atomic<bool>& cancel) {
+    constexpr std::size_t kLongest = 4096;
+    std::vector<std::string> lines;
+    if (count == 0) return lines;
+    const auto sources = openSources(file);
+    uint64_t line      = 1;
+    std::string current;  // the part read of a line wanted
+    bool cut            = false;
+    const auto end_line = [&] {
+        if (!current.empty() && current.back() == '\r') current.pop_back();
+        if (cut) current += "…";
+        lines.push_back(std::move(current));
+        current.clear();
+        cut = false;
+    };
+    std::vector<char> buffer(1 << 20);
+    for (const auto& source : sources) {
+        for (;;) {
+            if (cancel.load(std::memory_order_relaxed)) return lines;
+            const auto n = source->read(buffer.data(), buffer.size());
+            if (n == 0) break;
+            const char* p   = buffer.data();
+            const char* end = p + n;
+            while (p < end) {
+                const auto* nl   = static_cast<const char*>(std::memchr(p, '\n', static_cast<std::size_t>(end - p)));
+                const char* stop = nl ? nl : end;
+                if (line >= first) {
+                    const auto size = static_cast<std::size_t>(stop - p);
+                    const auto room = kLongest - std::min(kLongest, current.size());
+                    current.append(p, std::min(size, room));
+                    cut = cut || size > room;
+                }
+                if (!nl) break;
+                if (line >= first) {
+                    end_line();
+                    if (lines.size() == count) return lines;
+                }
+                ++line;
+                p = nl + 1;
+            }
+        }
+    }
+    if (line >= first && (!current.empty() || cut)) end_line();  // the last line, with no line end after it
+    return lines;
 }
 
 }  // namespace fcg::study

@@ -38,6 +38,9 @@ struct ImportedGame {
     static constexpr int16_t NO_EVAL = -32768;
     // What its moves tell the searches, made as they are read; a database makes it when it is missing.
     std::optional<GameSignature> signature;
+    // The line its text starts on in the file read (from 1, the members of an archive one after the other); 0 when it
+    // was not read from a file. Not kept by a database.
+    uint64_t line = 0;
 };
 
 // One game's text into a game. False when it holds no game.
@@ -81,5 +84,11 @@ struct ImportReport {
 // calling thread. `cancel` stops it between batches.
 ImportReport importGames(const std::filesystem::path& file, const ImportOptions& options, ImportProgress& progress,
                          const std::atomic<bool>& cancel, const std::function<void(std::vector<ImportedGame>&&)>& sink);
+
+// The lines of `file` as importGames reads it (PGN, .zst, .gz, .zip, the members of an archive one after the other),
+// from line `first` (from 1), `count` of them at most: fewer when the text ends before. Each without its line end, and
+// cut after 4 KB with "…". `cancel` stops it, with the lines read so far. Throws when the file cannot be read.
+[[nodiscard]] std::vector<std::string> readLines(const std::filesystem::path& file, uint64_t first, std::size_t count,
+                                                 const std::atomic<bool>& cancel);
 
 }  // namespace fcg::study

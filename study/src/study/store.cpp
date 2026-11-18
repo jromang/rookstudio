@@ -324,6 +324,9 @@ DatabaseImport importInto(Database& db, const std::filesystem::path& file, const
     };
     out.read = importGames(file, options, progress, cancel, [&](std::vector<ImportedGame>&& batch) {
         if (!out.error.empty()) return;
+        for (const auto& game : batch)
+            if (game.damaged && out.damaged_lines.size() < 64)
+                out.damaged_lines.emplace_back(duplicateKey(game), game.line);
         if (pending.empty()) {
             pending = std::move(batch);
         } else {

@@ -107,6 +107,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
 
 App::~App() {
     ui::setGuideOpener(nullptr);
+    closeFileLines();  // a file being read stops within a megabyte
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once, and the window goes away first rather than freeze while it does.
     if (probe_.valid() || check_.valid()) {

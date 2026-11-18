@@ -202,6 +202,9 @@ struct DatabaseImport {
     uint64_t duplicates = 0;
     uint64_t commits    = 0;
     std::string error;  // why the disk refused; the games committed before stay
+    // The first damaged games read, 64 at most: their duplicateKey(), which Snapshot::key() gives back, and the line
+    // of the file their text starts on.
+    std::vector<std::pair<uint64_t, uint64_t>> damaged_lines;
 };
 
 // The games of `file` (PGN, .zst, .gz, .zip) added to `db`, committed every `commit_games` games and at the end: a

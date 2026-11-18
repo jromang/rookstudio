@@ -2,6 +2,7 @@
 // and what can be done with it, an import with its progress, a file dropped on the page.
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstring>
 #include <iterator>
@@ -12,6 +13,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
 
+#include <study/import.hpp>
 #include <tour/files.hpp>
 
 #include "app.hpp"
@@ -143,7 +145,14 @@ void App::pollDatabases() {
                         else
                             why = trf("« {}{}{} » is not a legal move; kept up to move {}", game.plies / 2 + 1,
                                       game.plies % 2 ? "…" : ".", damage.move, kept);
-                        o.damaged.push_back({id, std::move(why)});
+                        uint64_t line  = 0;
+                        const auto key = snap->key(id);
+                        for (const auto& [k, l] : report->damaged_lines)
+                            if (k == key) {
+                                line = l;
+                                break;
+                            }
+                        o.damaged.push_back({id, std::move(why), line, damage.move});
                     }
                 }
         }
@@ -175,6 +184,117 @@ void App::pollDatabases() {
         Console::instance().add(db_message_, !report->error.empty());
         db_message_.clear();  // said by the banner on the database
     }
+}
+
+void App::openFileLines(const std::filesystem::path& file, uint64_t line, std::string move) {
+    closeFileLines();
+    FileLines v;
+    v.file    = file;
+    v.line    = line;
+    v.move    = std::move(move);
+    v.cancel  = std::make_shared<std::atomic<bool>>(false);
+    v.reading = std::async(std::launch::async,
+                           [file, line, cancel = v.cancel] { return study::readLines(file, line, 80, *cancel); });
+    db_lines_ = std::move(v);
+}
+
+void App::closeFileLines() {
+    if (!db_lines_) return;
+    if (db_lines_->cancel) *db_lines_->cancel = true;
+    db_lines_.reset();  // the reading stops within a megabyte
+}
+
+namespace {
+
+// The line, among a game's, that holds `move` as a word of its moves (after its tags); for a start position that is
+// not one, its FEN tag. -1 when none.
+int markedLine(const std::vector<std::string>& lines, std::string_view move) {
+    const auto word = [](char c) { return std::isalnum(static_cast<unsigned char>(c)) != 0; };
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const std::string_view line = lines[i];
+        if (move.empty()) {
+            if (line.starts_with("[FEN ")) return static_cast<int>(i);
+            continue;
+        }
+        if (line.starts_with('[')) continue;
+        for (auto at = line.find(move); at != std::string_view::npos; at = line.find(move, at + 1)) {
+            const bool before = at == 0 || !word(line[at - 1]);
+            const bool after  = at + move.size() == line.size() || !word(line[at + move.size()]);
+            if (before && after) return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+}  // namespace
+
+void App::drawFileLines() {
+    auto& v = *db_lines_;
+    if (!v.ready && v.reading.valid() && v.reading.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        try {
+            v.lines = v.reading.get();
+        } catch (const std::exception& e) {
+            v.error = e.what();
+        }
+        // The game alone: its lines end where the next game's tags start, the blank lines between them left out.
+        bool moves = false;
+        for (std::size_t i = 0; i < v.lines.size(); ++i) {
+            const std::string_view line = v.lines[i];
+            if (moves && line.starts_with('[')) {
+                v.lines.resize(i);
+                break;
+            }
+            moves = moves || (!line.empty() && !line.starts_with('['));
+        }
+        while (!v.lines.empty() && v.lines.back().find_first_not_of(" \t") == std::string::npos) v.lines.pop_back();
+        v.ready = true;
+    }
+    ui::beginCard("db_file_lines");
+    ImGui::TextUnformatted(trf("« {} », from line {}", v.file.filename().string(), ui::exactCount(v.line)).c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Open the file"))) ui::openPath(v.file);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip(
+            "%s",
+            trf("With the program the system gives it; the game starts at line {}.", ui::exactCount(v.line)).c_str());
+    ImGui::SameLine();
+    bool close = ImGui::SmallButton((std::string(TR("Close")) + "##file_lines").c_str());
+    if (!v.ready) {
+        ImGui::TextDisabled("%s", TR("Reading the file…"));
+    } else if (!v.error.empty()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+                           trf("The file cannot be read: {}.", v.error).c_str());
+    } else if (v.lines.empty()) {
+        ImGui::TextDisabled("%s", TR("The file no longer has this line: it has changed since the import."));
+    } else {
+        const int marked   = markedLine(v.lines, v.move);
+        const float line_h = ImGui::GetTextLineHeightWithSpacing();
+        const auto shown   = std::min<std::size_t>(v.lines.size(), 16);
+        const auto last    = ui::exactCount(v.line + v.lines.size() - 1);
+        const float gutter = ImGui::CalcTextSize(last.c_str()).x + px(12);
+        ImGui::BeginChild("##file_lines_text", ImVec2(0, line_h * static_cast<float>(shown) + px(8)),
+                          ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::PushFont(ui::monoFont());
+        for (std::size_t i = 0; i < v.lines.size(); ++i) {
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            if (static_cast<int>(i) == marked)
+                ImGui::GetWindowDrawList()->AddRectFilled(
+                    at, ImVec2(at.x + ImGui::GetContentRegionAvail().x + ImGui::GetScrollMaxX(), at.y + line_h),
+                    (ui::WARN & 0x00FFFFFF) | 0x40000000);
+            ImGui::TextDisabled("%s", ui::exactCount(v.line + i).c_str());
+            ImGui::SameLine(gutter);
+            ImGui::TextUnformatted(v.lines[i].c_str());
+        }
+        ImGui::PopFont();
+        ImGui::EndChild();
+        if (marked >= 0)
+            ImGui::TextDisabled("%s", (v.move.empty() ? std::string(TR("Marked: the start position that is not one."))
+                                                      : trf("Marked: the line of « {} ».", v.move))
+                                          .c_str());
+    }
+    ui::endCard();
+    ImGui::Dummy(ImVec2(0, px(6)));
+    if (close) closeFileLines();
 }
 
 void App::drawEmptyDatabase(std::size_t index) {
@@ -236,8 +356,19 @@ void App::drawImportOutcome(std::size_t index) {
                                           .c_str());
         if (damaged > 0) {
             ImGui::TextDisabled("%s", TR("Kept up to the move that cannot be read, their text kept as it was."));
-            for (const auto& d : o.damaged)
-                ImGui::BulletText("%s", trf("Game {}: {}.", ui::exactCount(d.id + 1), d.why).c_str());
+            // A game's line opens the file there, unless its text was pasted: that file is gone.
+            const auto openable = [&](const ImportOutcome::Damaged& d) { return d.line > 0 && !o.pasted; };
+            for (const auto& d : o.damaged) {
+                ImGui::BulletText("%s", (d.line > 0 ? trf("Game {}, line {}: {}.", ui::exactCount(d.id + 1),
+                                                          ui::exactCount(d.line), d.why)
+                                                    : trf("Game {}: {}.", ui::exactCount(d.id + 1), d.why))
+                                            .c_str());
+                if (openable(d) && ImGui::IsItemHovered()) {
+                    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                    ImGui::SetTooltip("%s", TR("A click shows the file at this line."));
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) openFileLines(o.file, d.line, d.move);
+                }
+            }
             if (damaged > o.damaged.size())
                 ImGui::TextDisabled("%s", trf("and {} more", ui::exactCount(damaged - o.damaged.size())).c_str());
             if (ImGui::Button(TR("See them in the list"))) {
@@ -250,9 +381,22 @@ void App::drawImportOutcome(std::size_t index) {
                 db_row_         = 0;
             }
             ImGui::SameLine();
+            if (!o.damaged.empty() && openable(o.damaged.front())) {
+                if (ImGui::Button(TR("Open the file at this line")))
+                    openFileLines(o.file, o.damaged.front().line, o.damaged.front().move);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s",
+                                      trf("Line {}, where game {} starts.", ui::exactCount(o.damaged.front().line),
+                                          ui::exactCount(o.damaged.front().id + 1))
+                                          .c_str());
+                ImGui::SameLine();
+            }
         }
     }
-    if (ImGui::SmallButton(TR("Close"))) db_outcome_.reset();
+    if (ImGui::SmallButton(TR("Close"))) {
+        db_outcome_.reset();
+        closeFileLines();
+    }
     ImGui::PopTextWrapPos();
     ui::endCard();
     ImGui::Dummy(ImVec2(0, px(6)));
@@ -445,6 +589,7 @@ void App::drawDatabases() {
     // The last import's outcome; or, a database of its own with no game, what to put in it (M1, board 4).
     if (db_outcome_ && db_outcome_->folder == entries[index].folder) {
         drawImportOutcome(index);
+        if (db_lines_) drawFileLines();
     } else if (!linked && facts.error.empty() && facts.games == 0 && !(s.import() && s.import()->index == index)) {
         drawEmptyDatabase(index);
         ImGui::Dummy(ImVec2(0, px(6)));

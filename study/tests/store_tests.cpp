@@ -260,6 +260,24 @@ TEST_CASE("store: a disk that refuses leaves the database as before; what is no 
     CHECK(packEco("Z99") == 0);
 }
 
+TEST_CASE("store: the line of each damaged game an import read, found again by the game's key") {
+    const auto file = fs::temp_directory_path() / "store-damaged-lines.pgn";
+    std::ofstream(file, std::ios::binary) << "[Event \"Fine\"]\n\n1. e4 e5 1-0\n\n"
+                                          << "[Event \"Illegal\"]\n[Round \"2\"]\n\n1. e4 e5 2. Ke3 *\n\n"
+                                          << "[Event \"Fine again\"]\n\n1. d4 d5 0-1\n\n"
+                                          << "[Event \"Cut\"]\n\n1. c4 e5 2. Nc";
+    auto db = Database::create(freshFolder("store-damaged-lines.fcgdb"));
+    std::atomic<bool> go_on{false};
+    ImportProgress progress;
+    const auto got = importInto(*db, file, ImportOptions{2, 4096}, progress, go_on);
+    REQUIRE(got.added == 4);
+    REQUIRE(got.read.damaged == 2);
+    REQUIRE(got.damaged_lines.size() == 2);
+    const auto snap = db->snapshot();
+    CHECK(got.damaged_lines[0] == std::pair<uint64_t, uint64_t>{snap->key(1), 5});
+    CHECK(got.damaged_lines[1] == std::pair<uint64_t, uint64_t>{snap->key(3), 14});
+}
+
 TEST_CASE("store: a file imported into a database, committed as it goes; cancelled or refused, it keeps what it had") {
     const auto games = fixtureGames();
     const auto dir   = freshFolder("store-import.fcgdb");

@@ -262,6 +262,93 @@ target_include_directories(fcg_commentary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/com
 target_compile_options(fcg_commentary PRIVATE -Wall -Wextra)
 target_link_libraries(fcg_commentary PUBLIC fcg_tournament)
 
+# ---------------------------------------------------------------------------
+# Assistant: the language model runtime (llama.cpp, MIT), run in a child process of the program
+# ---------------------------------------------------------------------------
+
+option(FCG_ASSISTANT "Build the assistant's language model runtime (llama.cpp)" ON)
+option(FCG_ASSISTANT_EVAL "Build fcg-assistant-eval: a model measured on commentary cases, as the program uses it" OFF)
+if(FCG_ASSISTANT)
+    # The release the prototype's commentary model was made and measured with (llama-cpp-2 0.1.161 vendors it), as
+    # shared libraries whose backends ggml loads at run time: the program links no GPU library, and starts where one is
+    # missing. The CPU backend in every variant x86-64 processors need, the best one chosen at run time.
+    FetchContent_Declare(llama
+        GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+        GIT_TAG v0.6.0
+        GIT_SHALLOW TRUE)
+    set(FCG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS ON)
+    set(GGML_BACKEND_DL ON CACHE BOOL "" FORCE)
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    # ggml's own thread pool: no OpenMP runtime to ship (libgomp on Windows; Apple's clang has none).
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
+        set(GGML_CPU_ALL_VARIANTS ON CACHE BOOL "" FORCE)
+    endif()
+    foreach(option LLAMA_BUILD_TESTS LLAMA_BUILD_TOOLS LLAMA_BUILD_EXAMPLES LLAMA_BUILD_SERVER LLAMA_BUILD_APP
+                   LLAMA_BUILD_COMMON LLAMA_OPENSSL LLAMA_SUBPROCESS)
+        set(${option} OFF CACHE BOOL "" FORCE)
+    endforeach()
+    set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+    FetchContent_MakeAvailable(llama)
+    set(BUILD_SHARED_LIBS ${FCG_BUILD_SHARED_LIBS})
+    # Its libraries beside the programs (llama.cpp puts them in bin/): where ggml looks for its backends, and where
+    # Windows finds a program's DLLs; elsewhere the programs' run path ($ORIGIN) does.
+    function(fcg_beside_programs dir)
+        get_property(targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+        foreach(target IN LISTS targets)
+            get_target_property(type ${target} TYPE)
+            if(type MATCHES "SHARED_LIBRARY|MODULE_LIBRARY")
+                set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+                                                           LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+                # One file each, shipped beside the program: no versioned names and links to them.
+                set_property(TARGET ${target} PROPERTY VERSION)
+                set_property(TARGET ${target} PROPERTY SOVERSION)
+                # Only their C interfaces cross between them and the programs: each has its runtime of its own, as
+                # the programs have, and needs no MinGW DLL beside it.
+                if(WIN32)
+                    # The static runtime's symbols kept inside each DLL: exported by one, they clash in the next.
+                    target_link_options(${target} PRIVATE -static -static-libgcc -static-libstdc++
+                                                          -Wl,--exclude-libs,ALL)
+                    # ggml looks for its backends by the names llama.cpp's own Windows builds give them
+                    # (ggml-cpu-haswell.dll), without MinGW's "lib".
+                    set_target_properties(${target} PROPERTIES PREFIX "")
+                endif()
+            endif()
+        endforeach()
+        get_property(subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+        foreach(sub IN LISTS subdirs)
+            fcg_beside_programs(${sub})
+        endforeach()
+    endfunction()
+    fcg_beside_programs(${llama_SOURCE_DIR})
+
+    # llama.cpp's Jinja engine, which renders a model's chat template as the fine-tuning library did, compiled here
+    # with the JSON value it reads its context from: its common library would bring an HTTP client and more.
+    file(GLOB FCG_JINJA_SOURCES ${llama_SOURCE_DIR}/common/jinja/*.cpp)
+    add_library(fcg_jinja STATIC ${FCG_JINJA_SOURCES} ${llama_SOURCE_DIR}/common/json.cpp
+                                 ${llama_SOURCE_DIR}/common/unicode.cpp)
+    target_compile_features(fcg_jinja PUBLIC cxx_std_17)
+    target_include_directories(fcg_jinja PUBLIC ${llama_SOURCE_DIR}/common
+                                         PRIVATE ${llama_SOURCE_DIR}/vendor)
+    target_link_libraries(fcg_jinja PUBLIC ggml)
+    set_target_properties(fcg_jinja PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    file(GLOB FCG_ASSISTANT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/assistant/src/assistant/*.cpp)
+    add_library(fcg_assistant STATIC ${FCG_ASSISTANT_SOURCES})
+    target_compile_features(fcg_assistant PUBLIC cxx_std_20)
+    target_include_directories(fcg_assistant PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assistant/src)
+    target_compile_options(fcg_assistant PRIVATE -Wall -Wextra)
+    target_link_libraries(fcg_assistant PUBLIC fcg_commentary PRIVATE llama fcg_jinja)
+    target_compile_definitions(fcg_assistant PUBLIC FCG_ASSISTANT=1)
+
+    if(FCG_ASSISTANT_EVAL)
+        add_executable(fcg-assistant-eval ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp)
+        target_link_libraries(fcg-assistant-eval PRIVATE fcg_assistant fcg_study)
+        target_compile_options(fcg-assistant-eval PRIVATE -Wall -Wextra)
+    endif()
+endif()
+
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_COMMENTARY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/tests/*.cpp)
     add_executable(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES})
@@ -584,6 +671,10 @@ if(FCG_BUILD_GUI)
     target_compile_options(fcg_lib PRIVATE -Wall -Wextra)
     target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}${FCG_VERSION_SUFFIX}")
     target_link_libraries(fcg_lib PUBLIC fcg_study fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2 tinygettext fcg_md4c)
+    if(FCG_ASSISTANT)
+        # The assistant's child process is this program too (--assistant), and the window talks with it.
+        target_link_libraries(fcg_lib PUBLIC fcg_assistant)
+    endif()
     if(WIN32)
         target_link_libraries(fcg_lib PUBLIC ws2_32)
     endif()
@@ -630,6 +721,17 @@ if(FCG_BUILD_GUI)
             target_link_options(fcg_wb_mover PRIVATE -static -static-libgcc -static-libstdc++)
         endif()
 
+        if(FCG_ASSISTANT)
+            # A language model that answers at once, for the tests of the assistant's process.
+            add_executable(fcg_mock_assistant ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/assistant.cpp)
+            target_link_libraries(fcg_mock_assistant PRIVATE fcg_assistant)
+            if(WIN32)
+                target_link_options(fcg_mock_assistant PRIVATE -static -static-libgcc -static-libstdc++)
+            endif()
+            add_dependencies(fastchess-gui-tests fcg_mock_assistant)
+            target_compile_definitions(fastchess-gui-tests
+                                       PRIVATE FCG_MOCK_ASSISTANT="$<TARGET_FILE_NAME:fcg_mock_assistant>")
+        endif()
         # The program itself too: the tests start tournament processes (--run ... --control stdio).
         add_dependencies(fastchess-gui-tests fcg_random_mover fcg_wb_mover fastchess-gui)
         target_compile_definitions(fastchess-gui-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"

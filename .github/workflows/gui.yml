@@ -115,6 +115,7 @@ jobs:
           path: |
             build/fastchess-gui
             build/fastchess
+            build/*.so
 
   sanitizers:
     name: Linux tests with AddressSanitizer and UBSan
@@ -164,7 +165,8 @@ jobs:
           restore-keys: ccache-sanitizers-
 
       - name: Configure
-        # Everything instrumented, the dependencies too; the test engines the tests start as well.
+        # Everything instrumented, the dependencies too; the test engines the tests start as well. Without the
+        # assistant's language model runtime: llama.cpp instrumented would double the build, and is not ours to fix.
         env:
           CC: clang-23
           CXX: clang++-23
@@ -173,6 +175,7 @@ jobs:
           "-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer"
           "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer"
           "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+          -DFCG_ASSISTANT=OFF
 
       - name: Build
         run: |
@@ -281,6 +284,8 @@ jobs:
             build-win/fcg-study-tests.exe
             build-win/fcg-commentary-tests.exe
             build-win/fcg_random_mover.exe
+            build-win/fcg_mock_assistant.exe
+            build-win/*.dll
 
   windows-tests:
     name: Windows tests
@@ -331,7 +336,10 @@ jobs:
           restore-keys: ccache-macos-
 
       - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+        # The assistant's libraries are not in the application bundle yet: built without it.
+        run: >
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+          -DFCG_ASSISTANT=OFF
 
       - name: Build
         run: |
@@ -407,6 +415,8 @@ jobs:
           mkdir -p "dist/${linux}"
           cp artifacts/linux/fastchess-gui "dist/${linux}/"
           chmod +x "dist/${linux}/fastchess-gui"
+          # The assistant's language model runtime (llama.cpp), beside the program that runs it.
+          cp artifacts/linux/*.so "dist/${linux}/"
           cp ${docs} "dist/${linux}/"
           cp -r gui/assets/licenses "dist/${linux}/"
           tar -C dist -czf "dist/${linux}.tar.gz" "${linux}"
@@ -414,6 +424,7 @@ jobs:
           windows="fastchess-gui-${version}-windows-x86_64"
           mkdir -p "dist/${windows}"
           cp artifacts/windows/fastchess-gui.exe "dist/${windows}/"
+          cp artifacts/windows/*.dll "dist/${windows}/"
           cp ${docs} "dist/${windows}/"
           cp -r gui/assets/licenses "dist/${windows}/"
           (cd dist && zip -qr "${windows}.zip" "${windows}")

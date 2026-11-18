@@ -67,7 +67,7 @@ jobs:
         env:
           CC: clang-23
           CXX: clang++-23
-        run: cmake -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFCG_FUZZ=ON -DFCG_BUILD_TESTS=OFF
+        run: cmake -B build-fuzz -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DFCG_FUZZ=ON -DFCG_BUILD_TESTS=OFF -DFCG_ASSISTANT=OFF
 
       - name: Build
         run: |

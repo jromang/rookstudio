@@ -58,7 +58,7 @@ jobs:
         env:
           CC: gcc-12
           CXX: g++-12
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCG_CCACHE=OFF
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCG_CCACHE=OFF -DFCG_ASSISTANT=OFF
 
       - name: Build the dependencies
         # Before CodeQL watches the compiler: the FetchContent libraries are not analysed (their known

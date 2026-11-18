@@ -39,6 +39,9 @@
 #include <tour/pgn_book.hpp>
 #include <tour/state.hpp>
 
+#ifdef FCG_ASSISTANT
+#    include <assistant/runtime.hpp>
+#endif
 #include "app.hpp"
 #include "child_process.hpp"
 #include "console.hpp"
@@ -689,6 +692,12 @@ int main(int argc, char** argv) {
     if (argc >= 2 && std::string_view(argv[1]) == "--book-adapter") {
         return fcg::tour::runBookAdapter(std::vector<std::string>(argv + 2, argv + argc));
     }
+#ifdef FCG_ASSISTANT
+    // The assistant's language model, in a process of its own: the window's requests on standard input, one per line.
+    if (argc >= 2 && std::string_view(argv[1]) == fcg::assistant::FLAG) {
+        return fcg::assistant::run(std::vector<std::string>(argv + 2, argv + argc));
+    }
+#endif
 
     // An error nothing else caught ends the program with its reason rather than without a word: in a message box
     // too for the window, as a Windows GUI program has no console.

@@ -30,6 +30,7 @@ struct Filter {
     uint16_t eco_to    = 0;
     char result        = 0;      // '1', '0', '=' or '*'; 0 for any
     bool annotated     = false;  // only games with comments, symbols or variations
+    bool with_deleted  = false;  // the deleted games too
 
     [[nodiscard]] bool empty() const noexcept;
 };

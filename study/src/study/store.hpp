@@ -98,6 +98,18 @@ class Snapshot {
     [[nodiscard]] std::span<const uint8_t> moves(GameId id) const;
     // What its moves tell the searches (signature.hpp): none in a segment of the first format.
     [[nodiscard]] std::optional<GameSignature> signature(GameId id) const;
+    // A game deleted keeps its number, its game shown or not as the list asks; searches and the tree leave it out.
+    [[nodiscard]] bool deleted(GameId id) const noexcept {
+        return id / 64 < deleted_.size() && (deleted_[id / 64] >> (id % 64) & 1);
+    }
+    [[nodiscard]] uint64_t deletedCount() const noexcept { return deleted_count_; }
+
+    // A game replaced: where its new version is (a segment of versions, and its place there).
+    struct Version {
+        GameId id        = 0;
+        uint32_t segment = 0;
+        uint32_t local   = 0;
+    };
     // What tells a game from another: its event, site, round, players, date, start, moves and result
     // (duplicateKey()).
     [[nodiscard]] uint64_t key(GameId id) const;
@@ -111,9 +123,13 @@ class Snapshot {
     friend class Database;
     [[nodiscard]] std::pair<const Segment*, std::size_t> locate(GameId id) const;
 
-    std::vector<std::shared_ptr<const Segment>> segments_;
-    std::vector<uint64_t> first_game_;  // of each segment
-    std::vector<uint32_t> first_name_;
+    std::vector<std::shared_ptr<const Segment>> segments_;  // all of them, those of versions included
+    std::vector<std::size_t> logical_;                      // the segments that add games, in order
+    std::vector<uint64_t> first_game_;                      // of each segment that adds games
+    std::vector<uint32_t> first_name_;                      // of each segment
+    std::vector<Version> replaced_;                         // by id
+    std::vector<uint64_t> deleted_;                         // a bit a game
+    uint64_t deleted_count_ = 0;
     uint64_t games_      = 0;
     uint32_t names_      = 0;
     uint64_t generation_ = 0;
@@ -136,6 +152,14 @@ class Database {
     // of them or none. A game the database already has, or the batch had before it, is left out unless
     // `keep_duplicates`. Throws std::runtime_error when the disk refuses; the database is then as before.
     Appended append(std::vector<ImportedGame> games, bool keep_duplicates = false);
+
+    // Replaces game `id` with `game`: it keeps its number, its new version written in a segment of versions; the
+    // old one stays where it was until the database is tidied. Committed as append() is. Throws std::out_of_range
+    // for a number the database does not have, std::runtime_error when the disk refuses (nothing changed then).
+    void replace(GameId id, ImportedGame game);
+    // Marks games deleted, or no longer deleted; numbers the database does not have are passed over. Committed and
+    // thrown as replace().
+    void setDeleted(std::span<const GameId> ids, bool deleted);
     [[nodiscard]] const std::filesystem::path& folder() const noexcept { return dir_; }
 
     explicit Database(const std::filesystem::path& dir);  // use create() or open()
@@ -143,6 +167,10 @@ class Database {
    private:
     void load();
     uint32_t nameId(const std::string& name, std::vector<std::string>& added);
+    // Writes `games` in new segments (of versions when `versions`) and commits them with the edits `replaced` and
+    // `deleted` (the snapshot's own when null), in one manifest. Under the lock.
+    void commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
+                const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted);
 
     std::filesystem::path dir_;
     tour::FolderLock lock_;

@@ -80,6 +80,16 @@ and goes on.
 
 A reader holds a `Snapshot`: the segments it maps stay valid while later commits add others.
 
+### Games replaced and deleted
+
+A game keeps its number. `replace` writes its new version in a segment of versions (named in the manifest with
+`"versions": true`: its games are no games of their own), and the manifest names an edits file (`edits-NNNNNN.bin`:
+each game replaced with its version's place, and the games deleted), written and synced before the manifest that
+names it, the rename of the manifest still the only commit. `setDeleted` marks games deleted, or no longer: the list
+shows them only when asked (`Filter::with_deleted`), the searches and the tree leave them out. The old versions stay
+in their segments until the database is tidied (not written yet). A crash at any step of a replacement leaves the game
+as it was, or as it is to be, as the tests check.
+
 ### Duplicates
 
 A game's key is a hash of its event, site, round, players, date, start position, moves and result. An append leaves out

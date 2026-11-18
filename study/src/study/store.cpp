@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cstdio>
 #include <cstring>
@@ -151,6 +152,35 @@ void writeFile(const fs::path& file, std::string_view bytes) {
     step("sync " + file.filename().string());
     if (!written || !tour::syncFile(f.get()))
         throw std::runtime_error("cannot write " + file.string() + " (is the disk full?)");
+}
+
+constexpr std::array<char, 8> EDITS_MAGIC{'F', 'C', 'G', 'E', 'D', 'I', 'T', '1'};
+
+std::string editsName(uint64_t generation) {
+    char name[32];
+    std::snprintf(name, sizeof name, "edits-%06llu.bin", static_cast<unsigned long long>(generation));
+    return name;
+}
+
+// The edits a manifest names: the games replaced (their versions' places) and the games deleted.
+std::string editsBytes(const std::vector<Snapshot::Version>& replaced, const std::vector<uint64_t>& deleted) {
+    std::vector<uint64_t> ids;
+    for (std::size_t w = 0; w < deleted.size(); ++w)
+        for (uint64_t bits = deleted[w]; bits; bits &= bits - 1)
+            ids.push_back(w * 64 + static_cast<uint64_t>(std::countr_zero(bits)));
+    std::string out(EDITS_MAGIC.begin(), EDITS_MAGIC.end());
+    const auto put = [&](auto v) { out.append(reinterpret_cast<const char*>(&v), sizeof v); };
+    put(uint32_t{1});
+    put(uint32_t{0});
+    put(static_cast<uint64_t>(replaced.size()));
+    put(static_cast<uint64_t>(ids.size()));
+    for (const auto& r : replaced) {
+        put(static_cast<uint64_t>(r.id));
+        put(r.segment);
+        put(r.local);
+    }
+    for (const auto id : ids) put(id);
+    return out;
 }
 
 std::string segmentName(uint64_t number) {
@@ -334,9 +364,14 @@ uint64_t duplicateKey(const ImportedGame& game) {
 
 std::pair<const Segment*, std::size_t> Snapshot::locate(GameId id) const {
     if (id >= games_) throw std::out_of_range("no such game");
+    if (!replaced_.empty()) {
+        const auto v = std::lower_bound(replaced_.begin(), replaced_.end(), id,
+                                        [](const Version& r, GameId x) { return r.id < x; });
+        if (v != replaced_.end() && v->id == id) return {segments_[v->segment].get(), v->local};
+    }
     const auto it = std::upper_bound(first_game_.begin(), first_game_.end(), id);
     const auto s  = static_cast<std::size_t>(it - first_game_.begin()) - 1;
-    return {segments_[s].get(), static_cast<std::size_t>(id - first_game_[s])};
+    return {segments_[logical_[s]].get(), static_cast<std::size_t>(id - first_game_[s])};
 }
 
 std::string_view Snapshot::name(uint32_t id) const {
@@ -531,13 +566,17 @@ void Database::load() {
     snap->generation_ = manifest.value("generation", uint64_t{0});
     std::vector<std::string> named;
     for (const auto& s : manifest.at("segments")) {
-        const auto name  = s.at("name").get<std::string>();
-        const auto games = s.at("games").get<uint32_t>();
-        const auto names = s.at("names").get<uint32_t>();
-        auto segment     = std::make_shared<const Segment>(dir_ / name, games, names);
-        snap->first_game_.push_back(snap->games_);
+        const auto name     = s.at("name").get<std::string>();
+        const auto games    = s.at("games").get<uint32_t>();
+        const auto names    = s.at("names").get<uint32_t>();
+        const bool versions = s.value("versions", false);
+        auto segment        = std::make_shared<const Segment>(dir_ / name, games, names);
+        if (!versions) {
+            snap->logical_.push_back(snap->segments_.size());
+            snap->first_game_.push_back(snap->games_);
+            snap->games_ += games;
+        }
         snap->first_name_.push_back(snap->names_);
-        snap->games_ += games;
         snap->names_ += names;
         snap->segments_.push_back(std::move(segment));
         named.push_back(name);
@@ -545,9 +584,38 @@ void Database::load() {
         std::sscanf(name.c_str(), "seg-%llu", &number);
         next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
     }
+    // The edits it names: the games replaced and those deleted.
+    const auto edits = manifest.value("edits", std::string());
+    if (!edits.empty()) {
+        std::ifstream in(dir_ / edits, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const auto bad = [&] { return std::runtime_error((dir_ / edits).string() + ": damaged edits"); };
+        if (bytes.size() < 32 || std::memcmp(bytes.data(), EDITS_MAGIC.data(), EDITS_MAGIC.size()) != 0) throw bad();
+        const auto at = [&](std::size_t o, auto v) {
+            std::memcpy(&v, bytes.data() + o, sizeof v);
+            return v;
+        };
+        const auto replaced = at(16, uint64_t{0}), deleted = at(24, uint64_t{0});
+        if (bytes.size() != 32 + replaced * 16 + deleted * 8) throw bad();
+        for (uint64_t i = 0; i < replaced; ++i) {
+            const std::size_t o = 32 + i * 16;
+            const Snapshot::Version v{at(o, uint64_t{0}), at(o + 8, uint32_t{0}), at(o + 12, uint32_t{0})};
+            if (v.id >= snap->games_ || v.segment >= snap->segments_.size() ||
+                v.local >= snap->segments_[v.segment]->games())
+                throw bad();
+            snap->replaced_.push_back(v);
+        }
+        for (uint64_t i = 0; i < deleted; ++i) {
+            const auto id = at(32 + replaced * 16 + i * 8, uint64_t{0});
+            if (id >= snap->games_) throw bad();
+            if (snap->deleted_.size() <= id / 64) snap->deleted_.resize(id / 64 + 1, 0);
+            snap->deleted_[id / 64] |= uint64_t{1} << (id % 64);
+        }
+        snap->deleted_count_ = deleted;
+    }
     // What a commit cut short left: segments the manifest does not name, and the new manifest not yet renamed over
-    // the old one (a killed program leaves it). A number such a leftover segment holds is not used again, should it
-    // not go.
+    // the old one (a killed program leaves it); edits it does not name. A number such a leftover segment holds is not
+    // used again, should it not go.
     std::error_code ec;
     for (const auto& entry : fs::directory_iterator(dir_, ec)) {
         const auto name      = entry.path().filename().string();
@@ -558,7 +626,7 @@ void Database::load() {
                 next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
             if (temporary || std::find(named.begin(), named.end(), name) == named.end())
                 fs::remove_all(entry.path(), ec);
-        } else if (temporary) {
+        } else if (temporary || (name.rfind("edits-", 0) == 0 && name != edits)) {
             fs::remove_all(entry.path(), ec);
         }
     }
@@ -579,46 +647,8 @@ uint32_t Database::nameId(const std::string& name, std::vector<std::string>& add
     return id;
 }
 
-Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates) {
-    Appended appended;
-    std::lock_guard lock(mutex_);
-    // Each game's key, made once: for the duplicates, the key column and the keys known after.
-    std::vector<uint64_t> keys(games.size());
-    for (std::size_t i = 0; i < games.size(); ++i) keys[i] = duplicateKey(games[i]);
-    if (!keep_duplicates) {
-        if (!keys_indexed_) {
-            known_keys_.reserve(current_->games_);
-            for (GameId id = 0; id < current_->games_; ++id) known_keys_.push_back(current_->key(id));
-            std::sort(known_keys_.begin(), known_keys_.end());
-            keys_indexed_ = true;
-        }
-        // Left out: a game whose key the database has, or a game before it in the batch. Sorted by key, then by
-        // place, the first of a key comes first.
-        std::vector<std::pair<uint64_t, std::size_t>> order(games.size());
-        for (std::size_t i = 0; i < games.size(); ++i) order[i] = {keys[i], i};
-        std::sort(order.begin(), order.end());
-        std::vector<char> left_out(games.size(), 0);
-        for (std::size_t j = 0; j < order.size(); ++j) {
-            const auto [key, i] = order[j];
-            if ((j > 0 && order[j - 1].first == key) || std::binary_search(known_keys_.begin(), known_keys_.end(), key))
-                left_out[i] = 1;
-        }
-        std::size_t kept = 0;
-        for (std::size_t i = 0; i < games.size(); ++i) {
-            if (left_out[i]) {
-                ++appended.duplicates;
-                continue;
-            }
-            if (kept != i) {
-                games[kept] = std::move(games[i]);
-                keys[kept]  = keys[i];
-            }
-            ++kept;
-        }
-        games.resize(kept);
-        keys.resize(kept);
-    }
-    if (games.empty()) return appended;
+void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
+                      const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted) {
     if (!names_indexed_) {
         for (uint32_t id = 0; id < current_->names_; ++id) name_ids_.emplace(std::string(current_->name(id)), id);
         names_indexed_ = true;
@@ -632,6 +662,8 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
         std::ifstream in(dir_ / MANIFEST, std::ios::binary);
         manifest = nlohmann::json::parse(in);
     }
+    const auto edits_before = manifest.value("edits", std::string());
+    std::string edits_written;
     bool committed = false;
     try {
         for (std::size_t from = 0; from < games.size(); from += SEGMENT_GAMES) {
@@ -775,9 +807,17 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
             syncFolder(dir_);
             counts.emplace_back(static_cast<uint32_t>(n), new_names);
         }
-        for (std::size_t s = 0; s < made.size(); ++s)
-            manifest["segments"].push_back(
-                {{"name", made[s]}, {"games", counts[s].first}, {"names", counts[s].second}});
+        for (std::size_t s = 0; s < made.size(); ++s) {
+            nlohmann::json entry{{"name", made[s]}, {"games", counts[s].first}, {"names", counts[s].second}};
+            if (versions) entry["versions"] = true;
+            manifest["segments"].push_back(std::move(entry));
+        }
+        if (replaced || deleted) {
+            edits_written = editsName(current_->generation_ + 1);
+            writeFile(dir_ / edits_written,
+                      editsBytes(replaced ? *replaced : current_->replaced_, deleted ? *deleted : current_->deleted_));
+            manifest["edits"] = edits_written;
+        }
         manifest["generation"] = current_->generation_ + 1;
         step("write manifest");
         tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
@@ -792,20 +832,77 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
             fs::remove_all(dir_ / name, ec);
             fs::remove_all(dir_ / (name + ".tmp"), ec);
         }
+        if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
         throw;
     }
 
     auto snap         = std::make_shared<Snapshot>(*current_);
     snap->generation_ = current_->generation_ + 1;
     for (std::size_t s = 0; s < made.size(); ++s) {
-        snap->first_game_.push_back(snap->games_);
+        if (!versions) {
+            snap->logical_.push_back(snap->segments_.size());
+            snap->first_game_.push_back(snap->games_);
+            snap->games_ += counts[s].first;
+        }
         snap->first_name_.push_back(snap->names_);
         snap->segments_.push_back(std::make_shared<const Segment>(dir_ / made[s], counts[s].first, counts[s].second));
-        snap->games_ += counts[s].first;
         snap->names_ += counts[s].second;
+    }
+    if (replaced) snap->replaced_ = *replaced;
+    if (deleted) {
+        snap->deleted_       = *deleted;
+        snap->deleted_count_ = 0;
+        for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
+    }
+    if (!edits_written.empty() && !edits_before.empty() && edits_before != edits_written) {
+        std::error_code gone;
+        fs::remove(dir_ / edits_before, gone);  // still read on Windows by nobody: the edits are in memory
     }
     next_segment_ += made.size();
     current_ = std::move(snap);
+}
+
+Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates) {
+    Appended appended;
+    std::lock_guard lock(mutex_);
+    // Each game's key, made once: for the duplicates, the key column and the keys known after.
+    std::vector<uint64_t> keys(games.size());
+    for (std::size_t i = 0; i < games.size(); ++i) keys[i] = duplicateKey(games[i]);
+    if (!keep_duplicates) {
+        if (!keys_indexed_) {
+            known_keys_.reserve(current_->games_);
+            for (GameId id = 0; id < current_->games_; ++id) known_keys_.push_back(current_->key(id));
+            std::sort(known_keys_.begin(), known_keys_.end());
+            keys_indexed_ = true;
+        }
+        // Left out: a game whose key the database has, or a game before it in the batch. Sorted by key, then by
+        // place, the first of a key comes first.
+        std::vector<std::pair<uint64_t, std::size_t>> order(games.size());
+        for (std::size_t i = 0; i < games.size(); ++i) order[i] = {keys[i], i};
+        std::sort(order.begin(), order.end());
+        std::vector<char> left_out(games.size(), 0);
+        for (std::size_t j = 0; j < order.size(); ++j) {
+            const auto [key, i] = order[j];
+            if ((j > 0 && order[j - 1].first == key) || std::binary_search(known_keys_.begin(), known_keys_.end(), key))
+                left_out[i] = 1;
+        }
+        std::size_t kept = 0;
+        for (std::size_t i = 0; i < games.size(); ++i) {
+            if (left_out[i]) {
+                ++appended.duplicates;
+                continue;
+            }
+            if (kept != i) {
+                games[kept] = std::move(games[i]);
+                keys[kept]  = keys[i];
+            }
+            ++kept;
+        }
+        games.resize(kept);
+        keys.resize(kept);
+    }
+    if (games.empty()) return appended;
+    commit(games, keys, false, nullptr, nullptr);
     if (keys_indexed_) {
         // Merged in: a sort of the new keys only, however many the database has.
         const auto before = static_cast<std::ptrdiff_t>(known_keys_.size());
@@ -815,6 +912,48 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
     }
     appended.added = games.size();
     return appended;
+}
+
+void Database::replace(GameId id, ImportedGame game) {
+    std::lock_guard lock(mutex_);
+    if (id >= current_->games_) throw std::out_of_range("no game " + std::to_string(id) + " to replace");
+    const uint64_t old_key = current_->key(id);
+    std::vector<uint64_t> keys{duplicateKey(game)};
+    std::vector<ImportedGame> games;
+    games.push_back(std::move(game));
+    // The new version goes in a segment of its own, the next one.
+    auto replaced = current_->replaced_;
+    const Snapshot::Version version{id, static_cast<uint32_t>(current_->segments_.size()), 0};
+    const auto at = std::lower_bound(replaced.begin(), replaced.end(), id,
+                                     [](const Snapshot::Version& r, GameId x) { return r.id < x; });
+    if (at != replaced.end() && at->id == id)
+        *at = version;
+    else
+        replaced.insert(at, version);
+    commit(games, keys, true, &replaced, nullptr);
+    if (keys_indexed_) {
+        if (const auto it = std::lower_bound(known_keys_.begin(), known_keys_.end(), old_key);
+            it != known_keys_.end() && *it == old_key)
+            known_keys_.erase(it);
+        known_keys_.insert(std::upper_bound(known_keys_.begin(), known_keys_.end(), keys[0]), keys[0]);
+    }
+}
+
+void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
+    std::lock_guard lock(mutex_);
+    auto bits = current_->deleted_;
+    for (const auto id : ids) {
+        if (id >= current_->games_) continue;
+        if (bits.size() <= id / 64) bits.resize(id / 64 + 1, 0);
+        if (deleted)
+            bits[id / 64] |= uint64_t{1} << (id % 64);
+        else
+            bits[id / 64] &= ~(uint64_t{1} << (id % 64));
+    }
+    while (!bits.empty() && bits.back() == 0) bits.pop_back();
+    if (bits == current_->deleted_) return;
+    std::vector<ImportedGame> none;
+    commit(none, {}, false, nullptr, &bits);
 }
 
 }  // namespace fcg::study

@@ -435,6 +435,7 @@ class Builder {
         const uint64_t standard = standard_.key();
         forParts(n, static_cast<std::size_t>(threads_), [&](std::size_t from, std::size_t to, std::size_t) {
             for (std::size_t id = from; id < to; ++id) {
+                if (snap_.deleted(id)) continue;  // left out of the tree
                 const auto m = snap_.gameMoves(id);
                 auto& g      = all[id];
                 g.codes      = m.codes.data();

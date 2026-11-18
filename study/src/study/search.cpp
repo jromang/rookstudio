@@ -229,7 +229,8 @@ void Search::work() {
         const uint64_t from = part * PART, to = std::min(n, from + PART);
         uint64_t looked = 0;
         for (GameId id = from; id < to && !cancel_; ++id, ++looked)
-            if (const auto ply = searchGame(*snapshot_, id, query_)) found.push_back({id, *ply});
+            if (!snapshot_->deleted(id))
+                if (const auto ply = searchGame(*snapshot_, id, query_)) found.push_back({id, *ply});
         searched_ += looked;
         std::lock_guard lock(mutex_);
         parts_[part] = std::move(found);

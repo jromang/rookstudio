@@ -17,8 +17,10 @@
 #include <matchmaking/sprt/sprt.hpp>
 #include <matchmaking/stats.hpp>
 
+#include <commentary/references.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
+#include <tour/polyglot.hpp>
 #include "board_3d.hpp"
 #include "board_nav.hpp"
 #include "board_page.hpp"
@@ -513,6 +515,34 @@ class App {
     void boardToast(std::string text);
     void drawBoardNagBar();
     void drawMoveField();  // the move being typed, played by Enter (the Chess space)
+    // The Chess space's column beside the board (mockups M2 and M3, view_board_tree.cpp): its tabs (Alt+1 to Alt+4),
+    // the opening tree of the databases and books, the reference games of the position.
+    void drawChessColumn();
+    void drawBoardTree();
+    void drawBoardReferences();
+    int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games
+    struct TreeRow {
+        std::string san;
+        chess::Move move;
+        uint64_t games = 0;                           // or a book's weight, in thousandths
+        double white = 0, draws = 0, black = 0;       // the shares of the games with a result
+        int score = -1, elo = 0, perf = 0, last = 0;  // for the side to move; -1 or 0 when not known
+    };
+    std::vector<TreeRow> tree_rows_;
+    std::string tree_rows_of_;  // the position and the source the rows are of
+    std::string tree_summary_;
+    bool tree_book_  = false;  // the rows are a book's weights
+    int tree_source_ = 0;      // the databases with a tree, then the library's Polyglot books
+    std::map<std::string, std::shared_ptr<tour::PolyglotBook>> tree_books_;
+    struct ReferencesJob {
+        std::string of;
+        std::future<commentary::References> done;
+        std::vector<DatabaseShelf::TreeSource> sources;
+    };
+    std::optional<ReferencesJob> references_job_;
+    commentary::References references_;
+    std::vector<DatabaseShelf::TreeSource> references_sources_;
+    std::string references_of_;
     // The threads the running tournament's games use now, about: its games times the larger thread count of its
     // engines.
     [[nodiscard]] int tournamentThreads() const;

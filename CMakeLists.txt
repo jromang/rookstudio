@@ -748,7 +748,9 @@ if(FCG_BUILD_GUI)
     )
     target_compile_options(fcg_lib PRIVATE -Wall -Wextra)
     target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}${FCG_VERSION_SUFFIX}")
-    target_link_libraries(fcg_lib PUBLIC fcg_study fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2 tinygettext fcg_md4c)
+    # The commentary library too, without the assistant's runtime: the Board page's reference games read it.
+    target_link_libraries(fcg_lib PUBLIC fcg_study fcg_commentary fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2
+                                         tinygettext fcg_md4c)
     if(FCG_ASSISTANT)
         # The assistant's child process is this program too (--assistant), and the window talks with it.
         target_link_libraries(fcg_lib PUBLIC fcg_assistant)

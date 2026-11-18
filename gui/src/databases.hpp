@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <future>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -71,6 +72,14 @@ class DatabaseShelf {
     // The database, opened at its first call; null when it cannot be (facts().error says why).
     [[nodiscard]] std::shared_ptr<study::Database> open(std::size_t index);
     [[nodiscard]] DatabaseFacts facts(std::size_t index);
+    // The database's snapshot and its opening tree when the tree covers it (none else), the tree opened once for a
+    // snapshot: what the Board page's tree and reference games read.
+    struct TreeSource {
+        std::string name;
+        std::shared_ptr<const study::Snapshot> snapshot;
+        std::shared_ptr<const study::Tree> tree;
+    };
+    [[nodiscard]] std::optional<TreeSource> treeSource(std::size_t index);
 
     // An import into a database, one at a time: started, followed, cancelled. After it, the database's opening
     // tree is built again (the tree's own progress), the database open all along.
@@ -110,6 +119,11 @@ class DatabaseShelf {
         bool refreshed = false;  // once since it was listed
     };
     std::vector<Link> links_;  // beside entries_, empty for the user's own
+    struct CachedTree {
+        uint64_t generation = ~uint64_t{0};
+        std::shared_ptr<const study::Tree> tree;
+    };
+    std::map<std::filesystem::path, CachedTree> trees_;  // by the database's folder, filled by treeSource()
     std::unique_ptr<Import> import_;
 };
 

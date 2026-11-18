@@ -1212,10 +1212,14 @@ void App::drawBoardPage() {
     ImGui::SameLine();
     ImGui::BeginChild("##board_side", ImVec2(0, 0));
     if (b.play_open || (b.match && b.match_state.running)) drawBoardPlay();
-    drawBoardAnalysis();
-    const float graph = boardGraphHeight();
-    drawBoardMoves(std::max(px(160), ImGui::GetContentRegionAvail().y - graph - ImGui::GetStyle().ItemSpacing.y));
-    drawBoardGraph(graph);
+    if (chessBoard()) {
+        drawChessColumn();
+    } else {
+        drawBoardAnalysis();
+        const float graph = boardGraphHeight();
+        drawBoardMoves(std::max(px(160), ImGui::GetContentRegionAvail().y - graph - ImGui::GetStyle().ItemSpacing.y));
+        drawBoardGraph(graph);
+    }
     ImGui::EndChild();
 }
 

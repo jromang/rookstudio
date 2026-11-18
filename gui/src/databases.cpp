@@ -302,6 +302,25 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
     return out;
 }
 
+std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t index) {
+    const auto db = open(index);
+    if (!db) return std::nullopt;
+    const auto snapshot = db->snapshot();
+    auto& cached        = trees_[entries_[index].folder];
+    if (cached.generation != snapshot->generation() || (!cached.tree && !entries_[index].source)) {
+        cached.generation = snapshot->generation();
+        cached.tree.reset();
+        if (!entries_[index].source) {
+            try {
+                auto tree = study::Tree::open(entries_[index].folder);
+                if (tree && !tree->stale(*snapshot)) cached.tree = std::move(tree);
+            } catch (const std::exception&) {
+            }
+        }
+    }
+    return TreeSource{entries_[index].name, snapshot, cached.tree};
+}
+
 bool DatabaseShelf::startImport(std::size_t index, const fs::path& file) {
     if (import_ || index >= entries_.size() || entries_[index].source) return false;
     const auto db = open(index);

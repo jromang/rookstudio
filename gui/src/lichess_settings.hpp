@@ -5,6 +5,7 @@
 // account's token is apart (lichess-account.json, readable by its owner alone).
 
 #include <string>
+#include <vector>
 
 #include <json.hpp>
 
@@ -16,7 +17,11 @@ struct LichessSettings {
     bool explorer  = true;   // Lichess's explorer in the Tree tab, the account linked
     bool count_new = false;  // the new games of the player counted when the home opens
     std::string player;      // whose games were imported last
+    // The Tree tab's "Lichess" source: the speeds and the rating groups of its games.
+    std::vector<std::string> explorer_speeds{"blitz", "rapid", "classical"};
+    std::vector<int> explorer_ratings{2000, 2200, 2500};
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
+                                                explorer_speeds, explorer_ratings)
 
 }  // namespace fcg

@@ -14,6 +14,7 @@
 
 #include "app.hpp"
 #include "console.hpp"
+#include "https.hpp"
 #include "i18n.hpp"
 #include "lichess_account.hpp"
 #include "lichess_broadcasts.hpp"
@@ -536,6 +537,133 @@ void App::drawLichessPage() {
     }
     drawLichessOnline();
     ImGui::EndChild();
+}
+
+}  // namespace fcg
+
+namespace fcg {
+
+void App::drawLichessTreeCard(bool linked) {
+    ui::beginCard("lichess_tree_card");
+    ImGui::PushTextWrapPos();
+    if (!linked) {
+        // M3, board 2: nothing is required, the local databases and the books stay.
+        ImGui::TextUnformatted(
+            TR("Lichess's explorer (the masters, all the players, one player) now asks for a linked "
+               "account. Nothing is required: the local databases and the books stay."));
+        if (ui::iconButton("lichess_tree_link", ui::Icon::External, TR("Link the account…"))) {
+            page_ = Page::Lichess;
+            startLichessLink();
+        }
+    } else {
+        ImGui::TextUnformatted(TR("Lichess's explorer is turned off on the Lichess page."));
+        if (ImGui::SmallButton(TR("The Lichess page ›"))) page_ = Page::Lichess;
+    }
+    ImGui::TextDisabled("%s", TR("Sent to Lichess for each position: its FEN and the filter chosen, with your token. "
+                                 "Nothing of your databases."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+}
+
+bool App::lichessTreeRows(int source, const std::string& fen) {
+    tree_db_   = -1;
+    tree_book_ = false;
+    if (!lichess_account_ || !lichess_.explorer) {
+        drawLichessTreeCard(lichess_account_.has_value());
+        return false;
+    }
+    // The answers that came.
+    if (explorer_job_.valid() && explorer_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (explorer_answers_.size() > 2000) explorer_answers_.clear();
+        explorer_answers_[explorer_asked_] = explorer_job_.get();
+    }
+    lichess::ExplorerQuery q;
+    q.source         = source == 0   ? lichess::ExplorerSource::Masters
+                       : source == 1 ? lichess::ExplorerSource::Lichess
+                                     : lichess::ExplorerSource::Player;
+    q.fen            = fen;
+    q.token          = lichess_account_->token;
+    const auto board = boardAt(board_.game, board_.chess960, board_.ply);
+    if (source == 1) {
+        q.speeds  = lichess_.explorer_speeds;
+        q.ratings = lichess_.explorer_ratings;
+    }
+    if (source == 2) {
+        q.player       = lichess_.player;
+        q.player_white = board.sideToMove() == chess::Color::WHITE;
+    }
+    std::string key = fmt::format("{}|{}", source, fen);
+    for (const auto& s : q.speeds) key += "|" + s;
+    for (const auto r : q.ratings) key += fmt::format("|{}", r);
+    key += "|" + q.player;
+    const auto found = explorer_answers_.find(key);
+    if (found == explorer_answers_.end()) {
+        // Asked once the position has stayed a moment: stepping through a game asks nothing on the way.
+        const double now = ImGui::GetTime();
+        if (fen != explorer_seen_) {
+            explorer_seen_  = fen;
+            explorer_since_ = now;
+        }
+        if (now - explorer_since_ > 0.4 && !explorer_job_.valid()) {
+            explorer_asked_ = key;
+            explorer_job_   = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+        }
+        tree_rows_.clear();
+        tree_rows_of_.clear();
+        tree_summary_ = TR("Asking Lichess…");
+        return true;
+    }
+    if (tree_rows_of_ == key) return true;
+    tree_rows_of_ = key;
+    tree_rows_.clear();
+    tree_row_     = -1;
+    const auto& a = found->second;
+    if (!a.value) {
+        const auto pause = HostGate::instance().pausedFor("explorer.lichess.ovh");
+        tree_summary_ =
+            pause.count() > 0
+                ? trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {} s.",
+                      std::chrono::duration_cast<std::chrono::seconds>(pause).count())
+                : trf("Lichess cannot be reached from here ({}): trying again at the next position. The local "
+                      "databases answer as always.",
+                      a.error);
+        explorer_answers_.erase(found);  // asked again at the next look
+        tree_rows_of_.clear();
+        return true;
+    }
+    const auto& e   = *a.value;
+    const auto all  = e.white + e.draws + e.black;
+    const bool side = board.sideToMove() == chess::Color::WHITE;
+    tree_summary_ =
+        trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(all, 1000000000)), ui::exactCount(all));
+    if (all > 0)
+        tree_summary_ += trf(" · White {} % · draws {} % · Black {} %", std::lround(100.0 * e.white / all),
+                             std::lround(100.0 * e.draws / all), std::lround(100.0 * e.black / all));
+    if (!e.opening.empty()) tree_summary_ += fmt::format(" · {} {}", e.eco, e.opening);
+    for (const auto& m : e.moves) {
+        chess::Move move = chess::Move::NO_MOVE;
+        try {
+            move = chess::uci::uciToMove(board, m.uci);
+        } catch (...) {
+        }
+        if (move == chess::Move::NO_MOVE) continue;
+        TreeRow row;
+        row.move        = move;
+        row.san         = chess::uci::moveToSan(board, move);
+        const auto done = m.white + m.draws + m.black;
+        row.games       = done;
+        if (done > 0) {
+            row.white = static_cast<double>(m.white) / done;
+            row.draws = static_cast<double>(m.draws) / done;
+            row.black = static_cast<double>(m.black) / done;
+            row.score = static_cast<int>(
+                std::lround(100.0 * (static_cast<double>(side ? m.white : m.black) + m.draws / 2.0) / done));
+        }
+        row.elo = m.average_rating;
+        tree_rows_.push_back(std::move(row));
+    }
+    if (tree_rows_.empty() && all == 0) tree_summary_ = TR("No game of this source reaches this position.");
+    return true;
 }
 
 }  // namespace fcg

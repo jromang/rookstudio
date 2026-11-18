@@ -833,7 +833,17 @@ class App {
     NoveltyJob tree_novelty_;
     std::string tree_summary_;
     bool tree_book_  = false;  // the rows are a book's weights
-    int tree_source_ = 0;      // the databases with a tree, then the library's Polyglot books
+    int tree_source_ = 0;      // the databases with a tree, the library's Polyglot books, then Lichess's explorer
+    // Lichess's explorer in the Tree tab (M3, board 2; M4): its answers this session, by position and source.
+    std::map<std::string, lichess::Answer<lichess::Explorer>> explorer_answers_;
+    std::future<lichess::Answer<lichess::Explorer>> explorer_job_;
+    std::string explorer_asked_;
+    void drawLichessTreeCard(bool linked);  // what the source needs: a linked account, the explorer allowed
+    // The Tree tab's rows from Lichess's explorer (0 the masters, 1 Lichess's players, 2 the player), asked when the
+    // position has stayed a moment; false when the card that source needs is drawn instead.
+    bool lichessTreeRows(int source, const std::string& fen);
+    std::string explorer_seen_;
+    double explorer_since_ = 0;
     std::map<std::string, std::shared_ptr<tour::PolyglotBook>> tree_books_;
     struct ReferencesJob {
         std::string of;

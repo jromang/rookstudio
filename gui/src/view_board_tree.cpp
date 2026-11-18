@@ -526,25 +526,34 @@ void App::drawBoardTree() {
         for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".bin") books.push_back(&book);
     }
-    // My databases: two or more together, their games added (M3, board 3); then each, then the books.
+    // My databases: two or more together, their games added (M3, board 3); then each, then the books; then Lichess's
+    // explorer: the masters, Lichess's players, the player whose games were imported (M3, board 2).
     const int together = databases.size() >= 2 ? 1 : 0;
-    const int count    = together + static_cast<int>(databases.size() + books.size());
-    if (count == 0) {
+    const int lichess_sources = lichess_.player.empty() ? 2 : 3;
+    const int count           = together + static_cast<int>(databases.size() + books.size()) + lichess_sources;
+    if (count == lichess_sources) {
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("No database with its opening tree, nor Polyglot book: import games on the "
                                      "Databases page (the tree is built after the import), or add a book on the Books "
                                      "page of the Engines space."));
         ImGui::PopTextWrapPos();
-        return;
     }
-    tree_source_       = std::clamp(tree_source_, 0, count - 1);
-    const int books_at = together + static_cast<int>(databases.size());
+    tree_source_         = std::clamp(tree_source_, 0, count - 1);
+    const int books_at   = together + static_cast<int>(databases.size());
+    const int lichess_at = books_at + static_cast<int>(books.size());
+    std::string ratings_label;
+    if (!lichess_.explorer_ratings.empty())
+        ratings_label = fmt::format(
+            " · {}+", *std::min_element(lichess_.explorer_ratings.begin(), lichess_.explorer_ratings.end()));
     std::size_t joined = 0;
     for (const auto& [name, i] : databases) joined += tree_left_.count(s.entries()[i].folder) ? 0 : 1;
     for (int i = 0; i < count; ++i) {
-        const auto label = i < together   ? trf("My databases · {}", joined)
-                           : i < books_at ? databases[static_cast<std::size_t>(i - together)].first
-                                          : books[static_cast<std::size_t>(i - books_at)]->name;
+        const auto label = i < together          ? trf("My databases · {}", joined)
+                           : i < books_at        ? databases[static_cast<std::size_t>(i - together)].first
+                           : i < lichess_at      ? books[static_cast<std::size_t>(i - books_at)]->name
+                           : i == lichess_at     ? std::string(TR("Masters (Lichess)"))
+                           : i == lichess_at + 1 ? "Lichess" + ratings_label
+                                                 : "Lichess · " + lichess_.player;
         if (i > 0) ImGui::SameLine();
         const bool on = tree_source_ == i;
         if (on) {
@@ -553,6 +562,41 @@ void App::drawBoardTree() {
         }
         if (ImGui::Button(fmt::format("{}##tree_source{}", label, i).c_str())) tree_source_ = i;
         if (on) ImGui::PopStyleColor(2);
+        // Lichess's players: the right button chooses the speeds and the ratings.
+        if (i == lichess_at + 1) {
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s",
+                                  TR("Lichess's players' games; the right button chooses their speeds and ratings"));
+            if (ImGui::BeginPopupContextItem("##lichess_filter")) {
+                bool changed = false;
+                ImGui::TextDisabled("%s", TR("Speeds"));
+                for (const char* speed : {"bullet", "blitz", "rapid", "classical", "correspondence"}) {
+                    auto& v = lichess_.explorer_speeds;
+                    bool in = std::find(v.begin(), v.end(), speed) != v.end();
+                    if (ImGui::Checkbox(speed, &in)) {
+                        if (in)
+                            v.push_back(speed);
+                        else
+                            std::erase(v, speed);
+                        changed = true;
+                    }
+                }
+                ImGui::TextDisabled("%s", TR("Ratings"));
+                for (const int r : {1600, 1800, 2000, 2200, 2500}) {
+                    auto& v = lichess_.explorer_ratings;
+                    bool in = std::find(v.begin(), v.end(), r) != v.end();
+                    if (ImGui::Checkbox(fmt::format("{}+##rating{}", r, r).c_str(), &in)) {
+                        if (in)
+                            v.push_back(r);
+                        else
+                            std::erase(v, r);
+                        changed = true;
+                    }
+                }
+                if (changed) saveLichessSettings();
+                ImGui::EndPopup();
+            }
+        }
         // My databases: the right button chooses those it adds together (M3, board 3).
         if (i < together) {
             if (ImGui::IsItemHovered())
@@ -590,6 +634,8 @@ void App::drawBoardTree() {
 
     // The rows of the position shown, made again when it or the source changes.
     const auto fen      = boardFen();
+    const bool online   = tree_source_ >= lichess_at;
+    if (online && !lichessTreeRows(tree_source_ - lichess_at, fen)) return;  // the card it needs instead
     const bool book     = tree_source_ >= books_at;
     const bool combined = tree_source_ < together;
     tree_db_ =
@@ -598,7 +644,7 @@ void App::drawBoardTree() {
     for (const auto& [name, i] : databases)
         counts += fmt::format("{}{},", tree_left_.count(s.entries()[i].folder) ? "-" : "", s.facts(i).games);
     const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
-    if (of != tree_rows_of_) {
+    if (!online && of != tree_rows_of_) {
         tree_rows_of_ = of;
         tree_rows_.clear();
         tree_summary_.clear();

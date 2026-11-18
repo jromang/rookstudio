@@ -1,6 +1,6 @@
 # Engine picker: GitHub releases of the top UCI engines (study, 18 November 2026)
 
-> The facts behind #59, the engine picker (2026-11-18): each engine's GitHub releases, the names of their files for each platform and CPU, the GitHub API and CPU detection. Spot-checked afterwards against the API (Stockfish sf_19, Gaia v4.4.4). Releases change: the picker reads them itself; this is for writing its catalogue.
+> The facts behind #59, the engine picker (2026-11-18): each engine's GitHub releases, the names of their files for each platform and CPU, the GitHub API and CPU detection. Spot-checked afterwards against the API (Stockfish sf_19, Gaia v4.4.4). Releases change: the picker reads them itself; this is for writing its catalogue. The catalogue is `gui/assets/engines.json`; `tools/engine_catalogue.py` checks it against each engine's newest release (a platform none of whose files are found is to look at: their names may have changed).
 
 Facts for a catalogue that a desktop GUI reads to download engines from their GitHub releases, always the latest.
 Collected on 2026-11-18 from the public GitHub API (`gh api`, read-only), the engines' release notes and build

@@ -572,7 +572,8 @@ TEST_CASE("assistant models: a model comes into the profile, checked against its
     CHECK(readAll(modelFile(profile, small)) == content);
     CHECK(progress.bytes == content.size());
     // A file that is not the one published is removed.
-    const AssistantModel other{"other", "other.gguf", "unused", std::string(64, '0'), content.size(), "MIT", "English"};
+    const std::string zeros(64, '0');  // the model holds a view of it
+    const AssistantModel other{"other", "other.gguf", "unused", zeros, content.size(), "MIT", "English"};
     CHECK_FALSE(downloadModel(profile, other, nullptr, nullptr, url).ok);
     CHECK_FALSE(fs::exists(modelFile(profile, other)));
     CHECK_FALSE(modelInstalled(profile, other));

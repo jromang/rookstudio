@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <fstream>
 #include <stdexcept>
 #include <system_error>
@@ -298,6 +299,9 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
     out.games     = snapshot->games() - snapshot->deletedCount();
     out.names = snapshot->names();
     out.bytes = folderBytes(entries_[index].folder);
+    std::error_code ec;
+    const auto written = std::filesystem::last_write_time(entries_[index].folder / "manifest.json", ec);
+    if (!ec) out.changed = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(written));
     try {
         const auto tree = study::Tree::open(entries_[index].folder);
         out.tree        = tree && !tree->stale(*snapshot) && tree->games() == snapshot->games();

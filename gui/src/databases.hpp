@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <filesystem>
 #include <future>
 #include <map>
@@ -39,7 +40,8 @@ struct DatabaseFacts {
     uint64_t bytes = 0;      // on the disk
     bool tree      = false;  // its opening tree covers its games
     bool read_only = false;  // another program writes to it: read as it commits, nothing written here
-    std::string error;       // why it could not be opened
+    std::time_t changed = 0;      // its last commit (an import, a game saved), from its manifest; 0 when not known
+    std::string error;            // why it could not be opened
 };
 
 // The quick filter of a game list, its words typed freely: a year (2024), an ECO code or its start (B90, B9, B), a

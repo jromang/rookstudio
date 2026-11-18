@@ -731,7 +731,9 @@ void App::drawBoardTree() {
     // The moves: a click plays one.
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
     const int columns    = tree_book_ ? 3 : 9;
-    const float toast_h  = star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
+    // Room under the table for the star's Undo and the line of keys.
+    const float toast_h = (star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f) +
+                          ImGui::GetTextLineHeightWithSpacing() * 2;
     if (!tree_rows_.empty() && ImGui::BeginTable("##tree_rows", columns, flags, ImVec2(0, -toast_h))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
@@ -832,6 +834,13 @@ void App::drawBoardTree() {
             repertoires().restore(star_undo_->index, std::move(star_undo_->lines));
             star_undo_.reset();
         }
+    }
+    // The keys, said under the moves (M3, board 1).
+    if (!tree_rows_.empty()) {
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", TR("↑ ↓ choose a move · Enter plays it · * marks it in the repertoire · Alt+3 this "
+                                     "tab"));
+        ImGui::PopTextWrapPos();
     }
     // The arrow on the board: the move under the mouse, else the one chosen.
     const auto shown = hovered ? hovered

@@ -189,6 +189,9 @@ void App::drawChessHome() {
                                                    static_cast<int>(100 * job->progress.bytes.load() / total));
         } else if (!facts.error.empty()) {
             sub = facts.error;
+        } else if (facts.changed) {
+            sub = trf("changed {}", ui::dayText(facts.changed));
+            if (facts.tree) sub += std::string(" · ") + TR("tree up to date");
         }
         ImGui::SetCursorPosX(start.x + px(4));
         ImGui::TextDisabled("%s", sub.empty() ? " " : sub.c_str());

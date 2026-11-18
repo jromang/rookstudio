@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <iterator>
 #include <string>
@@ -27,6 +28,29 @@
 namespace fcg {
 
 namespace {
+
+// Where a database is, as M1 writes it: from the home folder when it is in it, "Documents › RookStudio › Mega.fcgdb".
+std::string folderText(const std::filesystem::path& folder) {
+#ifdef _WIN32
+    const char* home = std::getenv("USERPROFILE");
+#else
+    const char* home = std::getenv("HOME");
+#endif
+    std::filesystem::path shown = folder;
+    if (home && *home) {
+        std::error_code ec;
+        const auto relative = std::filesystem::relative(folder, home, ec);
+        if (!ec && !relative.empty() && *relative.begin() != "..") shown = relative;
+    }
+    std::string text;
+    for (const auto& part : shown) {
+        const auto u8 = part.u8string();
+        const std::string piece(u8.begin(), u8.end());
+        if (piece.empty() || piece == "/" || piece == "\\") continue;
+        text += text.empty() ? piece : " › " + piece;
+    }
+    return text;
+}
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
@@ -526,6 +550,7 @@ void App::drawDatabases() {
                 line += entries[i].source->kind == study::LinkedSource::Kind::Tournament ? TR(" · tournament")
                                                                                          : TR(" · PGN file");
             if (refreshing) line += TR(" · bringing up to date…");
+            if (!entries[i].source && facts.changed) line += " · " + trf("changed {}", ui::dayText(facts.changed));
             ImGui::TextDisabled("%s", line.c_str());
         }
         ImGui::PopID();
@@ -539,6 +564,11 @@ void App::drawDatabases() {
     if (linked) s.refresh(index);  // brought up to date once it is shown
     const auto facts = s.facts(index);
     ui::pageTitle(entries[index].name.c_str());
+    if (!linked) {
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", folderText(entries[index].folder).c_str());
+        ImGui::PopTextWrapPos();
+    }
     if (!facts.error.empty()) {
         ImGui::PushTextWrapPos();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", facts.error.c_str());
@@ -640,9 +670,17 @@ void App::drawDatabases() {
         db_list_ = true;
         db_row_  = 0;
     }
-    ImGui::EndDisabled();
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("%s", TR("Enter"));
+    ImGui::SameLine();
+    if (ui::iconButton("db_search_here", ui::Icon::Search, TR("Search"))) {
+        db_list_        = true;
+        db_row_         = 0;
+        db_search_open_ = true;
+    }
+    ImGui::SameLine(0, px(4));
+    ImGui::TextDisabled("Ctrl+F");
+    ImGui::EndDisabled();
     if (linked) {
         // A tournament's games or a file: shown where they are.
         ImGui::SameLine();
@@ -757,7 +795,10 @@ void App::drawGameList() {
     const auto snapshot = db->snapshot();
 
     // Where it is: Databases › Name · N games.
-    if (ui::iconButton("db_back", ui::Icon::Back, TR("Databases")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup);
+    if (escape && db_search_open_) {
+        db_search_open_ = false;  // the panel first, then the list
+    } else if (ui::iconButton("db_back", ui::Icon::Back, TR("Databases")) || escape) {
         db_list_ = false;
         return;
     }
@@ -971,9 +1012,15 @@ void App::drawGameList() {
         const auto row = snap->row(id);
         ImGui::PushTextWrapPos();
         ImGui::TextUnformatted(fmt::format("{} – {}", row.white, row.black).c_str());
-        ImGui::TextDisabled("%s", fmt::format("{}{}{}", row.event, row.date ? " · " : "",
-                                              row.date ? study::dateText(row.date) : std::string())
-                                      .c_str());
+        std::string where(row.event);
+        const auto add = [&](const std::string& part) {
+            if (part.empty()) return;
+            where += where.empty() ? part : " · " + part;
+        };
+        if (row.date) add(study::dateText(row.date));
+        add(row.result == '1' ? "1-0" : row.result == '0' ? "0-1" : row.result == '=' ? "½-½" : "*");
+        if (row.eco) add(study::ecoText(row.eco));
+        ImGui::TextDisabled("%s", where.c_str());
         // Its moves, as the PGN gives them (the first ones).
         auto pgn         = study::importedPgn(snap->game(id));
         const auto moves = pgn.find("\n\n");
@@ -1145,8 +1192,12 @@ void App::pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, c
 void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot) {
     (void)snapshot;
     auto& p = db_search_;
-    ImGui::TextUnformatted(TR("Search"));
+    const auto& entries = shelf().entries();
+    const auto name =
+        db_selected_ >= 0 && static_cast<std::size_t>(db_selected_) < entries.size() ? entries[db_selected_].name : "";
+    ImGui::TextUnformatted(trf("Search in « {} »", name).c_str());
     ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("Esc"));
     ImGui::TextDisabled("%s", TR("the list follows it as it goes"));
     // The tabs of the mockup: the headers, the Board page's position, a material, a pattern.
     const char* tabs[] = {TR("Headers"), TR("Position"), TR("Material"), TR("Pattern")};
@@ -1201,7 +1252,10 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + label_w);
         ImGui::SetNextItemWidth(-1);
         const char* sides[] = {TR("Either colour"), TR("White"), TR("Black")};
-        ImGui::Combo("##s_side", &p.side, sides, 3);
+        for (int i = 0; i < 3; ++i) {
+            if (i > 0) ImGui::SameLine(0, px(2));
+            if (ImGui::RadioButton(sides[i], p.side == i)) p.side = i;
+        }
         field(TR("Opponent"), "##s_opponent", p.opponent);
         field(TR("Event"), "##s_event", p.event);
         label(TR("Years"));
@@ -1228,9 +1282,11 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         label(TR("Result"));
         const char* results[] = {TR("All"), "1-0", "½-½", "0-1"};
         const char values[]   = {0, '1', '=', '0'};
-        int result            = static_cast<int>(std::find(std::begin(values), std::end(values), p.result) - values);
-        ImGui::SetNextItemWidth(px(100));
-        if (ImGui::Combo("##s_result", &result, results, 4)) p.result = values[result];
+        const int result      = static_cast<int>(std::find(std::begin(values), std::end(values), p.result) - values);
+        for (int i = 0; i < 4; ++i) {
+            if (i > 0) ImGui::SameLine(0, px(2));
+            if (ImGui::RadioButton(results[i], result == i)) p.result = values[i];
+        }
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + label_w);
         ImGui::Checkbox(TR("Damaged games only"), &p.damaged);
         if (ImGui::IsItemHovered())

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iterator>
 #include <utility>
@@ -206,6 +207,31 @@ std::string formatCount(uint64_t n) {
     if (n >= 10'000ULL) return fmt::format("{:.0f}k", n / 1e3);
     if (n >= 1'000ULL) return fmt::format("{:.1f}k", n / 1e3);
     return fmt::format("{}", n);
+}
+
+std::string dayText(std::time_t when) {
+    const auto now = std::time(nullptr);
+    std::tm today{}, then{};
+#ifdef _WIN32
+    localtime_s(&today, &now);
+    localtime_s(&then, &when);
+#else
+    localtime_r(&now, &today);
+    localtime_r(&when, &then);
+#endif
+    // Days between them, counted from the calendar days, not 24-hour spans.
+    std::tm a = today, b = then;
+    a.tm_hour = b.tm_hour = 12;
+    a.tm_min = b.tm_min = a.tm_sec = b.tm_sec = 0;
+    const auto days = static_cast<long>(std::lround(std::difftime(std::mktime(&a), std::mktime(&b)) / 86400.0));
+    if (days <= 0) return TR("today");
+    if (days == 1) return TR("yesterday");
+    static constexpr const char* week[] = {N_("on Sunday"),   N_("on Monday"), N_("on Tuesday"), N_("on Wednesday"),
+                                           N_("on Thursday"), N_("on Friday"), N_("on Saturday")};
+    if (days < 7) return TR(week[then.tm_wday]);
+    char text[16];
+    std::strftime(text, sizeof(text), "%Y-%m-%d", &then);
+    return trf("on {}", text);
 }
 
 std::string exactCount(uint64_t n) {

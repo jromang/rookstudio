@@ -3,6 +3,7 @@
 // Small formatting and widget helpers shared by the views.
 
 #include <cstdint>
+#include <ctime>
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -46,6 +47,8 @@ std::string formatClock(int64_t ms);
 std::string formatCount(uint64_t n);
 // The exact number with the language's thousands separator: "12,345,678", "12 345 678" (narrow no-break spaces).
 std::string exactCount(uint64_t n);
+// A past moment's day as one says it: "today", "yesterday", the day of the week within the week, else the date.
+[[nodiscard]] std::string dayText(std::time_t when);
 
 // Engine score from the mover's point of view, as "+0.35" or "#5".
 std::string formatScore(const std::optional<fastchess::Score>& score);

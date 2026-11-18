@@ -245,7 +245,8 @@ class App {
     int db_selected_ = -1;
     bool db_naming_  = false;  // a new database's name being typed
     std::array<char, 128> db_name_{};
-    std::string db_message_;  // the last import's outcome
+    std::string db_message_;     // the last import's outcome
+    std::string db_linked_key_;  // the linked sources listed: the tournaments, the PGN file opened
     // The chosen database's games (mockup M1, board 2), in place of the list of databases: a quick filter, a sort, the
     // view made in the background, the game chosen.
     void drawGameList();

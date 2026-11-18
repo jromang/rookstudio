@@ -130,3 +130,33 @@ TEST_CASE("databases: the quick filter's words, a year, an ECO code and a result
     CHECK(f.eco_to == study::packEco("E97"));
     CHECK(quickFilter("").empty());
 }
+
+TEST_CASE("databases: a PGN file read as a database without a copy, after the user's own") {
+    const auto profile = freshDir("shelf-linked");
+    const auto file    = pgnFile(profile, 25);
+    {
+        DatabaseShelf shelf(profile);
+        shelf.create("Mine");
+        shelf.setLinked({{"games.pgn", study::LinkedSource{study::LinkedSource::Kind::PgnFile, file}}});
+        REQUIRE(shelf.entries().size() == 2);
+        CHECK_FALSE(shelf.entries()[0].source);
+        REQUIRE(shelf.entries()[1].source);
+        shelf.refresh(1);
+        const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+        while (shelf.refreshing(1) && std::chrono::steady_clock::now() < give_up)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        CHECK(shelf.facts(1).games == 25);
+        CHECK_FALSE(shelf.startImport(1, file));  // never written but by its refresh
+        shelf.remove(1);                          // not removed: it is listed from its source
+        CHECK(shelf.entries().size() == 2);
+        // A database made now goes before the linked ones.
+        CHECK(shelf.create("Mine too") == 1);
+        CHECK(shelf.entries()[2].source);
+        // The same source again keeps it as it is.
+        shelf.setLinked({{"renamed", study::LinkedSource{study::LinkedSource::Kind::PgnFile, file}}});
+        CHECK(shelf.entries()[2].name == "renamed");
+        CHECK(shelf.facts(2).games == 25);
+    }
+    DatabaseShelf again(profile);
+    CHECK(again.entries().size() == 2);  // databases.json keeps the user's own only
+}

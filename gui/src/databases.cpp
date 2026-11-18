@@ -103,6 +103,7 @@ DatabaseShelf::DatabaseShelf(fs::path profile) : profile_(std::move(profile)) {
     open_.resize(entries_.size());
     errors_.resize(entries_.size());
     facts_.resize(entries_.size());
+    links_.resize(entries_.size());
 }
 
 DatabaseShelf::~DatabaseShelf() {
@@ -110,11 +111,16 @@ DatabaseShelf::~DatabaseShelf() {
         import_->cancel = true;
         if (import_->done.valid()) import_->done.wait();
     }
+    for (auto& link : links_) {
+        if (link.cancel) *link.cancel = true;
+        if (link.refresh.valid()) link.refresh.wait();
+    }
 }
 
 void DatabaseShelf::save() const {
     auto json = nlohmann::json::array();
-    for (const auto& e : entries_) json.push_back({{"name", e.name}, {"folder", portable::stored(e.folder.string())}});
+    for (const auto& e : entries_)
+        if (!e.source) json.push_back({{"name", e.name}, {"folder", portable::stored(e.folder.string())}});
     tour::replaceFile(listFile(profile_), json.dump(2) + "\n");
 }
 
@@ -130,13 +136,17 @@ std::size_t DatabaseShelf::create(const std::string& wanted) {
     std::error_code ec;
     for (int n = 2; fs::exists(folder, ec); ++n) folder = dir / (folderName(name) + " " + std::to_string(n) + ".fcgdb");
     fs::create_directories(dir, ec);
-    auto db = study::Database::create(folder);
-    entries_.push_back({name, folder});
-    open_.push_back(std::move(db));
-    errors_.emplace_back();
-    facts_.emplace_back();
+    auto db        = study::Database::create(folder);
+    const auto own = static_cast<std::ptrdiff_t>(
+        std::count_if(entries_.begin(), entries_.end(), [](const DatabaseEntry& e) { return !e.source; }));
+    entries_.insert(entries_.begin() + own, {name, folder, std::nullopt});
+    open_.insert(open_.begin() + own, std::move(db));
+    errors_.insert(errors_.begin() + own, std::string());
+    facts_.insert(facts_.begin() + own, CachedFacts{});
+    links_.insert(links_.begin() + own, Link{});
+    if (import_ && import_->index >= static_cast<std::size_t>(own)) ++import_->index;
     save();
-    return entries_.size() - 1;
+    return static_cast<std::size_t>(own);
 }
 
 std::size_t DatabaseShelf::add(const fs::path& folder) {
@@ -146,17 +156,21 @@ std::size_t DatabaseShelf::add(const fs::path& folder) {
     if (it != entries_.end()) return static_cast<std::size_t>(it - entries_.begin());
     if (!fs::is_regular_file(folder / "manifest.json", ec))
         throw std::runtime_error(folder.string() + " is not a database (it has no manifest.json)");
-    auto name = folder.stem().string();
-    entries_.push_back({name.empty() ? folder.string() : name, folder});
-    open_.emplace_back();
-    errors_.emplace_back();
-    facts_.emplace_back();
+    auto name      = folder.stem().string();
+    const auto own = static_cast<std::ptrdiff_t>(
+        std::count_if(entries_.begin(), entries_.end(), [](const DatabaseEntry& e) { return !e.source; }));
+    entries_.insert(entries_.begin() + own, {name.empty() ? folder.string() : name, folder, std::nullopt});
+    open_.insert(open_.begin() + own, nullptr);
+    errors_.insert(errors_.begin() + own, std::string());
+    facts_.insert(facts_.begin() + own, CachedFacts{});
+    links_.insert(links_.begin() + own, Link{});
+    if (import_ && import_->index >= static_cast<std::size_t>(own)) ++import_->index;
     save();
-    return entries_.size() - 1;
+    return static_cast<std::size_t>(own);
 }
 
 void DatabaseShelf::remove(std::size_t index) {
-    if (index >= entries_.size()) return;
+    if (index >= entries_.size() || entries_[index].source) return;
     if (import_ && import_->index == index) {
         import_->cancel = true;
         if (import_->done.valid()) import_->done.wait();
@@ -169,18 +183,99 @@ void DatabaseShelf::remove(std::size_t index) {
     open_.erase(open_.begin() + at);
     errors_.erase(errors_.begin() + at);
     facts_.erase(facts_.begin() + at);
+    links_.erase(links_.begin() + at);
     save();
+}
+
+void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::LinkedSource>>& sources) {
+    // The user's own first, as they are; then the sources, those listed already keeping what they hold.
+    std::vector<DatabaseEntry> entries;
+    std::vector<std::shared_ptr<study::Database>> open;
+    std::vector<std::string> errors;
+    std::vector<CachedFacts> facts;
+    std::vector<Link> links;
+    for (std::size_t i = 0; i < entries_.size(); ++i) {
+        if (entries_[i].source) continue;
+        entries.push_back(std::move(entries_[i]));
+        open.push_back(std::move(open_[i]));
+        errors.push_back(std::move(errors_[i]));
+        facts.push_back(facts_[i]);
+        links.push_back(std::move(links_[i]));
+    }
+    const auto cache = profile_ / "cache" / "linked";
+    for (const auto& [name, source] : sources) {
+        const auto it = std::find_if(entries_.begin(), entries_.end(), [&](const DatabaseEntry& e) {
+            return e.source && e.source->kind == source.kind && e.source->path == source.path;
+        });
+        if (it != entries_.end()) {
+            const auto i = static_cast<std::size_t>(it - entries_.begin());
+            entries.push_back(std::move(entries_[i]));
+            entries.back().name = name;
+            open.push_back(std::move(open_[i]));
+            errors.push_back(std::move(errors_[i]));
+            facts.push_back(facts_[i]);
+            links.push_back(std::move(links_[i]));
+        } else {
+            entries.push_back({name, cache / (study::linkedKey(source) + ".fcgdb"), source});
+            open.emplace_back();
+            errors.emplace_back();
+            facts.emplace_back();
+            links.emplace_back();
+        }
+    }
+    // Those no longer listed: their refresh stopped.
+    for (std::size_t i = 0; i < entries_.size(); ++i) {
+        if (i < links_.size() && links_[i].refresh.valid()) {
+            if (links_[i].cancel) *links_[i].cancel = true;
+            links_[i].refresh.wait();
+        }
+    }
+    entries_ = std::move(entries);
+    open_    = std::move(open);
+    errors_  = std::move(errors);
+    facts_   = std::move(facts);
+    links_   = std::move(links);
+}
+
+void DatabaseShelf::refresh(std::size_t index) {
+    if (index >= entries_.size() || !entries_[index].source) return;
+    auto& link = links_[index];
+    if (link.refreshed || link.refresh.valid()) return;
+    if (!open(index) || !link.db) return;
+    link.refreshed = true;
+    link.cancel    = std::make_shared<std::atomic<bool>>(false);
+    link.refresh   = std::async(std::launch::async, [db = link.db, cancel = link.cancel] {
+        study::enterBackground();
+        return db->refresh(*cancel);
+    });
+}
+
+bool DatabaseShelf::refreshing(std::size_t index) {
+    if (index >= links_.size() || !links_[index].refresh.valid()) return false;
+    auto& link = links_[index];
+    if (link.refresh.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return true;
+    const auto done = link.refresh.get();
+    if (!done.error.empty()) errors_[index] = done.error;
+    facts_[index].generation = ~uint64_t{0};
+    if (done.rebuilt) open_[index] = link.db->database();  // a database read again from the start
+    return false;
 }
 
 std::shared_ptr<study::Database> DatabaseShelf::open(std::size_t index) {
     if (index >= entries_.size()) return nullptr;
     if (!open_[index] && errors_[index].empty()) {
         try {
-            open_[index] = study::Database::open(entries_[index].folder);
+            if (const auto& source = entries_[index].source) {
+                links_[index].db = study::LinkedDatabase::open(profile_ / "cache" / "linked", *source);
+                open_[index]     = links_[index].db->database();
+            } else {
+                open_[index] = study::Database::open(entries_[index].folder);
+            }
         } catch (const std::exception& e) {
             errors_[index] = e.what();
         }
     }
+    if (entries_[index].source && links_[index].db) open_[index] = links_[index].db->database();
     return open_[index];
 }
 
@@ -208,7 +303,7 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
 }
 
 bool DatabaseShelf::startImport(std::size_t index, const fs::path& file) {
-    if (import_) return false;
+    if (import_ || index >= entries_.size() || entries_[index].source) return false;
     const auto db = open(index);
     if (!db) return false;
     import_          = std::make_unique<Import>();

@@ -141,6 +141,23 @@ void App::drawDatabases() {
     }
     ImGui::Dummy(ImVec2(0, px(6)));
 
+    // The linked sources: the Engines space's tournaments, the PGN file opened on the Board page.
+    {
+        refreshTournaments();
+        std::vector<std::pair<std::string, study::LinkedSource>> sources;
+        for (const auto& t : tournaments_)
+            sources.push_back({t.spec.name.empty() ? t.dir.filename().string() : t.spec.name,
+                               study::LinkedSource{study::LinkedSource::Kind::Tournament, t.dir}});
+        if (board_.pgn && !board_.pgn->file.empty())
+            sources.push_back({board_.pgn->file.filename().string(),
+                               study::LinkedSource{study::LinkedSource::Kind::PgnFile, board_.pgn->file}});
+        std::string key;
+        for (const auto& [name, source] : sources) key += name + "\n" + source.path.string() + "\n";
+        if (key != db_linked_key_) {
+            s.setLinked(sources);
+            db_linked_key_ = key;
+        }
+    }
     const auto& entries = s.entries();
     if (entries.empty()) {
         ui::beginCard("db_empty");
@@ -155,8 +172,15 @@ void App::drawDatabases() {
     const float list_w = std::min(px(380), ImGui::GetContentRegionAvail().x * 0.45f);
     ImGui::BeginChild("##db_list", ImVec2(list_w, 0), ImGuiChildFlags_Borders);
     for (std::size_t i = 0; i < entries.size(); ++i) {
+        if (entries[i].source && (i == 0 || !entries[i - 1].source)) {
+            ImGui::Dummy(ImVec2(0, px(6)));
+            ImGui::TextDisabled("%s", TR("Read without a copy"));
+            ImGui::Separator();
+        }
         ImGui::PushID(static_cast<int>(i));
-        const auto facts = s.facts(i);
+        if (entries[i].source) s.refresh(i);  // once listed: its count comes
+        const bool refreshing = entries[i].source && s.refreshing(i);
+        const auto facts      = s.facts(i);
         const bool on    = db_selected_ == static_cast<int>(i);
         const auto start = ImGui::GetCursorPos();
         if (ImGui::Selectable("##db", on, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.2f)))
@@ -164,20 +188,26 @@ void App::drawDatabases() {
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(3)));
         ImGui::TextUnformatted(entries[i].name.c_str());
         ImGui::SetCursorPosX(start.x + px(6));
-        if (!facts.error.empty())
+        if (!facts.error.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", TR("cannot be opened"));
-        else
-            ImGui::TextDisabled(
-                "%s", trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(facts.games, 1000000000)),
-                          ui::exactCount(facts.games))
-                          .c_str());
+        } else {
+            auto line = trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(facts.games, 1000000000)),
+                            ui::exactCount(facts.games));
+            if (entries[i].source)
+                line += entries[i].source->kind == study::LinkedSource::Kind::Tournament ? TR(" · tournament")
+                                                                                         : TR(" · PGN file");
+            if (refreshing) line += TR(" · bringing up to date…");
+            ImGui::TextDisabled("%s", line.c_str());
+        }
         ImGui::PopID();
     }
     ImGui::EndChild();
     ImGui::SameLine(0, px(14));
 
     ImGui::BeginChild("##db_chosen", ImVec2(0, 0));
-    const auto index = static_cast<std::size_t>(db_selected_);
+    const auto index  = static_cast<std::size_t>(db_selected_);
+    const bool linked = entries[index].source.has_value();
+    if (linked) s.refresh(index);  // brought up to date once it is shown
     const auto facts = s.facts(index);
     ui::pageTitle(entries[index].name.c_str());
     if (!facts.error.empty()) {
@@ -198,8 +228,16 @@ void App::drawDatabases() {
             row(formatBytes(facts.bytes), TR("on the disk"));
             ImGui::EndTable();
         }
-        ImGui::TextDisabled(
-            "%s", facts.tree ? TR("Opening tree up to date.") : TR("Opening tree to build: after the next import."));
+        if (linked) {
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("%s", trf("Read from {} without a copy, brought up to date when shown.",
+                                          entries[index].source->path.string())
+                                          .c_str());
+            ImGui::PopTextWrapPos();
+        } else {
+            ImGui::TextDisabled("%s", facts.tree ? TR("Opening tree up to date.")
+                                                 : TR("Opening tree to build: after the next import."));
+        }
     }
     ImGui::Dummy(ImVec2(0, px(6)));
 
@@ -247,6 +285,16 @@ void App::drawDatabases() {
     ImGui::EndDisabled();
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("%s", TR("Enter"));
+    if (linked) {
+        // A tournament's games or a file: shown where they are.
+        ImGui::SameLine();
+        if (ui::iconButton("db_source", ui::Icon::FolderClosed, TR("Open the folder"))) {
+            const auto& path = entries[index].source->path;
+            ui::openPath(entries[index].source->kind == study::LinkedSource::Kind::PgnFile ? path.parent_path() : path);
+        }
+        ImGui::EndChild();
+        return;
+    }
     ImGui::SameLine();
     ImGui::BeginDisabled(s.import() != nullptr || !facts.error.empty());
     if (ui::iconButton("db_import_here", ui::Icon::Folder, TR("Import into this database…")))

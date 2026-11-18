@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <study/import.hpp>
+#include <study/linked.hpp>
 #include <study/query.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
@@ -24,7 +25,10 @@ namespace fcg {
 
 struct DatabaseEntry {
     std::string name;
-    std::filesystem::path folder;  // Name.fcgdb
+    std::filesystem::path folder;  // Name.fcgdb; a linked one's in the profile's cache
+    // A tournament's games or a PGN file, read without a copy (study::LinkedDatabase): listed after the user's own
+    // databases, never written but by the refresh that brings them up to date.
+    std::optional<study::LinkedSource> source;
 };
 
 // What the list of databases says of one.
@@ -53,8 +57,16 @@ class DatabaseShelf {
     std::size_t create(const std::string& name);
     // A database folder made elsewhere, listed last (or where it already is): its index. Throws when it is none.
     std::size_t add(const std::filesystem::path& folder);
-    // Out of the list; its files stay.
+    // Out of the list; its files stay. Not a linked one's.
     void remove(std::size_t index);
+
+    // The linked sources, after the user's own databases: the tournaments, the PGN files opened; those already open
+    // are kept.
+    void setLinked(const std::vector<std::pair<std::string, study::LinkedSource>>& sources);
+    // A linked database brought up to date in the background (a tournament's new games, a file rewritten), once
+    // after it is shown; true while it runs.
+    void refresh(std::size_t index);
+    [[nodiscard]] bool refreshing(std::size_t index);
 
     // The database, opened at its first call; null when it cannot be (facts().error says why).
     [[nodiscard]] std::shared_ptr<study::Database> open(std::size_t index);
@@ -91,6 +103,13 @@ class DatabaseShelf {
         DatabaseFacts facts;
     };
     std::vector<CachedFacts> facts_;  // refreshed when the database's snapshot changes
+    struct Link {
+        std::shared_ptr<study::LinkedDatabase> db;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::future<study::LinkedRefresh> refresh;
+        bool refreshed = false;  // once since it was listed
+    };
+    std::vector<Link> links_;  // beside entries_, empty for the user's own
     std::unique_ptr<Import> import_;
 };
 

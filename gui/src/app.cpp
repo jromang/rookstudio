@@ -1,5 +1,6 @@
 #include "app.hpp"
 
+#include "assistant_service.hpp"
 #include "board_text.hpp"
 #include "engine_hub.hpp"
 
@@ -18,9 +19,11 @@
 
 #include <fmt/include/fmt/format.h>
 #include <core/globals/globals.hpp>
+#include <engine/uci_engine.hpp>
 #include <tour/files.hpp>
 #include <tour/sprt_rules.hpp>
 
+#include "engine_oracle.hpp"
 #include "i18n.hpp"
 #include "memory.hpp"
 #include "notify.hpp"
@@ -100,6 +103,8 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     loadRecentGames();  // the board's game and the recent ones of the session before
     loadKeptSearches();
     loadLichess();
+    // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
+    assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
     updates_ = storage_.updateSettings();
     if (updates_.enabled && !options_.scripted && update::checkDue(updates_.checked, std::time(nullptr))) {
@@ -265,7 +270,8 @@ void App::frame() {
     handleBigScreenKeys();
     applyThemeSetting();
     updateBroadcast();
-    pollLichess();  // a link, a sync, the broadcasts: whatever page shows
+    pollLichess();    // a link, a sync, the broadcasts: whatever page shows
+    pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
     // --shot and --focus: show the requested page or tab once the first frames are drawn.
     if (!options_.focus_window.empty() && !focus_done_) {
@@ -1577,6 +1583,13 @@ void App::handleDialogs() {
                     board_.message       = trf("Cannot write {}: {}", path, e.what());
                     board_.message_error = true;
                 }
+                break;
+            case Dialogs::Purpose::AssistantModel:
+                // A GGUF file in place of the catalogue's model: loaded at the next question.
+                assistant_->unload();
+                assistant_->settings().model_file = path;
+                assistant_->settings().not_now    = false;
+                assistant_->saveSettings();
                 break;
             case Dialogs::Purpose::SaveBoardPgn:
                 try {

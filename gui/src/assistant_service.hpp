@@ -1,0 +1,89 @@
+#pragma once
+
+// The assistant as the window uses it (mockup M5): its model's file (the catalogue's, downloaded once, or a GGUF file
+// chosen), the download, and the model loaded in its process at the first request and unloaded by Unload, or by itself
+// after a quarter of an hour unused. It is the commentary::Model the questions and the comments are written with: a
+// request loads the model when it is not loaded, on the thread that asks (never the window's).
+
+#include <atomic>
+#include <chrono>
+#include <filesystem>
+#include <future>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+
+#include <commentary/commentator.hpp>
+#include <json.hpp>
+
+#include "assistant_models.hpp"
+#include "https.hpp"
+
+namespace fcg {
+
+class AssistantProcess;
+
+struct AssistantSettings {
+    std::string model_file;      // a GGUF file chosen instead of the catalogue's model; empty: the catalogue's
+    bool gpu           = true;   // on the GPU when the program has one to use
+    int unload_minutes = 15;     // unloaded after so long unused; 0: kept until Unload
+    bool not_now       = false;  // "Not now" said to the first use: offered again where it is asked, quietly
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AssistantSettings, model_file, gpu, unload_minutes, not_now)
+
+class AssistantService final : public commentary::Model {
+   public:
+    AssistantService(std::filesystem::path profile, std::string program);
+    ~AssistantService() override;
+    AssistantService(const AssistantService&)            = delete;
+    AssistantService& operator=(const AssistantService&) = delete;
+
+    AssistantSettings& settings() noexcept { return settings_; }
+    void saveSettings();
+
+    // The model: the catalogue's recommended one, unless a file was chosen.
+    [[nodiscard]] const AssistantModel& recommended() const;
+    [[nodiscard]] std::filesystem::path modelPath() const;
+    [[nodiscard]] bool installed() const;  // its file is there, whole
+
+    // The recommended model downloaded into the profile, resumed where an earlier try stopped, checked at its end.
+    void download();
+    void cancelDownload();
+    [[nodiscard]] bool downloading() const;
+    [[nodiscard]] uint64_t downloaded() const;        // bytes so far
+    [[nodiscard]] double downloadSpeed() const;       // bytes a second, lately
+    [[nodiscard]] std::string downloadError() const;  // why the last download stopped; empty after a success
+
+    enum class State { NoModel, Downloading, Unloaded, Loading, Ready, Failed };
+    [[nodiscard]] State state() const;
+    [[nodiscard]] std::string devices() const;  // where the model runs, as its process named it
+    [[nodiscard]] std::string failure() const;  // why it could not load
+    void unload();                              // its process ended: its memory, and the GPU's, freed
+    // Once a frame: a download that ended, the model unloaded after unload_minutes unused.
+    void poll();
+
+    // commentary::Model: the model's answer, loading it first when it is not loaded (on the caller's thread).
+    [[nodiscard]] std::optional<commentary::Generation> generate(const commentary::Request& request,
+                                                                 std::string* error) override;
+
+   private:
+    std::filesystem::path profile_;
+    std::string program_;
+    AssistantSettings settings_;
+    mutable std::mutex mutex_;
+    std::unique_ptr<AssistantProcess> process_;
+    std::atomic<bool> loading_{false};
+    std::atomic<bool> unload_asked_{false};  // Unload while a request held the model: done once it is answered
+    std::string failure_, devices_;
+    std::chrono::steady_clock::time_point last_use_{};
+    std::future<Download> download_;
+    std::shared_ptr<DownloadProgress> progress_;
+    std::shared_ptr<std::atomic<bool>> cancel_;
+    std::string download_error_;
+    std::chrono::steady_clock::time_point speed_at_{};
+    uint64_t speed_bytes_ = 0;
+    double speed_         = 0;
+};
+
+}  // namespace fcg

@@ -60,6 +60,8 @@ struct Answered {
     std::optional<Move> best;
     // The games the answer names, the strongest that reached the position.
     std::vector<ReferenceGame> games;
+    // What the question was taken to ask: the window says what the answer rests on from it.
+    Action::Kind kind                      = Action::Kind::Explain;
     bool operator==(const Answered&) const = default;
 };
 

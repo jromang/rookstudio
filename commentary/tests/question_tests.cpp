@@ -156,12 +156,14 @@ TEST_CASE("question: answers from the review's lines, the engine's, and the mode
     CHECK(said.text.starts_with("Meilleur coup : 1…e5."));
     CHECK(said.best == *pos.parseUci("e7e5"));
     CHECK(said.moves == std::vector<Move>{*pos.parseUci("e7e5")});
+    CHECK(said.kind == Action::Kind::Best);  // what the window says the answer rests on
     // A move of the position before, read by the model: played where it was legal.
     asked.question = "Et pourquoi pas 1.d4 ?";
     Scripted reader({"try d4"});
     const auto tried = answer(asked, reader, &engine, nullptr);
     REQUIRE(std::holds_alternative<Answered>(tried));
     CHECK(std::get<Answered>(tried).earlier);
+    CHECK(std::get<Answered>(tried).kind == Action::Kind::Try);
     CHECK(std::get<Answered>(tried).moves == std::vector<Move>{*start.parseUci("d2d4")});
     REQUIRE(!reader.requests.empty());
     CHECK(reader.requests.front().messages[1].second.starts_with("Move just played: 1.e4. Black to move."));
@@ -172,8 +174,18 @@ TEST_CASE("question: answers from the review's lines, the engine's, and the mode
     CHECK(std::get<Problem>(answer(asked, mute, &engine, nullptr)) == Problem::NoEngine);
     asked.question = "Quel est le meilleur coup ?";
     CHECK(std::get<Problem>(answer(asked, silent, nullptr, nullptr)) == Problem::NoEngine);
+    // The move just played, the game not reviewed: the engine's comment on it, where it was played.
     asked.question = "Why this move?";
-    CHECK(std::get<Problem>(answer(asked, silent, &engine, nullptr)) == Problem::Unanalyzed);
+    const auto why = answer(asked, silent, &engine, nullptr);
+    REQUIRE(std::holds_alternative<Answered>(why));
+    CHECK(std::get<Answered>(why).kind == Action::Kind::Explain);
+    CHECK(std::get<Answered>(why).earlier);
+    CHECK(std::get<Answered>(why).moves == std::vector<Move>{e4});
+    // No move before the position: nothing to explain without the review.
+    Asked alone    = asked;
+    alone.earlier  = nullptr;
+    alone.previous = std::nullopt;
+    CHECK(std::get<Problem>(answer(alone, silent, &engine, nullptr)) == Problem::Unanalyzed);
     // In check, the threat is the check itself.
     const auto checked = test::pos("4k3/8/8/8/8/8/4q3/4K3 w - - 0 1");
     Asked threat;

@@ -391,6 +391,8 @@ const char* glyph(Icon icon) {
             return "\uE404";  // radio-tower
         case Icon::Download:
             return "\uE0B2";  // download
+        case Icon::Comment:
+            return "\uE116";  // message-circle
     }
     return "";
 }

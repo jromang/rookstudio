@@ -18,6 +18,7 @@
 #include <matchmaking/stats.hpp>
 
 #include <commentary/openings.hpp>
+#include <commentary/question.hpp>
 #include <commentary/references.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
@@ -73,6 +74,9 @@
 struct SDL_Window;
 
 namespace fcg {
+
+class AssistantService;
+class EngineOracle;
 
 class EngineHub;
 
@@ -798,8 +802,37 @@ class App {
     // the opening tree of the databases and books, the reference games of the position.
     void drawChessColumn();
     void drawBoardTree();
+    // The Questions tab (Alt+5, mockup M5, board 2; view_board_questions.cpp): questions about the position, answered
+    // by the assistant from what the engine, the databases and the tables establish; the first time, the card that
+    // offers its model (board 1).
+    void drawBoardQuestions();
+    void drawAssistantFirstUse();
+    void askQuestion(const std::string& text);
+    void pollQuestions();  // once a frame: the answers that came, the assistant's download and unloading
+    // An answer put in the notation, on the move it was asked after: the assistant's comment when the move had none,
+    // added to the user's own otherwise.
+    void addAssistantComment(const std::string& text, int line, int ply, const std::string& fen);
+    std::unique_ptr<AssistantService> assistant_;
+    std::shared_ptr<EngineOracle> oracle_;  // the engine that answers, the analysis's, kept while it is the same
+    struct QuestionResult {
+        std::variant<commentary::Answered, commentary::Problem> answer = commentary::Problem::NoEngine;
+        std::string error;
+    };
+    struct QuestionAsked {
+        std::string question;
+        std::string fen;  // the position it was asked in, on the move (line, ply) of the game
+        int line = -1, ply = 0;
+        std::string engine;                            // the engine that answered, for what the answer rests on
+        std::vector<commentary::ReferenceBase> bases;  // the databases it looked in: a game it names opens from them
+        std::future<QuestionResult> answer;
+        std::optional<QuestionResult> done;
+    };
+    std::vector<QuestionAsked> questions_;                     // this game's, the oldest first
+    std::vector<std::future<QuestionResult>> questions_left_;  // those of a game left, still being answered
+    std::array<char, 512> question_text_{};
+    bool question_focus_ = false;  // the question's field takes the keys at its next drawing
     void drawBoardReferences();
-    int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games
+    int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions
     struct TreeRow {
         std::string shares;  // My databases: each database's games, said over the Games column
         std::string san;

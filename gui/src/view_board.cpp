@@ -20,6 +20,7 @@
 #include <tour/chess_text.hpp>
 
 #include "app.hpp"
+#include "assistant_notes.hpp"
 #include "board_text.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
@@ -247,6 +248,10 @@ int App::tournamentThreads() const {
 
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
     rememberBoardGame();  // its changes and undo history go with it
+    // The questions were about the game left: those still being answered end on their own, out of sight.
+    for (auto& q : questions_)
+        if (q.answer.valid()) questions_left_.push_back(std::move(q.answer));
+    questions_.clear();
     board_origin_.reset();
     board_.undo.clear();
     board_.redo.clear();
@@ -890,6 +895,7 @@ void App::boardCommentDone() {
     auto& slot = e.before ? notes->before : notes->after;
     if (slot == text) return;
     slot = text;
+    if (!e.before) markByAssistant(*notes, false);  // corrected by the user, the comment becomes theirs
     boardChanged(std::move(before));
     b.game = lineOf(b.tree, b.line);
 }
@@ -2502,21 +2508,35 @@ void App::drawBoardMoves(float height) {
         // In the Chess space: the comments, word by word, and the field where one is written.
         const bool proto        = chessBoard();
         const ImU32 comment_col = IM_COL32(52, 146, 92, 255);
+        // The assistant's: blue grey, in italics, after a bubble (M5, board 3).
+        const ImU32 assistant_col =
+            ui::currentTheme() == ui::Theme::Light ? IM_COL32(84, 104, 138, 255) : IM_COL32(150, 168, 198, 255);
         // A comment's words give back an id of their own: a click goes to its move, a double click corrects it.
         struct CommentAt {
             int line, ply;
             bool before;
+            bool assistant;
         };
         std::vector<CommentAt> comments;
-        const auto words = [&](const std::string& text, float indent, int line, int ply, bool before) {
+        const auto words = [&](const std::string& text, float indent, int line, int ply, bool before, bool assistant) {
             const int id = ply > 0 ? kCommentIds + static_cast<int>(comments.size()) : -1;  // the game's own: none
-            if (ply > 0) comments.push_back({line, ply, before});
+            if (ply > 0) comments.push_back({line, ply, before, assistant});
+            if (assistant) {
+                NotationItem bubble;
+                bubble.kind   = NotationItem::Kind::Text;
+                bubble.icon   = ui::Icon::Comment;
+                bubble.colour = assistant_col;
+                bubble.indent = indent;
+                bubble.id     = id;
+                items.push_back(std::move(bubble));
+            }
             std::istringstream in(text);
             for (std::string word; in >> word;) {
                 NotationItem w;
                 w.kind   = NotationItem::Kind::Text;
                 w.text   = std::move(word);
-                w.colour = comment_col;
+                w.colour = assistant ? assistant_col : comment_col;
+                w.italic = assistant;
                 w.indent = indent;
                 w.id     = id;
                 items.push_back(std::move(w));
@@ -2551,7 +2571,7 @@ void App::drawBoardMoves(float height) {
                     field(px(10) * static_cast<float>(depth));
                     number = true;
                 } else if (proto && !m.notes.before.empty()) {
-                    words(m.notes.before, px(10) * static_cast<float>(depth), line, ply + 1, true);
+                    words(m.notes.before, px(10) * static_cast<float>(depth), line, ply + 1, true, false);
                     number = true;
                 }
                 if (at.sideToMove() == chess::Color::WHITE || number) {
@@ -2596,7 +2616,8 @@ void App::drawBoardMoves(float height) {
                         field(px(10) * static_cast<float>(depth));
                         number = true;
                     } else if (!m.notes.after.empty()) {
-                        words(m.notes.after, px(10) * static_cast<float>(depth), line, ply + 1, false);
+                        words(m.notes.after, px(10) * static_cast<float>(depth), line, ply + 1, false,
+                              byAssistant(m.notes));
                         number = true;
                     }
                 }
@@ -2627,7 +2648,7 @@ void App::drawBoardMoves(float height) {
                 at.makeMove<true>(m.move);
             }
         };
-        if (proto && !main.pre_comment.empty()) words(main.pre_comment, 0, -1, 0, true);
+        if (proto && !main.pre_comment.empty()) words(main.pre_comment, 0, -1, 0, true, false);
         emit(-1, 0, boardAt(main, b.chess960, 0), 0);
         if (!main.result.empty() && main.result != "*") {
             NotationItem result;
@@ -2662,7 +2683,10 @@ void App::drawBoardMoves(float height) {
             showBoardLine(ev.clicked / 100000 - 1, ev.clicked % 100000);
             b.preview.reset();
         }
-        if (comment(ev.hovered)) ImGui::SetTooltip("%s", TR("A double click corrects the comment"));
+        if (const auto* c = comment(ev.hovered))
+            ImGui::SetTooltip("%s", c->assistant ? TR("The assistant's comment · a double click corrects it, and it "
+                                                      "becomes yours · Ctrl+Z takes it back")
+                                                 : TR("A double click corrects the comment"));
         // A move of the game: what its engine said and its judgement.
         if (ev.hovered >= 0 && ev.hovered < kCommentIds && ev.hovered / 100000 == 0) {
             const int i = ev.hovered % 100000 - 1;

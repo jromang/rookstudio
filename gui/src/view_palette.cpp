@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include "app.hpp"
+#include "assistant_service.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
 #include "layout.hpp"
@@ -516,6 +517,16 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     add(TR("Databases"), TR("Chess"), page(Page::Databases));
     add(TR("Openings: repertoires"), TR("Chess"), page(Page::Openings));
     add("Lichess", TR("Chess"), page(Page::Lichess));
+    // The assistant (M5): a question about the board's position, its model unloaded.
+    add(TR("Ask the assistant about the position"), "Alt+5", [this] {
+        switchSpace(Space::Chess);
+        page_           = Page::Board;
+        board_side_tab_ = 4;
+        question_focus_ = true;
+    });
+    if (assistant_ && assistant_->state() == AssistantService::State::Ready)
+        add(TR("Unload the assistant's model"), TR("Its memory freed; loaded again at the next question"),
+            [this] { assistant_->unload(); });
     if (!lichess_account_)
         add(TR("Link the Lichess account…"), "Lichess", [this, go = page(Page::Lichess)] {
             go();

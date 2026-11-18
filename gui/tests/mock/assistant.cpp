@@ -1,12 +1,13 @@
 // A language model for the tests of the assistant's process, speaking its protocol as the program's child does
 // (`--assistant --model PATH --gpu-layers N`): it answers at once with what it was asked, in words, and where it ran.
-// A model named "missing" does not load; on the GPU, one named "gpu-load-crash" falls while it loads, and one named
-// "gpu-crash" while it answers. A last message "crash" ends the process, "hang" makes it wait for ever, "refuse" gets
-// no answer.
+// A model named "missing" (its file's name) does not load; on the GPU, one named "gpu-load-crash" falls while it loads,
+// and one named "gpu-crash" while it answers. A last message "crash" ends the process, "hang" makes it wait for ever,
+// "refuse" gets no answer.
 
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -59,6 +60,7 @@ int main(int argc, char** argv) {
         if (std::string_view(argv[i]) == "--model") model = argv[i + 1];
         if (std::string_view(argv[i]) == "--gpu-layers") gpu_layers = std::atoi(argv[i + 1]);
     }
+    model = std::filesystem::path(model).filename().string();  // its file's name, wherever it is
     if (model == "missing") {
         std::fputs(fcg::assistant::errorLine("missing: the model does not load").c_str(), stdout);
         return 1;

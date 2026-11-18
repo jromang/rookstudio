@@ -1,6 +1,7 @@
 #include "notation_view.hpp"
 
 #include <algorithm>
+#include <cfloat>
 
 #include "ui.hpp"
 
@@ -79,6 +80,10 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
             w = fig ? fs * 1.05f + ImGui::CalcTextSize(fig->rest.c_str()).x : ImGui::CalcTextSize(it.text.c_str()).x;
             if (!it.mark.empty()) w += ImGui::CalcTextSize(it.mark.c_str()).x + px(1);
             w += pad * 2;
+        } else if (it.icon) {
+            w = fs;
+        } else if (it.italic) {
+            w = ui::italicFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, it.text.c_str()).x;
         } else {
             w = ImGui::CalcTextSize(it.text.c_str()).x + (it.kind == NotationItem::Kind::Number ? px(1) : 0.0f);
         }
@@ -193,7 +198,11 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
                 if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ev.double_clicked = it.id;
             }
             const ImU32 col = it.colour ? it.colour : ui::MUTED;
-            dl->AddText(font, fs, ImVec2(x, y + (lh - px(2) - ImGui::GetTextLineHeight()) / 2), col, it.text.c_str());
+            const float ty  = y + (lh - px(2) - ImGui::GetTextLineHeight()) / 2;
+            if (it.icon)
+                ui::drawIcon(dl, *it.icon, ImVec2(x + w / 2, ty + ImGui::GetTextLineHeight() / 2), fs * 0.85f, col);
+            else
+                dl->AddText(it.italic ? ui::italicFont() : font, fs, ImVec2(x, ty), col, it.text.c_str());
             x += w + (it.kind == NotationItem::Kind::Number ? px(1) : it.text == "(" ? 0.0f : gap);
         }
     }

@@ -368,8 +368,11 @@ std::optional<Action> readAction(std::string_view text, std::string_view questio
     return std::nullopt;
 }
 
-std::variant<Answered, Problem> answer(const Asked& asked, Model& model, const Oracle* oracle,
-                                       const Tablebases* tables) {
+namespace {
+
+// The answer, and in `action` what the question was taken to ask.
+std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const Oracle* oracle,
+                                         const Tablebases* tables, std::optional<Action>& action) {
     const auto& pos    = *asked.before;
     const auto lang    = asked.lang;
     const auto letters = asked.letters;
@@ -382,7 +385,7 @@ std::variant<Answered, Problem> answer(const Asked& asked, Model& model, const O
     for (const auto& [name, mv] : now) names[name] = mv;
     std::optional<std::string> played;
     if (asked.earlier && asked.previous) played = moveText(*asked.earlier, *asked.previous, PieceLetters::English);
-    auto action = plainAction(asked.question, names);
+    action = plainAction(asked.question, names);
     if (!action) action = namedAction(asked.question, names);
     if (!action) {
         std::optional<std::string_view> said;
@@ -437,7 +440,20 @@ std::variant<Answered, Problem> answer(const Asked& asked, Model& model, const O
             break;
     }
     if (action->kind == Action::Kind::Explain) {
-        if (!asked.explain) return Problem::Unanalyzed;
+        if (!asked.explain) {
+            // No review of the game: the engine's comment on the move that led to the position, as for a move tried
+            // there.
+            if (!asked.earlier || !asked.previous) return Problem::Unanalyzed;
+            if (!oracle) return Problem::NoEngine;
+            const auto said = commentOn(*asked.earlier, *asked.previous, asked.earlier_previous, *oracle, asked.known,
+                                        model, tables, lang, letters);
+            if (const auto* p = std::get_if<Problem>(&said)) return *p;
+            Answered a;
+            a.text    = std::get<0>(said).first;
+            a.moves   = {*asked.previous};
+            a.earlier = true;
+            return a;
+        }
         auto ctx           = *asked.explain;
         ctx.tables         = tables;
         ctx.oracle         = oracle;
@@ -533,6 +549,16 @@ std::variant<Answered, Problem> answer(const Asked& asked, Model& model, const O
             return a;
         }
     }
+}
+
+}  // namespace
+
+std::variant<Answered, Problem> answer(const Asked& asked, Model& model, const Oracle* oracle,
+                                       const Tablebases* tables) {
+    std::optional<Action> action;
+    auto out = answered(asked, model, oracle, tables, action);
+    if (auto* a = std::get_if<Answered>(&out); a && action) a->kind = action->kind;
+    return out;
 }
 
 }  // namespace fcg::commentary

@@ -13,6 +13,7 @@
 #include <chess.hpp>
 
 #include "board_view.hpp"
+#include "ui.hpp"
 
 namespace fcg {
 
@@ -27,6 +28,8 @@ struct NotationItem {
     ImU32 mark_colour = 0;
     bool current      = false;  // framed
     bool bold         = false;
+    bool italic       = false;     // a text in italics (the assistant's comments)
+    std::optional<ui::Icon> icon;  // a text that is an icon, as wide as the font is high
     int id                 = -1;  // what the mouse events give back (a text too when it has one: a comment)
     float indent      = 0;   // a line starting with it starts this far in (a variation)
     char* field            = nullptr;

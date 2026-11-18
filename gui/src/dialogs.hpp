@@ -51,6 +51,7 @@ class Dialogs {
         BoardPgn,        // a PGN file for the Board page
         SaveBoardPgn,    // the Board page's game saved as a PGN file
         AppendBoardPgn,  // the same, after the games of a PGN file
+        AssistantModel,  // a GGUF file for the assistant, instead of the catalogue's model
         EngineLogo,
         PieceFolder,
         MachineKey,          // a remote machine's key file (Settings)

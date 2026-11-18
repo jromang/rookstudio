@@ -111,7 +111,8 @@ enum class Icon {
     Openings,
     Globe,      // Lichess
     Broadcast,  // a broadcast followed
-    Download
+    Download,
+    Comment  // a speech bubble: the assistant's comments
 };
 
 // `icon` in a line of text, as wide as the font is high, in `col`.

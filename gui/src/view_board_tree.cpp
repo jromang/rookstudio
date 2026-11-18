@@ -475,12 +475,16 @@ void App::drawChessColumn() {
     drawNewMoveQuestion();  // a move where the game went another way, asked about
     drawBoardStrip();
     drawMoveField();  // while a move is typed, whatever the tab
-    // The tabs, in the order of the mockup; Alt+1 to Alt+4.
-    const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References")};
-    for (int i = 0; i < 4; ++i)
-        if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | static_cast<ImGuiKey>(ImGuiKey_1 + i))) board_side_tab_ = i;
+    // The tabs, in the order of the mockups; Alt+1 to Alt+5.
+    const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References"), TR("Questions")};
+    constexpr int TABS  = 5;
+    for (int i = 0; i < TABS; ++i) {
+        if (!ImGui::IsKeyChordPressed(ImGuiMod_Alt | static_cast<ImGuiKey>(ImGuiKey_1 + i))) continue;
+        board_side_tab_ = i;
+        if (i == 4) question_focus_ = true;  // Alt+5: the question is typed at once
+    }
     if (ImGui::BeginTabBar("##chess_column")) {
-        for (int i = 0; i < 4; ++i) {
+        for (int i = 0; i < TABS; ++i) {
             const auto label = fmt::format("{}###chess_tab{}", names[i], i);
             if (ImGui::BeginTabItem(label.c_str(), nullptr,
                                     board_side_tab_ == i ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
@@ -505,8 +509,11 @@ void App::drawChessColumn() {
         case 2:
             drawBoardTree();
             break;
-        default:
+        case 3:
             drawBoardReferences();
+            break;
+        default:
+            drawBoardQuestions();
             break;
     }
 }

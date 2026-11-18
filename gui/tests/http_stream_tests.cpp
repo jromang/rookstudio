@@ -24,78 +24,14 @@
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "net.hpp"
+#include "scripted_server.hpp"
 
 using namespace fcg;
+using namespace fcg::test;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 
 namespace {
-
-// True once `done()` is, false if it is not within `limit`: what a wait is bounded by is what it awaits.
-template <typename F>
-bool waitUntil(F&& done, std::chrono::milliseconds limit = 20s) {
-    const auto deadline = std::chrono::steady_clock::now() + limit;
-    while (!done()) {
-        if (std::chrono::steady_clock::now() > deadline) return false;
-        std::this_thread::sleep_for(2ms);
-    }
-    return true;
-}
-
-// Each connection served on a thread of its own by `serve`, given the request's head: it writes what it wants,
-// waiting where it wants. Counts the connections served at once.
-class ScriptedServer {
-   public:
-    using Serve = std::function<void(const std::string& head, net::TcpConnection& c)>;
-    ScriptedServer(uint16_t port, Serve serve) : serve_(std::move(serve)) {
-        ok_     = listener_.listen(port, true).empty();
-        thread_ = std::thread([this] {
-            while (!stop_) {
-                const auto fd = listener_.accept(50);
-                if (!fd) continue;
-                std::lock_guard lock(mutex_);
-                workers_.emplace_back([this, handle = *fd] {
-                    net::TcpConnection c(handle, &running_);
-                    const auto head = c.readUntil("\r\n\r\n", 1 << 16, 10000);
-                    if (head.find("\r\n\r\n") == std::string::npos) return;
-                    const int now = ++open_;
-                    int seen      = max_open_.load();
-                    while (now > seen && !max_open_.compare_exchange_weak(seen, now)) {
-                    }
-                    serve_(head, c);
-                    --open_;
-                });
-            }
-        });
-    }
-    ~ScriptedServer() {
-        stop_    = true;
-        running_ = false;
-        thread_.join();
-        for (auto& w : workers_) w.join();
-    }
-    ScriptedServer(const ScriptedServer&)            = delete;
-    ScriptedServer& operator=(const ScriptedServer&) = delete;
-
-    [[nodiscard]] bool ok() const { return ok_; }
-    [[nodiscard]] int maxOpen() const { return max_open_; }
-
-   private:
-    Serve serve_;
-    net::TcpListener listener_;
-    std::atomic_bool running_{true};
-    std::atomic<bool> stop_{false};
-    std::atomic<int> open_{0}, max_open_{0};
-    std::mutex mutex_;
-    std::vector<std::thread> workers_;
-    std::thread thread_;
-    bool ok_ = false;
-};
-
-std::string requestPath(const std::string& head) {
-    const auto start = head.find(' ') + 1;
-    return head.substr(start, head.find(' ', start) - start);
-}
 
 std::string readAll(const fs::path& file) {
     std::ifstream in(file, std::ios::binary);

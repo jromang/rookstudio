@@ -30,6 +30,10 @@ struct BoardText {
 // colour, a pawn on the first or last rank, the side not to move in check; empty when nothing is.
 [[nodiscard]] std::string positionProblem(const std::string& fen, bool chess960);
 
+// A move's SAN in French piece letters (R D T F C), as the assistant writes them: "Rxe8" is then "Txe8", "Kd3" "Rd3",
+// "e8=Q+" "e8=D+". Files, castling and signs stay as they are.
+[[nodiscard]] std::string frenchSan(std::string san);
+
 // Whether a position needs Chess960 castling: castling rights in file letters (Shredder-FEN), or rights whose king
 // or rook is not on its usual square.
 [[nodiscard]] bool needsChess960(const std::string& fen);

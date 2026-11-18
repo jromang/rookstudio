@@ -4,6 +4,7 @@
 #include <doctest/doctest.hpp>
 
 #include "analysis.hpp"
+#include "board_text.hpp"
 #include "notation_view.hpp"
 
 using namespace fcg;
@@ -22,6 +23,19 @@ TEST_CASE("notation: a piece's letter as a figurine, pawns and castling as they 
     CHECK_FALSE(figurineOf("O-O"));
     CHECK_FALSE(figurineOf("e8=Q"));
     CHECK_FALSE(figurineOf(""));
+}
+
+TEST_CASE("notation: a move in French letters, as the assistant writes them") {
+    CHECK(frenchSan("Rxe8") == "Txe8");  // the rook, not the king
+    CHECK(frenchSan("Kd3") == "Rd3");
+    CHECK(frenchSan("Qxd8+") == "Dxd8+");
+    CHECK(frenchSan("Nbd2") == "Cbd2");  // the file b stays a file
+    CHECK(frenchSan("Bxh7#") == "Fxh7#");
+    CHECK(frenchSan("e8=Q+") == "e8=D+");
+    CHECK(frenchSan("bxa1=N") == "bxa1=C");
+    CHECK(frenchSan("exd5") == "exd5");
+    CHECK(frenchSan("O-O-O") == "O-O-O");
+    CHECK(frenchSan("").empty());
 }
 
 TEST_CASE("notation: a line of moves as items, numbered, cut at an illegal move or the most asked") {

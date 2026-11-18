@@ -5,6 +5,7 @@
 #include <cctype>
 #include <functional>
 #include <sstream>
+#include <string_view>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
@@ -247,6 +248,16 @@ BoardText readBoardText(std::string_view text) {
 std::string gamePgn(const ReplayGame& game, bool chess960) { return gamePgn(GameTree{game, {}}, chess960); }
 
 std::string gamePgn(const GameTree& tree, bool chess960) { return gamePgn(tree, chess960, nullptr); }
+
+std::string frenchSan(std::string san) {
+    constexpr std::string_view english = "KQRBN", french = "RDTFC";
+    const auto local = [&](char& c) {
+        if (const auto i = english.find(c); i != std::string_view::npos) c = french[i];
+    };
+    if (!san.empty()) local(san[0]);
+    if (const auto eq = san.find('='); eq != std::string::npos && eq + 1 < san.size()) local(san[eq + 1]);
+    return san;
+}
 
 std::string gamePgn(const GameTree& tree, bool chess960, const std::function<std::string(int)>& annotate) {
     return study::writePgnGame(tree, study::PgnWriteOptions{chess960, annotate});

@@ -3142,7 +3142,12 @@ std::string App::boardMoveLabel(int ply) const {
     if (ply <= 0 || ply > static_cast<int>(main.moves.size())) return {};
     const auto before = boardAt(main, board_.chess960, ply - 1);
     const auto& m     = main.moves[static_cast<std::size_t>(ply - 1)];
-    return fmt::format("{}{}{}", before.fullMoveNumber(), m.mover == chess::Color::WHITE ? "." : "…", m.san);
+    return fmt::format("{}{}{}", before.fullMoveNumber(), m.mover == chess::Color::WHITE ? "." : "…", boardSan(m.san));
+}
+
+std::string App::boardSan(std::string san) const {
+    if (!chessBoard() || i18n::language() != i18n::Language::French) return san;
+    return frenchSan(std::move(san));
 }
 
 void App::drawBoardReview() {
@@ -3270,7 +3275,7 @@ void App::drawBoardReview() {
         const auto& before = review.positions[static_cast<std::size_t>(ply - 1)];
         const auto board   = boardAt(main, b.chess960, ply - 1);
         const auto best    = legalPrefix(board, {before.best}, 1);
-        return best.empty() ? std::string() : chess::uci::moveToSan(board, best.front());
+        return best.empty() ? std::string() : boardSan(chess::uci::moveToSan(board, best.front()));
     };
     const float move_w = px(96);
     for (std::size_t k = 0; k < moments.size(); ++k) {

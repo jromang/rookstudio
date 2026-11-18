@@ -52,6 +52,7 @@ std::optional<chess::Move> moveOfCode(const chess::Board& board, const study::Sc
 }  // namespace
 
 void App::drawChessColumn() {
+    drawListStrip();
     // The tabs, in the order of the mockup; Alt+1 to Alt+4.
     const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References")};
     for (int i = 0; i < 4; ++i)

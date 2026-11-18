@@ -254,11 +254,26 @@ class App {
     // view made in the background, the game chosen.
     void drawGameList();
     void openListedGame(std::size_t row);
+    // The list a game on the board was opened from (mockup M2, board 4): the previous and next games of it
+    // (Ctrl+Left, Ctrl+Right), opened at the same move when they pass through the position shown; Ctrl+S puts the
+    // game back in its database, under its number.
+    struct BoardOrigin {
+        std::filesystem::path folder;  // the database's
+        std::string name;
+        bool linked = false;  // a tournament's or a file's: not written
+        std::shared_ptr<study::View> view;
+        std::size_t row = 0;
+        std::string filter;  // the quick filter it was made with
+    };
+    std::optional<BoardOrigin> board_origin_;
+    void drawListStrip();               // the strip over the moves: previous, the game's place in the list, next
+    void openListRow(std::size_t row);  // another game of the same list, at the same position when it has it
+    bool saveBoardToDatabase();         // false when the game is not a database's to write
     bool db_list_ = false;
     std::array<char, 256> db_filter_{};
     study::SortBy db_sort_ = study::SortBy::Number;
     bool db_descending_    = false;
-    study::View db_view_;
+    std::shared_ptr<study::View> db_view_ = std::make_shared<study::View>();  // shared with board_origin_
     std::string db_view_of_;  // what db_view_ shows: the database, its snapshot, the filter and the sort
     struct ViewJob {
         std::string of;

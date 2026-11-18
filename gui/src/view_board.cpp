@@ -219,6 +219,7 @@ int App::tournamentThreads() const {
 }
 
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
+    board_origin_.reset();
     if (page_ != Page::Board) {
         board_back_ = BoardBack{page_, page_ == Page::Tournament ? std::optional<Tab>(shown_tab_) : std::nullopt};
     }
@@ -1152,7 +1153,9 @@ void App::drawBoardPage() {
             if (const int to = judgedPly(ImGui::GetIO().KeyShift ? -1 : 1); to >= 0) showBoardLine(-1, to);
         }
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
-        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) saveBoardPgn();
+        // Ctrl+S: a database's game back in its database, under its number (the Chess space); else a file.
+        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S) && !(chessBoard() && saveBoardToDatabase()))
+            saveBoardPgn();
         if (chessBoard()) boardEditKeys();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
@@ -1322,6 +1325,7 @@ void App::saveBoardPgn() {
 }
 
 void App::readOnBoard(const std::string& text, const std::string& name) {
+    board_origin_.reset();  // another game: a list's own, when it comes from one, says so after
     auto& b         = board_;
     const auto read = readBoardText(text);
     switch (read.kind) {

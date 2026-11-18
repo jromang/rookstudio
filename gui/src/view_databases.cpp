@@ -9,6 +9,7 @@
 #include <imgui.h>
 
 #include "app.hpp"
+#include "board_text.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
 #include "machines.hpp"
@@ -315,12 +316,87 @@ void App::drawDatabases() {
 }
 
 void App::openListedGame(std::size_t row) {
-    if (!db_view_.snapshot || row >= db_view_.ids.size()) return;
-    const auto id   = db_view_.ids[row];
-    const auto game = db_view_.snapshot->game(id);
-    const auto name = shelf().entries()[static_cast<std::size_t>(db_selected_)].name;
-    readOnBoard(study::importedPgn(game), trf("{}, game {}", name, ui::exactCount(id + 1)));
-    page_ = Page::Board;
+    if (!db_view_->snapshot || row >= db_view_->ids.size()) return;
+    const auto& entry = shelf().entries()[static_cast<std::size_t>(db_selected_)];
+    BoardOrigin origin;
+    origin.folder = entry.folder;
+    origin.name   = entry.name;
+    origin.linked = entry.source.has_value();
+    origin.view   = db_view_;
+    origin.filter = db_filter_.data();
+    board_origin_ = std::move(origin);
+    openListRow(row);
+}
+
+void App::openListRow(std::size_t row) {
+    if (!board_origin_ || !board_origin_->view || row >= board_origin_->view->ids.size()) return;
+    // The position shown, to open the next game at it when it passes through it.
+    const auto shown = boardAt(board_.game, board_.chess960, board_.ply).hash();
+    const bool keep  = board_.ply > 0;
+    auto origin      = *board_origin_;
+    const auto id    = origin.view->ids[row];
+    readOnBoard(study::importedPgn(origin.view->snapshot->game(id)),
+                trf("{}, game {}", origin.name, ui::exactCount(id + 1)));
+    origin.row    = row;
+    board_origin_ = std::move(origin);
+    page_         = Page::Board;
+    if (keep) {
+        auto board = boardAt(board_.game, board_.chess960, 0);
+        for (int ply = 0; ply <= static_cast<int>(board_.game.moves.size()); ++ply) {
+            if (board.hash() == shown) {
+                board_.ply = ply;
+                break;
+            }
+            if (ply < static_cast<int>(board_.game.moves.size()))
+                board.makeMove(board_.game.moves[static_cast<std::size_t>(ply)].move);
+        }
+    }
+}
+
+void App::drawListStrip() {
+    if (!board_origin_ || !board_origin_->view) return;
+    const auto& o    = *board_origin_;
+    const auto total = o.view->ids.size();
+    ImGui::BeginDisabled(o.row == 0);
+    if (ImGui::SmallButton(fmt::format("◂ {}", TR("Previous")).c_str()) ||
+        (o.row > 0 && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_LeftArrow)))
+        openListRow(o.row - 1);
+    ImGui::EndDisabled();
+    if (!board_origin_) return;
+    ImGui::SameLine();
+    const auto& now = *board_origin_;
+    auto place      = trf("game {} of {} in « {} »", ui::exactCount(now.row + 1), ui::exactCount(total), now.name);
+    if (!now.filter.empty()) place += trf(" · « {} »", now.filter);
+    ImGui::TextDisabled("%s", place.c_str());
+    ImGui::SameLine();
+    ImGui::BeginDisabled(now.row + 1 >= total);
+    if (ImGui::SmallButton(fmt::format("{} ▸", TR("Next")).c_str()) ||
+        (now.row + 1 < total && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_RightArrow)))
+        openListRow(now.row + 1);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Ctrl+← · Ctrl+→");
+}
+
+bool App::saveBoardToDatabase() {
+    if (!board_origin_ || board_origin_->linked || !board_origin_->view) return false;
+    auto& s = shelf();
+    for (std::size_t i = 0; i < s.entries().size(); ++i) {
+        if (s.entries()[i].folder != board_origin_->folder) continue;
+        const auto db = s.open(i);
+        if (!db) return false;
+        study::ImportedGame game;
+        if (!study::readImportedGame(gamePgn(board_.tree, board_.chess960), game)) return false;
+        const auto id = board_origin_->view->ids[board_origin_->row];
+        try {
+            db->replace(id, std::move(game));
+        } catch (const std::exception& e) {
+            boardToast(e.what());
+            return true;
+        }
+        boardToast(trf("Saved in « {} », game {}", board_origin_->name, ui::exactCount(id + 1)));
+        return true;
+    }
+    return false;
 }
 
 void App::drawGameList() {
@@ -398,9 +474,9 @@ void App::drawGameList() {
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - db_view_job_->started)
                     .count();
             if (db_view_of_.substr(0, db_view_of_.find('|')) != of.substr(0, of.find('|')) ||
-                view.ids.size() != db_view_.ids.size())
+                view.ids.size() != db_view_->ids.size())
                 db_row_ = 0;
-            db_view_    = std::move(view);
+            db_view_    = std::make_shared<study::View>(std::move(view));
             db_view_of_ = db_view_job_->of;
         }
         db_view_job_.reset();
@@ -411,13 +487,13 @@ void App::drawGameList() {
     else
         ImGui::TextDisabled("%s", trf("{} · {} ms",
                                       trn("{} game", "{} games",
-                                          static_cast<int>(std::min<std::size_t>(db_view_.ids.size(), 1000000000)),
-                                          ui::exactCount(db_view_.ids.size())),
+                                          static_cast<int>(std::min<std::size_t>(db_view_->ids.size(), 1000000000)),
+                                          ui::exactCount(db_view_->ids.size())),
                                       static_cast<int>(db_view_ms_))
                                       .c_str());
 
-    const auto& ids  = db_view_.ids;
-    const auto* snap = db_view_.snapshot.get();
+    const auto& ids  = db_view_->ids;
+    const auto* snap = db_view_->snapshot.get();
     if (!ids.empty()) db_row_ = std::min(db_row_, ids.size() - 1);
 
     // The list and, beside it, the game chosen.

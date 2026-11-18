@@ -474,7 +474,8 @@ void App::drawBoardStrip() {
 void App::drawChessColumn() {
     drawNewMoveQuestion();  // a move where the game went another way, asked about
     drawBoardStrip();
-    drawMoveField();  // while a move is typed, whatever the tab
+    drawMoveField();        // while a move is typed, whatever the tab
+    drawCommentProgress();  // the key moments being commented, whatever the tab
     // The tabs, in the order of the mockups; Alt+1 to Alt+5.
     const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References"), TR("Questions")};
     constexpr int TABS  = 5;

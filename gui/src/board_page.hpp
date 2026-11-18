@@ -239,6 +239,7 @@ struct BoardPage {
     std::string tb_key;               // the game they are of, and the folders
     std::vector<GameReview> reviews;  // the analyses of the game shown, the judging one first
     std::string review_key;           // the game they are of (reviewKey)
+    bool judged_chess = false;        // `judged` is the commentary's (the Chess space), not the analysis's own
     std::vector<MoveReview> judged;   // its moves judged by the first, for the game shown
 
     // Games played from the board's position between two engines.

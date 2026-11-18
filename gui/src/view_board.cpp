@@ -25,6 +25,7 @@
 #include "console.hpp"
 #include "i18n.hpp"
 #include "notation_view.hpp"
+#include "review_bridge.hpp"
 #include "review_stats.hpp"
 #include "run.hpp"
 #include "storage.hpp"
@@ -248,10 +249,13 @@ int App::tournamentThreads() const {
 
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
     rememberBoardGame();  // its changes and undo history go with it
-    // The questions were about the game left: those still being answered end on their own, out of sight.
+    // The questions were about the game left: those still being answered end on their own, out of sight; so do the
+    // comments being written, which go nowhere.
     for (auto& q : questions_)
         if (q.answer.valid()) questions_left_.push_back(std::move(q.answer));
     questions_.clear();
+    if (comment_job_) *comment_job_->cancel = true;
+    ++board_game_serial_;
     board_origin_.reset();
     board_.undo.clear();
     board_.redo.clear();
@@ -948,6 +952,7 @@ void App::boardEditKeys() {
         (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
         boardComment(io.KeyShift);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) boardUndo(false);
+    if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_C)) commentBoardMove();  // M5, board 3
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) ||
         ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z))
         boardUndo(true);
@@ -2480,10 +2485,14 @@ void App::drawBoardMoves(float height) {
     }
 
     // Its analyses: kept with the game, read again when another game comes.
-    if (const auto key = reviewKey(main); key != b.review_key) {
-        b.review_key = key;
+    if (const auto key = reviewKey(main); key != b.review_key || b.judged_chess != chessBoard()) {
+        b.review_key   = key;
+        b.judged_chess = chessBoard();
         b.reviews = !main.moves.empty() ? loadReviews(storage_.root() / "analyses", main) : std::vector<GameReview>{};
         b.judged  = b.reviews.empty() ? std::vector<MoveReview>{} : reviewMoves(main, b.chess960, b.reviews.front());
+        // In the Chess space, the moves judged as its review and its comments judge them (M5).
+        if (chessBoard() && !b.reviews.empty())
+            if (const auto review = boardCommentaryReview()) b.judged = judgedMoves(*review);
     }
     updateBoardTablebase();
 
@@ -3334,6 +3343,7 @@ void App::drawBoardReview() {
         }
         ImGui::SetClipboardText(out.c_str());
     }
+    if (chessBoard()) drawReviewAssistant();  // the story, the key moments commented, the annotation (M5, board 4)
     ui::topic(guide::topics::GameAnalysis);
 }
 

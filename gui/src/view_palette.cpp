@@ -524,6 +524,24 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         board_side_tab_ = 4;
         question_focus_ = true;
     });
+    if (board_.ply > 0)
+        add(TR("Comment this move"), "Alt+C", [this] {
+            switchSpace(Space::Chess);
+            page_ = Page::Board;
+            commentBoardMove();
+        });
+    if (!board_.reviews.empty()) {
+        add(TR("Comment the key moments"), TR("Board"), [this] {
+            switchSpace(Space::Chess);
+            page_ = Page::Board;
+            commentKeyMoments();
+        });
+        add(TR("Annotate the game"), TR("Board"), [this] {
+            switchSpace(Space::Chess);
+            page_ = Page::Board;
+            annotateBoardGame();
+        });
+    }
     if (assistant_ && assistant_->state() == AssistantService::State::Ready)
         add(TR("Unload the assistant's model"), TR("Its memory freed; loaded again at the next question"),
             [this] { assistant_->unload(); });

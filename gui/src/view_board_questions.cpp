@@ -212,6 +212,7 @@ void App::askQuestion(const std::string& text) {
 void App::pollQuestions() {
     if (!assistant_) return;
     assistant_->poll();
+    pollBoardComments();
     for (auto& q : questions_)
         if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             q.done = q.answer.get();

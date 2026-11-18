@@ -77,6 +77,7 @@ namespace fcg {
 
 class AssistantService;
 class EngineOracle;
+struct CommentaryReview;
 
 class EngineHub;
 
@@ -831,6 +832,33 @@ class App {
     std::vector<std::future<QuestionResult>> questions_left_;  // those of a game left, still being answered
     std::array<char, 512> question_text_{};
     bool question_focus_ = false;  // the question's field takes the keys at its next drawing
+    // The assistant's comments on the board (M5, boards 3 and 4; view_board_assist.cpp): Alt+C on the move shown, the
+    // key moments of the reviewed game in the background, the game annotated from its review. Each one change.
+    void commentBoardMove();
+    void commentKeyMoments();
+    void annotateBoardGame();
+    void pollBoardComments();
+    void drawCommentProgress();  // the key moments being commented: how many, Cancel
+    void drawReviewAssistant();  // the review tab's story of the game and the assistant's gestures
+    // The commentary's review of the board's game, from its judging analysis; made again when that changes.
+    [[nodiscard]] std::shared_ptr<const CommentaryReview> boardCommentaryReview();
+    struct CommentJob {
+        struct Target {
+            int line = -1, ply = 0;
+            std::string fen;  // the position after the move: the move is still the game's when it leads there
+        };
+        std::vector<Target> targets;
+        int total                                 = 0;
+        bool key_moments                          = false;
+        uint64_t game                             = 0;  // the board's game it was asked for (board_game_serial_)
+        std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        std::future<std::vector<std::string>> texts;  // one per target, empty when none
+    };
+    std::optional<CommentJob> comment_job_;
+    std::shared_ptr<const CommentaryReview> board_commentary_;
+    std::string board_commentary_of_;
+    uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
     int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions
     struct TreeRow {

@@ -525,6 +525,7 @@ void App::openListRow(std::size_t row) {
     auto origin      = *board_origin_;
     const auto id    = origin.view->ids[row];
     origin.row       = row;
+    origin.id        = id;
     // A game left with changes not saved comes back with them, where it was left.
     if (const auto copy = changedCopyOf(origin.folder, id)) {
         restoreRecentGame(*copy);
@@ -549,7 +550,7 @@ void App::openListRow(std::size_t row) {
 }
 
 bool App::saveBoardToDatabase() {
-    if (!board_origin_ || board_origin_->linked || !board_origin_->view) return false;
+    if (!board_origin_ || board_origin_->linked) return false;
     auto& s = shelf();
     for (std::size_t i = 0; i < s.entries().size(); ++i) {
         if (s.entries()[i].folder != board_origin_->folder) continue;
@@ -557,7 +558,7 @@ bool App::saveBoardToDatabase() {
         if (!db) return false;
         study::ImportedGame game;
         if (!study::readImportedGame(gamePgn(board_.tree, board_.chess960), game)) return false;
-        const auto id = board_origin_->view->ids[board_origin_->row];
+        const auto id = board_origin_->id;
         try {
             db->replace(id, std::move(game));
         } catch (const std::exception& e) {

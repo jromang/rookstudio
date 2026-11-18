@@ -97,6 +97,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     layouts_    = layout::named(storage_.loadLayouts());
     if (ImGui::GetCurrentContext()) registerPanelSettings();
 
+    loadRecentGames();  // the board's game and the recent ones of the session before
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
     updates_ = storage_.updateSettings();
     if (updates_.enabled && !options_.scripted && update::checkDue(updates_.checked, std::time(nullptr))) {
@@ -126,6 +127,7 @@ App::~App() {
     for (auto& f : abandoned_scans_) f.wait();
     storage_.saveSetup(setup_);
     storage_.saveEngines(engines_);
+    saveRecentGames();   // the board's game and the recent ones, for the next session
     saveLichessToken();  // a token still being typed when the program quits
     if (appearance_save_due_) storage_.setAppearance(appearance::current());
     for (const auto& [file, logo] : logo_textures_) {

@@ -3,18 +3,25 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include <map>
 #include <string>
 #include <utility>
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <json.hpp>
 
 #include <commentary/position.hpp>
+#include <study/pgn_reader.hpp>
 #include <study/scan_board.hpp>
+#include <tour/files.hpp>
 
 #include "app.hpp"
+#include "board_text.hpp"
+#include "console.hpp"
 #include "i18n.hpp"
+#include "portable.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -119,6 +126,92 @@ void App::rememberBoardGame() {
     }
 }
 
+void App::saveRecentGames() const {
+    if (options_.scripted) return;  // a run for screenshots leaves the profile as it was
+    nlohmann::json all = nlohmann::json::array();
+    const auto entry = [&](const std::string& title, const std::string& where, const GameTree& tree, int line, int ply,
+                           bool chess960, const GameChanges& changes, const std::optional<BoardOrigin>& origin,
+                           bool current) {
+        nlohmann::json j;
+        j["title"]    = title;
+        j["where"]    = where;
+        j["pgn"]      = gamePgn(tree, chess960);
+        j["line"]     = line;
+        j["ply"]      = ply;
+        j["chess960"] = chess960;
+        j["changes"]  = {{"count", changes.count}, {"lost", changes.lost}, {"saved_in", changes.saved_in}};
+        if (origin)
+            j["origin"] = {{"folder", portable::stored(origin->folder.string())},
+                           {"name", origin->name},
+                           {"linked", origin->linked},
+                           {"id", origin->id}};
+        if (current) j["current"] = true;
+        all.push_back(std::move(j));
+    };
+    const auto& b = board_;
+    if (boardHasGame(b))
+        entry(b.title,
+              board_origin_ ? board_origin_->name
+              : b.pgn       ? b.pgn->name
+                            : std::string(),
+              b.tree, b.line, b.ply, b.chess960, b.changes, board_origin_, true);
+    for (const auto& r : recent_games_)
+        entry(r.title, r.where, r.tree, r.line, r.ply, r.chess960, r.changes, r.origin, false);
+    try {
+        tour::replaceFile(storage_.root() / "recent.json", all.dump(1));
+    } catch (const std::exception& e) {
+        Console::instance().add(trf("The recent games could not be kept: {}", e.what()), true);
+    }
+}
+
+void App::loadRecentGames() {
+    if (options_.scripted) return;
+    std::ifstream in(storage_.root() / "recent.json", std::ios::binary);
+    if (!in) return;
+    nlohmann::json all;
+    try {
+        all = nlohmann::json::parse(in);
+    } catch (const std::exception&) {
+        return;  // a file cut short: the games of the session before are let go
+    }
+    if (!all.is_array()) return;
+    for (const auto& j : all) {
+        if (!j.is_object()) continue;
+        const auto read = study::readPgnGame(j.value("pgn", std::string()));
+        if (!read.tree) continue;
+        RecentGame r;
+        r.title    = j.value("title", std::string());
+        r.where    = j.value("where", std::string());
+        r.tree     = *read.tree;
+        r.line     = j.value("line", -1);
+        r.ply      = j.value("ply", 0);
+        r.chess960 = j.value("chess960", read.chess960);
+        if (const auto c = j.find("changes"); c != j.end() && c->is_object()) {
+            r.changes.count    = c->value("count", 0);
+            r.changes.lost     = c->value("lost", false);
+            r.changes.saved_in = c->value("saved_in", std::string());
+        }
+        if (const auto o = j.find("origin"); o != j.end() && o->is_object()) {
+            BoardOrigin origin;
+            origin.folder = std::filesystem::path(portable::resolved(o->value("folder", std::string())));
+            origin.name   = o->value("name", std::string());
+            origin.linked = o->value("linked", false);
+            origin.id     = o->value("id", study::GameId{0});
+            r.origin      = std::move(origin);
+        }
+        if (j.value("current", false) && !boardHasGame(board_)) {
+            // The game the board showed, on it again, the page shown at the start kept.
+            const auto page = page_;
+            recent_games_.push_front(std::move(r));
+            restoreRecentGame(0);
+            page_ = page;
+            board_back_.reset();
+        } else if (recent_games_.size() < 12) {
+            recent_games_.push_back(std::move(r));
+        }
+    }
+}
+
 void App::restoreRecentGame(std::size_t index) {
     if (index >= recent_games_.size()) return;
     auto chosen = std::move(recent_games_[index]);
@@ -140,9 +233,7 @@ void App::restoreRecentGame(std::size_t index) {
 std::optional<std::size_t> App::changedCopyOf(const std::filesystem::path& folder, uint32_t id) const {
     for (std::size_t i = 0; i < recent_games_.size(); ++i) {
         const auto& r = recent_games_[i];
-        if (r.changes.any() && r.origin && r.origin->view && r.origin->folder == folder &&
-            r.origin->row < r.origin->view->ids.size() && r.origin->view->ids[r.origin->row] == id)
-            return i;
+        if (r.changes.any() && r.origin && r.origin->folder == folder && r.origin->id == id) return i;
     }
     return std::nullopt;
 }

@@ -64,11 +64,11 @@ void App::drawChessHome() {
                                                   : TR("The game on the board"));
         ImGui::PopFont();
         std::vector<std::string> parts;
-        if (board_origin_ && board_origin_->view && board_origin_->row < board_origin_->view->ids.size()) {
+        if (board_origin_) {
             const auto& o = *board_origin_;
-            parts.push_back(o.filter.empty() ? trf("{} · game {}", o.name, ui::exactCount(o.view->ids[o.row] + 1))
-                                             : trf("{} · game {} of the filter « {} »", o.name,
-                                                   ui::exactCount(o.row + 1), o.filter));
+            parts.push_back(o.filter.empty() || !o.view ? trf("{} · game {}", o.name, ui::exactCount(o.id + 1))
+                                                        : trf("{} · game {} of the filter « {} »", o.name,
+                                                              ui::exactCount(o.row + 1), o.filter));
         } else if (b.pgn) {
             parts.push_back(b.pgn->name);
         }

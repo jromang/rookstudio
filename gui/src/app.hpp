@@ -291,8 +291,9 @@ class App {
         std::filesystem::path folder;  // the database's
         std::string name;
         bool linked = false;  // a tournament's or a file's: not written
-        std::shared_ptr<study::View> view;
-        std::size_t row = 0;
+        std::shared_ptr<study::View> view;  // none for a game kept from the session before: its list is not kept
+        std::size_t row  = 0;
+        study::GameId id = 0;  // its number in the database: Ctrl+S puts it back there
         std::string filter;  // the quick filter it was made with
     };
     std::optional<BoardOrigin> board_origin_;
@@ -315,6 +316,11 @@ class App {
     std::deque<RecentGame> recent_games_;       // the newest first
     int recent_pick_ = -1;                      // the one chosen while Ctrl+Tab is held; -1 when the list is closed
     void rememberBoardGame();                   // the board's game, before another replaces it
+    // The board's game and the recent ones, kept in the profile (recent.json) from one session to the next (M0's
+    // Resume where you were, Recently): each with its tree, its move, its changes not saved and its database's number;
+    // not their undo history nor their list.
+    void saveRecentGames() const;
+    void loadRecentGames();
     void restoreRecentGame(std::size_t index);  // on the board again, as it was left, the one shown remembered
     // The recent game that is game `id` of the database in `folder` with changes not saved, if there is one.
     [[nodiscard]] std::optional<std::size_t> changedCopyOf(const std::filesystem::path& folder, uint32_t id) const;

@@ -8,3 +8,23 @@ reason = "stb: an integer overflow in stb_hexwave.h's hexwave_init. Only stb_ima
 [[IgnoredVulns]]
 id = "OSV-2022-126"
 reason = "md4c: a 1-byte heap over-read in md_analyze_inlines (table cells) found by OSS-Fuzz, never fixed upstream (every release). md4c parses only the guides embedded in the program at build time, never a file or text from outside; a test parses every section of every guide, under AddressSanitizer in the CI."
+
+[[IgnoredVulns]]
+id = "CVE-2026-85091"
+reason = "zlib: a heap overflow in gz_write() after a failed write(). Only inflate.c, inftrees.c, inffast.c, adler32.c, crc32.c and zutil.c are compiled in (fcg_zlib): no gz* file function is built, gzwrite.c's least of all. Fixed in zlib 1.4."
+
+[[IgnoredVulns]]
+id = "CVE-2026-118375"
+reason = "llama.cpp: a stack overflow in the RDMA transport of ggml-rpc's server. ggml-rpc is not built (GGML_RPC off), nor any server, tool or example of llama.cpp."
+
+[[IgnoredVulns]]
+id = "CVE-2026-119052"
+reason = "llama.cpp: ggml-rpc's server aborted by an oversized message length. ggml-rpc is not built (GGML_RPC off), nor any server, tool or example of llama.cpp."
+
+[[IgnoredVulns]]
+id = "CVE-2026-116467"
+reason = "llama.cpp: a reachable assertion in the Mirostat sampler. The assistant samples with a grammar, greedily or with a temperature and a seed (assistant/src/assistant/generator.cpp), never with Mirostat."
+
+[[IgnoredVulns]]
+id = "CVE-2026-116096"
+reason = "llama.cpp: an out-of-bounds write in the Pocket-TTS model of tools/mtmd. No tool of llama.cpp is built (LLAMA_BUILD_TOOLS off), mtmd least of all."

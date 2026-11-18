@@ -115,6 +115,16 @@ of the games as they come; a cancel stops it between two games. Three queries:
 
 The tests compare each with a replay of every ply of every game, signatures unused.
 
+## Files and tournaments as databases
+
+`LinkedDatabase` keeps a PGN file, or a tournament of the Engines space, as a database in the program's cache
+(`<cache>/<key>.fcgdb`, beside a note of what was read, `<key>.json`), for the list, the searches and the tree to work
+on them. A refresh reads what was appended since: a plain PGN file's new bytes, its whole games only (one still being
+written waits for its end), or a tournament's newly counted games, in the order they finished, each with the text it
+counts with (a result set by hand). What was read is read again from the start when it changed: the first or the
+last bytes read of a file differ, a compressed file changed at all, a tournament's game was voided or its result set,
+or the database holds another count of games than the note (a commit the note did not follow).
+
 ## Opening tree
 
 `buildTree` makes a database's opening tree and `Tree` reads it: for a position, the games that reach it in their first

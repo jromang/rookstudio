@@ -712,6 +712,36 @@ class App {
         std::unique_ptr<lichess::RoundFollower> follower;
     };
     std::vector<FollowedRound> followed_rounds_;
+    // The broadcast mosaic (mockup M4, board 4; view_broadcast.cpp): a followed round's games side by side, each
+    // analysed by an engine of the library while the mosaic shows; the board can follow one of them live.
+    struct BroadcastBoard {
+        std::string url;  // the game's address: its place in the round
+        uint64_t version = 0;
+        ReplayGame game;  // its moves and clocks, as Lichess last sent them
+        chess::Board board;
+        std::string white, black, result;
+        int white_elo = 0, black_elo = 0;
+        std::string pgn;
+        std::unique_ptr<Analyser> analyser;
+    };
+    std::vector<BroadcastBoard> broadcast_boards_;
+    std::string broadcast_round_;     // the round the Lichess page shows as a mosaic (its id); empty: the page itself
+    std::string broadcast_selected_;  // the game chosen in it, by its address
+    std::set<std::string> broadcast_saved_;  // the rounds put in the « Broadcasts » database once they ended
+    std::map<std::string, uint64_t> broadcast_checked_;  // each followed round's changes looked at, for its end
+    int broadcast_drawn_ = -1000;  // the frame the mosaic was last drawn in: its engines stop unseen
+    void openBroadcastMosaic(const std::string& round_id);
+    void drawBroadcastMosaic();
+    void pollBroadcastBoards();  // once a frame: the games read again when they change, their engines, the round kept
+    void saveBroadcastRound(const FollowedRound& round, const std::vector<lichess::BroadcastGame>& games);
+    // The game the Board page follows live, from a followed round: it moves on with each move received.
+    struct BoardBroadcast {
+        std::string round, url;
+        uint64_t version = 0;
+    };
+    std::optional<BoardBroadcast> board_broadcast_;
+    void followBroadcastOnBoard(const BroadcastBoard& game);
+    void drawBoardBroadcastLine();  // « Live from Lichess », and Back to live when the board went back
     void loadLichess();
     void saveLichessSettings();
     void pollLichess();

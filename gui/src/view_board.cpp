@@ -256,6 +256,7 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     questions_.clear();
     if (comment_job_) *comment_job_->cancel = true;
     ++board_game_serial_;
+    board_broadcast_.reset();  // another game: the broadcast's, if it is one, is followed again by its caller
     board_origin_.reset();
     board_.undo.clear();
     board_.redo.clear();
@@ -1350,6 +1351,10 @@ void App::drawBoardPage() {
         add((main.header("ECO").empty() ? "" : main.header("ECO") + " ") + main.header("Opening"));
         if (!main.final_comment.empty() && main.final_comment.size() < 60) add(main.final_comment);
         if (!line.empty()) ImGui::TextDisabled("%s", line.c_str());
+        if (board_broadcast_) {  // a broadcast's game, followed live (M4, board 4)
+            if (!line.empty()) ImGui::SameLine();
+            drawBoardBroadcastLine();
+        }
     }
     if (!b.message.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, b.message_error ? ui::BAD : ui::MUTED);

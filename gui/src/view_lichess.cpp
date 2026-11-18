@@ -99,6 +99,7 @@ void App::pollLichess() {
         lichess_broadcasts_      = lichess_broadcasts_job_.get();
         lichess_broadcasts_time_ = std::chrono::steady_clock::now();
     }
+    pollBroadcastBoards();  // the mosaic's games, their engines, the game the board follows
 }
 
 std::optional<std::size_t> App::lichessBase() {
@@ -422,6 +423,7 @@ void App::followBroadcast(const lichess::BroadcastEntry& entry) {
     f.follower = std::make_unique<lichess::RoundFollower>(entry.round.id,
                                                           lichess_account_ ? lichess_account_->token : std::string());
     followed_rounds_.push_back(std::move(f));
+    openBroadcastMosaic(entry.round.id);  // Follow opens the round as a mosaic (M4)
 }
 
 void App::drawLichessFollowed() {
@@ -443,6 +445,8 @@ void App::drawLichessFollowed() {
             ImGui::TextDisabled("%s", error.empty()
                                           ? TR("connecting…")
                                           : trf("the stream broke ({}): it opens again by itself", error).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("The mosaic"))) openBroadcastMosaic(f.entry.round.id);
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Stop following"))) stop = r;
         const auto games = f.follower->games();
@@ -514,6 +518,11 @@ void App::drawLichessOnline() {
 }
 
 void App::drawLichessPage() {
+    // A followed round, as a mosaic (M4, board 4).
+    if (!broadcast_round_.empty()) {
+        drawBroadcastMosaic();
+        return;
+    }
     ImGui::PushTextWrapPos();
     ImGui::TextDisabled("%s", TR("Everything here is optional: RookStudio works without an account and without the "
                                  "Internet (R15). What goes to Lichess is said where you decide it (R16)."));

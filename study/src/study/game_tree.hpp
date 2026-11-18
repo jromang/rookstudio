@@ -5,6 +5,7 @@
 // (repertoire.hpp) is a game and its variations too.
 
 #include <utility>
+#include <vector>
 
 #include <chess.hpp>
 
@@ -37,5 +38,18 @@ int removeVariation(GameTree& tree, int line);
 // The variation becomes the line it branches from, whose moves after it become the variation: those branching from
 // either follow their moves. Returns that line.
 int promoteVariation(GameTree& tree, int line);
+
+// The notes of the move that leads to position `ply` of `line`; none at the start.
+[[nodiscard]] MoveNotes* notesAt(GameTree& tree, int line, int ply);
+// Takes away the move that leads to position `ply` of `line` and those after it in its line, with the variations
+// branching from them; the whole variation for its first move. An alternative to the first move taken away carries
+// the line on. The line and ply shown after.
+std::pair<int, int> truncateAt(GameTree& tree, int line, int ply);
+// A symbol on a move, or off it when it has it: one judgement of the move (!, ?, ...: $1 to $9) and one of the
+// position ($10 to $19) at most.
+void toggleNag(std::vector<uint8_t>& nags, uint8_t nag);
+// An arrow (from != to) or a square's mark in a colour (G, R, Y, B) on a move: off when it has the same, recoloured
+// when it has it in another colour.
+void toggleMark(MoveNotes& notes, char colour, int from, int to);
 
 }  // namespace fcg

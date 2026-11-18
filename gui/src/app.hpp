@@ -496,6 +496,22 @@ class App {
     // put down.
     void boardPointer(const chess::Board& board, std::optional<chess::Square> press, std::optional<chess::Square> hover,
                       bool right);
+    // The Board page as the Chess space has it (mockup M2): the notation written in place, the symbols typed, the
+    // arrows and squares of the right button. The Engines space's stays as it was.
+    [[nodiscard]] bool chessBoard() const { return space_ == Space::Chess; }
+    [[nodiscard]] BoardPage::Snapshot boardSnapshot() const;
+    void boardChanged(BoardPage::Snapshot before);  // a change made: undone back to `before`
+    void boardUndo(bool redo);
+    [[nodiscard]] MoveNotes* boardNotes();  // those of the move shown, the start position's at its start
+    void boardMark(chess::Square from, chess::Square to);
+    void boardClearMarks();
+    void boardEditKeys();
+    void boardTypeNag(char sign);
+    void boardSetNag(uint8_t nag);
+    void boardComment(bool before);  // the field opened on the move shown
+    void boardCommentDone();
+    void boardToast(std::string text);
+    void drawBoardNagBar();
     // The threads the running tournament's games use now, about: its games times the larger thread count of its
     // engines.
     [[nodiscard]] int tournamentThreads() const;

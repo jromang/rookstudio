@@ -16,6 +16,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <chess.hpp>
@@ -41,7 +42,17 @@ class Board3d {
         std::optional<chess::Square> clicked;  // a left click on a square, a piece's or the board's
         std::optional<chess::Square> hovered;  // the square under the pointer, a piece's or the board's
         bool right_click = false;              // a right click that did not turn the board
+        // Marks (setMarks): the right button held since it pressed this square, and once released over a square,
+        // where it went (the same square for a square's mark).
+        std::optional<chess::Square> marking;
+        std::optional<std::pair<chess::Square, chess::Square>> marked;
     };
+    // What the right button does: turn round the board (Off, the Engines space's); A (the Chess space's, mockup M2),
+    // mark the square it presses, turning round when it presses beside the board; B, mark wherever it presses, the
+    // middle button turning round. Where it marks, the middle button held turns round too, and its click brings the
+    // view back.
+    enum class Marks { Off, A, B };
+    void setMarks(Marks marks) { marks_ = marks; }
     // Draws the position at the cursor and reserves `size` x `size`, plus the eval bar if shown, as drawBoard().
     Input draw(const chess::Board& board, float size, const BoardDecor& decor);
     Input draw(const std::array<chess::Piece, 64>& pieces, float size, const BoardDecor& decor,
@@ -67,6 +78,9 @@ class Board3d {
     std::chrono::steady_clock::time_point turn_start_{};
     bool flipped_     = false;
     bool placed_      = false;  // the first draw sets the yaw without turning
+    Marks marks_      = Marks::Off;
+    std::optional<chess::Square> mark_from_;  // the right button pressed on this square, marking
+    bool middle_down_ = false, middle_dragged_ = false;
     float yaw_offset_ = 0;
     float pitch_      = 0;
     float zoom_       = 1;

@@ -17,7 +17,9 @@
 namespace fcg {
 
 struct NotationItem {
-    enum class Kind { Move, Number, Text, Break };  // Break: what follows starts a new line
+    // Break: what follows starts a new line. Field: a line of its own where text is written (field, field_size), its
+    // hint in `text`.
+    enum class Kind { Move, Number, Text, Break, Field };
     Kind kind = Kind::Move;
     std::string text;  // a move's SAN, a number ("12.", "12…"), a text
     ImU32 colour = 0;  // 0: the text's
@@ -27,6 +29,9 @@ struct NotationItem {
     bool bold         = false;
     int id            = -1;  // what the mouse events give back
     float indent      = 0;   // a line starting with it starts this far in (a variation)
+    char* field            = nullptr;
+    std::size_t field_size = 0;
+    bool field_focus       = false;  // the keys go to the field
 };
 
 struct NotationEvents {
@@ -34,6 +39,8 @@ struct NotationEvents {
     int clicked       = -1;
     int right_clicked = -1;
     std::optional<ImVec2> current_min, current_max;  // where the current move is, to scroll to it
+    bool field_done      = false;                    // the field left with Enter or a click elsewhere
+    bool field_cancelled = false;                    // left with Escape
 };
 
 // The items from the cursor, `width` wide (0: the room left), at most `max_lines` lines (0: all; the last one

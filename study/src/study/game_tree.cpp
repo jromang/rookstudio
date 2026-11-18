@@ -140,4 +140,82 @@ int promoteVariation(GameTree& tree, int line) {
     return parent;
 }
 
+MoveNotes* notesAt(GameTree& tree, int line, int ply) {
+    if (ply <= 0) return nullptr;
+    const int owner = ownerOf(tree, line, ply - 1);
+    auto& moves     = owner < 0 ? tree.main.moves : tree.variations[static_cast<std::size_t>(owner)].moves;
+    const int i     = ply - 1 - (owner < 0 ? 0 : tree.variations[static_cast<std::size_t>(owner)].from);
+    if (i < 0 || i >= static_cast<int>(moves.size())) return nullptr;
+    return &moves[static_cast<std::size_t>(i)].notes;
+}
+
+std::pair<int, int> truncateAt(GameTree& tree, int line, int ply) {
+    if (ply <= 0) return {line, ply};
+    int owner       = ownerOf(tree, line, ply - 1);
+    const int local = ply - 1 - (owner < 0 ? 0 : tree.variations[static_cast<std::size_t>(owner)].from);
+    if (owner >= 0 && local == 0) return {removeVariation(tree, owner), ply - 1};
+    auto& moves = owner < 0 ? tree.main.moves : tree.variations[static_cast<std::size_t>(owner)].moves;
+    if (local < 0 || local >= static_cast<int>(moves.size())) return {line, ply};
+    moves.resize(static_cast<std::size_t>(local));
+    // The variations branching from the moves taken away after the first, and theirs.
+    std::vector<bool> gone(tree.variations.size(), false);
+    for (std::size_t v = 0; v < tree.variations.size(); ++v)
+        gone[v] = tree.variations[v].parent == owner && tree.variations[v].from > ply - 1;
+    for (bool more = true; more;) {
+        more = false;
+        for (std::size_t v = 0; v < tree.variations.size(); ++v) {
+            const int p = tree.variations[v].parent;
+            if (!gone[v] && p >= 0 && gone[static_cast<std::size_t>(p)]) gone[v] = more = true;
+        }
+    }
+    std::vector<int> index(tree.variations.size(), -1);
+    std::vector<Variation> kept;
+    for (std::size_t v = 0; v < tree.variations.size(); ++v) {
+        if (gone[v]) continue;
+        index[v] = static_cast<int>(kept.size());
+        kept.push_back(std::move(tree.variations[v]));
+    }
+    for (auto& v : kept)
+        if (v.parent >= 0) v.parent = index[static_cast<std::size_t>(v.parent)];
+    tree.variations = std::move(kept);
+    if (owner >= 0) owner = index[static_cast<std::size_t>(owner)];
+    // An alternative to the first move taken away: the line now, the variation it leaves empty gone.
+    for (std::size_t v = 0; v < tree.variations.size(); ++v) {
+        if (tree.variations[v].parent != owner || tree.variations[v].from != ply - 1) continue;
+        promoteVariation(tree, static_cast<int>(v));
+        owner = removeVariation(tree, static_cast<int>(v));
+        break;
+    }
+    return {owner, ply - 1};
+}
+
+void toggleNag(std::vector<uint8_t>& nags, uint8_t nag) {
+    const auto move_nag     = [](uint8_t n) { return n >= 1 && n <= 9; };
+    const auto position_nag = [](uint8_t n) { return n >= 10 && n <= 19; };
+    if (const auto it = std::find(nags.begin(), nags.end(), nag); it != nags.end()) {
+        nags.erase(it);
+        return;
+    }
+    if (move_nag(nag)) std::erase_if(nags, move_nag);
+    if (position_nag(nag)) std::erase_if(nags, position_nag);
+    nags.push_back(nag);
+    std::stable_sort(nags.begin(), nags.end(), [&](uint8_t a, uint8_t b) {
+        const auto rank = [&](uint8_t n) { return move_nag(n) ? 0 : position_nag(n) ? 1 : 2; };
+        return rank(a) != rank(b) ? rank(a) < rank(b) : a < b;
+    });
+}
+
+void toggleMark(MoveNotes& notes, char colour, int from, int to) {
+    auto& marks = from == to ? notes.squares : notes.arrows;
+    const BoardMark mark{colour, static_cast<int8_t>(from), static_cast<int8_t>(from == to ? -1 : to)};
+    const auto it = std::find_if(marks.begin(), marks.end(),
+                                 [&](const BoardMark& m) { return m.from == mark.from && m.to == mark.to; });
+    if (it == marks.end())
+        marks.push_back(mark);
+    else if (it->colour == colour)
+        marks.erase(it);
+    else
+        it->colour = colour;
+}
+
 }  // namespace fcg

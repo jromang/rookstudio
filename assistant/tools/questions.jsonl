@@ -1,0 +1,46 @@
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Why this move?", "expect": "explain", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Pourquoi ce coup ?", "expect": "explain", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What is the idea behind White's last move?", "expect": "explain", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "À quoi sert le dernier coup des Blancs ?", "expect": "explain", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What should Black play now?", "expect": "best", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Que doivent jouer les Noirs ?", "expect": "best", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What is the best move here?", "expect": "best", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Quel est le meilleur coup pour les Noirs ?", "expect": "best", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What does White threaten?", "expect": "threat", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Les Blancs menacent-ils quelque chose ?", "expect": "threat", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Is there any danger for Black?", "expect": "threat", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What if Black plays h5?", "expect": "try h5", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Et si les Noirs jouent b5 ?", "expect": "try b5", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Why not d5?", "expect": "try d5", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Pourquoi pas Fe7 ?", "expect": "try Fe7", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Is Be7 better than h5?", "expect": "compare Be7 h5", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Cbd7 ou b5 ?", "expect": "compare Cbd7 b5", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Which is stronger, Qc7 or Be7?", "expect": "compare Qc7 Be7", "played": "8.f3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "en", "question": "Why not Nf6?", "expect": "try Nf6", "played": "2.Nf3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "en", "question": "Nc6 or d6?", "expect": "compare Nc6 d6", "played": "2.Nf3"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "en", "question": "What should White play?", "expect": "best"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "fr", "question": "Que menacent les Noirs ?", "expect": "threat"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "fr", "question": "Et si les Blancs jouent Rf5 ?", "expect": "try Rf5"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Who played this position?", "expect": "games", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "Show me master games from here", "expect": "games", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Quelles parties de maîtres passent par ici ?", "expect": "games", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Qui a déjà joué cette position ?", "expect": "games", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What is usually played here?", "expect": "played", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What do grandmasters play in this position?", "expect": "played", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Que jouent les forts joueurs ici ?", "expect": "played", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Quels sont les coups les plus joués ?", "expect": "played", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "How often was h5 played?", "expect": "played h5", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What is the score of Be7 in practice?", "expect": "played Be7", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Combien de fois Fe7 a-t-il été joué ?", "expect": "played Fe7", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Quel score pour b5 dans les parties ?", "expect": "played b5", "played": "8.f3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "en", "question": "What is played here usually?", "expect": "played", "played": "2.Nf3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "en", "question": "How did Nc6 score?", "expect": "played Nc6", "played": "2.Nf3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What opening is this?", "expect": "opening", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "fr", "question": "Comment s'appelle cette variante ?", "expect": "opening", "played": "8.f3"}
+{"fen": "rn1qkb1r/1p3ppp/p2pbn2/4p3/4P3/1NN1BP2/PPP3PP/R2QKB1R b KQkq - 0 8", "lang": "en", "question": "What's the name of this line?", "expect": "opening", "played": "8.f3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "fr", "question": "Quelle ouverture est-ce ?", "expect": "opening", "played": "2.Nf3"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "en", "question": "Is this endgame winning?", "expect": "tablebase"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "fr", "question": "Cette finale est-elle nulle ?", "expect": "tablebase"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "en", "question": "What do the tablebases say?", "expect": "tablebase"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "en", "question": "Is this a theoretical draw?", "expect": "tablebase"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "fr", "question": "Les Blancs peuvent-ils gagner cette finale ?", "expect": "tablebase"}

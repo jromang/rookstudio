@@ -1,0 +1,23 @@
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "Why did Black play that?", "expect": "explain", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "What's White's best continuation?", "expect": "best", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Que proposes-tu pour les Blancs ?", "expect": "best", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "Is White in danger?", "expect": "threat", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Qu'est-ce que les Noirs préparent ?", "expect": "threat", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "What happens after Qc2?", "expect": "try Qc2", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Que se passe-t-il après a3 ?", "expect": "try a3", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "Should I prefer e3 over Qc2?", "expect": "compare e3 Qc2", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Faut-il jouer f3 plutôt que Dc2 ?", "expect": "compare f3 Dc2", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "Which grandmaster games reached this?", "expect": "games", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Montre-moi des parties célèbres avec cette position", "expect": "games", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "Which move is the most popular here?", "expect": "played", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Quels coups jouent les champions ici ?", "expect": "played", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "How has Qc2 fared in tournament practice?", "expect": "played Qc2", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "Dc2 est-il souvent joué ?", "expect": "played Dc2", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "en", "question": "Which opening are we in?", "expect": "opening", "played": "3…Bb4"}
+{"fen": "rnbqk2r/pppp1ppp/4pn2/8/1bPP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 2 4", "lang": "fr", "question": "C'est quelle défense ?", "expect": "opening", "played": "3…Bb4"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "en", "question": "Is the rook endgame lost for Black?", "expect": "tablebase"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "fr", "question": "Cette position est-elle gagnante d'après les tables ?", "expect": "tablebase"}
+{"fen": "8/5k2/8/4P3/5K2/8/r7/7R w - - 0 50", "lang": "en", "question": "What is the result with perfect play?", "expect": "tablebase"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "en", "question": "What do club players usually play here?", "expect": "played", "played": "2.Nf3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "en", "question": "Should Black play d6?", "expect": "try d6", "played": "2.Nf3"}
+{"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", "lang": "fr", "question": "Et si je joue f5 ?", "expect": "try f5", "played": "2.Nf3"}

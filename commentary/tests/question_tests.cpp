@@ -94,6 +94,18 @@ TEST_CASE("question: the suggested questions need no model") {
     // A move named: the model reads it.
     CHECK(plain("Does Nf6 meet the threat?") == std::nullopt);
     CHECK(plain("Who stands better?") == std::nullopt);
+    // Unless the question sets two against each other, or asks for a move's record in the games.
+    const auto nf6 = *p.parseUci("g8f6"), e5 = *p.parseUci("e7e5");
+    CHECK(namedAction("Is Nf6 better than e5?", names) == Action{Action::Kind::Compare, nf6, e5});
+    CHECK(namedAction("e5 ou Cf6 ?", names) == Action{Action::Kind::Compare, e5, nf6});
+    CHECK(namedAction("How often was Nf6 played?", names) == Action{Action::Kind::Played, nf6});
+    CHECK(namedAction("Does Nf6 meet the threat?", names) == std::nullopt);
+    CHECK(namedAction("What is played here?", names) == std::nullopt);
+    // A comparison wants two moves: the grammar of a question naming one has none, and a move set against itself is
+    // read as tried.
+    CHECK(actionGrammar(namedIn("Why not Nf6?", names)).find("compare") == std::string::npos);
+    CHECK(actionGrammar(namedIn("Nf6 and e5", names)).find("compare") != std::string::npos);
+    CHECK(readAction("compare Nf6 Nf6", "Que se passe-t-il après Nf6 ?", names) == Action{Action::Kind::Try, nf6});
 }
 
 TEST_CASE("question: the request turning a question into an action") {
@@ -105,7 +117,13 @@ TEST_CASE("question: the request turning a question into an action") {
     CHECK(r.messages[0].second.starts_with("You turn a chess player's question"));
     CHECK(r.messages[1] == std::pair{Speaker::User, std::string("Move just played: 1.e4. Black to move.\n"
                                                                 "Question: Why not Nf6?\nAction:")});
-    CHECK(r.grammar == actionGrammar(names));
+    // Held to the moves the question names, by their two names: a move it does not name cannot be made up.
+    CHECK(r.grammar == actionGrammar(namedIn("Why not Nf6?", names)));
+    CHECK(namedIn("Why not Nf6?", names) == MoveNames{{"Cf6", *p.parseUci("g8f6")}, {"Nf6", *p.parseUci("g8f6")}});
+    CHECK(r.grammar->find("\"e5\"") == std::string::npos);
+    // None named: only the actions about no move.
+    CHECK(actionRequest("What is played here?", p, std::nullopt, names).grammar ==
+          "root ::= \"explain\" | \"best\" | \"threat\" | \"games\" | \"played\" | \"opening\" | \"tablebase\"\n");
     CHECK(r.max_tokens == 16);
     CHECK(r.temperature == 0.0f);
     CHECK(r.seed == 1);

@@ -252,6 +252,10 @@ void App::drawShell() {
         case Page::Openings:
             drawOpeningsPage();
             break;
+        case Page::Lichess:
+            ui::pageTitle("Lichess");
+            drawLichessPage();
+            break;
     }
     // The workspace's dock space stays alive on the other pages: the panels docked in it stay there. Also when the
     // page changed to the workspace's during this frame (Open on the list of tournaments), after the switch above.
@@ -352,7 +356,7 @@ void App::drawSpaceSwitch(float width) {
 }
 
 bool App::chessPage(Page page) noexcept {
-    return page == Page::ChessHome || page == Page::Databases || page == Page::Openings;
+    return page == Page::ChessHome || page == Page::Databases || page == Page::Openings || page == Page::Lichess;
 }
 
 bool App::sharedPage(Page page) noexcept {
@@ -426,6 +430,8 @@ void App::drawChessRail(float width, float button) {
         page_            = Page::Board;
         board_.play_open = true;
     }
+    if (ui::railButton("rail_lichess", ui::Icon::Globe, "Lichess", page_ == Page::Lichess, width, button))
+        page_ = Page::Lichess;
     if (ui::railButton("rail_chess_engines", ui::Icon::Engine, TR("Engines"), page_ == Page::Engines, width, button))
         page_ = Page::Engines;
     if (ui::railButton("rail_chess_settings", ui::Icon::Settings, TR("Settings"), page_ == Page::Settings, width,

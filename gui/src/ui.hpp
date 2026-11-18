@@ -108,7 +108,10 @@ enum class Icon {
     // The Chess space's rail.
     Home,
     Database,
-    Openings
+    Openings,
+    Globe,      // Lichess
+    Broadcast,  // a broadcast followed
+    Download
 };
 
 // `icon` in a line of text, as wide as the font is high, in `col`.

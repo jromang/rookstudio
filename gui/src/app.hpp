@@ -38,6 +38,10 @@
 #include "guide_view.hpp"
 #include "home.hpp"
 #include "layout.hpp"
+#include "lichess_account.hpp"
+#include "lichess_broadcasts.hpp"
+#include "lichess_games.hpp"
+#include "lichess_settings.hpp"
 #include "live.hpp"
 #include "machine_jobs.hpp"
 #include "machine_run.hpp"
@@ -220,7 +224,8 @@ class App {
         // The Chess space's own pages.
         ChessHome,
         Databases,
-        Openings
+        Openings,
+        Lichess
     };
     enum class Tab { Overview, Standings, Bracket, Schedule, Live, Games, Openings, Broadcast };
 
@@ -669,6 +674,54 @@ class App {
     // A move the user makes on the board or types. In the Chess space, where the game went another way, it starts a
     // variation (boardPlay), unless Shift is held: it replaces the moves after; or Ctrl, or the setting: asked about.
     void boardPlayAsked(chess::Move move);
+    // Lichess (mockup M4): the account, a player's games, the broadcasts, the online services of the analysis.
+    LichessSettings lichess_;
+    std::optional<lichess::Account> lichess_account_;
+    std::string lichess_error_;  // why the last link failed
+    struct LichessLink {
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<std::string> url;  // Lichess's page, as given to the browser
+        std::shared_ptr<std::atomic<bool>> opened;
+        std::future<lichess::Answer<lichess::Account>> result;
+    };
+    std::unique_ptr<LichessLink> lichess_link_;
+    std::future<std::string> lichess_unlink_;
+    struct LichessSync {
+        std::size_t index = 0;  // the database's
+        std::string name;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<lichess::SyncProgress> progress;
+        std::shared_ptr<study::Database> db;
+        std::future<lichess::SyncReport> done;
+    };
+    std::unique_ptr<LichessSync> lichess_sync_;
+    std::optional<lichess::SyncReport> lichess_sync_report_;
+    std::array<char, 64> lichess_player_{};
+    bool lichess_player_active_ = false;
+    lichess::Answer<lichess::BroadcastList> lichess_broadcasts_;
+    std::future<lichess::Answer<lichess::BroadcastList>> lichess_broadcasts_job_;
+    std::chrono::steady_clock::time_point lichess_broadcasts_time_{};
+    bool lichess_all_broadcasts_ = false;  // all the live ones listed, not the six best known
+    struct FollowedRound {
+        lichess::BroadcastEntry entry;
+        std::unique_ptr<lichess::RoundFollower> follower;
+    };
+    std::vector<FollowedRound> followed_rounds_;
+    void loadLichess();
+    void saveLichessSettings();
+    void pollLichess();
+    void askBroadcasts();  // the list of broadcasts, asked again after ten minutes
+    void startLichessLink();
+    void startLichessSync();  // the games of lichess_.player into "Lichess · player", made when it is missing
+    [[nodiscard]] std::optional<std::size_t> lichessBase();  // that database
+    void drawLichessHomeCard();
+    void followBroadcast(const lichess::BroadcastEntry& entry);
+    void drawLichessPage();
+    void drawLichessAccount();
+    void drawLichessGames();
+    void drawLichessBroadcasts();
+    void drawLichessFollowed();
+    void drawLichessOnline();
     // The game's headers, unfolded in place above the notation (M2, board 7): Alt+H.
     bool headers_open_ = false;
     std::map<std::string, std::array<char, 256>> header_edit_;  // a field's text while it is written

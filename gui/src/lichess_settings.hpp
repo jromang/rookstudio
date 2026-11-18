@@ -1,0 +1,22 @@
+#pragma once
+
+// What the user decided about Lichess (mockup M4): each online service of the analysis allowed or not, the explorer,
+// the new games counted on the home, and the player whose games were imported last. In the profile's lichess.json; the
+// account's token is apart (lichess-account.json, readable by its owner alone).
+
+#include <string>
+
+#include <json.hpp>
+
+namespace fcg {
+
+struct LichessSettings {
+    int cloud      = 0;      // the cloud's evaluation: 0 asked at its first use, 1 always, 2 never
+    int tablebase  = 0;      // the tables online, up to 7 pieces: the same
+    bool explorer  = true;   // Lichess's explorer in the Tree tab, the account linked
+    bool count_new = false;  // the new games of the player counted when the home opens
+    std::string player;      // whose games were imported last
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player)
+
+}  // namespace fcg

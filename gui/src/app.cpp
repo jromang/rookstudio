@@ -99,6 +99,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
 
     loadRecentGames();  // the board's game and the recent ones of the session before
     loadKeptSearches();
+    loadLichess();
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
     updates_ = storage_.updateSettings();
     if (updates_.enabled && !options_.scripted && update::checkDue(updates_.checked, std::time(nullptr))) {
@@ -109,6 +110,9 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
 App::~App() {
     ui::setGuideOpener(nullptr);
     closeFileLines();  // a file being read stops within a megabyte
+    // Lichess's waits end at once: the link's, the sync's.
+    if (lichess_link_) *lichess_link_->cancel = true;
+    if (lichess_sync_) *lichess_sync_->cancel = true;
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once, and the window goes away first rather than freeze while it does.
     if (probe_.valid() || check_.valid()) {
@@ -261,6 +265,7 @@ void App::frame() {
     handleBigScreenKeys();
     applyThemeSetting();
     updateBroadcast();
+    pollLichess();  // a link, a sync, the broadcasts: whatever page shows
 
     // --shot and --focus: show the requested page or tab once the first frames are drawn.
     if (!options_.focus_window.empty() && !focus_done_) {

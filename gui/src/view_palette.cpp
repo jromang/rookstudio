@@ -77,6 +77,7 @@ const char* App::guideSection() const {
         case Page::ChessHome:  // the guide's Chess space comes with the batch of preview 1
         case Page::Databases:
         case Page::Openings:
+        case Page::Lichess:
             break;
     }
     return Window;
@@ -514,6 +515,12 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     add(TR("Home"), TR("Chess"), page(Page::ChessHome));
     add(TR("Databases"), TR("Chess"), page(Page::Databases));
     add(TR("Openings: repertoires"), TR("Chess"), page(Page::Openings));
+    add("Lichess", TR("Chess"), page(Page::Lichess));
+    if (!lichess_account_)
+        add(TR("Link the Lichess account…"), "Lichess", [this, go = page(Page::Lichess)] {
+            go();
+            startLichessLink();
+        });
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {

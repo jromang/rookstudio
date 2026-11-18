@@ -21,6 +21,7 @@
 
 #include <tour/files.hpp>
 
+#include "console.hpp"
 #include "net.hpp"
 #include "tls_roots.hpp"
 
@@ -962,6 +963,14 @@ void HostGate::setPause(std::chrono::milliseconds pause) {
     pause_ = pause;
 }
 
+// What leaves the machine, in the log (R16): the address asked, with what it carries (a FEN, a player's name), and
+// whether the account's token went with it, never the token itself.
+static void logRequest(const HttpRequest& request) {
+    Console::instance().add(
+        fmt::format("{} {}{}", request.method, request.url, request.token.empty() ? "" : " (with the account's token)"),
+        false, "network");
+}
+
 HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* cancel) {
     const auto url = parseUrl(request.url);
     if (!url) return httpRequest(request);
@@ -972,6 +981,7 @@ HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* ca
         result.error = "cancelled";
         return result;
     }
+    logRequest(request);
     auto result = httpRequest(request);
     if (result.status == 429) gate.tooMany(url->host);
     return result;
@@ -986,6 +996,7 @@ HttpResult politeStream(const HttpRequest& request, const HttpStream& stream) {
         result.error = "cancelled";
         return result;
     }
+    logRequest(request);
     auto result = httpStream(request, stream);
     if (result.status == 429) gate.tooMany(url->host);
     return result;

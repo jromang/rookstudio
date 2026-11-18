@@ -208,6 +208,10 @@ void App::drawChessHome() {
     ui::endCard();
     if (reopen) restoreRecentGame(*reopen);
 
+    // Lichess (M0, M4): the account, a player's games, the broadcasts live.
+    ImGui::Dummy(ImVec2(0, px(6)));
+    drawLichessHomeCard();
+
     // What runs: the game's analysis, the position's, an import.
     const bool importing = job != nullptr;
     if (b.reviewing() || b.analysing || importing) {

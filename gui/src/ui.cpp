@@ -385,6 +385,12 @@ const char* glyph(Icon icon) {
             return "\uE0AD";  // database
         case Icon::Openings:
             return "\uE28D";  // git-fork
+        case Icon::Globe:
+            return "\uE0E8";  // globe
+        case Icon::Broadcast:
+            return "\uE404";  // radio-tower
+        case Icon::Download:
+            return "\uE0B2";  // download
     }
     return "";
 }

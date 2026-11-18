@@ -12,9 +12,7 @@ on:
     branches: ["main"]
     paths: ["**", "!**.md", "!docs/**", "docs/guide*.md", "docs/screenshots/appearance.png"]
   # A private repository pays its minutes: a push runs the Linux build and tests alone; the sanitizers and Windows run
-  # each night main has changed, on a tag and on a run by hand.
-  schedule:
-    - cron: "37 2 * * *"
+  # on a tag and on a run by hand.
   workflow_dispatch:
     inputs:
       macos:
@@ -37,25 +35,8 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  # The night's run, only when main has a commit of the last 25 hours: one minute, against the twenty the rest takes.
-  changed:
-    name: Changes of the day
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    outputs:
-      recent: ${{ steps.last.outputs.recent }}
-    steps:
-      - id: last
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          last=$(gh api "repos/${{ github.repository }}/commits/main" --jq .commit.committer.date)
-          echo "main's last commit: $last"
-          if [ $(( $(date +%s) - $(date -d "$last" +%s) )) -lt 90000 ]; then echo recent=true; else echo recent=false; fi >> "$GITHUB_OUTPUT"
-
   linux:
     name: Linux build and tests
-    if: github.event_name != 'schedule'
     # Ubuntu 26.04 and gcc 15, though the program runs on glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39,
     # RHEL 10 and later): cmake/glibc_floor.h, which a step checks. fastchess-gui's own job stays on 22.04: keep this
     # one when merging it.
@@ -166,11 +147,8 @@ jobs:
 
   sanitizers:
     name: Linux tests with AddressSanitizer and UBSan
-    needs: changed
-    # Not at each push: at night when main changed, on a tag, a pull request or a run by hand.
-    if: >-
-      !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')) &&
-      (github.event_name != 'schedule' || needs.changed.outputs.recent == 'true')
+    # Not at each push: on a tag, a pull request or a run by hand.
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-26.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -270,11 +248,8 @@ jobs:
 
   windows-build:
     name: Windows cross-build
-    needs: changed
     # As the sanitizers: code that differs on Windows is rare, and a Windows runner's minutes count twice.
-    if: >-
-      !cancelled() && (github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')) &&
-      (github.event_name != 'schedule' || needs.changed.outputs.recent == 'true')
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-26.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -378,7 +353,7 @@ jobs:
     name: macOS build and tests
     # A private repository counts macOS minutes ten times: the Mac builds the tags (a release needs it), and a run
     # started by hand when asked (gh workflow run gui.yml -R jromang/rookstudio --ref main -f macos=true); never a
-    # push nor the night's run.
+    # push.
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.macos)
     # Apple silicon. The programs are universal (arm64 and x86_64), for macOS 13.3 and later.
     runs-on: macos-latest

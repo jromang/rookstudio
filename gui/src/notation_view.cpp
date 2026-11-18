@@ -152,6 +152,7 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) ev.clicked = it.id;
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) ev.right_clicked = it.id;
+                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ev.double_clicked = it.id;
             }
             const ImU32 col = it.colour ? it.colour : text_col;
             float tx        = x + pad;
@@ -182,6 +183,15 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
         } else {
             // No room inside the brackets of a variation.
             if (it.text == ")" && x > o.x + gap) x -= gap * 0.5f + pad;
+            // A text with an id (a comment's word): the caret over it, its clicks given back.
+            if (it.id >= 0 && window_hovered && mouse.x >= x && mouse.x < x + w + gap && mouse.y >= y &&
+                mouse.y < y + lh - px(2)) {
+                ev.hovered = it.id;
+                ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) ev.clicked = it.id;
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) ev.right_clicked = it.id;
+                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ev.double_clicked = it.id;
+            }
             const ImU32 col = it.colour ? it.colour : ui::MUTED;
             dl->AddText(font, fs, ImVec2(x, y + (lh - px(2) - ImGui::GetTextLineHeight()) / 2), col, it.text.c_str());
             x += w + (it.kind == NotationItem::Kind::Number ? px(1) : it.text == "(" ? 0.0f : gap);

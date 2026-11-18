@@ -8,7 +8,6 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
-#include <imgui_internal.h>  // SetKeyOwner
 
 #include <commentary/position.hpp>
 #include <study/scan_board.hpp>
@@ -283,13 +282,6 @@ void App::drawBoardStrip() {
     std::optional<std::size_t> go;
     bool left = false;
     if (board_origin_ && board_origin_->view) {
-        // The arrows are claimed while Ctrl is held, before they are pressed: ImGui's keyboard navigation leaves
-        // keys someone owns alone.
-        if (keys && io.KeyCtrl) {
-            const auto owner = ImGui::GetID("##list_strip_keys");
-            ImGui::SetKeyOwner(ImGuiKey_LeftArrow, owner);
-            ImGui::SetKeyOwner(ImGuiKey_RightArrow, owner);
-        }
         const auto& o    = *board_origin_;
         const auto row   = o.row;
         const auto total = o.view->ids.size();

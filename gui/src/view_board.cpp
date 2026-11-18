@@ -11,6 +11,7 @@
 #include <SDL3/SDL.h>
 
 #include <imgui.h>
+#include <imgui_internal.h>  // SetKeyOwner
 #include <implot.h>
 
 #include <fmt/include/fmt/format.h>
@@ -94,6 +95,9 @@ std::string englishSan(std::string typed, bool french) {
 }
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
+
+// The ids of the notation's comments, above those of its moves ((line + 1) * 100000 + ply).
+constexpr int kCommentIds = 1 << 30;
 
 // The best line's first move strong, the others lighter.
 ImU32 arrowColour(int rank) {
@@ -1148,6 +1152,13 @@ void App::drawBoardPage() {
     // the keys (a text field's own ends it, and it comes back after).
     if (chessBoard() && keys && !b.editor && !SDL_TextInputActive(window_)) SDL_StartTextInput(window_);
     if (keys && !b.editor) {
+        // The arrows, Home and End are the board's. Claimed before they are pressed, ImGui's keyboard navigation
+        // leaves them alone: its cursor no longer shows on the button last clicked (a page of the rail), which
+        // Enter or Space would press then, in place of a comment.
+        const auto owner = ImGui::GetID("##board_keys");
+        for (const auto key : {ImGuiKey_LeftArrow, ImGuiKey_RightArrow, ImGuiKey_UpArrow, ImGuiKey_DownArrow,
+                               ImGuiKey_Home, ImGuiKey_End})
+            ImGui::SetKeyOwner(key, owner);
         const int before = b.ply;
         b.ply            = stepPly(navKeys(b.flip, !chessBoard()), b.ply, total);
         if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_F)) b.flip = !b.flip;
@@ -2360,7 +2371,15 @@ void App::drawBoardMoves(float height) {
         // In the Chess space: the comments, word by word, and the field where one is written.
         const bool proto        = chessBoard();
         const ImU32 comment_col = IM_COL32(52, 146, 92, 255);
-        const auto words        = [&](const std::string& text, float indent) {
+        // A comment's words give back an id of their own: a click goes to its move, a double click corrects it.
+        struct CommentAt {
+            int line, ply;
+            bool before;
+        };
+        std::vector<CommentAt> comments;
+        const auto words = [&](const std::string& text, float indent, int line, int ply, bool before) {
+            const int id = ply > 0 ? kCommentIds + static_cast<int>(comments.size()) : -1;  // the game's own: none
+            if (ply > 0) comments.push_back({line, ply, before});
             std::istringstream in(text);
             for (std::string word; in >> word;) {
                 NotationItem w;
@@ -2368,6 +2387,7 @@ void App::drawBoardMoves(float height) {
                 w.text   = std::move(word);
                 w.colour = comment_col;
                 w.indent = indent;
+                w.id     = id;
                 items.push_back(std::move(w));
             }
         };
@@ -2400,7 +2420,7 @@ void App::drawBoardMoves(float height) {
                     field(px(10) * static_cast<float>(depth));
                     number = true;
                 } else if (proto && !m.notes.before.empty()) {
-                    words(m.notes.before, px(10) * static_cast<float>(depth));
+                    words(m.notes.before, px(10) * static_cast<float>(depth), line, ply + 1, true);
                     number = true;
                 }
                 if (at.sideToMove() == chess::Color::WHITE || number) {
@@ -2445,7 +2465,7 @@ void App::drawBoardMoves(float height) {
                         field(px(10) * static_cast<float>(depth));
                         number = true;
                     } else if (!m.notes.after.empty()) {
-                        words(m.notes.after, px(10) * static_cast<float>(depth));
+                        words(m.notes.after, px(10) * static_cast<float>(depth), line, ply + 1, false);
                         number = true;
                     }
                 }
@@ -2476,7 +2496,7 @@ void App::drawBoardMoves(float height) {
                 at.makeMove<true>(m.move);
             }
         };
-        if (proto && !main.pre_comment.empty()) words(main.pre_comment, 0);
+        if (proto && !main.pre_comment.empty()) words(main.pre_comment, 0, -1, 0, true);
         emit(-1, 0, boardAt(main, b.chess960, 0), 0);
         if (!main.result.empty() && main.result != "*") {
             NotationItem result;
@@ -2496,12 +2516,24 @@ void App::drawBoardMoves(float height) {
         if (ev.field_done) boardCommentDone();
         if (ev.field_cancelled) b.comment_edit.reset();
         if (b.comment_edit) b.comment_edit->focus = false;
-        if (ev.clicked >= 0) {
+        const auto comment = [&](int id) -> const CommentAt* {
+            return id >= kCommentIds && id - kCommentIds < static_cast<int>(comments.size())
+                       ? &comments[static_cast<std::size_t>(id - kCommentIds)]
+                       : nullptr;
+        };
+        if (const auto* c = comment(ev.double_clicked)) {
+            showBoardLine(c->line, c->ply);
+            boardComment(c->before);
+        } else if (const auto* at = comment(ev.clicked)) {
+            showBoardLine(at->line, at->ply);
+            b.preview.reset();
+        } else if (ev.clicked >= 0) {
             showBoardLine(ev.clicked / 100000 - 1, ev.clicked % 100000);
             b.preview.reset();
         }
+        if (comment(ev.hovered)) ImGui::SetTooltip("%s", TR("A double click corrects the comment"));
         // A move of the game: what its engine said and its judgement.
-        if (ev.hovered >= 0 && ev.hovered / 100000 == 0) {
+        if (ev.hovered >= 0 && ev.hovered < kCommentIds && ev.hovered / 100000 == 0) {
             const int i = ev.hovered % 100000 - 1;
             if (i >= 0 && i < static_cast<int>(main.moves.size())) {
                 const auto& m = main.moves[static_cast<std::size_t>(i)];
@@ -2518,7 +2550,7 @@ void App::drawBoardMoves(float height) {
             }
         }
         // A variation's move: promote it, remove it.
-        if (ev.right_clicked >= 0 && ev.right_clicked / 100000 > 0) {
+        if (ev.right_clicked >= 0 && ev.right_clicked < kCommentIds && ev.right_clicked / 100000 > 0) {
             b.menu_line = ev.right_clicked / 100000 - 1;
             ImGui::OpenPopup("##variation_menu");
         }

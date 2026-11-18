@@ -27,7 +27,7 @@ struct NotationItem {
     ImU32 mark_colour = 0;
     bool current      = false;  // framed
     bool bold         = false;
-    int id            = -1;  // what the mouse events give back
+    int id                 = -1;  // what the mouse events give back (a text too when it has one: a comment)
     float indent      = 0;   // a line starting with it starts this far in (a variation)
     char* field            = nullptr;
     std::size_t field_size = 0;
@@ -38,6 +38,7 @@ struct NotationEvents {
     int hovered       = -1;  // ids
     int clicked       = -1;
     int right_clicked = -1;
+    int double_clicked = -1;                         // a move's, or a text's that has an id (a comment)
     std::optional<ImVec2> current_min, current_max;  // where the current move is, to scroll to it
     bool field_done      = false;                    // the field left with Enter or a click elsewhere
     bool field_cancelled = false;                    // left with Escape

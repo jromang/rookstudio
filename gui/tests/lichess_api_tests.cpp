@@ -133,6 +133,23 @@ TEST_CASE("Lichess: the tablebase's answer, each move with what it leaves the ot
     CHECK(t.value->moves[2].outcome == Outcome::Draw);
 }
 
+TEST_CASE("Lichess: an 8-piece position with opposing pawns, its distance to the next conversion") {
+    Lichess lichess([](const std::string&, const std::string&, net::TcpConnection& c) {
+        answer(c, 200,
+               R"({"checkmate":false,"stalemate":false,"insufficient_material":false,"dtz":null,"precise_dtz":null,)"
+               R"("dtm":null,"dtc":12,"category":"maybe-win","moves":[{"uci":"e1e2","san":"Ke2","zeroing":false,)"
+               R"("checkmate":false,"stalemate":false,"dtz":null,"dtm":null,"dtc":-11,"category":"maybe-loss"}]})");
+    });
+    const auto t = tablebase("4k3/1p3p2/1P3P2/8/8/8/8/4K3 w - - 0 1");
+    REQUIRE_MESSAGE(t.value, t.error);
+    CHECK(t.value->outcome == Outcome::MaybeWin);
+    CHECK_FALSE(t.value->dtz);
+    CHECK(t.value->dtc == 12);
+    REQUIRE(t.value->moves.size() == 1);
+    CHECK(t.value->moves[0].dtc == -11);
+    CHECK(t.value->moves[0].outcome == Outcome::MaybeLoss);
+}
+
 TEST_CASE("Lichess: the opening explorer, with an account's token, and without") {
     Lichess lichess([](const std::string& path, const std::string& head, net::TcpConnection& c) {
         if (head.find("Authorization: Bearer lip_test") == std::string::npos) {

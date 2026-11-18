@@ -205,6 +205,7 @@ Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cance
         t.outcome               = outcomeOf(textOf(j, "category"));
         t.dtz                   = intOf(j, "dtz");
         t.dtm                   = intOf(j, "dtm");
+        t.dtc                   = intOf(j, "dtc");
         t.checkmate             = j.value("checkmate", false);
         t.stalemate             = j.value("stalemate", false);
         t.insufficient_material = j.value("insufficient_material", false);
@@ -215,6 +216,7 @@ Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cance
             move.outcome   = outcomeOf(textOf(m, "category"));
             move.dtz       = intOf(m, "dtz");
             move.dtm       = intOf(m, "dtm");
+            move.dtc       = intOf(m, "dtc");
             move.zeroing   = m.value("zeroing", false);
             move.checkmate = m.value("checkmate", false);
             move.stalemate = m.value("stalemate", false);

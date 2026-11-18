@@ -97,12 +97,14 @@ nlohmann::json tablebaseJson(const lichess::Tablebase& t) {
                          {"outcome", static_cast<int>(m.outcome)},
                          {"dtz", opt(m.dtz)},
                          {"dtm", opt(m.dtm)},
+                         {"dtc", opt(m.dtc)},
                          {"zeroing", m.zeroing},
                          {"checkmate", m.checkmate},
                          {"stalemate", m.stalemate}});
     return {{"outcome", static_cast<int>(t.outcome)},
             {"dtz", opt(t.dtz)},
             {"dtm", opt(t.dtm)},
+            {"dtc", opt(t.dtc)},
             {"checkmate", t.checkmate},
             {"stalemate", t.stalemate},
             {"insufficient", t.insufficient_material},
@@ -114,6 +116,7 @@ lichess::Tablebase tablebaseFrom(const nlohmann::json& j) {
     t.outcome               = static_cast<lichess::Outcome>(j.value("outcome", 4));
     t.dtz                   = opt(j, "dtz");
     t.dtm                   = opt(j, "dtm");
+    t.dtc                   = opt(j, "dtc");
     t.checkmate             = j.value("checkmate", false);
     t.stalemate             = j.value("stalemate", false);
     t.insufficient_material = j.value("insufficient", false);
@@ -124,6 +127,7 @@ lichess::Tablebase tablebaseFrom(const nlohmann::json& j) {
         move.outcome   = static_cast<lichess::Outcome>(m.value("outcome", 4));
         move.dtz       = opt(m, "dtz");
         move.dtm       = opt(m, "dtm");
+        move.dtc       = opt(m, "dtc");
         move.zeroing   = m.value("zeroing", false);
         move.checkmate = m.value("checkmate", false);
         move.stalemate = m.value("stalemate", false);
@@ -168,6 +172,25 @@ std::string clockText(int64_t seconds) {
 // A count of plies (Lichess's DTZ and DTM) as moves, said as the mockup says them.
 int movesOf(int plies) { return (std::abs(plies) + 1) / 2; }
 
+// A position of eight pieces Lichess's op1 tables know, by their server's own test: no castling, a white pawn with a
+// black pawn ahead on its file, and more than a lone pawn on each side. They give its verdict and its distance to the
+// next capture, promotion or mate (DTC), not to mate.
+bool op1(const chess::Board& board) {
+    if (board.occ().count() != 8 || !board.castlingRights().isEmpty()) return false;
+    const auto black_pawns = board.pieces(chess::PieceType::PAWN, chess::Color::BLACK);
+    bool opposed           = false;
+    for (auto w = board.pieces(chess::PieceType::PAWN, chess::Color::WHITE); !w.empty() && !opposed;) {
+        const int square = w.pop();
+        for (int ahead = square + 8; ahead < 64 && !opposed; ahead += 8) opposed = black_pawns.check(ahead);
+    }
+    const auto more_than_lone_pawn = [&](chess::Color c) {
+        const auto pawns = board.pieces(chess::PieceType::PAWN, c);
+        const auto rest  = board.us(c).count() - pawns.count() - 1;  // without the king
+        return pawns.count() > 1 || rest > 0;
+    };
+    return opposed && more_than_lone_pawn(chess::Color::WHITE) && more_than_lone_pawn(chess::Color::BLACK);
+}
+
 // Why Lichess gave nothing, said with what still works (M4, board 6).
 std::string trouble(const std::string& error, const char* host) {
     const auto pause = HostGate::instance().pausedFor(host);
@@ -209,7 +232,9 @@ void App::drawBoardOnline() {
     // The answers that came.
     if (ready(online_tb_job_)) {
         auto answer = online_tb_job_.get();
-        if (answer.value)
+        // Kept for good, a verdict not changing; not a position the tables do not know (op1's eight pieces), which
+        // they may know later.
+        if (answer.value && answer.value->outcome != lichess::Outcome::Unknown)
             writeCached(cacheFile(root, "tablebase", online_tb_asked_), online_tb_asked_, tablebaseJson(*answer.value));
         online_tb_ = OnlineTablebase{online_tb_asked_, std::move(answer), nowSeconds()};
     }
@@ -255,10 +280,11 @@ void App::drawBoardOnline() {
     };
     const bool once = online_once_.count(positionOf(fen)) > 0;
 
-    // The tables, for seven pieces or fewer that those of the disk do not know.
-    const bool tb_fits     = pieces >= 3 && pieces <= 7 && !b.chess960;
+    // The tables, for seven pieces or fewer that those of the disk do not know, and the eight of op1 (#42).
+    const bool tb_fits     = ((pieces >= 3 && pieces <= 7) || op1(board)) && !b.chess960;
     const bool local_knows = b.line < 0 && b.ply < static_cast<int>(b.tb.size()) && b.tb[b.ply] != -2;
     bool tables_shown      = false;
+    bool op1_unknown       = false;  // eight pieces the op1 tables do not know: the cloud may
     if (tb_fits && !local_knows && lichess_.tablebase != 2) {
         if (lichess_.tablebase == 1 || once) {
             if (!online_tb_ || positionOf(online_tb_->fen) != positionOf(fen)) {
@@ -273,21 +299,32 @@ void App::drawBoardOnline() {
                 }
             }
             if (online_tb_ && positionOf(online_tb_->fen) == positionOf(fen)) {
-                tables_shown = true;
-                drawOnlineTablebase(board, pieces);
+                // Eight pieces: the op1 tables know some of them only, and one they do not shows nothing.
+                op1_unknown = pieces == 8 && online_tb_->answer.value &&
+                              online_tb_->answer.value->outcome == lichess::Outcome::Unknown;
+                if (!op1_unknown) {
+                    tables_shown = true;
+                    drawOnlineTablebase(board, pieces);
+                }
             } else if (online_tb_job_.valid()) {
                 ImGui::TextDisabled("%s", TR("Asking Lichess's tables…"));
             }
         } else if (!online_tb_not_now_) {
-            consent("online_tb_consent",
-                    trf("Lichess's tables know this ending ({} pieces); those of your disk do not.", pieces).c_str(),
-                    TR("To ask, its FEN would go to tablebase.lichess.ovh, without an account. Nothing else."),
-                    lichess_.tablebase, online_tb_not_now_);
+            consent(
+                "online_tb_consent",
+                pieces == 8
+                    ? std::string(TR("Lichess's tables may know this ending: eight pieces with opposing "
+                                     "pawns, their verdict and the moves to the next capture."))
+                          .c_str()
+                    : trf("Lichess's tables know this ending ({} pieces); those of your disk do not.", pieces).c_str(),
+                TR("To ask, its FEN would go to tablebase.lichess.ovh, without an account. Nothing else."),
+                lichess_.tablebase, online_tb_not_now_);
         }
     }
 
-    // The cloud, for a position of standard chess the tables do not answer (more than seven pieces).
-    if (!tables_shown && !tb_fits && !b.chess960 && lichess_.cloud != 2) {
+    // The cloud, for a position of standard chess the tables do not answer (more than seven pieces, or eight the op1
+    // tables do not know).
+    if (!tables_shown && (!tb_fits || op1_unknown) && !b.chess960 && lichess_.cloud != 2) {
         if (lichess_.cloud == 1 || once) {
             const bool known_empty = online_not_in_cloud_.count(positionOf(fen)) > 0;
             if (!known_empty && (!online_cloud_ || positionOf(online_cloud_->fen) != positionOf(fen))) {
@@ -367,13 +404,19 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
     if (t.dtm) ImGui::TextDisabled("%s", trf("mate in {} moves at best", movesOf(*t.dtm)).c_str());
     if (t.dtz && *t.dtz != 0)
         ImGui::TextDisabled("%s", trf("{} moves at most before a capture or a pawn move", movesOf(*t.dtz)).c_str());
+    // Eight pieces (op1): no distance to mate nor DTZ, the moves to the next conversion instead.
+    const bool conversion = t.dtc && !t.dtz && !t.dtm;
+    if (conversion)
+        ImGui::TextDisabled(
+            "%s", trf("{} moves at most before the next capture, promotion or mate", std::abs(*t.dtc)).c_str());
     // Each move, and what it leaves for the side that plays it (the tables give it for the other side).
     std::optional<std::string> play;
     if (!t.moves.empty() && ImGui::BeginTable("##online_tb_moves", 4, ImGuiTableFlags_SizingFixedFit)) {
         ImGui::TableSetupColumn(TR("Move"));
         ImGui::TableSetupColumn(TR("What it leaves"));
         ImGui::TableSetupColumn(TR("Mate in"));
-        ImGui::TableSetupColumn(TR("Before a capture or a pawn move"));
+        ImGui::TableSetupColumn(conversion ? TR("Before a capture, a promotion or mate")
+                                           : TR("Before a capture or a pawn move"));
         ImGui::TableHeadersRow();
         for (std::size_t i = 0; i < t.moves.size() && i < 10; ++i) {
             const auto& m = t.moves[i];
@@ -399,6 +442,8 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
             ImGui::TableNextColumn();
             if (m.zeroing)
                 ImGui::TextDisabled("%s", TR("now"));
+            else if (conversion && m.dtc)
+                ImGui::Text("%d", std::abs(*m.dtc));
             else if (m.dtz && *m.dtz != 0)
                 ImGui::Text("%d", movesOf(*m.dtz));
         }

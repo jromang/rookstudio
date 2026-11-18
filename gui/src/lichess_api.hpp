@@ -50,13 +50,15 @@ enum class Outcome { Win, CursedWin, MaybeWin, Draw, Unknown, MaybeLoss, Blessed
 struct TablebaseMove {
     std::string uci, san;
     Outcome outcome = Outcome::Unknown;  // for the side to move after it
-    std::optional<int> dtz, dtm;
+    std::optional<int> dtz, dtm;         // in plies
+    std::optional<int> dtc;  // moves to the next capture, promotion or mate: 8-piece positions (op1), in moves
     bool zeroing   = false;  // a capture or a pawn move
     bool checkmate = false, stalemate = false;
 };
 struct Tablebase {
     Outcome outcome = Outcome::Unknown;
-    std::optional<int> dtz, dtm;
+    std::optional<int> dtz, dtm;  // in plies: DTZ up to 7 pieces, DTM up to 6
+    std::optional<int> dtc;       // in moves: the 8-piece positions with opposing pawns (op1)
     bool checkmate = false, stalemate = false, insufficient_material = false;
     std::vector<TablebaseMove> moves;  // the best first, as Lichess gives them
 };

@@ -225,7 +225,7 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     board_.redo.clear();
     board_.start_notes = {};
     board_.comment_edit.reset();
-    board_.changed = false;
+    board_.changes = {};
     board_.toast.clear();  // what it said was about the game left
     board_.toast_time = -100;
     if (page_ != Page::Board) {
@@ -684,7 +684,7 @@ void App::boardChanged(BoardPage::Snapshot before) {
     b.undo.push_back(std::move(before));
     if (b.undo.size() > 200) b.undo.erase(b.undo.begin());
     b.redo.clear();
-    b.changed = true;
+    b.changes.change();
 }
 
 void App::boardUndo(bool redo) {
@@ -694,7 +694,7 @@ void App::boardUndo(bool redo) {
     (redo ? b.undo : b.redo).push_back(boardSnapshot());
     auto s = std::move(from.back());
     from.pop_back();
-    b.changed     = true;
+    b.changes.undone(redo);
     b.tree        = std::move(s.tree);
     b.start_notes = std::move(s.start_notes);
     b.comment_edit.reset();
@@ -1163,9 +1163,7 @@ void App::drawBoardPage() {
             if (const int to = judgedPly(ImGui::GetIO().KeyShift ? -1 : 1); to >= 0) showBoardLine(-1, to);
         }
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
-        // Ctrl+S: a database's game back in its database, under its number (the Chess space); else a file.
-        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S) && !(chessBoard() && saveBoardToDatabase()))
-            saveBoardPgn();
+        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) boardSave();
         if (chessBoard()) boardEditKeys();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
@@ -3288,7 +3286,7 @@ void App::startBoardGames() {
     b.redo.clear();
     b.start_notes = {};
     b.comment_edit.reset();
-    b.changed       = false;
+    b.changes       = {};
     b.match_version = 0;
     b.match_state   = {};
     b.watching      = true;

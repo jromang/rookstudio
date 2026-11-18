@@ -7,7 +7,6 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
-#include <imgui_internal.h>  // SetKeyOwner
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -360,44 +359,6 @@ void App::openListRow(std::size_t row) {
     }
 }
 
-void App::drawListStrip() {
-    if (!board_origin_ || !board_origin_->view) return;
-    // Ctrl+Left and Ctrl+Right, unless a field takes them (a word back or forward there). The arrows are claimed
-    // while Ctrl is held, before they are pressed: ImGui's keyboard navigation leaves keys someone owns alone.
-    const bool keys = !ImGui::GetIO().WantTextInput;
-    if (keys && ImGui::GetIO().KeyCtrl) {
-        const auto owner = ImGui::GetID("##list_strip_keys");
-        ImGui::SetKeyOwner(ImGuiKey_LeftArrow, owner);
-        ImGui::SetKeyOwner(ImGuiKey_RightArrow, owner);
-    }
-    const auto row   = board_origin_->row;
-    const auto total = board_origin_->view->ids.size();
-    std::optional<std::size_t> go;
-    ImGui::BeginDisabled(row == 0);
-    if (ImGui::SmallButton(fmt::format("◂ {}", TR("Previous")).c_str()) ||
-        (keys && row > 0 && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_LeftArrow)))
-        go = row - 1;
-    ImGui::EndDisabled();
-    ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("Ctrl+←");
-    ImGui::SameLine(0, px(14));
-    const auto& o = *board_origin_;
-    const auto place =
-        o.filter.empty()
-            ? trf("game {} of {} in « {} »", ui::exactCount(row + 1), ui::exactCount(total), o.name)
-            : trf("game {} of {} · « {} » in « {} »", ui::exactCount(row + 1), ui::exactCount(total), o.filter, o.name);
-    ImGui::TextUnformatted(place.c_str());
-    ImGui::SameLine(0, px(14));
-    ImGui::BeginDisabled(row + 1 >= total);
-    if (ImGui::SmallButton(fmt::format("{} ▸", TR("Next")).c_str()) ||
-        (keys && row + 1 < total && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_RightArrow)))
-        go = row + 1;
-    ImGui::EndDisabled();
-    ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("Ctrl+→");
-    if (go) openListRow(*go);
-}
-
 bool App::saveBoardToDatabase() {
     if (!board_origin_ || board_origin_->linked || !board_origin_->view) return false;
     auto& s = shelf();
@@ -414,7 +375,7 @@ bool App::saveBoardToDatabase() {
             boardToast(e.what());
             return true;
         }
-        board_.changed = false;
+        board_.changes.saved("« " + board_origin_->name + " »");
         boardToast(trf("Saved in « {} », game {}", board_origin_->name, ui::exactCount(id + 1)));
         return true;
     }

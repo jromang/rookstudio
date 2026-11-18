@@ -104,6 +104,30 @@ struct PgnSource {
     int selected      = -1;  // the game on the board
 };
 
+// A game's changes since it was opened or saved: + a change or a redo, − an undo. Once a change follows undos back
+// past the saved state, no redo brings that state back: `lost`.
+struct GameChanges {
+    int count = 0;
+    bool lost = false;
+    std::string saved_in;  // where it was saved last ("« Mega »", a file's name), said while nothing changed
+    [[nodiscard]] bool any() const noexcept { return count != 0 || lost; }
+    void change() noexcept {
+        if (count < 0) lost = true;
+        ++count;
+    }
+    void undone(bool redo) noexcept { count += redo ? 1 : -1; }
+    void saved(std::string where) {
+        count    = 0;
+        lost     = false;
+        saved_in = std::move(where);
+    }
+    // Whether undos or redos bring the saved (or opened) state back, from histories of these sizes.
+    [[nodiscard]] bool reversible(std::size_t undos, std::size_t redos) const noexcept {
+        return !lost &&
+               (count >= 0 ? undos >= static_cast<std::size_t>(count) : redos >= static_cast<std::size_t>(-count));
+    }
+};
+
 // The text of one game of a source.
 [[nodiscard]] std::optional<std::string> pgnSourceGame(const PgnSource& source, std::size_t game);
 
@@ -242,7 +266,7 @@ struct BoardPage {
         int line = -1, ply = 0;
     };
     std::vector<Snapshot> undo, redo;  // the game before each change, and the changes undone
-    bool changed = false;              // since it was opened or saved: the recent games say so
+    GameChanges changes;               // since it was opened or saved: the strip and the recent games say so
     std::string nag_typed;             // ! and ? typed in a row on a move
     double nag_time = 0;               // when the last of them was
     std::string toast;                 // a change said for a moment over the moves

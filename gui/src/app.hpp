@@ -266,7 +266,6 @@ class App {
         std::string filter;  // the quick filter it was made with
     };
     std::optional<BoardOrigin> board_origin_;
-    void drawListStrip();               // the strip over the moves: previous, the game's place in the list, next
     void openListRow(std::size_t row);  // another game of the same list, at the same position when it has it
     bool saveBoardToDatabase();         // false when the game is not a database's to write
     // The games the board showed before (mockup M2, board 4; R11): Ctrl+Tab and Ctrl+Shift+Tab through them, the one
@@ -277,7 +276,7 @@ class App {
         GameTree tree;
         int line = -1, ply = 0;
         bool chess960 = false;
-        bool modified = false;  // changed since it was opened, not saved
+        GameChanges changes;  // since it was opened or saved
         std::optional<BoardOrigin> origin;
         std::optional<PgnSource> pgn;  // the file it was read from, its list of games
         MoveNotes start_notes;
@@ -290,6 +289,14 @@ class App {
     // The recent game that is game `id` of the database in `folder` with changes not saved, if there is one.
     [[nodiscard]] std::optional<std::size_t> changedCopyOf(const std::filesystem::path& folder, uint32_t id) const;
     void drawRecentGames();  // the list while Ctrl is held, and the game chosen opened
+    // The strip over the column (mockup M2, board 1): the list's previous and next games, the recent games, the
+    // game's changes or where it was saved, Save.
+    void drawBoardStrip();
+    void drawRecentPopup();                      // the recent games listed by the strip's button, a click opening one
+    void boardSave();                            // Ctrl+S: into its database (the Chess space), else into a file
+    void discardBoardChanges();                  // back to the game as saved or opened
+    static bool discardAside(RecentGame& game);  // the same for a recent game; false when its history cannot
+    bool forget_board_game_ = false;             // the next game opened does not remember the one shown
     bool db_list_ = false;
     std::array<char, 256> db_filter_{};
     study::SortBy db_sort_ = study::SortBy::Number;

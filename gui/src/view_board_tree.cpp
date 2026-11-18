@@ -4,9 +4,11 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <utility>
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <imgui_internal.h>  // SetKeyOwner
 
 #include <commentary/position.hpp>
 #include <study/scan_board.hpp>
@@ -57,11 +59,34 @@ bool boardHasGame(const BoardPage& b) {
     return !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
 }
 
+// "Changed: 2 changes", or where it was saved while nothing changed since; empty for a game as it was opened.
+std::string changesText(const GameChanges& c) {
+    if (c.any()) {
+        const auto n = static_cast<uint64_t>(c.count < 0 ? -c.count : c.count);
+        return c.lost || n == 0 ? std::string(TR("Changed")) : trn("Changed: {} change", "Changed: {} changes", n, n);
+    }
+    return c.saved_in.empty() ? std::string() : trf("Saved in {}", c.saved_in);
+}
+
+// A row of the recent games: the title, then where it comes from and its state. `menu`: the right button on it.
+bool recentRow(int id, const std::string& title, std::string where, const GameChanges& changes, bool open_now,
+               bool chosen, bool* menu = nullptr) {
+    const bool clicked = ImGui::Selectable(fmt::format("{}##recent{}", title, id).c_str(), chosen);
+    if (menu) *menu = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+    if (open_now) where += (where.empty() ? "" : " · ") + std::string(TR("open now"));
+    if (changes.any()) where += (where.empty() ? "" : " · ") + std::string(TR("changed, not saved yet"));
+    if (!where.empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", where.c_str());
+    }
+    return clicked;
+}
+
 }  // namespace
 
 void App::rememberBoardGame() {
     auto& b = board_;
-    if (!boardHasGame(b)) return;
+    if (std::exchange(forget_board_game_, false) || !boardHasGame(b)) return;
     RecentGame game;
     game.title       = b.title.empty() ? std::string(TR("The game on the board")) : b.title;
     game.where       = board_origin_ ? board_origin_->name : b.pgn ? b.pgn->name : std::string();
@@ -69,7 +94,7 @@ void App::rememberBoardGame() {
     game.line        = b.line;
     game.ply         = b.ply;
     game.chess960    = b.chess960;
-    game.modified    = b.changed;
+    game.changes     = b.changes;
     game.origin      = board_origin_;
     game.pgn         = b.pgn;
     game.start_notes = b.start_notes;
@@ -80,7 +105,7 @@ void App::rememberBoardGame() {
     // One game of a list at a time, the last shown, unless a game has changes not saved: those stay until saved.
     // And a game read again from where it was read takes the place of its unchanged copy.
     std::erase_if(recent_games_, [&](const RecentGame& r) {
-        if (r.modified) return false;
+        if (r.changes.any()) return false;
         if (r.origin && game.origin) return r.origin->view == game.origin->view;
         return !r.origin && !game.origin && r.title == game.title &&
                r.tree.main.moves.size() == game.tree.main.moves.size();
@@ -88,8 +113,8 @@ void App::rememberBoardGame() {
     recent_games_.push_front(std::move(game));
     // At most 12, the oldest unchanged ones going first.
     while (recent_games_.size() > 12) {
-        auto last =
-            std::find_if(recent_games_.rbegin(), recent_games_.rend(), [](const RecentGame& r) { return !r.modified; });
+        auto last = std::find_if(recent_games_.rbegin(), recent_games_.rend(),
+                                 [](const RecentGame& r) { return !r.changes.any(); });
         recent_games_.erase(last != recent_games_.rend() ? std::next(last).base() : std::prev(recent_games_.end()));
     }
 }
@@ -107,7 +132,7 @@ void App::restoreRecentGame(std::size_t index) {
     b.start_notes = std::move(chosen.start_notes);
     b.undo        = std::move(chosen.undo);
     b.redo        = std::move(chosen.redo);
-    b.changed     = chosen.modified;
+    b.changes     = chosen.changes;
     b.pgn         = std::move(chosen.pgn);
     board_origin_ = std::move(chosen.origin);
 }
@@ -115,7 +140,7 @@ void App::restoreRecentGame(std::size_t index) {
 std::optional<std::size_t> App::changedCopyOf(const std::filesystem::path& folder, uint32_t id) const {
     for (std::size_t i = 0; i < recent_games_.size(); ++i) {
         const auto& r = recent_games_[i];
-        if (r.modified && r.origin && r.origin->view && r.origin->folder == folder &&
+        if (r.changes.any() && r.origin && r.origin->view && r.origin->folder == folder &&
             r.origin->row < r.origin->view->ids.size() && r.origin->view->ids[r.origin->row] == id)
             return i;
     }
@@ -150,32 +175,201 @@ void App::drawRecentGames() {
     ImGui::TextUnformatted(TR("Recent games"));
     ImGui::TextDisabled("%s", TR("Ctrl+Tab forward, Ctrl+Shift+Tab back; letting Ctrl go opens the game chosen"));
     ImGui::Separator();
-    const auto row = [&](int i, const std::string& title, std::string where, bool modified, bool open_now) {
-        ImGui::Selectable(fmt::format("{}##recent{}", title, i).c_str(), i == recent_pick_);
-        if (open_now) where += (where.empty() ? "" : " · ") + std::string(TR("open now"));
-        if (modified) where += (where.empty() ? "" : " · ") + std::string(TR("changed, not saved yet"));
-        if (!where.empty()) {
-            ImGui::SameLine();
-            ImGui::TextDisabled("%s", where.c_str());
-        }
-    };
     if (current) {
         const auto& b = board_;
-        row(0, b.title.empty() ? std::string(TR("The game on the board")) : b.title,
-            board_origin_ ? board_origin_->name
-            : b.pgn       ? b.pgn->name
-                          : std::string(),
-            b.changed, true);
+        recentRow(0, b.title.empty() ? std::string(TR("The game on the board")) : b.title,
+                  board_origin_ ? board_origin_->name
+                  : b.pgn       ? b.pgn->name
+                                : std::string(),
+                  b.changes, true, recent_pick_ == 0);
     }
     for (std::size_t i = 0; i < recent_games_.size(); ++i) {
         const auto& r = recent_games_[i];
-        row(current + static_cast<int>(i), r.title, r.where, r.modified, false);
+        const int id  = current + static_cast<int>(i);
+        recentRow(id, r.title, r.where, r.changes, false, recent_pick_ == id);
     }
     ImGui::End();
 }
 
+void App::drawRecentPopup() {
+    if (!ImGui::BeginPopup("##recent_popup")) return;
+    ImGui::TextUnformatted(TR("Recent games"));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + px(440));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("%s", TR("A click opens one, the right button on a changed one discards its changes; Ctrl+Tab "
+                                "from any page of the Chess space"));
+    ImGui::PopStyleColor();
+    ImGui::PopTextWrapPos();
+    ImGui::Separator();
+    std::optional<std::size_t> open, discard;
+    auto& b = board_;
+    if (boardHasGame(b)) {
+        bool menu = false;
+        recentRow(-1, b.title.empty() ? std::string(TR("The game on the board")) : b.title,
+                  board_origin_ ? board_origin_->name
+                  : b.pgn       ? b.pgn->name
+                                : std::string(),
+                  b.changes, true, false, &menu);
+        if (menu && b.changes.any()) ImGui::OpenPopup("##recent_open_menu");
+        if (ImGui::BeginPopup("##recent_open_menu")) {
+            const bool can = b.changes.reversible(b.undo.size(), b.redo.size()) || board_origin_;
+            if (ImGui::MenuItem(TR("Discard the changes"), nullptr, false, can)) discardBoardChanges();
+            ImGui::EndPopup();
+        }
+    }
+    for (std::size_t i = 0; i < recent_games_.size(); ++i) {
+        auto& r         = recent_games_[i];
+        bool menu       = false;
+        const auto name = fmt::format("##recent_menu{}", i);
+        if (recentRow(static_cast<int>(i), r.title, r.where, r.changes, false, false, &menu)) open = i;
+        if (menu && r.changes.any()) ImGui::OpenPopup(name.c_str());
+        if (ImGui::BeginPopup(name.c_str())) {
+            const bool can = r.changes.reversible(r.undo.size(), r.redo.size()) || r.origin;
+            if (ImGui::MenuItem(TR("Discard the changes"), nullptr, false, can)) discard = i;
+            ImGui::EndPopup();
+        }
+    }
+    if (recent_games_.empty()) ImGui::TextDisabled("%s", TR("The games opened on the board come here."));
+    if (open) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+    // A recent game of a database whose history cannot bring it back goes: reopened from its list, it is as saved.
+    if (discard && !discardAside(recent_games_[*discard]))
+        recent_games_.erase(recent_games_.begin() + static_cast<std::ptrdiff_t>(*discard));
+    if (open) restoreRecentGame(*open);
+}
+
+bool App::discardAside(RecentGame& r) {
+    if (!r.changes.reversible(r.undo.size(), r.redo.size())) return false;
+    while (r.changes.any()) {
+        const bool redo = r.changes.count < 0;
+        auto& from      = redo ? r.redo : r.undo;
+        (redo ? r.undo : r.redo).push_back({r.tree, r.start_notes, r.line, r.ply});
+        auto s = std::move(from.back());
+        from.pop_back();
+        r.tree        = std::move(s.tree);
+        r.start_notes = std::move(s.start_notes);
+        r.line        = s.line;
+        r.ply         = s.ply;
+        r.changes.undone(redo);
+    }
+    return true;
+}
+
+void App::discardBoardChanges() {
+    auto& b = board_;
+    if (!b.changes.any()) return;
+    if (b.changes.reversible(b.undo.size(), b.redo.size())) {
+        while (b.changes.any()) boardUndo(b.changes.count < 0);  // Ctrl+Y brings each change back
+        boardToast(TR("Changes discarded · Ctrl+Y makes them again"));
+        return;
+    }
+    if (board_origin_) {  // read again from its database, the game shown forgotten
+        forget_board_game_ = true;
+        openListRow(board_origin_->row);
+        forget_board_game_ = false;
+        boardToast(TR("Changes discarded"));
+    }
+}
+
+void App::boardSave() {
+    if (chessBoard() && saveBoardToDatabase()) return;
+    saveBoardPgn();
+}
+
+void App::drawBoardStrip() {
+    auto& b         = board_;
+    const auto& io  = ImGui::GetIO();
+    const bool keys = !io.WantTextInput;  // Ctrl+Left and Ctrl+Right are a word back or forward in a field
+    std::optional<std::size_t> go;
+    bool left = false;
+    if (board_origin_ && board_origin_->view) {
+        // The arrows are claimed while Ctrl is held, before they are pressed: ImGui's keyboard navigation leaves
+        // keys someone owns alone.
+        if (keys && io.KeyCtrl) {
+            const auto owner = ImGui::GetID("##list_strip_keys");
+            ImGui::SetKeyOwner(ImGuiKey_LeftArrow, owner);
+            ImGui::SetKeyOwner(ImGuiKey_RightArrow, owner);
+        }
+        const auto& o    = *board_origin_;
+        const auto row   = o.row;
+        const auto total = o.view->ids.size();
+        ImGui::BeginDisabled(row == 0);
+        if (ImGui::SmallButton("◂##list_previous") ||
+            (keys && row > 0 && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_LeftArrow)))
+            go = row - 1;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", TR("The previous game of the list · Ctrl+←"));
+        ImGui::SameLine(0, px(6));
+        const auto place =
+            o.filter.empty()
+                ? trf("{} · game {} of {}", o.name, ui::exactCount(row + 1), ui::exactCount(total))
+                : trf("{} · game {} of {} · « {} »", o.name, ui::exactCount(row + 1), ui::exactCount(total), o.filter);
+        ImGui::TextUnformatted(place.c_str());
+        ImGui::SameLine(0, px(6));
+        ImGui::BeginDisabled(row + 1 >= total);
+        if (ImGui::SmallButton("▸##list_next") ||
+            (keys && row + 1 < total && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_RightArrow)))
+            go = row + 1;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", TR("The next game of the list · Ctrl+→"));
+        left = true;
+    }
+
+    // At the right: the recent games, the game's state, Save; their keys said when there is room.
+    const auto status  = changesText(b.changes);
+    const char* recent = TR("Recent");
+    const char* save   = TR("Save");
+    const auto& style  = ImGui::GetStyle();
+    const auto button  = [&](const char* s) {
+        return ImGui::CalcTextSize(s, nullptr, true).x + style.FramePadding.x * 2;
+    };
+    const float gap    = px(10);
+    const float keys_w = px(4) + ImGui::CalcTextSize("Ctrl+Tab").x + px(4) + ImGui::CalcTextSize("Ctrl+S").x;
+    const float bare =
+        button(recent) + gap + (status.empty() ? 0 : ImGui::CalcTextSize(status.c_str()).x + gap) + button(save);
+    const float right = ImGui::GetContentRegionMax().x;
+    float x           = ImGui::GetCursorPosX();
+    if (left) {
+        ImGui::SameLine(0, gap);
+        x = ImGui::GetCursorPosX();
+    }
+    const bool show_keys = x + bare + keys_w <= right;
+    const float width    = bare + (show_keys ? keys_w : 0);
+    if (left && x + width > right) ImGui::NewLine();
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right - width));
+    if (ImGui::SmallButton(recent)) ImGui::OpenPopup("##recent_popup");
+    const ImVec2 under(ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y + px(4));  // the list's top right
+    if (show_keys) {
+        ImGui::SameLine(0, px(4));
+        ImGui::TextDisabled("Ctrl+Tab");
+    }
+    if (!status.empty()) {
+        ImGui::SameLine(0, gap);
+        if (b.changes.any()) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", status.c_str());
+        } else {
+            ImGui::TextDisabled("%s", status.c_str());
+        }
+    }
+    ImGui::SameLine(0, gap);
+    if (ImGui::SmallButton(save)) boardSave();
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", board_origin_ && !board_origin_->linked
+                                    ? trf("Into « {} », under its number", board_origin_->name).c_str()
+                                    : TR("Into a PGN file"));
+    if (show_keys) {
+        ImGui::SameLine(0, px(4));
+        ImGui::TextDisabled("Ctrl+S");
+    }
+    if (ImGui::IsPopupOpen("##recent_popup")) ImGui::SetNextWindowPos(under, ImGuiCond_Appearing, ImVec2(1, 0));
+    drawRecentPopup();
+    if (go) openListRow(*go);
+}
+
 void App::drawChessColumn() {
-    drawListStrip();
+    drawBoardStrip();
     // The tabs, in the order of the mockup; Alt+1 to Alt+4.
     const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References")};
     for (int i = 0; i < 4; ++i)

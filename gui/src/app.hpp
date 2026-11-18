@@ -405,6 +405,7 @@ class App {
     std::optional<study::Coverage> coverage_;
     std::string coverage_of_;
     int coverage_depth_ = 0;  // 0 the ends of the lines, 1 move 10, 2 move 15
+    std::set<std::filesystem::path> coverage_left_;  // the databases the coverage is not measured on (folders)
     bool rep_naming_    = false;
     std::array<char, 64> rep_name_{};
     int rep_side_ = 0;  // the new repertoire's colour: 0 White, 1 Black

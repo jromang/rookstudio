@@ -120,22 +120,44 @@ void App::drawOpeningsPage() {
 
     // Its coverage of the databases' games, measured in the background.
     auto& shelf_ = shelf();
+    // Measured on (M3, board 2): the databases whose tree is built, each a chip that leaves it out or takes it back.
     std::vector<study::TreeBase> bases;
-    std::string names;
+    std::vector<std::pair<std::string, std::filesystem::path>> chips;
     for (std::size_t i = 0; i < shelf_.entries().size(); ++i) {
         if (shelf_.entries()[i].source) continue;
         if (const auto source = shelf_.treeSource(i); source && source->tree) {
-            bases.push_back({source->snapshot, source->tree});
-            names += (names.empty() ? "" : ", ") + source->name;
+            chips.push_back({source->name, shelf_.entries()[i].folder});
+            if (!coverage_left_.count(shelf_.entries()[i].folder)) bases.push_back({source->snapshot, source->tree});
         }
     }
-    if (bases.empty()) {
+    if (chips.empty()) {
         ImGui::TextDisabled("%s", TR("Its coverage is measured on the databases whose opening tree is built: import "
                                      "games on the Databases page."));
         ImGui::EndChild();
         return;
     }
-    ImGui::TextDisabled("%s", trf("Measured on {}", names).c_str());
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", TR("Measured on"));
+    for (const auto& [name, folder] : chips) {
+        ImGui::SameLine();
+        const bool on = !coverage_left_.count(folder);
+        if (on) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+        }
+        if (ImGui::SmallButton(fmt::format("{}##cover_{}", name, folder.string()).c_str())) {
+            if (on)
+                coverage_left_.insert(folder);
+            else
+                coverage_left_.erase(folder);
+        }
+        if (on) ImGui::PopStyleColor(2);
+    }
+    if (bases.empty()) {
+        ImGui::TextDisabled("%s", TR("No database chosen: a click on one measures the coverage on it."));
+        ImGui::EndChild();
+        return;
+    }
     const char* depths[] = {TR("End of my lines"), TR("Move 10"), TR("Move 15")};
     for (int i = 0; i < 3; ++i) {
         if (i > 0) ImGui::SameLine();
@@ -143,6 +165,7 @@ void App::drawOpeningsPage() {
     }
     std::string of = fmt::format("{}|{}|{}", e.file.string(), coverage_depth_, r.map(index).size());
     for (const auto& base : bases) of += fmt::format("|{}", base.snapshot->generation());
+    for (const auto& chip : chips) of += coverage_left_.count(chip.second) ? "-" : "+";  // which ones, not how many
     if (of != coverage_of_ && (!coverage_job_ || coverage_job_->of != of)) {
         CoverageJob job;
         job.of = of;

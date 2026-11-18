@@ -101,3 +101,42 @@ TEST_CASE("review: who saw the turning point coming first") {
     CHECK(sawItAt(early, 30, 1) == -1);  // only from 12 plies before
     CHECK(sawItAt(early, 8, -1) == -1);
 }
+
+TEST_CASE("review: evaluations someone wrote into the game are one analysis, not the players' own") {
+    // The same evaluations, as Lichess or a broadcast writes them ([%eval] alone), as fastchess writes an engine
+    // game's, and as ChessBase does ([%eval] with [%emt]): a blunder answered by a blunder, two big jumps in a row.
+    const auto annotated =
+        gameOf("1. e4 {[%eval 0.3]} e5 {[%eval 0.3]} 2. Nf3 {[%eval 5.0]} Nc6 {[%eval 0.2]} 3. Bc4 {[%eval 0.3]} *");
+    const auto engines = gameOf(
+        "1. e4 {+0.30/20 1.0s} e5 {-0.30/20 1.0s} 2. Nf3 {+5.00/20 1.0s} Nc6 {-0.20/20 1.0s} "
+        "3. Bc4 {+0.30/20 1.0s} *");
+    const auto chessbase = gameOf(
+        "1. e4 {[%eval 0.3,20] [%emt 0:00:01]} e5 {[%eval 0.3,20] [%emt 0:00:01]} 2. Nf3 {[%eval 5.0,20] "
+        "[%emt 0:00:01]} Nc6 {[%eval 0.2,20] [%emt 0:00:01]} 3. Bc4 {[%eval 0.3,20] [%emt 0:00:01]} *");
+    CHECK(evaluationsAnnotated(annotated));
+    CHECK_FALSE(evaluationsAnnotated(engines));
+    CHECK_FALSE(evaluationsAnnotated(chessbase));
+    CHECK_FALSE(evaluationsAnnotated(gameOf("e4 e5 Nf3")));  // no evaluation at all
+
+    // The players' engines disagree; one analyst's numbers only follow the moves.
+    const auto disagreement = [](const ReplayGame& game) {
+        const auto moments = keyMoments(game, GameReview{}, {}, gamePhases(game, false), -1);
+        return std::count_if(moments.begin(), moments.end(),
+                             [](const KeyMoment& m) { return m.kind == KeyMoment::Kind::Disagreement; });
+    };
+    CHECK(disagreement(engines) == 1);
+    CHECK(disagreement(chessbase) == 1);
+    CHECK(disagreement(annotated) == 0);
+
+    // One curve on the graph, its own, and no players apart.
+    const auto graph = buildGameGraph(annotated, false, GraphChart::Eval, {}, {});
+    CHECK(graph.players[0].x.size() == 5);
+    CHECK(graph.players[0].name == "The game's evaluations");
+    CHECK(graph.players[1].x.empty());
+    CHECK_FALSE(graph.available[static_cast<std::size_t>(GraphChart::Agreement)]);
+    const auto two = buildGameGraph(engines, false, GraphChart::Eval, {}, {});
+    CHECK(two.players[0].x.size() == 3);
+    CHECK(two.players[1].x.size() == 2);
+    CHECK(two.players[0].name == "White");
+    CHECK(two.available[static_cast<std::size_t>(GraphChart::Agreement)]);
+}

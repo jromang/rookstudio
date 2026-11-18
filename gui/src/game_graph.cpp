@@ -159,6 +159,16 @@ float graphWin(const std::optional<fastchess::Score>& score, const std::optional
     return stm == chess::Color::WHITE ? own : 1.0f - own;
 }
 
+bool evaluationsAnnotated(const ReplayGame& game) {
+    std::size_t scored = 0, annotated = 0;
+    for (const auto& m : game.moves) {
+        if (!m.score) continue;
+        ++scored;
+        if (m.notes.eval_tag && !m.notes.emt_ms) ++annotated;
+    }
+    return annotated > 0 && annotated * 2 > scored;
+}
+
 GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart,
                          const std::vector<GraphAnalysis>& analyses, const std::vector<MoveReview>& judged) {
     GameGraph g;
@@ -182,6 +192,13 @@ GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart
     g.players[1].key    = "black";
     g.players[0].colour = light() ? IM_COL32(47, 111, 222, 255) : IM_COL32(91, 157, 255, 255);
     g.players[1].colour = light() ? IM_COL32(217, 130, 43, 255) : IM_COL32(240, 163, 91, 255);
+    // An analysis written into the game: one curve, its own, not the players'.
+    const bool annotated = evaluationsAnnotated(game);
+    if (annotated) {
+        g.players[0].key  = "game";
+        g.players[0].name = TR("The game's evaluations");
+        g.players[0].note = TR("in its comments");
+    }
 
     // What the moves' comments hold, for the tabs; the time strip.
     auto& av                                       = g.available;
@@ -205,7 +222,8 @@ GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart
             av[static_cast<std::size_t>(GraphChart::Predicted)] = true;
         if (m.score) (side == 0 ? white_eval : black_eval) = true;
     }
-    if ((white_eval && black_eval) || analyses.size() >= 2) av[static_cast<std::size_t>(GraphChart::Agreement)] = true;
+    if ((white_eval && black_eval && !annotated) || analyses.size() >= 2)
+        av[static_cast<std::size_t>(GraphChart::Agreement)] = true;
     g.wdl                                         = wdlSeries(game.moves);
     av[static_cast<std::size_t>(GraphChart::Wdl)] = !g.wdl.empty();
 
@@ -240,7 +258,7 @@ GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart
             for (std::size_t i = 0; i < game.moves.size(); ++i) {
                 const auto& m = game.moves[i];
                 if (m.book || !m.score) continue;
-                auto& c       = g.players[m.mover == chess::Color::WHITE ? 0 : 1];
+                auto& c       = g.players[annotated || m.mover == chess::Color::WHITE ? 0 : 1];
                 const float v = graphPawns(m.score, m.mover);
                 if (!std::isfinite(v)) continue;
                 c.x.push_back(static_cast<float>(i + 1));
@@ -259,7 +277,7 @@ GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart
             c.key    = "apart";
             c.name   = TR("The players apart");
             c.colour = ui::WARN;
-            for (std::size_t i = 1; i < game.moves.size(); ++i) {
+            for (std::size_t i = 1; i < game.moves.size() && !annotated; ++i) {
                 const auto &m = game.moves[i], &prev = game.moves[i - 1];
                 if (m.book || prev.book || !m.score || !prev.score) continue;
                 const float a = graphPawns(m.score, m.mover), b = graphPawns(prev.score, prev.mover);

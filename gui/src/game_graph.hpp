@@ -124,6 +124,12 @@ struct GameGraph {
 [[nodiscard]] float graphWin(const std::optional<fastchess::Score>& score,
                              const std::optional<std::array<int64_t, 3>>& wdl, chess::Color stm);
 
+// The game's evaluations are someone's analysis of its positions, not its players' own: most of its moves' scores
+// came from [%eval] without [%emt] (Lichess's analysis, a broadcast's engine, an annotator). An engine game's never
+// do: fastchess and cutechess write {+0.35/18 1.234s}, ChessBase an [%emt] with its [%eval]. Then one curve, with
+// no players to disagree or see a turning point.
+[[nodiscard]] bool evaluationsAnnotated(const ReplayGame& game);
+
 // One analysis of the game for the graph: its positions (plies + 1 of them, or fewer while it runs).
 struct GraphAnalysis {
     std::string name;

@@ -147,9 +147,11 @@ std::vector<KeyMoment> keyMoments(const ReplayGame& game, const GameReview& revi
         k.judgement = judged[i].judgement;
         out.push_back(k);
     }
-    // The two engines apart by 1.5 pawns or more, two moves in a row: where it starts.
+    // The two engines apart by 1.5 pawns or more, two moves in a row: where it starts. Not when the evaluations are
+    // one analyst's: two of its numbers in a row differ by the move between them, a mistake.
     int found = 0, run = 0;
-    for (std::size_t i = 1; i < game.moves.size() && found < 3; ++i) {
+    const bool annotated = evaluationsAnnotated(game);
+    for (std::size_t i = 1; i < game.moves.size() && found < 3 && !annotated; ++i) {
         const auto &m = game.moves[i], &prev = game.moves[i - 1];
         const float a    = m.book ? std::nanf("") : graphPawns(m.score, m.mover);
         const float b    = prev.book ? std::nanf("") : graphPawns(prev.score, prev.mover);

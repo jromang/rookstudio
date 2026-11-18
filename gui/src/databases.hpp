@@ -100,6 +100,21 @@ class DatabaseShelf {
     [[nodiscard]] std::optional<study::DatabaseImport> finishedImport();
     void cancelImport();
 
+    // A database's opening tree built again in the background, when an edit made it stale (a game saved or deleted):
+    // one at a time and none during an import, whose own build follows it; asked again while one runs, it runs
+    // again after it, the edits made meanwhile in it. treeSource() asks it for a stale tree it finds.
+    struct TreeJob {
+        std::size_t index = 0;
+        study::TreeProgress progress;
+        std::atomic<bool> cancel{false};
+        std::future<study::TreeBuilt> done;
+    };
+    void rebuildTree(std::size_t index);
+    [[nodiscard]] TreeJob* treeJob() noexcept { return tree_job_.get(); }
+    // Each frame: a build that ended taken, the next one asked for started. True when one ended.
+    bool pollTreeJob();
+    void cancelTreeJob();
+
    private:
     void save() const;
 
@@ -125,6 +140,8 @@ class DatabaseShelf {
     };
     std::map<std::filesystem::path, CachedTree> trees_;  // by the database's folder, filled by treeSource()
     std::unique_ptr<Import> import_;
+    std::unique_ptr<TreeJob> tree_job_;
+    std::optional<std::size_t> tree_again_;  // a build asked for while another ran, or during an import
 };
 
 }  // namespace fcg

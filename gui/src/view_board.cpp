@@ -822,7 +822,9 @@ void App::boardEditKeys() {
     auto& b        = board_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput) return;  // a field has the keys: the move typed, a comment
-    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt &&
+    // Enter writes a comment, unless a move of the tree is chosen (Up, Down): it plays it then.
+    const bool tree_chosen = board_side_tab_ == 2 && tree_row_ >= 0;
+    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen &&
         (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
         boardComment(io.KeyShift);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) boardUndo(false);
@@ -1767,6 +1769,9 @@ void App::drawBoardColumn(float size) {
                 decor.arrows.push_back({moves.front(), IM_COL32(205, 40, 40, 200)});
         }
     }
+    // The tree's move under the mouse or chosen (the Chess space's Tree tab), in the accent's blue.
+    if (chessBoard() && tree_arrow_ && tree_arrow_->position == board.hash())
+        decor.arrows.push_back({tree_arrow_->move, IM_COL32(47, 111, 222, 190)});
     // The marks of the move shown, and the arrow being drawn (the Chess space).
     if (chessBoard()) {
         const MoveNotes& notes = b.ply > 0 ? b.game.moves[static_cast<std::size_t>(b.ply - 1)].notes : b.start_notes;
@@ -2360,10 +2365,7 @@ void App::drawBoardMoves(float height) {
 
     // This move under the moves and the table; the review is about the whole game.
     const float strip = b.ply > 0 && b.ply <= total && b.game_tab != 3 ? thisMoveHeight() : 0.0f;
-    if (chessBoard() && b.game_tab == 0) {
-        drawMoveField();
-        drawBoardNagBar();
-    }
+    if (chessBoard() && b.game_tab == 0) drawBoardNagBar();  // the move field is the column's, above its tabs
     ImGui::BeginChild("##board_moves", ImVec2(0, -strip), ImGuiChildFlags_Borders);
     std::optional<ui::TopicRegion> moves_region(
         std::in_place, b.tree.variations.empty() ? guide::topics::BoardMoves : guide::topics::Variations);

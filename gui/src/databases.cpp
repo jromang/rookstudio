@@ -313,7 +313,10 @@ std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t i
         if (!entries_[index].source) {
             try {
                 auto tree = study::Tree::open(entries_[index].folder);
-                if (tree && !tree->stale(*snapshot)) cached.tree = std::move(tree);
+                if (tree && !tree->stale(*snapshot))
+                    cached.tree = std::move(tree);
+                else if (tree && !(tree_job_ && tree_job_->index == index) && tree_again_ != index)
+                    rebuildTree(index);  // a game saved or deleted since: built again in the background
             } catch (const std::exception&) {
             }
         }
@@ -354,6 +357,45 @@ std::optional<study::DatabaseImport> DatabaseShelf::finishedImport() {
 
 void DatabaseShelf::cancelImport() {
     if (import_) import_->cancel = true;
+}
+
+void DatabaseShelf::rebuildTree(std::size_t index) {
+    if (index >= entries_.size() || entries_[index].source) return;
+    if (import_ || tree_job_) {  // after it: a build running started from the snapshot before this edit
+        tree_again_ = index;
+        return;
+    }
+    const auto db = open(index);
+    if (!db) return;
+    tree_job_        = std::make_unique<TreeJob>();
+    tree_job_->index = index;
+    TreeJob* job     = tree_job_.get();
+    job->done        = std::async(std::launch::async, [db, job] {
+        study::enterBackground();
+        return study::buildTree(*db, *db->snapshot(), study::TreeOptions{}, job->progress, job->cancel);
+    });
+}
+
+bool DatabaseShelf::pollTreeJob() {
+    bool ended = false;
+    if (tree_job_ && tree_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        (void)tree_job_->done.get();
+        if (tree_job_->index < facts_.size()) facts_[tree_job_->index].generation = ~uint64_t{0};  // its tree now
+        if (tree_job_->index < entries_.size()) trees_.erase(entries_[tree_job_->index].folder);
+        tree_job_.reset();
+        ended = true;
+    }
+    if (!tree_job_ && !import_ && tree_again_) {
+        const auto index = *tree_again_;
+        tree_again_.reset();
+        rebuildTree(index);
+    }
+    return ended;
+}
+
+void DatabaseShelf::cancelTreeJob() {
+    if (tree_job_) tree_job_->cancel = true;
+    tree_again_.reset();
 }
 
 }  // namespace fcg

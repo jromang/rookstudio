@@ -646,6 +646,7 @@ class App {
     void drawBoardReferences();
     int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games
     struct TreeRow {
+        std::string shares;  // My databases: each database's games, said over the Games column
         std::string san;
         chess::Move move;
         uint64_t games = 0;                           // or a book's weight, in thousandths
@@ -654,6 +655,26 @@ class App {
     };
     std::vector<TreeRow> tree_rows_;
     std::string tree_rows_of_;  // the position and the source the rows are of
+    int tree_db_      = -1;     // the database the Tree tab shows (the shelf's index); -1: My databases, or a book
+    int tree_row_     = -1;     // the row chosen with Up and Down: Enter plays it, * stars it; -1 none
+    bool tree_scroll_ = false;  // the row chosen brought into view
+    void drawTreeNovelty(std::size_t index);  // where the game's line leaves the database, under the tree's summary
+    // The tree's move under the mouse or chosen, an arrow on the board the next frame, with the position it is of.
+    struct TreeArrow {
+        chess::Move move;
+        uint64_t position = 0;
+    };
+    std::optional<TreeArrow> tree_arrow_;
+    // Where the game's line leaves the database shown (M3): the first ply after which no game reaches its position,
+    // confirmed by a position search, since the tree does not see a position a single game reaches.
+    struct NoveltyJob {
+        std::string of;  // the database, its snapshot, the line
+        std::optional<uint32_t> ply;
+        std::unique_ptr<study::Search> search;  // the games through the position after it
+        bool confirmed = false;                 // none found
+        uint64_t found = 0;
+    };
+    NoveltyJob tree_novelty_;
     std::string tree_summary_;
     bool tree_book_  = false;  // the rows are a book's weights
     int tree_source_ = 0;      // the databases with a tree, then the library's Polyglot books

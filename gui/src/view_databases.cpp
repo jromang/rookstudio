@@ -89,6 +89,7 @@ void App::pasteGamesInto(int index) {
 
 void App::pollDatabases() {
     if (!shelf_) return;
+    shelf_->pollTreeJob();
     const auto* job = shelf_->import();
     if (!job) return;
     const auto file  = job->file.filename().string();
@@ -564,6 +565,7 @@ bool App::saveBoardToDatabase() {
             return true;
         }
         board_.changes.saved("« " + board_origin_->name + " »");
+        s.rebuildTree(i);  // the game replaced made its opening tree stale
         boardToast(trf("Saved in « {} », game {}", board_origin_->name, ui::exactCount(id + 1)));
         return true;
     }

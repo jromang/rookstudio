@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <string>
 #include <utility>
 
@@ -362,6 +363,7 @@ void App::drawBoardStrip() {
 
 void App::drawChessColumn() {
     drawBoardStrip();
+    drawMoveField();  // while a move is typed, whatever the tab
     // The tabs, in the order of the mockup; Alt+1 to Alt+4.
     const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References")};
     for (int i = 0; i < 4; ++i)
@@ -412,7 +414,9 @@ void App::drawBoardTree() {
         for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".bin") books.push_back(&book);
     }
-    const int count = static_cast<int>(databases.size() + books.size());
+    // My databases: two or more together, their games added (M3, board 3); then each, then the books.
+    const int together = databases.size() >= 2 ? 1 : 0;
+    const int count    = together + static_cast<int>(databases.size() + books.size());
     if (count == 0) {
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("No database with its opening tree, nor Polyglot book: import games on the "
@@ -421,11 +425,12 @@ void App::drawBoardTree() {
         ImGui::PopTextWrapPos();
         return;
     }
-    tree_source_ = std::clamp(tree_source_, 0, count - 1);
+    tree_source_       = std::clamp(tree_source_, 0, count - 1);
+    const int books_at = together + static_cast<int>(databases.size());
     for (int i = 0; i < count; ++i) {
-        const bool book  = i >= static_cast<int>(databases.size());
-        const auto label = book ? books[static_cast<std::size_t>(i) - databases.size()]->name
-                                : databases[static_cast<std::size_t>(i)].first;
+        const auto label = i < together   ? trf("My databases · {}", databases.size())
+                           : i < books_at ? databases[static_cast<std::size_t>(i - together)].first
+                                          : books[static_cast<std::size_t>(i - books_at)]->name;
         if (i > 0) ImGui::SameLine();
         const bool on = tree_source_ == i;
         if (on) {
@@ -436,23 +441,68 @@ void App::drawBoardTree() {
         if (on) ImGui::PopStyleColor(2);
     }
 
+    // A database whose tree is being built: its progress, and Cancel.
+    const auto* tree_job = s.treeJob();
+    const auto* import   = s.import();
+    if ((tree_job && tree_job->index < s.entries().size()) || (import && import->building)) {
+        const auto index = tree_job ? tree_job->index : import->index;
+        const auto total = tree_job ? tree_job->progress.total.load() : import->tree.total.load();
+        const auto done  = tree_job ? tree_job->progress.done.load() : import->tree.done.load();
+        ImGui::TextDisabled("%s", trf("« {} »: its opening tree being built, {} %", s.entries()[index].name,
+                                      total ? static_cast<int>(100 * done / total) : 0)
+                                      .c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Cancel"))) tree_job ? s.cancelTreeJob() : s.cancelImport();
+    }
+
     // The rows of the position shown, made again when it or the source changes.
-    const auto fen  = boardFen();
-    const bool book = tree_source_ >= static_cast<int>(databases.size());
-    const auto of   = fmt::format(
-        "{}|{}|{}", fen, tree_source_,
-        book ? std::string() : std::to_string(s.facts(databases[static_cast<std::size_t>(tree_source_)].second).games));
+    const auto fen      = boardFen();
+    const bool book     = tree_source_ >= books_at;
+    const bool combined = tree_source_ < together;
+    tree_db_ =
+        !book && !combined ? static_cast<int>(databases[static_cast<std::size_t>(tree_source_ - together)].second) : -1;
+    std::string counts;
+    for (const auto& [name, i] : databases) counts += fmt::format("{},", s.facts(i).games);
+    const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
     if (of != tree_rows_of_) {
         tree_rows_of_ = of;
         tree_rows_.clear();
         tree_summary_.clear();
+        tree_row_        = -1;
         tree_book_       = book;
         const auto board = boardAt(b.game, b.chess960, b.ply);
         const auto mover = board.sideToMove();
         study::ScanBoard scan;
         if (!book && scan.setFen(fen, b.chess960)) {
-            const auto source = s.treeSource(databases[static_cast<std::size_t>(tree_source_)].second);
-            const auto answer = source && source->tree ? source->tree->at(*source->snapshot, scan.key()) : std::nullopt;
+            // One database's answer, or those of all, added move by move (a move's code is the position's own).
+            std::optional<study::TreeAnswer> answer;
+            std::map<int, std::string> shares;
+            for (const auto& [name, i] : databases) {
+                if (!combined && static_cast<int>(i) != tree_db_) continue;
+                const auto source = s.treeSource(i);
+                const auto one =
+                    source && source->tree ? source->tree->at(*source->snapshot, scan.key()) : std::nullopt;
+                if (!one) continue;
+                if (!answer) answer.emplace();
+                answer->total.add(one->total);
+                for (const auto& m : one->moves) {
+                    auto at = std::find_if(answer->moves.begin(), answer->moves.end(),
+                                           [&](const study::TreeMove& t) { return t.code == m.code; });
+                    if (at == answer->moves.end()) at = answer->moves.insert(answer->moves.end(), {m.code, {}});
+                    at->stats.add(m.stats);
+                    if (combined) {
+                        auto& text = shares[m.code];
+                        text += (text.empty() ? "" : "\n") + fmt::format("{}: {}", name, ui::exactCount(m.stats.games));
+                    }
+                }
+            }
+            if (answer)
+                std::stable_sort(answer->moves.begin(), answer->moves.end(),
+                                 [](const study::TreeMove& x, const study::TreeMove& y) {
+                                     if ((x.code == study::TreeMove::END) != (y.code == study::TreeMove::END))
+                                         return y.code == study::TreeMove::END;
+                                     return x.stats.games > y.stats.games;
+                                 });
             if (answer) {
                 const auto& t      = answer->total;
                 const auto decided = t.white + t.draws + t.black;
@@ -488,13 +538,15 @@ void App::drawBoardTree() {
                         if (opp_rated) row.perf = static_cast<int>(opp_sum / opp_rated) + ratingDifference(score);
                     }
                     row.last = static_cast<int>(st.last >> 9);
+                    if (const auto share = shares.find(m.code); share != shares.end()) row.shares = share->second;
                     tree_rows_.push_back(std::move(row));
                 }
             } else {
-                tree_summary_ = TR("No two games of this database reach this position.");
+                tree_summary_ = combined ? TR("No two games of these databases reach this position.")
+                                         : TR("No two games of this database reach this position.");
             }
         } else if (book) {
-            const auto* entry = books[static_cast<std::size_t>(tree_source_) - databases.size()];
+            const auto* entry = books[static_cast<std::size_t>(tree_source_ - books_at)];
             auto& opened      = tree_books_[entry->path];
             try {
                 if (!opened) opened = std::make_shared<tour::PolyglotBook>(std::filesystem::path(entry->path));
@@ -518,6 +570,7 @@ void App::drawBoardTree() {
         }
     }
     ImGui::TextUnformatted(tree_summary_.c_str());
+    if (tree_db_ >= 0) drawTreeNovelty(static_cast<std::size_t>(tree_db_));
 
     // The star of the active repertoire: a move of it, added or taken out by a click (any side to move).
     const auto path  = boardPath();
@@ -527,8 +580,26 @@ void App::drawBoardTree() {
     const auto now   = ImGui::GetTime();
     std::optional<chess::Move> star;
 
+    // The keys (M3): Up and Down choose a move, Enter plays it, * stars it in the active repertoire.
+    std::optional<chess::Move> play, hovered;
+    const auto& io  = ImGui::GetIO();
+    const bool keys = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
+                      !io.KeyAlt && !tree_rows_.empty();
+    if (keys) {
+        const int last = static_cast<int>(tree_rows_.size()) - 1;
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) tree_row_ = std::min(tree_row_ + 1, last), tree_scroll_ = true;
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) tree_row_ = std::max(tree_row_ - 1, -1), tree_scroll_ = true;
+        if (tree_row_ > last) tree_row_ = last;
+        if (tree_row_ >= 0) {
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+                play = tree_rows_[static_cast<std::size_t>(tree_row_)].move;
+            for (const auto c : io.InputQueueCharacters)
+                if (c == '*' && path) star = tree_rows_[static_cast<std::size_t>(tree_row_)].move;
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape)) tree_row_ = -1;
+        }
+    }
+
     // The moves: a click plays one.
-    std::optional<chess::Move> play;
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
     const int columns    = tree_book_ ? 3 : 9;
     const float toast_h  = star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
@@ -551,8 +622,18 @@ void App::drawBoardTree() {
         for (std::size_t r = 0; r < tree_rows_.size(); ++r) {
             const auto& row = tree_rows_[r];
             ImGui::TableNextRow();
-            ImGui::TableNextColumn();
             ImGui::PushID(static_cast<int>(r));
+            // The move, the whole row a target: a click plays it, the mouse over it shows it as an arrow.
+            ImGui::TableSetColumnIndex(1);
+            if (ImGui::Selectable(row.san.c_str(), tree_row_ == static_cast<int>(r),
+                                  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
+                play = row.move;
+            if (ImGui::IsItemHovered()) hovered = row.move;
+            if (tree_row_ == static_cast<int>(r) && tree_scroll_) {
+                ImGui::SetScrollHereY();
+                tree_scroll_ = false;
+            }
+            ImGui::TableSetColumnIndex(0);
             if (path) {
                 const bool in = active >= 0 && reps.has(static_cast<std::size_t>(active), *path, row.move);
                 const auto at = ImGui::GetCursorScreenPos();
@@ -564,16 +645,15 @@ void App::drawBoardTree() {
                     ImGui::SetTooltip("%s", in ? TR("In the active repertoire: a click takes it out")
                                                : TR("A click adds it to the active repertoire"));
             }
-            ImGui::TableNextColumn();
-            if (ImGui::Selectable(row.san.c_str(), false)) play = row.move;
             ImGui::PopID();
-            ImGui::TableNextColumn();
+            ImGui::TableSetColumnIndex(2);
             if (tree_book_) {
                 ImGui::ProgressBar(static_cast<float>(row.games) / 1000.0f, ImVec2(-1, 0),
                                    fmt::format("{} %", std::lround(row.games / 10.0)).c_str());
                 continue;
             }
             ImGui::TextUnformatted(ui::exactCount(row.games).c_str());
+            if (!row.shares.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", row.shares.c_str());
             ImGui::TableNextColumn();
             // White's share light, the draws grey, Black's dark: told apart by their lightness.
             {
@@ -624,7 +704,85 @@ void App::drawBoardTree() {
             star_undo_.reset();
         }
     }
-    if (play) boardPlay(*play);
+    // The arrow on the board: the move under the mouse, else the one chosen.
+    const auto shown = hovered ? hovered
+                       : tree_row_ >= 0 && tree_row_ < static_cast<int>(tree_rows_.size())
+                           ? std::optional(tree_rows_[static_cast<std::size_t>(tree_row_)].move)
+                           : std::nullopt;
+    tree_arrow_.reset();
+    if (shown) tree_arrow_ = TreeArrow{*shown, boardAt(b.game, b.chess960, b.ply).hash()};
+    if (play) {
+        tree_row_ = -1;
+        boardPlay(*play);
+    }
+}
+
+void App::drawTreeNovelty(std::size_t index) {
+    // The line of the game shown, from the standard start; the novelty only for a database with its tree.
+    auto& b         = board_;
+    const auto path = boardPath();
+    const auto src  = shelf().treeSource(index);
+    if (!path || path->empty() || !src || !src->tree) return;
+    const auto of =
+        fmt::format("{}|{}|{}", src->name, src->snapshot->generation(), boardFen()) + fmt::format("|{}", b.ply);
+    if (of != tree_novelty_.of) {
+        tree_novelty_    = NoveltyJob{};
+        tree_novelty_.of = of;
+        study::ScanBoard scan;
+        if (!scan.setFen(chess::constants::STARTPOS, false)) return;
+        const auto start = scan;
+        std::vector<int> codes;
+        chess::Board board;
+        for (const auto& m : *path) {
+            const auto move = scan.parseSan(chess::uci::moveToSan(board, m));
+            if (!move) return;
+            codes.push_back(scan.encode(*move));
+            scan.play(*move);
+            board.makeMove<false>(m);
+        }
+        tree_novelty_.ply = src->tree->novelty(*src->snapshot, start, codes);
+        if (tree_novelty_.ply && *tree_novelty_.ply <= path->size()) {
+            // The position after it: no game of the database reaches it, unless a single one by other moves.
+            study::ScanBoard after;
+            if (after.setFen(chess::constants::STARTPOS, false)) {
+                chess::Board at;
+                for (uint32_t i = 0; i < *tree_novelty_.ply; ++i) at.makeMove<false>((*path)[i]);
+                if (after.setFen(at.getFen(), false))
+                    tree_novelty_.search = std::make_unique<study::Search>(src->snapshot, study::PositionQuery{after});
+            }
+        }
+    }
+    auto& n = tree_novelty_;
+    if (!n.ply || *n.ply > path->size()) return;
+    if (n.search && n.search->done()) {
+        const auto hits = n.search->hits();
+        n.found         = hits.size();
+        n.confirmed     = hits.empty();
+        n.search.reset();
+    }
+    const auto label = boardMoveLabel(static_cast<int>(*n.ply));
+    const auto move  = (*n.ply + 1) / 2;
+    ImGui::PushTextWrapPos();
+    if (n.search) {
+        ImGui::TextDisabled("%s", trf("The game's line leaves « {} » at move {}: looking whether a game reached its "
+                                      "position…",
+                                      src->name, move)
+                                      .c_str());
+    } else if (n.confirmed) {
+        ImGui::TextUnformatted(trf("The game's line leaves « {} » at move {}:", src->name, move).c_str());
+        ImGui::SameLine(0, px(4));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", trf("{} is a novelty", label).c_str());
+        ImGui::TextDisabled("%s", TR("No game of the database reached this position (the position search says so)."));
+    } else {
+        ImGui::TextDisabled("%s", trn("After {1}, a single game of « {2} » reaches the position, by other moves.",
+                                      "After {1}, {0} games of « {2} » reach the position, by other moves.", n.found,
+                                      ui::exactCount(n.found), label, src->name)
+                                      .c_str());
+    }
+    ImGui::PopTextWrapPos();
+    if (static_cast<int>(*n.ply) < b.ply || n.confirmed) {
+        if (ImGui::SmallButton(TR("See the last known position"))) showBoardLine(b.line, static_cast<int>(*n.ply) - 1);
+    }
 }
 
 void App::drawBoardReferences() {
@@ -691,6 +849,26 @@ void App::drawBoardReferences() {
         ImGui::TextDisabled("%s",
                             TR("Too many games reach it to look for the strongest: early in the opening, the Tree "
                                "tab tells more."));
+    // All of them, in the game list of a database: the one the Tree tab shows, else the first; the board's
+    // position added to the list's filter (M3, board 1).
+    if (t.games > 0) {
+        std::optional<std::size_t> base;
+        if (tree_db_ >= 0 && static_cast<std::size_t>(tree_db_) < s.entries().size()) base = tree_db_;
+        for (std::size_t i = 0; i < s.entries().size() && !base; ++i)
+            if (!s.entries()[i].source) base = i;
+        if (base &&
+            ImGui::SmallButton(trf("All the games of the position in « {} » ›", s.entries()[*base].name).c_str())) {
+            db_selected_        = static_cast<int>(*base);
+            db_search_          = SearchFields{};
+            db_search_.position = true;
+            db_filter_.fill(0);
+            db_search_open_ = true;
+            search_tab_     = 1;
+            db_list_        = true;
+            db_row_         = 0;
+            page_           = Page::Databases;
+        }
+    }
 }
 
 }  // namespace fcg

@@ -608,6 +608,97 @@ void App::boardPlay(chess::Move move) {
     }
 }
 
+void App::boardPlayAsked(chess::Move move) {
+    auto& b = board_;
+    if (!chessBoard()) return boardPlay(move);
+    // Only a move that would start a variation is asked about: the line's next move, or one a variation starts with,
+    // is played as it is.
+    auto trial            = b.tree;
+    const auto variations = trial.variations.size();
+    (void)playInTree(trial, b.chess960, b.line, b.ply, move);
+    if (trial.variations.size() == variations) return boardPlay(move);
+    const auto& io = ImGui::GetIO();
+    if (io.KeyShift) return boardPlayAs(move, NewMove::Replace);
+    if (io.KeyCtrl || b.settings.ask_new_move) {
+        new_move_       = move;
+        new_move_at_    = io.MousePos;
+        new_move_frame_ = ImGui::GetFrameCount();
+        return;
+    }
+    boardPlay(move);
+}
+
+void App::boardPlayAs(chess::Move move, NewMove as) {
+    auto& b = board_;
+    if (as == NewMove::Variation) return boardPlay(move);
+    auto before = boardSnapshot();
+    int line = b.line, ply = b.ply;
+    if (as == NewMove::Replace) {
+        // The moves after the position taken away in the line that holds them, then the move played there.
+        std::tie(line, ply) = truncateAt(b.tree, ownerOf(b.tree, b.line, b.ply), b.ply + 1);
+        std::tie(line, ply) = playInTree(b.tree, b.chess960, line, ply, move);
+        boardToast(TR("The moves after replaced · Ctrl+Z gives them back"));
+    } else {
+        std::tie(line, ply) = playInTree(b.tree, b.chess960, line, ply, move);
+        line                = promoteVariation(b.tree, line);
+        boardToast(TR("New main line · the moves it replaces became a variation · Ctrl+Z undoes it"));
+    }
+    b.game = lineOf(b.tree, line);
+    showBoardLine(line, ply);
+    boardChanged(std::move(before));
+}
+
+void App::drawNewMoveQuestion() {
+    constexpr const char* kId = "##new_move";
+    if (!new_move_) return;
+    // Opened the frame after the move: the click that made it does not close it.
+    if (!ImGui::IsPopupOpen(kId)) {
+        if (ImGui::GetFrameCount() <= new_move_frame_ + 1) return;
+        ImGui::OpenPopup(kId);
+        ImGui::SetNextWindowPos(new_move_at_, ImGuiCond_Appearing);
+    }
+    if (!ImGui::BeginPopup(kId)) {  // a click elsewhere: the move is not played
+        new_move_.reset();
+        return;
+    }
+    const auto& b    = board_;
+    const auto board = boardAt(b.game, b.chess960, b.ply);
+    const auto san   = shownSan(chess::uci::moveToSan(board, *new_move_), i18n::language() == i18n::Language::French);
+    std::optional<NewMove> as;
+    ImGui::TextDisabled("%s", trf("{}: the game went another way here", san).c_str());
+    struct Choice {
+        NewMove as;
+        const char* label;
+        const char* key;
+        ImGuiKey imgui_key;
+    };
+    static constexpr Choice choices[] = {{NewMove::Variation, N_("A variation"), "V", ImGuiKey_V},
+                                         {NewMove::MainLine, N_("A new main line"), "M", ImGuiKey_M},
+                                         {NewMove::Replace, N_("Replace the moves after"), "R", ImGuiKey_R}};
+    for (const auto& c : choices) {
+        if (ImGui::Selectable(TR(c.label), c.as == NewMove::Variation, 0, ImVec2(px(240), 0))) as = c.as;
+        ImGui::SameLine(px(250));
+        ImGui::TextDisabled("%s", c.key);
+        if (ImGui::IsKeyPressed(c.imgui_key, false)) as = c.as;
+    }
+    ImGui::TextDisabled("%s", TR("Enter: a variation · Esc: not played"));
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+        as = NewMove::Variation;
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        new_move_.reset();
+        ImGui::CloseCurrentPopup();
+    }
+    if (as) {
+        const auto move = *new_move_;
+        new_move_.reset();
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        boardPlayAs(move, *as);
+        return;
+    }
+    ImGui::EndPopup();
+}
+
 namespace {
 
 // The colour of the mark the right button draws: green; Shift (or Ctrl) red, Alt blue, both yellow, as on Lichess.
@@ -913,7 +1004,7 @@ void App::drawMoveField() {
         if (!move && matches.size() == 1) move = matches[0].second;  // what was typed names one move only
         if (move) {
             b.move_typed.reset();
-            boardPlay(*move);
+            boardPlayAsked(*move);
             return;
         }
         b.move_error = TR("Not a legal move here");
@@ -971,8 +1062,9 @@ void App::drawBoardNagBar() {
     ImGui::EndDisabled();
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", TR("Enter: a comment after the move · Shift+Enter: before it · ! and ?: symbols · Del: "
-                                "the moves from here · Alt+↑: the variation up · Ctrl+Z, Ctrl+Y · the right button "
-                                "on the board: arrows and squares (Shift red, Alt blue, both yellow)"));
+                                "the moves from here · Alt+↑: the variation up · Ctrl+Z, Ctrl+Y · another move: a "
+                                "variation, with Shift it replaces the moves after, with Ctrl a choice · the right "
+                                "button on the board: arrows and squares (Shift red, Alt blue, both yellow)"));
     ImGui::PopStyleColor();
     if (ImGui::GetTime() - b.toast_time < 4.0)
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", b.toast.c_str());
@@ -985,7 +1077,7 @@ void App::boardMove(chess::Move move) {
         b.selected.reset();
         return;
     }
-    boardPlay(move);
+    boardPlayAsked(move);
 }
 
 void App::boardClick(const chess::Board& board, chess::Square square) {

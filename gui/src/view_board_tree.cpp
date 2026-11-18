@@ -467,6 +467,7 @@ void App::drawBoardStrip() {
 }
 
 void App::drawChessColumn() {
+    drawNewMoveQuestion();  // a move where the game went another way, asked about
     drawBoardStrip();
     drawMoveField();  // while a move is typed, whatever the tab
     // The tabs, in the order of the mockup; Alt+1 to Alt+4.

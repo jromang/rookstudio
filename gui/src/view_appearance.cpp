@@ -258,6 +258,13 @@ void App::drawAppearanceSettings(float label) {
     ImGui::SetItemTooltip("%s", TR("The first move of each line of the Board page's analysis drawn as an arrow on the "
                                    "board, in 2D as in 3D. Without them the lines still show the moves."));
     ui::topic(guide::topics::Analysis);
+    // In the Chess space, a move where the game went another way: a variation at once, or the question.
+    if (ImGui::Checkbox(TR("Ask what a move where the game went another way becomes"), &board_.settings.ask_new_move))
+        saveBoardSettings();
+    ImGui::SetItemTooltip("%s", TR("In the Chess space: a variation, a new main line, or the moves after replaced, "
+                                   "chosen each time. Without it, such a move starts a variation (Ctrl+Z takes it "
+                                   "away); held while the move is made, Ctrl asks all the same and Shift replaces "
+                                   "the moves after."));
     changed |= ImGui::Checkbox(TR("Figurines in the notation"), &s.figurines);
     ImGui::SetItemTooltip("%s", TR("The moves of the Board page written with the pieces of the set chosen above "
                                    "(Nf3 becomes a knight and f3), in its moves and its analysis's lines."));

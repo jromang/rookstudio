@@ -638,7 +638,16 @@ class App {
     [[nodiscard]] bool boardKey();
     [[nodiscard]] std::string boardFen();  // the position of the Board page
     void boardPlay(chess::Move move);
-    // A move made on the board with the mouse: the user's move in the game they play, else boardPlay().
+    // A move the user makes on the board or types. In the Chess space, where the game went another way, it starts a
+    // variation (boardPlay), unless Shift is held: it replaces the moves after; or Ctrl, or the setting: asked about.
+    void boardPlayAsked(chess::Move move);
+    enum class NewMove { Variation, MainLine, Replace };
+    void boardPlayAs(chess::Move move, NewMove as);
+    std::optional<chess::Move> new_move_;  // asked about, waiting for the answer
+    ImVec2 new_move_at_;
+    int new_move_frame_ = 0;
+    void drawNewMoveQuestion();
+    // A move made on the board with the mouse: the user's move in the game they play, else boardPlayAsked().
     void boardMove(chess::Move move);
     void boardClick(const chess::Board& board, chess::Square square);
     // The left button on the board (board_.drag): `press`, the square it went down on this frame; `hover`, the square

@@ -13,6 +13,7 @@
 #include <json.hpp>
 
 #include <commentary/position.hpp>
+#include <study/import.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/scan_board.hpp>
 #include <tour/files.hpp>
@@ -113,7 +114,9 @@ void App::rememberBoardGame() {
     // And a game read again from where it was read takes the place of its unchanged copy.
     std::erase_if(recent_games_, [&](const RecentGame& r) {
         if (r.changes.any()) return false;
-        if (r.origin && game.origin) return r.origin->view == game.origin->view;
+        if (r.origin && game.origin)  // the same list, or the same game (a game kept from a session has no list)
+            return (r.origin->view && r.origin->view == game.origin->view) ||
+                   (r.origin->folder == game.origin->folder && r.origin->id == game.origin->id);
         return !r.origin && !game.origin && r.title == game.title &&
                r.tree.main.moves.size() == game.tree.main.moves.size();
     });
@@ -354,11 +357,22 @@ void App::discardBoardChanges() {
         boardToast(TR("Changes discarded · Ctrl+Y makes them again"));
         return;
     }
-    if (board_origin_) {  // read again from its database, the game shown forgotten
-        forget_board_game_ = true;
-        openListRow(board_origin_->row);
-        forget_board_game_ = false;
-        boardToast(TR("Changes discarded"));
+    if (board_origin_) {  // read again from its database, by its number, the game shown forgotten
+        auto& s           = shelf();
+        const auto origin = *board_origin_;
+        for (std::size_t i = 0; i < s.entries().size(); ++i) {
+            if (s.entries()[i].folder != origin.folder) continue;
+            const auto db = s.open(i);
+            if (!db || origin.id >= db->snapshot()->games()) break;
+            forget_board_game_ = true;
+            readOnBoard(study::importedPgn(db->snapshot()->game(origin.id)),
+                        trf("{}, game {}", origin.name, ui::exactCount(origin.id + 1)));
+            forget_board_game_ = false;
+            board_origin_      = origin;
+            boardToast(TR("Changes discarded"));
+            return;
+        }
+        boardToast(trf("« {} » cannot be read now: the changes stay.", origin.name));
     }
 }
 

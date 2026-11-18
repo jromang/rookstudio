@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include <commentary/commentator.hpp>
 #include <commentary/question.hpp>
 #include <commentary/story.hpp>
+#include <commentary/theory.hpp>
 #include <commentary/writing.hpp>
 #include <study/game_tree.hpp>
 
@@ -40,13 +42,80 @@ commentary::PieceLetters letters() {
 
 }  // namespace
 
-std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
+std::string App::boardTheoryKey() {
     const auto& b = board_;
+    if (b.chess960 || b.tree.main.moves.empty()) return {};
+    if (!b.tree.main.start_fen.empty() && b.tree.main.start_fen != std::string(chess::constants::STARTPOS)) return {};
+    auto& s = shelf();
+    std::optional<std::size_t> base;
+    if (tree_db_ >= 0 && static_cast<std::size_t>(tree_db_) < s.entries().size()) base = tree_db_;
+    for (std::size_t i = 0; i < s.entries().size() && !base; ++i)
+        if (!s.entries()[i].source) base = i;
+    if (!base || s.entries()[*base].source) return {};
+    const auto facts = s.facts(*base);  // a database that changed: looked for again
+    if (!facts.tree) return {};
+    return fmt::format("{}|{}|{}|{}", reviewKey(b.tree.main), s.entries()[*base].folder.string(), facts.games,
+                       facts.changed);
+}
+
+std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
+    auto& b = board_;
     if (b.reviews.empty() || b.chess960) return nullptr;
-    const auto& r  = b.reviews.front();
-    const auto key = fmt::format("{}|{}|{}|{}", reviewKey(b.tree.main), r.engine, r.passes, r.positions.size());
+    // The game's theory, looked for once per game and database; the review is made again when it comes.
+    const auto theory_key = boardTheoryKey();
+    if (!theory_key.empty() && theory_key != theory_of_ && (!theory_job_ || theory_job_->of != theory_key)) {
+        auto& s = shelf();
+        std::optional<std::size_t> base;
+        if (tree_db_ >= 0 && static_cast<std::size_t>(tree_db_) < s.entries().size()) base = tree_db_;
+        for (std::size_t i = 0; i < s.entries().size() && !base; ++i)
+            if (!s.entries()[i].source) base = i;
+        if (base) {
+            if (auto source = s.treeSource(*base); source && source->tree) {
+                commentary::TheoryOptions options;
+                // The game itself, when it came from that database, is not counted.
+                if (board_origin_ && board_origin_->folder == s.entries()[*base].folder)
+                    options.itself = board_origin_->id;
+                const auto date = b.tree.main.header("Date");
+                if (date.size() >= 4 && std::isdigit(static_cast<unsigned char>(date[0])))
+                    options.year = std::atoi(date.substr(0, 4).c_str());
+                TheoryJob job;
+                job.of             = theory_key;
+                board_theory_base_ = source->name;
+                job.done           = std::async(std::launch::async, [source = *source, main = b.tree.main, options] {
+                    const auto line = mainLineOf(main, false);
+                    return line ? commentary::theoryOf(*source.tree, source.snapshot, *line, options)
+                                : commentary::Opening{};
+                });
+                theory_job_        = std::move(job);
+            }
+        }
+    }
+    if (theory_job_ && theory_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        board_theory_ = theory_job_->done.get();
+        theory_of_    = theory_job_->of;
+        theory_job_.reset();
+        board_commentary_of_.clear();  // made again with it
+        b.review_key.clear();          // and the symbols with it
+    }
+    const bool theory = !theory_key.empty() && theory_key == theory_of_;
+    const auto& r     = b.reviews.front();
+    const auto key    = fmt::format("{}|{}|{}|{}|{}", reviewKey(b.tree.main), r.engine, r.passes, r.positions.size(),
+                                    theory ? theory_of_ : std::string());
     if (key != board_commentary_of_) {
-        board_commentary_    = commentaryReview(b.tree.main, b.chess960, r);
+        // Theory never hides an error the engine sees: a database of club games has its traps played a hundred
+        // times. Its book ends before the first mistake.
+        board_theory_used_ = theory ? board_theory_ : commentary::Opening{};
+        if (board_theory_used_.book_plies > 0)
+            if (const auto plain = commentaryReview(b.tree.main, b.chess960, r)) {
+                for (const auto& m : plain->report.moves) {
+                    if (m.ply > board_theory_used_.book_plies) break;
+                    if (m.judgment && *m.judgment != commentary::Judgment::Inaccuracy) {
+                        board_theory_used_.book_plies = m.ply - 1;
+                        break;
+                    }
+                }
+            }
+        board_commentary_    = commentaryReview(b.tree.main, b.chess960, r, board_theory_used_);
         board_commentary_of_ = key;
     }
     return board_commentary_;
@@ -240,6 +309,52 @@ void App::drawReviewAssistant() {
     auto& b           = board_;
     const auto review = boardCommentaryReview();
     if (!review) return;
+    ImGui::Spacing();
+    // Where the game left theory, in the user's database (M5, board 4).
+    if (!theory_of_.empty() && theory_of_ == boardTheoryKey()) {
+        const auto& t = board_theory_used_;
+        std::string line;
+        if (t.book_plies > 0)
+            line = trf("Theory in « {} » up to {}", board_theory_base_, boardMoveLabel(static_cast<int>(t.book_plies)));
+        else
+            line = trf("No theory from « {} » before the first error", board_theory_base_);
+        if (t.book_plies < board_theory_.book_plies)
+            line += " · " + trf("its games played on to {}, an error the engine sees",
+                                boardMoveLabel(static_cast<int>(board_theory_.book_plies)));
+        if (board_theory_.novelty)
+            line += " · " + trf("{} was new: no game had played it",
+                                boardMoveLabel(static_cast<int>(*board_theory_.novelty) + 1));
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", line.c_str());
+        ImGui::PopTextWrapPos();
+    } else if (theory_job_) {
+        ImGui::TextDisabled("%s", trf("Looking for the game's theory in « {} »…", board_theory_base_).c_str());
+    }
+    // The moves the review singles out, in words: a click goes to the move.
+    if (review->report.complete) {
+        if (review_moments_of_ != board_commentary_of_) {
+            review_moments_ = commentary::templateComments(review->line, review->report, review->analyses, {}, nullptr,
+                                                           nullptr, lang(), letters());
+            review_moments_of_ = board_commentary_of_;
+        }
+        if (!review_moments_.empty()) {
+            ImGui::Spacing();
+            ImGui::TextDisabled("%s", TR("THE KEY MOMENTS, IN WORDS"));
+            ImGui::PushTextWrapPos();
+            for (const auto& [ply, text] : review_moments_) {
+                ImGui::PushID(static_cast<int>(ply));
+                const auto label = boardMoveLabel(static_cast<int>(ply));
+                if (ImGui::Selectable(fmt::format("{}##moment", label).c_str(),
+                                      b.line < 0 && b.ply == static_cast<int>(ply), ImGuiSelectableFlags_None,
+                                      ImVec2(ImGui::CalcTextSize(label.c_str()).x, 0)))
+                    showBoardLine(-1, static_cast<int>(ply));
+                ImGui::SameLine();
+                ImGui::TextUnformatted(text.c_str());
+                ImGui::PopID();
+            }
+            ImGui::PopTextWrapPos();
+        }
+    }
     ImGui::Spacing();
     // The story of the game, from the review's facts (M5, board 4).
     const auto passages = commentary::story(review->line, b.tree.main.result.empty() ? "*" : b.tree.main.result,

@@ -20,6 +20,7 @@
 #include <commentary/openings.hpp>
 #include <commentary/question.hpp>
 #include <commentary/references.hpp>
+#include <commentary/review.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
 #include <tour/polyglot.hpp>
@@ -902,6 +903,21 @@ class App {
     std::optional<CommentJob> comment_job_;
     std::shared_ptr<const CommentaryReview> board_commentary_;
     std::string board_commentary_of_;
+    // How far the board's game followed theory, against a database of the user's (the Tree tab's, else the first with
+    // a tree): its book moves are not judged, its novelty is told. Looked for in the background.
+    struct TheoryJob {
+        std::string of;
+        std::future<commentary::Opening> done;
+    };
+    std::optional<TheoryJob> theory_job_;
+    std::string theory_of_;  // the game and database board_theory_ is of
+    commentary::Opening board_theory_;
+    commentary::Opening board_theory_used_;      // the same, ended before the first error the engine sees
+    std::string board_theory_base_;              // the database's name, for what the review says
+    [[nodiscard]] std::string boardTheoryKey();  // the game and the database its theory is looked for in; empty: none
+    // The moves the review singles out, each with its template comment: the review tab's key moments in words.
+    std::vector<std::pair<std::size_t, std::string>> review_moments_;
+    std::string review_moments_of_;
     uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
     int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions

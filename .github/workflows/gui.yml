@@ -93,9 +93,17 @@ jobs:
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCG_STATIC_RUNTIME=ON -DFCG_ASSISTANT_VULKAN=${VULKAN}
 
       - name: Build
+        # As many compilations as processors (ninja runs two more), with a swap file of 8 GB: a private repository's
+        # runner has two processors and 7 GB, and gcc 15 compiling llama.cpp's largest sources (and ggml's Vulkan
+        # backend) at once ran it out of memory on Ubuntu 26.04, its runner service stopped with the build.
         run: |
+          free -m
+          if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ]; then
+            sudo fallocate -l 8G /mnt/fcg-swap && sudo chmod 600 /mnt/fcg-swap && sudo mkswap /mnt/fcg-swap >/dev/null && sudo swapon /mnt/fcg-swap
+          fi
+          swapon --show
           ccache -z
-          cmake --build build
+          cmake --build build -j "$(nproc)"
           ccache -s
 
       - name: Compiler cache saved

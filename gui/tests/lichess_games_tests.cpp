@@ -216,3 +216,46 @@ TEST_CASE("Lichess games: an account Lichess does not have") {
     CHECK(r.error == "Lichess has no account named Nobody");
     CHECK_FALSE(loadSyncState(db->folder()));
 }
+
+TEST_CASE("Lichess games: the speeds and the moment asked for, and the new games counted without their moves") {
+    CHECK(perfTypes(0) == "ultraBullet,bullet,blitz,rapid,classical,correspondence,chess960");
+    CHECK(perfTypes(1) == "blitz,rapid,classical,chess960");
+    CHECK(perfTypes(2) == "classical,correspondence,chess960");
+
+    Export lichess(lichessGames(10, 0, 1));
+    auto db = emptyDatabase("lichess-filters");
+    SyncProgress progress;
+    std::atomic<bool> cancel{false};
+    SyncFilters filters;
+    filters.perf_types = perfTypes(1);
+    filters.since      = lichess.games[4].start;  // a year back, a date: the games from then on
+    const auto first   = syncGames(*db, "Me", "", progress, cancel, 50, filters);
+    CHECK_MESSAGE(first.error.empty(), first.error);
+    CHECK(lichess.lastPath() == fmt::format("/api/games/user/Me?clocks=true&evals=true&opening=true&sort=dateAsc"
+                                            "&perfType=blitz,rapid,classical,chess960&since={}",
+                                            filters.since));
+    CHECK(first.added == 6);
+
+    // The count: the games after the latest one held, as lines of NDJSON, their moves and tags left out.
+    std::string asked;
+    const auto port = freePort();
+    ScriptedServer counter(port, [&](const std::string& head, net::TcpConnection& c) {
+        asked                  = requestPath(head);
+        const std::string body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n{\"id\":\"c\"}\n";
+        c.sendAll(
+            fmt::format("HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nContent-Length: {}\r\n"
+                        "Connection: close\r\n\r\n{}",
+                        body.size(), body));
+    });
+    REQUIRE(counter.ok());
+    servers().api    = fmt::format("http://127.0.0.1:{}", port);
+    const auto count = countNewGames(db->folder(), "Me", "", filters);
+    REQUIRE_MESSAGE(count.value, count.error);
+    CHECK(*count.value == 3);
+    CHECK(asked == fmt::format("/api/games/user/Me?moves=false&tags=false&max=1000"
+                               "&perfType=blitz,rapid,classical,chess960&since={}",
+                               lichess.games.back().start + 1000));
+    // A database without Lichess's games: nothing asked.
+    auto other = emptyDatabase("lichess-none");
+    CHECK_FALSE(countNewGames(other->folder(), "Me", "", filters).value);
+}

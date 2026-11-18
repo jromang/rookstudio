@@ -24,8 +24,14 @@ struct LichessSettings {
     // its threads for each game.
     std::string broadcast_engine;
     int broadcast_threads = 1;
+    // A player's games (M4, board 3): the speeds asked for (0 all, 1 blitz, rapid and classical, 2 classical and
+    // correspondence), from when (0 the first game, 1 a year back, 2 the date below, "2024-01-31").
+    int sync_speeds = 0;
+    int sync_since  = 0;
+    std::string sync_date;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
-                                                explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads)
+                                                explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
+                                                sync_speeds, sync_since, sync_date)
 
 }  // namespace fcg

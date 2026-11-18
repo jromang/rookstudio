@@ -111,6 +111,22 @@ std::optional<std::size_t> App::lichessBase() {
     return std::nullopt;
 }
 
+lichess::SyncFilters App::lichessFilters() const {
+    lichess::SyncFilters f;
+    f.perf_types = lichess::perfTypes(lichess_.sync_speeds);
+    if (lichess_.sync_since == 1) {
+        const auto now =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count();
+        f.since = now - int64_t{365} * 24 * 3600 * 1000;
+    } else if (lichess_.sync_since == 2 && lichess_.sync_date.size() == 10) {
+        auto date = lichess_.sync_date;  // 2024-01-31, as Lichess's tags write it: 2024.01.31
+        std::replace(date.begin(), date.end(), '-', '.');
+        if (const auto at = lichess::startOf(date, "00:00:00")) f.since = *at;
+    }
+    return f;
+}
+
 void App::startLichessSync() {
     if (lichess_sync_ || lichess_.player.empty()) return;
     auto& s           = shelf();
@@ -133,10 +149,11 @@ void App::startLichessSync() {
     if (!job->db) return;
     const std::string token  = lichess_account_ ? lichess_account_->token : std::string();
     const std::string player = lichess_.player;
-    job->done =
-        std::async(std::launch::async, [db = job->db, player, token, progress = job->progress, cancel = job->cancel] {
-            return lichess::syncGames(*db, player, token, *progress, *cancel);
-        });
+    job->done                = std::async(std::launch::async, [db = job->db, player, token, progress = job->progress,
+                                                               cancel = job->cancel, filters = lichessFilters()] {
+        return lichess::syncGames(*db, player, token, *progress, *cancel, 500, filters);
+    });
+    lichess_new_games_.reset();  // counted again after it
     lichess_sync_report_.reset();
     lichess_sync_ = std::move(job);
 }
@@ -156,7 +173,34 @@ void App::drawLichessHomeCard() {
         const auto facts = shelf().facts(*base);
         auto line        = trf("Lichess · {}: {}", lichess_.player, ui::exactCount(facts.games));
         if (facts.changed) line += " · " + trf("synced {}", ui::dayText(facts.changed));
+        // The new games, counted when the home opens, at most once an hour, if the user chose it (M4, board 3).
+        if (lichess_.count_new && !lichess_sync_) {
+            const auto now = std::chrono::steady_clock::now();
+            if (!lichess_count_job_.valid() &&
+                (lichess_counted_.time_since_epoch().count() == 0 || now - lichess_counted_ > std::chrono::hours(1))) {
+                lichess_counted_ = now;
+                lichess_count_job_ =
+                    std::async(std::launch::async, [folder = shelf().entries()[*base].folder, player = lichess_.player,
+                                                    token = lichess_account_ ? lichess_account_->token : std::string(),
+                                                    filters = lichessFilters(), cancel = lichess_count_cancel_] {
+                        return lichess::countNewGames(folder, player, token, filters, cancel.get());
+                    });
+            }
+            if (lichess_count_job_.valid() &&
+                lichess_count_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                const auto answer  = lichess_count_job_.get();
+                lichess_new_games_ = answer.value;
+            }
+        }
         ImGui::TextDisabled("%s", line.c_str());
+        if (lichess_new_games_ && *lichess_new_games_ > 0) {
+            ImGui::SameLine();
+            ImGui::TextColored(
+                ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
+                trn("+{} new game", "+{} new games", *lichess_new_games_,
+                    *lichess_new_games_ >= 1000 ? std::string("1000") : std::to_string(*lichess_new_games_))
+                    .c_str());
+        }
         ImGui::SameLine();
         if (lichess_sync_) {
             ImGui::TextUnformatted(
@@ -354,9 +398,52 @@ void App::drawLichessGames() {
                                            .c_str());
         }
     }
-    ImGui::TextDisabled("%s", TR("Sent to Lichess: the player's name and the date of the last game received; with a "
-                                 "linked account, your token too. The games keep their link to lichess.org, their "
-                                 "clocks and Lichess's evaluations."));
+    // What is asked, what goes out (M4, board 3).
+    if (ImGui::TreeNode(TR("What is asked"))) {
+        bool changed = false;
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", TR("Speeds"));
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton(TR("All"), &lichess_.sync_speeds, 0);
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton(TR("Blitz, rapid, classical"), &lichess_.sync_speeds, 1);
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton(TR("Classical and correspondence"), &lichess_.sync_speeds, 2);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", TR("Since"));
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton(TR("The first game"), &lichess_.sync_since, 0);
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton(TR("A year"), &lichess_.sync_since, 1);
+        ImGui::SameLine();
+        changed |= ImGui::RadioButton(TR("A date"), &lichess_.sync_since, 2);
+        if (lichess_.sync_since == 2) {
+            ImGui::SameLine();
+            if (!ImGui::IsAnyItemActive() || lichess_date_[0] == 0)
+                std::snprintf(lichess_date_.data(), lichess_date_.size(), "%s", lichess_.sync_date.c_str());
+            ImGui::SetNextItemWidth(px(110));
+            ImGui::InputTextWithHint("##sync_date", "2024-01-31", lichess_date_.data(), lichess_date_.size(),
+                                     ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_CharsNoBlank);
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                lichess_.sync_date = lichess_date_.data();
+                changed            = true;
+            }
+        }
+        ImGui::TextDisabled("%s", TR("Variants: standard chess and Chess960."));
+        ImGui::TextDisabled("%s", TR("They apply to the games to come: a sync asks for what follows the last game "
+                                     "received."));
+        if (ImGui::Checkbox(TR("Count the new games when the home opens"), &lichess_.count_new)) {
+            changed          = true;
+            lichess_counted_ = {};
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", TR("one request, at most once an hour: the player's name"));
+        if (changed) saveLichessSettings();
+        ImGui::TreePop();
+    }
+    ImGui::TextDisabled("%s", TR("Sent to Lichess: the player's name, these filters and the date of the last game "
+                                 "received; with a linked account, your token too. The games keep their link to "
+                                 "lichess.org, their clocks and Lichess's evaluations."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }

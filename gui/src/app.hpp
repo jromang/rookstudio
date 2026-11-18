@@ -712,6 +712,14 @@ class App {
         std::unique_ptr<lichess::RoundFollower> follower;
     };
     std::vector<FollowedRound> followed_rounds_;
+    // The filters of a player's games, as the user chose them; the home's count of the new ones, asked at most once an
+    // hour when the user chose it (M4, board 3).
+    [[nodiscard]] lichess::SyncFilters lichessFilters() const;
+    std::future<lichess::Answer<uint64_t>> lichess_count_job_;
+    std::shared_ptr<std::atomic<bool>> lichess_count_cancel_ = std::make_shared<std::atomic<bool>>(false);
+    std::optional<uint64_t> lichess_new_games_;
+    std::chrono::steady_clock::time_point lichess_counted_{};
+    std::array<char, 16> lichess_date_{};
     // The broadcast mosaic (mockup M4, board 4; view_broadcast.cpp): a followed round's games side by side, each
     // analysed by an engine of the library while the mosaic shows; the board can follow one of them live.
     struct BroadcastBoard {

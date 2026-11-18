@@ -118,6 +118,7 @@ App::~App() {
     // Lichess's waits end at once: the link's, the sync's.
     if (lichess_link_) *lichess_link_->cancel = true;
     if (lichess_sync_) *lichess_sync_->cancel = true;
+    *lichess_count_cancel_ = true;
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once, and the window goes away first rather than freeze while it does.
     if (probe_.valid() || check_.valid()) {

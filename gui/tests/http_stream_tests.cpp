@@ -20,6 +20,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "assistant_models.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "net.hpp"
@@ -525,4 +526,54 @@ TEST_CASE("HTTPS: games streamed from Lichess, a file of its database downloaded
     CHECK_MESSAGE(got.ok, got.error);
     CHECK(progress.size == progress.bytes);
     CHECK(readAll(file).find("lichess_db_standard_rated_2013-01.pgn.zst") != std::string::npos);
+}
+
+TEST_CASE("assistant models: the recommended one is pinned to what was published") {
+    const auto models = assistantModels();
+    REQUIRE_FALSE(models.empty());
+    const auto& m = models.front();
+    CHECK(m.id == "commentary-v11");
+    // A published model is never changed: its version is in its name, and its hash and size are those of the file.
+    CHECK(m.file == "commentary-v11-Q4_K_M.gguf");
+    CHECK(m.url.starts_with("https://huggingface.co/"));
+    CHECK(m.url.ends_with(std::string("/") + std::string(m.file)));
+    CHECK(m.sha256.size() == 64);
+    CHECK(m.size == 2708804128);
+    CHECK(m.license == "Apache-2.0");
+    const auto profile = fs::temp_directory_path() / "profile";
+    CHECK(modelFile(profile, m) == profile / "models" / "commentary-v11-Q4_K_M.gguf");
+}
+
+TEST_CASE("assistant models: a model comes into the profile, checked against its hash") {
+    // A small file stands for the model, served from here.
+    std::string content(70000, '\0');
+    std::mt19937 random(7);
+    for (auto& ch : content) ch = static_cast<char>(random() & 0xFF);
+    const auto profile = fs::temp_directory_path() / "model-profile";
+    fs::remove_all(profile);
+    fs::create_directories(profile);
+    {
+        std::ofstream(profile / "reference", std::ios::binary) << content;
+    }
+    const auto hash = sha256File(profile / "reference");
+    const auto port = fcg::test::freePort();
+    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+        c.sendAll(fmt::format("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", content.size()));
+        c.sendAll(content);
+    });
+    REQUIRE(server.ok());
+    const auto url = fmt::format("http://127.0.0.1:{}/small.gguf", port);
+    const AssistantModel small{"small", "small.gguf", "unused", hash, content.size(), "MIT", "English"};
+    CHECK_FALSE(modelInstalled(profile, small));
+    DownloadProgress progress;
+    const auto got = downloadModel(profile, small, &progress, nullptr, url);
+    REQUIRE_MESSAGE(got.ok, got.error);
+    CHECK(modelInstalled(profile, small));
+    CHECK(readAll(modelFile(profile, small)) == content);
+    CHECK(progress.bytes == content.size());
+    // A file that is not the one published is removed.
+    const AssistantModel other{"other", "other.gguf", "unused", std::string(64, '0'), content.size(), "MIT", "English"};
+    CHECK_FALSE(downloadModel(profile, other, nullptr, nullptr, url).ok);
+    CHECK_FALSE(fs::exists(modelFile(profile, other)));
+    CHECK_FALSE(modelInstalled(profile, other));
 }

@@ -29,7 +29,7 @@ def properties(component):
 def declarations(cmake_text):
     """Every FetchContent_Declare: its name and its arguments, by keyword."""
     out = {}
-    for name, body in re.findall(r"FetchContent_Declare\(\s*(\w+)(.*?)\)", cmake_text, re.S):
+    for name, body in re.findall(r"FetchContent_Declare\(\s*([\w-]+)(.*?)\)", cmake_text, re.S):
         words = body.split()
         args = {}
         for key in ("GIT_REPOSITORY", "GIT_TAG", "URL", "URL_HASH"):

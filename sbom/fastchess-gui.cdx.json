@@ -144,6 +144,34 @@
     },
     {
       "type": "library",
+      "bom-ref": "fetchcontent:vulkan_headers",
+      "name": "Vulkan-Headers",
+      "version": "1.4.363.0",
+      "description": "The Vulkan headers ggml's Vulkan backend is cross-built for Windows with, and an import library for vulkan-1.dll made from them.",
+      "purl": "pkg:github/KhronosGroup/Vulkan-Headers@vulkan-sdk-1.4.363.0",
+      "licenses": [{ "expression": "Apache-2.0 OR MIT" }],
+      "externalReferences": [{ "type": "vcs", "url": "https://github.com/KhronosGroup/Vulkan-Headers.git" }],
+      "properties": [
+        { "name": "fastchess-gui:pin", "value": "vulkan-sdk-1.4.363.0" },
+        { "name": "fastchess-gui:commit", "value": "6802bb4733b63ed5efd3adb308a6c885ef180ea1" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "fetchcontent:SPIRV-Headers",
+      "name": "SPIRV-Headers",
+      "version": "1.4.363.0",
+      "description": "The SPIR-V headers ggml's Vulkan backend is cross-built for Windows with.",
+      "purl": "pkg:github/KhronosGroup/SPIRV-Headers@vulkan-sdk-1.4.363.0",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "externalReferences": [{ "type": "vcs", "url": "https://github.com/KhronosGroup/SPIRV-Headers.git" }],
+      "properties": [
+        { "name": "fastchess-gui:pin", "value": "vulkan-sdk-1.4.363.0" },
+        { "name": "fastchess-gui:commit", "value": "496543121ce6419f23d6fa5d7194ba66c36212d2" }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "fetchcontent:lucide",
       "name": "lucide-static",
       "version": "1.59.0",

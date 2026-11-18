@@ -292,6 +292,42 @@ if(FCG_ASSISTANT)
                    LLAMA_BUILD_COMMON LLAMA_OPENSSL LLAMA_SUBPROCESS)
         set(${option} OFF CACHE BOOL "" FORCE)
     endforeach()
+    if(FCG_ASSISTANT_VULKAN AND CMAKE_CROSSCOMPILING AND MINGW)
+        # Cross-built for Windows, the Vulkan SDK's parts for the target are made here: its headers and SPIRV-Headers,
+        # fetched; an import library for vulkan-1.dll, the loader every GPU driver installs, made from the headers'
+        # prototypes (only the functions ggml calls become imports); and the host's glslc.
+        FetchContent_Declare(vulkan_headers
+            GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
+            GIT_TAG vulkan-sdk-1.4.363.0
+            GIT_SHALLOW TRUE
+            SOURCE_SUBDIR fcg-no-cmake)
+        FetchContent_Declare(SPIRV-Headers
+            GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
+            GIT_TAG vulkan-sdk-1.4.363.0
+            GIT_SHALLOW TRUE
+            OVERRIDE_FIND_PACKAGE)
+        FetchContent_MakeAvailable(vulkan_headers SPIRV-Headers)
+        file(STRINGS ${vulkan_headers_SOURCE_DIR}/include/vulkan/vulkan_core.h prototypes
+             REGEX "VKAPI_CALL vk[A-Za-z0-9_]+\\(")
+        set(exports "LIBRARY vulkan-1.dll\nEXPORTS\n")
+        foreach(prototype IN LISTS prototypes)
+            string(REGEX MATCH "vk[A-Za-z0-9_]+\\(" name "${prototype}")
+            string(REPLACE "(" "" name "${name}")
+            string(APPEND exports "    ${name}\n")
+        endforeach()
+        file(WRITE ${CMAKE_BINARY_DIR}/vulkan-1.def "${exports}")
+        find_program(FCG_DLLTOOL NAMES x86_64-w64-mingw32-dlltool dlltool REQUIRED)
+        execute_process(COMMAND ${FCG_DLLTOOL} -d ${CMAKE_BINARY_DIR}/vulkan-1.def
+                                -l ${CMAKE_BINARY_DIR}/libvulkan-1.dll.a -D vulkan-1.dll
+                        RESULT_VARIABLE dlltool_result)
+        if(NOT dlltool_result EQUAL 0)
+            message(FATAL_ERROR "dlltool could not make the import library of vulkan-1.dll")
+        endif()
+        find_program(FCG_GLSLC glslc NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+        set(Vulkan_INCLUDE_DIR ${vulkan_headers_SOURCE_DIR}/include CACHE PATH "" FORCE)
+        set(Vulkan_LIBRARY ${CMAKE_BINARY_DIR}/libvulkan-1.dll.a CACHE FILEPATH "" FORCE)
+        set(Vulkan_GLSLC_EXECUTABLE ${FCG_GLSLC} CACHE FILEPATH "" FORCE)
+    endif()
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
     FetchContent_MakeAvailable(llama)
     set(BUILD_SHARED_LIBS ${FCG_BUILD_SHARED_LIBS})
@@ -325,6 +361,10 @@ if(FCG_ASSISTANT)
         endforeach()
     endfunction()
     fcg_beside_programs(${llama_SOURCE_DIR})
+    if(FCG_ASSISTANT_VULKAN AND CMAKE_CROSSCOMPILING AND MINGW)
+        # ggml finds SPIRV-Headers but takes its headers from the SDK's include folder: given to it here.
+        target_include_directories(ggml-vulkan PRIVATE ${spirv-headers_SOURCE_DIR}/include)
+    endif()
     if(MINGW)
         # Older MinGW-w64 headers lack the thread power throttling state ggml's CPU backend sets: it is given to it.
         include(CheckCSourceCompiles)
@@ -371,6 +411,9 @@ if(FCG_ASSISTANT)
         add_executable(fcg-assistant-eval ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp)
         target_link_libraries(fcg-assistant-eval PRIVATE fcg_assistant fcg_study)
         target_compile_options(fcg-assistant-eval PRIVATE -Wall -Wextra)
+        if(WIN32)
+            target_link_options(fcg-assistant-eval PRIVATE -static -static-libgcc -static-libstdc++)
+        endif()
     endif()
 endif()
 

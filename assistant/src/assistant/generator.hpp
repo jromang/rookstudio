@@ -15,8 +15,8 @@ namespace fcg::assistant {
 
 class Generator final : public commentary::Model {
    public:
-    // Loads a GGUF file, `gpu_layers` of it on the GPU (0 for the CPU only, a large number for all); none with `error`
-    // when it cannot.
+    // Loads a GGUF file, `gpu_layers` of it on the best GPU (0 for the CPU only, a large number for all): a discrete
+    // one before one built in, the one with the most free memory. None with `error` when it cannot.
     [[nodiscard]] static std::unique_ptr<Generator> load(const std::filesystem::path& path, int gpu_layers,
                                                          std::string& error);
     ~Generator() override;
@@ -32,7 +32,7 @@ class Generator final : public commentary::Model {
     [[nodiscard]] std::optional<commentary::Generation> generate(const commentary::Request& request,
                                                                  std::string* error) override;
 
-    // The devices the model runs on, as llama.cpp names them: "Vulkan0 (NVIDIA GeForce RTX 4070)", "CPU".
+    // The device the model runs on, as ggml names it: "Vulkan1 (NVIDIA GeForce RTX 5080)", "CPU (…)".
     [[nodiscard]] std::string devices() const;
 
    private:

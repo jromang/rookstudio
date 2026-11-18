@@ -267,6 +267,7 @@ target_link_libraries(fcg_commentary PUBLIC fcg_tournament)
 # ---------------------------------------------------------------------------
 
 option(FCG_ASSISTANT "Build the assistant's language model runtime (llama.cpp)" ON)
+option(FCG_ASSISTANT_VULKAN "The assistant's Vulkan backend (the Vulkan SDK's headers and loader, glslc, SPIRV-Headers)" OFF)
 option(FCG_ASSISTANT_EVAL "Build fcg-assistant-eval: a model measured on commentary cases, as the program uses it" OFF)
 if(FCG_ASSISTANT)
     # The release the prototype's commentary model was made and measured with (llama-cpp-2 0.1.161 vendors it), as
@@ -282,6 +283,8 @@ if(FCG_ASSISTANT)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
     # ggml's own thread pool: no OpenMP runtime to ship (libgomp on Windows; Apple's clang has none).
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    # The GPU backend: Vulkan alone, on every platform (MoltenVK on macOS), a module loaded where the loader is.
+    set(GGML_VULKAN ${FCG_ASSISTANT_VULKAN} CACHE BOOL "" FORCE)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
         set(GGML_CPU_ALL_VARIANTS ON CACHE BOOL "" FORCE)
     endif()
@@ -341,6 +344,12 @@ if(FCG_ASSISTANT)
     target_compile_options(fcg_assistant PRIVATE -Wall -Wextra)
     target_link_libraries(fcg_assistant PUBLIC fcg_commentary PRIVATE llama fcg_jinja)
     target_compile_definitions(fcg_assistant PUBLIC FCG_ASSISTANT=1)
+    if(FCG_ASSISTANT_VULKAN)
+        # The device is chosen before ggml starts, through the Vulkan loader: its headers.
+        find_package(Vulkan REQUIRED)
+        target_link_libraries(fcg_assistant PRIVATE Vulkan::Headers)
+        target_compile_definitions(fcg_assistant PRIVATE FCG_ASSISTANT_VULKAN=1)
+    endif()
 
     if(FCG_ASSISTANT_EVAL)
         add_executable(fcg-assistant-eval ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp)

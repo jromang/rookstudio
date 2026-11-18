@@ -1,5 +1,7 @@
 #include "generator.hpp"
 
+#include "vulkan_device.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -96,6 +98,29 @@ std::optional<llama_token> nextToken(llama_context* ctx, int32_t index, llama_sa
     return token;
 }
 
+// The device the model's layers go to: the GPU with the most free memory, a discrete one before one built in (a
+// machine with both would otherwise split the model between them, and the built-in one slows the other down); none
+// without a GPU, the CPU then.
+ggml_backend_dev_t bestGpu() {
+    ggml_backend_dev_t best = nullptr;
+    int best_rank           = 0;
+    std::size_t best_free   = 0;
+    for (std::size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+        auto* dev       = ggml_backend_dev_get(i);
+        const auto type = ggml_backend_dev_type(dev);
+        const int rank  = type == GGML_BACKEND_DEVICE_TYPE_GPU ? 2 : type == GGML_BACKEND_DEVICE_TYPE_IGPU ? 1 : 0;
+        if (rank == 0) continue;
+        std::size_t free = 0, total = 0;
+        ggml_backend_dev_memory(dev, &free, &total);
+        if (rank > best_rank || (rank == best_rank && free > best_free)) {
+            best      = dev;
+            best_rank = rank;
+            best_free = free;
+        }
+    }
+    return best;
+}
+
 std::string trim(const std::string& s) {
     const auto space  = [](unsigned char c) { return c == ' ' || (c >= '\t' && c <= '\r'); };
     std::size_t begin = 0, end = s.size();
@@ -115,6 +140,8 @@ struct Template {
 struct Generator::State {
     llama_model* model = nullptr;
     int threads        = 1;
+    // The devices the model was given, null-terminated: the chosen GPU alone, or none for the CPU.
+    std::vector<ggml_backend_dev_t> devices;
     std::unique_ptr<Template> jinja;  // none when the model's template does not parse
     std::string template_source;
 
@@ -127,11 +154,21 @@ Generator::Generator(std::unique_ptr<State> state) : state_(std::move(state)) {}
 Generator::~Generator() = default;
 
 std::unique_ptr<Generator> Generator::load(const std::filesystem::path& path, int gpu_layers, std::string& error) {
+    chooseVulkanDevice(gpu_layers > 0);
     initialise();
     auto state          = std::make_unique<State>();
     auto params         = llama_model_default_params();
     params.n_gpu_layers = gpu_layers;
-    state->model        = llama_model_load_from_file(path.string().c_str(), params);
+    if (gpu_layers > 0) {
+        if (auto* gpu = bestGpu()) state->devices = {gpu, nullptr};
+    }
+    if (state->devices.empty()) {
+        // The CPU alone: no layer, and no operation either, sent to a GPU.
+        params.n_gpu_layers = 0;
+        state->devices      = {nullptr};
+    }
+    params.devices = state->devices.data();
+    state->model   = llama_model_load_from_file(path.string().c_str(), params);
     if (!state->model) {
         error = path.string() + ": the model does not load";
         return nullptr;
@@ -265,14 +302,15 @@ std::optional<commentary::Generation> Generator::generate(const commentary::Requ
 }
 
 std::string Generator::devices() const {
-    std::string out;
+    const auto named = [](ggml_backend_dev_t dev) {
+        return std::string(ggml_backend_dev_name(dev)) + " (" + ggml_backend_dev_description(dev) + ")";
+    };
+    if (!state_->devices.empty() && state_->devices.front()) return named(state_->devices.front());
     for (std::size_t i = 0; i < ggml_backend_dev_count(); ++i) {
         auto* dev = ggml_backend_dev_get(i);
-        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && !out.empty()) continue;
-        out += (out.empty() ? "" : ", ") + std::string(ggml_backend_dev_name(dev)) + " (" +
-               ggml_backend_dev_description(dev) + ")";
+        if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU) return named(dev);
     }
-    return out;
+    return "CPU";
 }
 
 }  // namespace fcg::assistant

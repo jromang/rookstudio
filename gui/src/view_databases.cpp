@@ -9,6 +9,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <imgui_internal.h>  // SetKeyOwner
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -281,6 +282,10 @@ void App::drawDatabases() {
 
     // What can be done with it.
     ImGui::BeginDisabled(!facts.error.empty());
+    if (!db_naming_ && !ImGui::GetIO().WantTextInput) {
+        ImGui::SetKeyOwner(ImGuiKey_Enter, ImGui::GetID("##db_shelf_keys"));  // Enter is this page's: the list
+        ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, ImGui::GetID("##db_shelf_keys"));
+    }
     if (ui::iconButton("db_open_list", ui::Icon::Contents, TR("Open the list")) ||
         (!db_naming_ && ImGui::IsKeyPressed(ImGuiKey_Enter, false))) {
         db_list_ = true;
@@ -531,7 +536,15 @@ void App::drawGameList() {
             }
             specs->SpecsDirty = false;
         }
-        // The keys: up and down through the list, Enter opens; also while the filter is typed.
+        // The keys: up and down through the list, Enter opens; also while the filter is typed. They are the
+        // list's: claimed before they are pressed, ImGui's keyboard navigation leaves them alone, its cursor not
+        // shown on a button that Enter would press too.
+        {
+            const auto owner = ImGui::GetID("##db_list_keys");
+            for (const auto key : {ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_PageUp, ImGuiKey_PageDown,
+                                   ImGuiKey_Enter, ImGuiKey_KeypadEnter})
+                ImGui::SetKeyOwner(key, owner);
+        }
         if (!ids.empty()) {
             if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) db_row_ = std::min(db_row_ + 1, ids.size() - 1);
             if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && db_row_ > 0) --db_row_;

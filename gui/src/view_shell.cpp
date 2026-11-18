@@ -184,8 +184,20 @@ void App::drawShell() {
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_1)) switchSpace(Space::Engines);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_2)) switchSpace(Space::Chess);
     followPage();
+    // A page shown anew: ImGui's keyboard cursor, shown by the arrows of the page before, is hidden, so that Enter
+    // or Space press no button of that page or of the rail in place of the new page's own keys.
+    if (page_ != nav_page_) {
+        ImGui::SetNavCursorVisible(false);
+        nav_page_ = page_;
+    }
     pollDatabases();
-    if (space_ == Space::Chess) drawRecentGames();  // Ctrl+Tab, on any of its pages
+    if (space_ == Space::Chess) {
+        drawRecentGames();  // Ctrl+Tab, on any of its pages
+        if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_O)) openBoardPgnDialog();
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_N)) newBoardGame();
+        }
+    }
 
     const float rail = px(76);
     drawRail(rail);

@@ -237,7 +237,11 @@ class App {
     void drawEnginesRail(float width, float button);
     void drawChessRail(float width, float button);
     void drawBoardRailButton(float width, float button);  // in both rails, with its analysis's dot
-    void drawChessHome();                                 // view_chess.cpp
+    void drawChessHome();
+    Page nav_page_ = Page::Home;  // the page ImGui's keyboard cursor was last hidden for (view_shell.cpp)
+    void openBoardPgnDialog();    // Ctrl+O in the Chess space: a PGN file on the board
+    void newBoardGame();  // Ctrl+N in the Chess space: the start position, the game shown among the recent ones //
+                          // view_chess.cpp
     // The Databases page (view_databases.cpp): the databases of the profile, an import into one of them.
     void drawDatabases();
     DatabaseShelf& shelf();  // made at its first use

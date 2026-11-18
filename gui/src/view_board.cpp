@@ -252,6 +252,13 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     if (analyse) setBoardAnalysis(true);
 }
 
+void App::openBoardPgnDialog() {
+    page_ = Page::Board;
+    dialogs_.openFile(Dialogs::Purpose::BoardPgn, {{"PGN", "pgn"}}, storage_.runsDir().string());
+}
+
+void App::newBoardGame() { openPositionOnBoard(std::string(chess::constants::STARTPOS), false, {}, false); }
+
 void App::openPositionOnBoard(const std::string& fen, bool chess960, std::string title, bool analyse) {
     ReplayGame game;
     game.start_fen = fen;
@@ -1159,6 +1166,10 @@ void App::drawBoardPage() {
         for (const auto key : {ImGuiKey_LeftArrow, ImGuiKey_RightArrow, ImGuiKey_UpArrow, ImGuiKey_DownArrow,
                                ImGuiKey_Home, ImGuiKey_End})
             ImGui::SetKeyOwner(key, owner);
+        if (chessBoard()) {  // Enter writes a comment there
+            ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
+            ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, owner);
+        }
         const int before = b.ply;
         b.ply            = stepPly(navKeys(b.flip, !chessBoard()), b.ply, total);
         if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_F)) b.flip = !b.flip;

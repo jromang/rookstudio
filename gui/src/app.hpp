@@ -963,6 +963,9 @@ class App {
     // Lichess's explorer in the Tree tab (M3, board 2; M4): its answers this session, by position and source.
     std::map<std::string, lichess::Answer<lichess::Explorer>> explorer_answers_;
     std::future<lichess::Answer<lichess::Explorer>> explorer_job_;
+    double explorer_job_since_ = 0;  // when it was asked
+    std::map<std::string, double>
+        explorer_failed_;  // a question Lichess did not answer, and when: asked again after a minute
     std::string explorer_asked_;
     void drawLichessTreeCard(bool linked);  // what the source needs: a linked account, the explorer allowed
     // The Tree tab's rows from Lichess's explorer (0 the masters, 1 Lichess's players, 2 the player), asked when the

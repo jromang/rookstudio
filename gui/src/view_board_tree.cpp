@@ -555,21 +555,29 @@ void App::drawBoardTree() {
             " · {}+", *std::min_element(lichess_.explorer_ratings.begin(), lichess_.explorer_ratings.end()));
     std::size_t joined = 0;
     for (const auto& [name, i] : databases) joined += tree_left_.count(s.entries()[i].folder) ? 0 : 1;
+    // The player's games online; told apart from the database their sync fills, which has the same name.
+    std::string player_label = "Lichess · " + lichess_.player;
+    if (std::any_of(databases.begin(), databases.end(), [&](const auto& d) { return d.first == player_label; }))
+        player_label += std::string(" · ") + TR("online");
     for (int i = 0; i < count; ++i) {
         const auto label = i < together          ? trf("My databases · {}", joined)
                            : i < books_at        ? databases[static_cast<std::size_t>(i - together)].first
                            : i < lichess_at      ? books[static_cast<std::size_t>(i - books_at)]->name
                            : i == lichess_at     ? std::string(TR("Masters (Lichess)"))
                            : i == lichess_at + 1 ? "Lichess" + ratings_label
-                                                 : "Lichess · " + lichess_.player;
-        if (i > 0) ImGui::SameLine();
+                                                 : player_label;
+        // On as many lines as they need: the user's databases, the books, then Lichess's three.
+        if (i > 0) ui::sameLineOrWrap(ImGui::CalcTextSize(label.c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
         const bool on = tree_source_ == i;
-        if (on) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
+        if (on) {  // the source shown stays blue under the mouse, its text white
+            const auto accent = ImGui::ColorConvertU32ToFloat4(ui::ACCENT);
+            ImGui::PushStyleColor(ImGuiCol_Button, accent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, accent);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, accent);
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
         }
         if (ImGui::Button(fmt::format("{}##tree_source{}", label, i).c_str())) tree_source_ = i;
-        if (on) ImGui::PopStyleColor(2);
+        if (on) ImGui::PopStyleColor(4);
         // Lichess's players: the right button chooses the speeds and the ratings.
         if (i == lichess_at + 1) {
             if (ImGui::IsItemHovered())
@@ -758,7 +766,9 @@ void App::drawBoardTree() {
             }
         }
     }
+    ImGui::PushTextWrapPos();  // a message from Lichess can be long
     ImGui::TextUnformatted(tree_summary_.c_str());
+    ImGui::PopTextWrapPos();
     if (tree_db_ >= 0) drawTreeNovelty(static_cast<std::size_t>(tree_db_));
 
     // The star of the active repertoire: a move of it, added or taken out by a click (any side to move).

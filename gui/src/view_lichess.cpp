@@ -671,7 +671,9 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
     // The answers that came.
     if (explorer_job_.valid() && explorer_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         if (explorer_answers_.size() > 2000) explorer_answers_.clear();
-        explorer_answers_[explorer_asked_] = explorer_job_.get();
+        auto answer = explorer_job_.get();
+        if (!answer.value) explorer_failed_[explorer_asked_] = ImGui::GetTime();
+        explorer_answers_[explorer_asked_] = std::move(answer);
     }
     lichess::ExplorerQuery q;
     q.source         = source == 0   ? lichess::ExplorerSource::Masters
@@ -701,12 +703,16 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
             explorer_since_ = now;
         }
         if (now - explorer_since_ > 0.4 && !explorer_job_.valid()) {
-            explorer_asked_ = key;
-            explorer_job_   = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+            explorer_asked_     = key;
+            explorer_job_since_ = now;
+            explorer_job_       = std::async(std::launch::async, [q] { return lichess::explorer(q); });
         }
         tree_rows_.clear();
         tree_rows_of_.clear();
-        tree_summary_ = TR("Asking Lichess…");
+        // A player's games are gathered by Lichess the first time they are asked for: it can take a minute.
+        tree_summary_ = source == 2 && explorer_job_.valid() && explorer_asked_ == key && now - explorer_job_since_ > 5
+                            ? trf("Lichess is gathering {}'s games: the first time can take a minute…", q.player)
+                            : std::string(TR("Asking Lichess…"));
         return true;
     }
     if (tree_rows_of_ == key) return true;
@@ -720,10 +726,13 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
             pause.count() > 0
                 ? trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {} s.",
                       std::chrono::duration_cast<std::chrono::seconds>(pause).count())
-                : trf("Lichess cannot be reached from here ({}): trying again at the next position. The local "
-                      "databases answer as always.",
+                : trf("Lichess did not answer ({}): asked again in a minute. The local databases answer as always.",
                       a.error);
-        explorer_answers_.erase(found);  // asked again at the next look
+        // Asked again after a minute, or at once in another position: never in a loop.
+        if (ImGui::GetTime() - explorer_failed_[key] > 60) {
+            explorer_answers_.erase(found);
+            explorer_failed_.erase(key);
+        }
         tree_rows_of_.clear();
         return true;
     }

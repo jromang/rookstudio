@@ -98,6 +98,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     if (ImGui::GetCurrentContext()) registerPanelSettings();
 
     loadRecentGames();  // the board's game and the recent ones of the session before
+    loadKeptSearches();
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
     updates_ = storage_.updateSettings();
     if (updates_.enabled && !options_.scripted && update::checkDue(updates_.checked, std::time(nullptr))) {

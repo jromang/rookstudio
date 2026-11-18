@@ -824,6 +824,8 @@ void App::drawGameList() {
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_L)) ImGui::SetKeyboardFocusHere();
     ImGui::InputTextWithHint("##db_filter", TR("Quick filter: players, event, year, ECO, result"), db_filter_.data(),
                              db_filter_.size());
+    // The list's keys work while the quick filter is typed, not while another field is (the search panel's).
+    const bool list_keys = !ImGui::GetIO().WantTextInput || ImGui::IsItemActive();
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("Ctrl+L");
     ImGui::SameLine();
@@ -943,13 +945,13 @@ void App::drawGameList() {
         // The keys: up and down through the list, Enter opens; also while the filter is typed. They are the
         // list's: claimed before they are pressed, ImGui's keyboard navigation leaves them alone, its cursor not
         // shown on a button that Enter would press too.
-        {
+        if (list_keys) {
             const auto owner = ImGui::GetID("##db_list_keys");
             for (const auto key : {ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_PageUp, ImGuiKey_PageDown,
                                    ImGuiKey_Enter, ImGuiKey_KeypadEnter})
                 ImGui::SetKeyOwner(key, owner);
         }
-        if (!ids.empty()) {
+        if (!ids.empty() && list_keys) {
             if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) db_row_ = std::min(db_row_ + 1, ids.size() - 1);
             if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && db_row_ > 0) --db_row_;
             if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) db_row_ = std::min(db_row_ + 20, ids.size() - 1);
@@ -1167,7 +1169,7 @@ void App::pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, c
     std::string position_of;
     if (db_search_.position || (db_search_open_ && search_tab_ == 1)) {
         study::ScanBoard board;
-        const auto fen = boardFen();
+        const auto fen = db_search_.position_fen.empty() ? boardFen() : db_search_.position_fen;
         if (board.setFen(fen, board_.chess960)) {
             position    = study::PositionQuery{board};
             position_of = base + "|" + fen;
@@ -1200,6 +1202,49 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("Esc"));
     ImGui::TextDisabled("%s", TR("the list follows it as it goes"));
+    // The searches kept (M1, board 6): a click sets their criteria; the right button renames or deletes one.
+    if (!kept_searches_.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(TR("Kept searches"));
+        std::optional<std::size_t> apply, remove;
+        for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
+            ImGui::PushID(static_cast<int>(i));
+            auto& k = kept_searches_[i];
+            if (static_cast<int>(i) == kept_renaming_) {
+                ImGui::SetNextItemWidth(px(220));
+                if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive()) ImGui::SetKeyboardFocusHere();
+                const bool done = ImGui::InputText("##kept_rename", kept_rename_.data(), kept_rename_.size(),
+                                                   ImGuiInputTextFlags_EnterReturnsTrue);
+                if (done && kept_rename_[0]) {
+                    k.name = kept_rename_.data();
+                    saveKeptSearches();
+                }
+                if (done || ImGui::IsKeyPressed(ImGuiKey_Escape)) kept_renaming_ = -1;
+            } else {
+                const float w = ImGui::CalcTextSize(k.name.c_str()).x + ImGui::GetStyle().FramePadding.x * 2;
+                if (i > 0) ui::sameLineOrWrap(w, px(4));
+                if (ImGui::SmallButton(k.name.c_str())) apply = i;
+                if (ImGui::BeginPopupContextItem("##kept_menu")) {
+                    if (ImGui::MenuItem(TR("Rename"))) {
+                        kept_renaming_ = static_cast<int>(i);
+                        kept_rename_.fill(0);
+                        std::snprintf(kept_rename_.data(), kept_rename_.size(), "%s", k.name.c_str());
+                    }
+                    if (ImGui::MenuItem(TR("Delete"))) remove = i;
+                    ImGui::EndPopup();
+                }
+            }
+            ImGui::PopID();
+        }
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", TR("A click sets its criteria · the right button: rename, delete · in Ctrl+K too"));
+        ImGui::PopTextWrapPos();
+        if (apply) applyKeptSearch(*apply);
+        if (remove) {
+            kept_searches_.erase(kept_searches_.begin() + static_cast<std::ptrdiff_t>(*remove));
+            saveKeptSearches();
+        }
+    }
     // The tabs of the mockup: the headers, the Board page's position, a material, a pattern.
     const char* tabs[] = {TR("Headers"), TR("Position"), TR("Material"), TR("Pattern")};
     if (ImGui::BeginTabBar("##search_tabs")) {
@@ -1299,24 +1344,35 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         BoardDecor decor;
         decor.eval_white = -1.0f;
         decor.flipped    = board_.flip;
-        drawBoard(atlas_, boardAt(board_.game, board_.chess960, board_.ply), size, decor);
+        chess::Board kept;
+        kept.set960(board_.chess960);
+        const bool from_kept = !p.position_fen.empty() && kept.setFen(p.position_fen);
+        drawBoard(atlas_, from_kept ? kept : boardAt(board_.game, board_.chess960, board_.ply), size, decor);
         ImGui::SameLine(0, px(10));
         ImGui::BeginGroup();
-        ImGui::TextUnformatted(TR("The Board page's position"));
-        ImGui::PushTextWrapPos();
-        const auto mover = boardAt(board_.game, board_.chess960, board_.ply).sideToMove() == chess::Color::WHITE
-                               ? TR("White to move")
-                               : TR("Black to move");
-        const auto shown = board_.ply > 0 ? trf("After {}, {}.", boardMoveLabel(board_.ply), mover)
-                                          : trf("The start position, {}.", mover);
-        ImGui::TextDisabled("%s", shown.c_str());
-        ImGui::PopTextWrapPos();
-        if (ImGui::Button(TR("Set up the pieces…"))) {
-            page_ = Page::Board;
-            openPositionEditor();
+        if (from_kept) {
+            ImGui::TextUnformatted(TR("The kept search's position"));
+            if (ImGui::Button(TR("The Board page's position instead"))) p.position_fen.clear();
+            ImGui::EndGroup();
+            status(db_position_job_, TR("The position cannot be searched."), "");
         }
-        ImGui::EndGroup();
-        status(db_position_job_, TR("The position cannot be searched."), "");
+        if (!from_kept) {
+            ImGui::TextUnformatted(TR("The Board page's position"));
+            ImGui::PushTextWrapPos();
+            const auto mover = boardAt(board_.game, board_.chess960, board_.ply).sideToMove() == chess::Color::WHITE
+                                   ? TR("White to move")
+                                   : TR("Black to move");
+            const auto shown = board_.ply > 0 ? trf("After {}, {}.", boardMoveLabel(board_.ply), mover)
+                                              : trf("The start position, {}.", mover);
+            ImGui::TextDisabled("%s", shown.c_str());
+            ImGui::PopTextWrapPos();
+            if (ImGui::Button(TR("Set up the pieces…"))) {
+                page_ = Page::Board;
+                openPositionEditor();
+            }
+            ImGui::EndGroup();
+            status(db_position_job_, TR("The position cannot be searched."), "");
+        }
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("The games that cannot reach it (their pawns, their material) are left out "
                                      "without being replayed."));
@@ -1467,6 +1523,34 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
     if (ImGui::Button(TR("Clear everything"))) {
         p = SearchFields{};
         db_filter_.fill(0);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(TR("Keep this search…"))) {
+        keep_naming_ = true;
+        keep_name_.fill(0);
+        std::snprintf(keep_name_.data(), keep_name_.size(), "%s", keptSearchName(p).c_str());
+    }
+    if (keep_naming_) {
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("Its name"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(std::max(px(160), ImGui::GetContentRegionAvail().x - px(90)));
+        if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive()) ImGui::SetKeyboardFocusHere();
+        const bool enter =
+            ImGui::InputText("##keep_name", keep_name_.data(), keep_name_.size(), ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::SameLine();
+        if ((ImGui::Button(TR("Keep")) || enter) && keep_name_[0]) {
+            auto fields = p;
+            // A position kept is that of the board now, not the board's later.
+            if (fields.position && fields.position_fen.empty()) fields.position_fen = boardFen();
+            kept_searches_.push_back({keep_name_.data(), fields});
+            saveKeptSearches();
+            keep_naming_ = false;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) keep_naming_ = false;
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", TR("Its criteria, not its games: on any database, its new games found next time."));
+        ImGui::PopTextWrapPos();
     }
 }
 

@@ -401,8 +401,25 @@ class App {
             return squares;
         }();
         std::array<bool, 2> only_pawns{};
-        bool damaged = false;  // only the games a move of which could not be read
+        bool damaged = false;      // only the games a move of which could not be read
+        std::string position_fen;  // the position a kept search brought; empty: the Board page's
     };
+    // The searches kept (M1, board 6): their criteria, for every database, in the profile's searches.json.
+    struct KeptSearch {
+        std::string name;
+        SearchFields fields;
+    };
+    std::vector<KeptSearch> kept_searches_;
+    bool keep_naming_ = false;  // the name of the search to keep being written
+    std::array<char, 96> keep_name_{};
+    int kept_renaming_ = -1;
+    std::array<char, 96> kept_rename_{};
+    void loadKeptSearches();
+    void saveKeptSearches();
+    [[nodiscard]] std::string keptSearchName(const SearchFields& fields) const;  // made of its criteria
+    void applyKeptSearch(std::size_t index);
+    [[nodiscard]] static nlohmann::json keptSearchJson(const KeptSearch& kept);
+    [[nodiscard]] static KeptSearch keptSearchFrom(const nlohmann::json& json);
     static constexpr int8_t kEmptySquare = 12;
     SearchFields db_search_;
     int search_tab_    = 0;  // Headers, Position, Material, Pattern

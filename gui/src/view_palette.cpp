@@ -514,6 +514,22 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     add(TR("Home"), TR("Chess"), page(Page::ChessHome));
     add(TR("Databases"), TR("Chess"), page(Page::Databases));
     add(TR("Openings: repertoires"), TR("Chess"), page(Page::Openings));
+    // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
+    for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
+        add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {
+            switchSpace(Space::Chess);
+            page_               = Page::Databases;
+            const auto& entries = shelf().entries();
+            if (db_selected_ < 0 || static_cast<std::size_t>(db_selected_) >= entries.size()) {
+                for (std::size_t e = 0; e < entries.size(); ++e)
+                    if (!entries[e].source) {
+                        db_selected_ = static_cast<int>(e);
+                        break;
+                    }
+            }
+            if (db_selected_ >= 0) applyKeptSearch(i);
+        });
+    }
     const auto ratings_tab = [&](const char* label, int index) {
         add(shown(label), TR("Ratings"), [this, index, go = page(Page::Ratings)] {
             go();

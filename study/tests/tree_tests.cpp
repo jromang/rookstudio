@@ -354,3 +354,30 @@ TEST_CASE("tree: where a line leaves the database, as a recount tells it") {
     CHECK(left > 300);
     MESSAGE("lines leaving the database: ", left, "; earlier than a recount, by a transposition: ", unseen);
 }
+
+TEST_CASE("tree: the games that played a move from a position, as a recount gives them") {
+    auto db = database("tree-with", randomGames(2000, 31, 12));
+    build(*db);
+    const auto snap     = db->snapshot();
+    const auto tree     = Tree::open(db->folder());
+    const auto expected = recount(*snap, TREE_PLIES);
+    uint64_t checked = 0, wrong = 0;
+    for (const auto& [key, e] : expected) {
+        if (e.games.size() < 2) continue;
+        for (const auto& [code, stats] : e.moves) {
+            auto got = tree->gamesWith(*snap, key, code);
+            std::vector<TreeGame> want;
+            for (const auto& g : e.games)
+                if (g.code == code) want.push_back(g);
+            const auto by_id = [](const TreeGame& a, const TreeGame& b) { return a.id < b.id; };
+            std::sort(got.begin(), got.end(), by_id);
+            std::sort(want.begin(), want.end(), by_id);
+            if (got != want) ++wrong;
+            ++checked;
+        }
+        // A move nobody played there.
+        if (tree->gamesWith(*snap, key, 250).size() != 0) ++wrong;
+    }
+    CHECK(wrong == 0);
+    CHECK(checked > 1000);
+}

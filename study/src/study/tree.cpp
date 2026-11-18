@@ -910,6 +910,45 @@ std::vector<TreeGame> Tree::gamesAt(const Snapshot& snapshot, uint64_t key) cons
     return out;
 }
 
+std::vector<TreeGame> Tree::gamesWith(const Snapshot& snapshot, uint64_t key, int code) const {
+    std::vector<TreeGame> out;
+    const auto r = record(key);
+    if (!r || snapshot.games() < games_) return out;
+    const auto idAt   = [&](uint64_t j) -> GameId { return load<uint32_t>(order_.data() + HEADER + j * 4); };
+    const auto codeOf = [&](uint64_t j, uint32_t depth) {
+        const auto m = snapshot.gameMoves(idAt(j));
+        return codeAt(m.codes, m.plies, depth, r->wide);
+    };
+    for (const auto& run : r->runs) {
+        uint64_t lo = run.start, hi = run.start + run.count;
+        if (run.count > 1 && !r->wide) {
+            // Sorted by the next move within the run: the first game with `code`, then the first after them.
+            uint64_t a = lo, b = hi;
+            while (a < b) {
+                const uint64_t mid = a + (b - a) / 2;
+                if (codeOf(mid, run.depth) < code)
+                    a = mid + 1;
+                else
+                    b = mid;
+            }
+            uint64_t c2 = a, d = hi;
+            while (c2 < d) {
+                const uint64_t mid = c2 + (d - c2) / 2;
+                if (codeOf(mid, run.depth) <= code)
+                    c2 = mid + 1;
+                else
+                    d = mid;
+            }
+            lo = a;
+            hi = c2;
+        }
+        for (uint64_t j = lo; j < hi; ++j)
+            if (run.count > 1 && !r->wide ? true : codeOf(j, run.depth) == code)
+                out.push_back({idAt(j), run.depth, code});
+    }
+    return out;
+}
+
 std::optional<uint32_t> Tree::novelty(const Snapshot& snapshot, const ScanBoard& start,
                                       std::span<const int> line) const {
     if (!record(start.key())) return 0;

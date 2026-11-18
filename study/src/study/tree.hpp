@@ -91,6 +91,9 @@ class Tree {
     [[nodiscard]] std::optional<TreeAnswer> at(const Snapshot& snapshot, uint64_t key) const;
     // Those games, in the order of their moves.
     [[nodiscard]] std::vector<TreeGame> gamesAt(const Snapshot& snapshot, uint64_t key) const;
+    // Those that played `code` from the position (TreeMove::END: those that end there): found by halving, the games
+    // of a move order being in the order of their next moves, so a move from the start costs little.
+    [[nodiscard]] std::vector<TreeGame> gamesWith(const Snapshot& snapshot, uint64_t key, int code) const;
 
     // Where a line leaves the database: the first ply after which no game reaches the line's position in its first
     // plies(), as far as the tree tells it. The line is its moves' codes on the boards from `start`

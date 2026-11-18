@@ -916,8 +916,11 @@ void App::clearRunView() {
     }
 
     const auto& info = run_->info();
-    sprt_.reset();
-    if (info.sprt) sprt_.emplace(info.alpha, info.beta, info.elo0, info.elo1, info.model, true);
+    // Not reset() then emplace(): gcc 15 then takes the string emplace() destroys for one never made.
+    if (info.sprt)
+        sprt_.emplace(info.alpha, info.beta, info.elo0, info.elo1, info.model, true);
+    else
+        sprt_.reset();
     // The openings it replaced before it was opened are in its results already.
     openings_replaced_seen_ = run_->tournament() ? run_->tournament()->openingsReplaced() : 0;
     network_voids_seen_     = run_->tournament() ? run_->tournament()->networkVoids() : 0;

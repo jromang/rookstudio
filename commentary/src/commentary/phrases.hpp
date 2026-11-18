@@ -121,11 +121,11 @@ std::vector<std::string> reasons(std::span<const Fact> why, Would would, By by) 
     std::optional<std::string> gain;
     if (wins && isMechanism(*top)) gain = would(*wins);
     // The piece a tactic is about is the piece won: said once, as the gain when the tactic only takes it, as the tactic
-    // when it traps it.
-    const std::optional<Placed> won = wins ? std::get<fact::WinsMaterial>(*wins).taken : std::nullopt;
-    if (const auto* t = std::get_if<fact::Trapped>(top); t && won == t->piece) return {said};
-    if (const auto* h = std::get_if<fact::Hanging>(top); h && won == h->piece) return {said};
-    if (const auto* r = std::get_if<fact::RemovesDefender>(top); r && won == r->defender) {
+    // when it traps it. (Compared in place: a copy of `taken` makes gcc 14 warn of a payload "maybe uninitialized".)
+    const auto won = [&](const Placed& p) { return wins && std::get<fact::WinsMaterial>(*wins).taken == p; };
+    if (const auto* t = std::get_if<fact::Trapped>(top); t && won(t->piece)) return {said};
+    if (const auto* h = std::get_if<fact::Hanging>(top); h && won(h->piece)) return {said};
+    if (const auto* r = std::get_if<fact::RemovesDefender>(top); r && won(r->defender)) {
         if (gain) return {*gain};
         return {};
     }

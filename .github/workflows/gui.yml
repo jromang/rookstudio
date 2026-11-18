@@ -35,9 +35,10 @@ concurrency:
 jobs:
   linux:
     name: Linux build and tests
-    # Ubuntu 24.04: the binary needs its glibc, 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40, RHEL 10 and later).
-    # fastchess-gui's own job stays on 22.04 (2.35): keep this one when merging it.
-    runs-on: ubuntu-24.04
+    # Ubuntu 26.04 and gcc 15, though the program runs on glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39,
+    # RHEL 10 and later): cmake/glibc_floor.h, which a step checks. fastchess-gui's own job stays on 22.04: keep this
+    # one when merging it.
+    runs-on: ubuntu-26.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 500M
@@ -62,47 +63,32 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build ccache g++-14 \
+          sudo apt-get install -y --no-install-recommends ninja-build ccache g++-15 \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
             libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev \
             libdrm-dev libgbm-dev libdbus-1-dev libudev-dev libpipewire-0.3-dev libpulse-dev libasound2-dev
 
-      - name: The Vulkan SDK
+      - name: Vulkan
         # The assistant's GPU backend, for a release and on demand: its shaders take minutes that no cache keeps.
-        # Ubuntu 24.04's glslc (shaderc 2023.8) knows neither the integer dot product nor NVIDIA's cooperative matrices
-        # 2, which ggml's faster shaders need (commentary-v11 measured: comments 20 % slower on a small integrated GPU,
-        # 4 % on a large NVIDIA one): LunarG's SDK, the release whose headers the Windows build fetches, of which
-        # glslc, the headers (SPIRV-Headers' CMake package too, which ggml asks for) and the loader to link with are
-        # kept.
+        # Ubuntu 26.04's glslc (shaderc 2026.1) knows the extensions of ggml's faster shaders, all but two of the
+        # newest: NVIDIA's vector decoding for cooperative matrices and FP4 (commentary-v11 on an RTX 5080: prompts
+        # 4 to 7 % slower than with LunarG's SDK, a comment 0.5 %). With the headers, ggml's SPIRV-Headers and the
+        # loader to link with.
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        env:
-          SDK: 1.4.363.0
-          SDK_SHA256: 197962f5cbf80baf2775a03336a01cee7c8745686c65aaa70d3f751ade4d7e43
-        run: |
-          curl -sSfL --retry 5 -o "$RUNNER_TEMP/vulkan-sdk.tar.xz" \
-            "https://sdk.lunarg.com/sdk/download/$SDK/linux/vulkansdk-linux-x86_64-$SDK.tar.xz"
-          echo "$SDK_SHA256  $RUNNER_TEMP/vulkan-sdk.tar.xz" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/vulkan-sdk"
-          tar -xJf "$RUNNER_TEMP/vulkan-sdk.tar.xz" -C "$RUNNER_TEMP/vulkan-sdk" --strip-components=1 --wildcards \
-            '*/x86_64/bin/glslc' '*/x86_64/include/*' '*/x86_64/lib/VulkanLoader/lib/libvulkan.so*' \
-            '*/x86_64/share/cmake/SPIRV-Headers/*'
-          rm "$RUNNER_TEMP/vulkan-sdk.tar.xz"
-          # The loader where CMake looks for it ($VULKAN_SDK/lib).
-          mv "$RUNNER_TEMP"/vulkan-sdk/x86_64/lib/VulkanLoader/lib/libvulkan.so* "$RUNNER_TEMP/vulkan-sdk/x86_64/lib/"
-          echo "VULKAN_SDK=$RUNNER_TEMP/vulkan-sdk/x86_64" >> "$GITHUB_ENV"
+        run: sudo apt-get install -y --no-install-recommends glslc libvulkan-dev spirv-headers
 
       - name: Compiler cache
         # What the last runs compiled (the dependencies above all): only what changed is compiled again.
         uses: actions/cache/restore@v6
         with:
           path: .ccache
-          key: ccache-linux-noble-${{ github.run_id }}
-          restore-keys: ccache-linux-noble-
+          key: ccache-linux-resolute-${{ github.run_id }}
+          restore-keys: ccache-linux-resolute-
 
       - name: Configure
         env:
-          CC: gcc-14
-          CXX: g++-14
+          CC: gcc-15
+          CXX: g++-15
           VULKAN: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && 'ON' || 'OFF' }}
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCG_STATIC_RUNTIME=ON -DFCG_ASSISTANT_VULKAN=${VULKAN}
 
@@ -119,7 +105,16 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .ccache
-          key: ccache-linux-noble-${{ github.run_id }}
+          key: ccache-linux-resolute-${{ github.run_id }}
+
+      - name: The glibc the program asks for
+        # README.md's 2.38: a function a newer glibc gave a new version, left out of cmake/glibc_floor.h, or one new
+        # since, would ask for more.
+        run: |
+          files="build/fastchess-gui build/fastchess $(find build -maxdepth 1 -name '*.so' | sort)"
+          echo "Newest version asked for: $(objdump -T $files | grep -oE 'GLIBC_2\.[0-9]+' | sort -uV | tail -1)"
+          newer=$(objdump -T $files | grep -E 'GLIBC_2\.(39|[4-9][0-9])\b' || true)
+          if [ -n "$newer" ]; then echo "Newer than glibc 2.38:"; echo "$newer"; exit 1; fi
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py): they mostly wait, so two per
@@ -150,7 +145,7 @@ jobs:
 
   sanitizers:
     name: Linux tests with AddressSanitizer and UBSan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 500M
@@ -176,7 +171,7 @@ jobs:
         # clang 23 from LLVM's archive, as for the fuzzers: everything instrumented compiles in a third of gcc's time.
         run: |
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
-          echo "deb https://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" | sudo tee /etc/apt/sources.list.d/llvm-23.list
+          echo "deb https://apt.llvm.org/resolute/ llvm-toolchain-resolute-23 main" | sudo tee /etc/apt/sources.list.d/llvm-23.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ninja-build ccache clang-23 libclang-rt-23-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
@@ -192,8 +187,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .ccache
-          key: ccache-sanitizers-${{ github.run_id }}
-          restore-keys: ccache-sanitizers-
+          key: ccache-sanitizers-resolute-${{ github.run_id }}
+          restore-keys: ccache-sanitizers-resolute-
 
       - name: Configure
         # Everything instrumented, the dependencies too; the test engines the tests start as well. Without the
@@ -222,7 +217,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .ccache
-          key: ccache-sanitizers-${{ github.run_id }}
+          key: ccache-sanitizers-resolute-${{ github.run_id }}
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py), one per processor: instrumented,
@@ -249,7 +244,7 @@ jobs:
 
   windows-build:
     name: Windows cross-build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 500M
@@ -278,7 +273,9 @@ jobs:
 
       - name: glslc
         # The assistant's GPU backend, for a release and on demand: its shaders, compiled by the host's glslc, take
-        # minutes that no cache keeps. The Vulkan headers and loader library for Windows are made by the build.
+        # minutes that no cache keeps. Ubuntu 26.04's (shaderc 2026.1) knows the extensions of ggml's faster shaders
+        # but the two newest (see the Linux job's). The Vulkan headers and loader library for Windows are made by the
+        # build.
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: sudo apt-get install -y --no-install-recommends glslc
 
@@ -287,8 +284,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .ccache
-          key: ccache-windows-${{ github.run_id }}
-          restore-keys: ccache-windows-
+          key: ccache-windows-resolute-${{ github.run_id }}
+          restore-keys: ccache-windows-resolute-
 
       - name: Configure
         env:
@@ -310,7 +307,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .ccache
-          key: ccache-windows-${{ github.run_id }}
+          key: ccache-windows-resolute-${{ github.run_id }}
 
       - uses: actions/upload-artifact@v7
         with:

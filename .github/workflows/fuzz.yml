@@ -18,7 +18,7 @@ concurrency:
 jobs:
   fuzz:
     name: libFuzzer, every target at once
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 500M
@@ -44,7 +44,7 @@ jobs:
         # clang 23 from LLVM's own archive (Ubuntu 24.04 ships 18), the version the fuzzers are written against.
         run: |
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
-          echo "deb https://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" | sudo tee /etc/apt/sources.list.d/llvm-23.list
+          echo "deb https://apt.llvm.org/resolute/ llvm-toolchain-resolute-23 main" | sudo tee /etc/apt/sources.list.d/llvm-23.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ninja-build ccache clang-23 libclang-rt-23-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
@@ -60,8 +60,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .ccache
-          key: ccache-fuzz-${{ github.run_id }}
-          restore-keys: ccache-fuzz-
+          key: ccache-fuzz-resolute-${{ github.run_id }}
+          restore-keys: ccache-fuzz-resolute-
 
       - name: Configure
         env:

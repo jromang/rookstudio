@@ -48,6 +48,8 @@ endif()
 
 if(FCG_STATIC_RUNTIME AND NOT WIN32 AND NOT APPLE)
     add_link_options(-static-libstdc++ -static-libgcc)
+    # The release, built on a newer glibc, runs on glibc 2.38 (cmake/glibc_floor.h): the dependencies' sources too.
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-include${CMAKE_CURRENT_SOURCE_DIR}/cmake/glibc_floor.h>")
 endif()
 
 # Fuzzing: every library instrumented for libFuzzer's coverage and the sanitizers, the fuzz targets (at the end)
@@ -380,6 +382,9 @@ if(FCG_ASSISTANT)
                 endif()
             endforeach()
         endif()
+        # MinGW-w64 13's headers check printf's formats against msvcrt's, which knows no %zu, though the calls go
+        # to MinGW's own printf, which does: the warnings of ggml's messages are left out (Mbed TLS's too, below).
+        target_compile_options(ggml-base PRIVATE -Wno-format)
     endif()
 
     # llama.cpp's Jinja engine, which renders a model's chat template as the fine-tuning library did, compiled here
@@ -388,8 +393,9 @@ if(FCG_ASSISTANT)
     add_library(fcg_jinja STATIC ${FCG_JINJA_SOURCES} ${llama_SOURCE_DIR}/common/json.cpp
                                  ${llama_SOURCE_DIR}/common/unicode.cpp)
     target_compile_features(fcg_jinja PUBLIC cxx_std_17)
-    target_include_directories(fcg_jinja PUBLIC ${llama_SOURCE_DIR}/common
-                                         PRIVATE ${llama_SOURCE_DIR}/vendor)
+    # SYSTEM: what gcc finds in its headers (static functions a source including them leaves unused) is llama.cpp's.
+    target_include_directories(fcg_jinja SYSTEM PUBLIC ${llama_SOURCE_DIR}/common
+                                                PRIVATE ${llama_SOURCE_DIR}/vendor)
     target_link_libraries(fcg_jinja PUBLIC ggml)
     set_target_properties(fcg_jinja PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -530,6 +536,10 @@ if(FCG_BUILD_GUI)
         CACHE FILEPATH "" FORCE)
     set(LINK_WITH_PTHREAD ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(mbedtls)
+    if(MINGW)
+        # Its %zu, which MinGW's printf knows though MinGW-w64 13's headers check it against msvcrt's (see ggml's).
+        target_compile_options(mbedtls PRIVATE -Wno-format)
+    endif()
 
     # SSH for the web page's tunnel: libssh2 (BSD-3-Clause), compiled here with a cryptography backend of our own on
     # Mbed TLS 4's PSA API (gui/libssh2-psa): its released versions do not build with Mbed TLS 4. A commit of its

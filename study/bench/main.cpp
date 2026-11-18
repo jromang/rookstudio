@@ -7,6 +7,7 @@
 //   fcg-study-bench crash <games> <database> [--kills N]          (not on Windows)
 //   fcg-study-bench tree <database> [--threads N] [--plies N] [--memory MB]
 //   fcg-study-bench search <database> [--threads N]
+//   fcg-study-bench repertoire <database> <repertoire.pgn> white|black   (the database's tree built before)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -25,7 +26,9 @@
 #include <chess.hpp>
 
 #include <study/import.hpp>
+#include <study/pgn_reader.hpp>
 #include <study/query.hpp>
+#include <study/repertoire.hpp>
 #include <study/scan_board.hpp>
 #include <study/search.hpp>
 #include <study/store.hpp>
@@ -668,6 +671,58 @@ int runSearch(const Args& a) {
     return 0;
 }
 
+// A repertoire's coverage of the database's games, from its tree: the time it takes, and its gaps.
+int runRepertoire(const Args& a) {
+    if (a.words.size() != 4 || (a.words[3] != "white" && a.words[3] != "black")) return 2;
+    auto db         = Database::open(a.words[1]);
+    const auto snap = db->snapshot();
+    const auto tree = Tree::open(db->folder());
+    if (!tree || tree->stale(*snap)) {
+        std::fprintf(stderr, "repertoire: no tree for this database (fcg-study-bench tree)\n");
+        return 1;
+    }
+    std::string text;
+    {
+        std::FILE* f = std::fopen(a.words[2].c_str(), "rb");
+        if (!f) {
+            std::fprintf(stderr, "repertoire: cannot read %s\n", a.words[2].c_str());
+            return 1;
+        }
+        char buffer[65536];
+        for (std::size_t n; (n = std::fread(buffer, 1, sizeof buffer, f)) > 0;) text.append(buffer, n);
+        std::fclose(f);
+    }
+    const auto read = readPgnGame(text);
+    if (!read.tree) {
+        std::fprintf(stderr, "repertoire: no game in %s (%s)\n", a.words[2].c_str(), read.error.c_str());
+        return 1;
+    }
+    const auto side = a.words[3] == "white" ? chess::Color::WHITE : chess::Color::BLACK;
+    auto start      = Clock::now();
+    const Repertoire rep(*read.tree, side);
+    const double map = ms(start);
+    const auto moves = treeMoves({{snap, tree}});
+    for (const char* walk : {"first", "again"}) {
+        start             = Clock::now();
+        const auto cover  = coverage(rep, moves);
+        const double took = ms(start);
+        std::printf(
+            "repertoire (%s): %zu positions (%.1f ms), %zu in the database; covered %.1f %% in %.1f ms; %zu gaps\n",
+            walk, cover.positions, map, cover.known, 100 * cover.covered, took, cover.gaps.size());
+        if (std::string_view(walk) == "first") continue;
+        for (std::size_t i = 0; i < cover.gaps.size() && i < 15; ++i) {
+            const auto& g = cover.gaps[i];
+            std::string line;
+            for (std::size_t p = 0; p < g.line.size(); ++p)
+                line += (p % 2 == 0 ? std::to_string(p / 2 + 1) + "." : "") + g.line[p] + " ";
+            std::printf("  %5.1f %% of the games, %8llu: %s%s\n", 100 * g.reach,
+                        static_cast<unsigned long long>(g.games), line.c_str(),
+                        g.move.empty() ? "(no move of ours)" : ("-> " + g.move).c_str());
+        }
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -683,6 +738,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "decode") rc = runDecode(a);
         if (a.words[0] == "tree") rc = runTree(a);
         if (a.words[0] == "search") rc = runSearch(a);
+        if (a.words[0] == "repertoire") rc = runRepertoire(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

@@ -190,6 +190,23 @@ cross many move orders, a fifth of the novelties came earlier than a recount for
   threads), a smaller database seconds. Until a new build is done, the tree answers for the games it covers
   (`Tree::games()`).
 
+## Repertoire
+
+A repertoire is a game and its variations (a PGN the Board page edits like any game), the lines of one colour.
+`Repertoire` finds its positions by their Polyglot keys, so that two move orders that reach one position give it the
+moves of both, and keeps where its lines first reach each one: a move marked in the opening tree is added there
+(`addMove`), whatever order the board came by.
+
+`coverage` follows its moves from the start and, at each position where the opponent moves, weighs the moves the
+databases' games played there (their trees summed, `treeMoves`): those it answers, and those played often enough (10
+games and 2 % of the position's, by default) that it does not, its gaps. The end of a line after the opponent's move
+is a gap when the games go on from there; after one of its own moves, it is where its owner stopped preparing, unless a
+depth is asked for. Its own choices count alike, the opponent's moves as often as the games played them: how often a
+game along the repertoire comes to each gap, by which the gaps are listed.
+
+Measured on the reference database's tree: a White repertoire of 84 positions, covering 57.9 % of the games along it,
+42 gaps, in 137 ms the first time (the tree's pages read from the disk) and 0.4 ms after.
+
 ## Beside the tournaments
 
 A thread that calls `enterBackground()` runs at the lowest priority (a niceness of 19 on Linux, the lowest thread

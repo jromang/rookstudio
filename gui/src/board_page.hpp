@@ -16,6 +16,7 @@
 #include <json.hpp>
 #include <types/score.hpp>
 
+#include <study/game_tree.hpp>
 #include <tour/pgn_index.hpp>
 
 #include "analysis.hpp"
@@ -66,19 +67,11 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BoardSettings, analysis, arrows,
                                                 game_second, first_clock, second_clock, same_clock, game_pair,
                                                 game_human, graph)
 
-// The position after the first `ply` moves of `game` (its start position for 0). The moves were checked when the game
-// was read or played.
-[[nodiscard]] chess::Board boardAt(const ReplayGame& game, bool chess960, int ply);
-
 // The same, for the analysis engine: the start position and the moves to it.
 [[nodiscard]] AnalysisPosition analysisPosition(const ReplayGame& game, bool chess960, int ply);
 
 // A score from the side to move's point of view, from White's.
 [[nodiscard]] fastchess::Score whiteScore(const fastchess::Score& score, chess::Color side_to_move);
-
-// Plays `move` on the game after its first `ply` moves: the game's next move when it is that one, otherwise the moves
-// after `ply` give way to it. Returns the new ply.
-int playOnGame(ReplayGame& game, bool chess960, int ply, chess::Move move);
 
 // The Syzygy tablebases' result of each position of `game` (the side to move's: 1 win, 0 draw, -1 loss, -2 not
 // known), with the tables of the folders `paths` (fastchess' probing code, whose tables are the process's: loaded
@@ -92,24 +85,6 @@ int playOnGame(ReplayGame& game, bool chess960, int ply, chess::Move move);
 // Each move's mover's clock after it: from its [%clk] when the game has them, else rebuilt from the TimeControl tag
 // ("base+increment" in seconds, or "base") and the moves' times, book moves taking none; nullopt where neither tells.
 [[nodiscard]] std::vector<std::optional<int64_t>> moveClocks(const ReplayGame& game);
-
-// The moves of a line from the start: the game's (-1), or a variation's after those of its parents up to where it
-// starts. Its tags are the game's.
-[[nodiscard]] ReplayGame lineOf(const GameTree& tree, int line);
-// The line that holds the move after position `ply` of `line`: the line itself, or a parent when `ply` is before the
-// line starts.
-[[nodiscard]] int ownerOf(const GameTree& tree, int line, int ply);
-// The position of the game that a line leaves it at (its own start, or its first parent's); the line's ply for the
-// game itself.
-[[nodiscard]] int branchPly(const GameTree& tree, int line, int ply);
-// Plays `move` after position `ply` of `line`: the line's next move when it is that one, a variation from there that
-// starts with it, else a new variation; at the end of a line, the line grows. The line and ply shown after.
-std::pair<int, int> playInTree(GameTree& tree, bool chess960, int line, int ply, chess::Move move);
-// Removes a variation and those branching from it. Returns its parent, as numbered after the removal.
-int removeVariation(GameTree& tree, int line);
-// The variation becomes the line it branches from, whose moves after it become the variation: those branching from
-// either follow their moves. Returns that line.
-int promoteVariation(GameTree& tree, int line);
 
 // The legal moves of the piece on `from`, the target squares as the board shows them (castling on the king's square).
 [[nodiscard]] std::vector<chess::Move> movesFrom(const chess::Board& board, chess::Square from);

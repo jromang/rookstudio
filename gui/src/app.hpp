@@ -47,6 +47,7 @@
 #include "profiles.hpp"
 #include "qr.hpp"
 #include "remote_run.hpp"
+#include "repertoires.hpp"
 #include "run.hpp"
 #include "stats.hpp"
 #include "storage.hpp"
@@ -288,6 +289,31 @@ class App {
     std::vector<study::GameId> db_position_;  // the games it found, sorted
     bool db_position_ready_ = false;
     void drawOpeningsPage();  // the repertoires (the tournament's Openings tab is drawOpenings)
+    // The repertoires (repertoires.hpp): the star of the Board page's tree, the Openings page (view_openings.cpp).
+    RepertoireShelf& repertoires();
+    std::unique_ptr<RepertoireShelf> repertoires_;
+    struct StarUndo {
+        std::size_t index = 0;
+        GameTree lines;
+        std::string said;
+        double at = 0;
+    };
+    std::optional<StarUndo> star_undo_;  // the last star's change, undone by its toast
+    struct CoverageJob {
+        std::string of;
+        std::future<study::Coverage> done;
+    };
+    std::optional<CoverageJob> coverage_job_;
+    std::optional<study::Coverage> coverage_;
+    std::string coverage_of_;
+    int coverage_depth_ = 0;  // 0 the ends of the lines, 1 move 10, 2 move 15
+    bool rep_naming_    = false;
+    std::array<char, 64> rep_name_{};
+    int rep_side_ = 0;  // the new repertoire's colour: 0 White, 1 Black
+    // The Board page's line to a position: from the start (the repertoires' start), none when it starts elsewhere.
+    [[nodiscard]] std::optional<std::vector<chess::Move>> boardPath() const;
+    // A line of moves from the start (SAN) shown on the board, at its end, the tree beside it.
+    void showLineOnBoard(const std::vector<std::string>& line, const std::string& title);
     Space space_       = Space::Engines;
     Page engines_page_ = Page::Home;  // the page each space comes back to
     Page chess_page_   = Page::ChessHome;

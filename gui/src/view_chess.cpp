@@ -103,9 +103,4 @@ void App::drawChessHome() {
     ui::endCard();
 }
 
-void App::drawOpeningsPage() {
-    ui::pageTitle(TR("Openings"), guideSection());
-    ImGui::TextDisabled("%s", TR("No repertoire yet."));
-}
-
 }  // namespace fcg

@@ -209,12 +209,22 @@ void App::drawBoardTree() {
     }
     ImGui::TextUnformatted(tree_summary_.c_str());
 
+    // The star of the active repertoire: a move of it, added or taken out by a click (any side to move).
+    const auto path  = boardPath();
+    auto& reps       = repertoires();
+    const int active = reps.active();
+    const auto mover = boardAt(b.game, b.chess960, b.ply).sideToMove();
+    const auto now   = ImGui::GetTime();
+    std::optional<chess::Move> star;
+
     // The moves: a click plays one.
     std::optional<chess::Move> play;
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
-    const int columns    = tree_book_ ? 2 : 8;
-    if (!tree_rows_.empty() && ImGui::BeginTable("##tree_rows", columns, flags, ImVec2(0, 0))) {
+    const int columns    = tree_book_ ? 3 : 9;
+    const float toast_h  = star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
+    if (!tree_rows_.empty() && ImGui::BeginTable("##tree_rows", columns, flags, ImVec2(0, -toast_h))) {
         ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
         ImGui::TableSetupColumn(TR("Move"));
         if (tree_book_) {
             ImGui::TableSetupColumn(TR("Weight"), ImGuiTableColumnFlags_WidthStretch);
@@ -233,7 +243,19 @@ void App::drawBoardTree() {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::PushID(static_cast<int>(r));
-            if (ImGui::Selectable(row.san.c_str(), false, ImGuiSelectableFlags_SpanAllColumns)) play = row.move;
+            if (path) {
+                const bool in = active >= 0 && reps.has(static_cast<std::size_t>(active), *path, row.move);
+                const auto at = ImGui::GetCursorScreenPos();
+                const float h = ImGui::GetTextLineHeight();
+                if (ImGui::InvisibleButton("##repertoire_star", ImVec2(h, h))) star = row.move;
+                ui::drawIcon(ImGui::GetWindowDrawList(), ui::Icon::Star, ImVec2(at.x + h * 0.5f, at.y + h * 0.5f), h,
+                             in ? ui::WARN : (ImGui::IsItemHovered() ? ImGui::GetColorU32(ImGuiCol_Text) : ui::MUTED));
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", in ? TR("In the active repertoire: a click takes it out")
+                                               : TR("A click adds it to the active repertoire"));
+            }
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable(row.san.c_str(), false)) play = row.move;
             ImGui::PopID();
             ImGui::TableNextColumn();
             if (tree_book_) {
@@ -273,6 +295,24 @@ void App::drawBoardTree() {
             ImGui::TableNextColumn();
         }
         ImGui::EndTable();
+    }
+    if (star && path) {
+        const auto index = active >= 0 ? static_cast<std::size_t>(active) : reps.activeOrNew(mover);
+        auto before      = reps.entries()[index].lines;
+        const auto board = boardAt(b.game, b.chess960, b.ply);
+        const auto san   = chess::uci::moveToSan(board, *star);
+        const bool added = reps.toggle(index, *path, *star);
+        star_undo_       = StarUndo{
+            index, std::move(before),
+            trf(added ? TR("{} added to « {} »") : TR("{} taken out of « {} »"), san, reps.entries()[index].name), now};
+    }
+    if (star_undo_ && now - star_undo_->at < 8) {
+        ImGui::TextUnformatted(star_undo_->said.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Undo"))) {
+            repertoires().restore(star_undo_->index, std::move(star_undo_->lines));
+            star_undo_.reset();
+        }
     }
     if (play) boardPlay(*play);
 }

@@ -58,7 +58,13 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
     if (const auto db = s.open(static_cast<std::size_t>(index))) start.games = db->snapshot()->games();
     start.bytes = s.facts(static_cast<std::size_t>(index)).bytes;
     if (!s.startImport(static_cast<std::size_t>(index), file)) {
-        db_message_ = s.import() ? TR("An import runs already: one at a time.") : s.facts(index).error;
+        const auto facts = s.facts(index);
+        db_message_      = s.import() ? TR("An import runs already: one at a time.")
+                           : facts.read_only
+                               ? trf("« {} » is read-only while another program writes to it: import into it once it "
+                                     "has finished.",
+                                     s.entries()[static_cast<std::size_t>(index)].name)
+                               : facts.error;
     } else {
         db_message_.clear();
         db_outcome_.reset();
@@ -90,6 +96,7 @@ void App::pasteGamesInto(int index) {
 void App::pollDatabases() {
     if (!shelf_) return;
     shelf_->pollTreeJob();
+    shelf_->keepReadOnlyCurrent();
     const auto* job = shelf_->import();
     if (!job) return;
     const auto file  = job->file.filename().string();
@@ -419,6 +426,22 @@ void App::drawDatabases() {
     }
     ImGui::Dummy(ImVec2(0, px(6)));
 
+    // Read-only (M1, board 4): another program writes to it.
+    if (facts.read_only) {
+        ui::beginCard("db_read_only");
+        ImGui::PushTextWrapPos();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           trf("« {} » is open read-only.", entries[index].name).c_str());
+        ImGui::TextUnformatted(TR("Another program writes to it: another RookStudio importing, for instance."));
+        ImGui::TextDisabled("%s",
+                            TR("The list, the tree and the searches work; importing and saving games into it wait "
+                               "until it has finished. The database takes in what that program commits as it "
+                               "goes, and is written here again once it lets it go."));
+        ImGui::PopTextWrapPos();
+        ui::endCard();
+        ImGui::Dummy(ImVec2(0, px(6)));
+    }
+
     // The last import's outcome; or, a database of its own with no game, what to put in it (M1, board 4).
     if (db_outcome_ && db_outcome_->folder == entries[index].folder) {
         drawImportOutcome(index);
@@ -556,6 +579,11 @@ bool App::saveBoardToDatabase() {
         if (s.entries()[i].folder != board_origin_->folder) continue;
         const auto db = s.open(i);
         if (!db) return false;
+        if (db->readOnly()) {
+            boardToast(trf("« {} » is read-only for now, another program writes to it: the game stays changed here.",
+                           board_origin_->name));
+            return true;
+        }
         study::ImportedGame game;
         if (!study::readImportedGame(gamePgn(board_.tree, board_.chess960), game)) return false;
         const auto id = board_origin_->id;

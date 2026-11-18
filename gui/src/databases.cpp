@@ -269,7 +269,12 @@ std::shared_ptr<study::Database> DatabaseShelf::open(std::size_t index) {
                 links_[index].db = study::LinkedDatabase::open(profile_ / "cache" / "linked", *source);
                 open_[index]     = links_[index].db->database();
             } else {
-                open_[index] = study::Database::open(entries_[index].folder);
+                try {
+                    open_[index] = study::Database::open(entries_[index].folder);
+                } catch (const tour::FolderBusy&) {
+                    // Another program writes to it (another RookStudio importing): read as it commits.
+                    open_[index] = study::Database::openReadOnly(entries_[index].folder);
+                }
             }
         } catch (const std::exception& e) {
             errors_[index] = e.what();
@@ -288,8 +293,9 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
     }
     const auto snapshot = db->snapshot();
     auto& cached        = facts_[index];
-    if (cached.generation == snapshot->generation()) return cached.facts;
-    out.games = snapshot->games() - snapshot->deletedCount();
+    if (cached.generation == snapshot->generation() && cached.facts.read_only == db->readOnly()) return cached.facts;
+    out.read_only = db->readOnly();
+    out.games     = snapshot->games() - snapshot->deletedCount();
     out.names = snapshot->names();
     out.bytes = folderBytes(entries_[index].folder);
     try {
@@ -327,7 +333,7 @@ std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t i
 bool DatabaseShelf::startImport(std::size_t index, const fs::path& file) {
     if (import_ || index >= entries_.size() || entries_[index].source) return false;
     const auto db = open(index);
-    if (!db) return false;
+    if (!db || db->readOnly()) return false;
     import_          = std::make_unique<Import>();
     import_->index   = index;
     import_->file    = file;
@@ -359,8 +365,30 @@ void DatabaseShelf::cancelImport() {
     if (import_) import_->cancel = true;
 }
 
+void DatabaseShelf::keepReadOnlyCurrent() {
+    const auto now  = std::chrono::steady_clock::now();
+    const bool read = now - read_only_read_ >= std::chrono::seconds(2);
+    const bool try_ = now - read_only_tried_ >= std::chrono::seconds(5);
+    if (!read && !try_) return;
+    if (read) read_only_read_ = now;
+    if (try_) read_only_tried_ = now;
+    for (std::size_t i = 0; i < open_.size() && i < entries_.size(); ++i) {
+        if (!open_[i] || !open_[i]->readOnly() || entries_[i].source) continue;
+        if (try_) {
+            try {
+                open_[i] = study::Database::open(entries_[i].folder);  // let go: written again here
+                trees_.erase(entries_[i].folder);
+                continue;
+            } catch (const std::exception&) {
+            }
+        }
+        if (read && open_[i]->refresh()) trees_.erase(entries_[i].folder);
+    }
+}
+
 void DatabaseShelf::rebuildTree(std::size_t index) {
     if (index >= entries_.size() || entries_[index].source) return;
+    if (const auto db = open(index); !db || db->readOnly()) return;  // the other program builds it
     if (import_ || tree_job_) {  // after it: a build running started from the snapshot before this edit
         tree_again_ = index;
         return;

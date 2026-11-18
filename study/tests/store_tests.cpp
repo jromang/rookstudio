@@ -307,3 +307,45 @@ TEST_CASE("store: a file imported into a database, committed as it goes; cancell
     CHECK(got.added >= 50);
     CHECK(got.added < 120);
 }
+
+TEST_CASE("store: a database another program writes, read as it commits, nothing written") {
+    const auto games = fixtureGames();
+    const auto dir   = freshFolder("store-read-only.fcgdb");
+    auto writer      = Database::create(dir);
+    writer->append(std::vector<ImportedGame>(games.begin(), games.begin() + 30));
+    CHECK_FALSE(writer->readOnly());
+    CHECK_FALSE(writer->refresh());  // the writer's snapshot is always current
+
+    auto reader = Database::openReadOnly(dir);
+    CHECK(reader->readOnly());
+    CHECK(reader->snapshot()->games() == 30);
+    CHECK_FALSE(reader->refresh());  // nothing committed since
+
+    // What the writer is writing, not committed yet, stays: the reader opening or refreshing clears nothing.
+    fs::create_directories(dir / "seg-000099");
+    std::ofstream(dir / "seg-000099" / "cols.bin") << "under way";
+    std::ofstream(dir / "manifest.json.tmp") << "{";
+    auto second = Database::openReadOnly(dir);
+    CHECK(fs::exists(dir / "seg-000099" / "cols.bin"));
+    CHECK(fs::exists(dir / "manifest.json.tmp"));
+    fs::remove_all(dir / "seg-000099");
+    fs::remove(dir / "manifest.json.tmp");
+
+    // A commit of the writer: the reader takes it in, its snapshot from before left as it was.
+    const auto before = reader->snapshot();
+    writer->append(std::vector<ImportedGame>(games.begin() + 30, games.begin() + 70));
+    CHECK(reader->refresh());
+    CHECK(reader->snapshot()->games() == 70);
+    CHECK(before->games() == 30);
+    sameGame(reader->snapshot()->game(50), games[50]);
+    CHECK_FALSE(reader->refresh());
+
+    // Nothing written through the reader.
+    CHECK_THROWS_AS(reader->append(std::vector<ImportedGame>(games.begin() + 70, games.begin() + 71)),
+                    std::runtime_error);
+    CHECK_THROWS_AS(reader->replace(0, games[0]), std::runtime_error);
+    const std::vector<GameId> one{0};
+    CHECK_THROWS_AS(reader->setDeleted(one, true), std::runtime_error);
+    CHECK(writer->snapshot()->games() == 70);
+    CHECK_THROWS(Database::openReadOnly(freshFolder("store-read-only-none")));
+}

@@ -515,7 +515,11 @@ ImportedGame Snapshot::game(GameId id) const {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-Database::Database(const fs::path& dir) : dir_(dir), lock_(dir) {}
+Database::Database(const fs::path& dir) : dir_(dir), lock_(std::in_place, dir) {}
+
+Database::Database(const fs::path& dir, bool read_only) : dir_(dir) {
+    if (!read_only) lock_.emplace(dir);
+}
 
 std::shared_ptr<Database> Database::create(const fs::path& dir) {
     std::error_code ec;
@@ -547,6 +551,32 @@ std::shared_ptr<Database> Database::open(const fs::path& dir) {
     auto db = std::make_shared<Database>(dir);
     db->load();
     return db;
+}
+
+std::shared_ptr<Database> Database::openReadOnly(const fs::path& dir) {
+    std::error_code ec;
+    if (!fs::is_regular_file(dir / MANIFEST, ec)) throw std::runtime_error(dir.string() + " is not a database");
+    auto db = std::make_shared<Database>(dir, true);
+    db->load();
+    return db;
+}
+
+bool Database::refresh() {
+    if (lock_) return false;
+    uint64_t generation = 0;
+    try {
+        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
+        generation = nlohmann::json::parse(in).value("generation", uint64_t{0});
+    } catch (const std::exception&) {
+        return false;  // being replaced as it was read: read again next time
+    }
+    if (generation == snapshot()->generation()) return false;
+    try {
+        load();
+    } catch (const std::exception&) {
+        return false;
+    }
+    return true;
 }
 
 void Database::load() {
@@ -617,18 +647,21 @@ void Database::load() {
     // What a commit cut short left: segments the manifest does not name, and the new manifest not yet renamed over
     // the old one (a killed program leaves it); edits it does not name. A number such a leftover segment holds is not
     // used again, should it not go.
+    // Read-only, they are left alone: they may be the other program's commit under way.
     std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(dir_, ec)) {
-        const auto name      = entry.path().filename().string();
-        const bool temporary = name.size() > 4 && name.compare(name.size() - 4, 4, ".tmp") == 0;
-        if (name.rfind("seg-", 0) == 0) {
-            unsigned long long number = 0;
-            if (std::sscanf(name.c_str(), "seg-%llu", &number) == 1)
-                next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
-            if (temporary || std::find(named.begin(), named.end(), name) == named.end())
+    if (lock_) {
+        for (const auto& entry : fs::directory_iterator(dir_, ec)) {
+            const auto name      = entry.path().filename().string();
+            const bool temporary = name.size() > 4 && name.compare(name.size() - 4, 4, ".tmp") == 0;
+            if (name.rfind("seg-", 0) == 0) {
+                unsigned long long number = 0;
+                if (std::sscanf(name.c_str(), "seg-%llu", &number) == 1)
+                    next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
+                if (temporary || std::find(named.begin(), named.end(), name) == named.end())
+                    fs::remove_all(entry.path(), ec);
+            } else if (temporary || (name.rfind("edits-", 0) == 0 && name != edits)) {
                 fs::remove_all(entry.path(), ec);
-        } else if (temporary || (name.rfind("edits-", 0) == 0 && name != edits)) {
-            fs::remove_all(entry.path(), ec);
+            }
         }
     }
     std::lock_guard lock(mutex_);
@@ -866,6 +899,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
 }
 
 Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     Appended appended;
     std::lock_guard lock(mutex_);
     // Each game's key, made once: for the duplicates, the key column and the keys known after.
@@ -918,6 +952,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
 }
 
 void Database::replace(GameId id, ImportedGame game) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard lock(mutex_);
     if (id >= current_->games_) throw std::out_of_range("no game " + std::to_string(id) + " to replace");
     const uint64_t old_key = current_->key(id);
@@ -943,6 +978,7 @@ void Database::replace(GameId id, ImportedGame game) {
 }
 
 void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard lock(mutex_);
     auto bits = current_->deleted_;
     for (const auto id : ids) {

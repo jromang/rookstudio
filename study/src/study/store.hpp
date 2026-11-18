@@ -146,6 +146,14 @@ class Database {
     static std::shared_ptr<Database> create(const std::filesystem::path& dir);
     // An existing database, the leftovers of a commit cut short removed. Throws std::runtime_error when it is none.
     static std::shared_ptr<Database> open(const std::filesystem::path& dir);
+    // A database another program writes (it holds the folder's lock, open() throws tour::FolderBusy): its games read
+    // as that program commits them (refresh()), nothing written; the files it is writing are left alone. Throws as
+    // open() does.
+    static std::shared_ptr<Database> openReadOnly(const std::filesystem::path& dir);
+    [[nodiscard]] bool readOnly() const noexcept { return !lock_.has_value(); }
+    // Read-only: the snapshot made again when the other program committed since (its manifest's generation changed).
+    // True when it was; false otherwise, and for a database this program writes, always current.
+    bool refresh();
 
     [[nodiscard]] std::shared_ptr<const Snapshot> snapshot() const;
     struct Appended {
@@ -167,6 +175,7 @@ class Database {
     [[nodiscard]] const std::filesystem::path& folder() const noexcept { return dir_; }
 
     explicit Database(const std::filesystem::path& dir);  // use create() or open()
+    Database(const std::filesystem::path& dir, bool read_only);  // use openReadOnly()
 
    private:
     void load();
@@ -177,7 +186,7 @@ class Database {
                 const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted);
 
     std::filesystem::path dir_;
-    tour::FolderLock lock_;
+    std::optional<tour::FolderLock> lock_;  // none when read-only
     mutable std::mutex mutex_;
     std::shared_ptr<const Snapshot> current_;
     std::unordered_map<std::string, uint32_t> name_ids_;  // filled at the first append

@@ -38,6 +38,7 @@ struct DatabaseFacts {
     uint32_t names = 0;      // players, events, sites
     uint64_t bytes = 0;      // on the disk
     bool tree      = false;  // its opening tree covers its games
+    bool read_only = false;  // another program writes to it: read as it commits, nothing written here
     std::string error;       // why it could not be opened
 };
 
@@ -110,6 +111,9 @@ class DatabaseShelf {
         std::future<study::TreeBuilt> done;
     };
     void rebuildTree(std::size_t index);
+    // Each frame: the databases another program writes read again when it committed (every 2 s), and opened to be
+    // written again once it lets them go (tried every 5 s).
+    void keepReadOnlyCurrent();
     [[nodiscard]] TreeJob* treeJob() noexcept { return tree_job_.get(); }
     // Each frame: a build that ended taken, the next one asked for started. True when one ended.
     bool pollTreeJob();
@@ -141,6 +145,7 @@ class DatabaseShelf {
     std::map<std::filesystem::path, CachedTree> trees_;  // by the database's folder, filled by treeSource()
     std::unique_ptr<Import> import_;
     std::unique_ptr<TreeJob> tree_job_;
+    std::chrono::steady_clock::time_point read_only_read_{}, read_only_tried_{};
     std::optional<std::size_t> tree_again_;  // a build asked for while another ran, or during an import
 };
 

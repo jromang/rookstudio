@@ -387,6 +387,24 @@ if(FCG_ASSISTANT)
         target_compile_options(ggml-base PRIVATE -Wno-format)
     endif()
 
+    # llama.cpp's heaviest sources (its model and vocabulary, ggml's Vulkan backend) take gigabytes each to compile
+    # with gcc 15: no more of them at once than the memory holds. A private repository's CI runner, two cores and 7 GB,
+    # ran out of it on four, and its runner service was stopped with the build.
+    if(CMAKE_GENERATOR MATCHES "Ninja")
+        cmake_host_system_information(RESULT FCG_MEMORY_MB QUERY TOTAL_PHYSICAL_MEMORY)
+        math(EXPR FCG_HEAVY_JOBS "${FCG_MEMORY_MB} / 4000")
+        if(FCG_HEAVY_JOBS LESS 1)
+            set(FCG_HEAVY_JOBS 1)
+        endif()
+        set_property(GLOBAL APPEND PROPERTY JOB_POOLS fcg_heavy=${FCG_HEAVY_JOBS})
+        foreach(heavy IN ITEMS llama ggml-vulkan)
+            if(TARGET ${heavy})
+                set_property(TARGET ${heavy} PROPERTY JOB_POOL_COMPILE fcg_heavy)
+            endif()
+        endforeach()
+        message(STATUS "llama.cpp's heaviest sources: ${FCG_HEAVY_JOBS} at once (${FCG_MEMORY_MB} MB of memory)")
+    endif()
+
     # llama.cpp's Jinja engine, which renders a model's chat template as the fine-tuning library did, compiled here
     # with the JSON value it reads its context from: its common library would bring an HTTP client and more.
     file(GLOB FCG_JINJA_SOURCES ${llama_SOURCE_DIR}/common/jinja/*.cpp)

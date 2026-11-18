@@ -109,7 +109,11 @@ bool copyProfile(const fs::path& from, const fs::path& to, std::string& error, s
         if (it->is_directory(ec)) {
             fs::create_directories(target, ec);
         } else if (it->is_regular_file(ec)) {
-            fs::copy_file(it->path(), target, fs::copy_options::overwrite_existing, ec);
+            // A file the program's profile has already is replaced: removed first. On Windows, MinGW's copy_file
+            // refuses to write over it (overwrite_existing) since every file has the same inode there: a target is
+            // taken for the source itself.
+            fs::remove(target, ec);
+            if (!ec) fs::copy_file(it->path(), target, ec);
             if (!ec && done) *done += it->file_size(ec);
         }
         if (ec) break;

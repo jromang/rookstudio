@@ -436,7 +436,7 @@ MoveFacts gather(const MoveContext& ctx) {
         // for.
         if (facts.missedChance()) {
             dropIf(facts.punished_by,
-                          [](const Fact& f) { return !(salience(f) >= NOTABLE && !is<fact::ThreatensCapture>(f)); });
+                   [](const Fact& f) { return !(salience(f) >= NOTABLE && !is<fact::ThreatensCapture>(f)); });
         }
     }
     return facts;

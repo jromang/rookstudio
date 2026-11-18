@@ -35,8 +35,9 @@ concurrency:
 jobs:
   linux:
     name: Linux build and tests
-    # The oldest supported runner, so that the binary runs on older glibc versions too.
-    runs-on: ubuntu-22.04
+    # Ubuntu 24.04: the binary needs its glibc, 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40, RHEL 10 and later).
+    # fastchess-gui's own job stays on 22.04 (2.35): keep this one when merging it.
+    runs-on: ubuntu-24.04
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 500M
@@ -61,16 +62,18 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build ccache g++-12 \
+          sudo apt-get install -y --no-install-recommends ninja-build ccache g++-14 \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
             libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev \
             libdrm-dev libgbm-dev libdbus-1-dev libudev-dev libpipewire-0.3-dev libpulse-dev libasound2-dev
 
       - name: The Vulkan SDK
         # The assistant's GPU backend, for a release and on demand: its shaders take minutes that no cache keeps.
-        # Ubuntu 22.04 has no glslc, and Vulkan headers older than ggml needs: LunarG's SDK, the release whose headers
-        # the Windows build fetches, of which glslc, the headers (SPIRV-Headers' CMake package too, which ggml asks
-        # for) and the loader to link with are kept.
+        # Ubuntu 24.04's glslc (shaderc 2023.8) knows neither the integer dot product nor NVIDIA's cooperative matrices
+        # 2, which ggml's faster shaders need (commentary-v11 measured: comments 20 % slower on a small integrated GPU,
+        # 4 % on a large NVIDIA one): LunarG's SDK, the release whose headers the Windows build fetches, of which
+        # glslc, the headers (SPIRV-Headers' CMake package too, which ggml asks for) and the loader to link with are
+        # kept.
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         env:
           SDK: 1.4.363.0
@@ -93,13 +96,13 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .ccache
-          key: ccache-linux-${{ github.run_id }}
-          restore-keys: ccache-linux-
+          key: ccache-linux-noble-${{ github.run_id }}
+          restore-keys: ccache-linux-noble-
 
       - name: Configure
         env:
-          CC: gcc-12
-          CXX: g++-12
+          CC: gcc-14
+          CXX: g++-14
           VULKAN: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && 'ON' || 'OFF' }}
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFCG_STATIC_RUNTIME=ON -DFCG_ASSISTANT_VULKAN=${VULKAN}
 
@@ -116,7 +119,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: .ccache
-          key: ccache-linux-${{ github.run_id }}
+          key: ccache-linux-noble-${{ github.run_id }}
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py): they mostly wait, so two per

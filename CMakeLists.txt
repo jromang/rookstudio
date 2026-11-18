@@ -325,6 +325,22 @@ if(FCG_ASSISTANT)
         endforeach()
     endfunction()
     fcg_beside_programs(${llama_SOURCE_DIR})
+    if(MINGW)
+        # Older MinGW-w64 headers lack the thread power throttling state ggml's CPU backend sets: it is given to it.
+        include(CheckCSourceCompiles)
+        check_c_source_compiles("#include <windows.h>
+            int main(void) { THREAD_POWER_THROTTLING_STATE t; t.Version = THREAD_POWER_THROTTLING_CURRENT_VERSION;
+                             return (int) t.Version; }" FCG_HAVE_THREAD_POWER_THROTTLING)
+        if(NOT FCG_HAVE_THREAD_POWER_THROTTLING)
+            get_property(ggml_targets DIRECTORY ${llama_SOURCE_DIR}/ggml/src PROPERTY BUILDSYSTEM_TARGETS)
+            foreach(target IN LISTS ggml_targets)
+                if(target MATCHES "^ggml-cpu")
+                    target_compile_options(${target} PRIVATE
+                        -include ${CMAKE_CURRENT_SOURCE_DIR}/assistant/compat/thread_power_throttling.h)
+                endif()
+            endforeach()
+        endif()
+    endif()
 
     # llama.cpp's Jinja engine, which renders a model's chat template as the fine-tuning library did, compiled here
     # with the JSON value it reads its context from: its common library would bring an HTTP client and more.

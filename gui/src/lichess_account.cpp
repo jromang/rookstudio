@@ -1,5 +1,6 @@
 #include "lichess_account.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <fstream>
@@ -102,7 +103,8 @@ Pkce makePkce() {
     return p;
 }
 
-std::string authorizeUrl(const Pkce& pkce, std::string_view redirect_uri, const std::vector<std::string>& scopes) {
+std::string authorizeUrl(const Pkce& pkce, std::string_view redirect_uri, const std::vector<std::string>& scopes,
+                         std::string_view username) {
     std::string scope;
     for (const auto& s : scopes) scope += (scope.empty() ? "" : " ") + s;
     std::string url = servers().api + "/oauth?response_type=code&client_id=" + urlEncode(CLIENT_ID) +
@@ -110,7 +112,50 @@ std::string authorizeUrl(const Pkce& pkce, std::string_view redirect_uri, const 
                       "&code_challenge_method=S256&code_challenge=" + urlEncode(pkce.challenge) +
                       "&state=" + urlEncode(pkce.state);
     if (!scope.empty()) url += "&scope=" + urlEncode(scope);
+    if (!username.empty()) url += "&username=" + urlEncode(username);
     return url;
+}
+
+bool Account::has(std::string_view scope) const {
+    return std::find(scopes.begin(), scopes.end(), scope) != scopes.end();
+}
+
+Answer<TokenState> testToken(std::string_view token, const std::atomic<bool>* cancel) {
+    Answer<TokenState> a;
+    HttpRequest request;
+    request.url          = servers().api + "/api/token/test";
+    request.method       = "POST";
+    request.content_type = "text/plain";
+    request.body         = std::string(token);
+    request.headers.emplace_back("Accept", "application/json");
+    const auto r = politeRequest(request, cancel);
+    a.status     = r.status;
+    if (r.status != 200) {
+        a.error = reason(r);
+        return a;
+    }
+    try {
+        const auto j  = nlohmann::json::parse(r.body);
+        const auto it = j.find(std::string(token));
+        if (it == j.end() || it->is_null()) return a;  // no longer a token
+        TokenState t;
+        t.user = it->value("userId", std::string());
+        // "study:read,puzzle:read", empty when it has none.
+        const auto scopes = it->value("scopes", std::string());
+        for (std::size_t from = 0; from < scopes.size();) {
+            const auto comma = scopes.find(',', from);
+            const auto one   = scopes.substr(from, comma == std::string::npos ? std::string::npos : comma - from);
+            if (!one.empty()) t.scopes.push_back(one);
+            if (comma == std::string::npos) break;
+            from = comma + 1;
+        }
+        if (const auto e = it->find("expires"); e != it->end() && e->is_number_integer())
+            t.expires = e->get<int64_t>() / 1000;  // milliseconds
+        a.value = std::move(t);
+    } catch (const std::exception& e) {
+        a.error = std::string("Lichess's answer could not be read: ") + e.what();
+    }
+    return a;
 }
 
 Callback::Callback() { (void)listener_.listen(0, true); }
@@ -233,7 +278,7 @@ std::string revoke(std::string_view token, const std::atomic<bool>* cancel) {
 }
 
 Answer<Account> link(const std::function<bool(const std::string& url)>& open, const std::vector<std::string>& scopes,
-                     std::chrono::milliseconds within, const std::atomic<bool>* cancel) {
+                     std::chrono::milliseconds within, const std::atomic<bool>* cancel, std::string_view username) {
     Answer<Account> a;
     Callback callback;
     if (callback.port() == 0) {
@@ -247,7 +292,7 @@ Answer<Account> link(const std::function<bool(const std::string& url)>& open, co
         a.error = e.what();
         return a;
     }
-    (void)open(authorizeUrl(pkce, callback.redirectUri(), scopes));
+    (void)open(authorizeUrl(pkce, callback.redirectUri(), scopes, username));
     const auto reply = callback.wait(within, cancel);
     if (!reply.error.empty()) {
         a.error = reply.error == "access_denied" ? "the link was refused on Lichess" : reply.error;
@@ -268,6 +313,12 @@ Answer<Account> link(const std::function<bool(const std::string& url)>& open, co
         return a;
     }
     a.value->username = *name.value;
+    // What the token may do, as Lichess says it; else what was asked.
+    a.value->scopes = scopes;
+    if (const auto tested = testToken(a.value->token, cancel); tested.value) {
+        a.value->scopes = tested.value->scopes;
+        if (tested.value->expires > 0) a.value->expires = tested.value->expires;
+    }
     return a;
 }
 
@@ -280,6 +331,7 @@ std::optional<Account> loadAccount(const std::filesystem::path& profile) {
         a.username = j.at("username").get<std::string>();
         a.token    = j.at("token").get<std::string>();
         a.expires  = j.value("expires", int64_t{0});
+        a.scopes   = j.value("scopes", std::vector<std::string>{});  // none before #45: the link asked for none
         if (a.token.empty()) return std::nullopt;
         return a;
     } catch (const std::exception&) {
@@ -288,7 +340,10 @@ std::optional<Account> loadAccount(const std::filesystem::path& profile) {
 }
 
 void saveAccount(const std::filesystem::path& profile, const Account& account) {
-    const nlohmann::json j{{"username", account.username}, {"token", account.token}, {"expires", account.expires}};
+    const nlohmann::json j{{"username", account.username},
+                           {"token", account.token},
+                           {"expires", account.expires},
+                           {"scopes", account.scopes}};
     tour::replaceFile(profile / ACCOUNT_FILE, j.dump(1), false, true);
 }
 

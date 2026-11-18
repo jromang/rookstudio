@@ -690,9 +690,20 @@ class App {
         std::shared_ptr<std::string> url;  // Lichess's page, as given to the browser
         std::shared_ptr<std::atomic<bool>> opened;
         std::future<lichess::Answer<lichess::Account>> result;
+        std::string previous_token;                          // the token a link made again replaces: revoked once kept
+        std::optional<lichess::BroadcastEntry> then_follow;  // the round to follow once the scope is granted
     };
     std::unique_ptr<LichessLink> lichess_link_;
     std::future<std::string> lichess_unlink_;
+    std::vector<std::future<std::string>> lichess_revokes_;  // tokens replaced by a link made again
+    // A scope a feature needs and the token lacks (#45): asked on the Lichess page, the M4 way, before going on.
+    struct LichessScopeAsk {
+        std::string scope;
+        std::optional<lichess::BroadcastEntry> follow;  // the round to follow with it (#44)
+        std::string error;                              // why the last try gave nothing
+    };
+    std::optional<LichessScopeAsk> lichess_scope_ask_;
+    void drawLichessScopeAsk();
     struct LichessSync {
         std::size_t index = 0;  // the database's
         std::string name;
@@ -712,6 +723,7 @@ class App {
     struct FollowedRound {
         lichess::BroadcastEntry entry;
         std::unique_ptr<lichess::RoundFollower> follower;
+        bool with_token = false;  // followed with a token allowed to read broadcasts
     };
     std::vector<FollowedRound> followed_rounds_;
     // The filters of a player's games, as the user chose them; the home's count of the new ones, asked at most once an
@@ -761,7 +773,9 @@ class App {
     void saveLichessSettings();
     void pollLichess();
     void askBroadcasts();  // the list of broadcasts, asked again after ten minutes
-    void startLichessLink();
+    // The link, asking for `scopes`; `username`: the account Lichess offers, for a link made again with more scopes.
+    void startLichessLink(std::vector<std::string> scopes = {}, std::string username = {},
+                          std::optional<lichess::BroadcastEntry> then_follow = std::nullopt);
     void startLichessSync();  // the games of lichess_.player into "Lichess · player", made when it is missing
     [[nodiscard]] std::optional<std::size_t> lichessBase();  // that database
     void drawLichessHomeCard();
@@ -791,7 +805,8 @@ class App {
     void drawBoardOnline();
     void drawOnlineTablebase(const chess::Board& board, int pieces);
     void drawOnlineCloud(const chess::Board& board);
-    void followBroadcast(const lichess::BroadcastEntry& entry);
+    // `without_account`: anonymously, as Lichess lets it still (slowly), when the user chose not to give the scope.
+    void followBroadcast(const lichess::BroadcastEntry& entry, bool without_account = false);
     void drawLichessPage();
     void drawLichessAccount();
     void drawLichessGames();

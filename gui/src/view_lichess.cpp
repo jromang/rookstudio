@@ -65,7 +65,9 @@ void App::saveLichessSettings() { (void)writeJson(storage_.root() / "lichess.jso
 void App::pollLichess() {
     // The link: the browser said yes or no, or the wait ended.
     if (lichess_link_ && ready(lichess_link_->result)) {
-        auto answer = lichess_link_->result.get();
+        auto answer         = lichess_link_->result.get();
+        const auto previous = std::move(lichess_link_->previous_token);
+        const auto follow   = std::move(lichess_link_->then_follow);
         lichess_link_.reset();
         if (answer.value) {
             try {
@@ -75,13 +77,38 @@ void App::pollLichess() {
                 if (lichess_.player.empty()) lichess_.player = answer.value->username;
                 saveLichessSettings();
                 if (window_) SDL_RaiseWindow(window_);  // back in front of the browser
+                // A link made again: the token it replaces revoked (#45).
+                if (!previous.empty() && previous != answer.value->token)
+                    lichess_revokes_.push_back(
+                        std::async(std::launch::async, [previous] { return lichess::revoke(previous); }));
+                // Allowed to read broadcasts now: the rounds followed without it followed again with it (#44).
+                if (lichess_account_->has(lichess::SCOPE_STUDY_READ)) {
+                    for (auto& f : followed_rounds_) {
+                        if (f.with_token) continue;
+                        f.follower->stop();
+                        f.follower =
+                            std::make_unique<lichess::RoundFollower>(f.entry.round.id, lichess_account_->token);
+                        f.with_token = true;
+                    }
+                    lichess_scope_ask_.reset();
+                }
+                if (follow) followBroadcast(*follow);
             } catch (const std::exception& e) {
                 lichess_error_ = e.what();
             }
         } else if (answer.error != "cancelled") {
-            lichess_error_ = answer.error;
+            if (lichess_scope_ask_)
+                lichess_scope_ask_->error = answer.error;
+            else
+                lichess_error_ = answer.error;
         }
     }
+    std::erase_if(lichess_revokes_, [](auto& f) {
+        if (!ready(f)) return false;
+        if (const auto error = f.get(); !error.empty())
+            Console::instance().add(trf("Lichess: the token replaced could not be revoked: {}", error), true);
+        return true;
+    });
     if (lichess_unlink_.valid() && ready(lichess_unlink_)) {
         const auto error = lichess_unlink_.get();
         if (!error.empty()) Console::instance().add(trf("Lichess: the token could not be revoked: {}", error), true);
@@ -239,24 +266,80 @@ void App::askBroadcasts() {
     lichess_broadcasts_job_  = std::async(std::launch::async, [] { return lichess::topBroadcasts(); });
 }
 
-void App::startLichessLink() {
+void App::startLichessLink(std::vector<std::string> scopes, std::string username,
+                           std::optional<lichess::BroadcastEntry> then_follow) {
     lichess_error_.clear();
-    auto link     = std::make_unique<LichessLink>();
-    link->cancel  = std::make_shared<std::atomic<bool>>(false);
-    auto url      = std::make_shared<std::string>();
-    auto opened   = std::make_shared<std::atomic<bool>>(true);
-    link->url     = url;
-    link->opened  = opened;
-    link->result  = std::async(std::launch::async, [cancel = link->cancel, url, opened] {
+    if (lichess_scope_ask_) lichess_scope_ask_->error.clear();
+    auto link         = std::make_unique<LichessLink>();
+    link->cancel      = std::make_shared<std::atomic<bool>>(false);
+    auto url          = std::make_shared<std::string>();
+    auto opened       = std::make_shared<std::atomic<bool>>(true);
+    link->url         = url;
+    link->opened      = opened;
+    link->then_follow = std::move(then_follow);
+    if (lichess_account_) link->previous_token = lichess_account_->token;
+    link->result  = std::async(std::launch::async, [cancel = link->cancel, url, opened, scopes = std::move(scopes),
+                                                    username = std::move(username)] {
         return lichess::link(
             [url, opened](const std::string& page) {
                 *url    = page;
                 *opened = SDL_OpenURL(page.c_str());
                 return opened->load();
             },
-            {}, std::chrono::minutes(5), cancel.get());
+            scopes, std::chrono::minutes(5), cancel.get(), username);
     });
     lichess_link_ = std::move(link);
+}
+
+void App::drawLichessScopeAsk() {
+    if (!lichess_scope_ask_ || !lichess_account_) return;
+    auto& ask = *lichess_scope_ask_;
+    ui::beginCard("lichess_scope");
+    ImGui::PushTextWrapPos();
+    ImGui::TextUnformatted(TR("Lichess asks for one more permission"));
+    if (ask.follow)
+        ImGui::TextDisabled("%s", trf("to follow « {} · {} »", ask.follow->tour.name, ask.follow->round.name).c_str());
+    ImGui::TextUnformatted(
+        TR("Since August 2026, Lichess lets broadcasts be followed with an account allowed to read "
+           "studies and broadcasts; without it, it slows them down heavily and may stop them."));
+    ImGui::TextDisabled("%s", TR("The permission lets RookStudio read your studies and the broadcasts; it writes "
+                                 "nothing. Lichess's page opens for it; your account stays linked meanwhile, and the "
+                                 "token it replaces is revoked."));
+    if (lichess_link_) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
+                           TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
+    } else {
+        if (!ask.error.empty())
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               ask.error.find("refused") != std::string::npos
+                                   ? TR("You refused it on Lichess: nothing changed.")
+                                   : trf("Lichess gave nothing ({}).", ask.error).c_str());
+        if (ui::iconButton("lichess_scope_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
+            auto scopes = lichess_account_->scopes;
+            if (!lichess_account_->has(ask.scope)) scopes.push_back(ask.scope);
+            startLichessLink(scopes, lichess_account_->username, ask.follow);
+        }
+        if (ask.follow) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Follow without it"))) {
+                const auto entry = *ask.follow;
+                lichess_scope_ask_.reset();
+                followBroadcast(entry, true);
+                ImGui::PopTextWrapPos();
+                ui::endCard();
+                return;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Not now"))) {
+            lichess_scope_ask_.reset();
+            ImGui::PopTextWrapPos();
+            ui::endCard();
+            return;
+        }
+    }
+    ImGui::PopTextWrapPos();
+    ui::endCard();
 }
 
 void App::drawLichessAccount() {
@@ -290,6 +373,22 @@ void App::drawLichessAccount() {
         if (a.expires > 0) {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", trf("· the token lasts until {}", dateText(a.expires)).c_str());
+        }
+        // What the token may do, asked for when a feature needed it (#45).
+        ImGui::TextDisabled("%s", a.has(lichess::SCOPE_STUDY_READ)
+                                      ? TR("RookStudio may read your studies and the broadcasts.")
+                                      : TR("RookStudio reads your name and public data only; it asks for more when a "
+                                           "feature needs it."));
+        // Lichess's tokens last a year and cannot be refreshed: a new link a month before the end.
+        const auto now =
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count();
+        if (a.expires > 0 && a.expires - now < 30 * 24 * 3600) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               a.expires <= now ? TR("The token has ended: link the account again.")
+                                                : TR("The token ends within a month: renew it to keep the link."));
+            if (ImGui::SmallButton(TR("Renew…"))) startLichessLink(a.scopes, a.username);
+            ImGui::SameLine();
         }
         if (ImGui::SmallButton(TR("Unlink"))) {
             lichess_unlink_ =
@@ -496,19 +595,28 @@ void App::drawLichessBroadcasts() {
     ui::endCard();
 }
 
-void App::followBroadcast(const lichess::BroadcastEntry& entry) {
+void App::followBroadcast(const lichess::BroadcastEntry& entry, bool without_account) {
     for (const auto& f : followed_rounds_)
         if (f.entry.round.id == entry.round.id) return;
+    // Lichess asks for a token allowed to read broadcasts (#44): asked once, on the Lichess page, before following.
+    const bool allowed = lichess_account_ && lichess_account_->has(lichess::SCOPE_STUDY_READ);
+    if (lichess_account_ && !allowed && !without_account) {
+        lichess_scope_ask_ = LichessScopeAsk{lichess::SCOPE_STUDY_READ, entry, {}};
+        broadcast_round_.clear();  // the page itself, where the question is
+        page_ = Page::Lichess;
+        return;
+    }
     // Lichess's limit: four rounds at once without an account, eight with one.
-    const std::size_t most = lichess_account_ ? 8 : 4;
+    const std::size_t most = allowed ? 8 : 4;
     if (followed_rounds_.size() >= most) {
         Console::instance().add(trf("Lichess lets {} rounds be followed at once: stop one first.", most), true);
         return;
     }
     FollowedRound f;
-    f.entry    = entry;
-    f.follower = std::make_unique<lichess::RoundFollower>(entry.round.id,
-                                                          lichess_account_ ? lichess_account_->token : std::string());
+    f.entry      = entry;
+    f.with_token = allowed;
+    f.follower =
+        std::make_unique<lichess::RoundFollower>(entry.round.id, allowed ? lichess_account_->token : std::string());
     followed_rounds_.push_back(std::move(f));
     openBroadcastMosaic(entry.round.id);  // Follow opens the round as a mosaic (M4)
 }
@@ -536,6 +644,28 @@ void App::drawLichessFollowed() {
         if (ImGui::SmallButton(TR("The mosaic"))) openBroadcastMosaic(f.entry.round.id);
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Stop following"))) stop = r;
+        // Lichess refuses it, or slows it down, without an account allowed to read broadcasts (#44).
+        if (!f.with_token) {
+            const bool refused = f.follower->refused();
+            ImGui::TextColored(refused ? ImGui::ColorConvertU32ToFloat4(ui::WARN) : ui::MUTED4, "%s",
+                               refused            ? TR("Lichess refuses this round without an account allowed to read "
+                                                       "broadcasts.")
+                               : lichess_account_ ? TR("Followed without the permission to read broadcasts: Lichess "
+                                                       "slows that down heavily, and may stop it.")
+                                                  : TR("Followed without an account: Lichess slows that down heavily, "
+                                                       "and may stop it."));
+            ImGui::SameLine();
+            if (lichess_account_) {
+                if (!lichess_link_ && ImGui::SmallButton(TR("Allow on Lichess…"))) {
+                    lichess_scope_ask_ = LichessScopeAsk{lichess::SCOPE_STUDY_READ, std::nullopt, {}};
+                    auto scopes        = lichess_account_->scopes;
+                    scopes.emplace_back(lichess::SCOPE_STUDY_READ);
+                    startLichessLink(scopes, lichess_account_->username);
+                }
+            } else if (!lichess_link_ && ImGui::SmallButton(TR("Link the account…"))) {
+                startLichessLink({lichess::SCOPE_STUDY_READ});
+            }
+        }
         const auto games = f.follower->games();
         for (std::size_t g = 0; g < games.size(); ++g) {
             const auto& game = games[g];
@@ -615,6 +745,10 @@ void App::drawLichessPage() {
                                  "Internet (R15). What goes to Lichess is said where you decide it (R16)."));
     ImGui::PopTextWrapPos();
     ImGui::Dummy(ImVec2(0, px(6)));
+    if (lichess_scope_ask_ && lichess_account_) {
+        drawLichessScopeAsk();
+        ImGui::Dummy(ImVec2(0, px(8)));
+    }
     const float avail = ImGui::GetContentRegionAvail().x;
     const bool two    = avail > px(900);
     const float col   = two ? (avail - px(14)) / 2 : avail;

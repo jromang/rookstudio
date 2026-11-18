@@ -48,7 +48,8 @@ struct BroadcastGame {
 // A round followed on a thread of its own until stop() or the end of the follower.
 class RoundFollower {
    public:
-    // `token`, when given, lets Lichess open more streams at once.
+    // `token`, when given, lets Lichess open more streams at once; Lichess asks one allowed to read studies and
+    // broadcasts (SCOPE_STUDY_READ) since 2026-08, and may refuse or slow down a round followed without.
     explicit RoundFollower(std::string round_id, std::string token = {});
     ~RoundFollower();
     RoundFollower(const RoundFollower&)            = delete;
@@ -60,6 +61,9 @@ class RoundFollower {
     [[nodiscard]] uint64_t changes() const noexcept { return changes_; }  // grows with each game that changes
     [[nodiscard]] bool streaming() const noexcept { return streaming_; }
     [[nodiscard]] std::string error() const;  // why the stream broke, last; empty while it runs
+    // Lichess refused the round to this token, or to no token (401, 403): an account allowed to read broadcasts is
+    // needed. Cleared when the stream opens.
+    [[nodiscard]] bool refused() const noexcept { return refused_; }
     [[nodiscard]] uint32_t connections() const noexcept { return connections_; }
 
     // The pause before opening the stream again after a break: it doubles after each failure, from `first` to `most`.
@@ -72,6 +76,7 @@ class RoundFollower {
     std::string round_, token_;
     std::atomic<bool> stop_{false};
     std::atomic<bool> streaming_{false};
+    std::atomic<bool> refused_{false};
     std::atomic<uint64_t> changes_{0};
     std::atomic<uint32_t> connections_{0};
     mutable std::mutex mutex_;

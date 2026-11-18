@@ -172,6 +172,7 @@ void RoundFollower::run() {
             if (s == 200) {
                 ++connections_;
                 streaming_ = true;
+                refused_   = false;
                 std::lock_guard lock(mutex_);
                 error_.clear();
             }
@@ -197,10 +198,12 @@ void RoundFollower::run() {
         if (stop_) break;
         {
             std::lock_guard lock(mutex_);
-            error_ = status == 200   ? (r.error.empty() ? std::string("the stream ended") : r.error)
-                     : status == 0   ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                     : status == 404 ? std::string("Lichess has no such round")
-                                     : fmt::format("Lichess answered {}", status);
+            refused_ = status == 401 || status == 403;
+            error_   = status == 200   ? (r.error.empty() ? std::string("the stream ended") : r.error)
+                       : status == 0   ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
+                       : status == 404 ? std::string("Lichess has no such round")
+                       : refused_      ? std::string("Lichess asks for an account allowed to read broadcasts")
+                                       : fmt::format("Lichess answered {}", status);
         }
         if (status == 200) pause = std::chrono::milliseconds(g_first_retry_ms.load());
         // Then again, after a pause that grows while it fails.

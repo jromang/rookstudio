@@ -155,3 +155,19 @@ TEST_CASE("Lichess broadcasts: a round Lichess does not have") {
     follower.stop();
     RoundFollower::setRetry(5s, 60s);
 }
+
+TEST_CASE("Lichess broadcasts: a round refused without a token allowed to read broadcasts says so") {
+    const auto port = freePort();
+    ScriptedServer server(port, [](const std::string&, net::TcpConnection& c) {
+        c.sendAll("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    });
+    REQUIRE(server.ok());
+    Servers_ local(port);
+    RoundFollower::setRetry(10ms, 40ms);
+    RoundFollower follower("private");
+    REQUIRE(waitUntil([&] { return follower.refused(); }));
+    CHECK(follower.error() == "Lichess asks for an account allowed to read broadcasts");
+    CHECK(follower.connections() == 0);
+    follower.stop();
+    RoundFollower::setRetry(5s, 60s);
+}

@@ -63,7 +63,13 @@ struct FakeLichess {
                   if (body.size() < n) body += c.readUntil("\x01\x02\x03", n - body.size(), 2000);
               }
               std::lock_guard lock(mutex);
-              if (head.rfind("POST /api/token", 0) == 0) {
+              if (head.rfind("POST /api/token/test", 0) == 0) {
+                  // What the token may do: the one granted may read studies; its end in milliseconds.
+                  answer(c, 200,
+                         body == "lio_granted"
+                             ? R"({"lio_granted":{"userId":"someone","scopes":"study:read","expires":1795000000000}})"
+                             : fmt::format(R"({{"{}":null}})", body));
+              } else if (head.rfind("POST /api/token", 0) == 0) {
                   posted = body;
                   if (challengeOf(valueOf(body, "code_verifier")) != challenge || valueOf(body, "code") != "the-code")
                       answer(c, 400, R"({"error":"invalid_grant"})");
@@ -85,7 +91,7 @@ struct FakeLichess {
     ~FakeLichess() { servers() = Servers{}; }
     uint16_t port;
     std::mutex mutex;
-    std::string challenge, posted;
+    std::string challenge, posted, asked;  // asked: Lichess's page, as the browser was given it
     bool revoked = false;
     ScriptedServer server;
 };
@@ -161,17 +167,31 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
         {
             std::lock_guard lock(lichess.mutex);
             lichess.challenge = valueOf(url, "code_challenge");
+            lichess.asked     = url;
         }
         const auto redirect = valueOf(url, "redirect_uri");
         const auto state    = valueOf(url, "state");
         std::thread([redirect, state] { (void)comeBack(redirect, "?code=the-code&state=" + state); }).detach();
         return true;
     };
-    const auto linked = link(opened, {}, 20s);
+    // Linked again with a scope, the account offered by its name.
+    const auto linked = link(opened, {SCOPE_STUDY_READ}, 20s, nullptr, "SomeOne");
     REQUIRE_MESSAGE(linked.value, linked.error);
     CHECK(linked.value->username == "SomeOne");
     CHECK(linked.value->token == "lio_granted");
-    CHECK(linked.value->expires > 1700000000);
+    // What the token may do and until when, as Lichess says it.
+    CHECK(linked.value->scopes == std::vector<std::string>{"study:read"});
+    CHECK(linked.value->has(SCOPE_STUDY_READ));
+    CHECK(linked.value->expires == 1795000000);
+    {
+        std::lock_guard lock(lichess.mutex);
+        CHECK(valueOf(lichess.asked, "scope") == "study:read");
+        CHECK(valueOf(lichess.asked, "username") == "SomeOne");
+    }
+    // A token Lichess no longer takes: no state, and no error.
+    const auto gone = testToken("lio_revoked");
+    CHECK(gone.error.empty());
+    CHECK_FALSE(gone.value);
     {
         std::lock_guard lock(lichess.mutex);
         CHECK(valueOf(lichess.posted, "grant_type") == "authorization_code");
@@ -188,6 +208,7 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
     REQUIRE(again);
     CHECK(again->username == "SomeOne");
     CHECK(again->token == "lio_granted");
+    CHECK(again->scopes == std::vector<std::string>{"study:read"});
 #ifndef _WIN32
     const auto perms = fs::status(profile / "lichess-account.json").permissions();
     CHECK((perms & (fs::perms::group_all | fs::perms::others_all)) == fs::perms::none);

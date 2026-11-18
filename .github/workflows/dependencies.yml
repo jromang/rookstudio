@@ -1,10 +1,13 @@
 name: Dependencies
 
 on:
+  # The pins change with these files only; the weekly run catches the vulnerabilities published since.
   push:
     branches: ["main"]
+    paths: ["CMakeLists.txt", "cmake/**", "sbom/**", "app/third_party/**", ".github/workflows/dependencies.yml"]
   pull_request:
     branches: ["main"]
+    paths: ["CMakeLists.txt", "cmake/**", "sbom/**", "app/third_party/**", ".github/workflows/dependencies.yml"]
   schedule:
     # Weekly: new vulnerabilities are published for unchanged pins too.
     - cron: "41 4 * * 1"

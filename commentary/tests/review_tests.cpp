@@ -197,6 +197,11 @@ TEST_CASE("review: a side already lost is still told what it drops") {
     CHECK(dropped->win_after == 0.0);
     // Told, but for what it is: the game was lost before it.
     CHECK(dropped->judgment == Judgment::Inaccuracy);
+    // Judged by the chances between people it threw away, which the engine's figures do not see: the loss said with
+    // the judgment is theirs.
+    CHECK(dropped->loss() == 0.0);
+    CHECK(dropped->judgedLoss() > 15.0);
+    CHECK(dropped->judgedLoss() == dropped->chances_lost);
     // From clearly worse to lost, the same drop is a blunder.
     a[3] = analysis({line({mv(g, 3, "b8c6")}, 90, Wdl{420, 560, 20})});
     CHECK(review(g, a, Opening{}).get(4)->judgment == Judgment::Blunder);

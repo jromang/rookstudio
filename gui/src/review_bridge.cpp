@@ -73,7 +73,7 @@ std::vector<MoveReview> judgedMoves(const CommentaryReview& review) {
         if (m.ply == 0) continue;
         if (out.size() < m.ply) out.resize(m.ply);
         auto& j = out[m.ply - 1];
-        j.loss  = m.loss();
+        j.loss  = m.judgedLoss();  // the reading the judgment stands on, for the figure said with it
         j.best  = m.played_best;
         if (m.judgment && !m.book)
             j.judgement = *m.judgment == commentary::Judgment::Blunder   ? Judgement::Blunder

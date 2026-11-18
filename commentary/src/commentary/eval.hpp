@@ -100,6 +100,8 @@ struct MoveReport {
     double accuracy = 100.0;
     // Centipawns lost, for the average centipawn loss.
     int32_t cp_loss = 0;
+    // The mover's chances between people the move lost, in points (the tablebases' outcome where they know it).
+    double chances_lost = 0.0;
     std::optional<Judgment> judgment;
     bool played_best = false;
     // The best move was the only one, and it was played.
@@ -115,6 +117,9 @@ struct MoveReport {
     bool plan = false;
 
     [[nodiscard]] double loss() const noexcept { return win_before > win_after ? win_before - win_after : 0.0; }
+    // What the move is judged by: the larger of the two readings, the engine's expected score and the chances between
+    // people (see review()), in points.
+    [[nodiscard]] double judgedLoss() const noexcept { return chances_lost > loss() ? chances_lost : loss(); }
     // A move worth a word: a mistake, an only move, a turning point or a plan.
     [[nodiscard]] bool isNotable() const noexcept { return judgment.has_value() || only_move || key || plan; }
 };

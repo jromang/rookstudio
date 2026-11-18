@@ -370,6 +370,7 @@ GameReport review(const MainLine& line, const Analyses& analyses, const Opening&
         m.win_after   = weighed->win_after;
         m.accuracy    = weighed->accuracy;
         m.cp_loss     = weighed->cp_loss;
+        m.chances_lost = std::max(0.0, weighed->chances.first - weighed->chances.second);
         m.judgment    = book ? std::nullopt : weighed->judgment;
         m.played_best = weighed->played_best;
         m.only_move   = weighed->only && weighed->played_best && !book && !forced;

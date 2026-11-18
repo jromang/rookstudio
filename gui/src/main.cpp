@@ -25,6 +25,7 @@
 
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
+#include <imgui_internal.h>
 #include <implot.h>
 
 #ifndef _WIN32
@@ -642,6 +643,9 @@ int run(const Args& args, int argc, char** argv) {
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+    // Ctrl+Tab is the recent games' (the Chess space), not ImGui's way through its windows.
+    ImGui::GetCurrentContext()->ConfigNavWindowingKeyNext = 0;
+    ImGui::GetCurrentContext()->ConfigNavWindowingKeyPrev = 0;
     io.IniFilename = ini_path.c_str();
 
     // Scripted screenshots must not show hover effects from wherever the real mouse happens to be.

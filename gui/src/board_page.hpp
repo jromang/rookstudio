@@ -242,6 +242,7 @@ struct BoardPage {
         int line = -1, ply = 0;
     };
     std::vector<Snapshot> undo, redo;  // the game before each change, and the changes undone
+    bool changed = false;              // since it was opened or saved: the recent games say so
     std::string nag_typed;             // ! and ? typed in a row on a move
     double nag_time = 0;               // when the last of them was
     std::string toast;                 // a change said for a moment over the moves

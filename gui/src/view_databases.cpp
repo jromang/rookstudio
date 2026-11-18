@@ -7,6 +7,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <imgui_internal.h>  // SetKeyOwner
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -335,9 +336,15 @@ void App::openListRow(std::size_t row) {
     const bool keep  = board_.ply > 0;
     auto origin      = *board_origin_;
     const auto id    = origin.view->ids[row];
+    origin.row       = row;
+    // A game left with changes not saved comes back with them, where it was left.
+    if (const auto copy = changedCopyOf(origin.folder, id)) {
+        restoreRecentGame(*copy);
+        board_origin_ = std::move(origin);  // in the list it is reached from now
+        return;
+    }
     readOnBoard(study::importedPgn(origin.view->snapshot->game(id)),
                 trf("{}, game {}", origin.name, ui::exactCount(id + 1)));
-    origin.row    = row;
     board_origin_ = std::move(origin);
     page_         = Page::Board;
     if (keep) {
@@ -355,26 +362,40 @@ void App::openListRow(std::size_t row) {
 
 void App::drawListStrip() {
     if (!board_origin_ || !board_origin_->view) return;
-    const auto& o    = *board_origin_;
-    const auto total = o.view->ids.size();
-    ImGui::BeginDisabled(o.row == 0);
+    // Ctrl+Left and Ctrl+Right, unless a field takes them (a word back or forward there). The arrows are claimed
+    // while Ctrl is held, before they are pressed: ImGui's keyboard navigation leaves keys someone owns alone.
+    const bool keys = !ImGui::GetIO().WantTextInput;
+    if (keys && ImGui::GetIO().KeyCtrl) {
+        const auto owner = ImGui::GetID("##list_strip_keys");
+        ImGui::SetKeyOwner(ImGuiKey_LeftArrow, owner);
+        ImGui::SetKeyOwner(ImGuiKey_RightArrow, owner);
+    }
+    const auto row   = board_origin_->row;
+    const auto total = board_origin_->view->ids.size();
+    std::optional<std::size_t> go;
+    ImGui::BeginDisabled(row == 0);
     if (ImGui::SmallButton(fmt::format("◂ {}", TR("Previous")).c_str()) ||
-        (o.row > 0 && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_LeftArrow)))
-        openListRow(o.row - 1);
+        (keys && row > 0 && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_LeftArrow)))
+        go = row - 1;
     ImGui::EndDisabled();
-    if (!board_origin_) return;
-    ImGui::SameLine();
-    const auto& now = *board_origin_;
-    auto place      = trf("game {} of {} in « {} »", ui::exactCount(now.row + 1), ui::exactCount(total), now.name);
-    if (!now.filter.empty()) place += trf(" · « {} »", now.filter);
-    ImGui::TextDisabled("%s", place.c_str());
-    ImGui::SameLine();
-    ImGui::BeginDisabled(now.row + 1 >= total);
+    ImGui::SameLine(0, px(4));
+    ImGui::TextDisabled("Ctrl+←");
+    ImGui::SameLine(0, px(14));
+    const auto& o = *board_origin_;
+    const auto place =
+        o.filter.empty()
+            ? trf("game {} of {} in « {} »", ui::exactCount(row + 1), ui::exactCount(total), o.name)
+            : trf("game {} of {} · « {} » in « {} »", ui::exactCount(row + 1), ui::exactCount(total), o.filter, o.name);
+    ImGui::TextUnformatted(place.c_str());
+    ImGui::SameLine(0, px(14));
+    ImGui::BeginDisabled(row + 1 >= total);
     if (ImGui::SmallButton(fmt::format("{} ▸", TR("Next")).c_str()) ||
-        (now.row + 1 < total && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_RightArrow)))
-        openListRow(now.row + 1);
+        (keys && row + 1 < total && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_RightArrow)))
+        go = row + 1;
     ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("Ctrl+← · Ctrl+→");
+    ImGui::SameLine(0, px(4));
+    ImGui::TextDisabled("Ctrl+→");
+    if (go) openListRow(*go);
 }
 
 bool App::saveBoardToDatabase() {
@@ -393,6 +414,7 @@ bool App::saveBoardToDatabase() {
             boardToast(e.what());
             return true;
         }
+        board_.changed = false;
         boardToast(trf("Saved in « {} », game {}", board_origin_->name, ui::exactCount(id + 1)));
         return true;
     }

@@ -185,6 +185,7 @@ void App::drawShell() {
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_2)) switchSpace(Space::Chess);
     followPage();
     pollDatabases();
+    if (space_ == Space::Chess) drawRecentGames();  // Ctrl+Tab, on any of its pages
 
     const float rail = px(76);
     drawRail(rail);

@@ -1551,6 +1551,7 @@ void App::handleDialogs() {
             case Dialogs::Purpose::SaveBoardPgn:
                 try {
                     tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
+                    board_.changed       = false;
                     board_.message       = trf("Saved in {}", path);
                     board_.message_error = false;
                 } catch (const std::exception& e) {

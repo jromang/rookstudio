@@ -269,6 +269,27 @@ class App {
     void drawListStrip();               // the strip over the moves: previous, the game's place in the list, next
     void openListRow(std::size_t row);  // another game of the same list, at the same position when it has it
     bool saveBoardToDatabase();         // false when the game is not a database's to write
+    // The games the board showed before (mockup M2, board 4; R11): Ctrl+Tab and Ctrl+Shift+Tab through them, the one
+    // chosen opened when Ctrl is let go, each with its changes and its place.
+    struct RecentGame {
+        std::string title;
+        std::string where;  // its database, its file, or nothing
+        GameTree tree;
+        int line = -1, ply = 0;
+        bool chess960 = false;
+        bool modified = false;  // changed since it was opened, not saved
+        std::optional<BoardOrigin> origin;
+        std::optional<PgnSource> pgn;  // the file it was read from, its list of games
+        MoveNotes start_notes;
+        std::vector<BoardPage::Snapshot> undo, redo;  // its changes, still undone and redone
+    };
+    std::deque<RecentGame> recent_games_;       // the newest first
+    int recent_pick_ = -1;                      // the one chosen while Ctrl+Tab is held; -1 when the list is closed
+    void rememberBoardGame();                   // the board's game, before another replaces it
+    void restoreRecentGame(std::size_t index);  // on the board again, as it was left, the one shown remembered
+    // The recent game that is game `id` of the database in `folder` with changes not saved, if there is one.
+    [[nodiscard]] std::optional<std::size_t> changedCopyOf(const std::filesystem::path& folder, uint32_t id) const;
+    void drawRecentGames();  // the list while Ctrl is held, and the game chosen opened
     bool db_list_ = false;
     std::array<char, 256> db_filter_{};
     study::SortBy db_sort_ = study::SortBy::Number;
@@ -594,7 +615,9 @@ class App {
     void openBoardPgn(const std::filesystem::path& file);
     void pollBoardPgn();
     void showPgnSource(PgnSource source);  // its first game on the board, its games listed
-    void loadPgnGame(int index);
+    // Game `index` of the board's PGN source, or of `fresh`, which becomes the board's source once the game shown has
+    // been remembered with its own (openOnBoard, the recent games).
+    void loadPgnGame(int index, std::optional<PgnSource> fresh = std::nullopt);
     void readOnBoard(const std::string& text, const std::string& name);  // a FEN, a PGN, moves
     void pasteOnBoard();
     void saveBoardPgn();  // asks where, then writes the game with its variations and notes

@@ -219,7 +219,15 @@ int App::tournamentThreads() const {
 }
 
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
+    rememberBoardGame();  // its changes and undo history go with it
     board_origin_.reset();
+    board_.undo.clear();
+    board_.redo.clear();
+    board_.start_notes = {};
+    board_.comment_edit.reset();
+    board_.changed = false;
+    board_.toast.clear();  // what it said was about the game left
+    board_.toast_time = -100;
     if (page_ != Page::Board) {
         board_back_ = BoardBack{page_, page_ == Page::Tournament ? std::optional<Tab>(shown_tab_) : std::nullopt};
     }
@@ -676,6 +684,7 @@ void App::boardChanged(BoardPage::Snapshot before) {
     b.undo.push_back(std::move(before));
     if (b.undo.size() > 200) b.undo.erase(b.undo.begin());
     b.redo.clear();
+    b.changed = true;
 }
 
 void App::boardUndo(bool redo) {
@@ -685,6 +694,7 @@ void App::boardUndo(bool redo) {
     (redo ? b.undo : b.redo).push_back(boardSnapshot());
     auto s = std::move(from.back());
     from.pop_back();
+    b.changed     = true;
     b.tree        = std::move(s.tree);
     b.start_notes = std::move(s.start_notes);
     b.comment_edit.reset();
@@ -1286,21 +1296,29 @@ void App::pollBoardPgn() {
 void App::showPgnSource(PgnSource source) {
     auto& b         = board_;
     const auto n    = source.index->size();
-    b.pgn           = std::move(source);
-    b.message       = trn("{} game in {}", "{} games in {}", n, n, b.pgn->name);
+    b.message       = trn("{} game in {}", "{} games in {}", n, n, source.name);
     b.message_error = false;
-    loadPgnGame(0);
+    loadPgnGame(0, std::move(source));
     if (n > 1) b.open_tab = 1;  // the list of the games
 }
 
-void App::loadPgnGame(int index) {
-    auto& b = board_;
-    if (!b.pgn || index < 0 || index >= static_cast<int>(b.pgn->index->size())) return;
-    b.pgn->selected = index;
-    const auto text = pgnSourceGame(*b.pgn, static_cast<std::size_t>(index));
+void App::loadPgnGame(int index, std::optional<PgnSource> fresh) {
+    auto& b         = board_;
+    const auto take = [&] {
+        if (fresh) b.pgn = std::move(fresh);
+        fresh.reset();
+    };
+    const PgnSource* source = fresh ? &*fresh : b.pgn ? &*b.pgn : nullptr;
+    if (!source || index < 0 || index >= static_cast<int>(source->index->size())) {
+        take();
+        return;
+    }
+    const auto text = pgnSourceGame(*source, static_cast<std::size_t>(index));
     std::string error;
     auto game = text ? readPgnGame(*text, error) : std::nullopt;
     if (!game) {
+        take();
+        b.pgn->selected = index;
         b.message       = trf("Game {}: {}", index + 1, text ? error : std::string(TR("it cannot be read.")));
         b.message_error = true;
         return;
@@ -1312,6 +1330,8 @@ void App::loadPgnGame(int index) {
         title += " · " + trf("round {}", round);
     const auto back = board_back_;
     openOnBoard(std::move(*game), 0, chess960, std::move(title), false);
+    take();
+    b.pgn->selected   = index;
     board_back_       = back;
     b.tree.variations = readVariations(*text, b.tree.main, chess960);  // those of the file, kept
     b.message.clear();
@@ -1325,7 +1345,6 @@ void App::saveBoardPgn() {
 }
 
 void App::readOnBoard(const std::string& text, const std::string& name) {
-    board_origin_.reset();  // another game: a list's own, when it comes from one, says so after
     auto& b         = board_;
     const auto read = readBoardText(text);
     switch (read.kind) {
@@ -1357,8 +1376,7 @@ void App::readOnBoard(const std::string& text, const std::string& name) {
             source.text  = std::move(pasted);
             source.index = std::make_shared<const tour::PgnIndex>(std::move(index));
             if (source.index->size() == 1) {
-                b.pgn = std::move(source);
-                loadPgnGame(0);
+                loadPgnGame(0, std::move(source));
                 b.pgn.reset();  // one game: nothing to list
             } else {
                 showPgnSource(std::move(source));
@@ -3263,6 +3281,14 @@ void App::startBoardGames() {
         b.message_error = true;
         return;
     }
+    // The game shown gives way to the one played: among the recent games, with its list and its changes.
+    rememberBoardGame();
+    board_origin_.reset();
+    b.undo.clear();
+    b.redo.clear();
+    b.start_notes = {};
+    b.comment_edit.reset();
+    b.changed       = false;
     b.match_version = 0;
     b.match_state   = {};
     b.watching      = true;

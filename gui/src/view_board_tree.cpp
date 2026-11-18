@@ -51,6 +51,129 @@ std::optional<chess::Move> moveOfCode(const chess::Board& board, const study::Sc
 
 }  // namespace
 
+namespace {
+
+bool boardHasGame(const BoardPage& b) {
+    return !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
+}
+
+}  // namespace
+
+void App::rememberBoardGame() {
+    auto& b = board_;
+    if (!boardHasGame(b)) return;
+    RecentGame game;
+    game.title       = b.title.empty() ? std::string(TR("The game on the board")) : b.title;
+    game.where       = board_origin_ ? board_origin_->name : b.pgn ? b.pgn->name : std::string();
+    game.tree        = b.tree;
+    game.line        = b.line;
+    game.ply         = b.ply;
+    game.chess960    = b.chess960;
+    game.modified    = b.changed;
+    game.origin      = board_origin_;
+    game.pgn         = b.pgn;
+    game.start_notes = b.start_notes;
+    game.undo        = std::move(b.undo);  // the board takes another game: its history goes with this one
+    game.redo        = std::move(b.redo);
+    b.undo.clear();
+    b.redo.clear();
+    // One game of a list at a time, the last shown, unless a game has changes not saved: those stay until saved.
+    // And a game read again from where it was read takes the place of its unchanged copy.
+    std::erase_if(recent_games_, [&](const RecentGame& r) {
+        if (r.modified) return false;
+        if (r.origin && game.origin) return r.origin->view == game.origin->view;
+        return !r.origin && !game.origin && r.title == game.title &&
+               r.tree.main.moves.size() == game.tree.main.moves.size();
+    });
+    recent_games_.push_front(std::move(game));
+    // At most 12, the oldest unchanged ones going first.
+    while (recent_games_.size() > 12) {
+        auto last =
+            std::find_if(recent_games_.rbegin(), recent_games_.rend(), [](const RecentGame& r) { return !r.modified; });
+        recent_games_.erase(last != recent_games_.rend() ? std::next(last).base() : std::prev(recent_games_.end()));
+    }
+}
+
+void App::restoreRecentGame(std::size_t index) {
+    if (index >= recent_games_.size()) return;
+    auto chosen = std::move(recent_games_[index]);
+    recent_games_.erase(recent_games_.begin() + static_cast<std::ptrdiff_t>(index));
+    openOnBoard(chosen.tree.main, 0, chosen.chess960, chosen.title, false);  // remembers the one shown
+    auto& b       = board_;
+    b.tree        = std::move(chosen.tree);
+    b.line        = chosen.line >= -1 && chosen.line < static_cast<int>(b.tree.variations.size()) ? chosen.line : -1;
+    b.game        = lineOf(b.tree, b.line);
+    b.ply         = std::clamp(chosen.ply, 0, static_cast<int>(b.game.moves.size()));
+    b.start_notes = std::move(chosen.start_notes);
+    b.undo        = std::move(chosen.undo);
+    b.redo        = std::move(chosen.redo);
+    b.changed     = chosen.modified;
+    b.pgn         = std::move(chosen.pgn);
+    board_origin_ = std::move(chosen.origin);
+}
+
+std::optional<std::size_t> App::changedCopyOf(const std::filesystem::path& folder, uint32_t id) const {
+    for (std::size_t i = 0; i < recent_games_.size(); ++i) {
+        const auto& r = recent_games_[i];
+        if (r.modified && r.origin && r.origin->view && r.origin->folder == folder &&
+            r.origin->row < r.origin->view->ids.size() && r.origin->view->ids[r.origin->row] == id)
+            return i;
+    }
+    return std::nullopt;
+}
+
+void App::drawRecentGames() {
+    // The rows: the game on the board ("open now"), then the recent ones, the newest first.
+    const auto& io    = ImGui::GetIO();
+    const int current = boardHasGame(board_) ? 1 : 0;
+    const int n       = current + static_cast<int>(recent_games_.size());
+    if (ImGui::IsKeyPressed(ImGuiKey_Tab, false) && io.KeyCtrl && !recent_games_.empty()) {
+        recent_pick_ =
+            recent_pick_ < 0 ? (io.KeyShift ? n - 1 : current) : (recent_pick_ + (io.KeyShift ? n - 1 : 1)) % n;
+    }
+    if (recent_pick_ < 0) return;
+    if (recent_pick_ >= n) recent_pick_ = n - 1;
+    if (!io.KeyCtrl) {
+        // Ctrl let go: the game chosen on the board, the one there among the recent ones.
+        const int pick = recent_pick_ - current;
+        recent_pick_   = -1;
+        if (pick >= 0) restoreRecentGame(static_cast<std::size_t>(pick));  // else the one already open
+        return;
+    }
+    const auto* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(
+        ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.4f),
+        ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::Begin("##recent_games", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+    ImGui::TextUnformatted(TR("Recent games"));
+    ImGui::TextDisabled("%s", TR("Ctrl+Tab forward, Ctrl+Shift+Tab back; letting Ctrl go opens the game chosen"));
+    ImGui::Separator();
+    const auto row = [&](int i, const std::string& title, std::string where, bool modified, bool open_now) {
+        ImGui::Selectable(fmt::format("{}##recent{}", title, i).c_str(), i == recent_pick_);
+        if (open_now) where += (where.empty() ? "" : " · ") + std::string(TR("open now"));
+        if (modified) where += (where.empty() ? "" : " · ") + std::string(TR("changed, not saved yet"));
+        if (!where.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", where.c_str());
+        }
+    };
+    if (current) {
+        const auto& b = board_;
+        row(0, b.title.empty() ? std::string(TR("The game on the board")) : b.title,
+            board_origin_ ? board_origin_->name
+            : b.pgn       ? b.pgn->name
+                          : std::string(),
+            b.changed, true);
+    }
+    for (std::size_t i = 0; i < recent_games_.size(); ++i) {
+        const auto& r = recent_games_[i];
+        row(current + static_cast<int>(i), r.title, r.where, r.modified, false);
+    }
+    ImGui::End();
+}
+
 void App::drawChessColumn() {
     drawListStrip();
     // The tabs, in the order of the mockup; Alt+1 to Alt+4.

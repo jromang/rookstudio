@@ -103,11 +103,6 @@ void App::drawChessHome() {
     ui::endCard();
 }
 
-void App::drawDatabases() {
-    ui::pageTitle(TR("Databases"), guideSection());
-    ImGui::TextDisabled("%s", TR("No database yet."));
-}
-
 void App::drawOpeningsPage() {
     ui::pageTitle(TR("Openings"), guideSection());
     ImGui::TextDisabled("%s", TR("No repertoire yet."));

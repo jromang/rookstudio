@@ -17,6 +17,7 @@
 #include <matchmaking/sprt/sprt.hpp>
 #include <matchmaking/stats.hpp>
 
+#include <study/query.hpp>
 #include "board_3d.hpp"
 #include "board_nav.hpp"
 #include "board_page.hpp"
@@ -24,6 +25,7 @@
 #include "book_jobs.hpp"
 #include "broadcaster.hpp"
 #include "console.hpp"
+#include "databases.hpp"
 #include "dialogs.hpp"
 #include "engine_changes.hpp"
 #include "engine_import.hpp"
@@ -232,7 +234,36 @@ class App {
     void drawChessRail(float width, float button);
     void drawBoardRailButton(float width, float button);  // in both rails, with its analysis's dot
     void drawChessHome();                                 // view_chess.cpp
+    // The Databases page (view_databases.cpp): the databases of the profile, an import into one of them.
     void drawDatabases();
+    DatabaseShelf& shelf();  // made at its first use
+    // `file` imported into database `index`, or into a new database named after it for -1.
+    void importIntoDatabase(int index, const std::filesystem::path& file);
+    void pollDatabases();  // each frame: an import's end said
+    std::unique_ptr<DatabaseShelf> shelf_;
+    int db_selected_ = -1;
+    bool db_naming_  = false;  // a new database's name being typed
+    std::array<char, 128> db_name_{};
+    std::string db_message_;  // the last import's outcome
+    // The chosen database's games (mockup M1, board 2), in place of the list of databases: a quick filter, a sort, the
+    // view made in the background, the game chosen.
+    void drawGameList();
+    void openListedGame(std::size_t row);
+    bool db_list_ = false;
+    std::array<char, 256> db_filter_{};
+    study::SortBy db_sort_ = study::SortBy::Number;
+    bool db_descending_    = false;
+    study::View db_view_;
+    std::string db_view_of_;  // what db_view_ shows: the database, its snapshot, the filter and the sort
+    struct ViewJob {
+        std::string of;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::chrono::steady_clock::time_point started;
+        std::future<study::View> done;
+    };
+    std::optional<ViewJob> db_view_job_;
+    double db_view_ms_  = 0;
+    std::size_t db_row_ = 0;
     void drawOpeningsPage();  // the repertoires (the tournament's Openings tab is drawOpenings)
     Space space_       = Space::Engines;
     Page engines_page_ = Page::Home;  // the page each space comes back to

@@ -922,6 +922,11 @@ void App::dropFile(const std::string& path) {
     const std::filesystem::path file(path);
     auto ext = file.extension().string();
     for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    // On the Databases page, games go into the database chosen, or into a new one named after the file.
+    if (page_ == Page::Databases && (ext == ".pgn" || ext == ".zst" || ext == ".gz" || ext == ".zip")) {
+        importIntoDatabase(db_selected_, file);
+        return;
+    }
     if (ext == ".pgn") {
         openBoardPgn(file);
         return;

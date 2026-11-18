@@ -208,6 +208,28 @@ std::string formatCount(uint64_t n) {
     return fmt::format("{}", n);
 }
 
+std::string exactCount(uint64_t n) {
+    const char* sep = ",";
+    switch (i18n::language()) {
+        case i18n::Language::French:
+        case i18n::Language::Russian:
+            sep = "\u202f";
+            break;
+        case i18n::Language::German:
+        case i18n::Language::Spanish:
+        case i18n::Language::Italian:
+        case i18n::Language::Portuguese:
+            sep = ".";
+            break;
+        default:
+            break;
+    }
+    auto digits = std::to_string(n);
+    for (int at = static_cast<int>(digits.size()) - 3; at > 0; at -= 3)
+        digits.insert(static_cast<std::size_t>(at), sep);
+    return digits;
+}
+
 std::string formatScore(const std::optional<fastchess::Score>& score) {
     if (!score) return "";
     if (score->type == fastchess::ScoreType::MATE) return fmt::format("#{}", score->value);

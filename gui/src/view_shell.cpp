@@ -184,6 +184,7 @@ void App::drawShell() {
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_1)) switchSpace(Space::Engines);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_2)) switchSpace(Space::Chess);
     followPage();
+    pollDatabases();
 
     const float rail = px(76);
     drawRail(rail);

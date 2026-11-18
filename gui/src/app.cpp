@@ -294,7 +294,16 @@ void App::frame() {
             page_ = Page::ChessHome;
         else if (w == "databases")
             page_ = Page::Databases;
-        else if (w == "openings")
+        else if (w == "databases-list" || w.rfind("databases-list=", 0) == 0) {
+            // The first database's games; databases-list=WORDS: through that quick filter.
+            page_        = Page::Databases;
+            db_selected_ = 0;
+            db_list_     = true;
+            if (w.size() > 15) std::snprintf(db_filter_.data(), db_filter_.size(), "%s", w.substr(15).c_str());
+        } else if (w.rfind("databases-import=", 0) == 0) {  // databases-import=FILE: into a new database named after it
+            page_ = Page::Databases;
+            importIntoDatabase(-1, std::filesystem::path(w.substr(17)));
+        } else if (w == "openings")
             page_ = Page::Openings;
         else if (w.rfind("engines-remote-picker", 0) == 0) {
             // The first machine's files, as Add, A program on <machine>, shows them; engines-remote-picker=PATH: from
@@ -1547,6 +1556,16 @@ void App::handleDialogs() {
                 break;
             case Dialogs::Purpose::MachineEngineBuild:
                 offerEngineCopy(machine_dialog_for_, machine_dialog_engine_, std::filesystem::path(path));
+                break;
+            case Dialogs::Purpose::ImportGames:
+                importIntoDatabase(db_selected_, std::filesystem::path(path));
+                break;
+            case Dialogs::Purpose::AddDatabase:
+                try {
+                    db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
+                } catch (const std::exception& e) {
+                    db_message_ = e.what();
+                }
                 break;
         }
     }

@@ -44,6 +44,8 @@ std::string formatClock(int64_t ms);
 
 // 12345678 -> "12.3M"
 std::string formatCount(uint64_t n);
+// The exact number with the language's thousands separator: "12,345,678", "12 345 678" (narrow no-break spaces).
+std::string exactCount(uint64_t n);
 
 // Engine score from the mover's point of view, as "+0.35" or "#5".
 std::string formatScore(const std::optional<fastchess::Score>& score);

@@ -52,9 +52,11 @@ class Dialogs {
         SaveBoardPgn,  // the Board page's game saved as a PGN file
         EngineLogo,
         PieceFolder,
-        MachineKey,         // a remote machine's key file (Settings)
-        MachineProgram,     // the fastchess-gui to install on a remote machine of another system
-        MachineEngineBuild  // an engine's build for a remote machine's system, copied there
+        MachineKey,          // a remote machine's key file (Settings)
+        MachineProgram,      // the fastchess-gui to install on a remote machine of another system
+        MachineEngineBuild,  // an engine's build for a remote machine's system, copied there
+        ImportGames,         // a PGN (.pgn, .zst, .gz, .zip) imported into a database
+        AddDatabase          // a database folder made elsewhere, added to the list
     };
 
     struct Answer {

@@ -43,6 +43,10 @@ struct ImportedGame {
 // One game's text into a game. False when it holds no game.
 bool readImportedGame(std::string_view text, ImportedGame& out);
 
+// A game as PGN, to be read again: its own text when it kept one (comments, symbols, variations, a move that could
+// not be read), else its tags, its moves in SAN and its result.
+[[nodiscard]] std::string importedPgn(const ImportedGame& game);
+
 // The games of a piece of text, each with its tags and moves: where they start and end.
 [[nodiscard]] std::vector<std::string_view> splitGames(std::string_view text);
 

@@ -66,14 +66,14 @@ TEST_CASE("assistant: the child loads its model, then answers requests one after
     std::string error;
     REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 99, error, 30s), error);
     CHECK(assistant.running());
-    CHECK(assistant.devices() == "Mock (scripted)");
+    CHECK(assistant.devices() == "Mock GPU");
     const auto first = assistant.generate(asked("A novelty."), &error);
     REQUIRE_MESSAGE(first, error);
-    CHECK(first->text == "2 messages, seed 1, greedy, held to a grammar: A novelty.");
+    CHECK(first->text == "2 messages, seed 1, greedy, held to a grammar, on the GPU: A novelty.");
     CHECK(first->tokens == 130);
     const auto second = assistant.generate(asked("Nouveauté.", 2, 0.7f, false), &error);
     REQUIRE_MESSAGE(second, error);
-    CHECK(second->text == "2 messages, seed 2, sampled, free: Nouveauté.");
+    CHECK(second->text == "2 messages, seed 2, sampled, free, on the GPU: Nouveauté.");
     // A request it cannot answer leaves it running.
     CHECK_FALSE(assistant.generate(asked("refuse"), &error));
     CHECK(error == "refused");
@@ -112,6 +112,28 @@ TEST_CASE("assistant: a child that fails or hangs is told apart, and a new one s
     REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
     assistant.answer_within = 30s;
     CHECK(assistant.generate(asked("Fine again."), &error));
+}
+
+TEST_CASE("assistant: a GPU that fails leaves the model on the CPU") {
+    AssistantProcess assistant;
+    std::string error;
+    // The driver fails while the model loads: started again on the CPU.
+    REQUIRE_MESSAGE(assistant.start(mock(), "gpu-load-crash", 99, error, 30s), error);
+    CHECK(assistant.gpuFailed());
+    CHECK(assistant.devices() == "Mock (scripted)");
+    // It fails while it answers: on the CPU since, and the request answered all the same.
+    REQUIRE_MESSAGE(assistant.start(mock(), "gpu-crash", 99, error, 30s), error);
+    CHECK_FALSE(assistant.gpuFailed());
+    const auto answered = assistant.generate(asked("A novelty."), &error);
+    REQUIRE_MESSAGE(answered, error);
+    CHECK(answered->text == "2 messages, seed 1, greedy, held to a grammar, on the CPU: A novelty.");
+    CHECK(assistant.gpuFailed());
+    CHECK(assistant.running());
+    // On the CPU from the start, a crash is told as it is.
+    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
+    CHECK_FALSE(assistant.generate(asked("crash"), &error));
+    CHECK(error == "the assistant ended");
+    CHECK_FALSE(assistant.gpuFailed());
 }
 
 TEST_CASE("assistant: the program's comment comes from the child's text, held to the facts") {

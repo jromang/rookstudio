@@ -106,12 +106,18 @@ std::optional<Judged> judged(const Position& before, const Move& mv, const Oracl
     reply.moves =
         tried->moves.empty() ? std::vector<Move>{} : std::vector<Move>(tried->moves.begin() + 1, tried->moves.end());
     PositionAnalysis after_analysis;
-    if (const auto end = gameEnd(after))
+    if (const auto end = gameEnd(after)) {
         after_analysis = PositionAnalysis::ended(*end);
-    else if (reply.moves.empty())
-        return std::nullopt;
-    else
+    } else {
+        // A line the engine printed down to the move alone (Gaia does, from a fresh hash): the reply comes from the
+        // position after it, searched.
+        if (reply.moves.empty()) {
+            if (const auto found = oracle.search(after, {}); found && !found->moves.empty())
+                reply = whiteLine(after, *found, found->moves);
+        }
+        if (reply.moves.empty()) return std::nullopt;
         after_analysis.lines = {reply};
+    }
     const MainLine game(before, {mv});
     const Analyses analyses{PositionAnalysis{{*best}, std::nullopt}, after_analysis};
     const auto report = review(game, analyses, Opening{});
@@ -119,11 +125,18 @@ std::optional<Judged> judged(const Position& before, const Move& mv, const Oracl
     return Judged{report.moves.front(), *best, reply};
 }
 
+// The model's comment on a move, how the mover stands after it, and the engine's line after it.
+struct Said {
+    std::string text;
+    double after = 0.0;
+    EngineLine reply;
+};
+
 // The model's comment on `mv` played from `before`, as on a game move, and how the mover stands after it.
-std::variant<std::pair<std::string, double>, Problem> commentOn(
-    const Position& before, const Move& mv, const std::optional<Move>& previous, const Oracle& oracle,
-    std::span<const std::pair<Position, PositionAnalysis>> known, Model& model, const Tablebases* tables, Lang lang,
-    PieceLetters letters) {
+std::variant<Said, Problem> commentOn(const Position& before, const Move& mv, const std::optional<Move>& previous,
+                                      const Oracle& oracle,
+                                      std::span<const std::pair<Position, PositionAnalysis>> known, Model& model,
+                                      const Tablebases* tables, Lang lang, PieceLetters letters) {
     const auto j = judged(before, mv, oracle, known);
     if (!j) return Problem::NoEngine;
     MoveContext ctx;
@@ -136,7 +149,7 @@ std::variant<std::pair<std::string, double>, Problem> commentOn(
     ctx.previous       = previous;
     ctx.oracle         = &oracle;
     const auto written = writtenComment(model, ctx, lang, letters);
-    return std::pair{written ? written->text : std::string(), j->report.win_after};
+    return Said{written ? written->text : std::string(), j->report.win_after, j->reply};
 }
 
 std::string trimmed(std::string_view s) { return std::string(text::trim(s)); }
@@ -449,7 +462,7 @@ std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const
                                         model, tables, lang, letters);
             if (const auto* p = std::get_if<Problem>(&said)) return *p;
             Answered a;
-            a.text    = std::get<0>(said).first;
+            a.text    = std::get<0>(said).text;
             a.moves   = {*asked.previous};
             a.earlier = true;
             return a;
@@ -485,7 +498,7 @@ std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const
             const auto name = moveText(pos, *mv, letters);
             const auto head = fr ? fmt::format("Meilleur coup : {}.", name) : fmt::format("Best move: {}.", name);
             Answered a;
-            a.text  = trimmed(head + " " + std::get<0>(said).first);
+            a.text  = trimmed(head + " " + std::get<0>(said).text);
             a.moves = {*mv};
             a.best  = mv;
             return a;
@@ -501,7 +514,7 @@ std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const
             if (const auto* p = std::get_if<Problem>(&said)) return *p;
             // After the colon, the comment goes on the sentence: « Menace : le fou prend en f7 ».
             Answered a;
-            a.text   = trimmed(std::string(fr ? "Menace :" : "Threat:") + " " + lowerFirst(std::get<0>(said).first));
+            a.text   = trimmed(std::string(fr ? "Menace :" : "Threat:") + " " + lowerFirst(std::get<0>(said).text));
             a.moves  = {mv};
             a.threat = true;
             return a;
@@ -513,7 +526,7 @@ std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const
             const auto said = comment(*from->pos, mv, from->previous);
             if (const auto* p = std::get_if<Problem>(&said)) return *p;
             Answered a;
-            a.text    = std::get<0>(said).first;
+            a.text    = std::get<0>(said).text;
             a.moves   = {mv};
             a.earlier = !legal_now(mv);
             return a;
@@ -529,8 +542,8 @@ std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const
             if (const auto* p = std::get_if<Problem>(&first)) return *p;
             const auto second = comment(*from->pos, b_mv, from->previous);
             if (const auto* p = std::get_if<Problem>(&second)) return *p;
-            const auto& [first_text, a_after]  = std::get<0>(first);
-            const auto& [second_text, b_after] = std::get<0>(second);
+            const auto& [first_text, a_after, a_line]  = std::get<0>(first);
+            const auto& [second_text, b_after, b_line] = std::get<0>(second);
             const auto a_name = moveText(*from->pos, a_mv, letters), b_name = moveText(*from->pos, b_mv, letters);
             const double d = a_after - b_after;
             std::string verdict;
@@ -543,8 +556,12 @@ std::variant<Answered, Problem> answered(const Asked& asked, Model& model, const
                 verdict = fr ? fmt::format("{} vaut mieux que {}.", b_name, a_name)
                              : fmt::format("{} is the better move.", b_name);
             Answered a;
-            a.text    = fmt::format("{} {} {}", first_text, second_text, verdict);
+            // A move the comments have nothing to say about leaves no gap.
+            for (const std::string_view part :
+                 {std::string_view(first_text), std::string_view(second_text), std::string_view(verdict)})
+                if (!part.empty()) a.text += (a.text.empty() ? "" : " ") + std::string(part);
             a.moves   = {a_mv, b_mv};
+            a.lines   = {a_line, b_line};
             a.earlier = !legal_now(a_mv);
             return a;
         }

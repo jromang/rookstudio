@@ -23,12 +23,34 @@ namespace fcg::commentary {
 struct Passage {
     std::string text;
     std::optional<std::size_t> ply;
+    bool lesson                           = false;  // what a side should work on: workOn() gives it on its own
     bool operator==(const Passage&) const = default;
 };
 
 // The story of the reviewed game, in a few paragraphs; nothing while the review is not complete, or for a game too
 // short to have one. `result` is the game's: "1-0", "0-1", "1/2-1/2" or "*".
 [[nodiscard]] std::vector<Passage> story(const MainLine& line, std::string_view result, const GameReport& report,
+                                         const Analyses& analyses, const Tablebases* tables, Lang lang,
+                                         PieceLetters letters);
+
+// What one side should work on, from its mistakes: the story's lessons on their own (mockup M5, board 4). The kinds
+// of mistakes it made most, each twice at least or the one that decided the game, with the plies of the moves that
+// show them; and the advice the first one that has one calls for, empty when none.
+struct WorkOn {
+    Color side = Color::White;
+    struct Topic {
+        std::string name;  // « les fourchettes », "rook endgames"
+        std::vector<std::size_t> plies;
+        bool operator==(const Topic&) const = default;
+    };
+    std::vector<Topic> topics;
+    std::string advice;
+    bool operator==(const WorkOn&) const = default;
+};
+
+// What each side that made mistakes should work on, White first; nothing where story() tells nothing. `result` as
+// for story(): the mistake that decided the game is a lesson by itself.
+[[nodiscard]] std::vector<WorkOn> workOn(const MainLine& line, std::string_view result, const GameReport& report,
                                          const Analyses& analyses, const Tablebases* tables, Lang lang,
                                          PieceLetters letters);
 

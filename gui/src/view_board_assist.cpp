@@ -6,6 +6,7 @@
 #include <atomic>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,7 @@
 #include "assistant_notes.hpp"
 #include "assistant_service.hpp"
 #include "engine_oracle.hpp"
+#include "game_graph.hpp"
 #include "i18n.hpp"
 #include "review_bridge.hpp"
 #include "ui.hpp"
@@ -39,6 +41,8 @@ commentary::Lang lang() {
 commentary::PieceLetters letters() {
     return lang() == commentary::Lang::Fr ? commentary::PieceLetters::French : commentary::PieceLetters::English;
 }
+
+float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 }  // namespace
 
@@ -121,6 +125,21 @@ std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
     return board_commentary_;
 }
 
+std::vector<std::string> App::commentBasis(bool from_review) {
+    std::vector<std::string> out;
+    if (from_review && !board_.reviews.empty())
+        out.push_back(trf("{}: the game's analysis, position by position", board_.reviews.front().engine));
+    else if (oracle_)
+        out.push_back(trf("{}, 300,000 nodes per position", oracle_->engine()));
+    out.emplace_back(TR("the facts of the positions its lines lead to"));
+    if (from_review && !theory_of_.empty() && theory_of_ == boardTheoryKey())
+        out.push_back(trf("« {} »: the game's theory and its novelty", board_theory_base_));
+    out.emplace_back(assistant_ && assistant_->installed()
+                         ? TR("written by the model, held to these facts; a template where it had nothing better")
+                         : TR("a template comment, written without the model"));
+    return out;
+}
+
 void App::commentBoardMove() {
     auto& b = board_;
     if (b.ply <= 0 || !assistant_) return;
@@ -151,6 +170,7 @@ void App::commentBoardMove() {
     job.game  = board_game_serial_;
     // The review's view of the move when it has one (the main line); else the engine's, on the spot.
     std::shared_ptr<const CommentaryReview> review = b.line < 0 ? boardCommentaryReview() : nullptr;
+    job.basis = commentBasis(review && review->report.get(static_cast<std::size_t>(b.ply)));
     const auto before_fen                          = boardAt(b.game, b.chess960, b.ply - 1).getFen();
     const auto played = chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(b.ply - 1)].move, b.chess960);
     job.texts =
@@ -220,6 +240,7 @@ void App::commentKeyMoments() {
         return;
     }
     job.total = static_cast<int>(wanted.size());
+    job.basis = commentBasis(true);
     // With the model, its comments (the template's where it has nothing better); without it, the template's.
     AssistantService* model = assistant_->installed() ? assistant_.get() : nullptr;
     job.texts               = std::async(std::launch::async, [review, wanted, model, oracle = oracle_, done = job.done,
@@ -264,6 +285,7 @@ void App::pollBoardComments() {
         if (!notes || !notes->after.empty()) continue;
         notes->after = texts[i];
         markByAssistant(*notes, true);
+        assistant_basis_[texts[i]] = job.basis;
         ++added;
     }
     if (added == 0) {
@@ -303,6 +325,102 @@ void App::drawCommentProgress() {
                         trf("The assistant comments the key moments: {} of {}", done, comment_job_->total).c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Cancel"))) *comment_job_->cancel = true;
+}
+
+void App::drawReviewCurve() {
+    auto& b = board_;
+    if (b.reviews.empty() || b.tree.main.moves.empty()) return;
+    const auto graph = buildGameGraph(b.tree.main, b.chess960, GraphChart::Win,
+                                      {GraphAnalysis{b.reviews.front().engine, "", 0, &b.reviews.front()}}, b.judged);
+    if (graph.analyses.empty() || graph.analyses.front().x.empty()) return;
+    const auto& curve = graph.analyses.front();
+    const int plies   = std::max(1, graph.plies);
+    const auto win_at = [&](int ply) {
+        for (std::size_t i = 0; i < curve.x.size() && i < curve.win.size(); ++i)
+            if (static_cast<int>(std::lround(curve.x[i])) == ply) return curve.win[i];
+        return std::nanf("");
+    };
+
+    const float w = ImGui::GetContentRegionAvail().x, h = px(88), pad = px(8);
+    const ImVec2 p0 = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("##review_curve", ImVec2(w, h));
+    const bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
+    const bool light = ui::currentTheme() == ui::Theme::Light;
+    auto* dl         = ImGui::GetWindowDrawList();
+    const auto x_of  = [&](float ply) { return p0.x + pad + (w - 2 * pad) * ply / static_cast<float>(plies); };
+    const auto y_of  = [&](float win) { return p0.y + pad + (h - 2 * pad) * (1.0f - std::clamp(win, 0.0f, 1.0f)); };
+    dl->AddRectFilled(p0, ImVec2(p0.x + w, p0.y + h), light ? IM_COL32(243, 245, 248, 255) : IM_COL32(32, 36, 43, 255),
+                      px(6));
+    // Even chances, and the move shown.
+    dl->AddLine(ImVec2(p0.x + pad, y_of(0.5f)), ImVec2(p0.x + w - pad, y_of(0.5f)),
+                light ? IM_COL32(201, 206, 214, 255) : IM_COL32(70, 76, 88, 255));
+    if (b.line < 0) {
+        const float cx = x_of(static_cast<float>(boardMainPly()));
+        dl->AddLine(ImVec2(cx, p0.y + px(3)), ImVec2(cx, p0.y + h - px(3)), ui::MUTED);
+    }
+    std::vector<ImVec2> points;
+    for (std::size_t i = 0; i < curve.x.size() && i < curve.win.size(); ++i)
+        if (std::isfinite(curve.win[i])) points.emplace_back(x_of(curve.x[i]), y_of(curve.win[i]));
+    if (points.size() >= 2)
+        dl->AddPolyline(points.data(), static_cast<int>(points.size()), ui::ACCENT, ImDrawFlags_None, px(2.2f));
+
+    // The review's key moments, dark for a good move, orange for a mistake.
+    struct Dot {
+        int ply;
+        ImVec2 at;
+    };
+    std::vector<Dot> dots;
+    if (const auto review = boardCommentaryReview()) {
+        for (const auto key : review->report.key_moments) {
+            const int ply = static_cast<int>(key);
+            if (const float v = win_at(ply); std::isfinite(v)) dots.push_back({ply, ImVec2(x_of(ply), y_of(v))});
+        }
+    }
+    const auto judgement = [&](int ply) {
+        return ply >= 1 && static_cast<std::size_t>(ply - 1) < b.judged.size()
+                   ? b.judged[static_cast<std::size_t>(ply - 1)].judgement
+                   : Judgement::None;
+    };
+    const ImU32 good = light ? IM_COL32(31, 79, 158, 255) : IM_COL32(150, 186, 240, 255);
+    const ImU32 bad  = IM_COL32(224, 138, 46, 255);
+    for (const auto& d : dots) {
+        dl->AddCircleFilled(d.at, px(6), light ? IM_COL32(255, 255, 255, 255) : IM_COL32(32, 36, 43, 255));
+        dl->AddCircleFilled(d.at, px(4.5f), judgement(d.ply) != Judgement::None ? bad : good);
+    }
+
+    // The move under the pointer, a dot first: its tooltip, and where a click or a drag goes.
+    if (hovered || active) {
+        const ImVec2 m  = ImGui::GetIO().MousePos;
+        const Dot* near = nullptr;
+        for (const auto& d : dots)
+            if (std::hypot(d.at.x - m.x, d.at.y - m.y) <= px(8)) near = &d;
+        const int ply = near
+                            ? near->ply
+                            : std::clamp(static_cast<int>(std::lround((m.x - p0.x - pad) / std::max(1.0f, w - 2 * pad) *
+                                                                      static_cast<float>(plies))),
+                                         0, plies);
+        if (active && (b.line >= 0 || boardMainPly() != ply)) showBoardLine(-1, ply);
+        if (hovered) {
+            std::string tip = ply == 0 ? std::string(TR("at the start")) : boardMoveLabel(ply);
+            if (ply > 0) tip += judgementMark(judgement(ply));
+            if (const float v = win_at(ply); std::isfinite(v))
+                tip += " · " + trf("White's chances {} %", static_cast<int>(std::lround(v * 100.0f)));
+            if (near && review_moments_of_ == board_commentary_of_) {
+                for (const auto& [at, text] : review_moments_)
+                    if (static_cast<int>(at) == ply) tip += "\n" + text;
+            }
+            if (ImGui::BeginTooltip()) {
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28);
+                ImGui::TextUnformatted(tip.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+        }
+    }
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("A click on the curve goes to the move. The dots are the key moments: dark for a good "
+                                 "move, orange for a mistake."));
+    ImGui::PopTextWrapPos();
 }
 
 void App::drawReviewAssistant() {
@@ -356,13 +474,22 @@ void App::drawReviewAssistant() {
         }
     }
     ImGui::Spacing();
-    // The story of the game, from the review's facts (M5, board 4).
-    const auto passages = commentary::story(review->line, b.tree.main.result.empty() ? "*" : b.tree.main.result,
-                                            review->report, review->analyses, nullptr, lang(), letters());
-    if (!passages.empty()) {
+    // The story of the game, from the review's facts, and what each side should work on (M5, board 4): told once for
+    // each review.
+    const std::string result = b.tree.main.result.empty() ? "*" : b.tree.main.result;
+    const auto story_of      = fmt::format("{}|{}|{}", board_commentary_of_, result, static_cast<int>(lang()));
+    if (review_story_of_ != story_of) {
+        review_story_ =
+            commentary::story(review->line, result, review->report, review->analyses, nullptr, lang(), letters());
+        review_work_on_ =
+            commentary::workOn(review->line, result, review->report, review->analyses, nullptr, lang(), letters());
+        review_story_of_ = story_of;
+    }
+    if (std::any_of(review_story_.begin(), review_story_.end(), [](const auto& p) { return !p.lesson; })) {
         ImGui::TextDisabled("%s", TR("THE STORY OF THE GAME"));
         ImGui::PushTextWrapPos();
-        for (const auto& p : passages) {
+        for (const auto& p : review_story_) {
+            if (p.lesson) continue;  // in a section of their own, below
             ImGui::TextUnformatted(p.text.c_str());
             if (p.ply && ImGui::IsItemClicked()) showBoardLine(-1, static_cast<int>(*p.ply));
             if (p.ply && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A click goes to the move it is about"));
@@ -370,6 +497,51 @@ void App::drawReviewAssistant() {
         ImGui::TextDisabled("%s", TR("Written from the review's facts: its verdicts, its evaluations, the positions."));
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
+    }
+    // What each side should work on: the kinds of mistakes it made most, the moves that show them a click away, and
+    // the advice they call for.
+    if (!review_work_on_.empty()) {
+        ImGui::TextDisabled("%s", TR("WHAT TO WORK ON"));
+        for (const auto& w : review_work_on_) {
+            const bool white = w.side == commentary::Color::White;
+            ImGui::PushID(white ? "white" : "black");
+            ImGui::TextUnformatted(white ? TR("For White") : TR("For Black"));
+            if (const auto name = b.tree.main.header(white ? "White" : "Black"); !name.empty() && name != "?") {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", name.c_str());
+            }
+            for (std::size_t t = 0; t < w.topics.size(); ++t) {
+                const auto& topic = w.topics[t];
+                ImGui::PushID(static_cast<int>(t));
+                ImGui::Bullet();
+                ImGui::SameLine();
+                auto name = topic.name;
+                if (!name.empty()) name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+                ImGui::TextUnformatted(trf("{}:", name).c_str());
+                for (std::size_t k = 0; k < topic.plies.size(); ++k) {
+                    const int ply = static_cast<int>(topic.plies[k]);
+                    auto move     = boardMoveLabel(ply);
+                    if (ply >= 1 && static_cast<std::size_t>(ply - 1) < b.judged.size())
+                        move += judgementMark(b.judged[static_cast<std::size_t>(ply - 1)].judgement);
+                    const float move_w = ImGui::CalcTextSize(move.c_str()).x;
+                    ui::sameLineOrWrap(move_w);
+                    ImGui::PushID(static_cast<int>(k));
+                    if (ImGui::Selectable(move.c_str(), b.line < 0 && b.ply == ply, ImGuiSelectableFlags_None,
+                                          ImVec2(move_w, 0)))
+                        showBoardLine(-1, ply);
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A click goes to the move"));
+                    ImGui::PopID();
+                }
+                ImGui::PopID();
+            }
+            if (!w.advice.empty()) {
+                ImGui::PushTextWrapPos();
+                ImGui::TextDisabled("%s", w.advice.c_str());
+                ImGui::PopTextWrapPos();
+            }
+            ImGui::PopID();
+            ImGui::Spacing();
+        }
     }
     // The assistant's two gestures on the game.
     ImGui::BeginDisabled(comment_job_.has_value() || !review->report.complete);

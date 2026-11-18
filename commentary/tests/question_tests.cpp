@@ -54,6 +54,35 @@ class FirstMoves final : public Oracle {
 
 }  // namespace
 
+// An engine that prints its line from one position down to its first move alone, as Gaia does from a fresh hash.
+class Terse final : public Oracle {
+   public:
+    explicit Terse(Position root) : root_(std::move(root)) {}
+    std::optional<Searched> search(const Position& pos, std::span<const Move> only) const override {
+        auto s = FirstMoves{}.search(pos, only);
+        if (s && pos == root_) s->moves.resize(1);
+        return s;
+    }
+
+   private:
+    Position root_;
+};
+
+TEST_CASE("question: a line the engine stops at its first move goes on from the position after it") {
+    auto pos = Position::initial();
+    pos.playUnchecked(*pos.parseUci("e2e4"));
+    const Terse engine(pos);
+    Asked asked;
+    asked.question = "What is the best move?";
+    asked.before   = &pos;
+    asked.lang     = Lang::En;
+    asked.letters  = PieceLetters::English;
+    Scripted silent({});
+    const auto best = answer(asked, silent, &engine, nullptr);
+    REQUIRE(std::holds_alternative<Answered>(best));
+    CHECK(std::get<Answered>(best).best == pos.legalMoves().front());
+}
+
 TEST_CASE("question: moves go by both names, the reader's first") {
     // Rf1 is the rook's move in English, the king's in French: both are legal here.
     const auto p      = test::pos("4k3/8/8/8/8/8/8/4K2R w K - 0 1");
@@ -192,4 +221,18 @@ TEST_CASE("question: answers from the review's lines, the engine's, and the mode
     threat.question = "What does Black threaten?";
     threat.before   = &checked;
     CHECK(std::get<Problem>(answer(threat, silent, &engine, nullptr)) == Problem::InCheck);
+    // Two moves compared: the engine's line after each, in their order, for the window's table.
+    asked.question      = "e5 ou c5 ?";
+    const auto compared = answer(asked, silent, &engine, nullptr);
+    REQUIRE(std::holds_alternative<Answered>(compared));
+    const auto& both = std::get<Answered>(compared);
+    CHECK(both.kind == Action::Kind::Compare);
+    CHECK(both.moves == std::vector<Move>{*pos.parseUci("e7e5"), *pos.parseUci("c7c5")});
+    REQUIRE(both.lines.size() == 2);
+    for (std::size_t i = 0; i < 2; ++i) {
+        auto after = pos;
+        after.playUnchecked(both.moves[i]);
+        REQUIRE(!both.lines[i].moves.empty());
+        CHECK(after.parseUci(uci(both.lines[i].moves.front())).has_value());
+    }
 }

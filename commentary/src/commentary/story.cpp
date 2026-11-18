@@ -123,6 +123,33 @@ class Teller {
         return passages;
     }
 
+    // The lessons on their own, for each side that has some.
+    std::vector<WorkOn> workOn() const {
+        const auto* decided                           = decisive();
+        const std::optional<std::size_t> decisive_ply = decided ? std::optional(decided->ply) : std::nullopt;
+        std::vector<WorkOn> out;
+        for (const auto c : COLORS) {
+            const auto found = lessonsOf(c, decisive_ply);
+            if (found.empty()) continue;
+            WorkOn w;
+            w.side = c;
+            for (const auto& [lesson, moves] : found) {
+                WorkOn::Topic t;
+                t.name = topic(lesson);
+                for (const auto* m : moves) t.plies.push_back(m->ply);
+                w.topics.push_back(std::move(t));
+            }
+            for (const auto& [lesson, moves] : found) {
+                if (const auto* said = advice(lesson)) {
+                    w.advice = said;
+                    break;
+                }
+            }
+            out.push_back(std::move(w));
+        }
+        return out;
+    }
+
    private:
     bool fr() const { return lang_ == Lang::Fr; }
     const char* side(Color c) const { return sideName(c, lang_); }
@@ -449,7 +476,7 @@ class Teller {
             }
             const auto& first_moves = found.front().second;
             passages.push_back(
-                Passage{text, first_moves.empty() ? std::nullopt : std::optional(first_moves.front()->ply)});
+                Passage{text, first_moves.empty() ? std::nullopt : std::optional(first_moves.front()->ply), true});
         }
         return passages;
     }
@@ -759,6 +786,12 @@ std::vector<Passage> story(const MainLine& line, std::string_view result, const 
                            const Analyses& analyses, const Tablebases* tables, Lang lang, PieceLetters letters) {
     if (!report.complete || report.moves.size() < MIN_PLIES) return {};
     return Teller(line, result, report, analyses, tables, lang, letters).tell();
+}
+
+std::vector<WorkOn> workOn(const MainLine& line, std::string_view result, const GameReport& report,
+                           const Analyses& analyses, const Tablebases* tables, Lang lang, PieceLetters letters) {
+    if (!report.complete || report.moves.size() < MIN_PLIES) return {};
+    return Teller(line, result, report, analyses, tables, lang, letters).workOn();
 }
 
 namespace story_detail {

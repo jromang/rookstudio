@@ -21,6 +21,7 @@
 #include <commentary/question.hpp>
 #include <commentary/references.hpp>
 #include <commentary/review.hpp>
+#include <commentary/story.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
 #include <tour/polyglot.hpp>
@@ -862,12 +863,19 @@ class App {
     [[nodiscard]] std::string gpuTournament() const;
     // An answer put in the notation, on the move it was asked after: the assistant's comment when the move had none,
     // added to the user's own otherwise.
-    void addAssistantComment(const std::string& text, int line, int ply, const std::string& fen);
+    void addAssistantComment(const std::string& text, int line, int ply, const std::string& fen,
+                             const std::vector<std::string>& basis = {});
+    // What the assistant's comments written in this session rest on, by their text: said when one is hovered (R9).
+    std::map<std::string, std::vector<std::string>> assistant_basis_;
+    [[nodiscard]] std::vector<std::string> commentBasis(bool from_review);
     std::unique_ptr<AssistantService> assistant_;
     std::shared_ptr<EngineOracle> oracle_;  // the engine that answers, the analysis's, kept while it is the same
     struct QuestionResult {
         std::variant<commentary::Answered, commentary::Problem> answer = commentary::Problem::NoEngine;
         std::string error;
+        // Two moves compared: the position they are played from, and what the databases hold of it.
+        std::optional<commentary::Position> from;
+        std::optional<commentary::References> refs;
     };
     struct QuestionAsked {
         std::string question;
@@ -890,6 +898,7 @@ class App {
     void pollBoardComments();
     void drawCommentProgress();  // the key moments being commented: how many, Cancel
     void drawReviewAssistant();  // the review tab's story of the game and the assistant's gestures
+    void drawReviewCurve();      // the review tab's head: White's chances, the key moments as dots (M5, board 4)
     // The commentary's review of the board's game, from its judging analysis; made again when that changes.
     [[nodiscard]] std::shared_ptr<const CommentaryReview> boardCommentaryReview();
     struct CommentJob {
@@ -904,6 +913,7 @@ class App {
         std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
         std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
         std::future<std::vector<std::string>> texts;  // one per target, empty when none
+        std::vector<std::string> basis;               // what they rest on (commentBasis())
     };
     std::optional<CommentJob> comment_job_;
     std::shared_ptr<const CommentaryReview> board_commentary_;
@@ -923,6 +933,10 @@ class App {
     // The moves the review singles out, each with its template comment: the review tab's key moments in words.
     std::vector<std::pair<std::size_t, std::string>> review_moments_;
     std::string review_moments_of_;
+    // The story of the game and what each side should work on, from the same review.
+    std::vector<commentary::Passage> review_story_;
+    std::vector<commentary::WorkOn> review_work_on_;
+    std::string review_story_of_;
     uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
     int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions

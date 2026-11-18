@@ -234,6 +234,16 @@ TEST_CASE("game: the story of a game is told from its review") {
         "À travailler pour les Noirs : les pièces laissées en prise (12…Dg4?\?). Avant chaque coup, vérifier ce qu'il "
         "laisse sans défense.");
     CHECK(told.back().text == "Les Blancs l'emportent.");
+    // The lessons on their own, as the review shows them apart: the same kind of mistake, its move, the advice.
+    CHECK(told[told.size() - 2].lesson);
+    CHECK_FALSE(told[1].lesson);
+    const auto work = workOn(g, "1-0", report, a, nullptr, Lang::Fr, PieceLetters::French);
+    REQUIRE(work.size() == 1);
+    CHECK(work[0].side == Color::Black);
+    REQUIRE(work[0].topics.size() == 1);
+    CHECK(work[0].topics[0].name == "les pièces laissées en prise");
+    CHECK(work[0].topics[0].plies == std::vector<std::size_t>{24});
+    CHECK(work[0].advice == "Avant chaque coup, vérifier ce qu'il laisse sans défense.");
     const auto en = story(g, "1-0", report, a, nullptr, Lang::En, PieceLetters::English);
     REQUIRE(en.size() >= 3);
     CHECK(en.back().text == "White wins.");
@@ -244,6 +254,7 @@ TEST_CASE("game: the story of a game is told from its review") {
     auto partial = a;
     partial[10].reset();
     CHECK(story(g, "1-0", review(g, partial, Opening{}), partial, nullptr, Lang::En, PieceLetters::English).empty());
+    CHECK(workOn(g, "1-0", review(g, partial, Opening{}), partial, nullptr, Lang::En, PieceLetters::English).empty());
 }
 
 TEST_CASE("game: a quiet move that carries out a plan gets a word") {

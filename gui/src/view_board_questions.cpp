@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <variant>
 #include <vector>
@@ -32,6 +33,64 @@ namespace {
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 bool french() { return i18n::language() == i18n::Language::French; }
+
+// A score from White's side: "+0.62", "#3", "-#2".
+std::string whiteScore(const commentary::Score& s) {
+    if (s.kind == commentary::Score::Kind::Mate)
+        return s.value > 0 ? fmt::format("#{}", s.value) : fmt::format("-#{}", -s.value);
+    return fmt::format("{:+.2f}", s.value / 100.0);
+}
+
+// The table under two moves compared (M5, board 2): for each, the engine's score after it, White's; its games in the
+// databases and how they scored for the side that played it; and the line that follows.
+void drawComparison(const commentary::Position& from, const commentary::Answered& ans,
+                    const std::optional<commentary::References>& refs, const std::string& engine,
+                    const std::vector<commentary::ReferenceBase>& bases, commentary::PieceLetters letters) {
+    const std::string base = bases.size() == 1 ? bases.front().name : std::string(TR("Your databases"));
+    ImGui::PushTextWrapPos(-1.0f);  // the card wraps its text: not the table's cells, sized by what they hold
+    if (!ImGui::BeginTable("##compare", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerH)) {
+        ImGui::PopTextWrapPos();
+        return;
+    }
+    ImGui::TableSetupColumn(TR("Move"));
+    ImGui::TableSetupColumn(engine.empty() ? TR("Engine") : engine.c_str());
+    ImGui::TableSetupColumn(base.c_str());
+    ImGui::TableSetupColumn(TR("The line"), ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableHeadersRow();
+    for (std::size_t i = 0; i < ans.moves.size() && i < ans.lines.size(); ++i) {
+        const auto& mv = ans.moves[i];
+        auto after     = from;
+        after.playUnchecked(mv);
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(commentary::moveText(from, mv, letters).c_str());
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(whiteScore(ans.lines[i].score).c_str());
+        ImGui::TableNextColumn();
+        std::string games = "–";
+        if (refs) {
+            games = TR("no game");
+            for (const auto& p : refs->moves) {
+                if (!(p.move == mv) || p.stats.games == 0) continue;
+                const auto& st     = p.stats;
+                const auto decided = st.white + st.draws + st.black;
+                const auto won     = from.turn() == commentary::Color::White ? st.white : st.black;
+                const auto counted = ui::exactCount(st.games);
+                games = decided == 0
+                            ? trn("{} game", "{} games", st.games, counted)
+                            : trn("{} game, {} %", "{} games, {} %", st.games, counted,
+                                  static_cast<int>(std::lround(
+                                      100.0 * (static_cast<double>(won) + 0.5 * static_cast<double>(st.draws)) /
+                                      static_cast<double>(decided))));
+            }
+        }
+        ImGui::TextUnformatted(games.c_str());
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(commentary::lineText(after, ans.lines[i].moves, 4, letters).c_str());
+    }
+    ImGui::EndTable();
+    ImGui::PopTextWrapPos();
+}
 
 // A move with its number, as the notation writes it: "14.Nd5", "14…Bxd5".
 std::string numberedSan(const chess::Board& before, const std::string& san) {
@@ -201,6 +260,13 @@ void App::askQuestion(const std::string& text) {
                        }
                        asked.line = moves;
                        r.answer   = commentary::answer(asked, *model, oracle.get(), nullptr);
+                       // Two moves compared: the position they are played from, and what the databases hold of it,
+                       // for the table under the answer.
+                       if (const auto* a = std::get_if<commentary::Answered>(&r.answer);
+                           a && a->kind == commentary::Action::Kind::Compare) {
+                           r.from = a->earlier && earlier ? *earlier : *pos;
+                           if (!bases.empty()) r.refs = commentary::references(*r.from, bases, 0);
+                       }
                        if (const auto* p = std::get_if<commentary::Problem>(&r.answer);
                            p && *p == commentary::Problem::NoEngine && oracle && !oracle->error().empty())
                            r.error = oracle->error();
@@ -221,7 +287,8 @@ void App::pollQuestions() {
                   [](auto& f) { return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
 }
 
-void App::addAssistantComment(const std::string& text, int line, int ply, const std::string& fen) {
+void App::addAssistantComment(const std::string& text, int line, int ply, const std::string& fen,
+                              const std::vector<std::string>& basis) {
     auto& b = board_;
     if (ply <= 0 || text.empty()) return;
     // The move it was asked after, if the game still has it there.
@@ -241,6 +308,7 @@ void App::addAssistantComment(const std::string& text, int line, int ply, const 
     if (notes->after.empty()) {
         notes->after = text;
         markByAssistant(*notes, true);
+        if (!basis.empty()) assistant_basis_[text] = basis;
     } else {
         notes->after += " " + text;  // added by the user to their own comment: it stays theirs
     }
@@ -311,6 +379,9 @@ void App::drawBoardQuestions() {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", q.done->error.c_str());
         } else if (const auto* ans = std::get_if<commentary::Answered>(&q.done->answer)) {
             ImGui::TextUnformatted(ans->text.c_str());
+            if (ans->kind == commentary::Action::Kind::Compare && q.done->from)
+                drawComparison(*q.done->from, *ans, q.done->refs, q.engine, q.bases,
+                               french() ? commentary::PieceLetters::French : commentary::PieceLetters::English);
             // What it rests on (M5, board 2).
             using K = commentary::Action::Kind;
             std::vector<std::string> sources;
@@ -367,7 +438,7 @@ void App::drawBoardQuestions() {
                 if (action(TR("The reference games"))) board_side_tab_ = 3;
             }
             if (q.ply > 0 && ans->kind != K::Opening && action(TR("Add to the notation")))
-                addAssistantComment(ans->text, q.line, q.ply, q.fen);
+                addAssistantComment(ans->text, q.line, q.ply, q.fen, sources);
             if (action(TR("Remove"))) remove = n;
         } else if (const auto* problem = std::get_if<commentary::Problem>(&q.done->answer)) {
             using P         = commentary::Problem;

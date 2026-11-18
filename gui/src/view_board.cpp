@@ -2697,10 +2697,25 @@ void App::drawBoardMoves(float height) {
             showBoardLine(ev.clicked / 100000 - 1, ev.clicked % 100000);
             b.preview.reset();
         }
-        if (const auto* c = comment(ev.hovered))
-            ImGui::SetTooltip("%s", c->assistant ? TR("The assistant's comment · a double click corrects it, and it "
-                                                      "becomes yours · Ctrl+Z takes it back")
-                                                 : TR("A double click corrects the comment"));
+        if (const auto* c = comment(ev.hovered)) {
+            std::string tip = c->assistant ? TR("The assistant's comment · a double click corrects it, and it "
+                                                "becomes yours · Ctrl+Z takes it back")
+                                           : TR("A double click corrects the comment");
+            // What it rests on, when it was written in this session (R9).
+            if (const MoveNotes* notes = c->assistant ? notesAt(b.tree, c->line, c->ply) : nullptr) {
+                if (const auto it = assistant_basis_.find(c->before ? notes->before : notes->after);
+                    it != assistant_basis_.end()) {
+                    tip += "\n\n" + std::string(TR("What it rests on:"));
+                    for (const auto& s : it->second) tip += "\n· " + s;
+                }
+            }
+            if (ImGui::BeginTooltip()) {
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30);
+                ImGui::TextUnformatted(tip.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+        }
         // A move of the game: what its engine said and its judgement.
         if (ev.hovered >= 0 && ev.hovered < kCommentIds && ev.hovered / 100000 == 0) {
             const int i = ev.hovered % 100000 - 1;
@@ -3138,6 +3153,10 @@ void App::drawBoardReview() {
                                     "moments, and who saw them coming."));
         if (!b.reviewing() && !main.moves.empty() && ImGui::Button(TR("Analyse the game"))) startGameReview();
         return;
+    }
+    if (chessBoard()) {
+        drawReviewCurve();
+        ImGui::Spacing();
     }
     const auto& review = b.reviews.front();
     const auto phases  = gamePhases(main, b.chess960);

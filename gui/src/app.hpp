@@ -22,6 +22,7 @@
 #include <commentary/references.hpp>
 #include <commentary/review.hpp>
 #include <commentary/story.hpp>
+#include <commentary/tablebase.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
 #include <tour/polyglot.hpp>
@@ -56,6 +57,7 @@
 #include "qr.hpp"
 #include "remote_run.hpp"
 #include "repertoires.hpp"
+#include "review_tables.hpp"
 #include "run.hpp"
 #include "stats.hpp"
 #include "storage.hpp"
@@ -952,6 +954,29 @@ class App {
     std::vector<commentary::Passage> review_story_;
     std::vector<commentary::WorkOn> review_work_on_;
     std::string review_story_of_;
+    // Lichess's tables for the review's endgame (#42, M5 board 4): the game's positions of seven men or fewer asked
+    // once each, with « Always » for the tables on the Lichess page or for this game alone, in the background; taught
+    // to tables the review is then held to (review_tables.hpp).
+    struct ReviewTablesJob {
+        std::string of;  // the game it asks for
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
+        int total                                 = 0;
+        std::future<std::string> finished;  // why it stopped early, empty when it went to the end
+    };
+    std::optional<ReviewTablesJob> review_tables_job_;
+    std::shared_ptr<commentary::Tablebases> review_tables_;  // what they were taught, for review_tables_of_
+    std::string review_tables_of_;                           // the game they are of
+    int review_tables_taught_ = 0;  // positions dealt with when the review was last made: part of its key
+    std::vector<TablePosition> review_tables_positions_;              // the game's positions they could be taught about
+    std::shared_ptr<const commentary::MainLine> review_tables_line_;  // the game, as the tables read it
+    bool review_tables_started_ = false;                              // asked for this game already
+    bool review_tables_once_    = false;                              // asked for this game, without « Always »
+    bool review_tables_not_now_ = false;                              // not asked for this game
+    std::string review_tables_error_;
+    void updateReviewTables();  // a new game's tables; the asking started when allowed, its end taken
+    void drawReviewTables();    // the review's line about them: the question, the asking, what they judged
+    [[nodiscard]] const commentary::Tablebases* reviewTables() const;  // when taught anything
     uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
     int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions

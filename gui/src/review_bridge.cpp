@@ -1,5 +1,7 @@
 #include "review_bridge.hpp"
 
+#include <commentary/exact.hpp>
+
 #include <algorithm>
 #include <array>
 #include <sstream>
@@ -84,10 +86,16 @@ std::vector<MoveReview> judgedMoves(const CommentaryReview& review) {
 }
 
 std::shared_ptr<const CommentaryReview> commentaryReview(const ReplayGame& game, bool chess960,
-                                                         const GameReview& review, const commentary::Opening& opening) {
+                                                         const GameReview& review, const commentary::Opening& opening,
+                                                         const commentary::Tablebases* tables) {
     auto line = mainLineOf(game, chess960);
     if (!line) return nullptr;
     auto analyses = analysesOf(*line, review);
+    if (tables) {
+        const auto& positions = line->positions();
+        for (std::size_t i = 0; i < analyses.size() && i < positions.size(); ++i)
+            if (analyses[i]) commentary::settle(positions[i], *analyses[i], *tables);
+    }
     auto report   = commentary::review(*line, analyses, opening);
     return std::make_shared<const CommentaryReview>(
         CommentaryReview{std::move(*line), std::move(analyses), std::move(report)});

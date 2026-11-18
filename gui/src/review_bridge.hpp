@@ -8,6 +8,7 @@
 #include <optional>
 
 #include <commentary/review.hpp>
+#include <commentary/tablebase.hpp>
 
 #include "game_analysis.hpp"
 #include "pgn_store.hpp"
@@ -31,9 +32,12 @@ struct CommentaryReview {
 [[nodiscard]] commentary::Analyses analysesOf(const commentary::MainLine& line, const GameReview& review);
 
 // The review of `game` from `review`, `opening` telling how far it followed theory; none where mainLineOf() has none.
+// With `tables`, the engine's lines give way to the outcomes they know (commentary::settle()) before the moves are
+// judged.
 [[nodiscard]] std::shared_ptr<const CommentaryReview> commentaryReview(const ReplayGame& game, bool chess960,
                                                                        const GameReview& review,
-                                                                       const commentary::Opening& opening = {});
+                                                                       const commentary::Opening& opening   = {},
+                                                                       const commentary::Tablebases* tables = nullptr);
 
 // The moves judged as the commentary judges them (two readings of the engine, lichess's thresholds on the chances
 // between people): the Chess space's symbols, which its comments agree with. One per move up to the last one the

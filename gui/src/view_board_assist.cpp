@@ -65,6 +65,7 @@ std::string App::boardTheoryKey() {
 std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
     auto& b = board_;
     if (b.reviews.empty() || b.chess960) return nullptr;
+    updateReviewTables();
     // The game's theory, looked for once per game and database; the review is made again when it comes.
     const auto theory_key = boardTheoryKey();
     if (!theory_key.empty() && theory_key != theory_of_ && (!theory_job_ || theory_job_->of != theory_key)) {
@@ -103,8 +104,8 @@ std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
     }
     const bool theory = !theory_key.empty() && theory_key == theory_of_;
     const auto& r     = b.reviews.front();
-    const auto key    = fmt::format("{}|{}|{}|{}|{}", reviewKey(b.tree.main), r.engine, r.passes, r.positions.size(),
-                                    theory ? theory_of_ : std::string());
+    const auto key    = fmt::format("{}|{}|{}|{}|{}|{}", reviewKey(b.tree.main), r.engine, r.passes, r.positions.size(),
+                                    theory ? theory_of_ : std::string(), review_tables_taught_);
     if (key != board_commentary_of_) {
         // Theory never hides an error the engine sees: a database of club games has its traps played a hundred
         // times. Its book ends before the first mistake.
@@ -119,10 +120,114 @@ std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
                     }
                 }
             }
-        board_commentary_    = commentaryReview(b.tree.main, b.chess960, r, board_theory_used_);
+        board_commentary_    = commentaryReview(b.tree.main, b.chess960, r, board_theory_used_, reviewTables());
         board_commentary_of_ = key;
     }
     return board_commentary_;
+}
+
+const commentary::Tablebases* App::reviewTables() const {
+    return review_tables_taught_ > 0 ? review_tables_.get() : nullptr;
+}
+
+void App::updateReviewTables() {
+    auto& b        = board_;
+    const auto key = b.chess960 || b.tree.main.moves.empty() ? std::string() : reviewKey(b.tree.main);
+    if (key != review_tables_of_) {
+        // Another game: its own tables; an asking still going stops, its answers kept in the profile all the same.
+        if (review_tables_job_) *review_tables_job_->cancel = true;
+        review_tables_of_      = key;
+        review_tables_         = std::make_shared<commentary::Tablebases>();
+        review_tables_taught_  = 0;
+        review_tables_once_    = false;
+        review_tables_not_now_ = false;
+        review_tables_started_ = false;
+        review_tables_error_.clear();
+        review_tables_positions_.clear();
+        review_tables_line_.reset();
+        if (!key.empty()) {
+            if (auto line = mainLineOf(b.tree.main, false)) {
+                review_tables_positions_ = tablePositions(*line, *review_tables_);
+                review_tables_line_      = std::make_shared<const commentary::MainLine>(std::move(*line));
+            }
+        }
+    }
+    // Its end: the review made again, held to what they said (an earlier game's asking just ends).
+    if (review_tables_job_ &&
+        review_tables_job_->finished.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto error      = review_tables_job_->finished.get();
+        const bool ours = review_tables_job_->of == review_tables_of_;
+        const int done  = *review_tables_job_->done;
+        review_tables_job_.reset();
+        if (ours) {
+            review_tables_error_  = std::move(error);
+            review_tables_taught_ = std::max(done, 1);
+            b.review_key.clear();  // the moves' symbols with it
+        }
+    }
+    const bool allowed = lichess_.tablebase == 1 || review_tables_once_;
+    if (!allowed || lichess_.tablebase == 2 || review_tables_started_ || review_tables_job_ ||
+        review_tables_positions_.empty() || !review_tables_line_ || !chessBoard())
+        return;
+    review_tables_started_ = true;
+    ReviewTablesJob job;
+    job.of       = key;
+    job.total    = static_cast<int>(review_tables_positions_.size());
+    job.finished = std::async(std::launch::async,
+                              [positions = review_tables_positions_, line = review_tables_line_, root = storage_.root(),
+                               tables = review_tables_, cancel = job.cancel,
+                               done = job.done] { return askTables(positions, *line, root, *tables, *cancel, *done); });
+    review_tables_job_ = std::move(job);
+}
+
+void App::drawReviewTables() {
+    if (review_tables_positions_.empty() || lichess_.tablebase == 2) return;
+    const int n = static_cast<int>(review_tables_positions_.size());
+    ImGui::PushTextWrapPos();
+    if (review_tables_job_ && review_tables_job_->of == review_tables_of_) {
+        ImGui::TextDisabled("%s", trf("Asking Lichess's tables about the endgame: {} of {} positions…",
+                                      review_tables_job_->done->load(), review_tables_job_->total)
+                                      .c_str());
+    } else if (review_tables_taught_ > 0) {
+        if (!review_tables_error_.empty())
+            ImGui::TextDisabled("%s", trf("Lichess's tables could not be asked to the end ({}): the engine judged the "
+                                          "moves they did not answer for.",
+                                          review_tables_error_)
+                                          .c_str());
+        else
+            ImGui::TextDisabled("%s", trn("The endgame judged by Lichess's tables: {} position of seven pieces or "
+                                          "fewer, each move by what it does to the exact result.",
+                                          "The endgame judged by Lichess's tables: {} positions of seven pieces or "
+                                          "fewer, each move by what it does to the exact result.",
+                                          n, n)
+                                          .c_str());
+    } else if (lichess_.tablebase == 0 && !review_tables_once_ && !review_tables_not_now_) {
+        // The question of the Analysis tab, for the whole game (M4, board 5).
+        ui::beginCard("review_tables");
+        ImGui::PushTextWrapPos();
+        ImGui::TextUnformatted(trn("Lichess's tables can judge this endgame exactly: {} position of seven pieces or "
+                                   "fewer.",
+                                   "Lichess's tables can judge this endgame exactly: {} positions of seven pieces or "
+                                   "fewer.",
+                                   n, n)
+                                   .c_str());
+        ImGui::TextDisabled("%s",
+                            TR("To ask, their FEN would go to lichess.org, one at a time, without an account; the "
+                               "answers are kept in the profile."));
+        if (ImGui::SmallButton(TR("Ask for this game"))) review_tables_once_ = true;
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Always"))) {
+            lichess_.tablebase = 1;
+            saveLichessSettings();
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Not now"))) review_tables_not_now_ = true;
+        ImGui::TextDisabled("%s", TR("« Always » is changed on the Lichess page (Online for the analysis), where it is "
+                                     "said too (R8)."));
+        ImGui::PopTextWrapPos();
+        ui::endCard();
+    }
+    ImGui::PopTextWrapPos();
 }
 
 std::vector<std::string> App::commentBasis(bool from_review) {
@@ -173,36 +278,37 @@ void App::commentBoardMove() {
     job.basis = commentBasis(review && review->report.get(static_cast<std::size_t>(b.ply)));
     const auto before_fen                          = boardAt(b.game, b.chess960, b.ply - 1).getFen();
     const auto played = chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(b.ply - 1)].move, b.chess960);
-    job.texts =
-        std::async(std::launch::async, [review, ply = static_cast<std::size_t>(b.ply), fen = job.targets.front().fen,
-                                        before_fen, played, model = assistant_.get(), oracle = oracle_, done = job.done,
-                                        l = lang(), letters = letters()]() {
-            std::vector<std::string> out(1);
-            if (review) {
-                if (const auto* m = review->report.get(ply)) {
-                    const auto ctx =
-                        commentary::moveContext(review->line, *m, review->analyses, nullptr, nullptr, oracle.get());
-                    if (const auto w = commentary::writtenComment(*model, ctx, l, letters)) out[0] = w->text;
-                    ++*done;
-                    return out;
-                }
-            }
-            const auto pos     = commentary::Position::fromFen(fen);
-            const auto earlier = commentary::Position::fromFen(before_fen);
-            if (pos && earlier) {
-                commentary::Asked asked;
-                asked.question = "Why this move?";
-                asked.before   = &*pos;
-                asked.earlier  = &*earlier;
-                asked.previous = earlier->parseUci(played);
-                asked.lang     = l;
-                asked.letters  = letters;
-                const auto a   = commentary::answer(asked, *model, oracle.get(), nullptr);
-                if (const auto* said = std::get_if<commentary::Answered>(&a)) out[0] = said->text;
-            }
-            ++*done;
-            return out;
-        });
+    job.texts    = std::async(std::launch::async,
+                              [review, ply = static_cast<std::size_t>(b.ply), fen = job.targets.front().fen, before_fen,
+                               played, model = assistant_.get(), oracle = oracle_, done = job.done,
+                               tables = reviewTables() ? review_tables_ : nullptr, l = lang(), letters = letters()]() {
+                               std::vector<std::string> out(1);
+                               if (review) {
+                                   if (const auto* m = review->report.get(ply)) {
+                                       const auto ctx = commentary::moveContext(review->line, *m, review->analyses,
+                                                                                nullptr, tables.get(), oracle.get());
+                                       if (const auto w = commentary::writtenComment(*model, ctx, l, letters))
+                                           out[0] = w->text;
+                                       ++*done;
+                                       return out;
+                                   }
+                               }
+                               const auto pos     = commentary::Position::fromFen(fen);
+                               const auto earlier = commentary::Position::fromFen(before_fen);
+                               if (pos && earlier) {
+                                   commentary::Asked asked;
+                                   asked.question = "Why this move?";
+                                   asked.before   = &*pos;
+                                   asked.earlier  = &*earlier;
+                                   asked.previous = earlier->parseUci(played);
+                                   asked.lang     = l;
+                                   asked.letters  = letters;
+                                   const auto a   = commentary::answer(asked, *model, oracle.get(), nullptr);
+                                   if (const auto* said = std::get_if<commentary::Answered>(&a)) out[0] = said->text;
+                               }
+                               ++*done;
+                               return out;
+                              });
     comment_job_ = std::move(job);
     boardToast(TR("The assistant is commenting the move…"));
 }
@@ -221,7 +327,7 @@ void App::commentKeyMoments() {
     else if (!oracle_ || oracle_->engine() != engine->name)
         oracle_ = std::make_shared<EngineOracle>(*engine);
     // The moves that deserve a comment: mistakes, only moves, turning points, plans, the novelty; those with none yet.
-    const auto picked = commentary::templateComments(review->line, review->report, review->analyses, {}, nullptr,
+    const auto picked = commentary::templateComments(review->line, review->report, review->analyses, {}, reviewTables(),
                                                      nullptr, lang(), letters());
     CommentJob job;
     job.key_moments = true;
@@ -243,16 +349,17 @@ void App::commentKeyMoments() {
     job.basis = commentBasis(true);
     // With the model, its comments (the template's where it has nothing better); without it, the template's.
     AssistantService* model = assistant_->installed() ? assistant_.get() : nullptr;
-    job.texts               = std::async(std::launch::async, [review, wanted, model, oracle = oracle_, done = job.done,
-                                                              cancel = job.cancel, l = lang(), letters = letters()]() {
+    job.texts = std::async(std::launch::async, [review, wanted, model, oracle = oracle_, done = job.done,
+                                                tables = reviewTables() ? review_tables_ : nullptr, cancel = job.cancel,
+                                                l = lang(), letters = letters()]() {
         std::vector<std::string> out;
         for (const auto& [ply, text] : wanted) {
             if (*cancel) break;
             std::string said = text;
             if (model) {
                 if (const auto* m = review->report.get(ply)) {
-                    const auto ctx =
-                        commentary::moveContext(review->line, *m, review->analyses, nullptr, nullptr, oracle.get());
+                    const auto ctx = commentary::moveContext(review->line, *m, review->analyses, nullptr, tables.get(),
+                                                             oracle.get());
                     if (const auto w = commentary::writtenComment(*model, ctx, l, letters)) said = w->text;
                 }
             }
@@ -455,11 +562,13 @@ void App::drawReviewAssistant() {
     } else if (theory_job_) {
         ImGui::TextDisabled("%s", trf("Looking for the game's theory in « {} »…", board_theory_base_).c_str());
     }
+    // How its endgame is judged: Lichess's tables, asked when allowed (#42).
+    drawReviewTables();
     // The moves the review singles out, in words: a click goes to the move.
     if (review->report.complete) {
         if (review_moments_of_ != board_commentary_of_) {
-            review_moments_ = commentary::templateComments(review->line, review->report, review->analyses, {}, nullptr,
-                                                           nullptr, lang(), letters());
+            review_moments_    = commentary::templateComments(review->line, review->report, review->analyses, {},
+                                                              reviewTables(), nullptr, lang(), letters());
             review_moments_of_ = board_commentary_of_;
         }
         if (!review_moments_.empty()) {
@@ -486,10 +595,10 @@ void App::drawReviewAssistant() {
     const std::string result = b.tree.main.result.empty() ? "*" : b.tree.main.result;
     const auto story_of      = fmt::format("{}|{}|{}", board_commentary_of_, result, static_cast<int>(lang()));
     if (review_story_of_ != story_of) {
-        review_story_ =
-            commentary::story(review->line, result, review->report, review->analyses, nullptr, lang(), letters());
-        review_work_on_ =
-            commentary::workOn(review->line, result, review->report, review->analyses, nullptr, lang(), letters());
+        review_story_    = commentary::story(review->line, result, review->report, review->analyses, reviewTables(),
+                                             lang(), letters());
+        review_work_on_  = commentary::workOn(review->line, result, review->report, review->analyses, reviewTables(),
+                                              lang(), letters());
         review_story_of_ = story_of;
     }
     if (std::any_of(review_story_.begin(), review_story_.end(), [](const auto& p) { return !p.lesson; })) {

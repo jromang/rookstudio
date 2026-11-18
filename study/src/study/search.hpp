@@ -6,6 +6,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -69,6 +70,8 @@ class Search {
     [[nodiscard]] bool cancelled() const noexcept { return cancel_; }
     [[nodiscard]] uint64_t searched() const noexcept { return searched_; }  // games looked at
     [[nodiscard]] uint64_t total() const noexcept { return snapshot_->games(); }
+    // How long it took, from its start to its last thread's end, once done (not counting a wait for its result).
+    [[nodiscard]] double elapsedMs() const noexcept { return static_cast<double>(elapsed_us_) / 1000.0; }
     // The hits found so far, in the order of the games.
     [[nodiscard]] std::vector<SearchHit> hits() const;
 
@@ -81,6 +84,9 @@ class Search {
     std::atomic<uint64_t> next_{0};  // the next part of the games to take
     std::atomic<uint64_t> searched_{0};
     std::atomic<std::size_t> finished_{0};
+    std::size_t planned_                           = 0;  // the threads it starts
+    std::chrono::steady_clock::time_point started_ = std::chrono::steady_clock::now();
+    std::atomic<int64_t> elapsed_us_{0};
     mutable std::mutex mutex_;
     std::vector<std::vector<SearchHit>> parts_;  // each part's hits, once searched
     std::vector<std::thread> threads_;

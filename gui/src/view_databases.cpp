@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
+#include <iterator>
 #include <string>
 
 #include <fmt/include/fmt/format.h>
@@ -10,6 +12,7 @@
 
 #include "app.hpp"
 #include "board_text.hpp"
+#include "board_view.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
 #include "machines.hpp"
@@ -421,14 +424,21 @@ void App::drawGameList() {
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("Ctrl+F");
 
-    // The view, made again in the background when what it shows changed.
+    // The view, made again in the background when what it shows changed: narrowed by the searches set (the position
+    // added to the filter, a material, a pattern) once they are done.
+    pollSearches(snapshot, s.entries()[index].folder.string());
     const auto& p = db_search_;
+    std::vector<const SearchJob*> narrowing_jobs;
+    if (p.position) narrowing_jobs.push_back(&db_position_job_);
+    if (!db_material_job_.of.empty()) narrowing_jobs.push_back(&db_material_job_);
+    if (!db_pattern_job_.of.empty()) narrowing_jobs.push_back(&db_pattern_job_);
+    std::string narrowing;
+    for (const auto* job : narrowing_jobs) narrowing += job->of + (job->ready ? "+" : "-");
     const auto of =
         fmt::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(),
                     snapshot->generation(), db_filter_.data(), static_cast<int>(db_sort_), db_descending_,
                     p.player.data(), p.opponent.data(), p.event.data(), p.side, p.year_from.data(), p.year_to.data(),
-                    p.eco_from.data(), p.eco_to.data(), p.elo_min.data(), static_cast<int>(p.result),
-                    p.position ? db_position_of_ + (db_position_ready_ ? "+" : "-") : std::string());
+                    p.eco_from.data(), p.eco_to.data(), p.elo_min.data(), static_cast<int>(p.result), narrowing);
     if (db_view_of_ != of && (!db_view_job_ || db_view_job_->of != of)) {
         if (db_view_job_) *db_view_job_->cancel = true;
         ViewJob job;
@@ -436,9 +446,19 @@ void App::drawGameList() {
         job.cancel        = std::make_shared<std::atomic<bool>>(false);
         job.started       = std::chrono::steady_clock::now();
         const auto filter = listFilter();
-        // The games through the position, once found: the others left out of the view.
+        // The games the searches found, those of all of them: the others left out of the view.
         std::optional<std::vector<study::GameId>> through;
-        if (db_search_.position && db_position_ready_) through = db_position_;
+        for (const auto* job : narrowing_jobs) {
+            if (!job->ready) continue;
+            if (!through) {
+                through = job->ids;
+                continue;
+            }
+            std::vector<study::GameId> both;
+            std::set_intersection(through->begin(), through->end(), job->ids.begin(), job->ids.end(),
+                                  std::back_inserter(both));
+            through = std::move(both);
+        }
         job.done     = std::async(std::launch::async, [snapshot, filter, sort = db_sort_, down = db_descending_,
                                                        cancel = job.cancel, through = std::move(through)] {
             auto view = study::makeView(snapshot, filter, sort, down, 0, cancel.get());
@@ -480,7 +500,8 @@ void App::drawGameList() {
     if (!ids.empty()) db_row_ = std::min(db_row_, ids.size() - 1);
 
     // The list and, beside it, the game chosen.
-    const float preview_w = std::min(px(300), ImGui::GetContentRegionAvail().x * 0.3f);
+    const float preview_w = db_search_open_ ? std::min(px(420), ImGui::GetContentRegionAvail().x * 0.42f)
+                                            : std::min(px(300), ImGui::GetContentRegionAvail().x * 0.3f);
     constexpr auto flags  = ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
                             ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
                             ImGuiTableFlags_SizingFixedFit;
@@ -636,102 +657,375 @@ study::Filter App::listFilter() const {
     return f;
 }
 
+namespace {
+
+// "" any, "2" exactly, "0-2" (or "0 – 2") from low to high; nullopt when it cannot be read.
+std::optional<std::pair<int, int>> readRange(std::string text) {
+    for (std::size_t at; (at = text.find("–")) != std::string::npos;) text.replace(at, std::strlen("–"), "-");
+    std::erase(text, ' ');
+    if (text.empty()) return std::pair{-1, -1};
+    const auto dash   = text.find('-');
+    const auto number = [](const std::string& t) -> std::optional<int> {
+        if (t.empty() || t.size() > 2 || !std::all_of(t.begin(), t.end(), [](char c) { return c >= '0' && c <= '9'; }))
+            return std::nullopt;
+        return std::stoi(t);
+    };
+    const auto low  = number(text.substr(0, dash));
+    const auto high = dash == std::string::npos ? low : number(text.substr(dash + 1));
+    if (!low || !high || *low > *high) return std::nullopt;
+    return std::pair{*low, *high};
+}
+
+constexpr chess::PieceType kKinds[] = {chess::PieceType::PAWN, chess::PieceType::KNIGHT, chess::PieceType::BISHOP,
+                                       chess::PieceType::ROOK, chess::PieceType::QUEEN,  chess::PieceType::KING};
+
+chess::Piece patternPiece(int man) {
+    return chess::Piece(kKinds[man % 6], man < 6 ? chess::Color::WHITE : chess::Color::BLACK);
+}
+
+std::string searchTime(double ms) {
+    return ms < 1000 ? fmt::format("{} ms", static_cast<int>(std::lround(ms))) : fmt::format("{:.1f} s", ms / 1000);
+}
+
+}  // namespace
+
+std::optional<study::MaterialQuery> App::materialQuery() const {
+    study::MaterialQuery q;
+    bool any = false;
+    for (std::size_t i = 0; i < 10; ++i) {
+        const auto range = readRange(db_search_.material[i].data());
+        if (!range || range->first < 0) continue;
+        q.low[i]  = static_cast<uint8_t>(range->first);
+        q.high[i] = static_cast<uint8_t>(std::min<int>(range->second, q.high[i]));
+        any       = true;
+    }
+    q.plies = static_cast<uint32_t>(std::max(1, db_search_.material_plies));
+    return any ? std::optional(q) : std::nullopt;
+}
+
+std::optional<study::PatternQuery> App::patternQuery() const {
+    study::PatternQuery q;
+    bool any = false;
+    for (int sq = 0; sq < 64; ++sq) {
+        const int v = db_search_.pattern[static_cast<std::size_t>(sq)];
+        if (v < 0) continue;
+        any = true;
+        if (v == kEmptySquare)
+            q.empty |= uint64_t{1} << sq;
+        else
+            q.men[static_cast<std::size_t>(v / 6)][static_cast<std::size_t>(v % 6)] |= uint64_t{1} << sq;
+    }
+    q.only_these_pawns = db_search_.only_pawns;
+    any                = any || q.only_these_pawns[0] || q.only_these_pawns[1];
+    return any ? std::optional(q) : std::nullopt;
+}
+
+void App::pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, const std::string& folder) {
+    const auto poll = [&](SearchJob& job, std::string of, std::optional<study::SearchQuery> query) {
+        if (of != job.of) {
+            job.search.reset();  // cancelled, its threads joined
+            job.ready = false;
+            job.ids.clear();
+            job.of = std::move(of);
+            if (query && !job.of.empty()) job.search = std::make_unique<study::Search>(snapshot, std::move(*query));
+        }
+        if (job.search && !job.ready && job.search->done()) {
+            for (const auto& hit : job.search->hits()) job.ids.push_back(hit.id);
+            std::sort(job.ids.begin(), job.ids.end());
+            job.ids.erase(std::unique(job.ids.begin(), job.ids.end()), job.ids.end());
+            job.ms    = job.search->elapsedMs();
+            job.ready = true;
+        }
+    };
+    const auto base = fmt::format("{}|{}", folder, snapshot->generation());
+    // The Board page's position: shown by its tab, or in the filter.
+    std::optional<study::SearchQuery> position;
+    std::string position_of;
+    if (db_search_.position || (db_search_open_ && search_tab_ == 1)) {
+        study::ScanBoard board;
+        const auto fen = boardFen();
+        if (board.setFen(fen, board_.chess960)) {
+            position    = study::PositionQuery{board};
+            position_of = base + "|" + fen;
+        }
+    }
+    poll(db_position_job_, position_of, std::move(position));
+    std::string material_of;
+    const auto material = materialQuery();
+    if (material) {
+        material_of = base + fmt::format("|{}|", material->plies);
+        for (std::size_t i = 0; i < 10; ++i) material_of += fmt::format("{}-{},", material->low[i], material->high[i]);
+    }
+    poll(db_material_job_, material_of, material ? std::optional<study::SearchQuery>(*material) : std::nullopt);
+    std::string pattern_of;
+    const auto pattern = patternQuery();
+    if (pattern) {
+        pattern_of = base + fmt::format("|{}{}|", db_search_.only_pawns[0], db_search_.only_pawns[1]);
+        for (const auto v : db_search_.pattern) pattern_of += fmt::format("{},", v);
+    }
+    poll(db_pattern_job_, pattern_of, pattern ? std::optional<study::SearchQuery>(*pattern) : std::nullopt);
+}
+
 void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot) {
+    (void)snapshot;
     auto& p = db_search_;
     ImGui::TextUnformatted(TR("Search"));
     ImGui::SameLine();
-    ImGui::TextDisabled("%s", TR("the list follows at each letter"));
+    ImGui::TextDisabled("%s", TR("the list follows it as it goes"));
+    // The tabs of the mockup: the headers, the Board page's position, a material, a pattern.
+    const char* tabs[] = {TR("Headers"), TR("Position"), TR("Material"), TR("Pattern")};
+    if (ImGui::BeginTabBar("##search_tabs")) {
+        for (int i = 0; i < 4; ++i) {
+            if (ImGui::BeginTabItem(tabs[i])) {
+                search_tab_ = i;
+                ImGui::EndTabItem();
+            }
+        }
+        ImGui::EndTabBar();
+    }
     const float label_w = px(96);
     const auto label    = [&](const char* text) {
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(text);
         ImGui::SameLine(label_w);
     };
-    const auto field = [&](const char* text, const char* id, std::array<char, 64>& buffer) {
-        label(text);
-        ImGui::SetNextItemWidth(-1);
-        ImGui::InputText(id, buffer.data(), buffer.size());
+    // A small button on the line of the one before when it fits there.
+    const auto flow = [](const char* label) {
+        const auto& style = ImGui::GetStyle();
+        const float w     = ImGui::CalcTextSize(label).x + style.FramePadding.x * 2;
+        const float x     = ImGui::GetItemRectMax().x + style.ItemSpacing.x;
+        if (x + w <= ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x) ImGui::SameLine();
     };
-    field(TR("Player"), "##s_player", p.player);
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + label_w);
-    ImGui::SetNextItemWidth(-1);
-    const char* sides[] = {TR("Either colour"), TR("White"), TR("Black")};
-    ImGui::Combo("##s_side", &p.side, sides, 3);
-    field(TR("Opponent"), "##s_opponent", p.opponent);
-    field(TR("Event"), "##s_event", p.event);
-    // The years, the ECO codes, the ratings, the result.
-    label(TR("Years"));
-    ImGui::SetNextItemWidth(px(60));
-    ImGui::InputText("##s_from", p.year_from.data(), p.year_from.size(), ImGuiInputTextFlags_CharsDecimal);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("–");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(px(60));
-    ImGui::InputText("##s_to", p.year_to.data(), p.year_to.size(), ImGuiInputTextFlags_CharsDecimal);
-    label(TR("ECO code"));
-    ImGui::SetNextItemWidth(px(52));
-    ImGui::InputText("##s_eco_from", p.eco_from.data(), p.eco_from.size(), ImGuiInputTextFlags_CharsUppercase);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("–");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(px(52));
-    ImGui::InputText("##s_eco_to", p.eco_to.data(), p.eco_to.size(), ImGuiInputTextFlags_CharsUppercase);
-    label(TR("Elo"));
-    ImGui::SetNextItemWidth(px(60));
-    ImGui::InputText("##s_elo", p.elo_min.data(), p.elo_min.size(), ImGuiInputTextFlags_CharsDecimal);
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", TR("at least, both players"));
-    label(TR("Result"));
-    const char* results[] = {TR("All"), "1-0", "½-½", "0-1"};
-    const char values[]   = {0, '1', '=', '0'};
-    int result            = static_cast<int>(std::find(std::begin(values), std::end(values), p.result) - values);
-    ImGui::SetNextItemWidth(px(100));
-    if (ImGui::Combo("##s_result", &result, results, 4)) p.result = values[result];
-    ImGui::Separator();
-
-    // The Board page's position: the games that reach it, found in the background.
-    ImGui::Checkbox(TR("The Board page's position"), &p.position);
-    if (p.position) {
-        const auto fen = boardFen();
-        const auto of  = fmt::format("{}|{}", snapshot->generation(), fen);
-        if (of != db_position_of_) {
-            db_position_search_.reset();
-            db_position_ready_ = false;
-            db_position_.clear();
-            db_position_of_ = of;
-            study::ScanBoard board;
-            if (board.setFen(fen, board_.chess960))
-                db_position_search_ = std::make_unique<study::Search>(snapshot, study::PositionQuery{board});
-        }
-        if (db_position_search_ && !db_position_ready_ && db_position_search_->done()) {
-            for (const auto& hit : db_position_search_->hits()) db_position_.push_back(hit.id);
-            std::sort(db_position_.begin(), db_position_.end());
-            db_position_.erase(std::unique(db_position_.begin(), db_position_.end()), db_position_.end());
-            db_position_ready_ = true;
-        }
+    // How far a search went, or what it found.
+    const auto status = [&](const SearchJob& job, const char* empty, const char* how) {
         ImGui::PushTextWrapPos();
-        const auto shown =
-            board_.ply > 0 ? trf("After {}.", boardMoveLabel(board_.ply)) : std::string(TR("The start position."));
-        ImGui::TextDisabled("%s", shown.c_str());
-        if (!db_position_ready_ && db_position_search_) {
-            const auto total = std::max<uint64_t>(1, db_position_search_->total());
-            ImGui::ProgressBar(static_cast<float>(db_position_search_->searched()) / static_cast<float>(total),
-                               ImVec2(-1, 0));
+        if (job.of.empty()) {
+            ImGui::TextDisabled("%s", empty);
+        } else if (!job.ready && job.search) {
+            const auto total = std::max<uint64_t>(1, job.search->total());
+            ImGui::ProgressBar(static_cast<float>(job.search->searched()) / static_cast<float>(total), ImVec2(-1, 0));
         } else {
-            ImGui::TextUnformatted(trn("{} game reaches it", "{} games reach it",
-                                       static_cast<int>(std::min<std::size_t>(db_position_.size(), 1000000000)),
-                                       ui::exactCount(db_position_.size()))
+            ImGui::TextUnformatted(trn("{} game", "{} games",
+                                       static_cast<int>(std::min<std::size_t>(job.ids.size(), 1000000000)),
+                                       ui::exactCount(job.ids.size()))
                                        .c_str());
+            ImGui::SameLine(0, px(4));
+            ImGui::TextDisabled("· %s%s", searchTime(job.ms).c_str(), how);
         }
+        ImGui::PopTextWrapPos();
+    };
+
+    if (search_tab_ == 0) {
+        const auto field = [&](const char* text, const char* id, std::array<char, 64>& buffer) {
+            label(text);
+            ImGui::SetNextItemWidth(-1);
+            ImGui::InputText(id, buffer.data(), buffer.size());
+        };
+        field(TR("Player"), "##s_player", p.player);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + label_w);
+        ImGui::SetNextItemWidth(-1);
+        const char* sides[] = {TR("Either colour"), TR("White"), TR("Black")};
+        ImGui::Combo("##s_side", &p.side, sides, 3);
+        field(TR("Opponent"), "##s_opponent", p.opponent);
+        field(TR("Event"), "##s_event", p.event);
+        label(TR("Years"));
+        ImGui::SetNextItemWidth(px(60));
+        ImGui::InputText("##s_from", p.year_from.data(), p.year_from.size(), ImGuiInputTextFlags_CharsDecimal);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("–");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(60));
+        ImGui::InputText("##s_to", p.year_to.data(), p.year_to.size(), ImGuiInputTextFlags_CharsDecimal);
+        label(TR("ECO code"));
+        ImGui::SetNextItemWidth(px(52));
+        ImGui::InputText("##s_eco_from", p.eco_from.data(), p.eco_from.size(), ImGuiInputTextFlags_CharsUppercase);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("–");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(52));
+        ImGui::InputText("##s_eco_to", p.eco_to.data(), p.eco_to.size(), ImGuiInputTextFlags_CharsUppercase);
+        label(TR("Elo"));
+        ImGui::SetNextItemWidth(px(60));
+        ImGui::InputText("##s_elo", p.elo_min.data(), p.elo_min.size(), ImGuiInputTextFlags_CharsDecimal);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", TR("at least, both players"));
+        label(TR("Result"));
+        const char* results[] = {TR("All"), "1-0", "½-½", "0-1"};
+        const char values[]   = {0, '1', '=', '0'};
+        int result            = static_cast<int>(std::find(std::begin(values), std::end(values), p.result) - values);
+        ImGui::SetNextItemWidth(px(100));
+        if (ImGui::Combo("##s_result", &result, results, 4)) p.result = values[result];
+    } else if (search_tab_ == 1) {
+        // The Board page's position: the games that reach it, found in the background.
+        const float size = std::min(px(200), ImGui::GetContentRegionAvail().x * 0.5f);
+        BoardDecor decor;
+        decor.eval_white = -1.0f;
+        decor.flipped    = board_.flip;
+        drawBoard(atlas_, boardAt(board_.game, board_.chess960, board_.ply), size, decor);
+        ImGui::SameLine(0, px(10));
+        ImGui::BeginGroup();
+        ImGui::TextUnformatted(TR("The Board page's position"));
+        ImGui::PushTextWrapPos();
+        const auto mover = boardAt(board_.game, board_.chess960, board_.ply).sideToMove() == chess::Color::WHITE
+                               ? TR("White to move")
+                               : TR("Black to move");
+        const auto shown = board_.ply > 0 ? trf("After {}, {}.", boardMoveLabel(board_.ply), mover)
+                                          : trf("The start position, {}.", mover);
+        ImGui::TextDisabled("%s", shown.c_str());
+        ImGui::PopTextWrapPos();
+        if (ImGui::Button(TR("Set up the pieces…"))) {
+            page_ = Page::Board;
+            openPositionEditor();
+        }
+        ImGui::EndGroup();
+        status(db_position_job_, TR("The position cannot be searched."), "");
+        ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("The games that cannot reach it (their pawns, their material) are left out "
                                      "without being replayed."));
         ImGui::PopTextWrapPos();
-    } else if (db_position_search_ || !db_position_of_.empty()) {
-        db_position_search_.reset();
-        db_position_of_.clear();
-        db_position_ready_ = false;
+        if (ImGui::Button(p.position ? TR("Take out of the filter") : TR("Add to the filter")))
+            p.position = !p.position;
+    } else if (search_tab_ == 2) {
+        // A material, for some plies in a row: presets, or the counts typed.
+        struct Preset {
+            const char* name;
+            std::array<const char*, 10> cells;
+        };
+        const Preset presets[] = {
+            {TR("Rook endings"), {"0-8", "0", "0", "1", "0", "0-8", "0", "0", "1", "0"}},
+            {TR("No queens"), {"0-8", "0-2", "0-2", "0-2", "0", "0-8", "0-2", "0-2", "0-2", "0"}},
+            {TR("Bishop pair against bishop and knight"), {"0-8", "0", "2", "0-2", "0", "0-8", "1", "1", "0-2", "0"}},
+            {TR("Queen against two rooks"), {"0-8", "0-2", "0-2", "0", "1", "0-8", "0-2", "0-2", "2", "0"}},
+        };
+        for (std::size_t i = 0; i < std::size(presets); ++i) {
+            if (i > 0) flow(presets[i].name);
+            if (ImGui::SmallButton(presets[i].name))
+                for (std::size_t c = 0; c < 10; ++c)
+                    std::snprintf(p.material[c].data(), p.material[c].size(), "%s", presets[i].cells[c]);
+        }
+        const char* kinds[] = {TR("Pawns"), TR("Knights"), TR("Bishops"), TR("Rooks"), TR("Queens")};
+        if (ImGui::BeginTable("##material", 3, ImGuiTableFlags_SizingStretchSame)) {
+            ImGui::TableSetupColumn(TR("Piece"));
+            ImGui::TableSetupColumn(TR("White"));
+            ImGui::TableSetupColumn(TR("Black"));
+            ImGui::TableHeadersRow();
+            for (std::size_t k = 0; k < 5; ++k) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(kinds[k]);
+                for (std::size_t side = 0; side < 2; ++side) {
+                    ImGui::TableNextColumn();
+                    auto& cell     = p.material[side * 5 + k];
+                    const bool bad = !readRange(cell.data());
+                    if (bad) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::BAD));
+                    ImGui::SetNextItemWidth(-1);
+                    ImGui::InputTextWithHint(fmt::format("##m{}", side * 5 + k).c_str(), TR("any"), cell.data(),
+                                             cell.size());
+                    if (bad) ImGui::PopStyleColor();
+                }
+            }
+            ImGui::EndTable();
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("For"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(80));
+        ImGui::InputInt("##m_plies", &p.material_plies);
+        p.material_plies = std::clamp(p.material_plies, 1, 200);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", TR("plies at least"));
+        ImGui::TextDisabled("%s", TR("An exchange under way is not a material. A count: 2, or 0-2."));
+        status(db_material_job_, TR("Any material: a preset, or the counts typed."), "");
+    } else {
+        // A pattern: men put on a board, empty squares, the rest anything.
+        const float size = std::min(px(220), ImGui::GetContentRegionAvail().x * 0.6f);
+        std::array<chess::Piece, 64> pieces;
+        pieces.fill(chess::Piece(chess::Piece::NONE));
+        BoardDecor decor;
+        decor.eval_white = -1.0f;
+        for (int sq = 0; sq < 64; ++sq) {
+            const int v = p.pattern[static_cast<std::size_t>(sq)];
+            if (v >= 0 && v < kEmptySquare) pieces[static_cast<std::size_t>(sq)] = patternPiece(v);
+            if (v == kEmptySquare) decor.tints.push_back({chess::Square(sq), IM_COL32(236, 140, 80, 150)});
+        }
+        const ImVec2 top = ImGui::GetCursorScreenPos();
+        drawBoard(atlas_, pieces, size, decor);
+        if (ImGui::IsItemHovered()) {
+            const bool left  = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+            const bool right = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+            if (left || right) {
+                if (const auto square = boardSquareAt(ImGui::GetMousePos(), top, size, decor)) {
+                    auto& at          = p.pattern[static_cast<std::size_t>(square->index())];
+                    const int8_t want = ImGui::GetIO().KeyShift ? kEmptySquare : static_cast<int8_t>(pattern_brush_);
+                    at                = right || at == want ? int8_t{-1} : want;
+                }
+            }
+        }
+        ImGui::SameLine(0, px(10));
+        ImGui::BeginGroup();
+        // The men a click puts: white then black.
+        const float button = px(26);
+        for (int side = 0; side < 2; ++side) {
+            for (int kind = 5; kind >= 0; --kind) {
+                const int man = side * 6 + kind;
+                ImVec2 uv0, uv1;
+                atlas_.uv(patternPiece(man), uv0, uv1);
+                ImGui::PushID(man);
+                const bool chosen = pattern_brush_ == man;
+                if (chosen) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
+                if (ImGui::ImageButton("##man", atlas_.texture(button), ImVec2(button, button), uv0, uv1))
+                    pattern_brush_ = man;
+                if (chosen) ImGui::PopStyleColor();
+                ImGui::PopID();
+                if (kind > 0 && kind % 3 != 0) ImGui::SameLine(0, px(2));
+            }
+        }
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", TR("A click puts the man chosen (again: takes it away); Shift and a click: an empty "
+                                     "square; the rest: anything."));
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        ImGui::Checkbox(TR("White has only these pawns"), &p.only_pawns[0]);
+        ImGui::Checkbox(TR("Black has only these pawns"), &p.only_pawns[1]);
+        struct Preset {
+            const char* name;
+            std::vector<std::pair<int, int>> men;  // square, man
+        };
+        const auto sq          = [](const char* name) { return (name[1] - '1') * 8 + (name[0] - 'a'); };
+        const Preset presets[] = {
+            {TR("Short castling, pawns intact"),
+             {{sq("g1"), 5},
+              {sq("f1"), 3},
+              {sq("f2"), 0},
+              {sq("g2"), 0},
+              {sq("h2"), 0},
+              {sq("f3"), kEmptySquare},
+              {sq("g3"), kEmptySquare},
+              {sq("h3"), kEmptySquare}}},
+            {TR("Maroczy bind"), {{sq("c4"), 0}, {sq("e4"), 0}, {sq("d6"), 6}}},
+            {TR("King's fianchetto"), {{sq("g1"), 5}, {sq("g2"), 2}, {sq("f2"), 0}, {sq("g3"), 0}, {sq("h2"), 0}}},
+        };
+        for (std::size_t i = 0; i < std::size(presets); ++i) {
+            if (i > 0) flow(presets[i].name);
+            if (ImGui::SmallButton(presets[i].name)) {
+                p.pattern.fill(-1);
+                p.only_pawns = {};
+                for (const auto& [square, man] : presets[i].men)
+                    p.pattern[static_cast<std::size_t>(square)] = static_cast<int8_t>(man);
+            }
+        }
+        status(db_pattern_job_, TR("Put men on the board: the games where they stand so."),
+               TR(" (each game replayed up to the pattern)"));
     }
+
     ImGui::Separator();
+    if (ImGui::Button(TR("See in the list")) ||
+        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::GetIO().WantTextInput))
+        db_search_open_ = false;
+    ImGui::SameLine(0, px(4));
+    ImGui::TextDisabled("%s", TR("Enter"));
+    ImGui::SameLine();
     if (ImGui::Button(TR("Clear everything"))) {
         p = SearchFields{};
         db_filter_.fill(0);

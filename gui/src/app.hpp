@@ -324,13 +324,37 @@ class App {
         std::array<char, 4> eco_from{}, eco_to{};
         std::array<char, 5> elo_min{};
         char result   = 0;
-        bool position = false;  // the games through the Board page's position
+        bool position = false;  // the games through the Board page's position, in the list's filter
+        // Material: for White then Black, pawns, knights, bishops, rooks, queens: "" any, "2", or "0-2".
+        std::array<std::array<char, 8>, 10> material{};
+        int material_plies = 4;  // that long at least: an exchange under way is not a material
+        // A pattern: on each square (a1 = 0), -1 anything, a man (side * 6 + kind: pawn, knight, bishop, rook,
+        // queen, king) or kEmptySquare; and a side's pawns only those it shows.
+        std::array<int8_t, 64> pattern = [] {
+            std::array<int8_t, 64> squares{};
+            squares.fill(-1);
+            return squares;
+        }();
+        std::array<bool, 2> only_pawns{};
     };
+    static constexpr int8_t kEmptySquare = 12;
     SearchFields db_search_;
-    std::unique_ptr<study::Search> db_position_search_;
-    std::string db_position_of_;              // what it searches: the database's snapshot and the position
-    std::vector<study::GameId> db_position_;  // the games it found, sorted
-    bool db_position_ready_ = false;
+    int search_tab_    = 0;  // Headers, Position, Material, Pattern
+    int pattern_brush_ = 5;  // the man a click puts on the pattern: a white king
+    // A search of the database in the background (study::Search): the games it found, once it is done.
+    struct SearchJob {
+        std::string of;  // what it searches: the database, its snapshot, the query; empty for nothing
+        std::unique_ptr<study::Search> search;
+        double ms  = 0;  // how long it took
+        bool ready = false;
+        std::vector<study::GameId> ids;  // sorted
+    };
+    SearchJob db_position_job_, db_material_job_, db_pattern_job_;
+    // The three searches made again when what they search changed: the position when the panel shows it or the
+    // filter has it, the material and the pattern when they ask for something.
+    void pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, const std::string& folder);
+    [[nodiscard]] std::optional<study::MaterialQuery> materialQuery() const;
+    [[nodiscard]] std::optional<study::PatternQuery> patternQuery() const;
     void drawOpeningsPage();  // the repertoires (the tournament's Openings tab is drawOpenings)
     // The repertoires (repertoires.hpp): the star of the Board page's tree, the Openings page (view_openings.cpp).
     RepertoireShelf& repertoires();

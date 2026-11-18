@@ -205,6 +205,7 @@ Search::Search(std::shared_ptr<const Snapshot> snapshot, SearchQuery query, int 
     parts_.resize((snapshot_->games() + PART - 1) / PART);
     const int machine = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
     const auto count  = std::min<std::size_t>(static_cast<std::size_t>(threads > 0 ? threads : machine), parts_.size());
+    planned_          = count;
     threads_.reserve(count);
     const Inherited inherited;
     for (std::size_t t = 0; t < count; ++t)
@@ -241,7 +242,9 @@ void Search::work() {
         std::lock_guard lock(mutex_);
         parts_[part] = std::move(found);
     }
-    ++finished_;
+    if (++finished_ == planned_)
+        elapsed_us_ =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started_).count();
 }
 
 std::vector<SearchHit> Search::hits() const {

@@ -725,6 +725,9 @@ class App {
     // analysed by an engine of the library while the mosaic shows; the board can follow one of them live.
     struct BroadcastBoard {
         std::string url;  // the game's address: its place in the round
+        // The tables' verdict for a position of 7 pieces or fewer (Lichess's, asked when the user said « always »).
+        std::string tb_fen;
+        std::optional<lichess::Outcome> tb;
         uint64_t version = 0;
         ReplayGame game;  // its moves and clocks, as Lichess last sent them
         chess::Board board;
@@ -734,6 +737,8 @@ class App {
         std::unique_ptr<Analyser> analyser;
     };
     std::vector<BroadcastBoard> broadcast_boards_;
+    std::future<lichess::Answer<lichess::Tablebase>> broadcast_tb_job_;  // one question to the tables at a time
+    std::string broadcast_tb_fen_;
     std::string broadcast_round_;     // the round the Lichess page shows as a mosaic (its id); empty: the page itself
     std::string broadcast_selected_;  // the game chosen in it, by its address
     std::set<std::string> broadcast_saved_;  // the rounds put in the « Broadcasts » database once they ended

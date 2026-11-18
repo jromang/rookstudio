@@ -23,6 +23,7 @@
 #include "i18n.hpp"
 #include "lichess_api.hpp"
 #include "live.hpp"
+#include "online_cache.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -179,6 +180,17 @@ std::string trouble(const std::string& error, const char* host) {
 }
 
 }  // namespace
+
+std::optional<lichess::Tablebase> cachedTablebase(const std::filesystem::path& root, const std::string& fen) {
+    if (const auto cached = readCached(cacheFile(root, "tablebase", fen), fen, 0)) return tablebaseFrom(*cached);
+    return std::nullopt;
+}
+
+void keepTablebase(const std::filesystem::path& root, const std::string& fen, const lichess::Tablebase& t) {
+    writeCached(cacheFile(root, "tablebase", fen), fen, tablebaseJson(t));
+}
+
+namespace {}  // namespace
 
 void App::drawBoardOnline() {
     if (!chessBoard()) return;

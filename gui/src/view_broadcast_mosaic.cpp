@@ -21,6 +21,7 @@
 #include "console.hpp"
 #include "i18n.hpp"
 #include "live.hpp"
+#include "online_cache.hpp"
 #include "pgn_store.hpp"
 #include "ui.hpp"
 
@@ -59,6 +60,18 @@ Seen seenBy(const Analyser* analyser, const chess::Board& board) {
     s.line  = localLine(pvToSan(board, l.pv, 4));
     s.depth = l.depth;
     return s;
+}
+
+// What the tables say of a position, for White: none when they do not know it.
+const char* tablesSay(const std::optional<lichess::Outcome>& outcome, bool white_to_move) {
+    if (!outcome || *outcome == lichess::Outcome::Unknown) return nullptr;
+    const auto o   = *outcome;
+    const bool win = o == lichess::Outcome::Win, loss = o == lichess::Outcome::Loss;
+    if (o == lichess::Outcome::Draw || o == lichess::Outcome::CursedWin || o == lichess::Outcome::BlessedLoss)
+        return TR("draw");
+    if ((win && white_to_move) || (loss && !white_to_move)) return TR("White wins");
+    if (win || loss) return TR("Black wins");
+    return nullptr;  // a win or a loss the fifty moves may change: not said
 }
 
 }  // namespace
@@ -141,6 +154,29 @@ void App::pollBroadcastBoards() {
         b.analyser->analyse(position);  // the same position: nothing happens
         b.analyser->poll();
     }
+    // The tables' verdict for the games of 7 pieces or fewer, when the user said « always » to Lichess's tables (M4,
+    // board 4): from the profile's answers, else asked, one position at a time, while the mosaic shows.
+    if (broadcast_tb_job_.valid() && broadcast_tb_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        const auto answer = broadcast_tb_job_.get();
+        if (answer.value) keepTablebase(storage_.root(), broadcast_tb_fen_, *answer.value);
+    }
+    for (auto& b : broadcast_boards_) {
+        const auto pieces = b.board.occ().count();
+        if (pieces > 7 || pieces < 3 || lichess_.tablebase != 1) {
+            b.tb.reset();
+            continue;
+        }
+        const auto fen = b.board.getFen();
+        if (fen == b.tb_fen && b.tb) continue;
+        if (const auto known = cachedTablebase(storage_.root(), fen)) {
+            b.tb_fen = fen;
+            b.tb     = known->outcome;
+        } else if (shown && !broadcast_tb_job_.valid()) {
+            broadcast_tb_fen_ = fen;
+            broadcast_tb_job_ = std::async(std::launch::async, [fen] { return lichess::tablebase(fen); });
+        }
+    }
+
     // A followed round whose games have all ended goes into the « Broadcasts » database, once, shown or not.
     for (const auto& f : followed_rounds_) {
         const auto changes = f.follower->changes();
@@ -384,14 +420,21 @@ void App::drawBroadcastMosaic() {
             dl->AddRect(pos, ImVec2(pos.x + inner, pos.y + bar), IM_COL32(130, 130, 130, 255), bar);
             ImGui::Dummy(ImVec2(inner, bar));
         }
-        if (!playing(b.result))
+        if (!playing(b.result)) {
             ImGui::TextUnformatted(b.result.c_str());
-        else if (!seen.score.empty())
+        } else if (const char* says = b.tb_fen == b.board.getFen()
+                                          ? tablesSay(b.tb, b.board.sideToMove() == chess::Color::WHITE)
+                                          : nullptr) {
+            // The tables' verdict, for White: exact, before any engine's score.
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
+                               trf("Tables (Lichess): {}", says).c_str());
+        } else if (!seen.score.empty()) {
             ImGui::TextDisabled("%s", fmt::format("{}  {}", seen.score, seen.line).c_str());
-        else if (lichess_.broadcast_engine.empty())
+        } else if (lichess_.broadcast_engine.empty()) {
             ImGui::TextDisabled(" ");
-        else
+        } else {
             ImGui::TextDisabled("%s", b.analyser ? TR("analysing…") : TR("not analysed: the cores are taken"));
+        }
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(2);
@@ -449,12 +492,16 @@ void App::drawBroadcastMosaic() {
     ImGui::TextUnformatted(TR("The round"));
     if (ImGui::BeginTable("##round_games", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("##game", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("move 888").x);
+        ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed);  // as wide as its widest
         for (const auto& b : broadcast_boards_) {
             ImGui::PushID(b.url.c_str());
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            const auto state = playing(b.result) ? trf("move {}", b.game.moves.size() / 2 + 1) : b.result;
+            auto state = playing(b.result) ? trf("move {}", b.game.moves.size() / 2 + 1) : b.result;
+            if (const char* says = playing(b.result) && b.tb_fen == b.board.getFen()
+                                       ? tablesSay(b.tb, b.board.sideToMove() == chess::Color::WHITE)
+                                       : nullptr)
+                state += " · " + trf("tables: {}", says);
             if (ImGui::Selectable(fmt::format("{} – {}##round", b.white, b.black).c_str(), b.url == broadcast_selected_,
                                   ImGuiSelectableFlags_SpanAllColumns))
                 broadcast_selected_ = b.url;

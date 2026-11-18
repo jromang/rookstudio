@@ -61,6 +61,9 @@ struct Tablebase {
     std::vector<TablebaseMove> moves;  // the best first, as Lichess gives them
 };
 [[nodiscard]] Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cancel = nullptr);
+// The tables' best line from the position, as UCI moves, up to the end (a mate, a capture into a draw): one request.
+[[nodiscard]] Answer<std::vector<std::string>> tablebaseMainline(std::string_view fen,
+                                                                 const std::atomic<bool>* cancel = nullptr);
 
 // The opening explorer: masters' games, Lichess's, or a player's.
 enum class ExplorerSource { Masters, Lichess, Player };

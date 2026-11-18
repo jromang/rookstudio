@@ -496,6 +496,7 @@ void App::drawChessColumn() {
             drawBoardMoves(std::max(px(160), ImGui::GetContentRegionAvail().y));
             break;
         case 1: {
+            drawBoardOnline();  // Lichess's tables and cloud, when the user has chosen them (M4, board 5)
             drawBoardAnalysis();
             const float graph = boardGraphHeight();
             drawBoardGraph(std::max(graph, ImGui::GetContentRegionAvail().y));

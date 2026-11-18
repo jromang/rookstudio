@@ -178,6 +178,29 @@ struct LineBoard final : chess::Board {
 
 }  // namespace
 
+std::string localSan(std::string san) { return shownSan(std::move(san), i18n::language() == i18n::Language::French); }
+
+std::string localLine(const std::string& line) {
+    // Each move of "12.Nf3 Nc6 13.Be2", its number kept.
+    std::string out, word;
+    const auto flush = [&] {
+        if (word.empty()) return;
+        const auto dot = word.find_last_of('.');
+        out += dot == std::string::npos ? localSan(word) : word.substr(0, dot + 1) + localSan(word.substr(dot + 1));
+        word.clear();
+    };
+    for (const char c : line) {
+        if (c == ' ') {
+            flush();
+            out += ' ';
+        } else {
+            word += c;
+        }
+    }
+    flush();
+    return out;
+}
+
 void App::loadBoardSettings() {
     if (board_.settings_loaded) return;
     board_.settings_loaded = true;

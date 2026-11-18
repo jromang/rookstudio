@@ -175,6 +175,23 @@ Answer<CloudEval> cloudEval(std::string_view fen, int lines, const std::atomic<b
     return a;
 }
 
+Answer<std::vector<std::string>> tablebaseMainline(std::string_view fen, const std::atomic<bool>* cancel) {
+    Answer<std::vector<std::string>> a;
+    const auto r =
+        politeRequest(get(fmt::format("{}/standard/mainline?fen={}", servers().tablebase, urlEncode(fen))), cancel);
+    a.status = r.status;
+    if (r.status != 200) {
+        a.error = reason(r);
+        return a;
+    }
+    readInto(a, r.body, [](const nlohmann::json& j) {
+        std::vector<std::string> moves;
+        for (const auto& m : j.at("mainline")) moves.push_back(textOf(m, "uci"));
+        return moves;
+    });
+    return a;
+}
+
 Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cancel) {
     Answer<Tablebase> a;
     const auto r = politeRequest(get(fmt::format("{}/standard?fen={}", servers().tablebase, urlEncode(fen))), cancel);

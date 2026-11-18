@@ -715,6 +715,32 @@ class App {
     void startLichessSync();  // the games of lichess_.player into "Lichess · player", made when it is missing
     [[nodiscard]] std::optional<std::size_t> lichessBase();  // that database
     void drawLichessHomeCard();
+    // Lichess's answers for the board's position (M4, board 5): the tables online, the cloud's lines; each service
+    // allowed at its first use, for a position or always; the answers kept in the profile's lichess-cache.
+    struct OnlineTablebase {
+        std::string fen;
+        lichess::Answer<lichess::Tablebase> answer;
+        int64_t when = 0;  // seconds since the epoch: when Lichess answered
+    };
+    struct OnlineCloud {
+        std::string fen;
+        lichess::Answer<lichess::CloudEval> answer;
+        int64_t when = 0;
+    };
+    std::optional<OnlineTablebase> online_tb_;
+    std::optional<OnlineCloud> online_cloud_;
+    std::future<lichess::Answer<lichess::Tablebase>> online_tb_job_;
+    std::future<lichess::Answer<lichess::CloudEval>> online_cloud_job_;
+    std::future<lichess::Answer<std::vector<std::string>>> online_line_job_;
+    std::string online_tb_asked_, online_cloud_asked_, online_line_asked_;
+    std::set<std::string> online_once_;          // positions allowed once ("Ask for this position")
+    std::set<std::string> online_not_in_cloud_;  // positions the cloud had nothing for, this session
+    bool online_tb_not_now_ = false, online_cloud_not_now_ = false;
+    std::string online_seen_;  // the position shown, since when: stepping through a game asks nothing on the way
+    double online_since_ = 0;
+    void drawBoardOnline();
+    void drawOnlineTablebase(const chess::Board& board, int pieces);
+    void drawOnlineCloud(const chess::Board& board);
     void followBroadcast(const lichess::BroadcastEntry& entry);
     void drawLichessPage();
     void drawLichessAccount();

@@ -44,6 +44,9 @@ struct BoardText {
 // The game as PGN: its tags (the Seven Tag Roster first, SetUp and FEN when it starts from another position), its
 // moves in SAN, each with the engine's score, depth and time as a comment in fastchess' style when it has them.
 [[nodiscard]] std::string gamePgn(const ReplayGame& game, bool chess960);
+// A SAN as the interface writes it: French letters in French ("Cf3", "e8=D"); a line of them, its numbers kept.
+[[nodiscard]] std::string localSan(std::string san);
+[[nodiscard]] std::string localLine(const std::string& line);
 // The same with its variations, each in brackets after the move it replaces.
 [[nodiscard]] std::string gamePgn(const GameTree& tree, bool chess960);
 // The same, `annotate` adding what it returns after each move of the game (its ply: the position after it).

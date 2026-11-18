@@ -377,8 +377,9 @@ void App::discardBoardChanges() {
 }
 
 void App::boardSave() {
-    if (chessBoard() && saveBoardToDatabase()) return;
-    saveBoardPgn();
+    if (!chessBoard()) return saveBoardPgn();
+    if (saveBoardToDatabase()) return;  // a database's game: replaced under its number
+    boardSaveMenu(false);               // else where it goes, asked under the Save button
 }
 
 void App::drawBoardStrip() {
@@ -453,16 +454,20 @@ void App::drawBoardStrip() {
     }
     ImGui::SameLine(0, gap);
     if (ImGui::SmallButton(save)) boardSave();
+    const ImVec2 save_under(ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y + px(4));
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", board_origin_ && !board_origin_->linked
-                                    ? trf("Into « {} », under its number", board_origin_->name).c_str()
-                                    : TR("Into a PGN file"));
+        ImGui::SetTooltip(
+            "%s",
+            board_origin_ && !board_origin_->linked
+                ? trf("Into « {} », under its number · Ctrl+Shift+S: a copy elsewhere", board_origin_->name).c_str()
+                : TR("Into a database, its PGN file or another: a menu · Ctrl+S"));
     if (show_keys) {
         ImGui::SameLine(0, px(4));
         ImGui::TextDisabled("Ctrl+S");
     }
     if (ImGui::IsPopupOpen("##recent_popup")) ImGui::SetNextWindowPos(under, ImGuiCond_Appearing, ImVec2(1, 0));
     drawRecentPopup();
+    drawSaveMenu(save_under);
     if (go) openListRow(*go);
 }
 

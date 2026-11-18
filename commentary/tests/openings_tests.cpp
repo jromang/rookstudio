@@ -60,6 +60,12 @@ TEST_CASE("openings: the Najdorf is named and keeps its name") {
     for (const auto& m : test::moves(after, {"h2h3", "a8a7"})) later.push_back(m);
     CHECK(openingName(later) == "Sicilian Defense: Najdorf Variation, Adams Attack");
     CHECK(openingName({}) == std::nullopt);
+    // With its ECO code, for a game's ECO tag.
+    REQUIRE(openingCode(najdorf));
+    CHECK(openingCode(najdorf)->eco == "B90");
+    CHECK(openingCode(najdorf)->name == "Sicilian Defense: Najdorf Variation");
+    CHECK(openingCode(later)->eco == "B90");
+    CHECK(openingCode({}) == std::nullopt);
     // A transposition finds the name of the position: the Queen's Gambit Declined reached by 1.c4.
     const auto english = test::moves(start, {"c2c4", "e7e6", "d2d4", "d7d5"});
     const auto qgd     = test::moves(start, {"d2d4", "d7d5", "c2c4", "e7e6"});

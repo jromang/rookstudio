@@ -767,6 +767,7 @@ bool App::saveBoardToDatabase() {
                            board_origin_->name));
             return true;
         }
+        fillBoardEco();
         study::ImportedGame game;
         if (!study::readImportedGame(gamePgn(board_.tree, board_.chess960), game)) return false;
         const auto id = board_origin_->id;

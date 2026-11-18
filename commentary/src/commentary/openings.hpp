@@ -14,4 +14,11 @@ namespace fcg::commentary {
 // The opening reached by `moves` from the usual starting position: the name of the last named position on the way.
 [[nodiscard]] std::optional<std::string> openingName(std::span<const Move> moves);
 
+// The same with its ECO code ("B92", "Sicilian Defense: Najdorf Variation, Opočenský Variation").
+struct OpeningCode {
+    std::string eco;
+    std::string name;
+};
+[[nodiscard]] std::optional<OpeningCode> openingCode(std::span<const Move> moves);
+
 }  // namespace fcg::commentary

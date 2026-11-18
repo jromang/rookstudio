@@ -45,10 +45,15 @@ struct KeyHash {
     }
 };
 
+// A named position: the ECO code and the name of the first line the table gives it.
+struct Named {
+    std::string_view eco, name;
+};
+
 // The named positions, each with the first name the table gives it.
-const std::unordered_map<Key, std::string_view, KeyHash>& names() {
+const std::unordered_map<Key, Named, KeyHash>& names() {
     static const auto table = [] {
-        std::unordered_map<Key, std::string_view, KeyHash> out;
+        std::unordered_map<Key, Named, KeyHash> out;
         const std::string_view all(reinterpret_cast<const char*>(assets::lichess_openings),
                                    assets::lichess_openings_size);
         bool header = true;
@@ -80,7 +85,7 @@ const std::unordered_map<Key, std::string_view, KeyHash>& names() {
                 }
                 pos.playUnchecked(*mv);
             }
-            if (replayed) out.try_emplace(Key(pos), name);
+            if (replayed) out.try_emplace(Key(pos), Named{line.substr(0, first), name});
         }
         return out;
     }();
@@ -89,16 +94,22 @@ const std::unordered_map<Key, std::string_view, KeyHash>& names() {
 
 }  // namespace
 
-std::optional<std::string> openingName(std::span<const Move> moves) {
+std::optional<OpeningCode> openingCode(std::span<const Move> moves) {
     const auto& table = names();
     auto pos          = Position::initial();
-    std::optional<std::string_view> found;
+    const Named* found = nullptr;
     for (const auto& mv : moves) {
         pos.playUnchecked(mv);
-        if (const auto it = table.find(Key(pos)); it != table.end()) found = it->second;
+        if (const auto it = table.find(Key(pos)); it != table.end()) found = &it->second;
     }
     if (!found) return std::nullopt;
-    return std::string(*found);
+    return OpeningCode{std::string(found->eco), std::string(found->name)};
+}
+
+std::optional<std::string> openingName(std::span<const Move> moves) {
+    auto code = openingCode(moves);
+    if (!code) return std::nullopt;
+    return std::move(code->name);
 }
 
 }  // namespace fcg::commentary

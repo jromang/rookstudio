@@ -65,10 +65,11 @@ struct BoardSettings {
     // In the Chess space, a move where the game went another way: asked about (a variation, a new main line, or the
     // moves after replaced) as Ctrl does, rather than made a variation at once.
     bool ask_new_move = false;
+    std::string save_database;  // the folder of the database a game from elsewhere was last saved into
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BoardSettings, analysis, arrows, review_ceiling_ms, game_first,
                                                 game_second, first_clock, second_clock, same_clock, game_pair,
-                                                game_human, graph, ask_new_move)
+                                                game_human, graph, ask_new_move, save_database)
 
 // The same, for the analysis engine: the start position and the moves to it.
 [[nodiscard]] AnalysisPosition analysisPosition(const ReplayGame& game, bool chess960, int ply);

@@ -17,6 +17,7 @@
 #include <matchmaking/sprt/sprt.hpp>
 #include <matchmaking/stats.hpp>
 
+#include <commentary/openings.hpp>
 #include <commentary/references.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
@@ -317,6 +318,16 @@ class App {
     std::optional<BoardOrigin> board_origin_;
     void openListRow(std::size_t row);  // another game of the same list, at the same position when it has it
     bool saveBoardToDatabase();         // false when the game is not a database's to write
+    // Where a game that is not a database's goes when saved (M2, board 8): a menu under the Save button; Ctrl+Shift+S
+    // opens it for any game, a copy then.
+    bool save_menu_ = false;  // to open
+    bool save_copy_ = false;
+    void boardSaveMenu(bool copy);
+    void drawSaveMenu(ImVec2 under);
+    // One more game there, the game that database's from then on; a copy leaves the game as it was.
+    bool saveBoardInto(std::size_t database, bool copy = false);
+    bool saveBoardInPgnFile();  // in place of itself in the PGN file it was read from
+    void fillBoardEco();        // its ECO code from its moves, when it has none
     // The games the board showed before (mockup M2, board 4; R11): Ctrl+Tab and Ctrl+Shift+Tab through them, the one
     // chosen opened when Ctrl is let go, each with its changes and its place.
     struct RecentGame {
@@ -641,6 +652,20 @@ class App {
     // A move the user makes on the board or types. In the Chess space, where the game went another way, it starts a
     // variation (boardPlay), unless Shift is held: it replaces the moves after; or Ctrl, or the setting: asked about.
     void boardPlayAsked(chess::Move move);
+    // The game's headers, unfolded in place above the notation (M2, board 7): Alt+H.
+    bool headers_open_ = false;
+    std::map<std::string, std::array<char, 256>> header_edit_;  // a field's text while it is written
+    std::string header_active_;                                 // the field being written
+    std::array<char, 64> header_new_key_{};
+    std::array<char, 256> header_new_value_{};
+    std::string suggest_base_, suggest_typed_;  // what a name field holds; what the names were looked up for
+    std::vector<std::string> suggest_names_;
+    void drawGameHeaders();
+    void setGameHeader(const std::string& key, const std::string& value);
+    [[nodiscard]] std::optional<commentary::OpeningCode> boardOpening() const;
+    // The names that start as `typed` does (from two letters), in the game's database or the one games were last
+    // saved into: players, events, sites.
+    [[nodiscard]] std::vector<std::string> nameSuggestions(std::string_view typed);
     enum class NewMove { Variation, MainLine, Replace };
     void boardPlayAs(chess::Move move, NewMove as);
     std::optional<chess::Move> new_move_;  // asked about, waiting for the answer

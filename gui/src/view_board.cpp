@@ -1280,6 +1280,7 @@ void App::drawBoardPage() {
         }
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) boardSave();
+        if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S)) boardSaveMenu(true);
         if (chessBoard()) boardEditKeys();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
@@ -2435,7 +2436,9 @@ void App::drawBoardMoves(float height) {
         ui::endCard();
         return;
     }
-    {
+    if (chessBoard()) {
+        drawGameHeaders();  // the title line, and the headers unfolded on it (M2, board 7)
+    } else {
         const auto white = main.header("White"), black = main.header("Black");
         if (!white.empty() || !black.empty()) {
             ImGui::TextUnformatted(

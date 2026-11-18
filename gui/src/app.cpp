@@ -1551,8 +1551,30 @@ void App::handleDialogs() {
             case Dialogs::Purpose::BoardPgn:
                 openBoardPgn(std::filesystem::path(path));
                 break;
+            case Dialogs::Purpose::AppendBoardPgn:
+                try {
+                    // After the file's games, a blank line between.
+                    if (chessBoard()) fillBoardEco();
+                    std::string text;
+                    {
+                        std::ifstream in(std::filesystem::path(path), std::ios::binary);
+                        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                    }
+                    while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
+                        text.pop_back();
+                    if (!text.empty()) text += "\n\n";
+                    text += gamePgn(board_.tree, board_.chess960);
+                    tour::replaceFile(std::filesystem::path(path), text);
+                    board_.changes.saved(std::filesystem::path(path).filename().string());
+                    boardToast(trf("Saved at the end of « {} »", std::filesystem::path(path).filename().string()));
+                } catch (const std::exception& e) {
+                    board_.message       = trf("Cannot write {}: {}", path, e.what());
+                    board_.message_error = true;
+                }
+                break;
             case Dialogs::Purpose::SaveBoardPgn:
                 try {
+                    if (chessBoard()) fillBoardEco();
                     tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
                     board_.changes.saved(std::filesystem::path(path).filename().string());
                     board_.message       = trf("Saved in {}", path);

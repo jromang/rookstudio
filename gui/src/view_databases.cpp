@@ -994,10 +994,32 @@ void App::drawGameList() {
                     ImGui::TableNextColumn();
                     ImGui::TextUnformatted(v.data(), v.data() + v.size());
                 };
-                text(row.white);
+                // A player's name: their FIDE card under the mouse once known, asked by a right click (#57).
+                const auto player = [&](std::string_view name, bool white) {
+                    text(name);
+                    if (name.empty()) return;
+                    // Over the row's selectable, which spans the columns: its hover allowed.
+                    constexpr auto over = ImGuiHoveredFlags_AllowWhenOverlappedByItem;
+                    if (ImGui::IsItemHovered(over) && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                        int64_t fide = 0;
+                        for (const auto& [tag, value] : snap->game(id).tags)
+                            if (tag == (white ? "WhiteFideId" : "BlackFideId")) fide = std::atoll(value.c_str());
+                        askFideCard(std::string(name), fide);
+                    }
+                    if (!ImGui::IsItemHovered(over | ImGuiHoveredFlags_DelayNormal)) return;
+                    if (const auto* card = fideCards().byName(name)) {
+                        ImGui::BeginTooltip();
+                        drawFideCard(*card);
+                        ImGui::EndTooltip();
+                    } else {
+                        ImGui::SetTooltip("%s", TR("A right click: their FIDE card, asked of Lichess (the name only, "
+                                                   "without an account)."));
+                    }
+                };
+                player(row.white, true);
                 ImGui::TableNextColumn();
                 if (row.white_elo) ImGui::Text("%u", row.white_elo);
-                text(row.black);
+                player(row.black, false);
                 ImGui::TableNextColumn();
                 if (row.black_elo) ImGui::Text("%u", row.black_elo);
                 ImGui::TableNextColumn();
@@ -1028,6 +1050,29 @@ void App::drawGameList() {
         const auto row = snap->row(id);
         ImGui::PushTextWrapPos();
         ImGui::TextUnformatted(fmt::format("{} – {}", row.white, row.black).c_str());
+        // Their FIDE cards, known or asked for by a click (#57).
+        for (const bool white : {true, false}) {
+            const std::string name(white ? row.white : row.black);
+            if (name.empty() || name == "?") continue;
+            ImGui::PushID(white ? "fide_white" : "fide_black");
+            if (const auto* card = fideCards().byName(name)) {
+                const auto line =
+                    fmt::format("{}{} · {} · {}", card->title.empty() ? "" : card->title + " ", card->name,
+                                card->federation, card->standard > 0 ? std::to_string(card->standard) : "–");
+                ImGui::TextDisabled("%s", line.c_str());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    drawFideCard(*card);
+                    ImGui::EndTooltip();
+                }
+            } else if (ImGui::SmallButton(trf("FIDE card of {}", name).c_str())) {
+                int64_t fide = 0;
+                for (const auto& [tag, value] : snap->game(id).tags)
+                    if (tag == (white ? "WhiteFideId" : "BlackFideId")) fide = std::atoll(value.c_str());
+                askFideCard(name, fide);
+            }
+            ImGui::PopID();
+        }
         std::string where(row.event);
         const auto add = [&](const std::string& part) {
             if (part.empty()) return;
@@ -1056,6 +1101,7 @@ void App::drawGameList() {
         ImGui::TextDisabled("%s", TR("No game matches."));
     }
     ImGui::EndChild();
+    drawFidePopup();  // a FIDE card asked for (#57)
     if (open) openListedGame(db_row_);
 }
 

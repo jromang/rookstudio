@@ -40,6 +40,7 @@
 #include "engine_downloads.hpp"
 #include "engine_import.hpp"
 #include "engines.hpp"
+#include "fide_cards.hpp"
 #include "game_graph.hpp"
 #include "guide_view.hpp"
 #include "home.hpp"
@@ -1353,6 +1354,25 @@ class App {
     void pollExplorerMonths();
     void drawTreeGames();
     void drawTreeMonths(const std::string& key);  // a move's months, as a line in its row
+    // FIDE cards for the players of the databases (#57, mockup M8, board "Prep"): on demand only, kept in the profile.
+    std::unique_ptr<lichess::FideCards> fide_cards_;
+    [[nodiscard]] lichess::FideCards& fideCards();
+    struct FideAsk {
+        std::string name;  // as the database writes it
+        int64_t id = 0;    // the FIDE id the game gives, 0 without
+        std::future<lichess::Answer<lichess::FideCard>> card;
+        std::future<lichess::Answer<std::vector<lichess::FideCard>>> search;
+        std::optional<std::vector<lichess::FideCard>> choices;  // namesakes: the user chooses
+        std::optional<lichess::FideCard> shown;
+        std::string error;
+    };
+    std::optional<FideAsk> fide_ask_;
+    bool fide_popup_ = false;  // opened the next frame
+    void askFideCard(std::string name, int64_t id);
+    void pollFideCards();
+    void drawFideCard(const lichess::FideCard& card);  // its lines
+    void drawFidePopup();                              // the card asked for, or the namesakes, by the mouse
+    void drawFideAsk(FideAsk& ask);                    // the popup's content
     std::string explorer_seen_;
     double explorer_since_ = 0;
     std::map<std::string, std::shared_ptr<tour::PolyglotBook>> tree_books_;

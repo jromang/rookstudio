@@ -1052,6 +1052,15 @@ it. The quick filter above takes free words: players, event, year, ECO code, res
 through the list and the game chosen shows beside, on a small board with its moves; Enter or a double click opens it
 on the Board page. Millions of games scroll and sort at once.
 
+### FIDE cards
+
+A player's **FIDE card** (title, federation, birth year, FIDE id, standard, rapid and blitz ratings) is asked of
+Lichess, which keeps FIDE's list, without an account and only when you ask: a right click on a name of the game list,
+or *FIDE card of …* in the game's preview. A game that gives the player's FIDE id (*WhiteFideId*, as Lichess's
+broadcasts do) sends that id; otherwise the name is sent, and when several players of FIDE's list are called that way,
+you choose which one it is. The card is kept in your profile for that name: it then shows under the mouse over the
+name, and in the preview. *On lichess.org* opens the player's page there.
+
 ### Searching
 
 *Search* (Ctrl+F) opens the search panel beside the list, in four tabs; the list follows each criterion as it is

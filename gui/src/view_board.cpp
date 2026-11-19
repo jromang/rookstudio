@@ -2405,21 +2405,16 @@ void App::showBoardLine(int line, int ply) {
 
 void App::updateBoardTablebase() {
     auto& b = board_;
-    // Fair play (#48): no tables while a live game lasts, nor from a correspondence game's position on.
-    const int hidden = liveGameOn() ? 0 : correspondencePly(b.tree.main, b.chess960, INT32_MAX);
-    const auto key   = fmt::format("{}|{}|{}", b.review_key, setup_.tb_paths, hidden);
+    // Fair play (#48): no tables while a live game lasts, nor on a game that passes through a correspondence game's
+    // position.
+    const bool hidden = liveGameOn() || correspondencePly(b.tree.main, b.chess960, INT32_MAX) >= 0;
+    const auto key    = fmt::format("{}|{}|{}", b.review_key, setup_.tb_paths, hidden);
     if (key == b.tb_key) return;
-    if (hidden >= 0 && static_cast<std::size_t>(hidden) < b.tb.size()) b.tb.resize(static_cast<std::size_t>(hidden));
+    if (hidden) b.tb.clear();  // at once, a tournament playing or not
     // fastchess' Syzygy tables are those of the process: not while a tournament plays in it.
     if (run_->running()) return;
     b.tb_key = key;
-    if (hidden == 0) {
-        b.tb.clear();
-        return;
-    }
-    auto line = b.tree.main;  // up to the position before the hidden one
-    if (hidden > 0) line.moves.resize(std::min(line.moves.size(), static_cast<std::size_t>(hidden - 1)));
-    b.tb = tablebaseResults(line, b.chess960, setup_.tb_paths);
+    if (!hidden) b.tb = tablebaseResults(b.tree.main, b.chess960, setup_.tb_paths);
 }
 
 int App::boardTablebasePly() const {

@@ -1,7 +1,8 @@
 // Fair play (#48, mockup M8, board "Fairplay"): the user's games in progress on Lichess, wherever they play them. A
 // live game locks every aid on any position (Lichess forbids any help, a database's included), until it ends; a
-// correspondence game locks the engine, the cloud, the tables and the assistant on its position and those that come
-// from it, the tree of the user's databases staying open (Lichess allows a book and a database there). The games are
+// correspondence game locks the engine, the cloud, the tables and the assistant on the whole of a line that passes
+// through its position, before it and after it, the tree of the user's databases staying open (Lichess allows a book
+// and a database there). The games are
 // looked at when the Home page shows, every half-minute while a live one lasts and every ten minutes while a game by
 // correspondence does; with the right to read challenges, heard as they start and end. The Home page lists them, "your
 // turn" first (board "Main").
@@ -233,8 +234,20 @@ const lichess::PlayingGame* App::fairPlayLock(bool whole_game) const {
     if (const auto* live = liveGameOn()) return live;
     const auto& b                    = board_;
     const lichess::PlayingGame* game = nullptr;
-    if (correspondencePly(b.game, b.chess960, b.ply, &game) >= 0) return game;
-    if (whole_game && correspondencePly(b.tree.main, b.chess960, INT32_MAX, &game) >= 0) return game;
+    // The line shown passes through a correspondence game's position: the whole of it, the moves that led there too
+    // (the engine's line from the position before the opponent's move would give the answer to it).
+    if (correspondencePly(b.game, b.chess960, INT32_MAX, &game) >= 0) return game;
+    // The main line does: the whole game, and a position of it shown from a variation.
+    if (correspondencePly(b.tree.main, b.chess960, INT32_MAX, &game) >= 0) {
+        if (whole_game) return game;
+        const auto shown = menOf(boardAt(b.game, b.chess960, b.ply));
+        auto board       = boardAt(b.tree.main, b.chess960, 0);
+        for (std::size_t ply = 0;; ++ply) {
+            if (menOf(board) == shown) return game;
+            if (ply >= b.tree.main.moves.size()) break;
+            board.makeMove(b.tree.main.moves[ply].move);
+        }
+    }
     return nullptr;
 }
 
@@ -259,10 +272,10 @@ void App::drawFairPlayBanner(bool whole_game) {
     } else {
         ImGui::TextColored(
             ImGui::ColorConvertU32ToFloat4(tone), "%s",
-            trf("Correspondence game against {}: the engine is locked on its position", opponentText(*g)).c_str());
+            trf("Correspondence game against {}: the engine is locked on this game", opponentText(*g)).c_str());
         ImGui::TextDisabled("%s", TR("Lichess allows an opening book and a database there: the tree of your databases "
-                                     "stays open. The engine, the cloud, the tables and the assistant do not look at "
-                                     "this position, nor at those that come from it."));
+                                     "stays open. The engine, the cloud, the tables and the assistant look at no "
+                                     "position of this game, before the one it has reached or after it."));
     }
     ImGui::PopTextWrapPos();
     ImGui::EndGroup();

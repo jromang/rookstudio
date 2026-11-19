@@ -1109,9 +1109,10 @@ browser or on a phone:
   neither the engine, the threat, the tables, the cloud nor the assistant look at any position; a review under way
   stops, the passes it has done kept. Engine tournaments go on, without analysis on their Board. Everything comes back
   by itself when the game ends.
-- a correspondence game locks the engine, the cloud, the tables and the assistant on its position and those that come
-  from it; Lichess allows a book and a database there, so the tree of your databases and their reference games stay
-  open. Elsewhere, everything works.
+- a correspondence game locks the engine, the cloud, the tables and the assistant on the game on the board that
+  passes through its position, from the first move to what follows it, a position of that game shown from a variation
+  included; Lichess allows a book and a database there, so the tree of your databases and their reference games stay
+  open. On any other game, everything works.
 
 A banner on the Board page says which game locks what. The Home page's Lichess card lists your games in progress,
 those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*.

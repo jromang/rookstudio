@@ -777,8 +777,8 @@ class App {
     void pollLichessProfile();
     void drawLichessAccountPanel();
     // Fair play (#48, mockup M8, board "Fairplay"): the user's games in progress on Lichess. A live one locks every
-    // aid on every position; a correspondence game the engine, the cloud, the tables and the assistant on its position
-    // and those that come from it.
+    // aid on every position; a correspondence game the engine, the cloud, the tables and the assistant on the whole of
+    // a line that passes through its position.
     std::vector<lichess::PlayingGame> lichess_playing_;
     std::future<lichess::Answer<std::vector<lichess::PlayingGame>>> lichess_playing_job_;
     std::chrono::steady_clock::time_point lichess_playing_asked_{};
@@ -792,8 +792,8 @@ class App {
     // that game.
     [[nodiscard]] int correspondencePly(const ReplayGame& line, bool chess960, int last,
                                         const lichess::PlayingGame** game = nullptr) const;
-    // The game that locks the board: a live one; a correspondence game whose position is on the board's line up to its
-    // position; with `whole_game`, anywhere on the game's main line too.
+    // The game that locks the board: a live one; a correspondence game whose position is on the line shown, or on the
+    // main line when the position shown is one of its; with `whole_game`, anywhere on the main line.
     [[nodiscard]] const lichess::PlayingGame* fairPlayLock(bool whole_game) const;
     [[nodiscard]] bool aidsLocked() const { return fairPlayLock(false) != nullptr; }  // on the board's position
     [[nodiscard]] bool gameLocked() const { return fairPlayLock(true) != nullptr; }   // on the whole game

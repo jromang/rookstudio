@@ -199,7 +199,8 @@ void App::pollDatabases() {
                     "missing ones only.",
                     file, ui::exactCount(report->added));
         } else {
-            db_message_ = trf("Import of {} done: {} games added", file, ui::exactCount(report->added));
+            db_message_ = trn("Import of {} done: {} game added", "Import of {} done: {} games added", report->added,
+                              file, ui::exactCount(report->added));
             if (report->duplicates > 0)
                 db_message_ += trf(", {} already there left out", ui::exactCount(report->duplicates));
             if (report->read.damaged > 0)

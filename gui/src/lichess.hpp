@@ -85,6 +85,7 @@ class LichessRelay {
         std::string name;     // the tournament's
         std::filesystem::path dir;  // the tournament's folder, for lichess.json
         std::string base = "https://lichess.org";
+        std::string description;  // a new broadcast's, before "Engine games played with RookStudio."
     };
     struct Status {
         bool running = false;

@@ -307,10 +307,13 @@ bool LichessRelay::Session::prepare() {
         while (cut > 0 && cut < settings_.name.size() && (settings_.name[cut] & 0xC0) == 0x80) --cut;
         auto name = settings_.name.substr(0, cut);
         while (name.size() < 3) name += '.';
-        const auto r = post("/broadcast/new", "application/x-www-form-urlencoded",
-                            formEncode({{"name", name},
-                                        {"visibility", settings_.listed ? "public" : "unlisted"},
-                                        {"markdown", "Engine games played with RookStudio."}}));
+        const auto r =
+            post("/broadcast/new", "application/x-www-form-urlencoded",
+                 formEncode({{"name", name},
+                             {"visibility", settings_.listed ? "public" : "unlisted"},
+                             {"markdown", settings_.description.empty()
+                                              ? std::string("Engine games played with RookStudio.")
+                                              : settings_.description + "\n\nEngine games played with RookStudio."}}));
         std::string error;
         if (r.status == 200) {
             try {

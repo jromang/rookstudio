@@ -555,6 +555,16 @@ void App::drawWorkspaceHeader() {
         drawClone(t->dir());
         ImGui::SameLine();
         if (ui::iconButton("folder", ui::Icon::Folder, TR("Folder"))) openFolder(t->dir());
+        // On the user's own Lichess broadcast (#51).
+        if (!setup_.broadcast_lichess) {
+            ImGui::SameLine();
+            if (ui::iconButton("cast", ui::Icon::Globe, TR("Broadcast on Lichess…"))) {
+                if (cast_sheet_)
+                    cast_sheet_ = false;
+                else
+                    openCastSheet();
+            }
+        }
     }
     ImGui::SameLine();
     drawLayoutMenu();
@@ -571,6 +581,10 @@ void App::drawWorkspace() {
 
     drawWorkspaceHeader();
     ImGui::Spacing();
+    if (run_->running()) {  // the tournament on Lichess (#51), pushed from this window as the Broadcast tab does
+        drawCastSheet();
+        drawCastBanner();
+    }
 
     drawWorkspaceDock();
 }

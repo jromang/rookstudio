@@ -80,6 +80,7 @@ inline constexpr const char* LichessLinks       = "lichess-links";
 inline constexpr const char* FairPlay           = "fair-play";
 inline constexpr const char* FinishedGames      = "your-finished-games";
 inline constexpr const char* FollowedPlayers    = "followed-players";
+inline constexpr const char* LichessCast        = "your-own-lichess-broadcast";
 inline constexpr const char* Assistant          = "the-assistant";
 inline constexpr const char* AssistantModel     = "its-model";
 inline constexpr const char* Questions          = "questions";

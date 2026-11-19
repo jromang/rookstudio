@@ -26,6 +26,8 @@ inline constexpr const char* CLIENT_ID = "rookstudio";
 // asks it of every broadcast tournament and round request since 2026-08, unauthenticated ones being "heavily
 // rate-limited" and possibly stopped.
 inline constexpr const char* SCOPE_STUDY_READ = "study:read";
+// Creating studies and broadcasts: a tournament on the user's own broadcast (#51).
+inline constexpr const char* SCOPE_STUDY_WRITE = "study:write";
 
 // What proves that the program that asked is the one that exchanges the code (RFC 7636), and what the answer must
 // bring back.

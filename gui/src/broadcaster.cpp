@@ -522,7 +522,14 @@ void Broadcaster::updateLichess(const BroadcastInput& input, const BroadcastSnap
         lichess_for_ = input.tournament;
         if (settings.lichess_token.empty()) return;
         lichess_results_ = input.results.size();
-        lichess_.start({settings.lichess_token, settings.lichess_round, settings.lichess_listed, spec.name, input.dir});
+        LichessRelay::Settings relay;
+        relay.token       = settings.lichess_token;
+        relay.round       = settings.lichess_round;
+        relay.listed      = settings.lichess_listed;
+        relay.name        = settings.lichess_name.empty() ? spec.name : settings.lichess_name;
+        relay.dir         = input.dir;
+        relay.description = settings.lichess_description;
+        lichess_.start(std::move(relay));
     }
     if (!lichess_.running()) return;
     const auto now = Clock::now();

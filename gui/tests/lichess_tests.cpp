@@ -177,7 +177,7 @@ TEST_CASE("lichess: a broadcast made, its rounds filled up to 64 games, over HTT
     CHECK(requests[0].body == "body");
 
     LichessRelay relay;
-    relay.start({"secret", "", false, "Relay test", dir, fmt::format("http://127.0.0.1:{}", port)});
+    relay.start({"secret", "", false, "Relay test", dir, fmt::format("http://127.0.0.1:{}", port), "Match · 10+0.1"});
     std::vector<LichessGame> finished;
     for (uint32_t round = 1; round <= 65; ++round) {
         finished.push_back(lichessFinishedGame("[Event \"x\"]\n\n1. e4 {[%clk 0:00:10]} 1-0\n", "Relay test", round,
@@ -207,6 +207,9 @@ TEST_CASE("lichess: a broadcast made, its rounds filled up to 64 games, over HTT
     REQUIRE(create != requests.end());
     CHECK(create->body.find("name=Relay+test") != std::string::npos);
     CHECK(create->body.find("visibility=unlisted") != std::string::npos);
+    // The tournament's format and time control, before the program's name (#51).
+    CHECK(create->body.find("markdown=Match+%C2%B7+10%2B0.1") != std::string::npos);
+    CHECK(create->body.find("Engine+games+played+with+RookStudio.") != std::string::npos);
 
     // lichess.json: where the games went, which are finished; no token.
     const auto saved = readJson<nlohmann::json>(dir / "lichess.json");

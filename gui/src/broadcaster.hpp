@@ -40,6 +40,8 @@ struct BroadcastSettings {
     std::string lichess_token;
     std::string lichess_round;  // a round's URL or id; empty: a new broadcast
     bool lichess_listed = false;
+    std::string lichess_name;         // a new broadcast's; empty: the tournament's (#51)
+    std::string lichess_description;  // a new broadcast's: the tournament's format and time control
 
     // The web page on the internet through an SSH tunnel, while it is served; to the web server's port.
     bool tunnel = false;

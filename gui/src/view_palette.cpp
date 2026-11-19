@@ -583,6 +583,12 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         });
     // The followed players' games, in the broadcasts' mosaic (#50).
     add(TR("Followed players' games in the mosaic"), "Lichess", [this] { openPlayersMosaic(); });
+    // The tournament on the user's own Lichess broadcast (#51).
+    if (run_->running() && !setup_.broadcast_lichess)
+        add(TR("Broadcast on Lichess…"), TR("Tournament"), [this] {
+            page_ = Page::Tournament;
+            openCastSheet();
+        });
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {

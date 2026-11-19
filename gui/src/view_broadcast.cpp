@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include <SDL3/SDL.h>
+#include <fmt/include/fmt/format.h>
 #include <imgui.h>
 
 #include <engine/uci_engine.hpp>
@@ -12,6 +13,7 @@
 #include "broadcaster.hpp"
 #include "console.hpp"
 #include "engine_logos.hpp"
+#include "home.hpp"
 #include "i18n.hpp"
 #include "net.hpp"
 #include "qr.hpp"
@@ -57,9 +59,12 @@ void App::updateBroadcast() {
     settings.chat_link      = setup_.web_chat_link;
     settings.discord_id     = setup_.web_discord_id;
     settings.lichess        = setup_.broadcast_lichess;
-    settings.lichess_token  = lichess_token_;
+    settings.lichess_token  = broadcastToken();  // the linked account's once it may create broadcasts (#51)
     settings.lichess_round  = setup_.lichess_round;
     settings.lichess_listed = setup_.lichess_listed;
+    settings.lichess_name   = setup_.lichess_name;
+    if (const auto& info = run_->info(); run_->tournament())
+        settings.lichess_description = fmt::format("{} · {}", home::formatLabel(info.format), info.limit_text);
     // The tunnel stops with the tournament; another server needs a host.
     settings.tunnel =
         setup_.broadcast_tunnel && run_->running() && (setup_.tunnel_service == 0 || !setup_.tunnel_host.empty());

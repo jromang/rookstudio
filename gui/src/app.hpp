@@ -763,6 +763,19 @@ class App {
     void pollFollowedPlayers();
     void drawFollowedPlayers();  // the Lichess page's card
     void openPlayersMosaic(bool asked = false);
+    // A tournament on the user's own Lichess broadcast (#51, mockup M8, board "Moteurs"): the sheet that makes it; the
+    // account's token once it may create broadcasts (study:write, asked then), else the one pasted on the Broadcast
+    // page.
+    bool cast_sheet_ = false;
+    std::array<char, 96> cast_name_{};
+    bool cast_public_     = false;
+    bool cast_after_link_ = false;  // the permission granted, the broadcast made
+    [[nodiscard]] std::string broadcastToken() const;
+    void openCastSheet();
+    void startCast();
+    void pollCast();
+    void drawCastSheet();
+    void drawCastBanner();
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;

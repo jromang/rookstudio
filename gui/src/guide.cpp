@@ -139,7 +139,8 @@ const std::vector<const char*>& allTopics() {
                                               LichessLinks,
                                               FairPlay,
                                               FinishedGames,
-                                              FollowedPlayers};
+                                              FollowedPlayers,
+                                              LichessCast};
     return all;
 }
 

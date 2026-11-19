@@ -411,6 +411,7 @@ struct MatchSetup {
     bool broadcast_lichess = false;
     std::string lichess_round;    // a round's URL or id; empty: a new broadcast named after the tournament
     bool lichess_listed = false;  // among lichess' community broadcasts, rather than for those with the link
+    std::string lichess_name;     // the broadcast's name, chosen on its sheet (#51); empty: the tournament's
     // The web page on the internet, through an SSH tunnel while a tournament runs: 0 localhost.run, 1 another SSH
     // server (host, port, user, port forwarded on the server).
     bool broadcast_tunnel  = false;
@@ -454,15 +455,15 @@ inline void keepProgramSettings(MatchSetup& next, const MatchSetup& current) {
         concurrency, affinity, book, book_random, book_plies, book_start, chess960, opening_per_round, seed, pgn_out, \
         engine_syzygy, engine_ownbook_off, book_a, book_b, big_scale, big_follow, big_seconds, book_randomness,       \
         unbalanced_enabled, unbalanced_cp, unbalanced_moves, unbalanced_replace, sprt_bias, sprt_min_games
-#define FCG_MATCH_SETUP_FIELDS_2                                                                                  \
-    draw_enabled, draw_movenumber, draw_movecount, draw_score, resign_enabled, resign_movecount, resign_score,    \
-        resign_twosided, maxmoves_enabled, maxmoves, tb_enabled, tb_paths, tb_pieces, tb_ignore50, tb_result,     \
-        pgn_event, export_style, pgn_nodes, pgn_seldepth, pgn_nps, pgn_pv, pgn_tbhits, pgn_decision, recover,     \
-        log_every_game, stop_on_start_failure, check_mate_pvs, notify, language, theme, ui_zoom, tile_info,       \
-        live_seed_side, live_arrows, nav_buttons,                                                                 \
-        panes, broadcast_files, broadcast_dir, broadcast_tlcs, tlcs_port, tlcs_lanes, broadcast_web, web_port,    \
-        broadcast_follow, broadcast_lichess, lichess_round, lichess_listed, resume_at_launch, broadcast_tunnel,   \
-        tunnel_service, tunnel_host, tunnel_port, tunnel_user, tunnel_remote_port, web_chat_link, web_discord_id
+#define FCG_MATCH_SETUP_FIELDS_2                                                                                    \
+    draw_enabled, draw_movenumber, draw_movecount, draw_score, resign_enabled, resign_movecount, resign_score,      \
+        resign_twosided, maxmoves_enabled, maxmoves, tb_enabled, tb_paths, tb_pieces, tb_ignore50, tb_result,       \
+        pgn_event, export_style, pgn_nodes, pgn_seldepth, pgn_nps, pgn_pv, pgn_tbhits, pgn_decision, recover,       \
+        log_every_game, stop_on_start_failure, check_mate_pvs, notify, language, theme, ui_zoom, tile_info,         \
+        live_seed_side, live_arrows, nav_buttons, panes, broadcast_files, broadcast_dir, broadcast_tlcs, tlcs_port, \
+        tlcs_lanes, broadcast_web, web_port, broadcast_follow, broadcast_lichess, lichess_round, lichess_listed,    \
+        lichess_name, resume_at_launch, broadcast_tunnel, tunnel_service, tunnel_host, tunnel_port, tunnel_user,    \
+        tunnel_remote_port, web_chat_link, web_discord_id
 template <typename BasicJsonType,
           nlohmann::detail::enable_if_t<nlohmann::detail::is_basic_json<BasicJsonType>::value, int> = 0>
 void to_json(BasicJsonType& nlohmann_json_j, const MatchSetup& nlohmann_json_t) {

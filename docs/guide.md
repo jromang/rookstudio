@@ -1962,6 +1962,16 @@ names, as `http://proxy.example:3128` or `http://user:password@proxy.example:312
 `NO_PROXY`; on Windows too the proxy comes from these variables, not from the system settings. SOCKS proxies are not
 supported.
 
+### Your own Lichess broadcast
+
+*Broadcast on Lichess…*, in the header of a tournament that plays on this machine, opens a sheet: the broadcast's name
+(the tournament's at first), unlisted (for those who have its link) unless *Public* is chosen, and what goes to
+Lichess, the name, the tournament's format and time control, and each game's PGN. *Create the broadcast* asks your
+linked account for one more permission the first time, creating studies and broadcasts (Lichess's page opens for it),
+or links the account with it; the token pasted in the lichess card above serves when no account is linked. Then the
+games go to the broadcast as described above, and a banner under the header says how many were sent and when the last
+one was, with *Open on lichess.org* and *Stop*.
+
 ### A team match on the air
 
 A team match shows the teams' score everywhere: in the web page's header and above its standings (with team A's

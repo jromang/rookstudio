@@ -516,10 +516,18 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(trf("View: {}", views_[static_cast<std::size_t>(i)].name), fmt::format("Ctrl+{}", i + 1),
             [this, i] { switchView(i); });
     add(TR("Edit the views…"), TR("Settings"), [this] { openViewsSheet(view_); });
-    add(TR("Home"), TR("Study"), page(Page::ChessHome));
-    add(TR("Databases"), TR("Study"), page(Page::Databases));
-    add(TR("Openings: repertoires"), TR("Study"), page(Page::Openings));
-    add("Lichess", TR("Study"), page(Page::Lichess));
+    // Each with the view it opens in: the view shown when it holds the page, else the first that does.
+    const auto where = [this](Page p) -> std::string {
+        const auto root = rootOf(p);
+        if (!root || view().holds(*root)) return view().name;
+        for (const auto& v : views_)
+            if (v.holds(*root)) return v.name;
+        return TR("in no view");
+    };
+    add(TR("Home"), where(Page::ChessHome), page(Page::ChessHome));
+    add(TR("Databases"), where(Page::Databases), page(Page::Databases));
+    add(TR("Openings: repertoires"), where(Page::Openings), page(Page::Openings));
+    add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {
         toStudyBoard();

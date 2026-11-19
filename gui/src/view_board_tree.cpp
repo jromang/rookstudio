@@ -789,7 +789,8 @@ void App::drawBoardTree() {
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) tree_row_ = std::max(tree_row_ - 1, -1), tree_scroll_ = true;
         if (tree_row_ > last) tree_row_ = last;
         if (tree_row_ >= 0) {
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+            if (!linkCardTakesKeys() &&
+                (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
                 play = tree_rows_[static_cast<std::size_t>(tree_row_)].move;
             for (const auto c : io.InputQueueCharacters)
                 if (c == '*' && path) star = tree_rows_[static_cast<std::size_t>(tree_row_)].move;

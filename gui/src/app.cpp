@@ -281,6 +281,7 @@ void App::frame() {
     applyThemeSetting();
     updateBroadcast();
     pollLichess();    // a link, a sync, the broadcasts: whatever page shows
+    pollLinkJob();    // a Lichess link pasted: its game asked, its import
     pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
@@ -355,6 +356,9 @@ void App::frame() {
         } else if (w == "board" || w == "board-analyse") {  // the Board page; its analysis started
             page_ = Page::Board;
             if (w == "board-analyse") setBoardAnalysis(true);
+        } else if (w.rfind("link=", 0) == 0) {  // link=URL: a Lichess link, as pasted on the Board page (#47)
+            page_ = Page::Board;
+            (void)offerLichessLink(w.substr(5));
         } else if (w.rfind("board=", 0) == 0 || w.rfind("board-analyse=", 0) == 0 || w.rfind("board-review", 0) == 0) {
             // board=FILE: a PGN file (or a FEN, EPD file) on the Board page; board-analyse=FILE, analysed;
             // board-review=FILE: its first game analysed move by move, once read; board-review-PLY=FILE, shown at

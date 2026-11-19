@@ -47,6 +47,7 @@
 #include "lichess_account.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
+#include "lichess_links.hpp"
 #include "lichess_settings.hpp"
 #include "live.hpp"
 #include "machine_jobs.hpp"
@@ -740,6 +741,38 @@ class App {
     };
     std::optional<LichessScopeAsk> lichess_scope_ask_;
     void drawLichessScopeAsk();
+    // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
+    struct LinkCard {
+        lichess::Link link;
+        std::string url;       // as pasted
+        bool to_base = false;  // into a database rather than on the board
+        bool follow  = false;  // a round followed live
+        int base     = -1;     // the database chosen; -1: the one by default, made when missing
+        std::future<lichess::Answer<std::string>> pgn;  // a game's or a chapter's, asked at once
+        std::optional<lichess::Answer<std::string>> got;
+    };
+    std::optional<LinkCard> link_card_;
+    struct LinkJob {
+        lichess::Link link;
+        std::size_t index = 0;  // the database's
+        std::string name;
+        std::shared_ptr<std::atomic<uint64_t>> games = std::make_shared<std::atomic<uint64_t>>(0);
+        std::shared_ptr<std::atomic<bool>> cancel    = std::make_shared<std::atomic<bool>>(false);
+        std::future<lichess::LinkImport> result;
+        bool done = false;
+        std::string said;  // its outcome
+    };
+    std::optional<LinkJob> link_job_;
+    int link_key_frame_ = -1;  // the frame whose Enter or Escape the card took
+    // True when `text` is a Lichess address: its card shown, or said unknown. `databases`: pasted on the Databases
+    // page, its games offered for the database chosen there.
+    bool offerLichessLink(const std::string& text, bool databases = false);
+    void pollLinkJob();
+    void actOnLink();
+    void drawLinkCard();
+    [[nodiscard]] bool linkCardTakesKeys() const {
+        return link_card_.has_value() || link_key_frame_ == ImGui::GetFrameCount();
+    }
     struct LichessSync {
         std::size_t index = 0;  // the database's
         std::string name;

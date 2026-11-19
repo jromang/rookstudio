@@ -1080,6 +1080,26 @@ heavily a broadcast followed without an account allowed to read broadcasts: the 
 permission (*Allow on Lichess…*, or *Follow without it*). A round whose games have all ended goes into the
 *Broadcasts* database.
 
+### Lichess links
+
+A Lichess address pasted with Ctrl+V on the Board page or on the Databases page is recognised without asking Lichess
+anything: a game (`lichess.org/abcd1234`, with `/white`, `/black` or a move after `#`), a study or one of its chapters,
+a broadcast round or tournament, an arena, a Swiss tournament, a player (`lichess.org/@/name`) or your bookmarks. An
+address RookStudio does not know is said so, and nothing is asked.
+
+A card then says what it is, where its games go and what is asked of Lichess; Enter does it, Escape leaves it:
+
+- a game or a chapter opens on the board, at the side and the move the address shows, or goes into a database;
+- a study, a broadcast, an arena, a Swiss tournament or your bookmarks come into a database in the background, their
+  games counted as they come, with *Cancel*; then *Open the database*;
+- a round under way can be followed live instead (see [Official broadcasts](#official-broadcasts));
+- a player's games go into their database, through [their sync](#a-players-games).
+
+The database offered is the one chosen on the Databases page when the link was pasted there, else *Lichess games*,
+*Lichess studies*, *Broadcasts*, *Lichess tournaments* or *Lichess bookmarks*, made when missing; another can be
+chosen. A game is asked by its id, without an account; a private study with your token; broadcasts with an account
+allowed to read them, asked once, as for following a round; your bookmarks need a linked account.
+
 ### Online for the analysis
 
 Three services, each asked about at its first use (for this position, always, or not now) and changed here:

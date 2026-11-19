@@ -103,6 +103,7 @@ void App::pasteGamesInto(int index) {
     char* clip             = SDL_GetClipboardText();
     const std::string text = clip ? clip : "";
     SDL_free(clip);
+    if (offerLichessLink(text, true)) return;  // a Lichess link: its card (#47)
     if (study::splitGames(text).empty()) {
         db_message_ = TR("No game in the clipboard.");
         return;
@@ -432,6 +433,15 @@ void App::drawImportOutcome(std::size_t index) {
 
 void App::drawDatabases() {
     auto& s = shelf();
+    // A Lichess link pasted here (#47): its card, its games offered for the database chosen.
+    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) {
+        char* clip             = SDL_GetClipboardText();
+        const std::string text = clip ? clip : "";
+        SDL_free(clip);
+        if (!offerLichessLink(text, true) && !study::splitGames(text).empty() && db_selected_ >= 0)
+            pasteGamesInto(db_selected_);
+    }
+    drawLinkCard();
     if (db_list_ && db_selected_ >= 0 && db_selected_ < static_cast<int>(s.entries().size())) {
         drawGameList();
         return;
@@ -667,7 +677,8 @@ void App::drawDatabases() {
         ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, ImGui::GetID("##db_shelf_keys"));
     }
     if (ui::iconButton("db_open_list", ui::Icon::Contents, TR("Open the list")) ||
-        (!db_naming_ && db_named_frame_ != ImGui::GetFrameCount() && ImGui::IsKeyPressed(ImGuiKey_Enter, false))) {
+        (!db_naming_ && db_named_frame_ != ImGui::GetFrameCount() && !linkCardTakesKeys() &&
+         ImGui::IsKeyPressed(ImGuiKey_Enter, false))) {
         db_list_ = true;
         db_row_  = 0;
     }
@@ -957,7 +968,7 @@ void App::drawGameList() {
             if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && db_row_ > 0) --db_row_;
             if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) db_row_ = std::min(db_row_ + 20, ids.size() - 1);
             if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) db_row_ = db_row_ > 20 ? db_row_ - 20 : 0;
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false)) open = true;
+            if (!linkCardTakesKeys() && ImGui::IsKeyPressed(ImGuiKey_Enter, false)) open = true;
         }
         ImGuiListClipper clipper;
         clipper.Begin(static_cast<int>(ids.size()));

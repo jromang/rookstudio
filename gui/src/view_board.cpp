@@ -949,7 +949,7 @@ void App::boardEditKeys() {
     if (io.WantTextInput) return;  // a field has the keys: the move typed, a comment
     // Enter writes a comment, unless a move of the tree is chosen (Up, Down): it plays it then.
     const bool tree_chosen = board_side_tab_ == 2 && tree_row_ >= 0;
-    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen &&
+    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen && !linkCardTakesKeys() &&
         (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
         boardComment(io.KeyShift);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) boardUndo(false);
@@ -1378,6 +1378,7 @@ void App::drawBoardPage() {
     ImGui::EndGroup();
     ImGui::SameLine();
     ImGui::BeginChild("##board_side", ImVec2(0, 0));
+    drawLinkCard();  // a Lichess link pasted (#47)
     if (b.play_open || (b.match && b.match_state.running)) drawBoardPlay();
     if (chessBoard()) {
         drawChessColumn();
@@ -1544,6 +1545,10 @@ void App::pasteOnBoard() {
     char* clip             = SDL_GetClipboardText();
     const std::string text = clip ? clip : "";
     SDL_free(clip);
+    if (offerLichessLink(text)) {  // a Lichess link: its card (#47)
+        page_ = Page::Board;
+        return;
+    }
     readOnBoard(text, TR("From the clipboard"));
 }
 

@@ -635,6 +635,16 @@ it to the library. *Run as a test suite…* opens an EPD book in **Suites**.
   key as the format wants, is then added to the library, its options in its description. The console says how many
   games went into it, how many the options left out and how many could not be read.
 
+### Books from the named openings
+
+*From Lichess's named openings…*, in **Create…**, makes a book of starting positions from Lichess's table of named
+openings, in the program already (chess-openings, CC0): nothing is downloaded. Its form, in place of the book's
+details, takes the **families** (A flank openings, B semi-open games, C open games, D closed games, E Indian
+defences), the **lengths** of the lines kept, in plies (8 to 16 at first), *One position per named variation* (several
+lines share a name), and the **number** of positions, spread evenly over the ECO codes when more qualify. It says how
+many positions and openings it would hold; *Make the book…* asks where to write the EPD file, each position with its
+opening as `c0`, and adds it to the library.
+
 ## Board
 
 The Board page shows one game or one position, from anywhere: **A** on any board of the program (a game of the

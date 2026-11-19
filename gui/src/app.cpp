@@ -521,6 +521,9 @@ void App::frame() {
         } else if (w.rfind("books-chess324=", 0) == 0) {  // books-chess324=FILE: the Chess324 book written there
             page_ = Page::Books;
             writeChess324Book(w.substr(15), false);
+        } else if (w.rfind("books-openings=", 0) == 0) {  // books-openings=FILE: Lichess's named openings book there
+            page_ = Page::Books;
+            writeOpeningSuiteBook(w.substr(15));
         } else if (w.rfind("books-build", 0) == 0) {
             // books-build[=PGN[>BIN]]: the form of Build a Polyglot book, with that PGN file, building BIN.
             page_ = Page::Books;
@@ -1514,6 +1517,9 @@ void App::handleDialogs() {
             case Dialogs::Purpose::Chess324Book:
             case Dialogs::Purpose::Chess324SymmetricalBook:
                 writeChess324Book(path, answer->purpose == Dialogs::Purpose::Chess324SymmetricalBook);
+                break;
+            case Dialogs::Purpose::OpeningSuiteBook:
+                writeOpeningSuiteBook(path);
                 break;
             case Dialogs::Purpose::BuildBookPgn:
                 book_build_form_.pgn = path;

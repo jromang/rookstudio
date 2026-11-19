@@ -57,6 +57,7 @@
 #include "machine_run.hpp"
 #include "model.hpp"
 #include "notice.hpp"
+#include "opening_suite.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
 #include "prep.hpp"
@@ -1555,6 +1556,13 @@ class App {
     [[nodiscard]] tour::PgnBookOptions bookBuildOptions() const;
     BookBuildForm book_build_form_;
     bool book_build_shown_ = false;  // the detail pane shows the form rather than the book chosen
+    // A book of starting positions from Lichess's named openings (#53, mockup M8, board "Moteurs"): its form in the
+    // detail pane too; what it would hold, worked out again when the options change.
+    bool opening_suite_shown_ = false;
+    OpeningSuiteOptions opening_suite_;
+    std::optional<std::pair<OpeningSuiteOptions, std::vector<SuitePosition>>> opening_suite_preview_;
+    void drawOpeningSuite();
+    void writeOpeningSuiteBook(std::string path);
     std::string book_build_error_;   // why the last build failed, shown in the form
     PolyglotBuild book_build_;
 

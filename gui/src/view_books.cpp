@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <set>
 #include <utility>
 
 #include <imgui.h>
@@ -150,11 +151,107 @@ void App::drawBookCreateMenu() {
         tip(TR("Black's pieces on the same files as White's: 18 starting positions, added to the library."));
         ImGui::EndMenu();
     }
-    if (ImGui::MenuItem(TR("Build a Polyglot book…"))) openBookBuild();
+    if (ImGui::MenuItem(TR("From Lichess's named openings…"))) {
+        opening_suite_shown_ = true;
+        book_build_shown_    = false;
+    }
+    tip(
+        TR("The position each named line of Lichess's opening table comes to, out of the families, the lengths and the "
+           "number chosen; written to an EPD file and added to the library. Nothing is downloaded."));
+    if (ImGui::MenuItem(TR("Build a Polyglot book…"))) {
+        openBookBuild();
+        opening_suite_shown_ = false;
+    }
     tip(
         TR("From the games of a PGN file: their moves up to a depth, those played by enough games, weighted by their "
            "number or their score; written as a Polyglot book (.bin) and added to the library."));
     ImGui::EndPopup();
+}
+
+void App::drawOpeningSuite() {
+    const ui::TopicRegion topic(guide::topics::OpeningSuite);
+    auto& o = opening_suite_;
+    ImGui::PushTextWrapPos(0);
+    ImGui::PushFont(ui::titleFont(), ImGui::GetFontSize() * 1.1f);
+    ImGui::TextUnformatted(TR("A book from Lichess's named openings"));
+    ImGui::PopFont();
+    ImGui::TextDisabled("%s", TR("The position each named line of Lichess's opening table comes to, for an engine "
+                                 "tournament. The table is in the program already (chess-openings, CC0): nothing is "
+                                 "downloaded."));
+    ImGui::Spacing();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(TR("Families"));
+    for (const char family : std::string("ABCDE")) {
+        ImGui::SameLine();
+        bool on = o.families.find(family) != std::string::npos;
+        if (ImGui::Checkbox(fmt::format("{}##suite_family", family).c_str(), &on)) {
+            std::string kept;
+            for (const char f : std::string("ABCDE"))
+                if (f == family ? on : o.families.find(f) != std::string::npos) kept += f;
+            o.families = kept;
+        }
+    }
+    ImGui::TextDisabled("%s", TR("A flank openings · B semi-open games · C open games · D closed games · E Indian "
+                                 "defences"));
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(TR("Lines of"));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 6);
+    if (ImGui::InputInt("##suite_min", &o.min_plies)) o.min_plies = std::clamp(o.min_plies, 1, 40);
+    ImGui::SameLine();
+    ImGui::TextUnformatted(TR("to"));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 6);
+    if (ImGui::InputInt("##suite_max", &o.max_plies)) o.max_plies = std::clamp(o.max_plies, 1, 40);
+    ImGui::SameLine();
+    ImGui::TextUnformatted(TR("plies"));
+    if (o.max_plies < o.min_plies) o.max_plies = o.min_plies;
+    ImGui::Checkbox(TR("One position per named variation"), &o.one_per_name);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(TR("At most"));
+    ImGui::SameLine();
+    int most = static_cast<int>(o.most);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7);
+    if (ImGui::InputInt("##suite_most", &most, 50)) o.most = static_cast<std::size_t>(std::clamp(most, 1, 5000));
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("positions, spread over the ECO codes"));
+    // What it would hold, worked out again when the options change.
+    if (!opening_suite_preview_ || !(opening_suite_preview_->first == o))
+        opening_suite_preview_ = std::make_pair(o, openingSuite(namedOpenings(), o));
+    const auto& kept = opening_suite_preview_->second;
+    std::set<std::string> openings;
+    for (const auto& p : kept) openings.insert(p.name.substr(0, p.name.find(':')));
+    ImGui::Spacing();
+    if (kept.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("No position: widen the choices."));
+    else
+        ImGui::TextUnformatted(trf("{} positions · {} openings · from {} to {}", kept.size(), openings.size(),
+                                   kept.front().eco, kept.back().eco)
+                                   .c_str());
+    ImGui::BeginDisabled(kept.empty());
+    if (ImGui::Button(TR("Make the book…")))
+        dialogs_.saveFile(Dialogs::Purpose::OpeningSuiteBook, {{"EPD", "epd"}}, newBookPath("lichess-openings.epd"));
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Cancel"))) opening_suite_shown_ = false;
+    ImGui::PopTextWrapPos();
+}
+
+void App::writeOpeningSuiteBook(std::string path) {
+    if (!fs::path(path).has_extension()) path += ".epd";  // a book is read by its extension
+    const auto kept = openingSuite(namedOpenings(), opening_suite_);
+    try {
+        writeOpeningSuite(path, kept);
+    } catch (const std::exception& e) {
+        Console::instance().add(e.what(), true);
+        return;
+    }
+    const auto& o = opening_suite_;
+    Console::instance().add(
+        trn("{} position written to {}", "{} positions written to {}", kept.size(), kept.size(), path));
+    addWrittenBook(path, trf("Lichess's named openings: {} positions, {}, lines of {} to {} plies", kept.size(),
+                             o.families, o.min_plies, o.max_plies));
+    opening_suite_shown_ = false;
 }
 
 tour::PgnBookOptions App::bookBuildOptions() const {
@@ -467,7 +564,9 @@ void App::drawBooks() {
     if (ui::splitter("##book_split", setup_.panes["books"], page)) saveSetupSoon();
 
     ImGui::BeginChild("##book_detail");
-    if (book_build_shown_) {
+    if (opening_suite_shown_) {
+        drawOpeningSuite();
+    } else if (book_build_shown_) {
         drawBookBuild();
     } else if (selected_book_ < 0 || selected_book_ >= static_cast<int>(books_.size())) {
         ui::emptyState(TR("Choose a book in the list."));

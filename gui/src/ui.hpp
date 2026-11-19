@@ -112,8 +112,18 @@ enum class Icon {
     Globe,      // Lichess
     Broadcast,  // a broadcast followed
     Download,
-    Comment  // a speech bubble: the assistant's comments
+    Comment,  // a speech bubble: the assistant's comments
+    // The views' icons (views.hpp).
+    Flask,
+    Cap,
+    Layers,
+    Crown,
+    Swords,
+    Rook
 };
+
+// The icon of a view, by the name views.hpp gives it ("flask", "cap"…).
+[[nodiscard]] Icon viewIcon(std::string_view name);
 
 // `icon` in a line of text, as wide as the font is high, in `col`.
 void inlineIcon(Icon icon, ImU32 col);

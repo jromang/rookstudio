@@ -302,9 +302,19 @@ void Storage::setGuideSettings(const GuideSettings& guide) const {
 
 std::string Storage::space() const { return setting(settings(), "space", std::string{}); }
 
-void Storage::setSpace(const std::string& space) const {
+nlohmann::json Storage::viewsJson() const {
+    const auto s  = settings();
+    const auto it = s.find("views");
+    return it != s.end() ? *it : nlohmann::json();
+}
+
+int Storage::shownView() const { return setting(settings(), "view", 0); }
+
+void Storage::setViews(const nlohmann::json& views, int shown) const {
     auto settings     = this->settings();
-    settings["space"] = space;
+    settings["views"] = views;
+    settings["view"]  = shown;
+    settings.erase("space");  // the views replace it
     save(root_ / "settings.json", settings);
 }
 

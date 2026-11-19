@@ -46,10 +46,16 @@ void App::drawChessHome() {
     ImGui::TextDisabled("Ctrl+K");
     ImGui::Dummy(ImVec2(0, px(4)));
     auto& b = board_;
+    // The cards of the view's pages (M6, board 3): the board's, the databases', Lichess', the tournaments'.
+    const auto& v          = view();
+    const bool board       = v.holds(views::PageId::Board) || v.holds(views::PageId::Play);
+    const bool bases       = v.holds(views::PageId::Databases);
+    const bool lichess     = v.holds(views::PageId::Lichess);
+    const bool tournaments = v.holds(views::PageId::Tournaments);
 
     // Where the user was (mockup M0): the Board page's game at its move, where it comes from, what it holds.
     const bool has_game = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
-    if (has_game) {
+    if (has_game && board) {
         ui::beginCard("chess_resume");
         BoardDecor decor;
         decor.eval_white = -1.0f;
@@ -104,114 +110,136 @@ void App::drawChessHome() {
         ImGui::TextDisabled("%s", k);
         ImGui::SameLine(0, px(14));
     };
-    if (ui::iconButton("chess_open", ui::Icon::Folder, TR("Open a PGN…"))) openBoardPgnDialog();
-    key("Ctrl+O");
-    if (ui::iconButton("chess_paste", ui::Icon::Paste, TR("Paste a game or a FEN"))) {
-        page_ = Page::Board;
-        pasteOnBoard();
+    if (board) {
+        if (ui::iconButton("chess_open", ui::Icon::Folder, TR("Open a PGN…"))) openBoardPgnDialog();
+        key("Ctrl+O");
+        if (ui::iconButton("chess_paste", ui::Icon::Paste, TR("Paste a game or a FEN"))) {
+            page_ = Page::Board;
+            pasteOnBoard();
+        }
+        key("Ctrl+V");
+        if (ui::iconButton("chess_new", ui::Icon::Plus, TR("New game"))) newBoardGame();
+        key("Ctrl+N");
     }
-    key("Ctrl+V");
-    if (ui::iconButton("chess_new", ui::Icon::Plus, TR("New game"))) newBoardGame();
-    key("Ctrl+N");
-    if (ui::iconButton("chess_import", ui::Icon::Database, TR("Import into a database…"))) {
-        page_ = Page::Databases;
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+    if (bases) {
+        if (ui::iconButton("chess_import", ui::Icon::Database, TR("Import into a database…"))) {
+            page_ = Page::Databases;
+            dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+        }
+        ImGui::SameLine(0, px(14));
     }
-    ImGui::SameLine(0, px(14));
-    if (ui::iconButton("chess_play", ui::Icon::Play, TR("Play against an engine"))) {
+    if (board && ui::iconButton("chess_play", ui::Icon::Play, TR("Play against an engine"))) {
         page_            = Page::Board;
         board_.play_open = true;
     }
-    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) {
+    if (tournaments) {
+        if (board) ImGui::SameLine(0, px(14));
+        if (ui::iconButton("chess_tournament", ui::Icon::Trophy, TR("New tournament"))) page_ = Page::NewMatch;
+    }
+    if (board && !ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) {
         page_ = Page::Board;
         pasteOnBoard();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
 
+    // The tournaments running, as the Tournaments page shows them.
+    if (tournaments) {
+        refreshTournaments();
+        drawRunCards();
+        ImGui::Dummy(ImVec2(0, px(6)));
+    }
+
     // The recent games and the databases, side by side.
     const float gap    = px(14);
-    const float column = (ImGui::GetContentRegionAvail().x - gap) * 0.5f;
-    ui::beginCard("chess_recent", ImVec2(column, 0));
-    ImGui::TextUnformatted(TR("Recently"));
+    const float column = board && bases ? (ImGui::GetContentRegionAvail().x - gap) * 0.5f : 0.0f;
     std::optional<std::size_t> reopen;
-    for (std::size_t i = 0; i < std::min<std::size_t>(recent_games_.size(), 6); ++i) {
-        const auto& r = recent_games_[i];
-        ImGui::PushID(static_cast<int>(i));
-        const auto start = ImGui::GetCursorPos();
-        if (ImGui::Selectable("##recent", false, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.1f)))
-            reopen = i;
-        ImGui::SetCursorPos(ImVec2(start.x + px(4), start.y + px(2)));
-        ImGui::TextUnformatted(r.title.c_str());
-        auto sub = r.where;
-        if (r.changes.any()) sub += (sub.empty() ? "" : " · ") + std::string(TR("changed, not saved yet"));
-        ImGui::SetCursorPosX(start.x + px(4));
-        ImGui::TextDisabled("%s", sub.empty() ? " " : sub.c_str());
-        ImGui::PopID();
-    }
-    if (recent_games_.empty())
-        ImGui::TextDisabled("%s", TR("The games you open on the board come here, Ctrl+Tab away."));
-    ui::endCard();
-    ImGui::SameLine(0, gap);
-    ui::beginCard("chess_bases", ImVec2(0, 0));
-    ImGui::TextUnformatted(TR("My databases"));
-    ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10), ImGui::GetContentRegionMax().x - px(90)));
-    if (ImGui::SmallButton(TR("+ Import…"))) {
-        page_ = Page::Databases;
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
-    }
-    auto& shelf_       = shelf();
-    const auto* job    = shelf_.import();
-    std::size_t linked = 0, shown = 0;
-    for (std::size_t i = 0; i < shelf_.entries().size(); ++i) {
-        const auto& e = shelf_.entries()[i];
-        if (e.source) {
-            linked += e.source->kind == study::LinkedSource::Kind::Tournament ? 1 : 0;
-            continue;
+    auto& shelf_    = shelf();
+    const auto* job = shelf_.import();
+    if (board) {
+        ui::beginCard("chess_recent", ImVec2(column, 0));
+        ImGui::TextUnformatted(TR("Recently"));
+        for (std::size_t i = 0; i < std::min<std::size_t>(recent_games_.size(), 6); ++i) {
+            const auto& r = recent_games_[i];
+            ImGui::PushID(static_cast<int>(i));
+            const auto start = ImGui::GetCursorPos();
+            if (ImGui::Selectable("##recent", false, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.1f)))
+                reopen = i;
+            ImGui::SetCursorPos(ImVec2(start.x + px(4), start.y + px(2)));
+            ImGui::TextUnformatted(r.title.c_str());
+            auto sub = r.where;
+            if (r.changes.any()) sub += (sub.empty() ? "" : " · ") + std::string(TR("changed, not saved yet"));
+            ImGui::SetCursorPosX(start.x + px(4));
+            ImGui::TextDisabled("%s", sub.empty() ? " " : sub.c_str());
+            ImGui::PopID();
         }
-        ++shown;
-        const auto facts = shelf_.facts(i);
-        ImGui::PushID(static_cast<int>(i));
-        const auto start = ImGui::GetCursorPos();
-        if (ImGui::Selectable("##base", false, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.1f))) {
-            db_selected_ = static_cast<int>(i);
-            db_list_     = true;
-            page_        = Page::Databases;
-        }
-        ImGui::SetCursorPos(ImVec2(start.x + px(4), start.y + px(2)));
-        ImGui::TextUnformatted(e.name.c_str());
-        const auto count = ui::exactCount(facts.games);
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(count.c_str()).x - px(4));
-        ImGui::TextDisabled("%s", count.c_str());
-        std::string sub;
-        if (job && job->index == i) {
-            const auto total = std::max<uint64_t>(1, job->progress.total_bytes);
-            sub              = job->building ? std::string(TR("its opening tree being built"))
-                                             : trf("import of {}: {} %", job->file.filename().string(),
-                                                   static_cast<int>(100 * job->progress.bytes.load() / total));
-        } else if (!facts.error.empty()) {
-            sub = facts.error;
-        } else if (facts.changed) {
-            sub = trf("changed {}", ui::dayText(facts.changed));
-            if (facts.tree) sub += std::string(" · ") + TR("tree up to date");
-        }
-        ImGui::SetCursorPosX(start.x + px(4));
-        ImGui::TextDisabled("%s", sub.empty() ? " " : sub.c_str());
-        ImGui::PopID();
+        if (recent_games_.empty())
+            ImGui::TextDisabled("%s", TR("The games you open on the board come here, Ctrl+Tab away."));
+        ui::endCard();
     }
-    if (linked > 0) {
-        if (ImGui::Selectable(trn("Tournaments ({}) · the Engines space's games, read without a copy",
-                                  "Tournaments ({}) · the Engines space's games, read without a copy", linked, linked)
-                                  .c_str()))
+    if (board && bases) ImGui::SameLine(0, gap);
+    if (bases) {
+        ui::beginCard("chess_bases", ImVec2(0, 0));
+        ImGui::TextUnformatted(TR("My databases"));
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10), ImGui::GetContentRegionMax().x - px(90)));
+        if (ImGui::SmallButton(TR("+ Import…"))) {
             page_ = Page::Databases;
+            dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+        }
+        std::size_t linked = 0, shown = 0;
+        for (std::size_t i = 0; i < shelf_.entries().size(); ++i) {
+            const auto& e = shelf_.entries()[i];
+            if (e.source) {
+                linked += e.source->kind == study::LinkedSource::Kind::Tournament ? 1 : 0;
+                continue;
+            }
+            ++shown;
+            const auto facts = shelf_.facts(i);
+            ImGui::PushID(static_cast<int>(i));
+            const auto start = ImGui::GetCursorPos();
+            if (ImGui::Selectable("##base", false, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.1f))) {
+                db_selected_ = static_cast<int>(i);
+                db_list_     = true;
+                page_        = Page::Databases;
+            }
+            ImGui::SetCursorPos(ImVec2(start.x + px(4), start.y + px(2)));
+            ImGui::TextUnformatted(e.name.c_str());
+            const auto count = ui::exactCount(facts.games);
+            ImGui::SameLine(ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(count.c_str()).x - px(4));
+            ImGui::TextDisabled("%s", count.c_str());
+            std::string sub;
+            if (job && job->index == i) {
+                const auto total = std::max<uint64_t>(1, job->progress.total_bytes);
+                sub              = job->building ? std::string(TR("its opening tree being built"))
+                                                 : trf("import of {}: {} %", job->file.filename().string(),
+                                                       static_cast<int>(100 * job->progress.bytes.load() / total));
+            } else if (!facts.error.empty()) {
+                sub = facts.error;
+            } else if (facts.changed) {
+                sub = trf("changed {}", ui::dayText(facts.changed));
+                if (facts.tree) sub += std::string(" · ") + TR("tree up to date");
+            }
+            ImGui::SetCursorPosX(start.x + px(4));
+            ImGui::TextDisabled("%s", sub.empty() ? " " : sub.c_str());
+            ImGui::PopID();
+        }
+        if (linked > 0) {
+            if (ImGui::Selectable(trn("Tournaments ({}) · the Engines space's games, read without a copy",
+                                      "Tournaments ({}) · the Engines space's games, read without a copy", linked,
+                                      linked)
+                                      .c_str()))
+                page_ = Page::Databases;
+        }
+        if (shown == 0)
+            ImGui::TextDisabled("%s", TR("No database yet: import a PGN file, or drop one on the Databases page."));
+        ui::endCard();
     }
-    if (shown == 0)
-        ImGui::TextDisabled("%s", TR("No database yet: import a PGN file, or drop one on the Databases page."));
-    ui::endCard();
     if (reopen) restoreRecentGame(*reopen);
 
     // Lichess (M0, M4): the account, a player's games, the broadcasts live.
-    ImGui::Dummy(ImVec2(0, px(6)));
-    drawLichessHomeCard();
+    if (lichess) {
+        ImGui::Dummy(ImVec2(0, px(6)));
+        drawLichessHomeCard();
+    }
 
     // What runs: the game's analysis, the position's, an import, the assistant (M5, board 1).
     const bool importing = job != nullptr;

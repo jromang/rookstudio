@@ -79,6 +79,7 @@ const char* App::guideSection() const {
         case Page::Databases:
         case Page::Openings:
         case Page::Lichess:
+        case Page::Count:
             break;
     }
     return Window;
@@ -510,35 +511,33 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     if (replay_) add(TR("Analyse the game shown"), name, [this] { analyseReplay(); });
     add(TR("Test suites"), "", page(Page::Suites));
     add(TR("Ratings"), "", page(Page::Ratings));
-    // The spaces, and the Chess space's pages: a command of the other space takes it there.
-    add(TR("The Engines space"), "Ctrl+1", [this] { switchSpace(Space::Engines); });
-    add(TR("The Chess space"), "Ctrl+2", [this] { switchSpace(Space::Chess); });
-    add(TR("Home"), TR("Chess"), page(Page::ChessHome));
-    add(TR("Databases"), TR("Chess"), page(Page::Databases));
-    add(TR("Openings: repertoires"), TR("Chess"), page(Page::Openings));
-    add("Lichess", TR("Chess"), page(Page::Lichess));
+    // The views, and the pages of every view: a page of another view takes it there (followPage).
+    for (int i = 0; i < static_cast<int>(views_.size()); ++i)
+        add(trf("View: {}", views_[static_cast<std::size_t>(i)].name), fmt::format("Ctrl+{}", i + 1),
+            [this, i] { switchView(i); });
+    add(TR("Edit the views…"), TR("Settings"), [this] { openViewsSheet(view_); });
+    add(TR("Home"), TR("Study"), page(Page::ChessHome));
+    add(TR("Databases"), TR("Study"), page(Page::Databases));
+    add(TR("Openings: repertoires"), TR("Study"), page(Page::Openings));
+    add("Lichess", TR("Study"), page(Page::Lichess));
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {
-        switchSpace(Space::Chess);
-        page_           = Page::Board;
+        toStudyBoard();
         board_side_tab_ = 4;
         question_focus_ = true;
     });
     if (board_.ply > 0)
         add(TR("Comment this move"), "Alt+C", [this] {
-            switchSpace(Space::Chess);
-            page_ = Page::Board;
+            toStudyBoard();
             commentBoardMove();
         });
     if (!board_.reviews.empty()) {
         add(TR("Comment the key moments"), TR("Board"), [this] {
-            switchSpace(Space::Chess);
-            page_ = Page::Board;
+            toStudyBoard();
             commentKeyMoments();
         });
         add(TR("Annotate the game"), TR("Board"), [this] {
-            switchSpace(Space::Chess);
-            page_ = Page::Board;
+            toStudyBoard();
             annotateBoardGame();
         });
     }
@@ -553,7 +552,6 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {
-            switchSpace(Space::Chess);
             page_               = Page::Databases;
             const auto& entries = shelf().entries();
             if (db_selected_ < 0 || static_cast<std::size_t>(db_selected_) >= entries.size()) {

@@ -67,6 +67,7 @@
 #include "tablebases.hpp"
 #include "topology.hpp"
 #include "ui.hpp"
+#include "views.hpp"
 
 #include <tour/book_scan.hpp>
 #include <tour/by_opening.hpp>
@@ -241,23 +242,39 @@ class App {
         ChessHome,
         Databases,
         Openings,
-        Lichess
+        Lichess,
+        Count  // none: the sheet of the views is shown in place of the page
     };
     enum class Tab { Overview, Standings, Bracket, Schedule, Live, Games, Openings, Broadcast };
 
-    // The program's two spaces, each with its rail: the engines' (tournaments, books, suites, ratings: fastchess-gui
-    // as it was) and the players' (games, databases, openings). The Board, Engines and Settings pages are in both.
-    enum class Space { Engines, Chess };
-    [[nodiscard]] static bool chessPage(Page page) noexcept;   // a page of the Chess space alone
-    [[nodiscard]] static bool sharedPage(Page page) noexcept;  // Board, Engines, Settings
-    // To the other space, on the page it showed last (Ctrl+1, Ctrl+2, the switch at the top of the rail).
-    void switchSpace(Space to);
-    // The space follows the page shown: a page of the other space alone, set by a command or a notice, takes it there.
+    // The views (#43, mockup M6; views.hpp, view_views.cpp): one to three sets of pages of the user's, switched at the
+    // top of the rail (Ctrl+1 to Ctrl+3), each with its rail and the Board it shows, in place of the two spaces.
+    std::vector<views::View> views_ = views::fromSpaces();
+    int view_                       = 0;
+    std::vector<Page> view_pages_;  // the page each view comes back to
+    [[nodiscard]] const views::View& view() const { return views_[static_cast<std::size_t>(view_)]; }
+    [[nodiscard]] static std::optional<views::PageId> rootOf(Page page);  // the page of the rail it belongs to
+    [[nodiscard]] static Page pageFor(views::PageId id);                  // where a page of the rail opens
+    [[nodiscard]] bool viewHolds(Page page) const;                        // the view shown holds it
+    void switchView(int index);                                           // to another view, on the page it showed last
+    void saveViews();
+    // A page shown by a command or a notice that the view does not hold: the first view that holds it, else it stays
+    // in the view shown (drawPageInNoView offers to add it).
     void followPage();
-    void drawSpaceSwitch(float width);
-    [[nodiscard]] float spaceSwitchHeight() const;
-    void drawEnginesRail(float width, float button);
-    void drawChessRail(float width, float button);
+    void toStudyBoard();  // the Board, in a view that shows the study's
+    void drawViewSwitch(float width);
+    [[nodiscard]] float viewSwitchHeight() const;
+    void drawViewRail(float width, float button);
+    void drawPageInNoView();
+    // The sheet where the views are made (M6, board 2), in place of the page while open.
+    struct ViewsSheet {
+        bool open    = false;
+        int selected = 0;
+        std::vector<views::View> before;             // Esc: back to them
+        std::vector<std::vector<views::View>> undo;  // Ctrl+Z
+    } views_sheet_;
+    void openViewsSheet(int selected);
+    void drawViewsSheet();
     void drawBoardRailButton(float width, float button);  // in both rails, with its analysis's dot
     void drawChessHome();
     Page nav_page_ = Page::Home;  // the page ImGui's keyboard cursor was last hidden for (view_shell.cpp)
@@ -486,9 +503,6 @@ class App {
     [[nodiscard]] std::optional<std::vector<chess::Move>> boardPath() const;
     // A line of moves from the start (SAN) shown on the board, at its end, the tree beside it.
     void showLineOnBoard(const std::vector<std::string>& line, const std::string& title);
-    Space space_       = Space::Engines;
-    Page engines_page_ = Page::Home;  // the page each space comes back to
-    Page chess_page_   = Page::ChessHome;
 
     // shell
     void drawShell();
@@ -866,7 +880,7 @@ class App {
                       bool right);
     // The Board page as the Chess space has it (mockup M2): the notation written in place, the symbols typed, the
     // arrows and squares of the right button. The Engines space's stays as it was.
-    [[nodiscard]] bool chessBoard() const { return space_ == Space::Chess; }
+    [[nodiscard]] bool chessBoard() const { return !views_.empty() && view().study_board; }
     [[nodiscard]] BoardPage::Snapshot boardSnapshot() const;
     void boardChanged(BoardPage::Snapshot before);  // a change made: undone back to `before`
     void boardUndo(bool redo);

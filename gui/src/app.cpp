@@ -54,11 +54,19 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     recognizeProfiles(setup_, profiles_);
     i18n::setLanguage(i18n::resolve(setup_.language));
     loadAppearance();
-    // The space shown last, on its home page.
-    if (storage_.space() == "chess") {
-        space_ = Space::Chess;
-        page_  = Page::ChessHome;
+    // The views and the one shown last, on its first page; a profile of the spaces read as two views, and kept so
+    // (M6, board 4).
+    if (auto kept = views::fromJson(storage_.viewsJson())) {
+        views_ = std::move(*kept);
+        view_  = std::clamp(storage_.shownView(), 0, static_cast<int>(views_.size()) - 1);
+    } else if (const auto space = storage_.space(); !space.empty()) {
+        views_ = views::fromSpaces();
+        view_  = space == "chess" ? 1 : 0;
+        saveViews();
     }
+    view_pages_.clear();
+    for (const auto& v : views_) view_pages_.push_back(pageFor(v.pages.front()));
+    page_ = view_pages_[static_cast<std::size_t>(view_)];
 
     // The guide panel: its width kept, the `?` of the titles and the messages opening it, links in the browser.
     {
@@ -342,8 +350,7 @@ void App::frame() {
             page_            = Page::Engines;
             selected_engine_ = engines_.empty() ? -1 : 0;
         } else if (w == "board-tree" || w == "board-references") {  // the Chess space's column at that tab
-            page_           = Page::Board;
-            space_          = Space::Chess;
+            toStudyBoard();
             board_side_tab_ = w == "board-tree" ? 2 : 3;
         } else if (w == "board" || w == "board-analyse") {  // the Board page; its analysis started
             page_ = Page::Board;

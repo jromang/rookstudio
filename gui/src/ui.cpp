@@ -393,6 +393,18 @@ const char* glyph(Icon icon) {
             return "\uE0B2";  // download
         case Icon::Comment:
             return "\uE116";  // message-circle
+        case Icon::Flask:
+            return "\uE0D5";  // flask-conical
+        case Icon::Cap:
+            return "\uE234";  // graduation-cap
+        case Icon::Layers:
+            return "\uE529";  // layers
+        case Icon::Crown:
+            return "\uE1D6";  // crown
+        case Icon::Swords:
+            return "\uE2B4";  // swords
+        case Icon::Rook:
+            return "\uE6A5";  // chess-rook
     }
     return "";
 }
@@ -464,6 +476,21 @@ void loadRequestedFonts(float size) {
         }
         return;
     }
+}
+
+Icon viewIcon(std::string_view name) {
+    if (name == "cap") return Icon::Cap;
+    if (name == "layers") return Icon::Layers;
+    if (name == "trophy") return Icon::Trophy;
+    if (name == "crown") return Icon::Crown;
+    if (name == "swords") return Icon::Swords;
+    if (name == "book") return Icon::Book;
+    if (name == "globe") return Icon::Globe;
+    if (name == "cpu") return Icon::Engine;
+    if (name == "chart") return Icon::Chart;
+    if (name == "board") return Icon::Board;
+    if (name == "rook") return Icon::Rook;
+    return Icon::Flask;
 }
 
 void drawIcon(ImDrawList* dl, Icon icon, ImVec2 c, float size, ImU32 col) {

@@ -82,8 +82,7 @@ void App::openBroadcastMosaic(const std::string& round_id) {
         broadcast_selected_.clear();
     }
     broadcast_round_ = round_id;
-    switchSpace(Space::Chess);
-    page_ = Page::Lichess;
+    page_            = Page::Lichess;  // its view, or the view shown
 }
 
 void App::pollBroadcastBoards() {

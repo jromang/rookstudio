@@ -1,6 +1,7 @@
 #include "first_start.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <fstream>
 #include <system_error>
@@ -11,6 +12,7 @@
 #include "i18n.hpp"
 #include "logo.hpp"
 #include "ui.hpp"
+#include "views.hpp"
 
 namespace fs = std::filesystem;
 
@@ -46,9 +48,18 @@ fs::path tournamentsFolder(const fs::path& profile) {
 
 }  // namespace
 
+int shownFirst(const Page& page) {
+    // fastchess-gui's users arrive in Tests, the others in Study, when chosen; else the first view chosen.
+    const int wanted = page.legacy.empty() ? 1 : 0;
+    if (page.views[static_cast<std::size_t>(wanted)]) return wanted;
+    for (int i = 0; i < 3; ++i)
+        if (page.views[static_cast<std::size_t>(i)]) return i;
+    return 0;
+}
+
 bool fresh(const fs::path& profile) {
     const auto settings = readJson(profile / "settings.json");
-    return !settings || !settings->is_object() || !settings->contains("space");
+    return !settings || !settings->is_object() || (!settings->contains("space") && !settings->contains("views"));
 }
 
 fs::path legacyProfile(const fs::path& own) {
@@ -165,45 +176,85 @@ bool drawPage(Page& page) {
     }
     ImGui::Dummy(ImVec2(0, px(18)));
 
-    // The two spaces, side by side.
-    const float card_w = (width - px(16)) * 0.5f;
-    const auto card    = [&](const char* id, bool chess, ui::Icon icon, const char* title, const char* text,
-                             const char* where) {
-        const bool on = page.chess == chess;
-        ImGui::PushStyleColor(ImGuiCol_Border, on ? ImGui::ColorConvertU32ToFloat4(ui::ACCENT)
+    // The views offered (M6, board 4), each ticked or not: one at least.
+    ImGui::TextUnformatted(TR("What do you want to do here? A view for each thing."));
+    ImGui::Dummy(ImVec2(0, px(6)));
+    const auto offered  = views::proposed();
+    const char* what[3] = {
+        TR("Make engines play each other: tournaments, opening suites, ratings."),
+        TR("Your games and others': databases, notation, the opening tree, Lichess, the assistant."),
+        TR("Both at once, every page in one rail."),
+    };
+    const char* which[3] = {TR("Tournaments · Engines · Books · Board · Suites · Ratings · Log"),
+                            TR("Home · Board · Databases · Openings · Lichess · Engines"), TR("Every page")};
+    const float card_w   = (width - 2 * px(14)) / 3.0f;
+    const float card_h   = px(200);
+    for (int i = 0; i < 3; ++i) {
+        if (i > 0) ImGui::SameLine(0, px(14));
+        const auto& colour = views::palette()[static_cast<std::size_t>(offered[static_cast<std::size_t>(i)].colour)];
+        const bool on      = page.views[static_cast<std::size_t>(i)];
+        ImGui::PushID(i);
+        ImGui::PushStyleColor(ImGuiCol_Border, on ? ImGui::ColorConvertU32ToFloat4(colour.full)
                                                   : ImGui::GetStyleColorVec4(ImGuiCol_Border));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, on ? 2.0f : 1.0f);
-        ImGui::BeginChild(id, ImVec2(card_w, px(190)), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
+        ImGui::BeginChild("##view", ImVec2(card_w, card_h), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
+        auto* dl       = ImGui::GetWindowDrawList();
         const auto top = ImGui::GetCursorScreenPos();
-        ui::drawIcon(ImGui::GetWindowDrawList(), icon, ImVec2(top.x + px(14), top.y + px(14)), px(26),
-                     on ? ui::ACCENT : ImGui::GetColorU32(ImGuiCol_TextDisabled));
-        ImGui::Dummy(ImVec2(0, px(34)));
+        const float sq = px(34);
+        dl->AddRectFilled(ImVec2(top.x + px(4), top.y + px(4)), ImVec2(top.x + px(4) + sq, top.y + px(4) + sq),
+                          on ? colour.full : colour.tint, px(9));
+        ui::drawIcon(dl, ui::viewIcon(offered[static_cast<std::size_t>(i)].icon),
+                     ImVec2(top.x + px(4) + sq * 0.5f, top.y + px(4) + sq * 0.5f), px(20),
+                     on ? IM_COL32_WHITE : colour.full);
+        // The tick, at the right.
+        const ImVec2 box(top.x + card_w - px(40), top.y + px(10));
+        dl->AddRect(box, ImVec2(box.x + px(18), box.y + px(18)), on ? colour.full : ImGui::GetColorU32(ImGuiCol_Border),
+                    px(4), 0, px(1.5f));
+        if (on) {
+            dl->AddRectFilled(box, ImVec2(box.x + px(18), box.y + px(18)), colour.full, px(4));
+            dl->AddPolyline(
+                std::array<ImVec2, 3>{ImVec2(box.x + px(4), box.y + px(9)), ImVec2(box.x + px(8), box.y + px(13)),
+                                      ImVec2(box.x + px(14), box.y + px(5))}
+                    .data(),
+                3, IM_COL32_WHITE, 0, px(2));
+        }
+        ImGui::Dummy(ImVec2(0, sq + px(10)));
         ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.2f);
-        ImGui::TextUnformatted(title);
+        ImGui::TextUnformatted(offered[static_cast<std::size_t>(i)].name.c_str());
         ImGui::PopFont();
         ImGui::PushTextWrapPos(card_w - px(16));
-        ImGui::TextDisabled("%s", text);
+        ImGui::TextUnformatted(what[i]);
+        ImGui::TextDisabled("%s", which[i]);
         ImGui::PopTextWrapPos();
-        ImGui::SetCursorPosY(px(190) - ImGui::GetTextLineHeightWithSpacing() - px(10));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", where);
-        // The whole card is the button.
+        // The whole card is the button; the last one ticked stays.
         ImGui::SetCursorScreenPos(ImGui::GetWindowPos());
-        if (ImGui::InvisibleButton("##pick", ImGui::GetWindowSize())) page.chess = chess;
+        if (ImGui::InvisibleButton("##pick", ImGui::GetWindowSize())) {
+            auto next                         = page.views;
+            next[static_cast<std::size_t>(i)] = !next[static_cast<std::size_t>(i)];
+            if (next[0] || next[1] || next[2]) page.views = next;
+        }
         ImGui::EndChild();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
-    };
-    card("##engines", false, ui::Icon::Trophy, TR("Test engines"),
-         TR("Tournaments and matches, SPRT, opening suites, ratings, remote machines: fastchess-gui as you know it."),
-         TR("Engines space · Ctrl+1"));
-    ImGui::SameLine(0, px(16));
-    card("##chess", true, ui::Icon::Board, TR("Study, analyse, play"),
-         TR("Game databases, annotated notation, opening tree, Lichess, an assistant that comments on your "
-            "machine."),
-         TR("Chess space · Ctrl+2"));
+        ImGui::PopID();
+    }
+    // What it makes, and that it is changed later.
+    {
+        std::vector<std::string> names;
+        for (int i = 0; i < 3; ++i)
+            if (page.views[static_cast<std::size_t>(i)]) names.push_back(offered[static_cast<std::size_t>(i)].name);
+        const int first = shownFirst(page);
+        std::string list;
+        for (std::size_t i = 0; i < names.size(); ++i) list += (i ? ", " : "") + names[i];
+        const auto summary = names.size() == 1 ? trf("One view: {}, without a switch in the rail.", names.front())
+                                               : trf("{} views: {}; {} shown first, Ctrl+1 to Ctrl+{}.", names.size(),
+                                                     list, offered[static_cast<std::size_t>(first)].name, names.size());
+        ImGui::Dummy(ImVec2(0, px(4)));
+        ImGui::TextUnformatted(summary.c_str());
+    }
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + width);
-    ImGui::TextDisabled("%s", TR("Both spaces stay one click away: the switch at the top of the rail, or Ctrl+1 and "
-                                 "Ctrl+2. Nothing is fixed by this choice."));
+    ImGui::TextDisabled("%s", TR("Everything can be changed later in Settings › Views, or with ⋯ under the switch at "
+                                 "the top of the rail."));
     ImGui::PopTextWrapPos();
     ImGui::Dummy(ImVec2(0, px(14)));
 

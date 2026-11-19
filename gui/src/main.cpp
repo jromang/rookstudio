@@ -63,6 +63,7 @@
 #include "storage.hpp"
 #include "topology.hpp"
 #include "ui.hpp"
+#include "views.hpp"
 #include "wb2uci.hpp"
 #include "window_place.hpp"
 
@@ -368,14 +369,13 @@ fs::path profileFolder(const Args& args, const std::string& executable) {
 }
 
 // The first start's page (first_start.hpp) until its choice is made, then fastchess-gui's profile copied if asked,
-// the language and the space kept in the profile. With --focus first-start and screenshots, the page only, for the
+// the language and the views kept in the profile. With --focus first-start and screenshots, the page only, for the
 // screenshots: false then, as when the window was closed first.
 bool runFirstStart(SDL_Window* window, const fs::path& own, const Args& args, bool system_profile) {
     fcg::first::Page page;
     page.own = own;
     if (system_profile || std::getenv("FCG_LEGACY_PROFILE")) page.legacy = fcg::first::legacyProfile(own);
     if (!page.legacy.empty()) page.summary = fcg::first::summarize(page.legacy);
-    page.chess = page.legacy.empty();  // fastchess-gui's users arrive in the Engines space
 
     const auto started = std::chrono::steady_clock::now();
     auto shots         = args.shots;
@@ -454,7 +454,17 @@ bool runFirstStart(SDL_Window* window, const fs::path& own, const Args& args, bo
         setup.language = page.language;
         profile.saveSetup(setup);
     }
-    profile.setSpace(page.chess ? "chess" : "engines");
+    // The views chosen, the one shown first (M6, board 4).
+    const auto offered = fcg::views::proposed();
+    const int first    = fcg::first::shownFirst(page);
+    std::vector<fcg::views::View> chosen;
+    int shown = 0;
+    for (int i = 0; i < 3; ++i) {
+        if (!page.views[static_cast<std::size_t>(i)]) continue;
+        if (i == first) shown = static_cast<int>(chosen.size());
+        chosen.push_back(offered[static_cast<std::size_t>(i)]);
+    }
+    profile.setViews(fcg::views::toJson(chosen), shown);
     return true;
 }
 

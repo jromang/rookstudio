@@ -1,9 +1,10 @@
 #pragma once
 
-// The first start (mockup M0, board 3): the language, the space to begin in, and a copy of fastchess-gui's profile
-// when one is on the machine and the program's own has never started. fastchess-gui's profile is only read: both
-// programs keep running side by side.
+// The first start (mockups M0, board 3, and M6, board 4): the language, the views to begin with, and a copy of
+// fastchess-gui's profile when one is on the machine and the program's own has never started. fastchess-gui's profile
+// is only read: both programs keep running side by side.
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -12,7 +13,7 @@
 
 namespace fcg::first {
 
-// A profile that has never started: its settings.json names no space yet.
+// A profile that has never started: its settings.json has neither views nor a space yet.
 [[nodiscard]] bool fresh(const std::filesystem::path& profile);
 
 // fastchess-gui's profile in the system's place for it, beside the program's own `own` (".../rookstudio/" there,
@@ -43,11 +44,15 @@ bool copyProfile(const std::filesystem::path& from, const std::filesystem::path&
 struct Page {
     std::filesystem::path own, legacy;  // the program's profile; fastchess-gui's, empty for none
     ProfileSummary summary;             // of `legacy`
-    bool chess = false;                 // the space chosen
+    std::array<bool, 3> views{true, true, false};  // the views offered (views::proposed()) that are chosen
     std::string language;               // the language chosen, as the setup keeps it ("fr")
     std::optional<bool> copy;           // set once chosen: copy fastchess-gui's profile or not
 };
 // Draws the page over the whole window; true once its choice is made (Continue, Start without, Enter).
 bool drawPage(Page& page);
+
+// Of the views chosen (views::proposed()'s indexes), the one shown first: Tests for fastchess-gui's users, Study for
+// the others, when chosen; else the first chosen.
+[[nodiscard]] int shownFirst(const Page& page);
 
 }  // namespace fcg::first

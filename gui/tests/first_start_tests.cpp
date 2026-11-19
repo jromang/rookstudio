@@ -49,10 +49,29 @@ TEST_CASE("first start: a profile that never started, and one that did") {
     CHECK(fresh(dir));
     write(dir / "settings.json", R"({"check_new_version":true})");
     CHECK(fresh(dir));
-    write(dir / "settings.json", R"({"space":"chess"})");
+    write(dir / "settings.json", R"({"space":"chess"})");  // a profile of before the views
+    CHECK_FALSE(fresh(dir));
+    write(dir / "settings.json", R"({"views":[{"name":"Study","pages":["board"]}],"view":0})");
     CHECK_FALSE(fresh(dir));
     write(dir / "settings.json", "not json");
     CHECK(fresh(dir));
+}
+
+TEST_CASE("first start: the view shown first, among those chosen") {
+    Page page;
+    // Without fastchess-gui's profile: Study, when chosen.
+    page.views = {true, true, false};
+    CHECK(shownFirst(page) == 1);
+    page.views = {true, false, true};
+    CHECK(shownFirst(page) == 0);
+    page.views = {false, false, true};
+    CHECK(shownFirst(page) == 2);
+    // fastchess-gui's users: Tests, when chosen.
+    page.legacy = "/somewhere/fastchess-gui";
+    page.views  = {true, true, false};
+    CHECK(shownFirst(page) == 0);
+    page.views = {false, true, true};
+    CHECK(shownFirst(page) == 1);
 }
 
 TEST_CASE("first start: fastchess-gui's profile, beside the program's own in the system's place") {
@@ -115,5 +134,5 @@ TEST_CASE("first start: the copy of fastchess-gui's profile, which stays as it w
     // fastchess-gui's profile is untouched.
     CHECK(read(from / "running.json") == "[]");
     CHECK(read(from / "fastchess-gui.log") == "a log");
-    CHECK(fresh(to));  // the space is the first start's to keep
+    CHECK(fresh(to));  // the views are the first start's to keep
 }

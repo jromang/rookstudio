@@ -77,9 +77,14 @@ class Storage {
     [[nodiscard]] GuideSettings guideSettings() const;
     void setGuideSettings(const GuideSettings& guide) const;
 
-    // The space shown last, "engines" or "chess" (settings.json); empty until the first start's choice.
+    // The space shown last, "engines" or "chess" (settings.json), as a profile of before the views kept it; empty
+    // otherwise. Read once, as two views.
     [[nodiscard]] std::string space() const;
-    void setSpace(const std::string& space) const;
+    // The views (views.hpp, settings.json "views") and the one shown last ("view"); null when the profile has none
+    // (the first start's choice makes them).
+    [[nodiscard]] nlohmann::json viewsJson() const;
+    [[nodiscard]] int shownView() const;
+    void setViews(const nlohmann::json& views, int shown) const;
 
     // How the boards look and sound (settings.json): colours, pieces, move sounds.
     [[nodiscard]] appearance::Settings appearance() const;

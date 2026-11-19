@@ -180,9 +180,10 @@ void App::drawShell() {
     ImGui::Begin("##shell", nullptr, flags);
     ImGui::PopStyleVar(2);
 
-    // Ctrl+1 and Ctrl+2: the spaces. The space follows the page a command or a notice showed.
-    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_1)) switchSpace(Space::Engines);
-    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_2)) switchSpace(Space::Chess);
+    // Ctrl+1 to Ctrl+3: the views. The view follows the page a command or a notice showed.
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_1)) switchView(0);
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_2)) switchView(1);
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_3)) switchView(2);
     followPage();
     // A page shown anew: ImGui's keyboard cursor, shown by the arrows of the page before, is hidden, so that Enter
     // or Space press no button of that page or of the rail in place of the new page's own keys.
@@ -191,7 +192,7 @@ void App::drawShell() {
         nav_page_ = page_;
     }
     pollDatabases();
-    if (space_ == Space::Chess) {
+    if (chessBoard()) {
         drawRecentGames();  // Ctrl+Tab, on any of its pages
         if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
             if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_O)) openBoardPgnDialog();
@@ -208,7 +209,13 @@ void App::drawShell() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(24), px(18)));
     ImGui::BeginChild("##page", ImVec2(guide_width > 0 ? -guide_width : 0.0f, 0),
                       ImGuiChildFlags_AlwaysUseWindowPadding);
-    switch (page_) {
+    // The sheet of the views in place of the page while it is open; a page that no view holds says so.
+    if (views_sheet_.open) {
+        drawViewsSheet();
+    } else {
+        drawPageInNoView();
+    }
+    switch (views_sheet_.open ? Page::Count : page_) {
         case Page::Home:
             drawHome();
             break;
@@ -256,6 +263,8 @@ void App::drawShell() {
             ui::pageTitle("Lichess");
             drawLichessPage();
             break;
+        case Page::Count:
+            break;
     }
     // The workspace's dock space stays alive on the other pages: the panels docked in it stay there. Also when the
     // page changed to the workspace's during this frame (Open on the list of tournaments), after the switch above.
@@ -286,10 +295,12 @@ void App::drawRail(float width) {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(ui::RAIL_BG));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, px(14)));
     ImGui::BeginChild("##rail", ImVec2(width, 0), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
-    // Nine buttons under the logo and the switch of spaces: lower ones in a low window, rather than a scroll bar.
+    // The view's pages and Quit under the logo and the switch of views: lower buttons in a low window, rather than a
+    // scroll bar.
     const float spacing = ImGui::GetStyle().ItemSpacing.y;
-    const float button = std::clamp((ImGui::GetContentRegionAvail().y - px(48) - spaceSwitchHeight() - 9 * spacing) / 9,
-                                    ImGui::GetFontSize() * 2.3f, ui::railButtonHeight());
+    const float n       = static_cast<float>(view().pages.size() + 1);
+    const float button  = std::clamp((ImGui::GetContentRegionAvail().y - px(48) - viewSwitchHeight() - n * spacing) / n,
+                                     ImGui::GetFontSize() * 2.0f, ui::railButtonHeight());
 
     // The logo, on the accent colour.
     {
@@ -299,11 +310,8 @@ void App::drawRail(float width) {
                    ui::currentTheme() == ui::Theme::Dark ? IM_COL32(11, 18, 32, 255) : IM_COL32_WHITE);
         ImGui::Dummy(ImVec2(width, size + px(12)));
     }
-    drawSpaceSwitch(width);
-    if (space_ == Space::Chess)
-        drawChessRail(width, button);
-    else
-        drawEnginesRail(width, button);
+    drawViewSwitch(width);
+    drawViewRail(width, button);
 
     // Quit, at the bottom: the window's own close button is not always in reach.
     ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - button - px(14)));
@@ -312,131 +320,6 @@ void App::drawRail(float width) {
     ImGui::EndChild();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
-}
-
-float App::spaceSwitchHeight() const { return 2 * ImGui::GetFontSize() * 1.55f + px(14); }
-
-void App::drawSpaceSwitch(float width) {
-    // Two segments stacked, the space shown on the accent colour.
-    ImDrawList* dl       = ImGui::GetWindowDrawList();
-    const float inset    = width * 0.1f;
-    const float segment  = ImGui::GetFontSize() * 1.55f;
-    const auto top       = ImGui::GetCursorScreenPos();
-    const ImVec2 box_min = ImVec2(top.x + inset, top.y);
-    const ImVec2 box_max = ImVec2(top.x + width - inset, top.y + 2 * segment);
-    dl->AddRectFilled(box_min, box_max, ImGui::GetColorU32(ImGuiCol_FrameBg), px(7));
-    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.8f);
-    for (const auto space : {Space::Engines, Space::Chess}) {
-        const bool on     = space_ == space;
-        const float y     = top.y + (space == Space::Chess ? segment : 0.0f);
-        const char* label = space == Space::Engines ? TR("Engines") : TR("Chess");
-        ImGui::SetCursorScreenPos(ImVec2(box_min.x, y));
-        ImGui::PushID(space == Space::Engines ? "space_engines" : "space_chess");
-        const bool pressed = ImGui::InvisibleButton("##space", ImVec2(box_max.x - box_min.x, segment));
-        ImGui::PopID();
-        const bool hovered = ImGui::IsItemHovered();
-        if (on || hovered) {
-            dl->AddRectFilled(ImVec2(box_min.x + px(2), y + px(2)), ImVec2(box_max.x - px(2), y + segment - px(2)),
-                              on ? ui::ACCENT : ImGui::GetColorU32(ImGuiCol_FrameBgHovered), px(6));
-        }
-        const ImU32 col = on ? (ui::currentTheme() == ui::Theme::Dark ? IM_COL32(11, 18, 32, 255) : IM_COL32_WHITE)
-                             : ImGui::GetColorU32(ImGuiCol_Text);
-        const ImVec2 ts = ImGui::CalcTextSize(label);
-        dl->AddText(ImVec2(top.x + (width - ts.x) * 0.5f, y + (segment - ts.y) * 0.5f), col, label);
-        if (hovered) {
-            ImGui::SetTooltip("%s", space == Space::Engines
-                                        ? TR("The Engines space: tournaments, engines, books, suites, ratings (Ctrl+1)")
-                                        : TR("The Chess space: games, databases, openings (Ctrl+2)"));
-        }
-        if (pressed && !on) switchSpace(space);
-    }
-    ImGui::PopFont();
-    ImGui::SetCursorScreenPos(ImVec2(top.x, box_max.y));
-    ImGui::Dummy(ImVec2(width, px(14)));
-}
-
-bool App::chessPage(Page page) noexcept {
-    return page == Page::ChessHome || page == Page::Databases || page == Page::Openings || page == Page::Lichess;
-}
-
-bool App::sharedPage(Page page) noexcept {
-    return page == Page::Board || page == Page::Engines || page == Page::Settings;
-}
-
-void App::switchSpace(Space to) {
-    if (to == space_) return;
-    (space_ == Space::Chess ? chess_page_ : engines_page_) = page_;
-    space_                                                 = to;
-    page_                                                  = to == Space::Chess ? chess_page_ : engines_page_;
-    if (page_ == Page::Home) tournaments_dirty_ = true;
-    storage_.setSpace(to == Space::Chess ? "chess" : "engines");
-}
-
-void App::followPage() {
-    if (sharedPage(page_)) return;
-    const Space wanted = chessPage(page_) ? Space::Chess : Space::Engines;
-    if (wanted == space_) return;
-    (space_ == Space::Chess ? chess_page_ : engines_page_) = page_;
-    space_                                                 = wanted;
-    storage_.setSpace(wanted == Space::Chess ? "chess" : "engines");
-}
-
-void App::drawEnginesRail(float width, float button) {
-    const bool in_tournaments = page_ == Page::Home || page_ == Page::NewMatch || page_ == Page::Tournament;
-    const int playing         = gamesPlaying(true);
-    if (ui::railButton("rail_home", ui::Icon::Trophy, TR("Tournaments"), in_tournaments, width, button)) {
-        page_              = Page::Home;
-        tournaments_dirty_ = true;
-    }
-    if (playing > 0) {
-        // The games being played, at the icon's top right.
-        const auto min   = ImGui::GetItemRectMin();
-        const float font = ImGui::GetFontSize();
-        const auto count = std::to_string(playing);
-        ui::drawBadge(ImGui::GetWindowDrawList(),
-                      ImVec2(min.x + width * 0.5f + font * 0.75f, min.y + button * 0.36f - font * 0.5f), count.c_str());
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", trn("{} game being played", "{} games being played", playing, playing).c_str());
-        }
-    }
-    if (ui::railButton("rail_engines", ui::Icon::Engine, TR("Engines"), page_ == Page::Engines, width, button)) {
-        page_ = Page::Engines;
-    }
-    if (ui::railButton("rail_books", ui::Icon::Book, TR("Books"), page_ == Page::Books, width, button))
-        page_ = Page::Books;
-    drawBoardRailButton(width, button);
-    if (ui::railButton("rail_suites", ui::Icon::Suite, TR("Suites"), page_ == Page::Suites, width, button)) {
-        page_ = Page::Suites;
-    }
-    if (ui::railButton("rail_ratings", ui::Icon::Chart, TR("Ratings"), page_ == Page::Ratings, width, button)) {
-        page_          = Page::Ratings;
-        game_db_dirty_ = true;
-    }
-    if (ui::railButton("rail_log", ui::Icon::Log, TR("Log"), page_ == Page::Log, width, button)) page_ = Page::Log;
-    if (ui::railButton("rail_settings", ui::Icon::Settings, TR("Settings"), page_ == Page::Settings, width, button)) {
-        page_ = Page::Settings;
-    }
-}
-
-void App::drawChessRail(float width, float button) {
-    if (ui::railButton("rail_chess_home", ui::Icon::Home, TR("Home"), page_ == Page::ChessHome, width, button))
-        page_ = Page::ChessHome;
-    drawBoardRailButton(width, button);
-    if (ui::railButton("rail_databases", ui::Icon::Database, TR("Databases"), page_ == Page::Databases, width, button))
-        page_ = Page::Databases;
-    if (ui::railButton("rail_openings", ui::Icon::Openings, TR("Openings"), page_ == Page::Openings, width, button))
-        page_ = Page::Openings;
-    if (ui::railButton("rail_play", ui::Icon::Play, TR("Play"), false, width, button)) {
-        page_            = Page::Board;
-        board_.play_open = true;
-    }
-    if (ui::railButton("rail_lichess", ui::Icon::Globe, "Lichess", page_ == Page::Lichess, width, button))
-        page_ = Page::Lichess;
-    if (ui::railButton("rail_chess_engines", ui::Icon::Engine, TR("Engines"), page_ == Page::Engines, width, button))
-        page_ = Page::Engines;
-    if (ui::railButton("rail_chess_settings", ui::Icon::Settings, TR("Settings"), page_ == Page::Settings, width,
-                       button))
-        page_ = Page::Settings;
 }
 
 void App::drawBoardRailButton(float width, float button) {
@@ -936,8 +819,8 @@ void App::drawSettings() {
     bool changed      = false;
     const float label = px(220);
 
-    // The current space's settings first: in the Chess space, the assistant's (M5, board 5).
-    if (space_ == Space::Chess) {
+    // The view's settings first: with the study's Board, the assistant's (M5, board 5).
+    if (chessBoard()) {
         drawAssistantSettings(label);
         ImGui::Spacing();
         ImGui::Separator();
@@ -994,6 +877,22 @@ void App::drawSettings() {
         TR("When the program ended while a tournament was running (a crash, a power cut, a reboot, or quitting "
            "while it ran), it resumes at the next launch, and the queue goes on after it. A tournament paused or "
            "stopped waits for you."));
+
+    // The views (M6, board 2): one to three sets of pages, switched at the top of the rail.
+    ImGui::Spacing();
+    ui::label(TR("Views"), label);
+    ImGui::BeginGroup();
+    for (int i = 0; i < static_cast<int>(views_.size()); ++i) {
+        const auto& v = views_[static_cast<std::size_t>(i)];
+        if (i > 0) ImGui::SameLine(0, px(14));
+        ui::inlineIcon(ui::viewIcon(v.icon), views::palette()[static_cast<std::size_t>(v.colour)].full);
+        ImGui::SameLine(0, px(4));
+        ImGui::TextUnformatted(fmt::format("{} · Ctrl+{}", v.name, i + 1).c_str());
+    }
+    if (ImGui::Button(TR("Edit the views…"))) openViewsSheet(view_);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("their pages, name, icon and colour; ⋯ under the switch, or a right click on a view"));
+    ImGui::EndGroup();
 
     // The new versions of the engines taken from the engine picker (M9, board 2).
     ImGui::Spacing();
@@ -1124,7 +1023,7 @@ void App::drawSettings() {
         ImGui::SameLine();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("Applies at the next launch."));
     }
-    if (space_ != Space::Chess) {
+    if (!chessBoard()) {
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();

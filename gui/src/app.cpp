@@ -1588,7 +1588,7 @@ void App::handleDialogs() {
                     text += gamePgn(board_.tree, board_.chess960);
                     tour::replaceFile(std::filesystem::path(path), text);
                     board_.changes.saved(std::filesystem::path(path).filename().string());
-                    boardToast(trf("Saved at the end of « {} »", std::filesystem::path(path).filename().string()));
+                    boardToast(trf("Saved at the end of “{}”", std::filesystem::path(path).filename().string()));
                 } catch (const std::exception& e) {
                     board_.message       = trf("Cannot write {}: {}", path, e.what());
                     board_.message_error = true;

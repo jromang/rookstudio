@@ -147,7 +147,7 @@ const char* noticeTopic(const Notice& notice) {
                 if (!topic) topic = guide::topics::Openings;
                 break;
             case Fix::Kind::ChangeTournamentsFolder:
-                if (!topic) topic = guide::topics::Home;
+                if (!topic) topic = guide::topics::TournamentsPage;
                 break;
             case Fix::Kind::OpenLog:
                 if (!topic) topic = guide::topics::Troubleshooting;

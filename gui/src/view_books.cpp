@@ -555,7 +555,7 @@ void App::drawBookDetail(BookEntry& book) {
             ImGui::SameLine();
             ImGui::TextUnformatted(trf("{}: {}", TR("lines starting with %, ignored"), ui::formatCount(n)).c_str());
             ui::help(
-                TR("The PGN standard makes them comments. RookStudio 0.4.13 and earlier read them as moves, "
+                TR("The PGN standard makes them comments. fastchess-gui 0.4.13 and earlier read them as moves, "
                    "and could play some openings of this book from a wrong position, often the starting one."));
         }
 

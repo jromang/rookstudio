@@ -142,7 +142,7 @@ void App::drawAssistantFirstUse() {
         if (ImGui::BeginTable("##assistant_facts", 2)) {
             // The labels as wide as the widest, the text wrapped in what is left.
             float label_w = 0;
-            for (const char* l : {TR("The model"), TR("On this machine"), TR("The room")})
+            for (const char* l : {TR("The model"), TR("On this machine"), TR("Disk and memory")})
                 label_w = std::max(label_w, ImGui::CalcTextSize(l).x);
             ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, label_w + px(4));
             ImGui::TableSetupColumn("##text", ImGuiTableColumnFlags_WidthStretch);
@@ -156,7 +156,7 @@ void App::drawAssistantFirstUse() {
             row(TR("The model"), trf("RookStudio commentary v11 · {}, downloaded once", size));
             row(TR("On this machine"), TR("on the GPU when there is one to use, else on the processor: a comment in "
                                           "about a quarter of a second on a GPU, 3 seconds on a processor"));
-            row(TR("The room"), trf("{} on the disk · about 3 GB of memory while it serves", size));
+            row(TR("Disk and memory"), trf("{} on the disk · about 3 GB of memory while it serves", size));
             ImGui::EndTable();
         }
         ImGui::TextUnformatted(TR("What stays on the machine"));
@@ -183,7 +183,7 @@ void App::drawAssistantFirstUse() {
     ui::endCard();
 }
 
-void App::askQuestion(const std::string& text) {
+void App::askQuestion(const std::string& text, const std::string& asked_text) {
     const auto& b = board_;
     if (text.empty() || !assistant_) return;
     // The engine that answers: the analysis's, kept while it is the same.
@@ -219,8 +219,9 @@ void App::askQuestion(const std::string& text) {
     const auto lang = french() ? commentary::Lang::Fr : commentary::Lang::En;
     q.answer =
         std::async(std::launch::async,
-                   [question = text, fen = q.fen, earlier_fen, previous, earlier_previous, line = std::move(line),
-                    bases = q.bases, lang, model = assistant_.get(), oracle = oracle_]() -> QuestionResult {
+                   [question = asked_text.empty() ? text : asked_text, fen = q.fen, earlier_fen, previous,
+                    earlier_previous, line = std::move(line), bases = q.bases, lang, model = assistant_.get(),
+                    oracle = oracle_]() -> QuestionResult {
                        QuestionResult r;
                        const auto pos = commentary::Position::fromFen(fen);
                        if (!pos) {
@@ -352,18 +353,23 @@ void App::drawBoardQuestions() {
         askQuestion(question_text_.data());
         question_text_.fill(0);
     }
-    std::vector<std::string> chips;
-    if (b.ply >= 1 && b.ply <= static_cast<int>(b.game.moves.size()))
-        chips.push_back(trf("Why {}?", numberedSan(boardAt(b.game, b.chess960, b.ply - 1),
-                                                   b.game.moves[static_cast<std::size_t>(b.ply - 1)].san)));
-    for (const char* c : {TR("What is the threat?"), TR("What is the best move?"), TR("Who played this position?"),
-                          TR("What is this opening?")})
-        chips.emplace_back(c);
+    // Each suggestion as shown, and as asked: in French for a French interface, else in English.
+    std::vector<std::pair<std::string, std::string>> chips;
+    const bool asked_french = french();
+    if (b.ply >= 1 && b.ply <= static_cast<int>(b.game.moves.size())) {
+        const auto san =
+            numberedSan(boardAt(b.game, b.chess960, b.ply - 1), b.game.moves[static_cast<std::size_t>(b.ply - 1)].san);
+        chips.emplace_back(trf("Why {}?", san), asked_french ? std::string() : fmt::format("Why {}?", san));
+    }
+    for (const char* c : {N_("What is the threat?"), N_("What is the best move?"), N_("Who played this position?"),
+                          N_("What is this opening?")})
+        chips.emplace_back(TR(c), asked_french ? std::string() : std::string(c));
     ImGui::BeginDisabled(busy);
     for (std::size_t i = 0; i < chips.size(); ++i) {
-        const float w = ImGui::CalcTextSize(chips[i].c_str()).x + ImGui::GetStyle().FramePadding.x * 2;
+        const float w = ImGui::CalcTextSize(chips[i].first.c_str()).x + ImGui::GetStyle().FramePadding.x * 2;
         if (i > 0) ui::sameLineOrWrap(w, px(4));
-        if (ImGui::SmallButton(fmt::format("{}##chip{}", chips[i], i).c_str())) askQuestion(chips[i]);
+        if (ImGui::SmallButton(fmt::format("{}##chip{}", chips[i].first, i).c_str()))
+            askQuestion(chips[i].first, chips[i].second);
     }
     ImGui::EndDisabled();
     ImGui::Dummy(ImVec2(0, px(4)));
@@ -449,7 +455,7 @@ void App::drawBoardQuestions() {
             using P         = commentary::Problem;
             const char* why = *problem == P::UnknownMove  ? TR("The question names no move of this position.")
                               : *problem == P::Unanalyzed ? TR("This needs the game's review first.")
-                              : *problem == P::InCheck    ? TR("The side not to move is in check: no threat beyond it.")
+                              : *problem == P::InCheck ? TR("The side to move is in check: no threat beyond the check.")
                               : *problem == P::NoEngine
                                   ? (q.engine.empty() ? TR("No engine to answer: choose one in the Analysis tab.")
                                                       : TR("The engine gave no answer, or the game is over."))
@@ -469,8 +475,8 @@ void App::drawBoardQuestions() {
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("What it can do: explain a move, the best move, the threat, try a move, compare "
                                      "two; the reference games and the moves played in a database; the opening's "
-                                     "name; what the endgame tables say. A question beyond them gets an « I cannot "
-                                     "tell » and what it can show instead."));
+                                     "name; what the endgame tables say. A question beyond them gets an “I cannot "
+                                     "tell” and what it can show instead."));
         ImGui::TextDisabled("%s", TR("Why believe it: it speaks only of what your engine, your databases and the "
                                      "tables establish, shown under the answer, and names only legal moves."));
         ImGui::PopTextWrapPos();
@@ -557,7 +563,7 @@ void App::drawAssistantSettings(float label) {
         if (ImGui::SmallButton(TR("Try the GPU again"))) a.retryGpu();
     }
     if (!a.gpuTaken().empty() && a.settings().gpu) {
-        ImGui::TextDisabled("%s", trf("The tournament « {} » uses the GPU: the assistant answers on the processor "
+        ImGui::TextDisabled("%s", trf("The tournament “{}” uses the GPU: the assistant answers on the processor "
                                       "meanwhile, in about 3 seconds.",
                                       a.gpuTaken())
                                       .c_str());
@@ -593,7 +599,7 @@ void App::drawAssistantSettings(float label) {
         }
         ImGui::SameLine();
     }
-    if (ImGui::SmallButton(TR("A GGUF file of the disk…")))
+    if (ImGui::SmallButton(TR("A GGUF file on the disk…")))
         dialogs_.openFile(Dialogs::Purpose::AssistantModel, {{"GGUF", "gguf"}});
     ImGui::PopTextWrapPos();
     ImGui::EndGroup();

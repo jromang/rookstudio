@@ -1714,7 +1714,7 @@ void App::drawPositionEditor(float size) {
     ImGui::SameLine();
     if (ImGui::RadioButton(TR("Black"), e.stm == chess::Color::BLACK)) e.stm = chess::Color::BLACK, changed = true;
     ImGui::SameLine(0, px(24));
-    ImGui::TextUnformatted(TR("Move"));
+    ImGui::TextUnformatted(TR("Move number"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(px(60));
     if (ui::inputInt("##editor_move", &e.fullmove)) {

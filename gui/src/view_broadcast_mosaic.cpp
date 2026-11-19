@@ -251,11 +251,11 @@ void App::saveBroadcastRound(const FollowedRound& round, const std::vector<liche
         const auto count = games.size();
         (void)db->append(std::move(games), false);
         s.rebuildTree(base);
-        Console::instance().add(trf("{} · {}: the round's {} games saved in « {} ».", round.entry.tour.name,
+        Console::instance().add(trf("{} · {}: the round's {} games saved in “{}”.", round.entry.tour.name,
                                     round.entry.round.name, count, name),
                                 false);
     } catch (const std::exception& e) {
-        Console::instance().add(trf("The round could not be saved in « {} »: {}", name, e.what()), true);
+        Console::instance().add(trf("The round could not be saved in “{}”: {}", name, e.what()), true);
     }
 }
 
@@ -480,7 +480,7 @@ void App::drawBroadcastMosaic() {
         if (ImGui::Button(TR("Follow on the board"))) followBroadcastOnBoard(*chosen);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", TR("On the board, the game moves on with each move received; going back to "
-                                       "analyse it lets it move on behind, « Back to live » brings it back."));
+                                       "analyse it lets it move on behind, “Back to live” brings it back."));
         ImGui::SameLine();
         if (ImGui::Button(TR("Copy the PGN"))) ImGui::SetClipboardText(chosen->pgn.c_str());
         ImGui::PopTextWrapPos();
@@ -514,7 +514,7 @@ void App::drawBroadcastMosaic() {
     ui::endCard();
     ImGui::TextDisabled("%s", TR("The moves come from Lichess's stream, opened again by itself after a break; the "
                                  "analysis is made on your machine, with your engines. A finished game stays here "
-                                 "until the round ends, then the whole round goes into the « Broadcasts » database."));
+                                 "until the round ends, then the whole round goes into the “Broadcasts” database."));
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
 }

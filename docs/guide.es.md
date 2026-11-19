@@ -1,8 +1,10 @@
-# Guía de usuario de fastchess-gui
+# Guía de usuario de RookStudio
 
-Esta guía describe cada página, ajuste y archivo de fastchess-gui. El [README](../README.md) explica qué es el
-programa, dónde descargarlo y cómo compilarlo. En el programa, F1 abre esta guía junto a la página, en la sección de
-lo que está bajo el ratón, en el idioma de la interfaz (consulta [La ayuda del programa](#la-ayuda-del-programa)).
+Esta guía describe cada página, ajuste y archivo de RookStudio: motores que juegan torneos, y el estudio de partidas
+(bases de datos, notación, el árbol de aperturas, repertorios, Lichess y un asistente local). El [README](../README.md)
+explica qué es el programa, dónde descargarlo y cómo compilarlo. En el programa, F1 abre esta guía junto a la página, en
+la sección de lo que está bajo el ratón, en el idioma de la interfaz (consulta [La ayuda del
+programa](#la-ayuda-del-programa)).
 
 ## Inicio rápido
 <!-- en: quick-start 92353f2c -->
@@ -38,13 +40,32 @@ lo es). La *Vista general* muestra el Elo, el LLR y sus límites a medida que ll
 conserva: la próxima vez, elige la siguiente versión como A y pulsa **Iniciar**, o haz clic en *Relanzar con…* en el
 match terminado.
 
+### Estudiar tus partidas
+<!-- en: studying-your-games a1bb7f7a -->
+
+1. **Una base de datos.** En la barra lateral, *Bases de datos*, luego *Nueva base de datos*, con su nombre escrito en
+   el sitio, e *Importar un archivo…*: un archivo PGN, o un archivo `.zst`, `.gz` o `.zip` que contenga uno (soltar un
+   archivo sobre la página hace lo mismo). Las partidas llegan en segundo plano y luego se construye el árbol de
+   aperturas de la base de datos.
+2. **Una partida.** Un clic en una partida de la lista la muestra al lado; Intro o un doble clic la abre en el
+   *Tablero*. Ctrl+O abre allí un archivo PGN, Ctrl+V pega una partida o una FEN.
+3. **Un motor.** El análisis necesita un motor: con la biblioteca vacía, la pestaña *Análisis* ofrece descargar Gaia con
+   un clic (consulta [Motores populares](#motores-populares)). A inicia y detiene el análisis de la posición (Alt+A en
+   el Tablero de estudio), G analiza la partida entera.
+4. **Tus notas.** Intro escribe un comentario tras la jugada, `!` y `?` ponen símbolos, una jugada distinta de la de la
+   partida abre una variante, el botón derecho dibuja flechas y casillas; Ctrl+S guarda la partida en su base de datos.
+
 ### Qué leer después
-<!-- en: where-to-go-next 2cd9b9f7 -->
+<!-- en: where-to-go-next d21be582 -->
 
 - [Nuevo torneo](#nuevo-torneo): todos los ajustes, y [consejos](#consejos-para-los-ajustes) para elegirlos;
 - [Un torneo en curso](#un-torneo-en-curso): qué muestran las pestañas, pausar, modificar un torneo mientras se
   juega;
 - [Clasificaciones](#clasificaciones): una lista de rating sobre todas las partidas jugadas;
+- [Bases de datos](#bases-de-datos), [el Tablero de estudio](#el-tablero-de-estudio), [la página
+  Aperturas](#la-página-aperturas), [la página Lichess](#la-página-lichess) y [el asistente](#el-asistente) para tus
+  propias partidas;
+- [Vistas](#vistas): las páginas de la barra lateral, como las quieras;
 - [Retransmisión](#retransmisión): las partidas en directo en una página web, en TLCV o en lichess;
 - [Solución de problemas](#solución-de-problemas) cuando algo va mal, y el [Glosario](#glosario) para las palabras de
   los testers.
@@ -53,30 +74,79 @@ match terminado.
 <!-- en: the-window 3a5230d4 -->
 
 ### Las páginas
-<!-- en: the-pages b13b4de2 -->
+<!-- en: the-pages 39322f52 -->
 
-Una barra de navegación a la izquierda lleva a ocho páginas:
+Una barra de navegación a la izquierda lleva a las páginas de la [vista](#vistas) mostrada, en su orden:
 
 | Página | Contenido |
 |---|---|
-| Torneos | La página de inicio: lo que está en marcha y lo que requiere atención, la cola, los últimos torneos terminados, todos los torneos del perfil, *Nuevo torneo* |
-| Motores | La biblioteca de motores: opciones, comprobaciones, grupos, Elo de referencia, importación de las listas de otros programas |
+| Inicio | La partida que retomar, lo que se puede empezar, las partidas recientes, tus bases de datos, Lichess y lo que está en marcha: tarjetas de las páginas de la vista (consulta [La página Inicio](#la-página-inicio)) |
+| Torneos | Lo que está en marcha y lo que requiere atención, la cola, los últimos torneos terminados, todos los torneos del perfil, *Nuevo torneo* |
+| Tablero | Una partida o una posición de cualquier procedencia, analizada por un motor de la biblioteca; en una vista para estudiar, la notación escrita en su sitio (consulta [El Tablero de estudio](#el-tablero-de-estudio)) |
+| Bases de datos | Tus bases de datos de partidas: importación, la lista de partidas, las búsquedas |
+| Aperturas | Tus repertorios, su cobertura y sus huecos |
+| Lichess | Tu cuenta de Lichess, las partidas de un jugador, las retransmisiones oficiales, lo que el análisis puede consultar a Lichess |
+| Jugar | Una partida contra un motor, en la página Tablero |
+| Motores | La biblioteca de motores: opciones, comprobaciones, grupos, Elo de referencia, importación de las listas de otros programas, los motores populares |
 | Libros | La biblioteca de libros de aperturas, y las aperturas de cada libro con lo que tienen de malo |
-| Tablero | Una partida o una posición de cualquier procedencia, analizada por un motor de la biblioteca |
 | Suites | Suites de tests (STS, WAC, ERET…): motores frente a las posiciones de un archivo EPD |
 | Clasificaciones | Una lista de rating sobre todas las partidas de todos los torneos |
 | Registro | La salida propia de fastchess y los mensajes del programa, e *Informar de un problema…* |
-| Ajustes | Idioma, tema, tamaño de la interfaz, notificaciones, la apariencia de los tableros, las carpetas del perfil y de torneos, las máquinas remotas, el token de lichess, la versión, la forma en que se dibuja la ventana |
+| Ajustes | Idioma, tema, tamaño de la interfaz, notificaciones, la apariencia de los tableros, las vistas, el asistente, las carpetas del perfil y de torneos, las máquinas remotas, el token de lichess, la versión, la forma en que se dibuja la ventana: primero las secciones de las páginas de la vista, las demás en *Otros ajustes* |
+
+### Vistas
+<!-- en: views 3d580a43 -->
+
+Una vista es un conjunto de páginas a tu medida: hasta tres, cada una con su nombre, su icono y su color, que se cambian
+en lo alto de la barra lateral. Cada vista tiene allí su botón, relleno para la vista mostrada, y el nombre de la vista
+mostrada se escribe debajo de ellos; un clic en un botón, o de Ctrl+1 a Ctrl+3, muestra esa vista, en la página en la
+que estaba. Con una sola vista, el selector desaparece.
+
+El primer inicio ofrece tres: *Pruebas* (Torneos, Motores, Libros, Tablero, Suites, Clasificaciones, Registro),
+*Estudio* (Inicio, Tablero, Bases de datos, Aperturas, Lichess, Motores) y *Todo* (todas las páginas). Ajustes está en
+todas las vistas.
+
+*Editar las vistas* abre la hoja de las vistas en lugar de la página: *Ajustes* > *Vistas*, ⋯ bajo el selector, un clic
+derecho en un botón (la hoja se abre en su vista), o *Editar las vistas…* en Ctrl+K. Contiene:
+
+- las vistas, en el orden de Ctrl+1 a Ctrl+3 (*Subir*, *Bajar*), *Nueva vista* (tres como máximo) y *Eliminar esta
+  vista*;
+- la vista elegida: su nombre (corto: se escribe bajo el selector), su icono entre doce, su color entre seis;
+- su Tablero: *Para estudiar* (la notación escrita en su sitio, las flechas y casillas, las pestañas Árbol, Referencias
+  y Preguntas: consulta [El Tablero de estudio](#el-tablero-de-estudio)) o *Para analizar con motores* (el Tablero de
+  quienes prueban motores, tal como era);
+- sus páginas, marcadas, en el orden de la barra lateral (↑ y ↓ junto a cada una la mueven; Ajustes queda la última);
+  una página puede estar en varias vistas, y *también: …* nombra las demás;
+- la barra lateral, tal como se verá.
+
+Todo se ve en la barra lateral al momento. Ctrl+Z deshace cada cambio mientras la hoja está abierta, Intro guarda los
+cambios, Esc deja las vistas como estaban. *Restaurar las vistas propuestas* recupera las tres del primer inicio.
+
+Ctrl+K lista todas las páginas con la vista en la que se abren: elegir una página de otra vista cambia a esa vista. Una
+página que no está en ninguna vista (un aviso puede llevar a ella) se abre en la vista mostrada, con *Añadirla a …*.
+
+### El primer inicio
+<!-- en: the-first-start 18171dec -->
+
+En el primer inicio, RookStudio pregunta:
+
+- el idioma de la interfaz;
+- qué quieres hacer: las vistas propuestas, cada una marcada o no (*Pruebas*, *Estudio*, *Todo*), y cuál se muestra
+  primero;
+- cuando hay un perfil de fastchess-gui en la máquina, si copiarlo: sus motores, libros, torneos y ajustes.
+  fastchess-gui se queda como está y puede seguir funcionando a su lado; *Empezar sin él* no lo toca.
+
+Todo se puede cambiar después en *Ajustes* > *Vistas*.
 
 ### La ayuda del programa
-<!-- en: help-in-the-program 351be20d -->
+<!-- en: help-in-the-program c08dbff5 -->
 
 - **Descripciones emergentes.** Deja el ratón sobre un control para ver qué hace. La descripción emergente de un
   control que esta guía explica más a fondo termina con *F1: más en la guía*.
 - **F1** abre esta guía en un panel a la derecha de la página, en la sección de lo que está bajo el ratón (una fila de
-  la configuración, una tarjeta de la página de inicio, una pestaña, una columna de la clasificación); si no hay nada
-  bajo el ratón, en la sección del último panel en el que se hizo clic, y si no, en la de la página. El **?** redondo
-  junto al título de una página abre la sección de esa página. F1 otra vez, o Esc en el panel, lo cierra.
+  la configuración, una tarjeta de la página Torneos, una pestaña, una columna de la clasificación); si no hay nada bajo
+  el ratón, en la sección del último panel en el que se hizo clic, y si no, en la de la página. El **?** redondo junto
+  al título de una página abre la sección de esa página. F1 otra vez, o Esc en el panel, lo cierra.
 - **El panel de la guía** muestra una sección con sus subsecciones, y la página de al lado sigue funcionando: puedes
   leer la explicación mientras cambias el ajuste. Su cabecera tiene *Atrás* y *Adelante* (también Alt+Izquierda y
   Alt+Derecha, o los botones laterales del ratón), *Índice* (todas las secciones), el campo de búsqueda (Ctrl+F en
@@ -93,22 +163,21 @@ Una barra de navegación a la izquierda lleva a ocho páginas:
   en la guía* busca en ella lo que se ha escrito.
 - **Mensajes.** Un problema que el programa notifica nombra el motor, el archivo o el recurso, con su solución a
   mano; un **?** a su lado abre su entrada en [Solución de problemas](#solución-de-problemas).
-- **Primeros pasos.** Hasta que se inicia un primer torneo, la página de inicio muestra los pasos del
-  [Inicio rápido](#inicio-rápido), cada uno con su botón, marcado una vez hecho; *Ocultar* los quita de la vista.
+- **Primeros pasos.** Hasta que se inicia un primer torneo, la página Torneos muestra los pasos del [Inicio
+  rápido](#inicio-rápido), cada uno con su botón, marcado una vez hecho; *Ocultar* los quita de la vista.
 - [Informa de un problema](#informar-de-un-problema) cuando el programa no haga lo que debería.
 
 ### La paleta de comandos
-<!-- en: the-command-palette 725e7934 -->
+<!-- en: the-command-palette 14590459 -->
 
-**Ctrl+K** abre la paleta de comandos: las páginas y pestañas, los motores de la biblioteca (abre su ficha), los
-libros, los torneos de la página de inicio, las secciones de la guía y las acciones posibles en ese momento (*Pausa*,
-*Reanudar*, *Pausar todo*, *Detener*, *Iniciar*, *Añadir a la cola*, *Relanzar … con…*, las entradas de
-*Importar…*, *Comprobar los no comprobados*, *Exportar para una lista de rating…*, *Copiar* la clasificación,
-*Copiar la versión*, *Informar de un problema…*, los colores del tablero y los juegos de piezas, los sonidos de las
-jugadas activados o desactivados…). Las mayúsculas no importan y las letras escritas no tienen por qué ser contiguas
-(«lr» encuentra *Lista de rating*); los nombres que empiezan por ellas, o que tienen una palabra que empieza por
-ellas, van primero. Arriba y Abajo eligen, Intro ejecuta, Esc cierra; Ctrl+K no abre la paleta mientras se escribe en
-un campo de texto.
+**Ctrl+K** abre la paleta de comandos: las páginas y pestañas, los motores de la biblioteca (abre su ficha), los libros,
+los torneos de la página Torneos, las secciones de la guía y las acciones posibles en ese momento (*Pausa*, *Reanudar*,
+*Pausar todo*, *Detener*, *Iniciar*, *Añadir a la cola*, *Relanzar … con…*, las entradas de *Importar…*, *Comprobar los
+no comprobados*, *Exportar para una lista de rating…*, *Copiar* la clasificación, *Copiar la versión*, *Informar de un
+problema…*, los colores del tablero y los juegos de piezas, los sonidos de las jugadas activados o desactivados…). Las
+mayúsculas no importan y las letras escritas no tienen por qué ser contiguas («lr» encuentra *Lista de rating*); los
+nombres que empiezan por ellas, o que tienen una palabra que empieza por ellas, van primero. Arriba y Abajo eligen,
+Intro ejecuta, Esc cierra; Ctrl+K no abre la paleta mientras se escribe en un campo de texto.
 
 ### Idioma, tema y tamaño
 <!-- en: language-theme-and-size 954fe416 -->
@@ -145,14 +214,14 @@ lista de jugadas desplaza la lista, nunca las jugadas. **A** en cualquier tabler
 [Tablero](#tablero) y la analiza.
 
 ### Versión y nuevas versiones
-<!-- en: version-and-new-versions 70e3e9a2 -->
+<!-- en: version-and-new-versions 6305c913 -->
 
 La versión está en el título de la ventana y en **Ajustes**, cuyo *Copiar* la pone en el portapapeles junto con el
-sistema, para un informe de error. *Avisarme cuando salga una versión nueva* (desactivado por defecto) pregunta a
-GitHub por la última versión publicada al iniciar, como mucho una vez al día y en segundo plano; cuando es más
-reciente, la página de inicio lo indica, con *Página de descarga* (la página de esa versión en GitHub, en el
-navegador), *Novedades* (sus notas) y *Ocultar* (hasta la próxima versión). El programa no descarga ni instala nada,
-y un fallo (sin red, GitHub inaccesible) solo se escribe en el registro.
+sistema, para un informe de error. *Avisarme cuando salga una versión nueva* (desactivado por defecto) pregunta a GitHub
+por la última versión publicada al iniciar, como mucho una vez al día y en segundo plano; cuando es más reciente, la
+página Torneos lo indica, con *Página de descarga* (la página de esa versión en GitHub, en el navegador), *Novedades*
+(sus notas) y *Ocultar* (hasta la próxima versión). El programa no descarga ni instala nada, y un fallo (sin red, GitHub
+inaccesible) solo se escribe en el registro.
 
 ### Informar de un problema
 <!-- en: reporting-a-problem 3e4e5989 -->
@@ -265,11 +334,12 @@ tableros siguen planos y *Apariencia* dice por qué. Las piezas son las Staunton
 licencia MIT; *Apariencia* enlaza con ellas.
 
 ## Atajos de teclado
-<!-- en: keyboard-shortcuts e0d74f26 -->
+<!-- en: keyboard-shortcuts 46ce10a3 -->
 
 | Teclas | Dónde | Qué hacen |
 |---|---|---|
 | <kbd>Ctrl</kbd>+<kbd>K</kbd> | En todas partes | La paleta de comandos |
+| <kbd>Ctrl</kbd>+<kbd>1</kbd>, <kbd>Ctrl</kbd>+<kbd>2</kbd>, <kbd>Ctrl</kbd>+<kbd>3</kbd> | En todas partes | Mostrar la primera, la segunda, la tercera vista |
 | <kbd>F1</kbd> | En todas partes | Esta guía, en la sección de lo que está bajo el ratón; otra vez: la cierra |
 | <kbd>F11</kbd> | En todas partes | Pantalla completa, y vuelta atrás (la ventana propia de un tablero separado cuando tiene el teclado) |
 | <kbd>Ctrl</kbd>+rueda, <kbd>Ctrl</kbd>+<kbd>+</kbd>, <kbd>Ctrl</kbd>+<kbd>-</kbd> | En todas partes | Tamaño de la interfaz; <kbd>Ctrl</kbd>+<kbd>0</kbd>: volver al 100 % |
@@ -288,6 +358,25 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>X</kbd> | La página Tablero | Mostrar u ocultar la amenaza |
 | <kbd>N</kbd>, <kbd>Mayús</kbd>+<kbd>N</kbd> | La página Tablero | La jugada siguiente, la anterior que marcó el análisis |
 | <kbd>Esc</kbd> | La página Tablero | Devolver la partida tras mostrar una línea; soltar la pieza cogida |
+| <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | Una vista para estudiar | Abrir un archivo PGN en la página Tablero; una partida nueva allí |
+| <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>Tab</kbd> | Una vista para estudiar | Las partidas recientes; al soltar Ctrl se abre la elegida |
+| <kbd>Intro</kbd> | La página Inicio | Retomar la partida en el tablero |
+| Una letra de una jugada | El Tablero de estudio | Escribir la jugada: se ofrecen las jugadas legales que empiezan así, Intro la juega |
+| <kbd>Intro</kbd>, <kbd>Mayús</kbd>+<kbd>Intro</kbd> | El Tablero de estudio | Un comentario tras la jugada, antes de ella |
+| <kbd>!</kbd> <kbd>?</kbd> | El Tablero de estudio | El símbolo de la jugada; dos signos seguidos: `!!`, `??`, `!?`, `?!` |
+| <kbd>Supr</kbd> | El Tablero de estudio | Borrar las jugadas desde la mostrada |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> | El Tablero de estudio | Promover la variante un nivel, hasta la línea principal |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | El Tablero de estudio | Deshacer, rehacer |
+| <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>S</kbd> | El Tablero de estudio | Guardar la partida; guardar una copia en otro sitio |
+| <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | El Tablero de estudio | La partida anterior, la siguiente de la lista de la que vino |
+| <kbd>Alt</kbd>+<kbd>H</kbd> | El Tablero de estudio | Desplegar las cabeceras de la partida |
+| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | El Tablero de estudio | Las pestañas Notación, Análisis, Árbol, Referencias y Preguntas |
+| <kbd>Alt</kbd>+<kbd>C</kbd> | El Tablero de estudio | El asistente comenta la jugada |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | El Tablero de estudio | Lo que hacen F, A, X, G y N en el Tablero de los motores (aquí las letras escriben jugadas) |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Intro</kbd>, <kbd>*</kbd> | La pestaña Árbol | Elegir una jugada, jugarla, marcarla en el repertorio activo |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Intro</kbd> | Una lista de partidas | Recorrer la lista, abrir la partida |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> | La página Bases de datos | El panel de búsqueda |
+| <kbd>Esc</kbd> | La página Bases de datos | Cerrar el panel de búsqueda, luego la lista |
 | <kbd>←</kbd> <kbd>→</kbd> | La pantalla grande | La partida anterior o la siguiente |
 | <kbd>+</kbd> <kbd>-</kbd> | La pantalla grande | Texto más grande o más pequeño |
 | <kbd>Esc</kbd> | La pantalla grande | Salir de ella |
@@ -304,8 +393,30 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Intro</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | La consola de un motor | Enviar la línea; recuperar las líneas anteriores |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | El modo sin interfaz gráfica | Detenerse tras las partidas en juego |
 
-## La página de inicio
-<!-- en: the-home-page 40031a16 -->
+## La página Inicio
+<!-- en: the-home-page 1eaa857d -->
+
+La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, primero lo que está en marcha:
+
+- **Retomar donde lo dejaste**, cuando la vista tiene el Tablero: la partida del tablero en su jugada, en un tablero
+  pequeño, de dónde viene (su base de datos y su número, su lugar en un filtro, o su archivo), sus comentarios, y si
+  tiene cambios aún sin guardar. *Reanudar* (Intro) vuelve a ella; Ctrl+Tab lista las partidas recientes.
+- Lo que se puede empezar, cada cosa con su tecla: *Abrir un PGN…* (Ctrl+O), *Pegar una partida o un FEN* (Ctrl+V),
+  *Nueva partida* (Ctrl+N), *Importar a una base de datos…*, *Jugar contra un motor*, *Nuevo torneo*: los de las páginas
+  de la vista.
+- Los torneos en marcha, como en la página Torneos, cuando la vista tiene Torneos.
+- **Recientes**: las partidas abiertas en el tablero; un clic vuelve a abrir una con sus cambios.
+- **Mis bases de datos**: cada una con sus partidas y el estado de su árbol de aperturas, la importación en curso, *+
+  Importar…*, y los torneos leídos sin copia (consulta [Bases de datos](#bases-de-datos)).
+- **Lichess**: la cuenta, las partidas de un jugador con *Sincronizar*, las partidas nuevas contadas si lo elegiste, las
+  retransmisiones en directo (consulta [La página Lichess](#la-página-lichess)).
+- **En curso**: el análisis de la partida, el de la posición, una importación, y el asistente (su descarga, su modelo
+  cargado, *Liberar*).
+
+El botón de búsqueda de arriba, o Ctrl+K, encuentra un comando, una partida, una base de datos.
+
+## La página Torneos
+<!-- en: the-tournaments-page eb693479 -->
 
 La página **Torneos** es una sala de control: primero lo que está en marcha y lo que te necesita, después el resto.
 
@@ -417,6 +528,30 @@ por defecto del motor se envían con `setoption` al inicio de cada partida. `Thr
   motor se incorpora). *Importar…* > *Una lista de rating, para el Elo de referencia…* lo fija para muchos motores a
   la vez (consulta [Importar motores y ratings](#importar-motores-y-ratings)).
 
+### Motores populares
+<!-- en: popular-engines 86dab934 -->
+
+*Motores populares…*, junto a *Añadir…*, lista los motores más fuertes cuyos autores publican compilaciones para Linux,
+Windows y macOS en GitHub (Gaia, Stockfish, Triumviratus, Reckless, PlentyChess, pawnocchio, Coda, Cinder, Stormphrax,
+Viridithas), cada uno en su última versión, con el archivo que ejecuta este procesador (la más rápida de sus
+compilaciones que admite el procesador: AVX2, BMI2, AVX-512, una compilación hecha para su generación Zen…), su tamaño y
+su licencia. *Añadir* lo descarga de la versión publicada por su autor, lo verifica con el hash SHA-256 que publica
+GitHub, lo extrae de su archivo comprimido, lo arranca una vez (`uci`) y lo añade a la biblioteca, cada versión en una
+carpeta propia dentro de la carpeta `engines` del perfil; un archivo que no arranca se sustituye por la siguiente
+compilación. *Cancelar* detiene una descarga, y el siguiente intento continúa desde donde se detuvo. La lista viene de
+un catálogo mantenido en el repositorio de RookStudio, que se vuelve a leer una vez al día; si no, se usa la copia del
+propio programa. Lo que sale de la máquina: el catálogo, una petición a api.github.com por motor (guardada un día) y el
+archivo elegido; solo mientras la página está abierta o se añade un motor.
+
+Un motor añadido así sigue sus nuevas versiones: se buscan una vez al día al abrir la página Motores (o solo al abrir
+*Motores populares…*, en *Ajustes*), y se muestran encima de la lista con *Actualizar*. La nueva versión va a una
+carpeta propia y el motor la adopta en cuanto ha respondido a `uci`; *Conservar también …* conserva la versión anterior
+como motor aparte, para un match entre ellas. Un torneo que no ha terminado conserva los archivos con los que empezó.
+
+Donde se necesita un motor por primera vez (el análisis de la página Tablero, sus preguntas y su revisión) y la
+biblioteca no tiene ninguno, una tarjeta ofrece Gaia, que se descarga con un clic (o Intro) y pasa a ser el motor del
+análisis y del asistente; los demás motores populares y un motor del disco también están allí a un clic.
+
 ### Arrancar los motores
 <!-- en: starting-engines 09d107ba -->
 
@@ -484,11 +619,11 @@ nuevo, marcado para fijarlo, y los nombres de la lista que no son ningún motor 
 lista suelen llevar su compilación (`64-bit 4CPU`): renombra los motores para que coincidan si hace falta.
 
 ### Motores WinBoard
-<!-- en: winboard-engines 079e4849 -->
+<!-- en: winboard-engines ff0920db -->
 
 Los **motores WinBoard** (protocolo xboard, CECP) se juegan como los demás. El *Protocolo* de un motor se averigua
 al añadirlo (*Automático*), o se elige: UCI o WinBoard. fastchess solo habla UCI: un motor WinBoard se arranca a
-través de una traducción integrada en fastchess-gui (`fastchess-gui --wb2uci ENGINE [ARGS]`, que fastchess arranca en
+través de una traducción integrada en RookStudio (`rookstudio --wb2uci ENGINE [ARGS]`, que fastchess arranca en
 lugar del motor), y sus opciones, `memory`, `cores` y la ruta de Syzygy se convierten en opciones UCI. Maneja el
 motor como lo hace WinBoard: features del protocolo 2, o protocolo 1 para los motores que no envían ninguna;
 posiciones con `setboard`, o modo de edición; jugadas en coordenadas o en SAN; `level`, `time`/`otim`, `st`, `sd`,
@@ -589,7 +724,7 @@ puntero, flotando sobre el tablero y pasando por detrás de las piezas que tiene
 como está; la pieza misma se mueve al soltarla.
 
 ### Abrir, pegar y preparar una posición
-<!-- en: opening-pasting-and-setting-up-a-position 3778ddb5 -->
+<!-- en: opening-pasting-and-setting-up-a-position b8dc5047 -->
 
 - **Abrir un PGN…** lee cualquier archivo PGN (también se puede soltar un archivo sobre la ventana), en segundo plano
   con una barra de progreso: un archivo de millones de partidas tarda unos segundos, y sus partidas se listan en una
@@ -612,7 +747,10 @@ como está; la pieza misma se mueve al soltarla.
   avanzar dos casillas) y Chess960. La FEN de debajo sigue al tablero, y una FEN escrita ahí lo fija. *Listo* se
   ofrece en cuanto la posición se puede jugar, y la pone en el tablero.
 - *Copiar PGN* (a la derecha de las pestañas de las jugadas) copia la partida mostrada, con sus etiquetas, sus jugadas
-  (las puntuaciones de los motores como comentarios cuando las tiene) y sus variantes.
+  (las puntuaciones de los motores como comentarios cuando las tiene) y sus variantes. Ctrl+S, o *Guardar la partida
+  como PGN…* en la paleta de comandos, escribe lo mismo en un archivo. Los comentarios, los símbolos ($1 o !?), las
+  flechas y casillas de color, los relojes y las evaluaciones de un archivo PGN abierto se conservan, y se escriben tal
+  como se leyeron.
 - **El tablero**: los botones de debajo y ← → Inicio Fin recorren las jugadas, y F (o el último botón) lo gira; un
   clic en una pieza y en una casilla juega una jugada (un peón que corona pregunta por su pieza). *Copiar FEN* copia la
   posición.
@@ -725,16 +863,16 @@ encima; Esc, un clic en el tablero o un paso por la partida devuelven la partida
 es una insignia en su casilla, y la respuesta que esperaba su motor, una flecha discontinua.
 
 ### Variantes
-<!-- en: variations 7932794c -->
+<!-- en: variations f4e65c3b -->
 
-Una jugada hecha en el tablero donde la partida siguió otro camino empieza una variante: la partida se queda como
-llegó, con sus análisis y su gráfico. Las jugadas muestran las variantes entre paréntesis tras la jugada que
-reemplazan, anidadas y numeradas; un clic en una jugada lleva allí, y *Volver a la partida* regresa a la posición de la
-que sale la variante. Un clic derecho en una jugada de una variante la promueve (pasa a ser la línea de la que parte,
-cuyas jugadas a partir de ahí pasan a ser la variante), la borra junto con las que parten de ella, o la copia. *Copiar
-PGN* escribe las variantes, y se leen las de un archivo PGN abierto (se omiten comentarios, números, anotaciones y
-resultados; una jugada que no se puede jugar solo termina su variante). El gráfico, los análisis y los juicios son los
-de la partida; en una variante, el gráfico marca dónde sale de la partida.
+Una jugada hecha en el tablero donde la partida siguió otro camino empieza una variante: la partida se queda como llegó,
+con sus análisis y su gráfico. Las jugadas muestran las variantes entre paréntesis tras la jugada que reemplazan,
+anidadas y numeradas; un clic en una jugada lleva allí, y *Volver a la partida* regresa a la posición de la que sale la
+variante. Un clic derecho en una jugada de una variante la promueve (pasa a ser la línea de la que parte, cuyas jugadas
+a partir de ahí pasan a ser la variante), la borra junto con las que parten de ella, o la copia. *Copiar PGN* escribe
+las variantes, y se leen las de un archivo PGN abierto, anidadas a cualquier profundidad, con sus comentarios y símbolos
+(una jugada que no se puede jugar solo termina su variante). El gráfico, los análisis y los juicios son los de la
+partida; en una variante, el gráfico marca dónde sale de la partida.
 
 ### Las jugadas, la tabla y la revisión
 <!-- en: the-moves-the-table-and-the-review 7880f8d8 -->
@@ -767,7 +905,7 @@ regla de las 50 jugadas está cerca. Las tablas son las del proceso del programa
 torneo en él.
 
 ### Jugar una partida desde una posición
-<!-- en: playing-a-game-from-a-position 7e83c318 -->
+<!-- en: playing-a-game-from-a-position 1e310963 -->
 
 **Jugar una partida…** juega una partida desde la posición del tablero entre dos motores de la biblioteca, o entre tú y
 uno de ellos (ver *Humano* más abajo) (*Blancas* y *Negras*; `<->` los intercambia con sus relojes), con un reloj para
@@ -781,7 +919,7 @@ jugada ilegal, un motor que se detiene, o una pérdida por tiempo (con 0,1 s de 
 jugada). Cada partida se añade, al terminar, a un archivo PGN en `games/` en el perfil (con el nombre de la fecha y de
 los motores, y una etiqueta `Termination`), que *Abrir las partidas* lista en el tablero.
 
-Las partidas las juega el cliente de motores propio de fastchess-gui, al margen de cualquier torneo: se juegan
+Las partidas las juega el cliente de motores propio de RookStudio, al margen de cualquier torneo: se juegan
 mientras se juega uno, sin interferir con él. Sus hilos (los del motor que más tiene de los dos, ya que juegan por
 turnos) cuentan en el presupuesto de núcleos; cuando las partidas de los torneos en marcha y el análisis ya llenan la
 máquina, la tarjeta lo indica y ofrece *Jugar de todos modos* en lugar de *Jugar*. El análisis se detiene cuando
@@ -798,6 +936,346 @@ partida* la termina en cualquier momento, ganada por el motor; con una segunda p
 invertido. Tus partidas se guardan con tu nombre de usuario, y solo el motor cuenta en el presupuesto de núcleos. No se
 puede deshacer una jugada, y el motor juega a plena fuerza salvo que su tarjeta fije una menor (`UCI_LimitStrength` y
 `UCI_Elo`, o `Skill Level`, si los tiene).
+
+### El Tablero de estudio
+<!-- en: the-study-board da17bfb4 -->
+
+En una vista cuyo Tablero es *Para estudiar* (consulta [Vistas](#vistas)), la página Tablero es donde se leen y se
+escriben las partidas. El tablero está a la izquierda; a la derecha, la franja de la partida y luego cinco pestañas, de
+Alt+1 a Alt+5:
+
+- **Notación**: la línea de título de la partida y sus cabeceras (consulta [Cabeceras](#cabeceras)), luego las jugadas,
+  sus comentarios, símbolos y variantes, escritos en su sitio (consulta [Notación](#notación)); la tabla de las jugadas
+  y la revisión están en pestañas propias (consulta [La revisión de una partida](#la-revisión-de-una-partida));
+- **Análisis**: las líneas del motor, y la nube y las tablas de finales de Lichess cuando las elegiste (consulta [En
+  línea para el análisis](#en-línea-para-el-análisis)), con el gráfico de la partida;
+- **Árbol**: las jugadas hechas desde la posición en tus bases de datos, tus libros y en Lichess (consulta [La pestaña
+  Árbol](#la-pestaña-árbol));
+- **Referencias**: las partidas más fuertes de la posición (consulta [Partidas de referencia](#partidas-de-referencia));
+- **Preguntas**: el asistente (consulta [Preguntas](#preguntas)).
+
+La franja sobre las pestañas dice de dónde viene la partida y qué ha sido de ella: *Guardar* (Ctrl+S) con su estado
+(*Modificada: 2 cambios*, luego *Guardada en «Mega»*), el lugar de la partida en la lista de la que vino,
+con la partida anterior y la siguiente (Ctrl+← y Ctrl+→), y *Recientes* (consulta [Las partidas recientes y la
+lista](#las-partidas-recientes-y-la-lista)). Con la biblioteca vacía, las pestañas Análisis, Preguntas y Revisión
+ofrecen descargar Gaia con un clic.
+
+Una jugada se puede escribir además de jugarla: su primera letra abre un campo sobre las pestañas, que ofrece las
+jugadas legales que empiezan así (con letras inglesas, K Q R B N; en francés, R D T F C), e Intro la juega. Las letras
+del Tablero de los motores pasan entonces a Alt: Alt+F gira el tablero, Alt+A inicia o detiene el análisis, Alt+X
+muestra la amenaza, Alt+G analiza la partida, Alt+N va a la siguiente jugada que marcó el análisis.
+
+### Notación
+<!-- en: notation 5e273d24 -->
+
+La notación se escribe en su sitio, sin ningún cuadro de diálogo:
+
+- **Comentarios**: Intro escribe un comentario tras la jugada mostrada, Mayús+Intro uno antes de ella; Intro lo guarda,
+  Esc lo descarta. Un clic en un comentario lleva a su jugada, un doble clic lo corrige.
+- **Símbolos**: `!` y `?` escritos ponen el símbolo de la jugada, y un segundo signo justo después forma el par (`!!`,
+  `??`, `!?`, `?!`). Los botones bajo la notación ponen los demás: jugada única, novedad, y la evaluación de la posición
+  (=, ∞, y la ventaja de las blancas o de las negras, ligera, clara o decisiva). Un símbolo puesto otra vez se quita.
+- **Variantes**: una jugada distinta de la de la partida, hecha en el tablero o escrita, abre una variante. Con Mayús
+  pulsada al hacer la jugada se reemplazan las jugadas siguientes, y con Ctrl se pregunta: una variante, una nueva línea
+  principal, o las jugadas siguientes reemplazadas (Esc no juega nada). *Preguntar qué hacer con una jugada que se
+  aparta de la partida* (*Ajustes* > *Apariencia*) pregunta cada vez.
+- **Supr** borra las jugadas desde la mostrada; **Alt+↑** promueve la variante un nivel, hasta llegar a la línea
+  principal.
+- **Ctrl+Z** deshace cada cambio (una jugada, un comentario, un símbolo, una marca, una cabecera) y **Ctrl+Y** lo
+  rehace; una línea bajo la notación dice qué se hizo y cómo deshacerlo.
+
+*Figuras en la notación* (*Ajustes* > *Apariencia*) muestra las piezas como figuras. Los comentarios del asistente se
+distinguen de los tuyos, en gris azulado y en cursiva, tras un bocadillo (consulta [Los comentarios del
+asistente](#los-comentarios-del-asistente)).
+
+### Flechas y casillas
+<!-- en: arrows-and-squares a46e6347 -->
+
+El botón derecho dibuja en el Tablero de estudio: un clic colorea una casilla, un arrastre de una casilla a otra dibuja
+una flecha, y lo mismo otra vez la quita. Verde por defecto, rojo con Mayús, azul con Alt, amarillo con ambas. Un clic
+con el botón izquierdo en una casilla vacía borra las marcas de la jugada. Las marcas pertenecen a la jugada mostrada y
+se guardan con la partida (como `[%cal]` y `[%csl]` en el PGN). En el tablero 3D, el botón derecho dibuja sobre el
+tablero y, fuera de él, gira la cámara; el botón central también la gira.
+
+### Cabeceras
+<!-- en: headers 4e8fbaae -->
+
+La línea de título, arriba de la notación, da los jugadores, su Elo, el evento, la ronda, la fecha y el resultado; un
+clic en ella, o Alt+H, despliega las cabeceras en su sitio. Tab pasa al campo siguiente y completa un nombre entre los
+de la base de datos; una fecha que no lo es se señala (`YYYY.MM.DD`, con `??` para lo que no se sabe); el resultado se
+elige con un clic; el código ECO se propone a partir de las jugadas (los nombres de aperturas de Lichess) y se escribe
+solo al guardar cuando falta. Las demás cabeceras se muestran tal como las tiene la partida, y se añade una más por su
+nombre. Cada campo modificado es un cambio (Ctrl+Z); Intro pliega las cabeceras, Esc devuelve al campo su valor.
+
+### Guardar una partida
+<!-- en: saving-a-game ca08879e -->
+
+Ctrl+S guarda la partida donde le corresponde: una partida abierta desde una base de datos vuelve a ella, con su número;
+una partida de un archivo PGN vuelve al archivo, en su sitio (el archivo se reescribe al momento, con sus otras partidas
+tal como están). Cualquier otra partida abre un menú bajo *Guardar*, donde Intro toma la primera línea: una de tus bases
+de datos (primero la de la última vez), un archivo PGN nuevo, o el final de un archivo PGN. Ctrl+Mayús+S guarda una
+copia de cualquier partida en otro sitio. Una partida sin jugadores abre primero sus cabeceras.
+
+Una base de datos en la que escribe otro programa queda mientras tanto en solo lectura: la partida sigue modificada aquí
+hasta que se pueda guardar.
+
+### Las partidas recientes y la lista
+<!-- en: recent-games-and-the-list ba602f73 -->
+
+Ctrl+Tab muestra las partidas recientes, primero la del tablero (doce como máximo): Ctrl+Tab otra vez baja por la lista,
+Ctrl+Mayús+Tab sube, y al soltar Ctrl se abre la partida elegida, con su lista, su archivo, sus cambios y su historial
+de deshacer. Una partida con cambios sin guardar se conserva tal cual hasta que vuelvas a ella. *Recientes*, en la
+franja, también las lista: un clic abre una, y el botón derecho en una modificada descarta sus cambios (Ctrl+Y los
+rehace).
+
+Una partida abierta desde la lista de una base de datos conserva su lugar en ella: Ctrl+← y Ctrl+→ abren la partida
+anterior y la siguiente de la lista, o de su filtro, en la misma jugada cuando la partida pasa por la posición mostrada.
+
+### La pestaña Árbol
+<!-- en: the-tree-tab 56161f62 -->
+
+La pestaña Árbol da las jugadas hechas desde la posición mostrada: sus partidas, las proporciones de victorias de las
+blancas, tablas y victorias de las negras, la puntuación, el Elo medio, el rendimiento del bando que juega (según la
+tabla de la FIDE) y el último año en que se jugó la jugada. Sus fuentes son botones sobre las jugadas:
+
+- **Mis bases de datos**: tus bases de datos sumadas, jugada a jugada (el botón derecho elige cuáles; la parte de cada
+  una se ve con el cursor sobre las partidas);
+- cada base de datos cuyo árbol de aperturas está construido, y cada libro Polyglot de la biblioteca;
+- **Maestros (Lichess)**, **Lichess** (el botón derecho elige sus ritmos y ratings) y el jugador cuyas partidas
+  importaste: el explorador de aperturas de Lichess, que necesita una cuenta vinculada (consulta [Vincular tu
+  cuenta](#vincular-tu-cuenta)).
+
+La jugada bajo el ratón, o elegida con ↑ ↓, se muestra como una flecha azul en el tablero; un clic o Intro la juega, y
+`*` o su estrella la marca en el repertorio activo (consulta [La página Aperturas](#la-página-aperturas)). Cuando la
+línea de la partida sale de la base de datos, la pestaña dice en qué jugada, y si esa jugada es una **novedad**, como
+confirma una búsqueda por posición (*Ver la última posición conocida*). El árbol de una base de datos se construye tras
+cada importación, y de nuevo en segundo plano después de guardar en ella una partida, con su progreso y *Cancelar*.
+
+### Partidas de referencia
+<!-- en: reference-games c45f1d18 -->
+
+La pestaña Referencias busca las partidas más fuertes de la posición en tus bases de datos, en segundo plano: primero
+las más fuertes (según el rating medio de los jugadores), luego las más recientes; un clic abre una. Al principio de la
+apertura, demasiadas partidas llegan a la posición para buscar las más fuertes: la pestaña Árbol dice más. *Todas las
+partidas de la posición en «…»* las lista en la base de datos.
+
+### La revisión de una partida
+<!-- en: the-review-of-a-game 2d88a6f5 -->
+
+En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (G) como lo haría un
+entrenador:
+
+- arriba, las posibilidades de las blancas a lo largo de la partida, con los momentos clave como puntos (oscuros para
+  una buena jugada, naranjas para un error); un clic lleva a la jugada;
+- la teoría de la partida en una de tus bases de datos (la de la pestaña Árbol, si no la primera): sus jugadas de libro
+  no se juzgan, y se nombra su novedad; el libro se detiene antes del primer error que ve el motor;
+- **Los momentos clave, en palabras**, **La historia de la partida** y **En qué trabajar**, para cada bando, con las
+  jugadas que lo muestran; un clic lleva a la jugada.
+
+Las posiciones del final con siete piezas o menos pueden juzgarse con exactitud con las tablas de Lichess, consultadas
+una vez para esta partida o siempre. *Comentar los momentos clave* escribe un comentario del asistente en cada uno, en
+segundo plano (un comentario ya existente nunca se reemplaza); *Anotar la partida* escribe las evaluaciones, los
+símbolos y las mejores líneas en la notación. Ctrl+Z deshace cualquiera de los dos.
+
+## Bases de datos
+<!-- en: databases e5980ed0 -->
+
+La página **Bases de datos** reúne tus bases de datos de partidas: su lista a la izquierda, las partidas de la elegida a
+la derecha. Una base de datos es una carpeta propia (`Name.fcgdb`), que se lee rápido incluso con millones de partidas.
+
+### Importar partidas
+<!-- en: importing-games 4997becc -->
+
+*Nueva base de datos* crea una, con su nombre escrito en el sitio; *Añadir una base de datos…* lista una carpeta de base
+de datos creada en otro sitio, y sus archivos se quedan donde están. *Importar a esta base de datos…* toma un archivo
+PGN, o un archivo `.zst`, `.gz` o `.zip` que contenga uno; un archivo soltado sobre la página va a la base de datos
+elegida, o a una nueva con su nombre, y *Pegar partidas* importa el texto PGN del portapapeles. La importación se hace
+en segundo plano con baja prioridad (un torneo que se juegue al lado no pierde tiempo), con su progreso, su velocidad y
+*Cancelar*. Las partidas ya guardadas se conservan si se detiene (cada 262.144 partidas, y al final), e importar de
+nuevo el archivo solo añade las que faltan; las partidas que ya están en la base de datos se omiten.
+
+Al final, un aviso sobre la base de datos dice lo que llegó: las partidas añadidas, las que ya estaban y las dañadas
+(una jugada que no se puede leer o es ilegal, un texto cortado, una posición inicial que no es válida), cada una
+conservada hasta esa jugada con su texto tal como estaba; *Verlas en la lista*, o un clic en una, muestra el archivo en
+su línea. Un disco lleno, una detención pedida u otro error dicen lo que se conserva y lo que hace falta, con *Reanudar
+la importación* y *Abrir la carpeta de la base de datos*. Luego se construye el árbol de aperturas de la base de datos,
+en segundo plano.
+
+Una base de datos en la que escribe otro programa (otro RookStudio que importa en ella, por ejemplo) se abre en solo
+lectura: la lista, el árbol y las búsquedas funcionan; la importación y el guardado de partidas esperan a que ese
+programa haya terminado. *Quitar de la lista* deja los archivos de una base de datos donde están.
+
+### La lista de partidas
+<!-- en: the-game-list ab35c5d5 -->
+
+La lista da de cada partida su número, sus jugadores, su Elo, su resultado, el evento, la fecha, el código ECO y la
+longitud; un clic en un encabezado la ordena. El filtro rápido de arriba acepta palabras libres: jugadores, evento, año,
+código ECO, resultado (`carlsen 2024 B90`). ↑ ↓ recorren la lista y la partida elegida se muestra al lado, en un tablero
+pequeño con sus jugadas; Intro o un doble clic la abre en la página Tablero. Millones de partidas se desplazan y se
+ordenan al instante.
+
+### Buscar
+<!-- en: searching 15418482 -->
+
+*Buscar* (Ctrl+F) abre el panel de búsqueda junto a la lista, en cuatro pestañas; la lista sigue cada criterio a medida
+que se escribe:
+
+- **Cabeceras**: un jugador y su color, el rival, el evento, los años, los códigos ECO, el Elo mínimo de ambos
+  jugadores, el resultado; *Solo partidas dañadas*;
+- **Posición**: la posición de la página Tablero, o una preparada (*Colocar las piezas…*): sus partidas se encuentran en
+  segundo plano, y las que no pueden llegar a ella (por sus peones, su material) se descartan sin reproducirlas;
+- **Material**: uno predefinido (finales de torres, sin damas, la pareja de alfiles contra alfil y caballo, una dama
+  contra dos torres) o las piezas de cada bando contadas (`2`, o `0-2`), durante un número mínimo de medias jugadas;
+- **Patrón**: piezas colocadas en el tablero con el ratón (un clic pone la pieza elegida, otro clic la quita; Mayús y un
+  clic, una casilla vacía; las demás casillas, cualquier cosa), *Las blancas solo tienen estos peones*, y tres ejemplos.
+
+Cada búsqueda da sus partidas y su tiempo; *Añadir al filtro* y *Quitar del filtro* las combinan, *Ver en la lista*
+(Intro) muestra el resultado, *Borrar todo* vuelve a empezar.
+
+*Guardar esta búsqueda…* le da un nombre a partir de sus criterios. Se guardan sus criterios, no sus partidas, para
+cualquier base de datos (sus partidas nuevas se encuentran la próxima vez); las búsquedas guardadas aparecen arriba del
+panel, donde un clic aplica sus criterios y el botón derecho renombra o elimina una, y en Ctrl+K (*Búsqueda: …*).
+
+### Torneos y archivos PGN
+<!-- en: tournaments-and-pgn-files 688ddcc2 -->
+
+Los torneos del perfil, y el archivo PGN abierto en la página Tablero, aparecen bajo *Leídas sin copia* después de tus
+bases de datos: sus partidas se listan y se buscan como las de una base de datos, y se actualizan en segundo plano al
+mostrarse (las partidas que termina un torneo, un archivo que creció o cambió). No se importan ni se eliminan.
+
+## La página Aperturas
+<!-- en: the-openings-page 651bcc49 -->
+
+Tus repertorios: cada uno es un archivo PGN del perfil (una partida y sus variantes, para las blancas o para las
+negras), que la página Tablero abre y edita como una partida (*Abrir su archivo en el tablero*). Uno está activo: la
+estrella de la pestaña Árbol le añade la jugada mostrada, o se la quita, sea cual sea el bando que juega; la primera
+estrella crea un repertorio cuando no hay ninguno. *Nuevo repertorio* crea uno con su nombre y su bando.
+
+La **cobertura** del repertorio activo se mide en tus bases de datos cuyo árbol de aperturas está construido (*Medida
+en*: un botón para cada una; un clic la quita o la vuelve a poner), en segundo plano: la proporción de las partidas que
+siguen el repertorio que encuentran respuesta hasta el final de sus líneas, o hasta la jugada 10 o 15. Siguen sus
+**huecos**, los más frecuentes primero: una jugada del rival hecha con suficiente frecuencia sin tu respuesta, o una
+línea que termina en una jugada del rival. Un clic muestra la posición, con el árbol al lado.
+
+## La página Lichess
+<!-- en: the-lichess-page ea1e19cc -->
+
+Todo aquí es opcional: RookStudio funciona sin cuenta y sin Internet, y lo que se envía a Lichess se indica donde lo
+decides.
+
+### Vincular tu cuenta
+<!-- en: linking-your-account 8b1bc649 -->
+
+*Vincular la cuenta…* abre lichess.org en el navegador, donde autorizas a RookStudio sin darle ninguna contraseña.
+Lichess devuelve el navegador a 127.0.0.1, a un puerto en el que solo escucha RookStudio mientras vincula; sin respuesta
+en 5 minutos, la vinculación se detiene sola. Si no se abre ningún navegador, se muestra la dirección, para pegarla en
+un navegador de esta máquina.
+
+Una vez vinculada, la tarjeta da el nombre de la cuenta y cuándo caduca su token (un año después; *Renovar…* un mes
+antes). RookStudio solo lee tu nombre y tus datos públicos, y pide más cuando una función lo necesita: leer las
+retransmisiones, por ejemplo. El token se guarda en tu perfil, legible solo por ti; *Desvincular* lo revoca en Lichess y
+lo borra aquí, y tus bases de datos se quedan. Una cuenta vinculada aporta el explorador de aperturas de Lichess en la
+pestaña Árbol (los maestros, todos los jugadores, un jugador), y tus partidas sincronizadas más rápido, también las
+privadas.
+
+### Las partidas de un jugador
+<!-- en: a-players-games 3d841cf1 -->
+
+*Las partidas de un jugador* importa las partidas públicas de un jugador de Lichess, tuyas o de otro, a una base de
+datos (*Lichess · nombre*), también sin cuenta: *Importar*, luego *Sincronizar* para las partidas jugadas desde
+entonces. Las partidas llegan por lotes, las más antiguas primero, y lo recibido se conserva si cancelas. *Qué se pide*:
+los ritmos (todos; blitz, rápidas y clásicas; clásicas y por correspondencia), desde cuándo (la primera partida, hace un año,
+una fecha), solo ajedrez estándar y Chess960. Las partidas conservan su enlace a lichess.org, sus relojes y las
+evaluaciones de Lichess. *Contar las partidas nuevas al abrir la página Inicio* consulta a Lichess como mucho una vez
+por hora, con el nombre del jugador.
+
+### Retransmisiones oficiales
+<!-- en: official-broadcasts a02f4c35 -->
+
+Las retransmisiones oficiales en directo, las más conocidas primero (*Todas las retransmisiones en directo* para las
+demás), y las próximas. *Seguir* abre una ronda en un mosaico en la página Lichess: la tarjeta de cada partida con los
+nombres, los relojes, la última jugada, la barra de evaluación, y la puntuación y la línea del motor elegido en
+*Análisis con*; a la derecha, la partida elegida con sus últimas jugadas, *Seguir en el tablero* y *Copiar el PGN*, y
+luego la ronda. Las partidas se analizan en tu máquina, con tu motor, tantas a la vez como permitan los núcleos que
+dejan libres los torneos, primero la partida elegida, y solo mientras se muestra el mosaico. En el tablero, la partida
+avanza con cada jugada recibida; volver atrás para analizarla la deja avanzar por detrás, y *Volver al directo* la
+recupera.
+
+Lichess permite seguir cuatro rondas a la vez sin cuenta, ocho con una. Desde agosto de 2026, ralentiza mucho una
+retransmisión seguida sin una cuenta autorizada a leer retransmisiones: la primera vez, RookStudio pide ese permiso
+(*Autorizar en Lichess…*, o *Seguir sin él*). Una ronda cuyas partidas han terminado todas pasa a la base de datos
+*Retransmisiones*.
+
+### En línea para el análisis
+<!-- en: online-for-the-analysis 991c19c9 -->
+
+Tres servicios: por cada uno se pregunta en su primer uso (para esta posición, siempre, o ahora no), y aquí se puede
+cambiar:
+
+- **La evaluación en la nube de Lichess**, en la pestaña Análisis: se envía la FEN de cada posición mostrada, sin
+  cuenta, y Lichess responde con las líneas que sus servidores ya han calculado, cuando las tiene. Tu motor responde
+  siempre.
+- **Finales en línea, hasta 7 piezas**: para una posición de siete piezas o menos que las tablas de tu disco no conocen,
+  se envía su FEN a las tablas de Lichess, sin cuenta. Dan el veredicto, el mate con el mejor juego o las jugadas antes
+  de una captura o una jugada de peón, y cada jugada con lo que deja (un clic la juega); *Ver la línea ganadora en el
+  tablero* la muestra en vista previa. Una victoria que la regla de las 50 jugadas convierte en tablas es una «cursed
+  win». Con ocho piezas y peones enfrentados, dan el veredicto y las jugadas hasta la siguiente captura.
+- **El explorador de Lichess**, en la pestaña Árbol: por cada posición se envían su FEN y el filtro elegido, con tu
+  token; necesita una cuenta vinculada. No se envía nada de tus bases de datos.
+
+Las respuestas se guardan en tu perfil: las de las tablas para siempre, las de la nube durante un mes. Cuando Lichess
+pide una pausa (demasiadas peticiones en poco tiempo), se muestra la cuenta atrás; sin conexión, se indica lo que sigue
+funcionando.
+
+## El asistente
+<!-- en: the-assistant d3ffeeba -->
+
+El asistente comenta tus partidas y responde a tus preguntas sobre ellas, en tu máquina. Se basa en lo que establecen tu
+motor, tus bases de datos y las tablas de finales, y lo dice con palabras; cuando nada lo establece, también lo dice.
+Escribe en inglés o en francés (en inglés para los demás idiomas de la interfaz).
+
+### Su modelo
+<!-- en: its-model 1e5f4544 -->
+
+El asistente necesita su modelo, *RookStudio commentary v11*, descargado una sola vez de huggingface.co (unos 2,7 GB en
+el disco, y unos 3 GB de memoria mientras funciona), verificado al llegar; una descarga cortada se reanuda donde estaba.
+Lo ofrece la primera tarjeta de la pestaña Preguntas, de *Comentar esta jugada* y de la revisión; *Un archivo GGUF del
+disco…* toma otro modelo, que responde a las preguntas pero no ha aprendido los comentarios de RookStudio (esos siguen
+siendo los de las plantillas). Solo la descarga del modelo pasa por Internet: tus partidas, tus preguntas y sus
+respuestas se quedan en la máquina.
+
+Funciona en un proceso propio, en la GPU cuando hay una disponible (un comentario en un cuarto de segundo
+aproximadamente), si no en el procesador (unos 3 segundos). Se carga con la primera pregunta o el primer comentario, y
+se libera tras un cuarto de hora sin uso, o con *Liberar* (en la página Inicio, en **Ajustes** o en Ctrl+K). Mientras un
+torneo usa la GPU, responde en el procesador (*Usar la GPU de todos modos* si quieres); un controlador gráfico que falla
+lo envía al procesador, y *Volver a probar la GPU* lo vuelve a intentar. *Ajustes* > *Asistente*: su modelo, la GPU o el
+procesador, los minutos antes de liberarlo (0: se mantiene hasta *Liberar*).
+
+Sin el modelo, todo lo demás funciona: el análisis, las cifras de la revisión, los comentarios de plantilla, el árbol.
+
+### Preguntas
+<!-- en: questions e1e09fc4 -->
+
+La pestaña Preguntas (Alt+5) acepta una pregunta sobre la posición o la partida, escrita o elegida entre las
+sugerencias: por qué la última jugada, cuál es la amenaza, la mejor jugada, quién jugó esta posición, qué apertura es
+esta. Sabe explicar una jugada, dar la mejor jugada o la amenaza, probar una jugada, comparar dos; dar las partidas de
+referencia y las jugadas que se juegan en una base de datos; nombrar la apertura; contar lo que dicen las tablas de
+finales. Cada respuesta muestra en qué se basa (la búsqueda del motor, el árbol, los nombres de las aperturas, las
+tablas) y sus acciones: jugar la jugada, mostrar la línea en vista previa, abrir la partida más fuerte, añadir la
+respuesta a la notación. A una pregunta que va más allá de lo que sabe hacer responde con un «No sabría decirlo» y lo
+que puede mostrar en su lugar.
+
+El motor de la pestaña Análisis responde por él, en un proceso propio (un hilo, 300.000 nodos por posición): las
+preguntas necesitan un motor en la biblioteca.
+
+### Los comentarios del asistente
+<!-- en: comments-by-the-assistant dea97e86 -->
+
+*Comentar esta jugada* (Alt+C, o Ctrl+K) escribe el comentario del asistente sobre la jugada mostrada, y *Comentar los
+momentos clave*, en la revisión, uno sobre cada momento clave. Sus comentarios se marcan en el PGN (`[%rs assistant]`) y
+se muestran en gris azulado y en cursiva, tras un bocadillo; con el cursor, en qué se basa cada uno: el motor, los
+hechos de las posiciones, la base de datos de la teoría, el modelo o una plantilla. Un doble clic corrige uno, y pasa a
+ser tuyo. Sin el modelo, los comentarios son plantillas, escritas a partir de los mismos hechos.
 
 ## Suites de tests
 <!-- en: test-suites 42c2b2ba -->
@@ -1193,7 +1671,7 @@ ilegales (con botones que abren esas partidas), el hash de cada motor (mostrado,
 libro de aperturas, las tablas de finales.
 
 ### Clasificación
-<!-- en: standings e4198fcd -->
+<!-- en: standings 5f5e0950 -->
 
 Puntos, partidas, pérdidas por tiempo (*TF*), victorias/tablas/derrotas, ratings con su intervalo de confianza,
 Sonneborn-Berger (Buchholz en un suizo), descansos. *Tabla* los lista con un motor por fila; *Tabla cruzada* (todos
@@ -1208,7 +1686,7 @@ luego sus rivales según sus propios puntos, cada uno con puntos, %, Elo ±, W-L
 *TF* como la clasificación del modo sin interfaz gráfica, siguen el orden elegido y terminan con una línea que da las
 partidas jugadas de las previstas, la proporción de tablas, el ritmo de juego, el libro (con las medias jugadas
 conservadas de un libro PGN; para un libro Polyglot, su profundidad y cómo se eligieron sus jugadas, p. ej. `book:Perfect2023.bin (8
-plies, moves by weight)`) y el evento. Las copias firman entonces con *fastchess-gui* y su versión, y la tabla del
+plies, moves by weight)`) y el evento. Las copias firman entonces con *RookStudio* y su versión, y la tabla del
 gauntlet usa = en lugar de - para las líneas, para que una tabla publicada en un foro se distinga de las de otros
 programas.
 
@@ -1379,47 +1857,47 @@ gráfica (`--run`): lo que usaron los motores de cada partida se escribe en `pro
 así que una reanudación lo conserva. Solo avisa; nunca decide una partida.
 
 ### Pausar, detener y reanudar
-<!-- en: pause-stop-and-resume 100c55cf -->
+<!-- en: pause-stop-and-resume f6885fa5 -->
 
 **Pausa** no inicia ningún par de partidas nuevo. Las partidas en curso se juegan hasta el final, y también la
 segunda partida de un par cuya primera partida ha empezado, así que una pausa nunca desperdicia un resultado.
 **Reanudar** continúa. **Detener** termina primero las partidas en curso, o detiene ahora (las partidas
 interrumpidas no se cuentan y se volverán a jugar).
 
-Un torneo detenido por un motor dice cuál en su cabecera y en la página de inicio, bajo *Requiere atención*:
-*Interrumpido: Alpha no pudo arrancar: …* (tras su último intento), o *Alpha se colgó o dejó de responder (partida
-12)* (sin *Reiniciar un motor que se cuelga*), con *Abrir el motor* y *Abrir el registro*.
+Un torneo detenido por un motor dice cuál en su cabecera y en la página Torneos, bajo *Requiere atención*:
+*Interrumpido: Alpha no pudo arrancar: …* (tras su último intento), o *Alpha se colgó o dejó de responder (partida 12)*
+(sin *Reiniciar un motor que se cuelga*), con *Abrir el motor* y *Abrir el registro*.
 
-**Cada torneo se reanuda exactamente donde se detuvo**, tras una detención, una ventana cerrada, un fallo o un corte
-de luz: no se pierde ninguna partida ni se juega ninguna dos veces, y un par de partidas a medio jugar se completa con
-la misma apertura y los mismos colores. *Reanudar* en la página de inicio lo continúa, con las estadísticas de las
-partidas ya jugadas: resultados, y la profundidad, el tiempo por jugada y los NPS de los motores leídos de los
-comentarios de las jugadas (los NPS solo cuando el PGN los registra, *nps* en *PGN y otros*). Cuando el programa
-terminó mientras se jugaba un torneo (un fallo, un corte de luz, un reinicio, o salir mientras se jugaba), el
-siguiente inicio lo reanuda por sí solo, y la cola continúa después: *Reanudar al iniciar el torneo que estaba en
-curso*, en **Ajustes**, activado por defecto. Un torneo en pausa o detenido te espera, y `--autostart` inicia en su
-lugar la configuración guardada. Un participante cuyo programa se recompiló o desapareció desde que se incorporó se
-nombra en la cabecera del torneo reanudado, con *Continuar* y *Pausa*: sus siguientes partidas las juega el programa
-tal como es ahora, con las opciones que le dio el torneo.
+**Cada torneo se reanuda exactamente donde se detuvo**, tras una detención, una ventana cerrada, un fallo o un corte de
+luz: no se pierde ninguna partida ni se juega ninguna dos veces, y un par de partidas a medio jugar se completa con la
+misma apertura y los mismos colores. *Reanudar* en la página Torneos lo continúa, con las estadísticas de las partidas
+ya jugadas: resultados, y la profundidad, el tiempo por jugada y los NPS de los motores leídos de los comentarios de las
+jugadas (los NPS solo cuando el PGN los registra, *nps* en *PGN y otros*). Cuando el programa terminó mientras se jugaba
+un torneo (un fallo, un corte de luz, un reinicio, o salir mientras se jugaba), el siguiente inicio lo reanuda por sí
+solo, y la cola continúa después: *Reanudar al iniciar el torneo que estaba en curso*, en **Ajustes**, activado por
+defecto. Un torneo en pausa o detenido te espera, y `--autostart` inicia en su lugar la configuración guardada. Un
+participante cuyo programa se recompiló o desapareció desde que se incorporó se nombra en la cabecera del torneo
+reanudado, con *Continuar* y *Pausa*: sus siguientes partidas las juega el programa tal como es ahora, con las opciones
+que le dio el torneo.
 
 ### Varios torneos a la vez
-<!-- en: several-tournaments-at-once df7ce566 -->
+<!-- en: several-tournaments-at-once 4914f1d0 -->
 
 Varios torneos pueden jugarse en paralelo: un gauntlet junto a un SPRT, dos gauntlets a la vez. *Iniciar* en la
 página *Nuevo torneo* inicia otro mientras se juegan otros; *Reanudar* reanuda uno junto a ellos. Cada torneo se
-juega en un proceso propio (`fastchess-gui --run <folder>` dirigido por la ventana), así que un fallo solo tumba ese
+juega en un proceso propio (`rookstudio --run <folder>` dirigido por la ventana), así que un fallo solo tumba ese
 torneo, y la ventana, sus comprobaciones de motores, sus pruebas rápidas y sus suites de tests ya no esperan a que
 termine un torneo.
 
 El espacio de trabajo tiene **una pestaña por cada torneo abierto**, encima de su cabecera: un punto mientras se juega
-(un signo de pausa mientras está en pausa), su estado bajo el cursor, una cruz para cerrar uno que no se está
-jugando. Los paneles muestran la pestaña elegida; la paleta de comandos lista las demás (*Mostrar: …*, *Pausa*,
-*Reanudar*). Un torneo terminado abierto desde la lista ocupa la pestaña de uno que solo se estaba consultando. La
-página de inicio tiene una tarjeta por cada torneo en juego, con su progreso, su líder, *Abrir* y *Pausa*, y debajo
-su **peso**, los núcleos que usan sus partidas de los que puede usar, y lo que espera su siguiente partida; la barra
-*Núcleos* de arriba muestra la parte de cada torneo (y la de la página Tablero), y cuántos núcleos comparten los
-torneos. El *Registro* muestra las líneas de un torneo, las de la ventana, o todas (cada línea de un torneo lleva su
-nombre); las líneas de un torneo también se guardan en `fastchess-gui.log` en su carpeta.
+(un signo de pausa mientras está en pausa), su estado bajo el cursor, una cruz para cerrar uno que no se está jugando.
+Los paneles muestran la pestaña elegida; la paleta de comandos lista las demás (*Mostrar: …*, *Pausa*, *Reanudar*). Un
+torneo terminado abierto desde la lista ocupa la pestaña de uno que solo se estaba consultando. La página Torneos tiene
+una tarjeta por cada torneo en juego, con su progreso, su líder, *Abrir* y *Pausa*, y debajo su **peso**, los núcleos
+que usan sus partidas de los que puede usar, y lo que espera su siguiente partida; la barra *Núcleos* de arriba muestra
+la parte de cada torneo (y la de la página Tablero), y cuántos núcleos comparten los torneos. El *Registro* muestra las
+líneas de un torneo, las de la ventana, o todas (cada línea de un torneo lleva su nombre); las líneas de un torneo
+también se guardan en `rookstudio.log` en su carpeta.
 
 **Compartir la máquina**: los torneos en juego comparten un presupuesto de núcleos, fijado en **Ajustes** (*Núcleos
 para los torneos*: los núcleos físicos menos uno por defecto). Cada uno recibe primero lo de una partida mientras el
@@ -1433,8 +1911,8 @@ torneo solo juega tantas partidas como indica su concurrencia.
 **Memoria**: una partida solo empieza cuando el `Hash` de sus dos motores, y lo que ocupa además cada proceso de motor
 (64 MB, y 8 MB por hilo), caben en lo que las partidas en juego dejan del presupuesto de memoria (*Memoria para los
 motores* en **Ajustes**, el 75 % de la memoria instalada por defecto), compartido entre los torneos. El resumen de la
-configuración dice cuántas partidas permite jugar a la vez el presupuesto, y la tarjeta *Fiabilidad* de la página de
-inicio, cuándo hay partidas esperando memoria.
+configuración dice cuántas partidas permite jugar a la vez el presupuesto, y la tarjeta *Fiabilidad* de la página
+Torneos, cuándo hay partidas esperando memoria.
 
 **GPU**: un motor marcado con *Usa una GPU* en su ficha (un motor de red neuronal como Lc0) cuenta frente a las *GPU*
 de **Ajustes**: no juegan a la vez más motores así que GPU hay, en un torneo y entre torneos, mientras las demás
@@ -1451,13 +1929,13 @@ para el torneo mostrado: para una retransmisión que continúe sin la ventana, i
 las opciones de retransmisión (consulta [Modo sin interfaz gráfica](#modo-sin-interfaz-gráfica)).
 
 ### Un motor que no arranca
-<!-- en: an-engine-that-cannot-start 765a7c61 -->
+<!-- en: an-engine-that-cannot-start 26c20dee -->
 
-Una noche desatendida no se detiene por un motor. Un motor que no arranca (un programa movido o recompilado, un
-archivo de red que falta, una unidad desaparecida) se vuelve a intentar tres veces, con 10 s de intervalo; luego sus
-partidas se apartan y las demás partidas continúan. Se vuelve a intentar cada 5 minutos, una partida cada vez, y sus
-partidas vuelven en cuanto arranca. La cabecera del torneo y la página de inicio (bajo *Requiere atención*) dicen qué
-motor, el error, y ofrecen:
+Una noche desatendida no se detiene por un motor. Un motor que no arranca (un programa movido o recompilado, un archivo
+de red que falta, una unidad desaparecida) se vuelve a intentar tres veces, con 10 s de intervalo; luego sus partidas se
+apartan y las demás partidas continúan. Se vuelve a intentar cada 5 minutos, una partida cada vez, y sus partidas
+vuelven en cuanto arranca. La cabecera del torneo y la página Torneos (bajo *Requiere atención*) dicen qué motor, el
+error, y ofrecen:
 
 - **Reintentar**: de inmediato, en lugar de en el siguiente intento (después de arreglar el programa, por ejemplo).
 - **Retirar…** y **Reemplazar…** (todos contra todos, gauntlets y encuentros por equipos): el panel de cambios de la
@@ -1523,24 +2001,24 @@ jugado partidas desde entonces o no (en una eliminatoria, cuyas rondas siguiente
 que empieza la siguiente partida); la pestaña *Partidas* también ofrece *Deshacer* junto a la partida.
 
 ### Cola y relanzamiento
-<!-- en: queue-and-relaunch 382fd33e -->
+<!-- en: queue-and-relaunch 06904b6c -->
 
-La **Cola** de la página de inicio contiene torneos que se juegan uno tras otro: cuando uno termina por sí solo,
-empieza el siguiente (no tras una detención o un error, ni mientras *Pausar todo* retiene la cola). Con *Empezar
-cuando haya núcleos libres*, el siguiente empieza junto a los que se están jugando en cuanto el presupuesto de núcleos
-supera lo que estos pueden tomar, cada uno con su concurrencia. Se pueden reordenar o quitar, e iniciar ahora el
-primero cuando no hay nada en marcha. La página de inicio indica cuándo termina el torneo en curso (*Termina hacia
-HH:MM (en …)*) y cuándo termina toda la cola, cada torneo en cola con su duración y, mientras se conozcan las
-duraciones de los anteriores, cuándo empieza; los torneos cuya duración no se puede conocer (un SPRT sin máximo, nodos
-o profundidad por jugada) se cuentan aparte.
+La **Cola** de la página Torneos contiene torneos que se juegan uno tras otro: cuando uno termina por sí solo, empieza
+el siguiente (no tras una detención o un error, ni mientras *Pausar todo* retiene la cola). Con *Empezar cuando haya
+núcleos libres*, el siguiente empieza junto a los que se están jugando en cuanto el presupuesto de núcleos supera lo que
+estos pueden tomar, cada uno con su concurrencia. Se pueden reordenar o quitar, e iniciar ahora el primero cuando no hay
+nada en marcha. La página Torneos indica cuándo termina el torneo en curso (*Termina hacia HH:MM (en …)*) y cuándo
+termina toda la cola, cada torneo en cola con su duración y, mientras se conozcan las duraciones de los anteriores,
+cuándo empieza; los torneos cuya duración no se puede conocer (un SPRT sin máximo, nodos o profundidad por jugada) se
+cuentan aparte.
 
-**Relanzar con…** en un match terminado (en su cabecera, o bajo *Últimos terminados* en la página de inicio) lo
-vuelve a jugar con otro motor A, normalmente la siguiente versión, contra el mismo motor B, con los demás ajustes del
-match (los de la página *Nuevo torneo* para un match iniciado por una versión anterior, que no los guardaba).
+**Relanzar con…** en un match terminado (en su cabecera, o bajo *Últimos terminados* en la página Torneos) lo vuelve a
+jugar con otro motor A, normalmente la siguiente versión, contra el mismo motor B, con los demás ajustes del match (los
+de la página *Nuevo torneo* para un match iniciado por una versión anterior, que no los guardaba).
 
-**Clonar** (en la cabecera de un torneo, bajo *Últimos terminados* y en *Todos los torneos* de la página de inicio)
-abre la página *Nuevo torneo* rellenada con la configuración de ese torneo, sea cual sea su formato: los participantes
-con sus propios ajustes, el ritmo de juego, las aperturas, la adjudicación y lo demás, cada valor tal como se jugó. Sus
+**Clonar** (en la cabecera de un torneo, bajo *Últimos terminados* y en *Todos los torneos* de la página Torneos) abre
+la página *Nuevo torneo* rellenada con la configuración de ese torneo, sea cual sea su formato: los participantes con
+sus propios ajustes, el ritmo de juego, las aperturas, la adjudicación y lo demás, cada valor tal como se jugó. Sus
 perfiles aparecen con su nombre, y un perfil modificado desde entonces se marca como cambiado para este torneo. Cambia
 lo que deba ser distinto (otro ritmo de juego, la siguiente versión de un motor, otro libro) y luego **Iniciar** o
 *Añadir a la cola*. Un torneo que aún se juega también se puede clonar; uno iniciado por una versión anterior, que no
@@ -1635,9 +2113,9 @@ límites de clientes y de inicios de sesión, y recibe la tabla cruzada tras cad
 no se aplica.
 
 ### Página web
-<!-- en: web-page 1d4c78b3 -->
+<!-- en: web-page bc743ffc -->
 
-Puerto TCP: una página servida por el propio fastchess-gui, para cualquier navegador de la red, de solo lectura y
+Puerto TCP: una página servida por el propio RookStudio, para cualquier navegador de la red, de solo lectura y
 actualizada cada segundo. La partida seguida (la primera en curso, o aquella en la que se hizo clic) está en el
 centro: el tablero con la última jugada, un rey en jaque, las coordenadas y las flechas; el reloj de cada jugador en
 letra grande; la evaluación de cada motor en letra grande con quién está pensando, su búsqueda en forma de recuadros
@@ -1689,15 +2167,15 @@ motores de cada equipo frente a los del otro), en `tournament.json` y `state.jso
 exportaciones conservan.
 
 ### Publicar la página web en internet
-<!-- en: putting-the-web-page-on-the-internet b19f02f8 -->
+<!-- en: putting-the-web-page-on-the-internet ec2bc274 -->
 
 La página web puede seguirse desde cualquier sitio sin abrir un puerto en el router: marca *Publicar en internet* bajo
-*Página web* en la pestaña *Retransmisión*. Mientras se juega un torneo, fastchess-gui abre un túnel SSH (libssh2,
+*Página web* en la pestaña *Retransmisión*. Mientras se juega un torneo, RookStudio abre un túnel SSH (libssh2,
 integrado en el programa) hacia un servicio de túneles, que da a la página una dirección https pública; no hace falta
 instalar nada.
 
 - *localhost.run* (la opción por defecto): gratuito, sin cuenta. Sus direcciones cambian de vez en cuando, y su
-  velocidad está limitada; la página y su estado se envían comprimidos, así que esto no importa mucho. fastchess-gui
+  velocidad está limitada; la página y su estado se envían comprimidos, así que esto no importa mucho. RookStudio
   conoce su clave de host: se rechaza una conexión a cualquier otra cosa.
 - *Otro servidor SSH*: su host, puerto y usuario, y el puerto que abre para la página (como lo pediría
   `ssh -R REMOTE_PORT:localhost:PORT user@host`; 0 le deja elegir). Solo se pueden usar servidores que dejen entrar al
@@ -1732,12 +2210,12 @@ aperturas y el archivo PGN de las partidas jugadas. Las carpetas y los archivos 
 privados. Sin interfaz gráfica:
 
 ```
-fastchess-gui --run FOLDER --tunnel                      # localhost.run, the address printed on the console
-fastchess-gui --run FOLDER --web 8080 --tunnel ssh://user@host[:port][/remote_port]
+rookstudio --run FOLDER --tunnel                      # localhost.run, the address printed on the console
+rookstudio --run FOLDER --web 8080 --tunnel ssh://user@host[:port][/remote_port]
 ```
 
 ### Dónde hablan los espectadores
-<!-- en: where-the-viewers-talk eb3ef90c -->
+<!-- en: where-the-viewers-talk e66bf5c5 -->
 
 La página no tiene chat propio; señala dónde tiene lugar la conversación. Un *Enlace del chat* bajo *Página web* (una
 invitación de Discord, un canal de Twitch, un hilo de foro; solo https, cualquier otra cosa se rechaza con un mensaje
@@ -1750,16 +2228,16 @@ un botón *Join*, no los mensajes. El propietario del servidor lo activa en Serv
 Widget»), que también muestra el ID del servidor para copiarlo (de 17 a 20 dígitos); con el Developer Mode activado,
 un clic derecho en el icono del servidor también da *Copy Server ID*. El widget se carga desde discord.com solo cuando
 un espectador abre la pestaña, y Discord ve entonces la visita de ese espectador (su dirección, su navegador, su
-sesión de Discord si la tiene); sin ID, la página no contacta con nadie más que con fastchess-gui. Los enlaces del
+sesión de Discord si la tiene); sin ID, la página no contacta con nadie más que con RookStudio. Los enlaces del
 chat y de lichess no envían nada hasta que un espectador hace clic en ellos, y entonces sin referrer. Un archivo de
 configuración ejecutado sin interfaz gráfica (`--run SETUP.json`) toma ambos de `web_chat_link` y `web_discord_id`.
 
 ## Modo sin interfaz gráfica
-<!-- en: headless-mode 3471fbb3 -->
+<!-- en: headless-mode a3cec26b -->
 
 ```
-fastchess-gui --run TOURNAMENT_FOLDER     # resume a tournament
-fastchess-gui --run SETUP.json            # create one from a setup or template file, with the profile's engines
+rookstudio --run TOURNAMENT_FOLDER     # resume a tournament
+rookstudio --run SETUP.json            # create one from a setup or template file, with the profile's engines
 ```
 
 No se abre ninguna ventana; la versión y luego el progreso se muestran en la consola, con los intentos de un motor que
@@ -1775,8 +2253,8 @@ arranca). El presupuesto de memoria y las GPU de los **Ajustes** del perfil tamb
 ventana lo muestra (se conecta a él) cuando se abre con el mismo perfil, y `--attach` se comunica con él:
 
 ```
-fastchess-gui --run FOLDER --detach         # in the background, on a local socket
-fastchess-gui --attach FOLDER               # its control channel on the standard input and output
+rookstudio --run FOLDER --detach         # in the background, on a local socket
+rookstudio --attach FOLDER               # its control channel on the standard input and output
 ```
 
 La ventana maneja cada torneo de la misma manera: `--run FOLDER --control socket` (o `--control stdio`) lo juega sin
@@ -1792,12 +2270,12 @@ entrada abierta mientras lee las respuestas.
 El torneo puede retransmitirse al mismo tiempo, como desde la pestaña *Retransmisión*:
 
 ```
-fastchess-gui --run FOLDER --tlcs 16001             # a TLCS server on UDP port 16001
-fastchess-gui --run FOLDER --tlcs 16001 --tlcs-lanes  # one port per game: 16001, 16002…
-fastchess-gui --run FOLDER --web 8080               # the web page on http://<this machine>:8080/
-fastchess-gui --run FOLDER --tunnel                # the web page on the internet (serves it too, --web's port or 8080)
-fastchess-gui --run FOLDER --live-files [DIR]       # live.pgn, standings.html, tournament.json ("live" by default)
-fastchess-gui --run FOLDER --lichess new            # a new lichess broadcast; or --lichess ROUND_URL|ROUND_ID
+rookstudio --run FOLDER --tlcs 16001             # a TLCS server on UDP port 16001
+rookstudio --run FOLDER --tlcs 16001 --tlcs-lanes  # one port per game: 16001, 16002…
+rookstudio --run FOLDER --web 8080               # the web page on http://<this machine>:8080/
+rookstudio --run FOLDER --tunnel                # the web page on the internet (serves it too, --web's port or 8080)
+rookstudio --run FOLDER --live-files [DIR]       # live.pgn, standings.html, tournament.json ("live" by default)
+rookstudio --run FOLDER --lichess new            # a new lichess broadcast; or --lichess ROUND_URL|ROUND_ID
 ```
 
 `--lichess` toma el token de la variable de entorno `FCG_LICHESS_TOKEN`, o el del perfil.
@@ -1815,7 +2293,7 @@ Otros ordenadores en los que jugar torneos: una máquina de pruebas, un servidor
 programa no guarda nada secreto.
 
 ### Añadir una máquina
-<!-- en: adding-a-machine f1f15823 -->
+<!-- en: adding-a-machine 6415de10 -->
 
 *Añadir una máquina*, y luego, en su ficha:
 
@@ -1827,24 +2305,24 @@ programa no guarda nada secreto.
   ningún sitio. La máquina debe conocer la clave: su mitad pública (`id_ed25519.pub`) va en `~/.ssh/authorized_keys`
   en la máquina (`ssh-copy-id user@host` la pone ahí), o, para un administrador de una máquina Windows, en
   `C:\ProgramData\ssh\administrators_authorized_keys`;
-- *Carpeta allí*: la carpeta de fastchess-gui en la máquina, para el programa, sus torneos, libros y tablas de
-  finales, relativa a la carpeta personal del usuario (`fastchess-gui` por defecto) o absoluta (`/srv/fcg`,
+- *Carpeta allí*: la carpeta de RookStudio en la máquina, para el programa, sus torneos, libros y tablas de
+  finales, relativa a la carpeta personal del usuario (`rookstudio` por defecto) o absoluta (`/srv/fcg`,
   `D:\fcg`);
 - *Presupuesto*: los núcleos y la memoria que pueden usar a la vez los torneos de la máquina; 0 toma lo que encontró
   la prueba, todos los hilos menos uno y el 80 % de la memoria.
 
 *Probar la conexión* inicia sesión y luego indica el sistema de la máquina, sus hilos, su memoria, el espacio libre
-donde está su carpeta, y si fastchess-gui está instalado allí, y en qué versión. La primera conexión muestra la clave
+donde está su carpeta, y si RookStudio está instalado allí, y en qué versión. La primera conexión muestra la clave
 de host de la máquina (su huella SHA256) y confía en ella a partir de entonces (`known_hosts.json` en el perfil, el
 mismo que el del túnel de la retransmisión). Cuando la clave cambia más tarde, no se envía nada y la ficha lo indica,
 con *Confiar en la nueva clave* para una máquina que se reinstaló. Cada fallo nombra la máquina y qué hacer: el host
 al que no se puede llegar, una clave que la máquina rechaza (y adónde va su mitad pública), una frase de contraseña
 incorrecta, ningún agente en ejecución.
 
-*Instalar fastchess-gui* (*Actualizar fastchess-gui* una vez que está allí) copia el programa a la carpeta de la
-máquina por SFTP, y luego comprueba que arranca allí (`fastchess-gui --version`). Copia este programa cuando la
+*Instalar RookStudio* (*Actualizar RookStudio* una vez que está allí) copia el programa a la carpeta de la
+máquina por SFTP, y luego comprueba que arranca allí (`rookstudio --version`). Copia este programa cuando la
 máquina usa el mismo sistema (de Linux x86-64 a Linux x86-64); para otro, una máquina Windows desde Linux por
-ejemplo, descarga la versión publicada para ese sistema y elige su programa en la ficha (*fastchess-gui para Windows
+ejemplo, descarga la versión publicada para ese sistema y elige su programa en la ficha (*RookStudio para Windows
 x86_64*). Una copia cortada por la red se reanuda donde se detuvo.
 
 ### Motores en una máquina
@@ -1905,34 +2383,34 @@ no empieza en una máquina sin su libro; las tablas de finales que faltan son un
 se las arreglan sin ellas).
 
 ### Un torneo en una máquina
-<!-- en: a-tournament-on-a-machine 8f918d9a -->
+<!-- en: a-tournament-on-a-machine f5d4c423 -->
 
 En la configuración, *Jugar en* (en *Concurrencia*) elige dónde se juega el torneo: *Este ordenador*, o una máquina.
-*Iniciar* lo prepara entonces allí: fastchess-gui debe estar instalado allí en esta versión (si no, *Actualizar
-fastchess-gui*), cada motor debe tener su ruta en la máquina (si no, el inicio ofrece *Copiar \<motor\> a
+*Iniciar* lo prepara entonces allí: RookStudio debe estar instalado allí en esta versión (si no, *Actualizar
+RookStudio*), cada motor debe tener su ruta en la máquina (si no, el inicio ofrece *Copiar \<motor\> a
 \<máquina\>…*), y los libros de la configuración deben estar en su carpeta de libros (si no, el inicio dice cuál
 falta, y *Enviar los archivos que faltan* lo pone allí); las tablas de finales que faltan solo son un aviso. El torneo
 recibe su carpeta en `tournaments/` de la carpeta de la máquina, con los motores, libros y tablas de finales en sus
-rutas de allí, y su proceso se inicia allí fuera de la sesión SSH (`fastchess-gui --run <folder> --detach`): se juega
+rutas de allí, y su proceso se inicia allí fuera de la sesión SSH (`rookstudio --run <folder> --detach`): se juega
 pase lo que pase con la ventana o la red. La ventana lo sigue como un torneo de este ordenador: Directo, Partidas, la
 clasificación, la pausa, la detención y los cambios, a través del canal de control de su proceso
-(`fastchess-gui --attach <folder>` por SSH).
+(`rookstudio --attach <folder>` por SSH).
 
-Su tarjeta en la página de inicio dice *En \<máquina\>*, y *Conectando con \<máquina\>…* mientras la conexión está
+Su tarjeta en la página Torneos dice *En \<máquina\>*, y *Conectando con \<máquina\>…* mientras la conexión está
 cortada: la ventana se vuelve a conectar sola, un poco más tarde tras cada fallo, y retoma los eventos donde se detuvo
 su copia. El diario y los archivos PGN se copian de vuelta a la carpeta del torneo de aquí a medida que crecen, cada
-pocos segundos, para que Clasificaciones, las exportaciones y la lista de comprobación del envío los lean; la carpeta
-de la máquina sigue siendo la referencia (`machine.json`, aquí, dice qué máquina y qué carpeta). Cerrar la ventana lo
-deja jugándose allí; el siguiente inicio lo vuelve a mostrar. *Reanudar* un torneo interrumpido de una máquina lo
-reanuda allí. El presupuesto de la máquina (sus núcleos y su memoria) lo comparten sus propios torneos, aparte de los
-de este ordenador. Un torneo se juega en una sola máquina: sus partidas no se reparten entre varias.
+pocos segundos, para que Clasificaciones, las exportaciones y la lista de comprobación del envío los lean; la carpeta de
+la máquina sigue siendo la referencia (`machine.json`, aquí, dice qué máquina y qué carpeta). Cerrar la ventana lo deja
+jugándose allí; el siguiente inicio lo vuelve a mostrar. *Reanudar* un torneo interrumpido de una máquina lo reanuda
+allí. El presupuesto de la máquina (sus núcleos y su memoria) lo comparten sus propios torneos, aparte de los de este
+ordenador. Un torneo se juega en una sola máquina: sus partidas no se reparten entre varias.
 
 Una máquina necesita un servidor OpenSSH (Linux, macOS, BSD; Windows 10 1809 y posteriores), con una clave de host RSA
 y SFTP, ambos presentes por defecto. Los comandos pasan por `sh` sea cual sea el shell del usuario (fish o csh no son
 un problema), y por cmd en Windows, el shell por defecto de su servidor OpenSSH.
 
 ### Motores jugados desde este ordenador
-<!-- en: engines-played-from-this-computer 8c14dc16 -->
+<!-- en: engines-played-from-this-computer 785e6bae -->
 
 Un motor de la biblioteca puede ejecutarse en una máquina mientras el torneo se juega aquí: un motor de GPU en la
 máquina con GPU, un motor compilado para otro sistema, una máquina reservada para un motor. En su ficha, *Se ejecuta en*
@@ -1950,7 +2428,7 @@ pide una vez por sesión, antes de la primera lectura o del inicio, y se queda e
 recibe de la ventana y la conserva, para que el torneo siga jugándose después de cerrar la ventana. `--run` en un
 terminal no la pide: usa allí el agente SSH.
 
-Cada motor se inicia a través de un intermediario, `fastchess-gui --remote-engine <key>`, que atiende el proceso que lo
+Cada motor se inicia a través de un intermediario, `rookstudio --remote-engine <key>`, que atiende el proceso que lo
 hace jugar: una conexión SSH a la máquina para diez motores como máximo (el `MaxSessions` de un servidor OpenSSH), y
 cada motor se inicia desde su carpeta allí. Un motor cuyo intermediario desaparece también se detiene allí, por su
 identificador de proceso, cuando no se detiene por sí solo (en una máquina Linux o macOS; en una de Windows, se cierra
@@ -1962,8 +2440,8 @@ si no hay incremento, con *Fijar un margen de … ms* (el doble del tiempo de id
 impide el inicio, igual que un torneo que se juega en una máquina distinta de la del motor (uno que se juega en la
 máquina del motor lo juega allí como un motor propio).
 
-Mientras se juega el torneo, la página de inicio tiene una línea *Máquinas* bajo los núcleos: cada máquina, conectada y
-lo que juega allí, o desde cuándo no responde. Una máquina que no responde es una sola entrada bajo *Requiere atención*:
+Mientras se juega el torneo, la página Torneos tiene una línea *Máquinas* bajo los núcleos: cada máquina, conectada y lo
+que juega allí, o desde cuándo no responde. Una máquina que no responde es una sola entrada bajo *Requiere atención*:
 las partidas de sus motores se apartan y se vuelven a intentar, las demás siguen, con *Reintentar* y *Probar
 \<máquina\>*. Una partida que un motor perdió porque se cortó su conexión (su final registrado como desconexión) se
 anula y se vuelve a jugar, anotada en el diario con su motivo (`connection to its machine lost: <machine>`);
@@ -1972,7 +2450,7 @@ sus motores apartados. Los núcleos, la memoria y las GPU de este ordenador no c
 intermediarios; el presupuesto de la máquina, que comparten sus propios torneos, aún no los cuenta.
 
 ### Una máquina Windows
-<!-- en: a-windows-machine 58ae029a -->
+<!-- en: a-windows-machine cd5493d1 -->
 
 Windows 10 (1809 y posteriores) y Windows 11 incluyen un servidor OpenSSH, que no se instala por defecto. En
 PowerShell, como administrador:
@@ -1992,24 +2470,24 @@ indican por sus SID, que son los mismos en todos los idiomas de Windows):
 icacls C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r /grant "*S-1-5-32-544:F" /grant "*S-1-5-18:F"
 ```
 
-Mantén cmd como shell del servidor: fastchess-gui habla cmd, no PowerShell (si se fijó un valor `DefaultShell` bajo
-`HKEY_LOCAL_MACHINE\SOFTWARE\OpenSSH`, elimínalo). En la ficha de la máquina, elige el `fastchess-gui.exe` de la
-versión para Windows, y luego *Instalar fastchess-gui*.
+Mantén cmd como shell del servidor: RookStudio habla cmd, no PowerShell (si se fijó un valor `DefaultShell` bajo
+`HKEY_LOCAL_MACHINE\SOFTWARE\OpenSSH`, elimínalo). En la ficha de la máquina, elige el `rookstudio.exe` de la
+versión para Windows, y luego *Instalar RookStudio*.
 
 ## Archivos
-<!-- en: files 837f3661 -->
+<!-- en: files d79e45d8 -->
 
-Todo se guarda en la carpeta del perfil: `~/.local/share/fastchess/fastchess-gui/` en Linux,
-`%APPDATA%\fastchess\fastchess-gui\` en Windows, `~/Library/Application Support/fastchess/fastchess-gui/` en macOS.
+Todo se guarda en la carpeta del perfil: `~/.local/share/rookstudio/` en Linux,
+`%APPDATA%\rookstudio\` en Windows, `~/Library/Application Support/rookstudio/` en macOS.
 Los archivos que crea el programa no pueden modificarlos otros usuarios, y `settings.json` solo lo puede leer su
 propietario en cuanto contiene un token de lichess. **Ajustes** muestra la carpeta del perfil, con *Abrir la
 carpeta*.
 
 ### Modo portátil
-<!-- en: portable-mode 29ddbe3b -->
+<!-- en: portable-mode 228dba26 -->
 
-Con un archivo llamado `portable` (vacío, sin extensión) junto al programa (junto a `fastchess-gui.exe` o
-`fastchess-gui`, junto a `fastchess-gui.app` en macOS), el perfil pasa a ser la carpeta `data` junto al programa, y la
+Con un archivo llamado `portable` (vacío, sin extensión) junto al programa (junto a `rookstudio.exe` o
+`rookstudio`, junto a `RookStudio.app` en macOS), el perfil pasa a ser la carpeta `data` junto al programa, y la
 carpeta de torneos por defecto es `data/runs`: no se escribe nada en ningún otro sitio, salvo en las carpetas
 elegidas para torneos, exportaciones y similares. Las rutas de lo que está en la carpeta del programa (motores,
 libros, tablas de finales, suites de tests, los archivos PGN de las clasificaciones y de la configuración, las
@@ -2022,7 +2500,7 @@ primero la cuarentena (consulta el README): si no, macOS ejecuta la aplicación 
 el archivo `portable`.
 
 ### La carpeta del perfil
-<!-- en: the-profile-folder 91838f38 -->
+<!-- en: the-profile-folder e39d5884 -->
 
 - `engines.json`: la biblioteca de motores, y `engines.json.bak` su versión anterior, que se lee si se pierde el
   primero;
@@ -2031,7 +2509,7 @@ el archivo `portable`.
 - `book-cache/`: los libros PGN convertidos en libros Polyglot para los libros propios de los participantes (se
   eliminan tras 30 días sin uso);
 - `layout.ini`: la disposición de la ventana y los paneles del espacio de trabajo; `layouts.json`: las disposiciones
-  guardadas con nombre; `fastchess-gui.log`: el registro de la última sesión;
+  guardadas con nombre; `rookstudio.log`: el registro de la última sesión;
 - `suite.json`: la última configuración de la página Suites; `suites/<suite>-<date>.json`: las ejecuciones de suites
   de tests terminadas;
 - `board.json`: los ajustes del análisis y de las partidas de la página Tablero; `analyses/*.json`: las partidas
@@ -2049,10 +2527,17 @@ el archivo `portable`.
 - `running.json`: los torneos que se están jugando ahora, con sus pesos, cada uno eliminado cuando se detiene; si se
   encuentra al iniciar, indica qué volver a mostrar (un torneo que siguió jugándose sin la ventana) o qué reanudar;
 - `runs/`: los torneos, salvo que se eligiera otra carpeta (consulta [La carpeta de un
-  torneo](#la-carpeta-de-un-torneo)).
+  torneo](#la-carpeta-de-un-torneo));
+- `databases.json`: tus bases de datos, y `databases/` las carpetas de las creadas aquí (`Name.fcgdb`); `searches.json`:
+  las búsquedas guardadas; `repertoires/`: tus repertorios, un archivo PGN cada uno;
+- `recent.json`: la partida de la página Tablero y las partidas recientes, con sus cambios sin guardar;
+- `engines/`: los motores populares descargados, cada versión en una carpeta propia;
+- `assistant.json`: los ajustes del asistente, y `models/` su modelo;
+- `lichess-account.json`: la cuenta de Lichess vinculada, sus permisos y su token (un archivo legible solo por ti);
+  `lichess-cache/`: las respuestas de las tablas y de la nube de Lichess.
 
 ### La carpeta de un torneo
-<!-- en: a-tournaments-folder 76959723 -->
+<!-- en: a-tournaments-folder 2189632d -->
 
 `runs/<date>_<A>_vs_<B>/` para un match, `runs/<date>_<name>/` para un torneo (en `runs/` o en la carpeta elegida),
 una carpeta para cada uno, que se puede mover, copiar, comprimir en zip y enviar:
@@ -2079,7 +2564,7 @@ una carpeta para cada uno, que se puede mover, copiar, comprimir en zip y enviar
 - `lichess.json`: la retransmisión y la ronda de lichess a las que fueron sus partidas (sin token);
 - `processor.tsv`: el tiempo de procesador que usaron los motores de cada partida, para el *Uso del procesador* de un
   torneo reanudado;
-- `fastchess-gui.log`: el registro de los procesos que lo jugaron (cada torneo se juega en un proceso propio);
+- `rookstudio.log`: el registro de los procesos que lo jugaron (cada torneo se juega en un proceso propio);
   `control.json`, mientras uno lo juega: dónde está su socket local (`control.sock` en la carpeta, o en la carpeta de
   ejecución del usuario cuando esa ruta es demasiado larga; una tubería con nombre en Windows), y qué proceso escucha;
 - `logs/game-N.log`: cada línea intercambiada con ambos motores durante la partida N (el número mostrado en la
@@ -2098,21 +2583,20 @@ ser un archivo `.pgn` (otro nombre se ignora, con un aviso), y una carpeta cuyo 
 bloqueo son enlaces simbólicos no se abre para escritura, así que no puede hacer que el programa escriba fuera de
 ella. Reanudarla ejecuta los motores que nombra su `tournament.json`, como hace cualquier torneo.
 
-Los matches jugados con la versión 0.2 aparecen en la página de inicio: *Importarlas* los convierte en torneos
-terminados.
+Los matches jugados con la versión 0.2 aparecen en la página Torneos: *Importarlas* los convierte en torneos terminados.
 
 ## Línea de comandos
-<!-- en: command-line bba4b98e -->
+<!-- en: command-line ab7d1780 -->
 
 ```
-fastchess-gui [--profile DIR] [--autostart] [--size WxH] [--software]
-              [--shot FILE.png[@WINDOW[@SECONDS]]]... [--select-game N] [--focus WINDOW]
-              [--quit-after SECONDS]
-fastchess-gui [--profile DIR] --run TOURNAMENT_FOLDER|SETUP.json [--tlcs UDP_PORT [--tlcs-lanes]]
-              [--web TCP_PORT] [--tunnel [localhost.run|ssh://USER@HOST[:PORT][/REMOTE_PORT]]] [--live-files [DIR]] [--lichess ROUND_URL|ROUND_ID|new]
-              [--control stdio|socket] [--detach] [--allowance THREADS:MEMORY_MB:GPUS:ONE]
-fastchess-gui --attach TOURNAMENT_FOLDER
-fastchess-gui --version
+rookstudio [--profile DIR] [--autostart] [--size WxH] [--software]
+           [--shot FILE.png[@WINDOW[@SECONDS]]]... [--select-game N] [--focus WINDOW]
+           [--quit-after SECONDS]
+rookstudio [--profile DIR] --run TOURNAMENT_FOLDER|SETUP.json [--tlcs UDP_PORT [--tlcs-lanes]]
+           [--web TCP_PORT] [--tunnel [localhost.run|ssh://USER@HOST[:PORT][/REMOTE_PORT]]] [--live-files [DIR]] [--lichess ROUND_URL|ROUND_ID|new]
+           [--control stdio|socket] [--detach] [--allowance THREADS:MEMORY_MB:GPUS:ONE]
+rookstudio --attach TOURNAMENT_FOLDER
+rookstudio --version
 ```
 
 - `--profile DIR` usa otra carpeta de perfil;
@@ -2228,7 +2712,7 @@ fastchess-gui --version
 la versión, el sistema y las últimas líneas del registro (consulta [Informar de un problema](#informar-de-un-problema)).
 
 ## Glosario
-<!-- en: glossary 0386d0d9 -->
+<!-- en: glossary 7cb8fba3 -->
 
 - **Adjudicación**: terminar una partida antes del mate cuando su resultado está claro: tablas cuando ambas
   puntuaciones se mantienen cerca de 0, derrota cuando se mantienen muy por debajo, o lo que digan las tablas de
@@ -2245,6 +2729,8 @@ la versión, el sistema y las últimas líneas del registro (consulta [Informar 
 - **Ciclo**: en un todos contra todos, cada emparejamiento jugado una vez con cada color (cutechess lo llama ronda, de
   2 partidas por encuentro).
 - **Concurrencia**: el número de partidas jugadas a la vez.
+- **Cursed win**: una posición que las tablas de finales cuentan como ganada, pero cuyo mate requiere más jugadas de las
+  que permite la regla de las 50 jugadas: tablas en una partida jugada con esa regla.
 - **ECO**: los códigos de la Encyclopaedia of Chess Openings, de A00 a E99.
 - **Elo, nElo**: la diferencia de rating que representa una puntuación. El nElo (Elo normalizado) divide por la
   dispersión de los resultados, para que su valor no dependa de la proporción de tablas; fishtest y OpenBench
@@ -2260,12 +2746,15 @@ la versión, el sistema y las últimas líneas del registro (consulta [Informar 
 - **LOS**: la probabilidad de superioridad (likelihood of superiority), la probabilidad de que un motor sea más fuerte
   que otro, según sus partidas.
 - **MultiPV**: un motor que busca varias líneas a la vez.
+- **Novedad**: la primera jugada de una partida que ninguna partida de la base de datos había jugado en esa posición.
 - **Pentanomial**: los resultados de los pares de partidas contados por su total: 0, ½, 1, 1½ o 2 puntos. Da barras de
   error más estrechas que contar partidas sueltas, ya que las dos partidas de un par comparten apertura.
 - **PGN**: el formato de texto de las partidas de ajedrez: etiquetas como `[White "…"]`, y luego las jugadas.
 - **Polyglot**: el formato binario de libros de aperturas (`.bin`) que leen la mayoría de los programas, con un peso
   para cada jugada.
-- **Ponder**: pensar durante el tiempo del rival; desactivado en los torneos de fastchess-gui.
+- **Ponder**: pensar durante el tiempo del rival; desactivado en los torneos de RookStudio.
+- **Repertorio**: las aperturas que uno juega, con una jugada elegida para su bando en cada posición, y las jugadas del
+  rival respondidas.
 - **SPRT**: el test secuencial de razón de probabilidades (sequential probability ratio test), que juega partidas
   hasta poder decir, con las tasas de error elegidas (alpha, beta), si un motor gana elo1 o más (H1) o no más de elo0
   (H0).

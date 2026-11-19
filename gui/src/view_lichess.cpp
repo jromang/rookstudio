@@ -14,6 +14,7 @@
 
 #include "app.hpp"
 #include "console.hpp"
+#include "guide.hpp"
 #include "https.hpp"
 #include "i18n.hpp"
 #include "lichess_account.hpp"
@@ -200,7 +201,7 @@ void App::drawLichessHomeCard() {
         const auto facts = shelf().facts(*base);
         auto line        = trf("Lichess · {}: {}", lichess_.player, ui::exactCount(facts.games));
         if (facts.changed) line += " · " + trf("synced {}", ui::dayText(facts.changed));
-        // The new games, counted when the home opens, at most once an hour, if the user chose it (M4, board 3).
+        // The new games, counted when the Home page opens, at most once an hour, if the user chose it (M4, board 3).
         if (lichess_.count_new && !lichess_sync_) {
             const auto now = std::chrono::steady_clock::now();
             if (!lichess_count_job_.valid() &&
@@ -298,7 +299,7 @@ void App::drawLichessScopeAsk() {
     ImGui::PushTextWrapPos();
     ImGui::TextUnformatted(TR("Lichess asks for one more permission"));
     if (ask.follow)
-        ImGui::TextDisabled("%s", trf("to follow « {} · {} »", ask.follow->tour.name, ask.follow->round.name).c_str());
+        ImGui::TextDisabled("%s", trf("to follow “{} · {}”", ask.follow->tour.name, ask.follow->round.name).c_str());
     ImGui::TextUnformatted(
         TR("Since August 2026, Lichess lets broadcasts be followed with an account allowed to read "
            "studies and broadcasts; without it, it slows them down heavily and may stop them."));
@@ -365,11 +366,12 @@ void App::drawLichessAccount() {
         if (ImGui::SmallButton(TR("Cancel")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) *lichess_link_->cancel = true;
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("Esc"));
-        ImGui::TextDisabled("%s", TR("Lichess sends the browser back to 127.0.0.1, a port only RookStudio listens on "
-                                     "while it links. Without an answer in 5 minutes, the link stops by itself."));
+        ImGui::TextDisabled("%s",
+                            TR("Lichess sends the browser back to 127.0.0.1, on a port only RookStudio listens on "
+                               "while it links. Without an answer in 5 minutes, the link stops by itself."));
     } else if (lichess_account_) {
         const auto& a = *lichess_account_;
-        ImGui::TextUnformatted(trf("{} linked", a.username).c_str());
+        ImGui::TextUnformatted(trf("Linked as {}", a.username).c_str());
         if (a.expires > 0) {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", trf("· the token lasts until {}", dateText(a.expires)).c_str());
@@ -460,7 +462,7 @@ void App::drawLichessGames() {
                 .c_str());
         if (ImGui::SmallButton(TR("Cancel"))) *lichess_sync_->cancel = true;
         ImGui::TextDisabled("%s", TR("The games come by batches, the oldest first; what was received stays if you "
-                                     "cancel (R18)."));
+                                     "cancel."));
     } else {
         ImGui::BeginDisabled(player.empty());
         const auto* label = base ? TR("Sync") : TR("Import");
@@ -513,7 +515,7 @@ void App::drawLichessGames() {
         ImGui::SameLine();
         changed |= ImGui::RadioButton(TR("The first game"), &lichess_.sync_since, 0);
         ImGui::SameLine();
-        changed |= ImGui::RadioButton(TR("A year"), &lichess_.sync_since, 1);
+        changed |= ImGui::RadioButton(TR("A year ago"), &lichess_.sync_since, 1);
         ImGui::SameLine();
         changed |= ImGui::RadioButton(TR("A date"), &lichess_.sync_since, 2);
         if (lichess_.sync_since == 2) {
@@ -531,7 +533,7 @@ void App::drawLichessGames() {
         ImGui::TextDisabled("%s", TR("Variants: standard chess and Chess960."));
         ImGui::TextDisabled("%s", TR("They apply to the games to come: a sync asks for what follows the last game "
                                      "received."));
-        if (ImGui::Checkbox(TR("Count the new games when the home opens"), &lichess_.count_new)) {
+        if (ImGui::Checkbox(TR("Count the new games when the Home page opens"), &lichess_.count_new)) {
             changed          = true;
             lichess_counted_ = {};
         }
@@ -564,9 +566,26 @@ void App::drawLichessBroadcasts() {
                 live ? IM_COL32(209, 74, 59, 255) : IM_COL32(201, 206, 214, 255));
             ImGui::Dummy(ImVec2(px(12), 0));
             ImGui::SameLine();
-            ImGui::TextUnformatted(e.tour.name.c_str());
+            // A long event's name is cut with "…", so that its round and Follow stay on the row.
+            const auto tag    = live ? trf("live · {}", e.round.name) : e.round.name;
+            const auto& style = ImGui::GetStyle();
+            const float room = ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(tag.c_str()).x -
+                               ImGui::CalcTextSize(TR("Follow")).x - style.FramePadding.x * 2 - style.ItemSpacing.x * 2;
+            std::string name = e.tour.name;
+            if (ImGui::CalcTextSize(name.c_str()).x > room) {
+                while (!name.empty() && ImGui::CalcTextSize((name + "…").c_str()).x > room) {
+                    name.pop_back();
+                    while (!name.empty() && (static_cast<unsigned char>(name.back()) & 0xC0) == 0x80) name.pop_back();
+                    if (!name.empty() && static_cast<unsigned char>(name.back()) >= 0xC0) name.pop_back();
+                }
+                name += "…";
+                ImGui::TextUnformatted(name.c_str());
+                ImGui::SetItemTooltip("%s", e.tour.name.c_str());
+            } else {
+                ImGui::TextUnformatted(name.c_str());
+            }
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", (live ? trf("live · {}", e.round.name) : e.round.name).c_str());
+            ImGui::TextDisabled("%s", tag.c_str());
             ImGui::SameLine();
             if (ImGui::SmallButton(TR("Follow"))) followBroadcast(e);
             ImGui::PopID();
@@ -587,10 +606,10 @@ void App::drawLichessBroadcasts() {
         if (b.value->active.empty() && b.value->upcoming.empty())
             ImGui::TextDisabled("%s", TR("No official broadcast now."));
     }
-    ImGui::TextDisabled("%s",
-                        TR("Follow opens the round in the Live mosaic, each game analysed by your engine, on your "
-                           "machine. Lichess limits the rounds followed at once: 4 without an account, 8 with "
-                           "one."));
+    ImGui::TextDisabled(
+        "%s", TR("Follow opens the round in a mosaic on this page, each game analysed by your engine, on your "
+                 "machine. Lichess limits the rounds followed at once: 4 without an account, 8 with "
+                 "one."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }
@@ -688,7 +707,7 @@ void App::drawLichessFollowed() {
         followed_rounds_[*stop].follower->stop();
         followed_rounds_.erase(followed_rounds_.begin() + static_cast<std::ptrdiff_t>(*stop));
     }
-    ImGui::TextDisabled("%s", TR("The moves come from Lichess's stream, opened again after a break (R6)."));
+    ImGui::TextDisabled("%s", TR("The moves come from Lichess's stream, opened again after a break."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }
@@ -715,8 +734,8 @@ void App::drawLichessOnline() {
             TR("Sent for each position shown: its FEN, without an account. Lichess answers with the lines its servers "
                "have already computed, when it has them; your engine always answers."));
     service("tablebase", TR("Endgames online, up to 7 pieces"), lichess_.tablebase,
-            TR("Sent for a position of 7 pieces or fewer: its FEN, without an account. Beyond the tables on your "
-               "disk."));
+            TR("Sent for a position of 7 pieces or fewer that the tables on your disk do not know: its FEN, "
+               "without an account."));
     bool explorer = lichess_.explorer;
     ImGui::BeginDisabled(!lichess_account_);
     if (ImGui::Checkbox(TR("Lichess's explorer, in the Tree tab"), &explorer)) {
@@ -742,7 +761,7 @@ void App::drawLichessPage() {
     }
     ImGui::PushTextWrapPos();
     ImGui::TextDisabled("%s", TR("Everything here is optional: RookStudio works without an account and without the "
-                                 "Internet (R15). What goes to Lichess is said where you decide it (R16)."));
+                                 "Internet. What goes to Lichess is said where you decide it."));
     ImGui::PopTextWrapPos();
     ImGui::Dummy(ImVec2(0, px(6)));
     if (lichess_scope_ask_ && lichess_account_) {
@@ -753,19 +772,31 @@ void App::drawLichessPage() {
     const bool two    = avail > px(900);
     const float col   = two ? (avail - px(14)) / 2 : avail;
     ImGui::BeginChild("##lichess_left", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);
-    drawLichessAccount();
+    {
+        ui::TopicRegion topic(guide::topics::LichessLink);
+        drawLichessAccount();
+    }
     ImGui::Dummy(ImVec2(0, px(8)));
-    drawLichessGames();
+    {
+        ui::TopicRegion topic(guide::topics::LichessGames);
+        drawLichessGames();
+    }
     ImGui::EndChild();
     if (two) ImGui::SameLine(0, px(14));
     ImGui::BeginChild("##lichess_right", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);
-    drawLichessBroadcasts();
-    ImGui::Dummy(ImVec2(0, px(8)));
-    if (!followed_rounds_.empty()) {
-        drawLichessFollowed();
+    {
+        ui::TopicRegion topic(guide::topics::LichessBroadcasts);
+        drawLichessBroadcasts();
         ImGui::Dummy(ImVec2(0, px(8)));
+        if (!followed_rounds_.empty()) {
+            drawLichessFollowed();
+            ImGui::Dummy(ImVec2(0, px(8)));
+        }
     }
-    drawLichessOnline();
+    {
+        ui::TopicRegion topic(guide::topics::LichessOnline);
+        drawLichessOnline();
+    }
     ImGui::EndChild();
 }
 

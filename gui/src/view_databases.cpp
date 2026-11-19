@@ -21,6 +21,7 @@
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "console.hpp"
+#include "guide.hpp"
 #include "i18n.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
@@ -87,7 +88,7 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
         const auto facts = s.facts(index);
         db_message_      = s.import() ? TR("An import runs already: one at a time.")
                            : facts.read_only
-                               ? trf("« {} » is read-only while another program writes to it: import into it once it "
+                               ? trf("“{}” is read-only while another program writes to it: import into it once it "
                                      "has finished.",
                                      s.entries()[static_cast<std::size_t>(index)].name)
                                : facts.error;
@@ -162,12 +163,12 @@ void App::pollDatabases() {
                         else if (damage.move.empty())
                             why = trf("its text stops there; kept up to move {}", kept);
                         else if (damage.cut)
-                            why = trf("its text is cut in « {}{}{} »; kept up to move {}", game.plies / 2 + 1,
+                            why = trf("its text is cut in “{}{}{}”; kept up to move {}", game.plies / 2 + 1,
                                       game.plies % 2 ? "…" : ".", damage.move, kept);
                         else if (kept == 0)
-                            why = trf("« {}.{} » is not a legal move; kept without its moves", 1, damage.move);
+                            why = trf("“{}.{}” is not a legal move; kept without its moves", 1, damage.move);
                         else
-                            why = trf("« {}{}{} » is not a legal move; kept up to move {}", game.plies / 2 + 1,
+                            why = trf("“{}{}{}” is not a legal move; kept up to move {}", game.plies / 2 + 1,
                                       game.plies % 2 ? "…" : ".", damage.move, kept);
                         uint64_t line  = 0;
                         const auto key = snap->key(id);
@@ -274,7 +275,7 @@ void App::drawFileLines() {
         v.ready = true;
     }
     ui::beginCard("db_file_lines");
-    ImGui::TextUnformatted(trf("« {} », from line {}", v.file.filename().string(), ui::exactCount(v.line)).c_str());
+    ImGui::TextUnformatted(trf("“{}”, from line {}", v.file.filename().string(), ui::exactCount(v.line)).c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Open the file"))) ui::openPath(v.file);
     if (ImGui::IsItemHovered())
@@ -313,7 +314,7 @@ void App::drawFileLines() {
         ImGui::EndChild();
         if (marked >= 0)
             ImGui::TextDisabled("%s", (v.move.empty() ? std::string(TR("Marked: the start position that is not one."))
-                                                      : trf("Marked: the line of « {} ».", v.move))
+                                                      : trf("Marked: the line of “{}”.", v.move))
                                           .c_str());
     }
     ui::endCard();
@@ -323,7 +324,7 @@ void App::drawFileLines() {
 
 void App::drawEmptyDatabase(std::size_t index) {
     ui::beginCard("db_empty");
-    ImGui::TextUnformatted(trf("« {} » has no game yet", shelf().entries()[index].name).c_str());
+    ImGui::TextUnformatted(trf("“{}” has no game yet", shelf().entries()[index].name).c_str());
     ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz or .zip file here, or:"));
     if (ui::iconButton("db_empty_import", ui::Icon::Folder, TR("Import a file…"))) {
         db_selected_ = static_cast<int>(index);
@@ -347,8 +348,7 @@ void App::drawImportOutcome(std::size_t index) {
     if (!o.report.error.empty()) {
         if (o.disk_full) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("Import stopped: the disk is full."));
-            ImGui::TextUnformatted(
-                trf("The first {} games are in « {} », the database is intact.", added, name).c_str());
+            ImGui::TextUnformatted(trf("The first {} games are in “{}”, the database is intact.", added, name).c_str());
             const auto rest =
                 (o.needed > 0 ? trf("About {} more is needed for the rest. ", formatBytes(o.needed)) : std::string()) +
                 TR("Once room is made, resuming the import adds only the missing games.");
@@ -605,7 +605,7 @@ void App::drawDatabases() {
         ui::beginCard("db_read_only");
         ImGui::PushTextWrapPos();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trf("« {} » is open read-only.", entries[index].name).c_str());
+                           trf("“{}” is open read-only.", entries[index].name).c_str());
         ImGui::TextUnformatted(TR("Another program writes to it: another RookStudio importing, for instance."));
         ImGui::TextDisabled("%s",
                             TR("The list, the tree and the searches work; importing and saving games into it wait "
@@ -631,13 +631,13 @@ void App::drawDatabases() {
         const bool here  = job->index == index;
         const auto where = job->index < entries.size() ? entries[job->index].name : std::string();
         if (job->building) {
-            ImGui::TextUnformatted(trf("Building the opening tree of « {} »", where).c_str());
+            ImGui::TextUnformatted(trf("Building the opening tree of “{}”", where).c_str());
             const auto total = job->tree.total.load();
             ImGui::ProgressBar(total ? static_cast<float>(job->tree.done.load()) / static_cast<float>(total) : 0.0f,
                                ImVec2(-1, 0));
             ImGui::TextDisabled("%s", TR("The database stays open meanwhile."));
         } else {
-            ImGui::TextUnformatted(trf("Import: {} into « {} »", job->file.filename().string(), where).c_str());
+            ImGui::TextUnformatted(trf("Import: {} into “{}”", job->file.filename().string(), where).c_str());
             const double seconds =
                 std::max(0.001, std::chrono::duration<double>(std::chrono::steady_clock::now() - job->started).count());
             const auto bytes = job->progress.bytes.load(), games = job->progress.games.load();
@@ -649,8 +649,9 @@ void App::drawDatabases() {
                                            formatBytes(static_cast<uint64_t>(bytes / seconds)),
                                            trf("{} games/s", ui::formatCount(static_cast<uint64_t>(games / seconds))))
                                    .c_str());
-            ImGui::TextDisabled("%s", TR("The games committed stay if the import stops: every 262 144, and at the end. "
-                                         "The opening tree is built again afterwards."));
+            ImGui::TextDisabled("%s",
+                                TR("The games committed stay if the import stops: every 262,144 games, and at the end. "
+                                   "The opening tree is built again afterwards."));
         }
         if (ImGui::Button(TR("Cancel")) || (here && ImGui::IsKeyPressed(ImGuiKey_Escape))) s.cancelImport();
         ImGui::SameLine();
@@ -763,7 +764,7 @@ bool App::saveBoardToDatabase() {
         const auto db = s.open(i);
         if (!db) return false;
         if (db->readOnly()) {
-            boardToast(trf("« {} » is read-only for now, another program writes to it: the game stays changed here.",
+            boardToast(trf("“{}” is read-only for now, another program writes to it: the game stays changed here.",
                            board_origin_->name));
             return true;
         }
@@ -777,9 +778,9 @@ bool App::saveBoardToDatabase() {
             boardToast(e.what());
             return true;
         }
-        board_.changes.saved("« " + board_origin_->name + " »");
+        board_.changes.saved(trf("“{}”", board_origin_->name));
         s.rebuildTree(i);  // the game replaced made its opening tree stale
-        boardToast(trf("Saved in « {} », game {}", board_origin_->name, ui::exactCount(id + 1)));
+        boardToast(trf("Saved in “{}”, game {}", board_origin_->name, ui::exactCount(id + 1)));
         return true;
     }
     return false;
@@ -1009,6 +1010,7 @@ void App::drawGameList() {
     // The game chosen: its players, its moves, Open; or the search panel.
     ImGui::BeginChild("##db_preview", ImVec2(0, 0), ImGuiChildFlags_Borders);
     if (db_search_open_) {
+        ui::TopicRegion topic(guide::topics::Searching);
         drawSearchPanel(snapshot);
     } else if (!ids.empty()) {
         const auto id  = ids[db_row_];
@@ -1198,7 +1200,7 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
     const auto& entries = shelf().entries();
     const auto name =
         db_selected_ >= 0 && static_cast<std::size_t>(db_selected_) < entries.size() ? entries[db_selected_].name : "";
-    ImGui::TextUnformatted(trf("Search in « {} »", name).c_str());
+    ImGui::TextUnformatted(trf("Search in “{}”", name).c_str());
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("Esc"));
     ImGui::TextDisabled("%s", TR("the list follows it as it goes"));
@@ -1429,7 +1431,7 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         p.material_plies = std::clamp(p.material_plies, 1, 200);
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("plies at least"));
-        ImGui::TextDisabled("%s", TR("An exchange under way is not a material. A count: 2, or 0-2."));
+        ImGui::TextDisabled("%s", TR("An exchange under way is not a material balance. A count: 2, or 0-2."));
         status(db_material_job_, TR("Any material: a preset, or the counts typed."), "");
     } else {
         // A pattern: men put on a board, empty squares, the rest anything.

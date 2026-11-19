@@ -72,7 +72,7 @@ struct Answered {
 enum class Problem : uint8_t {
     UnknownMove,  // the question names no move of the position, or not the one the model picked
     Unanalyzed,   // the move on the board has no analysis yet
-    InCheck,      // the side not to move is in check: no threat beyond it
+    InCheck,      // the side to move is in check: no threat beyond the check
     NoEngine,     // the engine gave no answer, or the game is over
     NoDatabase,   // no database to look in
     NotInTables,  // no tablebase knows the position (too many men, or none at hand)

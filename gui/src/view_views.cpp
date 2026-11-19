@@ -17,6 +17,52 @@ namespace fcg {
 
 namespace {
 
+// `text` in capitals, for the letters of the interface's languages: ASCII, Latin-1, Latin Extended-A, Greek and
+// Cyrillic; any other code point, or a malformed byte, as it is.
+std::string capitals(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    for (std::size_t i = 0; i < text.size();) {
+        const auto b    = static_cast<unsigned char>(text[i]);
+        std::size_t len = b < 0x80 ? 1 : (b >> 5) == 0x6 ? 2 : (b >> 4) == 0xE ? 3 : 1;
+        if (i + len > text.size()) len = 1;
+        char32_t cp = b;
+        if (len == 2) cp = ((b & 0x1Fu) << 6) | (static_cast<unsigned char>(text[i + 1]) & 0x3Fu);
+        if (len == 3)
+            cp = ((b & 0x0Fu) << 12) | ((static_cast<unsigned char>(text[i + 1]) & 0x3Fu) << 6) |
+                 (static_cast<unsigned char>(text[i + 2]) & 0x3Fu);
+        char32_t up = cp;
+        if (cp >= U'a' && cp <= U'z')
+            up = cp - 0x20;
+        else if (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7)  // Latin-1
+            up = cp - 0x20;
+        else if ((cp >= 0x100 && cp <= 0x137) || (cp >= 0x14A && cp <= 0x177))  // Latin Extended-A: upper even
+            up = cp & ~char32_t{1};
+        else if (((cp >= 0x139 && cp <= 0x148) || (cp >= 0x179 && cp <= 0x17E)) && cp % 2 == 0)  // upper odd
+            up = cp - 1;
+        else if (cp >= 0x3B1 && cp <= 0x3C9 && cp != 0x3C2)  // Greek
+            up = cp - 0x20;
+        else if (cp >= 0x430 && cp <= 0x44F)  // Cyrillic
+            up = cp - 0x20;
+        else if (cp >= 0x450 && cp <= 0x45F)
+            up = cp - 0x50;
+        if (up == cp) {
+            out.append(text, i, len);
+        } else if (up < 0x80) {
+            out += static_cast<char>(up);
+        } else if (up < 0x800) {
+            out += static_cast<char>(0xC0 | (up >> 6));
+            out += static_cast<char>(0x80 | (up & 0x3F));
+        } else {
+            out += static_cast<char>(0xE0 | (up >> 12));
+            out += static_cast<char>(0x80 | ((up >> 6) & 0x3F));
+            out += static_cast<char>(0x80 | (up & 0x3F));
+        }
+        i += len;
+    }
+    return out;
+}
+
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 using views::PageId;
@@ -246,11 +292,11 @@ void App::drawViewSwitch(float width) {
         }
         if (pressed) switchView(i);
     }
-    // The name of the view shown, in small capitals.
+    // The name of the view shown, in small capitals when they fit (capitals run wide: "ИЗУЧЕНИЕ"), else as written.
     {
-        auto name = view().name;
-        for (auto& ch : name) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
         ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 0.62f);
+        auto name = capitals(view().name);
+        if (ImGui::CalcTextSize(name.c_str()).x > box_w - px(4)) name = view().name;
         const auto ts = ImGui::CalcTextSize(name.c_str());
         const float y = top.y + px(6) + static_cast<float>(views_.size()) * (token + gap) - px(2);
         const auto& c = views::palette()[static_cast<std::size_t>(view().colour)];
@@ -317,7 +363,7 @@ void App::drawPageInNoView() {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(ui::CARD_BG));
     ImGui::BeginChild("##no_view", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("%s", trf("{} is in no view: shown here the time to look at it.", pageName(*root)).c_str());
+    ImGui::TextDisabled("%s", trf("{} is in no view: shown here while you look at it.", pageName(*root)).c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton(trf("Add it to {}", view().name).c_str())) {
         auto& pages = views_[static_cast<std::size_t>(view_)].pages;

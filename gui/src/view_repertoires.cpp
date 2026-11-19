@@ -54,8 +54,13 @@ void App::showLineOnBoard(const std::vector<std::string>& line, const std::strin
 void App::drawOpeningsPage() {
     auto& r = repertoires();
     ui::pageTitle(TR("Openings"), guideSection());
-    ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - px(200)));
-    if (ui::iconButton("rep_new", ui::Icon::Plus, TR("New repertoire"))) {
+    // At the right, as wide as its label in the language of the interface.
+    const char* new_label = TR("New repertoire");
+    const auto& style     = ImGui::GetStyle();
+    const float new_w     = style.FramePadding.x * 2 + ImGui::GetFrameHeight() * 0.42f + style.ItemInnerSpacing.x +
+                            ImGui::CalcTextSize(new_label).x;
+    ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - new_w));
+    if (ui::iconButton("rep_new", ui::Icon::Plus, new_label)) {
         rep_naming_ = true;
         rep_name_.fill(0);
     }

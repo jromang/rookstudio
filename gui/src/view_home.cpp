@@ -74,7 +74,7 @@ void App::drawHome() {
     }
     drawRemoteMachinesLine();
     {
-        ui::TopicRegion topic(guide::topics::Home);
+        ui::TopicRegion topic(guide::topics::TournamentsPage);
         drawNeedsAction();
         drawRunCards();
     }
@@ -84,7 +84,7 @@ void App::drawHome() {
         drawLastFinished();
     }
     {
-        ui::TopicRegion topic(guide::topics::Home);
+        ui::TopicRegion topic(guide::topics::TournamentsPage);
         drawHealth();
     }
 

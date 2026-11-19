@@ -1,8 +1,10 @@
-# fastchess-gui user guide
+# RookStudio user guide
 
-This guide describes every page, setting and file of fastchess-gui. The [README](../README.md) says what the program
-is, where to download it and how to build it. In the program, F1 opens this guide beside the page, at the section of
-what is under the mouse, in the language of the interface (see [Help in the program](#help-in-the-program)).
+This guide describes every page, setting and file of RookStudio: engines playing tournaments, and the study of games
+(databases, notation, the opening tree, repertoires, Lichess and a local assistant). The [README](../README.md) says
+what the program is, where to download it and how to build it. In the program, F1 opens this guide beside the page, at
+the section of what is under the mouse, in the language of the interface (see [Help in the
+program](#help-in-the-program)).
 
 ## Quick start
 
@@ -34,11 +36,27 @@ The match stops by itself once the SPRT decides: H1 accepted (A is stronger, by 
 not). The *Overview* shows the Elo, the LLR and its bounds as the games come. The setup is kept: next time, choose the
 next version as A and **Start**, or click *Relaunch with…* on the finished match.
 
+### Studying your games
+
+1. **A database.** In the rail, *Databases*, then *New database*, named in place, and *Import a file…*: a PGN file,
+   or a `.zst`, `.gz` or `.zip` file holding one (a file dropped on the page does the same). The games come in the
+   background, then the database's opening tree is built.
+2. **A game.** A click on a game of the list shows it beside; Enter or a double click opens it on the *Board*. Ctrl+O
+   opens a PGN file there, Ctrl+V pastes a game or a FEN.
+3. **An engine.** The analysis needs an engine: with an empty library, the *Analysis* tab offers to download Gaia in a
+   click (see [Popular engines](#popular-engines)). A starts and stops the analysis of the position (Alt+A on the
+   study Board), G analyses the whole game.
+4. **Your notes.** Enter writes a comment after the move, `!` and `?` put symbols, a move other than the game's starts
+   a variation, the right button draws arrows and squares; Ctrl+S saves the game into its database.
+
 ### Where to go next
 
 - [New tournament](#new-tournament): every setting, and [tips](#tips-for-the-settings) for choosing them;
 - [Running a tournament](#running-a-tournament): what the tabs show, pausing, changing a tournament while it plays;
 - [Ratings](#ratings): one rating list over every game played;
+- [Databases](#databases), [the study Board](#the-study-board), [the Openings page](#the-openings-page), [the Lichess
+  page](#the-lichess-page) and [the assistant](#the-assistant) for your own games;
+- [Views](#views): the pages of the rail, as you want them;
 - [Broadcast](#broadcast): the games live on a web page, in TLCV or on lichess;
 - [Troubleshooting](#troubleshooting) when something goes wrong, and the [Glossary](#glossary) for the testers'
   words.
@@ -47,27 +65,72 @@ next version as A and **Start**, or click *Relaunch with…* on the finished mat
 
 ### The pages
 
-A navigation rail on the left leads to eight pages:
+A navigation rail on the left leads to the pages of the [view](#views) shown, in its order:
 
 | Page | Contents |
 |---|---|
-| Tournaments | The home page: what runs and what needs action, the queue, the last tournaments finished, every tournament of the profile, *New tournament* |
-| Engines | The engine library: options, checks, groups, reference Elo, import of other programs' lists |
+| Home | The game to resume, what to start, the recent games, your databases, Lichess and what runs: cards of the view's pages (see [The Home page](#the-home-page)) |
+| Tournaments | What runs and what needs action, the queue, the last tournaments finished, every tournament of the profile, *New tournament* |
+| Board | A game or a position from anywhere, analysed by an engine of the library; in a view for study, the notation written in place (see [The study Board](#the-study-board)) |
+| Databases | Your game databases: import, the game list, the searches |
+| Openings | Your repertoires, their coverage and their gaps |
+| Lichess | Your Lichess account, a player's games, the official broadcasts, what the analysis may ask Lichess |
+| Play | A game against an engine, on the Board page |
+| Engines | The engine library: options, checks, groups, reference Elo, import of other programs' lists, the popular engines |
 | Books | The opening book library, and the openings of each book with what is wrong with them |
-| Board | A game or a position from anywhere, analysed by an engine of the library |
 | Suites | Test suites (STS, WAC, ERET…): engines against the positions of an EPD file |
 | Ratings | One rating list over every game of every tournament |
 | Log | fastchess' own output and the messages of the program, and *Report a problem…* |
-| Settings | Language, theme, interface size, notifications, the appearance of the boards, the profile and tournaments folders, the remote machines, the lichess token, the version, the way the window is drawn |
+| Settings | Language, theme, interface size, notifications, the appearance of the boards, the views, the assistant, the profile and tournaments folders, the remote machines, the lichess token, the version, the way the window is drawn: the sections of the view's pages first, the others under *Other settings* |
+
+### Views
+
+A view is a set of pages of your own: up to three, each with its name, icon and colour, switched at the top of the
+rail. Each view has a badge there, filled for the view shown, and the name of the view shown is written under them;
+a click on a badge, or Ctrl+1 to Ctrl+3, shows that view, at the page it was on. With a single view, the switch
+disappears.
+
+The first start offers three: *Tests* (Tournaments, Engines, Books, Board, Suites, Ratings, Log), *Study* (Home,
+Board, Databases, Openings, Lichess, Engines) and *Everything* (every page). Settings is in every view.
+
+*Edit the views* opens the views' sheet in place of the page: *Settings* > *Views*, ⋯ under the switch, a right click
+on a badge (the sheet opens at its view), or *Edit the views…* in Ctrl+K. It holds:
+
+- the views, in the order of Ctrl+1 to Ctrl+3 (*Up*, *Down*), *New view* (three at most) and *Delete this view*;
+- the view chosen: its name (short: it is written under the switch), its icon among twelve, its colour among six;
+- its Board: *For study* (the notation written in place, the arrows and squares, the Tree, References and Questions
+  tabs: see [The study Board](#the-study-board)) or *For the engines' analysis* (the Board of the engine testers, as
+  it was);
+- its pages, ticked, in the rail's order (↑ and ↓ beside each move it; Settings stays last); a page can be in several
+  views, and *also: …* names the others;
+- the rail, as it will look.
+
+Everything shows in the rail at once. Ctrl+Z undoes each change while the sheet is open, Enter keeps the changes,
+Escape leaves the views as they were. *Restore the views offered* brings back the three of the first start.
+
+Ctrl+K lists every page with the view it opens in: choosing a page of another view switches to it. A page that no
+view holds (a notice can lead there) opens in the view shown, with *Add it to …*.
+
+### The first start
+
+At the first start, RookStudio asks:
+
+- the language of the interface;
+- what you want to do: the views offered, each ticked or not (*Tests*, *Study*, *Everything*), and which one shows
+  first;
+- when a fastchess-gui profile is on the machine, whether to copy it: its engines, books, tournaments and settings.
+  fastchess-gui stays as it is and can keep running beside; *Start without* leaves it alone.
+
+Everything can be changed later in *Settings* > *Views*.
 
 ### Help in the program
 
 - **Tooltips.** Rest the mouse on a control to see what it does. The tooltip of a control this guide explains
   further ends with *F1: more in the guide*.
-- **F1** opens this guide in a panel at the right of the page, at the section of what is under the mouse (a row of
-  the setup, a card of the home page, a tab, a column of the standings); with nothing under the mouse, at the section
-  of the panel last clicked, else of the page. The round **?** beside a page's title opens the page's section. F1
-  again, or Escape in the panel, closes it.
+- **F1** opens this guide in a panel at the right of the page, at the section of what is under the mouse (a row of the
+  setup, a card of the Tournaments page, a tab, a column of the standings); with nothing under the mouse, at the section
+  of the panel last clicked, else of the page. The round **?** beside a page's title opens the page's section. F1 again,
+  or Escape in the panel, closes it.
 - **The guide panel** shows one section with its subsections, and the page beside it keeps working: the explanation
   can be read while the setting is changed. Its header has *Back* and *Forward* (also Alt+Left and Alt+Right, or the
   mouse's side buttons), *Contents* (every section), the search field (Ctrl+F in the panel) and *Open in the browser*
@@ -82,19 +145,19 @@ A navigation rail on the left leads to eight pages:
   for "…"* searches it for what was typed.
 - **Messages.** A problem the program reports names the engine, the file or the resource, with its fix in place; a
   **?** beside it opens its entry in [Troubleshooting](#troubleshooting).
-- **Getting started.** Until a first tournament is started, the home page shows the steps of the
+- **Getting started.** Until a first tournament is started, the Tournaments page shows the steps of the
   [Quick start](#quick-start), each with its button, ticked once done; *Hide* puts them away.
 - [Report a problem](#reporting-a-problem) when the program does not do what it should.
 
 ### The command palette
 
-**Ctrl+K** opens the command palette: the pages and tabs, the engines of the library (it opens the card), the books,
-the tournaments of the home page, the guide's sections, and the actions possible now (*Pause*, *Resume*, *Pause all*,
+**Ctrl+K** opens the command palette: the pages and tabs, the engines of the library (it opens the card), the books, the
+tournaments of the Tournaments page, the guide's sections, and the actions possible now (*Pause*, *Resume*, *Pause all*,
 *Stop*, *Start*, *Add to the queue*, *Relaunch … with…*, the entries of *Import…*, *Check those not checked*, *Export
 for a rating list…*, *Copy* the standings, *Copy the version*, *Report a problem…*, the board colours and piece sets,
-the move sounds on or off…). Letter case does not matter and the letters typed need not be adjacent ("rl" finds
-*Rating list*); names that start with them, or with a word that does, come first. Up and Down choose, Enter runs,
-Escape closes; Ctrl+K is left alone while a text field is being typed in.
+the move sounds on or off…). Letter case does not matter and the letters typed need not be adjacent ("rl" finds *Rating
+list*); names that start with them, or with a word that does, come first. Up and Down choose, Enter runs, Escape closes;
+Ctrl+K is left alone while a text field is being typed in.
 
 ### Language, theme and size
 
@@ -129,11 +192,11 @@ the [Board](#board) page and analyses it.
 
 ### Version and new versions
 
-The version is in the window title and in **Settings**, whose *Copy* puts it on the clipboard with the system, for
-a bug report. *Tell me when a new version is out* (off by default) asks GitHub for the latest release at launch, at
-most once a day and in the background; when it is newer, the home page says so, with *Download page* (the release's
-page on GitHub, in the browser), *What's new* (its notes) and *Hide* (until the next version). Nothing is downloaded
-or installed by the program, and a failure (no network, GitHub unreachable) is only written in the log.
+The version is in the window title and in **Settings**, whose *Copy* puts it on the clipboard with the system, for a bug
+report. *Tell me when a new version is out* (off by default) asks GitHub for the latest release at launch, at most once
+a day and in the background; when it is newer, the Tournaments page says so, with *Download page* (the release's page on
+GitHub, in the browser), *What's new* (its notes) and *Hide* (until the next version). Nothing is downloaded or
+installed by the program, and a failure (no network, GitHub unreachable) is only written in the log.
 
 ### Reporting a problem
 
@@ -237,6 +300,7 @@ them.
 | Keys | Where | What they do |
 |---|---|---|
 | <kbd>Ctrl</kbd>+<kbd>K</kbd> | Everywhere | The command palette |
+| <kbd>Ctrl</kbd>+<kbd>1</kbd>, <kbd>Ctrl</kbd>+<kbd>2</kbd>, <kbd>Ctrl</kbd>+<kbd>3</kbd> | Everywhere | Show the first, the second, the third view |
 | <kbd>F1</kbd> | Everywhere | This guide, at the section of what is under the mouse; again: closes it |
 | <kbd>F11</kbd> | Everywhere | Full screen, and back (a detached board's own window when it has the keyboard) |
 | <kbd>Ctrl</kbd>+wheel, <kbd>Ctrl</kbd>+<kbd>+</kbd>, <kbd>Ctrl</kbd>+<kbd>-</kbd> | Everywhere | Interface size; <kbd>Ctrl</kbd>+<kbd>0</kbd>: back to 100 % |
@@ -255,6 +319,25 @@ them.
 | <kbd>X</kbd> | The Board page | Show or hide the threat |
 | <kbd>N</kbd>, <kbd>Shift</kbd>+<kbd>N</kbd> | The Board page | The next, the previous move the analysis marked |
 | <kbd>Escape</kbd> | The Board page | The game back after a line was shown; put down the piece picked up |
+| <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | A view for study | Open a PGN file on the Board page; a new game there |
+| <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> | A view for study | The recent games; letting Ctrl go opens the one chosen |
+| <kbd>Enter</kbd> | The Home page | Resume the game on the board |
+| A letter of a move | The study Board | Type the move: the legal moves that begin so are offered, Enter plays it |
+| <kbd>Enter</kbd>, <kbd>Shift</kbd>+<kbd>Enter</kbd> | The study Board | A comment after the move, before it |
+| <kbd>!</kbd> <kbd>?</kbd> | The study Board | The move's symbol; two signs in a row: `!!`, `??`, `!?`, `?!` |
+| <kbd>Delete</kbd> | The study Board | Delete the moves from the one shown |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> | The study Board | Move the variation up, to the main line at last |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | The study Board | Undo, redo |
+| <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> | The study Board | Save the game; save a copy elsewhere |
+| <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | The study Board | The previous, the next game of the list it came from |
+| <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers |
+| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | The study Board | The Notation, Analysis, Tree, References and Questions tabs |
+| <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G and N do on the engines' Board (on the study Board, the letters type moves) |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | The Tree tab | Choose a move, play it, mark it in the active repertoire |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A game list | Go through the list, open the game |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> | The Databases page | The search panel |
+| <kbd>Escape</kbd> | The Databases page | Close the search panel, then the list |
 | <kbd>←</kbd> <kbd>→</kbd> | The big screen | The previous or next game |
 | <kbd>+</kbd> <kbd>-</kbd> | The big screen | Larger or smaller text |
 | <kbd>Escape</kbd> | The big screen | Leave it |
@@ -271,7 +354,27 @@ them.
 | <kbd>Enter</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | An engine's console | Send the line; bring the earlier lines back |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | The headless mode | Stop after the games being played |
 
-## The home page
+## The Home page
+
+A view's **Home** page gathers the view's pages in cards, what runs first:
+
+- **Resume where you were**, when the view holds the Board: the game on the board at its move, on a small board, where
+  it comes from (its database and number, its place in a filter, or its file), its comments, and whether it has
+  changes not saved yet. *Resume* (Enter) goes back to it; Ctrl+Tab lists the recent games.
+- What to start, each with its key: *Open a PGN…* (Ctrl+O), *Paste a game or a FEN* (Ctrl+V), *New game* (Ctrl+N),
+  *Import into a database…*, *Play against an engine*, *New tournament*: those of the view's pages.
+- The tournaments running, as on the Tournaments page, when the view holds Tournaments.
+- **Recently**: the games opened on the board, a click reopening one with its changes.
+- **My databases**: each with its games and the state of its opening tree, the import running, *+ Import…*, and the
+  tournaments read without a copy (see [Databases](#databases)).
+- **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
+  live (see [The Lichess page](#the-lichess-page)).
+- **In progress**: the game's analysis, the position's, an import, and the assistant (its download, its model
+  loaded, *Unload*).
+
+The search button at the top, or Ctrl+K, finds a command, a game, a database.
+
+## The Tournaments page
 
 The **Tournaments** page is a control room: what runs and what needs you come first, then the rest.
 
@@ -456,7 +559,7 @@ their build (`64-bit 4CPU`): rename the engines to match them if needed.
 
 **WinBoard engines** (xboard protocol, CECP) are played like the others. The *Protocol* of an engine is found
 out when it is added (*Automatic*), or chosen: UCI or WinBoard. fastchess only speaks UCI: a WinBoard engine is
-started through a translation built into fastchess-gui (`fastchess-gui --wb2uci ENGINE [ARGS]`, which fastchess
+started through a translation built into RookStudio (`rookstudio --wb2uci ENGINE [ARGS]`, which fastchess
 starts in place of the engine), and its options, `memory`, `cores` and Syzygy path become UCI options. It drives
 the engine the way WinBoard does: protocol 2 features, or protocol 1 for engines that send none; positions with
 `setboard`, or edit mode; moves in coordinates or SAN; `level`, `time`/`otim`, `st`, `sd`, `nps`; thinking
@@ -720,7 +823,7 @@ engine that stops, or a loss on time (the clock given 0.1 s for the move to come
 ends, to a PGN file in `games/` in the profile (named after the date and the engines, with a `Termination` tag), which
 *Open the games* lists on the board.
 
-The games are played by fastchess-gui's own engine client, apart from any tournament: they run while one plays,
+The games are played by RookStudio's own engine client, apart from any tournament: they run while one plays,
 without touching it. Their threads (the larger of the two engines', as they take turns) count in the core budget;
 when the running tournaments' games and the analysis already fill the machine, the card says so and offers *Play
 anyway* instead of *Play*. The analysis stops when a game starts, as it would compete with its engines.
@@ -735,6 +838,304 @@ too); the finished game has it, ready for *Analyse the game*. *Resign the game* 
 engine; with a second game, it follows, your colour reversed. Your games are saved under your login name, and only the
 engine counts in the core budget. There is no takeback, and the engine plays at its full strength unless its card sets a
 lower one (`UCI_LimitStrength` and `UCI_Elo`, or `Skill Level`, where it has them).
+
+### The study Board
+
+In a view whose Board is *For study* (see [Views](#views)), the Board page is where games are read and written. The
+board is on the left; on the right, the game's strip, then five tabs, Alt+1 to Alt+5:
+
+- **Notation**: the game's title line and its headers (see [Headers](#headers)), then the moves, their comments,
+  symbols and variations, written in place (see [Notation](#notation)); the table of the moves and the review are
+  in tabs of their own (see [The review of a game](#the-review-of-a-game));
+- **Analysis**: the engine's lines, and Lichess's cloud and endgame tables when you chose them (see [Online for the
+  analysis](#online-for-the-analysis)), with the game graph;
+- **Tree**: the moves played from the position in your databases, your books and on Lichess (see [The Tree
+  tab](#the-tree-tab));
+- **References**: the strongest games of the position (see [Reference games](#reference-games));
+- **Questions**: the assistant (see [Questions](#questions)).
+
+The strip above the tabs tells where the game comes from and what became of it: *Save* (Ctrl+S) with its state
+(*Changed: 2 changes*, then *Saved in “Mega”*), the game's place in the list it came from with the previous
+and the next game (Ctrl+← and Ctrl+→), and *Recent* (see [Recent games and the list](#recent-games-and-the-list)).
+With an empty library, the Analysis, Questions and Review tabs offer to download Gaia in a click.
+
+A move is typed as well as played: its first letter opens a field above the tabs, which offers the legal moves that
+begin so (in English letters, K Q R B N; in French, R D T F C), and Enter plays it. The letters of the engines' Board
+are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis, Alt+X shows the threat, Alt+G
+analyses the game, Alt+N goes to the next move the analysis marked.
+
+### Notation
+
+The notation is written in place, without a dialog:
+
+- **Comments**: Enter writes a comment after the move shown, Shift+Enter one before it; Enter keeps it, Escape leaves
+  it. A click on a comment goes to its move, a double click corrects it.
+- **Symbols**: `!` and `?` typed put the move's symbol, and a second sign right after makes the pair (`!!`, `??`,
+  `!?`, `?!`). The buttons under the notation put the others: only move, novelty, and the evaluation of the position
+  (=, ∞, and White's or Black's advantage, slight, clear or winning). A symbol put again is taken away.
+- **Variations**: a move other than the game's, played on the board or typed, starts a variation. Held while the move
+  is made, Shift replaces the moves after it, and Ctrl asks: a variation, a new main line, or the moves after replaced
+  (Escape plays nothing). *Ask what to do with a move that leaves the game* (*Settings* > *Appearance*) asks each
+  time.
+- **Delete** deletes the moves from the one shown; **Alt+↑** moves the variation up, to the main line at last.
+- **Ctrl+Z** undoes each change (a move, a comment, a symbol, a mark, a header) and **Ctrl+Y** makes it again; a line
+  under the notation says what was done and how to undo it.
+
+*Figurines in the notation* (*Settings* > *Appearance*) shows the pieces as figures. The assistant's comments show
+apart from yours, in blue grey and in italics, after a bubble (see [Comments by the
+assistant](#comments-by-the-assistant)).
+
+### Arrows and squares
+
+The right button draws on the study Board: a click colours a square, a drag from one square to another draws an arrow,
+and the same again takes it away. Green by default, red with Shift, blue with Alt, yellow with both. A left click on an
+empty square clears the marks of the move. The marks belong to the move shown and are saved with the game (as `[%cal]`
+and `[%csl]` in the PGN). On the 3D board, the right button draws on the board, and turns the camera when dragged beside
+it; the middle button turns it too.
+
+### Headers
+
+The title line at the top of the notation gives the players, their Elo, the event, the round, the date and the result; a
+click on it, or Alt+H, unfolds the headers in place. Tab goes to the next field and completes a name from those of the
+database; a date that is not one is pointed out (`YYYY.MM.DD`, with `??` for what is not known); the result is chosen
+with a click; the ECO code is offered from the moves (Lichess's opening names) and written by itself at saving when it
+is missing. The other headers show as the game has them, and one more is added by its name. Each field changed is a
+change (Ctrl+Z); Enter folds the headers, Escape gives the field its value back.
+
+### Saving a game
+
+Ctrl+S saves the game where it belongs: a game opened from a database goes back into it, under its number; a game of
+a PGN file goes back into the file, at its place (the file is written again at once, its other games as they are).
+Any other game opens a menu under *Save*, where Enter takes the first line: one of your databases (the one of last
+time first), a new PGN file, or the end of a PGN file. Ctrl+Shift+S saves a copy of any game elsewhere. A game without
+players opens its headers first.
+
+A database that another program writes to is read-only meanwhile: the game stays changed here until it can be saved.
+
+### Recent games and the list
+
+Ctrl+Tab shows the recent games, the one on the board first (twelve at most): Ctrl+Tab again goes down the list,
+Ctrl+Shift+Tab up, and letting Ctrl go opens the game chosen, with its list, its file, its changes and its undo
+history. A game with changes not saved is kept as it is until you come back to it. *Recent*, on the strip, lists them
+too: a click opens one, and the right button on a changed one discards its changes (Ctrl+Y makes them again).
+
+A game opened from a database's list keeps its place in it: Ctrl+← and Ctrl+→ open the previous and the next game of
+the list, or of its filter, at the same move when the game passes through the position shown.
+
+### The Tree tab
+
+The Tree tab gives the moves played from the position shown: their games, the shares of White's wins, draws and
+Black's wins, the score, the average Elo, the performance of the side to move (from FIDE's table) and the last year
+the move was played. Its sources are chips above the moves:
+
+- **My databases**: your databases added together, move by move (the right button chooses which; each one's share
+  shows at the cursor over the games);
+- each database whose opening tree is built, and each Polyglot book of the library;
+- **Masters (Lichess)**, **Lichess** (the right button chooses its speeds and ratings) and the player whose games
+  you imported: Lichess's opening explorer, which needs a linked account (see [Linking your
+  account](#linking-your-account)).
+
+The move under the mouse, or chosen with ↑ ↓, shows as a blue arrow on the board; a click or Enter plays it, and `*`
+or its star marks it in the active repertoire (see [The Openings page](#the-openings-page)). When the game's line
+leaves the database, the tab says at which move, and whether that move is a **novelty**, as a position search
+confirms (*See the last known position*). A database's tree is built after each import, and again in the background
+after a game is saved into it, its progress shown with *Cancel*.
+
+### Reference games
+
+The References tab looks for the strongest games of the position in your databases, in the background: the
+strongest first (by the players' mean rating), then the newest; a click opens one. Early in the opening, too many
+games reach the position to look for the strongest: the Tree tab tells more. *All the games of the position in “…”*
+lists them in the database.
+
+### The review of a game
+
+On the study Board, the *Review* tab beside the notation reads the game's analysis (G) as a coach would:
+
+- at the top, White's chances along the game, with the key moments as dots (dark for a good move, orange for a
+  mistake); a click goes to the move;
+- the game's theory in one of your databases (the Tree tab's, else the first): its book moves are not judged, and
+  its novelty is named; the book stops before the first error the engine sees;
+- **The key moments, in words**, **The story of the game**, and **What to work on**, for each side, with the moves
+  that show it; a click goes to the move.
+
+The endgame's positions of seven pieces or fewer can be judged exactly by Lichess's tables, asked once for this game
+or always. *Comment the key moments* writes a comment by the assistant on each, in the background (a comment already
+there is never replaced); *Annotate the game* writes the evaluations, the symbols and the better lines into the
+notation. Ctrl+Z takes either back.
+
+## Databases
+
+The **Databases** page holds your game databases: their list on the left, the games of the one chosen on the right. A
+database is a folder of its own (`Name.fcgdb`), read fast even with millions of games.
+
+### Importing games
+
+*New database* makes one, named in place; *Add a database…* lists a database folder made elsewhere, its files left
+where they are. *Import into this database…* takes a PGN file, or a `.zst`, `.gz` or `.zip` file holding one; a file
+dropped on the page goes into the database chosen, or into a new one named after it, and *Paste games* imports the
+PGN text of the clipboard. The import runs in the background at a low priority (a tournament beside it loses no
+time), with its progress, its speed and *Cancel*. The games committed stay if it stops (every 262,144 games, and at
+the end), and importing the file again adds only the missing ones; games already in the database are left out.
+
+At the end, a banner on the database tells what came: the games added, those already there, and the damaged ones (a
+move that cannot be read or is illegal, a text cut short, a start position that is not one), each kept up to that
+move with its text as it was; *See them in the list*, or a click on one, shows the file at its line. A full disk, a
+stop asked for or another error says what is kept and what is needed, with *Resume the import* and *Open the
+database's folder*. Then the database's opening tree is built, in the background.
+
+A database that another program writes to (another RookStudio importing into it, for instance) opens read-only: the
+list, the tree and the searches work; importing and saving games wait until that program has finished. *Remove from
+the list* leaves a database's files where they are.
+
+### The game list
+
+The list gives each game's number, players, Elo, result, event, date, ECO code and length; a click on a heading sorts
+it. The quick filter above takes free words: players, event, year, ECO code, result (`carlsen 2024 B90`). ↑ ↓ go
+through the list and the game chosen shows beside, on a small board with its moves; Enter or a double click opens it
+on the Board page. Millions of games scroll and sort at once.
+
+### Searching
+
+*Search* (Ctrl+F) opens the search panel beside the list, in four tabs; the list follows each criterion as it is
+typed:
+
+- **Headers**: a player and their colour, the opponent, the event, the years, the ECO codes, the Elo of both players
+  at least, the result; *Damaged games only*;
+- **Position**: the Board page's position, or one set up (*Set up the pieces…*): its games are found in the
+  background, those that cannot reach it (their pawns, their material) left out without being replayed;
+- **Material**: a preset (rook endings, no queens, the bishop pair against bishop and knight, a queen against two
+  rooks) or the men of each side counted (`2`, or `0-2`), for so many plies at least;
+- **Pattern**: men put on the board with the mouse (a click puts the man chosen, a click again takes it away; Shift
+  and a click, an empty square; the other squares, anything), *White has only these pawns*, and three examples.
+
+Each search gives its games and its time; *Add to the filter* and *Take out of the filter* combine them, *See in the
+list* (Enter) shows the result, *Clear everything* starts again.
+
+*Keep this search…* names it after its criteria. Its criteria are kept, not its games, for any database (its new
+games are found next time); the kept searches show at the top of the panel, where a click sets their criteria and the
+right button renames or deletes one, and in Ctrl+K (*Search: …*).
+
+### Tournaments and PGN files
+
+The tournaments of the profile, and the PGN file open on the Board page, show under *Read without a copy* after your
+databases: their games listed and searched like a database's, brought up to date in the background when shown (the
+games a tournament finishes, a file that grew or changed). They are neither imported nor removed.
+
+## The Openings page
+
+Your repertoires: each a PGN file of the profile (one game and its variations, for White or for Black), which the
+Board page opens and edits like a game (*Open its file on the board*). One is active: the star of the Tree tab adds
+the move shown to it, or takes it out, whatever the side to move; the first star makes a repertoire when there is
+none. *New repertoire* makes one by its name and side.
+
+The active repertoire's **coverage** is measured on your databases whose opening tree is built (*Measured on*: a chip
+for each, a click takes it out or back), in the background: the share of the games along the repertoire that find an
+answer to the end of its lines, or up to move 10 or 15. Its **gaps** follow, the most often met first: an opponent's
+move played often enough without your answer, or a line ending on an opponent's move. A click shows the position,
+with the tree beside it.
+
+## The Lichess page
+
+Everything here is optional: RookStudio works without an account and without the Internet, and what goes to Lichess
+is said where you decide it.
+
+### Linking your account
+
+*Link the account…* opens lichess.org in the browser, where you allow RookStudio without giving it a password. Lichess
+sends the browser back to 127.0.0.1, on a port only RookStudio listens on while it links; without an answer in 5
+minutes, the link stops by itself. When no browser opens, the address shows, to paste in a browser of this machine.
+
+Linked, the card gives the account's name and when its token ends (a year after; *Renew…* a month before). RookStudio
+reads your name and public data only, and asks for more when a feature needs it: reading the broadcasts, for
+instance. The token is kept in your profile, readable by you alone; *Unlink* revokes it at Lichess and deletes it
+here, and your databases stay. A linked account brings Lichess's opening explorer in the Tree tab (the masters, all
+the players, one player), and your games synced faster, your private ones too.
+
+### A player's games
+
+*A player's games* imports the public games of a Lichess player, yours or another's, into a database (*Lichess ·
+name*), without an account too: *Import*, then *Sync* for the games played since. The games come by batches, the
+oldest first, and what was received stays if you cancel. *What is asked*: the speeds (all; blitz, rapid and
+classical; classical and correspondence), since when (the first game, a year ago, a date), standard chess and Chess960
+only. The games keep their link to lichess.org, their clocks and Lichess's evaluations. *Count the new games when the
+Home page opens* asks Lichess at most once an hour, with the player's name.
+
+### Official broadcasts
+
+The official broadcasts live, the best known first (*All the broadcasts live* for the others), and the next ones.
+*Follow* opens a round in a mosaic on the Lichess page: each game's card with the names, the clocks, the last move,
+the evaluation bar, and the score and line of the engine chosen in *Analysed by*; on the right, the game chosen with
+its last moves, *Follow on the board* and *Copy the PGN*, then the round. The games are analysed on your machine, with
+your engine, as many at once as the cores the tournaments leave allow, the game chosen first, and only while the
+mosaic shows. On the board, the game moves on with each move received; going back to analyse it lets it move on
+behind, and *Back to live* brings it back.
+
+Lichess lets four rounds be followed at once without an account, eight with one. Since August 2026, it slows down
+heavily a broadcast followed without an account allowed to read broadcasts: the first time, RookStudio asks for that
+permission (*Allow on Lichess…*, or *Follow without it*). A round whose games have all ended goes into the
+*Broadcasts* database.
+
+### Online for the analysis
+
+Three services, each asked about at its first use (for this position, always, or not now) and changed here:
+
+- **Lichess's cloud evaluation**, in the Analysis tab: the FEN of each position shown is sent, without an account,
+  and Lichess answers with the lines its servers have already computed, when it has them. Your engine always answers.
+- **Endgames online, up to 7 pieces**: for a position of seven pieces or fewer that the tables on your disk do not
+  know, its FEN is sent to Lichess's tables, without an account. They give the verdict, mate at best or the moves
+  before a capture or a pawn move, and each move with what it leaves (a click plays it); *See the winning line on the
+  board* previews it. A win the 50-move rule turns into a draw is a “cursed win”. With eight pieces and opposing
+  pawns, they give the verdict and the moves to the next capture.
+- **Lichess's explorer**, in the Tree tab: for each position, its FEN and the filter chosen are sent with your
+  token; it needs a linked account. Nothing of your databases is sent.
+
+The answers are kept in your profile: the tables' for good, the cloud's for a month. When Lichess asks for a pause
+(too many requests in a short time), the countdown shows; offline, what still works is said.
+
+## The assistant
+
+The assistant comments on your games and answers your questions about them, on your machine. It relies on what your
+engine, your databases and the endgame tables establish, and says it in words; when nothing establishes it, it says
+so too. It writes in English or in French (in English for the other languages of the interface).
+
+### Its model
+
+The assistant needs its model, *RookStudio commentary v11*, downloaded once from huggingface.co (about 2.7 GB on the
+disk, and about 3 GB of memory while it serves), checked when it arrives; a download cut resumes where it was. The
+first card of the Questions tab, of *Comment this move* and of the review offers it; *A GGUF file on the disk…* takes
+another model, which answers questions but has not learnt RookStudio's comments (those stay the templates'). Only the
+model's download goes through the Internet: your games, your questions and its answers stay on the machine.
+
+It runs in a process of its own, on the GPU when there is one to use (a comment in about a quarter of a second), else
+on the processor (about 3 seconds). It is loaded at the first question or comment, and unloaded after a quarter of an
+hour without serving, or with *Unload* (on the Home page, in **Settings**, or in Ctrl+K). While a tournament uses the
+GPU, it answers on the processor (*Take the GPU anyway* if you wish); a graphics driver that fails sends it to the
+processor, and *Try the GPU again* tries again. *Settings* > *Assistant*: its model, the GPU or the processor, the
+minutes before it is unloaded (0: kept until *Unload*).
+
+Without the model, everything else works: the analysis, the review's figures, the template comments, the tree.
+
+### Questions
+
+The Questions tab (Alt+5) takes a question about the position or the game, typed or chosen among the suggestions: why
+the last move, what the threat is, the best move, who played this position, what this opening is. It can explain a move,
+give the best move or the threat, try a move, compare two; give the reference games and the moves played in a database;
+name the opening; tell what the endgame tables say. Each answer shows what it rests on (the engine's search, the tree,
+the opening names, the tables) and the actions it offers: play the move, show the line in preview, open the strongest
+game, add the answer to the notation. A question beyond what it can do gets an “I cannot tell” and what it can show
+instead.
+
+The engine of the Analysis tab answers for it, in a process of its own (one thread, 300,000 nodes per position): the
+questions need an engine in the library.
+
+### Comments by the assistant
+
+*Comment this move* (Alt+C, or Ctrl+K) writes the assistant's comment on the move shown, and *Comment the key
+moments*, in the review, one on each key moment. Its comments are marked in the PGN (`[%rs assistant]`) and shown in
+blue grey and in italics, after a bubble; at the cursor, what each rests on: the engine, the facts of the positions,
+the database of the theory, the model or a template. A double click corrects one, and it becomes yours. Without the
+model, the comments are templates, written from the same facts.
 
 ## Test suites
 
@@ -1095,7 +1496,7 @@ gauntlet *Gauntlet table as text* or *as BBCode, for a forum* (the seed, then it
 with points, %, Elo ±, W-L-D); *Export HTML…*. All have *TF* like the headless mode's standings, follow the order
 chosen, and end with a line giving the games played of those planned, the draw rate, time control, book (with the
 plies kept of a PGN book; for a Polyglot book its depth and how its moves were chosen, e.g. `book:Perfect2023.bin (8
-plies, moves by weight)`) and event. The copies then sign with *fastchess-gui* and its version, and the gauntlet table
+plies, moves by weight)`) and event. The copies then sign with *RookStudio* and its version, and the gauntlet table
 is ruled with = rather than -, so that a table posted on a forum is told apart from those of other programs.
 
 ### Teams
@@ -1244,36 +1645,36 @@ tournament folder, so a resume keeps it. It only warns; it never decides a game.
 first game has started, so a pause never throws a result away. **Resume** continues. **Stop** either finishes the
 running games first, or stops now (the interrupted games are not counted and will be played again).
 
-A tournament stopped by an engine says which one in its header and on the home page, under *Needs action*:
+A tournament stopped by an engine says which one in its header and on the Tournaments page, under *Needs action*:
 *Interrupted: Alpha could not start: …* (after its last try), or *Alpha crashed or stopped responding (game 12)*
 (without *Restart an engine that crashes*), with *Open the engine* and *Open the log*.
 
-**Every tournament resumes exactly where it stopped**, after a stop, a closed window, a crash or a power cut: no game
-is lost and none is played twice, and a half-played game pair is completed with the same opening and colours.
-*Resume* on the home page continues it, with the statistics of the games already played: results, and the engines'
-depth, time per move and NPS read back from the move comments (NPS only when the PGN records it, *nps* in *PGN and
-misc*). When the program ended while a tournament was running (a crash, a power cut, a reboot, or quitting while it
-ran), the next launch resumes it by itself, and the queue goes on after it: *Resume at launch the tournament that was
-running*, in **Settings**, on by default. A tournament paused or stopped waits for you, and `--autostart` starts the
-saved setup instead. A participant whose program was rebuilt or went missing since it joined is named in the header
-of the resumed tournament, with *Continue* and *Pause*: its next games are played by the program as it is now, with
-the options the tournament gave it.
+**Every tournament resumes exactly where it stopped**, after a stop, a closed window, a crash or a power cut: no game is
+lost and none is played twice, and a half-played game pair is completed with the same opening and colours. *Resume* on
+the Tournaments page continues it, with the statistics of the games already played: results, and the engines' depth,
+time per move and NPS read back from the move comments (NPS only when the PGN records it, *nps* in *PGN and misc*). When
+the program ended while a tournament was running (a crash, a power cut, a reboot, or quitting while it ran), the next
+launch resumes it by itself, and the queue goes on after it: *Resume at launch the tournament that was running*, in
+**Settings**, on by default. A tournament paused or stopped waits for you, and `--autostart` starts the saved setup
+instead. A participant whose program was rebuilt or went missing since it joined is named in the header of the resumed
+tournament, with *Continue* and *Pause*: its next games are played by the program as it is now, with the options the
+tournament gave it.
 
 ### Several tournaments at once
 
 Several tournaments can play side by side: a gauntlet beside an SPRT, two gauntlets at a time. *Start* on the *New
 tournament* page starts another one while some play; *Resume* resumes one beside them. Each tournament plays in a
-process of its own (`fastchess-gui --run <folder>` driven by the window), so a crash takes down that tournament only,
+process of its own (`rookstudio --run <folder>` driven by the window), so a crash takes down that tournament only,
 and the window, its engine checks, quick tests and test suites no longer wait for a tournament to end.
 
-The workspace has **a tab per open tournament**, above its header: a dot while it plays (a pause sign while paused),
-its status at the cursor, a cross to close one that does not play. The panels show the tab chosen; the command
-palette lists the others (*Show …*, *Pause*, *Resume*). A finished tournament opened from the list takes the tab of
-one only looked at. The home page has a card for each tournament playing, with its progress, its leader, *Open* and
-*Pause*, and under them its **weight**, the cores its games use of those it may use, and what its next game waits
-for; the *Cores* bar at the top shows each tournament's part (and the Board page's), and how many cores the
-tournaments share. The *Log* shows the lines of one tournament, of the window, or all (each line of a tournament
-carries its name); a tournament's lines are also kept in `fastchess-gui.log` in its folder.
+The workspace has **a tab per open tournament**, above its header: a dot while it plays (a pause sign while paused), its
+status at the cursor, a cross to close one that does not play. The panels show the tab chosen; the command palette lists
+the others (*Show …*, *Pause*, *Resume*). A finished tournament opened from the list takes the tab of one only looked
+at. The Tournaments page has a card for each tournament playing, with its progress, its leader, *Open* and *Pause*, and
+under them its **weight**, the cores its games use of those it may use, and what its next game waits for; the *Cores*
+bar at the top shows each tournament's part (and the Board page's), and how many cores the tournaments share. The *Log*
+shows the lines of one tournament, of the window, or all (each line of a tournament carries its name); a tournament's
+lines are also kept in `rookstudio.log` in its folder.
 
 **Sharing the machine**: the tournaments playing share a budget of cores, set in **Settings** (*Cores for the
 tournaments*: the physical cores less one by default). Each gets one game's worth first while the budget allows, the
@@ -1286,7 +1687,7 @@ its next one. A tournament alone plays as many games as its concurrency says.
 **Memory**: a game starts only when the `Hash` of its two engines, and what each engine process takes besides (64 MB,
 and 8 MB per thread), fit in what the games playing leave of the memory budget (*Memory for the engines* in
 **Settings**, 75 % of the installed memory by default), shared between the tournaments. The setup summary says how
-many games the budget lets play at once, and the home page's *Health* card when games wait for memory.
+many games the budget lets play at once, and the Tournaments page's *Health* card when games wait for memory.
 
 **GPUs**: an engine marked *Uses a GPU* on its card (a network engine such as Lc0) counts against the *GPUs* of
 **Settings**: no more such engines play at once than there are GPUs, in a tournament and across tournaments, while the
@@ -1305,7 +1706,7 @@ the tournament from a terminal with the broadcast options (see [Headless mode](#
 A night left alone does not stop on one engine. An engine that does not start (a program moved or rebuilt, a network
 file missing, a drive gone) is tried again three times, 10 s apart; then its games are set aside and the other games
 go on. It is tried again every 5 minutes, one game at a time, and its games come back as soon as it starts. The
-tournament header and the home page (under *Needs action*) say which engine, the error, and offer:
+tournament header and the Tournaments page (under *Needs action*) say which engine, the error, and offer:
 
 - **Try again**: at once, rather than at the next try (after fixing the program, say).
 - **Withdraw…** and **Replace…** (round robins, gauntlets and team matches): the Schedule tab's change panel, set for
@@ -1362,24 +1763,24 @@ next rounds follow from the results, until the next game starts); the *Games* ta
 
 ### Queue and relaunch
 
-The **Queue** on the home page holds tournaments to play one after the other: when one ends by itself, the next
-starts (not after a stop or an error, nor while *Pause all* holds the queue). With *Start when cores are free*, the
-next one starts beside those playing as soon as the budget of cores is more than they can take, each at its
-concurrency. They can be reordered or removed, and the first started now when nothing runs. The home page tells when
-the running tournament ends (*Ends about HH:MM (in …)*) and when the whole queue does, each queued tournament with its
-length and, while the lengths before it are known, when it starts; the tournaments whose length cannot be known (an
-SPRT without a maximum, nodes or depth per move) are counted apart.
+The **Queue** on the Tournaments page holds tournaments to play one after the other: when one ends by itself, the next
+starts (not after a stop or an error, nor while *Pause all* holds the queue). With *Start when cores are free*, the next
+one starts beside those playing as soon as the budget of cores is more than they can take, each at its concurrency. They
+can be reordered or removed, and the first started now when nothing runs. The Tournaments page tells when the running
+tournament ends (*Ends about HH:MM (in …)*) and when the whole queue does, each queued tournament with its length and,
+while the lengths before it are known, when it starts; the tournaments whose length cannot be known (an SPRT without a
+maximum, nodes or depth per move) are counted apart.
 
-**Relaunch with…** on a finished match (in its header, or under *Last finished* on the home page) plays it again with
-another engine A, typically the next version, against the same engine B, with the match's other settings (those of the
-*New tournament* page for a match started by an older version, which did not keep them).
+**Relaunch with…** on a finished match (in its header, or under *Last finished* on the Tournaments page) plays it again
+with another engine A, typically the next version, against the same engine B, with the match's other settings (those of
+the *New tournament* page for a match started by an older version, which did not keep them).
 
-**Clone** (in a tournament's header, under *Last finished* and in *All tournaments* on the home page) opens the *New
-tournament* page filled with that tournament's setup, whatever its format: the participants with their own settings,
-the time control, the openings, the adjudication and the rest, every value as it played. Its profiles are named, and
-one changed since is marked as changed for this tournament. Change what should differ (another time control, the next
-version of an engine, another book), then **Start** or *Add to the queue*. A tournament still playing can be cloned
-too; one started by an older version, which did not keep its setup, cannot.
+**Clone** (in a tournament's header, under *Last finished* and in *All tournaments* on the Tournaments page) opens the
+*New tournament* page filled with that tournament's setup, whatever its format: the participants with their own
+settings, the time control, the openings, the adjudication and the rest, every value as it played. Its profiles are
+named, and one changed since is marked as changed for this tournament. Change what should differ (another time control,
+the next version of an engine, another book), then **Start** or *Add to the queue*. A tournament still playing can be
+cloned too; one started by an older version, which did not keep its setup, cannot.
 
 ## Ratings
 
@@ -1454,7 +1855,7 @@ every game; *Game shown* then does not apply.
 
 ### Web page
 
-TCP port: a page served by fastchess-gui itself, for any browser on the network, read-only and refreshed every
+TCP port: a page served by RookStudio itself, for any browser on the network, read-only and refreshed every
 second. The followed game (the first in progress, or the one clicked) is in the middle: the board with the last move,
 a king in check, the coordinates and the arrows; each player's clock in large type; each engine's evaluation in large
 type with who is thinking, its search as tiles (depth/selective depth, nodes, speed, time, tablebase hits, hash) and
@@ -1502,12 +1903,12 @@ a line under the table ("Lynx 17½ - 18½ Otter · 48.6 % · Elo -9.7 ± 31.2").
 ### Putting the web page on the internet
 
 The web page can be followed from anywhere without opening a port in the router: tick *Publish on the internet* under
-*Web page* in the *Broadcast* tab. While a tournament runs, fastchess-gui opens an SSH tunnel (libssh2, built into the
+*Web page* in the *Broadcast* tab. While a tournament runs, RookStudio opens an SSH tunnel (libssh2, built into the
 program) to a tunnel service, which gives the page a public https address; nothing needs to be installed.
 
 - *localhost.run* (the default): free, without an account. Its addresses change now and then, and its speed is
   limited; the page and its state are sent compressed, so this does not matter much. Its host key is known to
-  fastchess-gui: a connection to anything else is refused.
+  RookStudio: a connection to anything else is refused.
 - *Another SSH server*: its host, port and user, and the port it opens for the page (as
   `ssh -R REMOTE_PORT:localhost:PORT user@host` would ask; 0 lets it choose). Only servers that let the user in
   without a key or a password can be used (authentication "none"), and they must offer curve25519-sha256, an RSA host
@@ -1538,8 +1939,8 @@ Viewers see the tournament's name, the engines' names, their ratings, searches a
 PGN file of the games played. The folders and the engines' files stay private. Headless:
 
 ```
-fastchess-gui --run FOLDER --tunnel                      # localhost.run, the address printed on the console
-fastchess-gui --run FOLDER --web 8080 --tunnel ssh://user@host[:port][/remote_port]
+rookstudio --run FOLDER --tunnel                      # localhost.run, the address printed on the console
+rookstudio --run FOLDER --web 8080 --tunnel ssh://user@host[:port][/remote_port]
 ```
 
 ### Where the viewers talk
@@ -1555,14 +1956,14 @@ server's owner switches it on in Server Settings, Widget ("Enable Server Widget"
 copy (17 to 20 digits); with Developer Mode on, right-clicking the server's icon gives *Copy Server ID* as well. The
 widget is loaded from discord.com only once a viewer opens the tab, and Discord then sees that viewer's visit (their
 address, their browser, their Discord login if they have one); without an ID, the page contacts nobody but
-fastchess-gui. The chat and lichess links send nothing until a viewer clicks them, and then no referrer. A setup file
+RookStudio. The chat and lichess links send nothing until a viewer clicks them, and then no referrer. A setup file
 run headless (`--run SETUP.json`) takes both from `web_chat_link` and `web_discord_id`.
 
 ## Headless mode
 
 ```
-fastchess-gui --run TOURNAMENT_FOLDER     # resume a tournament
-fastchess-gui --run SETUP.json            # create one from a setup or template file, with the profile's engines
+rookstudio --run TOURNAMENT_FOLDER     # resume a tournament
+rookstudio --run SETUP.json            # create one from a setup or template file, with the profile's engines
 ```
 
 No window is opened; the version, then the progress, are printed on the console, with the tries of an engine that
@@ -1577,8 +1978,8 @@ engine that cannot start). The memory budget and the GPUs of the profile's **Set
 terminal; the window shows it (it connects to it) when it opens with the same profile, and `--attach` talks with it:
 
 ```
-fastchess-gui --run FOLDER --detach         # in the background, on a local socket
-fastchess-gui --attach FOLDER               # its control channel on the standard input and output
+rookstudio --run FOLDER --detach         # in the background, on a local socket
+rookstudio --attach FOLDER               # its control channel on the standard input and output
 ```
 
 The window drives each tournament the same way: `--run FOLDER --control socket` (or `--control stdio`) plays it
@@ -1593,12 +1994,12 @@ input open while it reads the answers.
 The tournament can be broadcast at the same time, as from the *Broadcast* tab:
 
 ```
-fastchess-gui --run FOLDER --tlcs 16001             # a TLCS server on UDP port 16001
-fastchess-gui --run FOLDER --tlcs 16001 --tlcs-lanes  # one port per game: 16001, 16002…
-fastchess-gui --run FOLDER --web 8080               # the web page on http://<this machine>:8080/
-fastchess-gui --run FOLDER --tunnel                # the web page on the internet (serves it too, --web's port or 8080)
-fastchess-gui --run FOLDER --live-files [DIR]       # live.pgn, standings.html, tournament.json ("live" by default)
-fastchess-gui --run FOLDER --lichess new            # a new lichess broadcast; or --lichess ROUND_URL|ROUND_ID
+rookstudio --run FOLDER --tlcs 16001             # a TLCS server on UDP port 16001
+rookstudio --run FOLDER --tlcs 16001 --tlcs-lanes  # one port per game: 16001, 16002…
+rookstudio --run FOLDER --web 8080               # the web page on http://<this machine>:8080/
+rookstudio --run FOLDER --tunnel                # the web page on the internet (serves it too, --web's port or 8080)
+rookstudio --run FOLDER --live-files [DIR]       # live.pgn, standings.html, tournament.json ("live" by default)
+rookstudio --run FOLDER --lichess new            # a new lichess broadcast; or --lichess ROUND_URL|ROUND_ID
 ```
 
 `--lichess` takes the token from the `FCG_LICHESS_TOKEN` environment variable, or the profile's.
@@ -1625,22 +2026,22 @@ machine is reached with SSH: nothing has to be opened on it but its SSH server, 
   machine must know the key: its public half (`id_ed25519.pub`) goes in `~/.ssh/authorized_keys` on the machine
   (`ssh-copy-id user@host` puts it there), or, for an administrator of a Windows machine, in
   `C:\ProgramData\ssh\administrators_authorized_keys`;
-- *Folder there*: fastchess-gui's folder on the machine, for the program, its tournaments, books and tablebases,
-  relative to the user's home folder (`fastchess-gui` by default) or absolute (`/srv/fcg`, `D:\fcg`);
+- *Folder there*: RookStudio's folder on the machine, for the program, its tournaments, books and tablebases,
+  relative to the user's home folder (`rookstudio` by default) or absolute (`/srv/fcg`, `D:\fcg`);
 - *Budget*: the cores and the memory the tournaments on the machine may use at once; 0 takes what the test found,
   every thread but one and 80 % of the memory.
 
 *Test the connection* logs in, then tells the machine's system, threads, memory, the free space where its folder is,
-and whether fastchess-gui is installed there, in which version. The first connection shows the machine's host key
+and whether RookStudio is installed there, in which version. The first connection shows the machine's host key
 (its SHA256 fingerprint) and trusts it from then on (`known_hosts.json` in the profile, the broadcast tunnel's too).
 When the key changes later, nothing is sent and the card says so, with *Trust the new key* for a machine that was
 reinstalled. Every failure names the machine and what to do: the host that cannot be reached, a key the machine
 refuses (and where its public half goes), a passphrase that is not the right one, no agent running.
 
-*Install fastchess-gui* (*Update fastchess-gui* once it is there) copies the program to the machine's folder over
-SFTP, then checks it starts there (`fastchess-gui --version`). It copies this program when the machine runs the
+*Install RookStudio* (*Update RookStudio* once it is there) copies the program to the machine's folder over
+SFTP, then checks it starts there (`rookstudio --version`). It copies this program when the machine runs the
 same system (Linux x86-64 to Linux x86-64); for another one, a Windows machine from Linux say, download the release
-for that system and choose its program on the card (*fastchess-gui for Windows x86_64*). A copy cut by the network
+for that system and choose its program on the card (*RookStudio for Windows x86_64*). A copy cut by the network
 resumes where it stopped.
 
 ### Engines on a machine
@@ -1697,23 +2098,22 @@ adjudication and the engines do without them).
 ### A tournament on a machine
 
 In the setup, *Run on* (in *Concurrency*) chooses where the tournament plays: *This computer*, or a machine. *Start*
-then prepares it there: fastchess-gui must be installed there in this version (else *Update fastchess-gui*), every
+then prepares it there: RookStudio must be installed there in this version (else *Update RookStudio*), every
 engine must have its path on the machine (else the start offers *Copy \<engine\> to \<machine\>…*), and the setup's
 books must be in its books folder (else the start says which is missing, and *Push the missing files* puts it
 there); tablebases missing are only a warning. The tournament gets its folder in `tournaments/` of the machine's
 folder, with the engines, books and tablebases at their paths there, and its process starts there out of the SSH
-session (`fastchess-gui --run <folder> --detach`): it plays on whatever happens to the window or the network. The
+session (`rookstudio --run <folder> --detach`): it plays on whatever happens to the window or the network. The
 window follows it as a tournament of this computer: Live, Games, the standings, pause, stop and the changes, through
-the control channel of its process (`fastchess-gui --attach <folder>` over SSH).
+the control channel of its process (`rookstudio --attach <folder>` over SSH).
 
-Its card on the home page says *On \<machine\>*, and *Reaching \<machine\>…* while the connection is cut: the window
-connects again on its own, a little longer after each failure, and takes up the events where its copy stopped.
-The journal and the PGN files are copied back to the tournament's folder here as they grow, every few seconds, so
-that Ratings, exports and the submission checklist read them; the machine's folder stays the reference
-(`machine.json` here says which machine and folder). Closing the window leaves it playing there; the next launch
-shows it again. *Resume* of an interrupted tournament of a machine resumes it there. The machine's budget (its
-cores and memory) is shared by its own tournaments, apart from this computer's. One tournament plays on one machine:
-its games are not spread over several.
+Its card on the Tournaments page says *On \<machine\>*, and *Reaching \<machine\>…* while the connection is cut: the
+window connects again on its own, a little longer after each failure, and takes up the events where its copy stopped.
+The journal and the PGN files are copied back to the tournament's folder here as they grow, every few seconds, so that
+Ratings, exports and the submission checklist read them; the machine's folder stays the reference (`machine.json` here
+says which machine and folder). Closing the window leaves it playing there; the next launch shows it again. *Resume* of
+an interrupted tournament of a machine resumes it there. The machine's budget (its cores and memory) is shared by its
+own tournaments, apart from this computer's. One tournament plays on one machine: its games are not spread over several.
 
 A machine needs an OpenSSH server (Linux, macOS, BSD; Windows 10 1809 and later), with an RSA host key and SFTP,
 both there by default. Commands go through `sh` whatever the user's shell is (fish or csh are fine), and through
@@ -1736,7 +2136,7 @@ session, before the first read or the start, and kept in memory: the tournament'
 keeps it, so that the tournament plays on after the window closes. `--run` in a terminal does not ask for it: use the
 SSH agent there.
 
-Each engine is started through a relay, `fastchess-gui --remote-engine <key>`, which the process that plays it
+Each engine is started through a relay, `rookstudio --remote-engine <key>`, which the process that plays it
 serves: one SSH connection to the machine for ten engines at most (the `MaxSessions` of an OpenSSH server), each engine
 started from its folder there. An engine whose relay goes is ended there too, by its process id, when it does not end
 by itself (on a Linux or macOS machine; on a Windows one, its channel is closed).
@@ -1746,7 +2146,7 @@ warns when it takes more than 5 % of the increment, or of the time a move has wi
 (twice the round trip). A machine never tested stops the start, and so does a tournament that runs on another machine
 than the engine's (one that runs on the engine's machine plays it there as its own engine).
 
-While the tournament plays, the home page has a *Machines* line under the cores: each machine, connected and what
+While the tournament plays, the Tournaments page has a *Machines* line under the cores: each machine, connected and what
 plays there, or since when it does not answer. A machine that does not answer is one entry under *Needs action*: its
 engines' games are set aside and tried again, the others go on, with *Try again* and *Test \<machine\>*. A game that
 an engine lost because its connection broke (its end as a disconnection) is voided and played again, written in the
@@ -1774,21 +2174,21 @@ Administrators and SYSTEM may read (the groups are given by their SIDs, the same
 icacls C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r /grant "*S-1-5-32-544:F" /grant "*S-1-5-18:F"
 ```
 
-Keep cmd as the server's shell: fastchess-gui speaks cmd, not PowerShell (if a `DefaultShell` value was set under
+Keep cmd as the server's shell: RookStudio speaks cmd, not PowerShell (if a `DefaultShell` value was set under
 `HKEY_LOCAL_MACHINE\SOFTWARE\OpenSSH`, remove it). On the machine's card, choose the Windows release's
-`fastchess-gui.exe`, then *Install fastchess-gui*.
+`rookstudio.exe`, then *Install RookStudio*.
 
 ## Files
 
-Everything lives in the profile folder: `~/.local/share/fastchess/fastchess-gui/` on Linux,
-`%APPDATA%\fastchess\fastchess-gui\` on Windows, `~/Library/Application Support/fastchess/fastchess-gui/` on macOS.
+Everything lives in the profile folder: `~/.local/share/rookstudio/` on Linux,
+`%APPDATA%\rookstudio\` on Windows, `~/Library/Application Support/rookstudio/` on macOS.
 Files the program creates are not writable by other users, and `settings.json` is readable by its owner only once
 it holds a lichess token. **Settings** shows the profile folder, with *Open the folder*.
 
 ### Portable mode
 
-With a file named `portable` (empty, without extension) beside the program (beside `fastchess-gui.exe` or
-`fastchess-gui`, beside `fastchess-gui.app` on macOS), the profile is the folder `data` beside the program instead,
+With a file named `portable` (empty, without extension) beside the program (beside `rookstudio.exe` or
+`rookstudio`, beside `RookStudio.app` on macOS), the profile is the folder `data` beside the program instead,
 and the default tournaments folder is `data/runs`: nothing is written elsewhere, but in the folders chosen for
 tournaments, exports and the like. The paths of what lies in the program's folder (engines, books, tablebases, test
 suites, the PGN files of the ratings and the setup, the folders chosen) are kept relative to it in the profile's
@@ -1807,7 +2207,7 @@ place, where the `portable` file is not.
 - `book-cache/`: the PGN books turned into Polyglot books for the participants' own books (removed after 30 days
   unused);
 - `layout.ini`: the window layout and the panels of the workspace; `layouts.json`: the layouts saved by name;
-  `fastchess-gui.log`: the log of the last session;
+  `rookstudio.log`: the log of the last session;
 - `suite.json`: the last setup of the Suites page; `suites/<suite>-<date>.json`: the finished test suite runs;
 - `board.json`: the settings of the Board page's analysis and games; `analyses/*.json`: the games analysed move
   by move, one file each; `games/*.pgn`: the games played from the Board page;
@@ -1822,7 +2222,14 @@ place, where the `portable` file is not.
   last test found; no passphrase), and `known_hosts.json` the host keys trusted, of the machines and the tunnel;
 - `running.json`: the tournaments playing now, with their weights, each removed when it stops; found at launch, it
   tells what to show again (a tournament that played on without the window) or to resume;
-- `runs/`: the tournaments, unless another folder was chosen (see [A tournament's folder](#a-tournaments-folder)).
+- `runs/`: the tournaments, unless another folder was chosen (see [A tournament's folder](#a-tournaments-folder));
+- `databases.json`: your databases, and `databases/` the folders of those made here (`Name.fcgdb`); `searches.json`:
+  the kept searches; `repertoires/`: your repertoires, one PGN file each;
+- `recent.json`: the Board page's game and the recent games, with their changes not saved;
+- `engines/`: the popular engines downloaded, each version in a folder of its own;
+- `assistant.json`: the assistant's settings, and `models/` its model;
+- `lichess-account.json`: the Lichess account linked, its permissions and its token (a file readable by you alone);
+  `lichess-cache/`: the answers of Lichess's tables and cloud.
 
 ### A tournament's folder
 
@@ -1847,7 +2254,7 @@ folder each, which can be moved, copied, zipped and sent:
   without a name, an older one, or a match imported from 0.2.x has `games.pgn` and `games-chessbase.pgn`;
 - `lichess.json`: the lichess broadcast and round its games went to (no token);
 - `processor.tsv`: the processor time each game's engines used, for the *Processor use* of a resumed tournament;
-- `fastchess-gui.log`: the log of the processes that played it (each tournament plays in a process of its own);
+- `rookstudio.log`: the log of the processes that played it (each tournament plays in a process of its own);
   `control.json`, while one plays it: where its local socket is (`control.sock` in the folder, or in the user's
   runtime folder when that path is too long; a named pipe on Windows), and which process listens;
 - `logs/game-N.log`: every line exchanged with both engines during game N (the number shown in the *Games* tab), with
@@ -1865,19 +2272,19 @@ A folder received from someone else is safe to open: the file of *Also append ev
 not opened for writing, so it cannot make the program write outside it. Resuming it runs the engines its
 `tournament.json` names, as any tournament does.
 
-Matches played with version 0.2 appear on the home page: *Import them* turns them into finished tournaments.
+Matches played with version 0.2 appear on the Tournaments page: *Import them* turns them into finished tournaments.
 
 ## Command line
 
 ```
-fastchess-gui [--profile DIR] [--autostart] [--size WxH] [--software]
-              [--shot FILE.png[@WINDOW[@SECONDS]]]... [--select-game N] [--focus WINDOW]
-              [--quit-after SECONDS]
-fastchess-gui [--profile DIR] --run TOURNAMENT_FOLDER|SETUP.json [--tlcs UDP_PORT [--tlcs-lanes]]
-              [--web TCP_PORT] [--tunnel [localhost.run|ssh://USER@HOST[:PORT][/REMOTE_PORT]]] [--live-files [DIR]] [--lichess ROUND_URL|ROUND_ID|new]
-              [--control stdio|socket] [--detach] [--allowance THREADS:MEMORY_MB:GPUS:ONE]
-fastchess-gui --attach TOURNAMENT_FOLDER
-fastchess-gui --version
+rookstudio [--profile DIR] [--autostart] [--size WxH] [--software]
+           [--shot FILE.png[@WINDOW[@SECONDS]]]... [--select-game N] [--focus WINDOW]
+           [--quit-after SECONDS]
+rookstudio [--profile DIR] --run TOURNAMENT_FOLDER|SETUP.json [--tlcs UDP_PORT [--tlcs-lanes]]
+           [--web TCP_PORT] [--tunnel [localhost.run|ssh://USER@HOST[:PORT][/REMOTE_PORT]]] [--live-files [DIR]] [--lichess ROUND_URL|ROUND_ID|new]
+           [--control stdio|socket] [--detach] [--allowance THREADS:MEMORY_MB:GPUS:ONE]
+rookstudio --attach TOURNAMENT_FOLDER
+rookstudio --version
 ```
 
 - `--profile DIR` uses another profile folder;
@@ -1990,6 +2397,8 @@ system and the last lines of the log (see [Reporting a problem](#reporting-a-pro
 - **Chess960, Chess324**: starting positions with the back rank shuffled: 960 with the king between the rooks
   (castling to its usual squares), 324 with the king and rooks in place.
 - **Concurrency**: the number of games played at the same time.
+- **Cursed win**: a position the tablebases count as won, but whose mate takes more moves than the 50-move rule allows:
+  a draw in a game played to that rule.
 - **Cycle**: in a round robin, every pairing played once with each colour (cutechess calls it a round, of 2 games per
   encounter).
 - **ECO**: the Encyclopaedia of Chess Openings' codes, A00 to E99.
@@ -2003,12 +2412,15 @@ system and the last lines of the log (see [Reporting a problem](#reporting-a-pro
 - **LLR**: the log-likelihood ratio of an SPRT; the test ends when it leaves its bounds, from alpha and beta.
 - **LOS**: the likelihood of superiority, the probability that an engine is stronger than another, from their games.
 - **MultiPV**: an engine searching several lines at once.
+- **Novelty**: the first move of a game that no game of the database had played in that position.
 - **Opening suite, book**: the positions or moves the games start from, each played twice with colours reversed.
 - **Pentanomial**: the results of the game pairs counted by their total: 0, ½, 1, 1½ or 2 points. It gives tighter
   error bars than counting single games, since the two games of a pair share an opening.
 - **PGN**: the text format of chess games: tags such as `[White "…"]`, then the moves.
 - **Polyglot**: the binary format of opening books (`.bin`) read by most programs, with a weight for each move.
-- **Ponder**: thinking on the opponent's time; off in fastchess-gui's tournaments.
+- **Ponder**: thinking on the opponent's time; off in RookStudio's tournaments.
+- **Repertoire**: the openings one plays, a move chosen for one's side in each position, and the opponent's moves
+  answered.
 - **Seed**: a place in the participants' order: the engines under test of a gauntlet, the favourites of a knockout.
 - **SPRT**: the sequential probability ratio test, which plays games until it can tell, with the error rates chosen
   (alpha, beta), whether an engine gains elo1 or more (H1) or not more than elo0 (H0).

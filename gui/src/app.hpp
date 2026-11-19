@@ -904,7 +904,9 @@ class App {
     // offers its model (board 1).
     void drawBoardQuestions();
     void drawAssistantFirstUse();
-    void askQuestion(const std::string& text);
+    // `text` as the user reads it; `asked`, when not empty, what the assistant is given (a suggestion, in its own
+    // language).
+    void askQuestion(const std::string& text, const std::string& asked = {});
     void pollQuestions();  // once a frame: the answers that came, the assistant's download and unloading
     // Settings › Assistant (M5, board 5): where it stands, its model, where it runs, when it unloads.
     void drawAssistantSettings(float label);

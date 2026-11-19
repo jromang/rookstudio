@@ -269,7 +269,7 @@ void App::drawGameHeaders() {
         !validDate(date) && date != "?")
         ImGui::TextColored(
             ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-            trf("« {} » is not a date: YYYY.MM.DD, with ?? for what is not known (2024.??.?\?)", date).c_str());
+            trf("“{}” is not a date: YYYY.MM.DD, with ?? for what is not known (2024.??.?\?)", date).c_str());
     // The result: one click.
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(TR("Result"));
@@ -319,8 +319,9 @@ void App::drawGameHeaders() {
         header_new_value_.fill(0);
     }
     ImGui::PushTextWrapPos();
-    ImGui::TextDisabled("%s", TR("Tab: the next field (or a name of the database) · Enter: fold · Esc: the field as "
-                                 "it was · each field changed is a change (Ctrl+Z), Ctrl+S saves the game"));
+    ImGui::TextDisabled(
+        "%s", TR("Tab: the next field (or completes a name from the database) · Enter: fold · Esc: the field as "
+                 "it was · each field changed is a change (Ctrl+Z), Ctrl+S saves the game"));
     ImGui::PopTextWrapPos();
     ui::endCard();
     if (fold || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !io.WantTextInput)) headers_open_ = false;

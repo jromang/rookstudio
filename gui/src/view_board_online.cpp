@@ -272,8 +272,9 @@ void App::drawBoardOnline() {
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Not now"))) not_now = true;
-        ImGui::TextDisabled("%s", TR("« Always » is changed on the Lichess page (Online for the analysis), where it is "
-                                     "said too (R8)."));
+        ImGui::TextDisabled("%s",
+                            TR("“Always” can be changed on the Lichess page, under Online for the analysis, which "
+                               "also says what is sent."));
         ImGui::PopTextWrapPos();
         ui::endCard();
         ImGui::Dummy(ImVec2(0, px(4)));
@@ -459,7 +460,7 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
         ImGui::TextDisabled("%s", TR("the best line to the end, previewed; a click on a move plays it"));
     }
     ImGui::TextDisabled("%s", TR("A win drawn by the 50-move rule: the mate takes more than 50 moves without a capture "
-                                 "or a pawn move (a « cursed win », the tables say); « maybe » when the rule and the "
+                                 "or a pawn move (a “cursed win”, the tables say); “maybe” when the rule and the "
                                  "game played do not settle it."));
     ImGui::PopTextWrapPos();
     ui::endCard();

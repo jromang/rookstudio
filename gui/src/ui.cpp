@@ -231,7 +231,7 @@ std::string dayText(std::time_t when) {
     if (days < 7) return TR(week[then.tm_wday]);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &then);
-    return trf("on {}", text);
+    return text;
 }
 
 std::string exactCount(uint64_t n) {

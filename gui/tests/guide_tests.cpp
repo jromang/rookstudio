@@ -112,7 +112,7 @@ TEST_CASE("guide: the embedded guides, gzipped, read back whole") {
     const auto* en = guide::doc("en");
     REQUIRE(en);
     CHECK(en->text.size() > 100000);
-    CHECK(en->text.substr(0, 26) == "# fastchess-gui user guide");
+    CHECK(en->text.substr(0, 23) == "# RookStudio user guide");
     CHECK(guide::doc("") == en);
     CHECK(guide::doc("xx") == nullptr);
     CHECK(guide::picture("screenshots/appearance.png").has_value());

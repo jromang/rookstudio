@@ -65,12 +65,12 @@ bool App::saveBoardInto(std::size_t index, bool copy) {
     const auto& entry = s.entries()[index];
     const auto db     = s.open(index);
     if (!db) {
-        boardToast(trf("« {} » cannot be opened.", entry.name));
+        boardToast(trf("“{}” cannot be opened.", entry.name));
         return false;
     }
     if (db->readOnly()) {
         boardToast(
-            trf("« {} » is read-only for now, another program writes to it: the game stays changed here.", entry.name));
+            trf("“{}” is read-only for now, another program writes to it: the game stays changed here.", entry.name));
         return false;
     }
     fillBoardEco();
@@ -90,7 +90,7 @@ bool App::saveBoardInto(std::size_t index, bool copy) {
         return false;
     }
     if (copy) {  // the game stays where it came from, and as changed as it was
-        boardToast(trf("A copy saved in « {} », game {}", entry.name, ui::exactCount(id + 1)));
+        boardToast(trf("A copy saved in “{}”, game {}", entry.name, ui::exactCount(id + 1)));
         s.rebuildTree(index);
         return true;
     }
@@ -102,9 +102,9 @@ bool App::saveBoardInto(std::size_t index, bool copy) {
     board_origin_                 = std::move(origin);
     board_.settings.save_database = entry.folder.string();
     saveBoardSettings();
-    board_.changes.saved("« " + entry.name + " »");
+    board_.changes.saved(trf("“{}”", entry.name));
     s.rebuildTree(index);
-    boardToast(trf("Saved in « {} », game {}", entry.name, ui::exactCount(id + 1)));
+    boardToast(trf("Saved in “{}”, game {}", entry.name, ui::exactCount(id + 1)));
     return true;
 }
 
@@ -119,7 +119,7 @@ bool App::saveBoardInPgnFile() {
     {
         std::ifstream in(file, std::ios::binary);
         if (!in) {
-            boardToast(trf("« {} » cannot be read: the game stays changed here.", name));
+            boardToast(trf("“{}” cannot be read: the game stays changed here.", name));
             return false;
         }
         text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
@@ -132,8 +132,8 @@ bool App::saveBoardInPgnFile() {
         const auto& was = index->games[at];
         if (at >= fresh->games.size() || fresh->str(fresh->games[at].white) != index->str(was.white) ||
             fresh->str(fresh->games[at].black) != index->str(was.black)) {
-            boardToast(trf("« {} » has changed since: game {} is no longer there. Ctrl+Shift+S saves it elsewhere.",
-                           name, at + 1));
+            boardToast(trf("“{}” has changed since: game {} is no longer there. Ctrl+Shift+S saves it elsewhere.", name,
+                           at + 1));
             return false;
         }
         index = std::move(fresh);
@@ -156,7 +156,7 @@ bool App::saveBoardInPgnFile() {
     source.index        = std::make_shared<const tour::PgnIndex>(tour::indexPgn(written));
     source.filter_dirty = true;
     b.changes.saved(name);
-    boardToast(trf("Saved in « {} », game {}, at its place", name, at + 1));
+    boardToast(trf("Saved in “{}”, game {}, at its place", name, at + 1));
     return true;
 }
 
@@ -178,13 +178,13 @@ void App::drawSaveMenu(ImVec2 under) {
     const auto& b     = board_;
     const bool own_db = board_origin_ && !board_origin_->linked;
     if (save_copy_ && own_db)
-        choices.push_back({trf("Into « {} », under its number", board_origin_->name),
+        choices.push_back({trf("Into “{}”, under its number", board_origin_->name),
                            TR("what Ctrl+S does"),
                            [this] { (void)saveBoardToDatabase(); },
                            {}});
     const bool from_file = !own_db && b.pgn && !b.pgn->file.empty() && b.pgn->selected >= 0;
     if (from_file)
-        choices.push_back({trf("Into « {} », at its place", b.pgn->file.filename().string()),
+        choices.push_back({trf("Into “{}”, at its place", b.pgn->file.filename().string()),
                            TR("the file written again at once, its other games as they are"),
                            [this] { (void)saveBoardInPgnFile(); },
                            {}});
@@ -200,8 +200,8 @@ void App::drawSaveMenu(ImVec2 under) {
         const auto& e    = s.entries()[i];
         const auto facts = s.facts(i);
         Choice c;
-        c.label = save_copy_ ? trf("A copy in « {} »", e.name) : trf("Into « {} » · one more game", e.name);
-        if (save_copy_ && own_db && e.folder == board_origin_->folder) c.label = trf("A copy in « {} » too", e.name);
+        c.label = save_copy_ ? trf("A copy in “{}”", e.name) : trf("Into “{}” · one more game", e.name);
+        if (save_copy_ && own_db && e.folder == board_origin_->folder) c.label = trf("A copy in “{}” too", e.name);
         c.detail = e.folder == std::filesystem::path(b.settings.save_database)
                        ? std::string(TR("where you saved last time"))
                        : trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(facts.games, 1000000000)),

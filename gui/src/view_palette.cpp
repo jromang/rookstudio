@@ -38,6 +38,8 @@ const char* App::guideSection() const {
     using namespace guide::topics;
     switch (page_) {
         case Page::Home:
+            return TournamentsPage;
+        case Page::ChessHome:
             return Home;
         case Page::NewMatch:
             return NewTournament;
@@ -67,7 +69,27 @@ const char* App::guideSection() const {
         case Page::Books:
             return Books;
         case Page::Board:
-            return Board;
+            if (!chessBoard()) return Board;
+            switch (board_side_tab_) {
+                case 0:
+                    return Notation;
+                case 2:
+                    return TreeTab;
+                case 3:
+                    return ReferenceGames;
+                case 4:
+                    return Questions;
+                default:
+                    return StudyBoard;
+            }
+        case Page::Databases:
+            return Databases;
+        case Page::Openings:
+            return OpeningsPage;
+        case Page::Lichess:
+            return LichessPage;
+        case Page::Count:  // the views' sheet
+            return Views;
         case Page::Suites:
             return Suites;
         case Page::Ratings:
@@ -75,11 +97,6 @@ const char* App::guideSection() const {
         case Page::Log:
             return Report;
         case Page::Settings:
-        case Page::ChessHome:  // the guide's Chess space comes with the batch of preview 1
-        case Page::Databases:
-        case Page::Openings:
-        case Page::Lichess:
-        case Page::Count:
             break;
     }
     return Window;

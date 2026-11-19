@@ -211,9 +211,9 @@ void App::drawReviewTables() {
                                    "fewer.",
                                    n, n)
                                    .c_str());
-        ImGui::TextDisabled("%s",
-                            TR("To ask, their FEN would go to lichess.org, one at a time, without an account; the "
-                               "answers are kept in the profile."));
+        ImGui::TextDisabled(
+            "%s", TR("To ask, their FEN would go to tablebase.lichess.ovh, one at a time, without an account; the "
+                     "answers are kept in the profile."));
         if (ImGui::SmallButton(TR("Ask for this game"))) review_tables_once_ = true;
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Always"))) {
@@ -222,8 +222,9 @@ void App::drawReviewTables() {
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Not now"))) review_tables_not_now_ = true;
-        ImGui::TextDisabled("%s", TR("« Always » is changed on the Lichess page (Online for the analysis), where it is "
-                                     "said too (R8)."));
+        ImGui::TextDisabled("%s",
+                            TR("“Always” can be changed on the Lichess page, under Online for the analysis, which "
+                               "also says what is sent."));
         ImGui::PopTextWrapPos();
         ui::endCard();
     }
@@ -238,7 +239,7 @@ std::vector<std::string> App::commentBasis(bool from_review) {
         out.push_back(trf("{}, 300,000 nodes per position", oracle_->engine()));
     out.emplace_back(TR("the facts of the positions its lines lead to"));
     if (from_review && !theory_of_.empty() && theory_of_ == boardTheoryKey())
-        out.push_back(trf("« {} »: the game's theory and its novelty", board_theory_base_));
+        out.push_back(trf("“{}”: the game's theory and its novelty", board_theory_base_));
     out.emplace_back(assistant_ && assistant_->installed()
                          ? TR("written by the model, held to these facts; a template where it had nothing better")
                          : TR("a template comment, written without the model"));
@@ -541,26 +542,28 @@ void App::drawReviewAssistant() {
         const auto& t = board_theory_used_;
         std::string line;
         if (t.book_plies > 0)
-            line = trf("Theory in « {} » up to {}", board_theory_base_, boardMoveLabel(static_cast<int>(t.book_plies)));
+            line = trf("Theory in “{}” up to {}", board_theory_base_, boardMoveLabel(static_cast<int>(t.book_plies)));
         else
-            line = trf("No theory from « {} » before the first error", board_theory_base_);
+            line = trf("No theory from “{}” before the first error", board_theory_base_);
         if (t.book_plies < board_theory_.book_plies)
-            line += " · " + trf("its games played on to {}, an error the engine sees",
+            line += " · " + trf("its games went on to {}, a move the engine sees as an error",
                                 boardMoveLabel(static_cast<int>(board_theory_.book_plies)));
         if (board_theory_.novelty) {
             // Measured against the games that had come so far: a few, or thousands (M5, board 4).
             const auto move = boardMoveLabel(static_cast<int>(*board_theory_.novelty) + 1);
             const auto n    = board_theory_.reached;
-            line += " · " + (n == 0 ? trf("{} was new: no game had played it", move)
-                                    : trn("{} was new: the one game that had reached the position played another move",
-                                          "{} was new: none of the {} games that had reached the position played it", n,
-                                          move, ui::exactCount(n)));
+            line += " · " +
+                    (n == 0   ? trf("{} was new: no game had played it", move)
+                     : n == 1 ? trf("{} was new: the one game that had reached the position played another move", move)
+                              : trn("{} was new: none of the {} game that had reached the position played it",
+                                    "{} was new: none of the {} games that had reached the position played it", n, move,
+                                    ui::exactCount(n)));
         }
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", line.c_str());
         ImGui::PopTextWrapPos();
     } else if (theory_job_) {
-        ImGui::TextDisabled("%s", trf("Looking for the game's theory in « {} »…", board_theory_base_).c_str());
+        ImGui::TextDisabled("%s", trf("Looking for the game's theory in “{}”…", board_theory_base_).c_str());
     }
     // How its endgame is judged: Lichess's tables, asked when allowed (#42).
     drawReviewTables();

@@ -291,7 +291,7 @@ void App::drawRecentPopup() {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + px(440));
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", TR("A click opens one, the right button on a changed one discards its changes; Ctrl+Tab "
-                                "from any page of the Chess space"));
+                                "from any page of a view whose Board is for study"));
     ImGui::PopStyleColor();
     ImGui::PopTextWrapPos();
     ImGui::Separator();
@@ -372,7 +372,7 @@ void App::discardBoardChanges() {
             boardToast(TR("Changes discarded"));
             return;
         }
-        boardToast(trf("« {} » cannot be read now: the changes stay.", origin.name));
+        boardToast(trf("“{}” cannot be read now: the changes stay.", origin.name));
     }
 }
 
@@ -403,7 +403,7 @@ void App::drawBoardStrip() {
         const auto place =
             o.filter.empty()
                 ? trf("{} · game {} of {}", o.name, ui::exactCount(row + 1), ui::exactCount(total))
-                : trf("{} · game {} of {} · « {} »", o.name, ui::exactCount(row + 1), ui::exactCount(total), o.filter);
+                : trf("{} · game {} of {} · “{}”", o.name, ui::exactCount(row + 1), ui::exactCount(total), o.filter);
         ImGui::TextUnformatted(place.c_str());
         ImGui::SameLine(0, px(6));
         ImGui::BeginDisabled(row + 1 >= total);
@@ -457,10 +457,9 @@ void App::drawBoardStrip() {
     const ImVec2 save_under(ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y + px(4));
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip(
-            "%s",
-            board_origin_ && !board_origin_->linked
-                ? trf("Into « {} », under its number · Ctrl+Shift+S: a copy elsewhere", board_origin_->name).c_str()
-                : TR("Into a database, its PGN file or another: a menu · Ctrl+S"));
+            "%s", board_origin_ && !board_origin_->linked
+                      ? trf("Into “{}”, under its number · Ctrl+Shift+S: a copy elsewhere", board_origin_->name).c_str()
+                      : TR("Into a database, its PGN file or another: a menu · Ctrl+S"));
     if (show_keys) {
         ImGui::SameLine(0, px(4));
         ImGui::TextDisabled("Ctrl+S");
@@ -543,7 +542,7 @@ void App::drawBoardTree() {
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("No database with its opening tree, nor Polyglot book: import games on the "
                                      "Databases page (the tree is built after the import), or add a book on the Books "
-                                     "page of the Engines space."));
+                                     "page."));
         ImGui::PopTextWrapPos();
     }
     tree_source_         = std::clamp(tree_source_, 0, count - 1);
@@ -641,7 +640,7 @@ void App::drawBoardTree() {
         const auto index = tree_job ? tree_job->index : import->index;
         const auto total = tree_job ? tree_job->progress.total.load() : import->tree.total.load();
         const auto done  = tree_job ? tree_job->progress.done.load() : import->tree.done.load();
-        ImGui::TextDisabled("%s", trf("« {} »: its opening tree being built, {} %", s.entries()[index].name,
+        ImGui::TextDisabled("%s", trf("“{}”: its opening tree being built, {} %", s.entries()[index].name,
                                       total ? static_cast<int>(100 * done / total) : 0)
                                       .c_str());
         ImGui::SameLine();
@@ -895,7 +894,7 @@ void App::drawBoardTree() {
         const bool added = reps.toggle(index, *path, *star);
         star_undo_       = StarUndo{
             index, std::move(before),
-            trf(added ? TR("{} added to « {} »") : TR("{} taken out of « {} »"), san, reps.entries()[index].name), now};
+            trf(added ? TR("{} added to “{}”") : TR("{} taken out of “{}”"), san, reps.entries()[index].name), now};
     }
     if (star_undo_ && now - star_undo_->at < 8) {
         ImGui::TextUnformatted(star_undo_->said.c_str());
@@ -972,20 +971,22 @@ void App::drawTreeNovelty(std::size_t index) {
     const auto move  = (*n.ply + 1) / 2;
     ImGui::PushTextWrapPos();
     if (n.search) {
-        ImGui::TextDisabled("%s", trf("The game's line leaves « {} » at move {}: looking whether a game reached its "
+        ImGui::TextDisabled("%s", trf("The game's line leaves “{}” at move {}: looking whether a game reached its "
                                       "position…",
                                       src->name, move)
                                       .c_str());
     } else if (n.confirmed) {
-        ImGui::TextUnformatted(trf("The game's line leaves « {} » at move {}:", src->name, move).c_str());
+        ImGui::TextUnformatted(trf("The game's line leaves “{}” at move {}:", src->name, move).c_str());
         ImGui::SameLine(0, px(4));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", trf("{} is a novelty", label).c_str());
         ImGui::TextDisabled("%s", TR("No game of the database reached this position (the position search says so)."));
     } else {
-        ImGui::TextDisabled("%s", trn("After {1}, a single game of « {2} » reaches the position, by other moves.",
-                                      "After {1}, {0} games of « {2} » reach the position, by other moves.", n.found,
-                                      ui::exactCount(n.found), label, src->name)
-                                      .c_str());
+        const auto text = n.found == 1 ? trf("After {}, a single game of “{}” reaches the position, by other moves.",
+                                             label, src->name)
+                                       : trn("After {}, {} game of “{}” reaches the position, by other moves.",
+                                             "After {}, {} games of “{}” reach the position, by other moves.", n.found,
+                                             label, ui::exactCount(n.found), src->name);
+        ImGui::TextDisabled("%s", text.c_str());
     }
     ImGui::PopTextWrapPos();
     if (static_cast<int>(*n.ply) < b.ply || n.confirmed) {
@@ -1065,7 +1066,7 @@ void App::drawBoardReferences() {
         for (std::size_t i = 0; i < s.entries().size() && !base; ++i)
             if (!s.entries()[i].source) base = i;
         if (base &&
-            ImGui::SmallButton(trf("All the games of the position in « {} » ›", s.entries()[*base].name).c_str())) {
+            ImGui::SmallButton(trf("All the games of the position in “{}” ›", s.entries()[*base].name).c_str())) {
             db_selected_        = static_cast<int>(*base);
             db_search_          = SearchFields{};
             db_search_.position = true;

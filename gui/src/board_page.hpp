@@ -113,7 +113,7 @@ struct PgnSource {
 struct GameChanges {
     int count = 0;
     bool lost = false;
-    std::string saved_in;  // where it was saved last ("« Mega »", a file's name), said while nothing changed
+    std::string saved_in;  // where it was saved last ("“Mega”", a file's name), said while nothing changed
     [[nodiscard]] bool any() const noexcept { return count != 0 || lost; }
     void change() noexcept {
         if (count < 0) lost = true;

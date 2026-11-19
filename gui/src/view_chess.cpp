@@ -38,8 +38,13 @@ std::string gameTitle(const ReplayGame& game) {
 
 void App::drawChessHome() {
     ui::pageTitle(TR("Home"), guideSection());
-    ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - px(340)));
-    if (ui::iconButton("chess_search", ui::Icon::Search, TR("Find a command, a game, a database"))) {
+    // At the right, as wide as its label in the language of the interface, its key after it.
+    const char* search_label = TR("Find a command, a game, a database");
+    const auto& style        = ImGui::GetStyle();
+    const float search_w     = style.FramePadding.x * 2 + ImGui::GetFrameHeight() * 0.42f + style.ItemInnerSpacing.x +
+                               ImGui::CalcTextSize(search_label).x + px(6) + ImGui::CalcTextSize("Ctrl+K").x;
+    ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - search_w));
+    if (ui::iconButton("chess_search", ui::Icon::Search, search_label)) {
         palette_request_ = true;
     }
     ImGui::SameLine(0, px(6));
@@ -73,9 +78,9 @@ void App::drawChessHome() {
         std::vector<std::string> parts;
         if (board_origin_) {
             const auto& o = *board_origin_;
-            parts.push_back(o.filter.empty() || !o.view ? trf("{} · game {}", o.name, ui::exactCount(o.id + 1))
-                                                        : trf("{} · game {} of the filter « {} »", o.name,
-                                                              ui::exactCount(o.row + 1), o.filter));
+            parts.push_back(o.filter.empty() || !o.view
+                                ? trf("{} · game {}", o.name, ui::exactCount(o.id + 1))
+                                : trf("{} · game {} of the filter “{}”", o.name, ui::exactCount(o.row + 1), o.filter));
         } else if (b.pgn) {
             parts.push_back(b.pgn->name);
         }
@@ -180,8 +185,10 @@ void App::drawChessHome() {
     if (bases) {
         ui::beginCard("chess_bases", ImVec2(0, 0));
         ImGui::TextUnformatted(TR("My databases"));
-        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10), ImGui::GetContentRegionMax().x - px(90)));
-        if (ImGui::SmallButton(TR("+ Import…"))) {
+        const char* import_label = TR("+ Import…");
+        const float import_w     = ImGui::CalcTextSize(import_label).x + ImGui::GetStyle().FramePadding.x * 2;
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10), ImGui::GetContentRegionMax().x - import_w));
+        if (ImGui::SmallButton(import_label)) {
             page_ = Page::Databases;
             dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
         }
@@ -223,9 +230,8 @@ void App::drawChessHome() {
             ImGui::PopID();
         }
         if (linked > 0) {
-            if (ImGui::Selectable(trn("Tournaments ({}) · the Engines space's games, read without a copy",
-                                      "Tournaments ({}) · the Engines space's games, read without a copy", linked,
-                                      linked)
+            if (ImGui::Selectable(trn("Tournaments ({}) · their games, read without a copy",
+                                      "Tournaments ({}) · their games, read without a copy", linked, linked)
                                       .c_str()))
                 page_ = Page::Databases;
         }

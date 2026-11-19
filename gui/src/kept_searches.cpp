@@ -115,7 +115,7 @@ std::string App::keptSearchName(const SearchFields& f) const {
     if (f.result) add(f.result == '1' ? "1-0" : f.result == '0' ? "0-1" : "½-½");
     if (f.position) add(TR("the position"));
     if (std::any_of(f.material.begin(), f.material.end(), [](const auto& m) { return m[0] != 0; }))
-        add(TR("a material"));
+        add(TR("a material balance"));
     if (std::any_of(f.pattern.begin(), f.pattern.end(), [](int8_t v) { return v >= 0; })) add(TR("a pattern"));
     if (f.damaged) add(TR("damaged games"));
     return name.empty() ? std::string(TR("A search")) : name;

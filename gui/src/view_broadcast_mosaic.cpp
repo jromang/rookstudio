@@ -89,13 +89,21 @@ void App::pollBroadcastBoards() {
     const FollowedRound* round = nullptr;
     for (const auto& f : followed_rounds_)
         if (f.entry.round.id == broadcast_round_) round = &f;
-    if (!round) {
+    const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
+    if (!round && !players) {
         broadcast_boards_.clear();
         if (!broadcast_round_.empty()) broadcast_round_.clear();  // no longer followed: the page itself again
     }
     // The games, read again when Lichess sent them again.
-    if (round) {
-        for (const auto& g : round->follower->games()) {
+    if (round || players) {
+        const auto games = round               ? round->follower->games()
+                           : players_follower_ ? players_follower_->games()
+                                               : std::vector<lichess::BroadcastGame>{};
+        if (players)  // a player's game no longer followed leaves the mosaic
+            std::erase_if(broadcast_boards_, [&](const auto& b) {
+                return std::none_of(games.begin(), games.end(), [&](const auto& g) { return g.url == b.url; });
+            });
+        for (const auto& g : games) {
             auto it = std::find_if(broadcast_boards_.begin(), broadcast_boards_.end(),
                                    [&](const auto& b) { return b.url == g.url; });
             if (it == broadcast_boards_.end()) {
@@ -294,17 +302,33 @@ void App::drawBroadcastMosaic() {
         broadcast_round_.clear();
         return;
     }
-    if (!round) return;
+    const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
+    if (!round && !players) return;
     ImGui::SameLine();
-    ImGui::TextUnformatted(fmt::format("{} · {}", round->entry.tour.name, round->entry.round.name).c_str());
-    ImGui::SameLine();
-    const auto error = round->follower->error();
-    if (round->follower->streaming())
-        ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s", TR("live"));
-    else
-        ImGui::TextDisabled("%s", error.empty()
-                                      ? TR("connecting…")
-                                      : trf("the stream broke ({}): it opens again by itself", error).c_str());
+    if (players) {
+        ImGui::TextUnformatted(TR("Followed players"));
+        ImGui::SameLine();
+        const auto live = std::count_if(broadcast_boards_.begin(), broadcast_boards_.end(),
+                                        [](const auto& b) { return playing(b.result); });
+        if (live > 0)
+            ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s",
+                               trn("{} game live", "{} games live", static_cast<uint64_t>(live), live).c_str());
+        const auto error = players_follower_ ? players_follower_->error() : std::string();
+        if (!error.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", trf("· Lichess: {}", error).c_str());
+        }
+    } else {
+        ImGui::TextUnformatted(fmt::format("{} · {}", round->entry.tour.name, round->entry.round.name).c_str());
+        ImGui::SameLine();
+        const auto error = round->follower->error();
+        if (round->follower->streaming())
+            ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s", TR("live"));
+        else
+            ImGui::TextDisabled("%s", error.empty()
+                                          ? TR("connecting…")
+                                          : trf("the stream broke ({}): it opens again by itself", error).c_str());
+    }
 
     // Analysed by: an engine of the library, its threads for each game; or none.
     ImGui::AlignTextToFramePadding();
@@ -344,7 +368,7 @@ void App::drawBroadcastMosaic() {
     ImGui::TextDisabled(
         "%s", trn("thread a game", "threads a game", static_cast<uint64_t>(lichess_.broadcast_threads)).c_str());
     ImGui::SameLine();
-    if (ImGui::SmallButton(TR("Stop following"))) {
+    if (!players && ImGui::SmallButton(TR("Stop following"))) {
         for (std::size_t r = 0; r < followed_rounds_.size(); ++r) {
             if (followed_rounds_[r].entry.round.id != broadcast_round_) continue;
             followed_rounds_[r].follower->stop();
@@ -358,7 +382,10 @@ void App::drawBroadcastMosaic() {
     ImGui::Spacing();
 
     if (broadcast_boards_.empty()) {
-        ImGui::TextDisabled("%s", TR("No game of the round has come yet: they appear as Lichess sends them."));
+        ImGui::TextDisabled("%s", players
+                                      ? TR("None of them plays now: their games come here as they start, three "
+                                           "moves behind, as Lichess shows them.")
+                                      : TR("No game of the round has come yet: they appear as Lichess sends them."));
         return;
     }
     // The mosaic on the left, the game chosen and the round on the right.
@@ -488,7 +515,7 @@ void App::drawBroadcastMosaic() {
         ImGui::Dummy(ImVec2(0, px(6)));
     }
     ui::beginCard("broadcast_round");
-    ImGui::TextUnformatted(TR("The round"));
+    ImGui::TextUnformatted(players ? TR("Their games") : TR("The round"));
     if (ImGui::BeginTable("##round_games", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("##game", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed);  // as wide as its widest
@@ -512,9 +539,13 @@ void App::drawBroadcastMosaic() {
         ImGui::EndTable();
     }
     ui::endCard();
-    ImGui::TextDisabled("%s", TR("The moves come from Lichess's stream, opened again by itself after a break; the "
-                                 "analysis is made on your machine, with your engines. A finished game stays here "
-                                 "until the round ends, then the whole round goes into the “Broadcasts” database."));
+    ImGui::TextDisabled("%s", players ? TR("The moves come from Lichess, three moves behind, as it shows them to "
+                                           "anyone; the analysis is made on your machine, with your engines. A game "
+                                           "that ends stays here until another takes its place.")
+                                      : TR("The moves come from Lichess's stream, opened again by itself after a "
+                                           "break; the analysis is made on your machine, with your engines. A "
+                                           "finished game stays here until the round ends, then the whole round "
+                                           "goes into the “Broadcasts” database."));
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
 }

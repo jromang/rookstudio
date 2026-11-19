@@ -303,12 +303,21 @@ void App::drawLichessScopeAsk() {
     ImGui::TextUnformatted(TR("Lichess asks for one more permission"));
     if (ask.follow)
         ImGui::TextDisabled("%s", trf("to follow “{} · {}”", ask.follow->tour.name, ask.follow->round.name).c_str());
-    ImGui::TextUnformatted(
-        TR("Since August 2026, Lichess lets broadcasts be followed with an account allowed to read "
-           "studies and broadcasts; without it, it slows them down heavily and may stop them."));
-    ImGui::TextDisabled("%s", TR("The permission lets RookStudio read your studies and the broadcasts; it writes "
-                                 "nothing. Lichess's page opens for it; your account stays linked meanwhile, and the "
-                                 "token it replaces is revoked."));
+    if (ask.scope == lichess::SCOPE_FOLLOW_READ) {  // the followed players' mosaic (#50)
+        ImGui::TextUnformatted(
+            TR("To show the games of the players your account follows, RookStudio must be allowed "
+               "to read whom it follows."));
+        ImGui::TextDisabled("%s", TR("The permission lets RookStudio read the players you follow on Lichess; it writes "
+                                     "nothing. Lichess's page opens for it; your account stays linked meanwhile, and "
+                                     "the token it replaces is revoked."));
+    } else {
+        ImGui::TextUnformatted(
+            TR("Since August 2026, Lichess lets broadcasts be followed with an account allowed to read "
+               "studies and broadcasts; without it, it slows them down heavily and may stop them."));
+        ImGui::TextDisabled("%s", TR("The permission lets RookStudio read your studies and the broadcasts; it writes "
+                                     "nothing. Lichess's page opens for it; your account stays linked meanwhile, and "
+                                     "the token it replaces is revoked."));
+    }
     if (lichess_link_) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                            TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
@@ -321,7 +330,20 @@ void App::drawLichessScopeAsk() {
         if (ui::iconButton("lichess_scope_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
             auto scopes = lichess_account_->scopes;
             if (!lichess_account_->has(ask.scope)) scopes.push_back(ask.scope);
+            lichess_players_then_mosaic_ = ask.players;
             startLichessLink(scopes, lichess_account_->username, ask.follow);
+        }
+        if (ask.players) {  // the players added by name, without reading whom the account follows
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Without it"))) {
+                lichess_.follow_declined = true;
+                saveLichessSettings();
+                lichess_scope_ask_.reset();
+                openPlayersMosaic(true);
+                ImGui::PopTextWrapPos();
+                ui::endCard();
+                return;
+            }
         }
         if (ask.follow) {
             ImGui::SameLine();
@@ -804,6 +826,8 @@ void App::drawLichessPage() {
             ImGui::Dummy(ImVec2(0, px(8)));
         }
     }
+    drawFollowedPlayers();  // the players followed live (#50)
+    ImGui::Dummy(ImVec2(0, px(8)));
     {
         ui::TopicRegion topic(guide::topics::LichessOnline);
         drawLichessOnline();

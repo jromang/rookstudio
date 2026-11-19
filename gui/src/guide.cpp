@@ -138,7 +138,8 @@ const std::vector<const char*>& allTopics() {
                                               PopularEngines,
                                               LichessLinks,
                                               FairPlay,
-                                              FinishedGames};
+                                              FinishedGames,
+                                              FollowedPlayers};
     return all;
 }
 

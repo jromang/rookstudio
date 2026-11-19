@@ -31,9 +31,13 @@ struct LichessSettings {
     std::string sync_date;
     bool listen_declined = false;  // "Not now" said to hearing the user's games start and end (#48)
     bool review_finished = false;  // a game of the user's that ended opened on the Board, its review started (#49)
+    // The players followed live (#50): those added by name; "Without it" said to reading whom the account follows.
+    std::vector<std::string> followed;
+    bool follow_declined = false;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
                                                 explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
-                                                sync_speeds, sync_since, sync_date, listen_declined, review_finished)
+                                                sync_speeds, sync_since, sync_date, listen_declined, review_finished,
+                                                followed, follow_declined)
 
 }  // namespace fcg

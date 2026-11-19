@@ -581,6 +581,8 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             lichess_.listen_declined = false;
             saveLichessSettings();
         });
+    // The followed players' games, in the broadcasts' mosaic (#50).
+    add(TR("Followed players' games in the mosaic"), "Lichess", [this] { openPlayersMosaic(); });
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {

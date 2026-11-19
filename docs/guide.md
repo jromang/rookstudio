@@ -1134,6 +1134,17 @@ two sides' figures in the Review tab, the same formula for both. The Lichess pag
 once* starts the review by itself, unless the Board holds a game with unsaved changes or work under way; the banner
 offers it then.
 
+### Followed players
+
+The Lichess page's *Followed players* card lists the players your account follows on Lichess and those you add by
+name, each with a dot: red while they play, with the game's time control, green when they are online. Their status is
+asked every fifteen seconds while the card or their mosaic shows, without an account.
+
+*Their games in the mosaic* shows the games they are playing in the broadcasts' mosaic, each analysed by your engine,
+eight at most, as Lichess allows; Lichess shows their moves three moves late, to anyone. A game that ends stays with its
+result until another takes its place. Reading whom your account follows needs one more permission, asked the first
+time; *Without it*, the players added by name are followed. Your own account and your own games never come there.
+
 ### Online for the analysis
 
 Three services, each asked about at its first use (for this position, always, or not now) and changed here:

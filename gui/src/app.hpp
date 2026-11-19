@@ -48,6 +48,7 @@
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
+#include "lichess_players.hpp"
 #include "lichess_playing.hpp"
 #include "lichess_profile.hpp"
 #include "lichess_settings.hpp"
@@ -740,9 +741,28 @@ class App {
         std::string scope;
         std::optional<lichess::BroadcastEntry> follow;  // the round to follow with it (#44)
         std::string error;                              // why the last try gave nothing
+        bool players = false;                           // the followed players' mosaic to open with it (#50)
     };
     std::optional<LichessScopeAsk> lichess_scope_ask_;
     void drawLichessScopeAsk();
+    // Chosen players followed live (#50, mockup M8, board "Prep"): those the account follows (follow:read, asked at the
+    // first "Their games in the mosaic") and those added by name; their status asked while the Lichess page shows them,
+    // their games in the mosaic, eight at most.
+    std::vector<std::string> lichess_following_;  // the account's, read once a session
+    std::future<lichess::Answer<std::vector<std::string>>> lichess_following_job_;
+    std::string lichess_following_token_;  // the token they were read with
+    std::vector<lichess::PlayerStatus> lichess_statuses_;
+    std::future<lichess::Answer<std::vector<lichess::PlayerStatus>>> lichess_status_job_;
+    std::chrono::steady_clock::time_point lichess_status_asked_{};
+    std::string lichess_status_error_;
+    int lichess_players_drawn_        = -1000;  // the frame that drew their card last
+    bool lichess_players_then_mosaic_ = false;  // the permission granted, their mosaic opens
+    std::unique_ptr<lichess::PlayersFollower> players_follower_;
+    std::array<char, 40> lichess_add_player_{};
+    [[nodiscard]] std::vector<std::string> followedPlayers() const;  // once each, never the user's own account
+    void pollFollowedPlayers();
+    void drawFollowedPlayers();  // the Lichess page's card
+    void openPlayersMosaic(bool asked = false);
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;

@@ -285,6 +285,7 @@ void App::frame() {
     pollLichess();    // a link, a sync, the broadcasts: whatever page shows
     pollLinkJob();    // a Lichess link pasted: its game asked, its import
     pollLichessPlaying();  // the user's games in progress on Lichess, and what they lock (#48)
+    pollFollowedPlayers();  // the players followed live, their games in the mosaic (#50)
     pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 

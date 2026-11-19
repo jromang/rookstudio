@@ -48,6 +48,7 @@
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
+#include "lichess_profile.hpp"
 #include "lichess_settings.hpp"
 #include "live.hpp"
 #include "machine_jobs.hpp"
@@ -763,6 +764,17 @@ class App {
         std::string said;  // its outcome
     };
     std::optional<LinkJob> link_job_;
+    // The linked account on the Home page (#46, mockup M8): its profile, kept a day; a speed's figures.
+    std::optional<lichess::Profile> lichess_profile_;
+    bool lichess_profile_loaded_ = false;
+    std::future<lichess::Answer<lichess::Profile>> lichess_profile_job_;
+    std::string lichess_profile_error_;
+    std::chrono::steady_clock::time_point lichess_profile_asked_{};
+    int lichess_speed_ = 1;  // the speed whose figures show: blitz
+    std::map<std::string, lichess::Answer<lichess::PerfFigures>> lichess_figures_;
+    std::future<std::pair<std::string, lichess::Answer<lichess::PerfFigures>>> lichess_figures_job_;
+    void pollLichessProfile();
+    void drawLichessAccountPanel();
     int link_key_frame_ = -1;  // the frame whose Enter or Escape the card took
     // True when `text` is a Lichess address: its card shown, or said unknown. `databases`: pasted on the Databases
     // page, its games offered for the database chosen there.

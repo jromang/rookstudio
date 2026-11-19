@@ -197,6 +197,7 @@ void App::drawLichessHomeCard() {
                         lichess_account_ ? trf("· {}", lichess_account_->username).c_str() : TR("· no account linked"));
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("The Lichess page ›"))) page_ = Page::Lichess;
+    drawLichessAccountPanel();  // the account's ratings, figures and activity (#46)
     if (const auto base = lichessBase()) {
         const auto facts = shelf().facts(*base);
         auto line        = trf("Lichess · {}: {}", lichess_.player, ui::exactCount(facts.games));

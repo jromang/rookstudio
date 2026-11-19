@@ -20,6 +20,7 @@ struct BroadcastRound {
     std::string id, name, url;
     int64_t starts = 0;  // ms since the epoch, 0 when not told
     bool finished  = false;
+    bool ongoing   = false;
 };
 struct BroadcastTour {
     std::string id, name, url;
@@ -35,6 +36,34 @@ struct BroadcastList {
     std::vector<BroadcastEntry> active, upcoming;
 };
 [[nodiscard]] Answer<BroadcastList> topBroadcasts(const std::atomic<bool>* cancel = nullptr);
+// Lichess's recent official broadcasts whose names hold `query` (#55): a token allowed to read broadcasts
+// (SCOPE_STUDY_READ) since 2026-10; 401 or 403 without.
+[[nodiscard]] Answer<std::vector<BroadcastEntry>> searchBroadcasts(const std::string& query, const std::string& token,
+                                                                   const std::atomic<bool>* cancel = nullptr);
+
+// A round's tournament and names, from the round's address (lichess.org/broadcast/<tour>/<round>/<id>), for a round
+// followed from a link (#55); a token allowed to read broadcasts, Lichess slows it down without.
+[[nodiscard]] Answer<BroadcastEntry> broadcastRoundEntry(const std::string& round_url, const std::string& token,
+                                                         const std::atomic<bool>* cancel = nullptr);
+
+// A broadcast tournament's players and their standings (#55), as its organisers gave them; no token.
+struct BroadcastPlayer {
+    std::string name, title, fed, team;
+    int rating = 0, played = 0, rank = 0;
+    int performance = 0, rating_diff = 0;  // 0 when not told
+    double score = 0;
+    bool scored  = false;  // Lichess gives the scores
+};
+[[nodiscard]] Answer<std::vector<BroadcastPlayer>> broadcastPlayers(const std::string& tour_id,
+                                                                    const std::atomic<bool>* cancel = nullptr);
+// A team event's standings, the leader first: match points, then game points. Empty for another event.
+struct BroadcastTeam {
+    std::string name;
+    double match_points = 0, game_points = 0;
+    int matches = 0;
+};
+[[nodiscard]] Answer<std::vector<BroadcastTeam>> teamStandings(const std::string& tour_id,
+                                                               const std::atomic<bool>* cancel = nullptr);
 
 // A round's game as Lichess last sent it.
 struct BroadcastGame {
@@ -43,14 +72,18 @@ struct BroadcastGame {
     int white_elo = 0, black_elo = 0;
     std::string pgn;       // the whole game, as sent
     uint64_t version = 0;  // the times it was sent
+    std::string round_id;  // its round's, from its BroadcastURL: a tournament followed whole sends several rounds
+    std::string round;     // its round's number, from its Round tag ("6" of "6.1")
 };
 
-// A round followed on a thread of its own until stop() or the end of the follower.
+// A round followed on a thread of its own until stop() or the end of the follower; or, `whole_tour`, all the ongoing
+// rounds of a tournament (#55), each new one as it starts: `id` is then the tournament's.
 class RoundFollower {
    public:
     // `token`, when given, lets Lichess open more streams at once; Lichess asks one allowed to read studies and
     // broadcasts (SCOPE_STUDY_READ) since 2026-08, and may refuse or slow down a round followed without.
-    explicit RoundFollower(std::string round_id, std::string token = {});
+    explicit RoundFollower(std::string id, std::string token = {}, bool whole_tour = false);
+    [[nodiscard]] bool wholeTour() const noexcept { return whole_; }
     ~RoundFollower();
     RoundFollower(const RoundFollower&)            = delete;
     RoundFollower& operator=(const RoundFollower&) = delete;
@@ -74,6 +107,7 @@ class RoundFollower {
     void take(std::string_view pgn);
 
     std::string round_, token_;
+    bool whole_ = false;
     std::atomic<bool> stop_{false};
     std::atomic<bool> streaming_{false};
     std::atomic<bool> refused_{false};

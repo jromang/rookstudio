@@ -746,6 +746,7 @@ class App {
         std::optional<lichess::BroadcastEntry> follow;  // the round to follow with it (#44)
         std::string error;                              // why the last try gave nothing
         bool players = false;                           // the followed players' mosaic to open with it (#50)
+        bool search  = false;                           // a search among the broadcasts to make with it (#55)
     };
     std::optional<LichessScopeAsk> lichess_scope_ask_;
     void drawLichessScopeAsk();
@@ -952,8 +953,37 @@ class App {
         lichess::BroadcastEntry entry;
         std::unique_ptr<lichess::RoundFollower> follower;
         bool with_token = false;  // followed with a token allowed to read broadcasts
+        bool whole      = false;  // the whole tournament, its rounds one after another (#55)
+        // What tells it apart: its round, or its tournament followed whole.
+        [[nodiscard]] std::string key() const { return whole ? "tour:" + entry.tour.id : entry.round.id; }
     };
     std::vector<FollowedRound> followed_rounds_;
+    // A broadcast, more (#55, mockup M8, board "Prep"): the players' standings and a team event's, asked while its
+    // mosaic shows (no token); a search among the broadcasts (study:read).
+    struct BroadcastStandings {
+        std::string tour;  // the tournament's id
+        lichess::Answer<std::vector<lichess::BroadcastPlayer>> players;
+        lichess::Answer<std::vector<lichess::BroadcastTeam>> teams;
+        std::chrono::steady_clock::time_point asked{};
+        std::future<std::pair<lichess::Answer<std::vector<lichess::BroadcastPlayer>>,
+                              lichess::Answer<std::vector<lichess::BroadcastTeam>>>>
+            job;
+    };
+    BroadcastStandings broadcast_standings_;
+    std::string broadcast_tour_round_;  // a tournament followed whole: the round shown, chosen; empty: the newest live
+    bool broadcast_all_players_ = false;  // all the players in the standings, not the first twelve
+    std::array<char, 80> broadcast_search_{};
+    std::string broadcast_searched_;  // the words of the answer shown
+    std::future<lichess::Answer<std::vector<lichess::BroadcastEntry>>> broadcast_search_job_;
+    std::optional<lichess::Answer<std::vector<lichess::BroadcastEntry>>> broadcast_found_;
+    bool broadcast_search_after_link_ = false;  // asked again once the permission is given
+    // A round followed from a link: its tournament and names asked of Lichess, once.
+    std::future<std::pair<std::string, lichess::Answer<lichess::BroadcastEntry>>> broadcast_named_job_;
+    std::set<std::string> broadcast_named_;
+    void startBroadcastSearch();
+    void followWholeTournament(const std::string& key);  // a round followed becomes its tournament followed whole
+    void pollBroadcastStandings();
+    void drawBroadcastStandings();
     // The filters of a player's games, as the user chose them; the home's count of the new ones, asked at most once an
     // hour when the user chose it (M4, board 3).
     [[nodiscard]] lichess::SyncFilters lichessFilters() const;
@@ -976,6 +1006,7 @@ class App {
         int white_elo = 0, black_elo = 0;
         std::string pgn;
         std::unique_ptr<Analyser> analyser;
+        std::string round_id, round;  // its round's id and number: a tournament followed whole has several
     };
     std::vector<BroadcastBoard> broadcast_boards_;
     std::future<lichess::Answer<lichess::Tablebase>> broadcast_tb_job_;  // one question to the tables at a time
@@ -988,7 +1019,8 @@ class App {
     void openBroadcastMosaic(const std::string& round_id);
     void drawBroadcastMosaic();
     void pollBroadcastBoards();  // once a frame: the games read again when they change, their engines, the round kept
-    void saveBroadcastRound(const FollowedRound& round, const std::vector<lichess::BroadcastGame>& games);
+    void saveBroadcastRound(const FollowedRound& round, const std::string& round_id,
+                            const std::vector<lichess::BroadcastGame>& games);
     // The game the Board page follows live, from a followed round: it moves on with each move received.
     struct BoardBroadcast {
         std::string round, url;

@@ -4,12 +4,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <string>
 #include <thread>
 
 #include <fmt/include/fmt/format.h>
 
 #include "free_ports.hpp"
+#include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_broadcasts.hpp"
 #include "scripted_server.hpp"
@@ -170,4 +172,155 @@ TEST_CASE("Lichess broadcasts: a round refused without a token allowed to read b
     CHECK(follower.connections() == 0);
     follower.stop();
     RoundFollower::setRetry(5s, 60s);
+}
+
+TEST_CASE("Lichess broadcasts: a tournament's players, its team standings, and a search with the token") {
+    const auto port = freePort();
+    std::atomic<int> searches{0};
+    std::string authorization;
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        const auto path = requestPath(head);
+        const auto ok   = [&](const std::string& body) {
+            c.sendAll(
+                fmt::format("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n"
+                            "Connection: close\r\n\r\n{}",
+                            body.size(), body));
+        };
+        if (path == "/broadcast/T1/players") {
+            ok(R"([{"name":"Second, Player","rating":2650,"played":5,"score":3.5,"rank":2},)"
+               R"({"name":"First, Player","title":"GM","rating":2712,"fed":"NOR","played":5,"score":4,)"
+               R"("ratingDiffs":{"standard":9},"performances":{"standard":2801},"rank":1},)"
+               R"({"name":"Unranked, Player","rating":2500,"played":0}])");
+        } else if (path == "/broadcast/T1/teams/standings") {
+            ok(R"([{"name":"Club B","mp":2,"gp":9.5,"matches":[{},{}]},{"name":"Club A","mp":4,"gp":12,"matches":[{},{}]},)"
+               R"({"name":"Club C","mp":2,"gp":11,"matches":[{},{}]}])");
+        } else if (path.rfind("/api/broadcast/search?", 0) == 0) {
+            ++searches;
+            authorization = httpHeader(head, "Authorization").value_or("");
+            if (authorization != "Bearer allowed") {
+                c.sendAll("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                return;
+            }
+            CHECK(path == "/api/broadcast/search?q=world%20cup&page=1");
+            ok(R"({"currentPage":1,"maxPerPage":20,"currentPageResults":[{"tour":{"id":"T9","name":"World Cup 2026",)"
+               R"("tier":5},"round":{"id":"R9","name":"Round 3","ongoing":true}}],"previousPage":null,"nextPage":null})");
+        } else {
+            c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        }
+    });
+    REQUIRE(server.ok());
+    Servers_ servers_(port);
+
+    const auto players = broadcastPlayers("T1");
+    REQUIRE(players.value);
+    REQUIRE(players.value->size() == 3);
+    const auto& first = (*players.value)[0];
+    CHECK(first.name == "First, Player");
+    CHECK(first.title == "GM");
+    CHECK(first.fed == "NOR");
+    CHECK(first.score == 4);
+    CHECK(first.scored);
+    CHECK(first.performance == 2801);
+    CHECK(first.rating_diff == 9);
+    CHECK((*players.value)[1].rank == 2);
+    CHECK((*players.value)[2].name == "Unranked, Player");  // no rank: after the ranked ones
+    CHECK_FALSE((*players.value)[2].scored);
+
+    const auto teams = teamStandings("T1");
+    REQUIRE(teams.value);
+    REQUIRE(teams.value->size() == 3);
+    CHECK((*teams.value)[0].name == "Club A");
+    CHECK((*teams.value)[1].name == "Club C");  // the game points part the two on 2 match points
+    CHECK((*teams.value)[1].matches == 2);
+    CHECK(teamStandings("T2").error == "Lichess answered 404");
+
+    const auto found = searchBroadcasts("world cup", "allowed");
+    REQUIRE(found.value);
+    REQUIRE(found.value->size() == 1);
+    CHECK((*found.value)[0].tour.name == "World Cup 2026");
+    CHECK((*found.value)[0].round.id == "R9");
+    CHECK((*found.value)[0].round.ongoing);
+    const auto refused = searchBroadcasts("world cup", "other");
+    CHECK_FALSE(refused.value);
+    CHECK(refused.status == 403);
+    CHECK(refused.error == "Lichess asks for an account allowed to read broadcasts");
+    CHECK(searches == 2);
+}
+
+TEST_CASE("Lichess broadcasts: a whole tournament followed, its rounds told apart, with no round export first") {
+    const auto port = freePort();
+    std::atomic<int> exports{0};
+    std::string asked;
+    std::mutex mutex;
+    const auto tagged = [](const std::string& round_id, const std::string& round, const std::string& board,
+                           const std::string& result) {
+        return fmt::format(
+            "[Event \"Open\"]\n[Round \"{}.{}\"]\n[White \"W{}\"]\n[Black \"B{}\"]\n[Result \"{}\"]\n"
+            "[BroadcastURL \"https://lichess.org/broadcast/open/round-{}/{}\"]\n"
+            "[GameURL \"https://lichess.org/broadcast/open/round-{}/{}/g{}{}\"]\n\n1. e4 e5 {}\n\n\n",
+            round, board, board, board, result, round, round_id, round, round_id, round, board, result);
+    };
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        const auto path = requestPath(head);
+        if (path.rfind("/api/broadcast/round/", 0) == 0) ++exports;
+        if (path == "/api/stream/broadcast/tour/TOUR0001.pgn") {
+            {
+                std::lock_guard lock(mutex);
+                asked = path;
+            }
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Type: application/x-chess-pgn\r\nTransfer-Encoding: chunked\r\n\r\n");
+            chunk(c, tagged("ROUND005", "5", "1", "1-0") + tagged("ROUND006", "6", "1", "*") +
+                         tagged("ROUND006", "6", "2", "*"));
+            waitUntil([&] { return false; }, 300ms);
+            c.sendAll("0\r\n\r\n");
+            return;
+        }
+        c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    });
+    REQUIRE(server.ok());
+    Servers_ servers_(port);
+    RoundFollower follower("TOUR0001", "allowed", true);
+    CHECK(follower.wholeTour());
+    REQUIRE(waitUntil([&] { return follower.games().size() == 3; }));
+    const auto games = follower.games();
+    CHECK(games[0].round_id == "ROUND005");
+    CHECK(games[0].round == "5");
+    CHECK(games[1].round_id == "ROUND006");
+    CHECK(games[2].round == "6");
+    follower.stop();
+    CHECK(exports == 0);
+    std::lock_guard lock(mutex);
+    CHECK(asked == "/api/stream/broadcast/tour/TOUR0001.pgn");
+}
+
+TEST_CASE("Lichess broadcasts: a round's tournament and names, from its address") {
+    const auto port = freePort();
+    std::string asked, authorization;
+    std::mutex mutex;
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        {
+            std::lock_guard lock(mutex);
+            asked         = requestPath(head);
+            authorization = httpHeader(head, "Authorization").value_or("");
+        }
+        const std::string body =
+            R"({"round":{"id":"STz0PpOV","name":"Round 6","ongoing":true},)"
+            R"("tour":{"id":"eAhfBfzx","name":"Brazil Chess Series Masters","tier":3},"games":[]})";
+        c.sendAll(
+            fmt::format("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n"
+                        "Connection: close\r\n\r\n{}",
+                        body.size(), body));
+    });
+    REQUIRE(server.ok());
+    Servers_ servers_(port);
+    const auto entry =
+        broadcastRoundEntry("https://lichess.org/broadcast/brazil-masters/round-6/STz0PpOV?x=1", "allowed");
+    REQUIRE(entry.value);
+    CHECK(entry.value->tour.id == "eAhfBfzx");
+    CHECK(entry.value->tour.name == "Brazil Chess Series Masters");
+    CHECK(entry.value->round.name == "Round 6");
+    CHECK_FALSE(broadcastRoundEntry("https://lichess.org/abcd1234", "").value);
+    std::lock_guard lock(mutex);
+    CHECK(asked == "/api/broadcast/brazil-masters/round-6/STz0PpOV");
+    CHECK(authorization == "Bearer allowed");
 }

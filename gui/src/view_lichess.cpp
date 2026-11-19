@@ -87,8 +87,8 @@ void App::pollLichess() {
                     for (auto& f : followed_rounds_) {
                         if (f.with_token) continue;
                         f.follower->stop();
-                        f.follower =
-                            std::make_unique<lichess::RoundFollower>(f.entry.round.id, lichess_account_->token);
+                        f.follower = std::make_unique<lichess::RoundFollower>(
+                            f.whole ? f.entry.tour.id : f.entry.round.id, lichess_account_->token, f.whole);
                         f.with_token = true;
                     }
                     lichess_scope_ask_.reset();
@@ -303,7 +303,14 @@ void App::drawLichessScopeAsk() {
     ImGui::TextUnformatted(TR("Lichess asks for one more permission"));
     if (ask.follow)
         ImGui::TextDisabled("%s", trf("to follow “{} · {}”", ask.follow->tour.name, ask.follow->round.name).c_str());
-    if (ask.scope == lichess::SCOPE_FOLLOW_READ) {  // the followed players' mosaic (#50)
+    if (ask.search) {  // a search among the broadcasts (#55)
+        ImGui::TextUnformatted(
+            TR("To search the broadcasts, Lichess asks for an account allowed to read studies and "
+               "broadcasts."));
+        ImGui::TextDisabled("%s", TR("The permission lets RookStudio read your studies and the broadcasts; it writes "
+                                     "nothing. Lichess's page opens for it; your account stays linked meanwhile, and "
+                                     "the token it replaces is revoked."));
+    } else if (ask.scope == lichess::SCOPE_FOLLOW_READ) {  // the followed players' mosaic (#50)
         ImGui::TextUnformatted(
             TR("To show the games of the players your account follows, RookStudio must be allowed "
                "to read whom it follows."));
@@ -358,6 +365,7 @@ void App::drawLichessScopeAsk() {
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Not now"))) {
+            broadcast_search_after_link_ = false;
             lichess_scope_ask_.reset();
             ImGui::PopTextWrapPos();
             ui::endCard();
@@ -581,13 +589,49 @@ void App::drawLichessGames() {
     ui::endCard();
 }
 
+void App::startBroadcastSearch() {
+    const std::string words(broadcast_search_.data());
+    if (words.empty() || broadcast_search_job_.valid() || !lichess_account_) return;
+    // Lichess searches for an account allowed to read broadcasts only (since 2026-10): asked once, here.
+    if (!lichess_account_->has(lichess::SCOPE_STUDY_READ)) {
+        LichessScopeAsk ask;
+        ask.scope                    = lichess::SCOPE_STUDY_READ;
+        ask.search                   = true;
+        lichess_scope_ask_           = ask;
+        broadcast_search_after_link_ = true;
+        return;
+    }
+    broadcast_searched_   = words;
+    broadcast_search_job_ = std::async(std::launch::async, [words, token = lichess_account_->token] {
+        return lichess::searchBroadcasts(words, token);
+    });
+}
+
 void App::drawLichessBroadcasts() {
     askBroadcasts();
     ui::beginCard("lichess_broadcasts");
     ImGui::PushTextWrapPos();
     ImGui::TextUnformatted(TR("Official broadcasts"));
+    // A search among the recent ones (#55): the words, and an account allowed to read broadcasts.
+    ImGui::BeginDisabled(!lichess_account_);
+    ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x * 0.6f, px(320)));
+    if (ImGui::InputTextWithHint("##broadcast_search", TR("Search the broadcasts"), broadcast_search_.data(),
+                                 broadcast_search_.size(), ImGuiInputTextFlags_EnterReturnsTrue))
+        startBroadcastSearch();
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Search##broadcasts"))) startBroadcastSearch();
+    ImGui::EndDisabled();
+    if (!lichess_account_ && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", TR("With your Lichess account linked, allowed to read broadcasts."));
+    if (broadcast_found_ || broadcast_search_job_.valid()) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Back to the list"))) {
+            broadcast_found_.reset();
+            broadcast_search_.fill('\0');
+        }
+    }
     const auto& b = lichess_broadcasts_;
-    if (!b.value) {
+    if (!b.value && !broadcast_found_ && !broadcast_search_job_.valid()) {
         ImGui::TextDisabled("%s", b.error.empty() ? TR("Asking Lichess…")
                                                   : trf("Lichess cannot be reached from here: {}.", b.error).c_str());
     } else {
@@ -622,6 +666,27 @@ void App::drawLichessBroadcasts() {
             if (ImGui::SmallButton(TR("Follow"))) followBroadcast(e);
             ImGui::PopID();
         };
+        if (broadcast_search_job_.valid() || broadcast_found_) {
+            if (broadcast_search_job_.valid() || !broadcast_found_) {
+                ImGui::TextDisabled("%s", TR("Searching…"));
+                ImGui::PopTextWrapPos();
+                ui::endCard();
+                return;
+            }
+            const auto& found = *broadcast_found_;
+            if (!found.value)
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                                   trf("Lichess did not search: {}", found.error).c_str());
+            else if (found.value->empty())
+                ImGui::TextDisabled("%s", trf("No broadcast found for “{}”.", broadcast_searched_).c_str());
+            else
+                ImGui::TextDisabled("%s", trf("Found for “{}”:", broadcast_searched_).c_str());
+            if (found.value)
+                for (const auto& e : *found.value) row(e, e.round.ongoing);
+            ImGui::PopTextWrapPos();
+            ui::endCard();
+            return;
+        }
         // The best known events first (Lichess's tier), six of them unless all are asked for; the next ones after.
         auto active = b.value->active;
         std::stable_sort(active.begin(), active.end(),
@@ -647,8 +712,12 @@ void App::drawLichessBroadcasts() {
 }
 
 void App::followBroadcast(const lichess::BroadcastEntry& entry, bool without_account) {
-    for (const auto& f : followed_rounds_)
-        if (f.entry.round.id == entry.round.id) return;
+    for (auto& f : followed_rounds_) {
+        if (f.key() != entry.round.id) continue;
+        if (f.entry.tour.id.empty() && !entry.tour.id.empty()) f.entry = entry;  // its names, now known
+        openBroadcastMosaic(f.key());
+        return;
+    }
     // Lichess asks for a token allowed to read broadcasts (#44): asked once, on the Lichess page, before following.
     const bool allowed = lichess_account_ && lichess_account_->has(lichess::SCOPE_STUDY_READ);
     if (lichess_account_ && !allowed && !without_account) {
@@ -682,7 +751,9 @@ void App::drawLichessFollowed() {
         auto& f = followed_rounds_[r];
         ImGui::PushID(static_cast<int>(r));
         ImGui::Spacing();
-        ImGui::TextUnformatted(fmt::format("{} · {}", f.entry.tour.name, f.entry.round.name).c_str());
+        ImGui::TextUnformatted(
+            fmt::format("{} · {}", f.entry.tour.name, f.whole ? TR("the whole tournament") : f.entry.round.name)
+                .c_str());
         ImGui::SameLine();
         const auto error = f.follower->error();
         if (f.follower->streaming())
@@ -692,7 +763,7 @@ void App::drawLichessFollowed() {
                                           ? TR("connecting…")
                                           : trf("the stream broke ({}): it opens again by itself", error).c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton(TR("The mosaic"))) openBroadcastMosaic(f.entry.round.id);
+        if (ImGui::SmallButton(TR("The mosaic"))) openBroadcastMosaic(f.key());
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Stop following"))) stop = r;
         // Lichess refuses it, or slows it down, without an account allowed to read broadcasts (#44).

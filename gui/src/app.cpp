@@ -290,6 +290,7 @@ void App::frame() {
     pollPrep();             // a game prepared against an opponent: their games, then the report (#52)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
+    pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "console.hpp"
+#include "home.hpp"
 #include "i18n.hpp"
 #include "live.hpp"
 #include "online_cache.hpp"
@@ -88,7 +90,7 @@ void App::openBroadcastMosaic(const std::string& round_id) {
 void App::pollBroadcastBoards() {
     const FollowedRound* round = nullptr;
     for (const auto& f : followed_rounds_)
-        if (f.entry.round.id == broadcast_round_) round = &f;
+        if (f.key() == broadcast_round_) round = &f;
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
     if (!round && !players) {
         broadcast_boards_.clear();
@@ -113,6 +115,8 @@ void App::pollBroadcastBoards() {
             }
             if (it->version == g.version) continue;
             it->version   = g.version;
+            it->round_id  = g.round_id;
+            it->round     = g.round;
             it->white     = g.white;
             it->black     = g.black;
             it->white_elo = g.white_elo;
@@ -184,15 +188,23 @@ void App::pollBroadcastBoards() {
         }
     }
 
-    // A followed round whose games have all ended goes into the « Broadcasts » database, once, shown or not.
+    // A followed round whose games have all ended goes into the « Broadcasts » database, once, shown or not; a
+    // tournament followed whole, each of its rounds as it ends.
     for (const auto& f : followed_rounds_) {
         const auto changes = f.follower->changes();
-        auto& seen         = broadcast_checked_[f.entry.round.id];
-        if (seen == changes || broadcast_saved_.count(f.entry.round.id)) continue;
-        seen             = changes;
-        const auto games = f.follower->games();
-        if (!games.empty() && std::none_of(games.begin(), games.end(), [](const auto& g) { return playing(g.result); }))
-            saveBroadcastRound(f, games);
+        auto& seen         = broadcast_checked_[f.key()];
+        if (seen == changes) continue;
+        seen = changes;
+        std::map<std::string, std::vector<lichess::BroadcastGame>> rounds;  // its games by their round
+        for (auto& g : f.follower->games()) {
+            const auto id = f.whole && !g.round_id.empty() ? g.round_id : f.entry.round.id;
+            rounds[id].push_back(std::move(g));
+        }
+        for (const auto& [id, games] : rounds) {
+            if (broadcast_saved_.count(id)) continue;
+            if (std::none_of(games.begin(), games.end(), [](const auto& g) { return playing(g.result); }))
+                saveBroadcastRound(f, id, games);
+        }
     }
 
     // The game the Board page follows: it moves on, unless the user changed it.
@@ -201,7 +213,7 @@ void App::pollBroadcastBoards() {
         for (const auto& b : broadcast_boards_)
             if (b.url == board_broadcast_->url) game = &b;
         for (const auto& f : followed_rounds_) {
-            if (game || f.entry.round.id != board_broadcast_->round) continue;
+            if (game || f.key() != board_broadcast_->round) continue;
             // Another round on the mosaic: read from its follower.
             for (const auto& g : f.follower->games()) {
                 if (g.url != board_broadcast_->url || g.version == board_broadcast_->version) continue;
@@ -240,8 +252,9 @@ void App::pollBroadcastBoards() {
     }
 }
 
-void App::saveBroadcastRound(const FollowedRound& round, const std::vector<lichess::BroadcastGame>& games_sent) {
-    broadcast_saved_.insert(round.entry.round.id);
+void App::saveBroadcastRound(const FollowedRound& round, const std::string& round_id,
+                             const std::vector<lichess::BroadcastGame>& games_sent) {
+    broadcast_saved_.insert(round_id);
     auto& s          = shelf();
     const auto name  = std::string(TR("Broadcasts"));
     std::size_t base = s.entries().size();
@@ -259,12 +272,177 @@ void App::saveBroadcastRound(const FollowedRound& round, const std::vector<liche
         const auto count = games.size();
         (void)db->append(std::move(games), false);
         s.rebuildTree(base);
-        Console::instance().add(trf("{} · {}: the round's {} games saved in “{}”.", round.entry.tour.name,
-                                    round.entry.round.name, count, name),
-                                false);
+        const auto round_name = round.whole && !games_sent.empty() && !games_sent.front().round.empty()
+                                    ? trf("Round {}", games_sent.front().round)
+                                    : round.entry.round.name;
+        Console::instance().add(
+            trf("{} · {}: the round's {} games saved in “{}”.", round.entry.tour.name, round_name, count, name), false);
     } catch (const std::exception& e) {
         Console::instance().add(trf("The round could not be saved in “{}”: {}", name, e.what()), true);
     }
+}
+
+void App::followWholeTournament(const std::string& key) {
+    for (std::size_t i = 0; i < followed_rounds_.size(); ++i) {
+        auto& f = followed_rounds_[i];
+        if (f.key() != key || f.whole) continue;
+        const auto whole_key = "tour:" + f.entry.tour.id;
+        f.follower->stop();
+        // Followed whole already: that one shows, the round's follow ends.
+        if (std::any_of(followed_rounds_.begin(), followed_rounds_.end(),
+                        [&](const auto& o) { return o.key() == whole_key; })) {
+            followed_rounds_.erase(followed_rounds_.begin() + static_cast<std::ptrdiff_t>(i));
+        } else {
+            f.whole    = true;
+            f.follower = std::make_unique<lichess::RoundFollower>(
+                f.entry.tour.id, f.with_token && lichess_account_ ? lichess_account_->token : std::string(), true);
+        }
+        broadcast_tour_round_.clear();
+        openBroadcastMosaic(whole_key);
+        return;
+    }
+}
+
+void App::pollBroadcastStandings() {
+    using namespace std::chrono_literals;
+    auto& s = broadcast_standings_;
+    if (s.job.valid() && s.job.wait_for(0s) == std::future_status::ready) {
+        auto [players, teams] = s.job.get();
+        s.players             = std::move(players);
+        s.teams               = std::move(teams);
+    }
+    if (broadcast_search_job_.valid() && broadcast_search_job_.wait_for(0s) == std::future_status::ready)
+        broadcast_found_ = broadcast_search_job_.get();
+    // A round followed from a link: its tournament and its names, from Lichess.
+    if (broadcast_named_job_.valid() && broadcast_named_job_.wait_for(0s) == std::future_status::ready) {
+        auto [round_id, answer] = broadcast_named_job_.get();
+        if (answer.value && !answer.value->tour.id.empty())
+            for (auto& f : followed_rounds_)
+                if (!f.whole && f.entry.round.id == round_id) {
+                    const auto url = f.entry.round.url;
+                    f.entry        = *answer.value;
+                    if (f.entry.round.id.empty()) f.entry.round.id = round_id;
+                    if (f.entry.round.url.empty()) f.entry.round.url = url;
+                }
+    }
+    if (!broadcast_named_job_.valid())
+        for (const auto& f : followed_rounds_) {
+            if (!f.entry.tour.id.empty() || f.entry.round.url.empty() || broadcast_named_.count(f.entry.round.id))
+                continue;
+            broadcast_named_.insert(f.entry.round.id);
+            const auto token = f.with_token && lichess_account_ ? lichess_account_->token : std::string();
+            broadcast_named_job_ =
+                std::async(std::launch::async, [id = f.entry.round.id, url = f.entry.round.url, token] {
+                    return std::make_pair(id, lichess::broadcastRoundEntry(url, token));
+                });
+            break;
+        }
+    // The permission given: the search asked for made.
+    if (broadcast_search_after_link_ && !lichess_link_ && lichess_account_ &&
+        lichess_account_->has(lichess::SCOPE_STUDY_READ)) {
+        broadcast_search_after_link_ = false;
+        startBroadcastSearch();
+    }
+    // The standings of the tournament whose mosaic shows: asked again every two minutes while it shows.
+    const FollowedRound* round = nullptr;
+    for (const auto& f : followed_rounds_)
+        if (f.key() == broadcast_round_) round = &f;
+    const bool shown = round && !round->entry.tour.id.empty() && ImGui::GetFrameCount() - broadcast_drawn_ < 3;
+    if (!shown || s.job.valid()) return;
+    const auto now = std::chrono::steady_clock::now();
+    if (s.tour == round->entry.tour.id && now - s.asked < 2min) return;
+    if (s.tour != round->entry.tour.id) {
+        s.players = {};
+        s.teams   = {};
+    }
+    s.tour  = round->entry.tour.id;
+    s.asked = now;
+    s.job   = std::async(std::launch::async, [tour = s.tour] {
+        return std::make_pair(lichess::broadcastPlayers(tour), lichess::teamStandings(tour));
+    });
+}
+
+void App::drawBroadcastStandings() {
+    const auto& s              = broadcast_standings_;
+    const FollowedRound* round = nullptr;
+    for (const auto& f : followed_rounds_)
+        if (f.key() == broadcast_round_) round = &f;
+    if (!round || s.tour != round->entry.tour.id) return;
+    const auto* players = s.players.value ? &*s.players.value : nullptr;
+    const auto* teams   = s.teams.value ? &*s.teams.value : nullptr;
+    if ((!players || players->empty()) && (!teams || teams->empty())) {
+        if (!s.players.error.empty()) ImGui::TextDisabled("%s", trf("Standings: {}", s.players.error).c_str());
+        return;
+    }
+    ImGui::Dummy(ImVec2(0, px(6)));
+    const ui::TopicRegion topic(guide::topics::BroadcastMore);  // around the card, closed after it
+    ui::beginCard("broadcast_standings");
+    ImGui::PushTextWrapPos();
+    if (teams && !teams->empty()) {
+        ImGui::TextUnformatted(TR("The teams"));
+        ImGui::PushTextWrapPos(-1.0f);  // a number wraps in no column: the names are cut instead
+        if (ImGui::BeginTable("##teams", 3, ImGuiTableFlags_SizingStretchProp)) {
+            ImGui::TableSetupColumn(TR("Team"), ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn(TR("Match points"), ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn(TR("Game points"), ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableHeadersRow();
+            int rank = 0;
+            for (const auto& team : *teams) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(fmt::format("{}. {}", ++rank, team.name).c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(home::halfPoints(team.match_points).c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextDisabled("%s", home::halfPoints(team.game_points).c_str());
+            }
+            ImGui::EndTable();
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+    }
+    if (players && !players->empty()) {
+        const bool scored = std::any_of(players->begin(), players->end(), [](const auto& p) { return p.scored; });
+        ImGui::TextUnformatted(scored ? TR("The standings") : TR("The players"));
+        const std::size_t most = broadcast_all_players_ ? players->size() : std::min<std::size_t>(players->size(), 12);
+        ImGui::PushTextWrapPos(-1.0f);
+        if (ImGui::BeginTable("##players", scored ? 3 : 2, ImGuiTableFlags_SizingStretchProp)) {
+            ImGui::TableSetupColumn(TR("Player"), ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn(TR("Elo"), ImGuiTableColumnFlags_WidthFixed);
+            if (scored) ImGui::TableSetupColumn(TR("Points"), ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableHeadersRow();
+            for (std::size_t i = 0; i < most; ++i) {
+                const auto& p = (*players)[i];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                const auto name = p.title.empty() ? p.name : fmt::format("{} {}", p.title, p.name);
+                ImGui::TextUnformatted((p.rank > 0 ? fmt::format("{}. {}", p.rank, name) : name).c_str());
+                if (ImGui::IsItemHovered()) {
+                    std::string more = p.fed.empty() ? std::string() : p.fed;
+                    if (!p.team.empty()) more += (more.empty() ? "" : " · ") + p.team;
+                    if (p.performance > 0) more += (more.empty() ? "" : " · ") + trf("performance {}", p.performance);
+                    if (p.rating_diff != 0) more += fmt::format("{}{:+}", more.empty() ? "" : " · ", p.rating_diff);
+                    if (!more.empty()) ImGui::SetTooltip("%s", more.c_str());
+                }
+                ImGui::TableNextColumn();
+                ImGui::TextDisabled("%s", p.rating > 0 ? std::to_string(p.rating).c_str() : "–");
+                if (scored) {
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(p.scored ? trf("{} / {}", home::halfPoints(p.score), p.played).c_str()
+                                                    : "–");
+                }
+            }
+            ImGui::EndTable();
+        }
+        ImGui::PopTextWrapPos();
+        if (players->size() > 12 &&
+            ImGui::SmallButton(broadcast_all_players_ ? TR("Fewer")
+                                                      : trf("All the players ({})", players->size()).c_str()))
+            broadcast_all_players_ = !broadcast_all_players_;
+    }
+    ImGui::TextDisabled("%s", TR("From Lichess, as the organisers give them, asked again every two minutes."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
 }
 
 void App::followBroadcastOnBoard(const BroadcastBoard& game) {
@@ -297,7 +475,7 @@ void App::drawBroadcastMosaic() {
     broadcast_drawn_           = ImGui::GetFrameCount();
     const FollowedRound* round = nullptr;
     for (const auto& f : followed_rounds_)
-        if (f.entry.round.id == broadcast_round_) round = &f;
+        if (f.key() == broadcast_round_) round = &f;
     if (ImGui::SmallButton(TR("‹ Lichess"))) {
         broadcast_round_.clear();
         return;
@@ -319,7 +497,9 @@ void App::drawBroadcastMosaic() {
             ImGui::TextDisabled("%s", trf("· Lichess: {}", error).c_str());
         }
     } else {
-        ImGui::TextUnformatted(fmt::format("{} · {}", round->entry.tour.name, round->entry.round.name).c_str());
+        ImGui::TextUnformatted(fmt::format("{} · {}", round->entry.tour.name,
+                                           round->whole ? TR("the whole tournament") : round->entry.round.name)
+                                   .c_str());
         ImGui::SameLine();
         const auto error = round->follower->error();
         if (round->follower->streaming())
@@ -328,6 +508,17 @@ void App::drawBroadcastMosaic() {
             ImGui::TextDisabled("%s", error.empty()
                                           ? TR("connecting…")
                                           : trf("the stream broke ({}): it opens again by itself", error).c_str());
+        // A round's tournament followed whole: its rounds one after another (#55).
+        if (!round->whole && !round->entry.tour.id.empty()) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("The whole tournament"))) {
+                followWholeTournament(round->key());
+                return;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("Follows all the tournament's ongoing rounds, and each next one as it "
+                                           "starts, in this mosaic."));
+        }
     }
 
     // Analysed by: an engine of the library, its threads for each game; or none.
@@ -370,7 +561,7 @@ void App::drawBroadcastMosaic() {
     ImGui::SameLine();
     if (!players && ImGui::SmallButton(TR("Stop following"))) {
         for (std::size_t r = 0; r < followed_rounds_.size(); ++r) {
-            if (followed_rounds_[r].entry.round.id != broadcast_round_) continue;
+            if (followed_rounds_[r].key() != broadcast_round_) continue;
             followed_rounds_[r].follower->stop();
             followed_rounds_.erase(followed_rounds_.begin() + static_cast<std::ptrdiff_t>(r));
             break;
@@ -380,6 +571,49 @@ void App::drawBroadcastMosaic() {
         return;
     }
     ImGui::Spacing();
+
+    // A tournament followed whole: one of its rounds shown, the newest live one unless the user chose another.
+    std::string shown_round;
+    if (round && round->whole) {
+        std::vector<std::pair<std::string, std::string>> rounds;  // id, number, in the order they came
+        std::string live;
+        for (const auto& b : broadcast_boards_) {
+            if (std::none_of(rounds.begin(), rounds.end(), [&](const auto& r) { return r.first == b.round_id; }))
+                rounds.emplace_back(b.round_id, b.round);
+            if (playing(b.result)) live = b.round_id;
+        }
+        const auto number = [](const std::string& n) { return std::atoi(n.c_str()); };
+        std::stable_sort(rounds.begin(), rounds.end(),
+                         [&](const auto& x, const auto& y) { return number(x.second) < number(y.second); });
+        const bool chosen =
+            std::any_of(rounds.begin(), rounds.end(), [&](const auto& r) { return r.first == broadcast_tour_round_; });
+        shown_round = chosen ? broadcast_tour_round_ : !live.empty() ? live : rounds.empty() ? "" : rounds.back().first;
+        if (!rounds.empty()) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", TR("Rounds"));
+            for (const auto& [id, n] : rounds) {
+                ImGui::SameLine();
+                const bool on_now = std::any_of(broadcast_boards_.begin(), broadcast_boards_.end(),
+                                                [&](const auto& b) { return b.round_id == id && playing(b.result); });
+                const auto text   = on_now ? trf("{} · live", n.empty() ? "?" : n) : (n.empty() ? "?" : n);
+                const auto label  = text + "##" + id;
+                const ImVec2 size(ImGui::CalcTextSize(text.c_str()).x + px(12), ImGui::GetFrameHeight());
+                if (ImGui::Selectable(label.c_str(), id == shown_round, 0, size))
+                    broadcast_tour_round_ = id == live ? std::string() : id;  // the live one: following the next
+            }
+            ImGui::Spacing();
+        }
+    }
+    const auto shown = [&](const BroadcastBoard& b) { return shown_round.empty() || b.round_id == shown_round; };
+    // The game chosen, one of the round shown.
+    if (!shown_round.empty()) {
+        const auto chosen = std::find_if(broadcast_boards_.begin(), broadcast_boards_.end(),
+                                         [&](const auto& b) { return b.url == broadcast_selected_; });
+        if (chosen == broadcast_boards_.end() || !shown(*chosen)) {
+            const auto first    = std::find_if(broadcast_boards_.begin(), broadcast_boards_.end(), shown);
+            broadcast_selected_ = first == broadcast_boards_.end() ? std::string() : first->url;
+        }
+    }
 
     if (broadcast_boards_.empty()) {
         ImGui::TextDisabled("%s", players
@@ -397,8 +631,11 @@ void App::drawBroadcastMosaic() {
     const float card   = (room - px(8) * static_cast<float>(cols - 1)) / static_cast<float>(cols);
     ImGui::BeginChild("##broadcast_grid", ImVec2(grid_w, 0));
     const float line = ImGui::GetTextLineHeight();
-    for (std::size_t k = 0; k < broadcast_boards_.size(); ++k) {
-        auto& b = broadcast_boards_[k];
+    std::vector<std::size_t> cards;  // those of the round shown
+    for (std::size_t i = 0; i < broadcast_boards_.size(); ++i)
+        if (shown(broadcast_boards_[i])) cards.push_back(i);
+    for (std::size_t k = 0; k < cards.size(); ++k) {
+        auto& b = broadcast_boards_[cards[k]];
         if (k % static_cast<std::size_t>(cols) != 0) ImGui::SameLine(0, px(8));
         const bool selected = b.url == broadcast_selected_;
         ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(selected ? ui::ACCENT : ui::CARD_BD));
@@ -407,7 +644,7 @@ void App::drawBroadcastMosaic() {
         const float inner = card - px(12);
         // Two names, the board, the bar, a line of text; their spacing and the card's padding.
         const float h = inner + line * 3 + px(4) + ImGui::GetStyle().ItemSpacing.y * 4 + px(5) * 2 + px(4);
-        ImGui::BeginChild(fmt::format("##bcard{}", k).c_str(), ImVec2(card, h),
+        ImGui::BeginChild(fmt::format("##bcard{}", cards[k]).c_str(), ImVec2(card, h),
                           ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         const auto name_row = [&](chess::Color color) {
@@ -520,6 +757,7 @@ void App::drawBroadcastMosaic() {
         ImGui::TableSetupColumn("##game", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed);  // as wide as its widest
         for (const auto& b : broadcast_boards_) {
+            if (!shown(b)) continue;
             ImGui::PushID(b.url.c_str());
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -539,6 +777,7 @@ void App::drawBroadcastMosaic() {
         ImGui::EndTable();
     }
     ui::endCard();
+    if (round) drawBroadcastStandings();  // the players' standings, a team event's (#55)
     ImGui::TextDisabled("%s", players ? TR("The moves come from Lichess, three moves behind, as it shows them to "
                                            "anyone; the analysis is made on your machine, with your engines. A game "
                                            "that ends stays here until another takes its place.")

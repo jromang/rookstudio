@@ -1122,6 +1122,21 @@ heavily a broadcast followed without an account allowed to read broadcasts: the 
 permission (*Allow on Lichess…*, or *Follow without it*). A round whose games have all ended goes into the
 *Broadcasts* database.
 
+### More of a broadcast
+
+On the right of a broadcast's mosaic, under the round, **the standings**: each player's rank, title, rating and
+points as the organisers give them (the federation, team, performance and rating change under the mouse), the first
+twelve or all of them; for a team event, the teams first, by match points then game points. Lichess gives them without
+an account; they are asked again every two minutes while the mosaic shows.
+
+*The whole tournament*, beside a round's name, follows all of the tournament's ongoing rounds, and each next one as it
+starts: the mosaic shows the round live, and **Rounds** above it shows another (a click on the live one follows the
+next ones again). Each round goes into the *Broadcasts* database as it ends.
+
+**Search the broadcasts**, at the top of the official broadcasts, looks for a recent one by its name: Lichess answers
+only an account allowed to read broadcasts, asked the first time. *Back to the list* shows the broadcasts on now
+again.
+
 ### Lichess links
 
 A Lichess address pasted with Ctrl+V on the Board page or on the Databases page is recognised without asking Lichess

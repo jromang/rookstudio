@@ -222,6 +222,7 @@ void App::actOnLink() {
         // Followed live, as the Lichess page's Follow does: its names from its address until Lichess sends them.
         lichess::BroadcastEntry entry;
         entry.round.id   = link.id;
+        entry.round.url  = card.url;  // its tournament asked of Lichess from it (#55)
         const auto parts = [&] {
             std::vector<std::string> out;
             auto u = card.url.substr(

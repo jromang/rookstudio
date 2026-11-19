@@ -288,6 +288,7 @@ void App::frame() {
     pollFollowedPlayers();  // the players followed live, their games in the mosaic (#50)
     pollCast();             // a tournament on the user's own Lichess broadcast, once allowed (#51)
     pollPrep();             // a game prepared against an opponent: their games, then the report (#52)
+    pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
     pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
@@ -524,6 +525,20 @@ void App::frame() {
         } else if (w.rfind("books-openings=", 0) == 0) {  // books-openings=FILE: Lichess's named openings book there
             page_ = Page::Books;
             writeOpeningSuiteBook(w.substr(15));
+        } else if (w == "books-evaluated") {  // the form of Lichess's evaluated positions
+            page_ = Page::Books;
+            openEvaluatedSuite();
+        } else if (w.rfind("books-evaluated=", 0) == 0) {
+            // books-evaluated=FILE.zst: Lichess's evaluations database read from that file; =FILE.epd: the book
+            // written there from what the profile kept.
+            page_ = Page::Books;
+            openEvaluatedSuite();
+            const auto file = w.substr(16);
+            if (file.size() > 4 && file.substr(file.size() - 4) == ".epd") {
+                writeEvaluatedSuiteBook(file);
+            } else {
+                startEvalsReading(file);
+            }
         } else if (w.rfind("books-build", 0) == 0) {
             // books-build[=PGN[>BIN]]: the form of Build a Polyglot book, with that PGN file, building BIN.
             page_ = Page::Books;
@@ -1520,6 +1535,12 @@ void App::handleDialogs() {
                 break;
             case Dialogs::Purpose::OpeningSuiteBook:
                 writeOpeningSuiteBook(path);
+                break;
+            case Dialogs::Purpose::EvaluatedSuiteBook:
+                writeEvaluatedSuiteBook(path);
+                break;
+            case Dialogs::Purpose::EvalsFile:
+                startEvalsReading(path);
                 break;
             case Dialogs::Purpose::BuildBookPgn:
                 book_build_form_.pgn = path;

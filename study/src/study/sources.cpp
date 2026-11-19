@@ -280,6 +280,45 @@ std::vector<std::unique_ptr<ByteSource>> zipFiles(const fs::path& file,
     return zipSources(file, wanted);
 }
 
+struct ZstdStream::Decoder {
+    ZSTD_DStream* stream = nullptr;
+    Decoder() {
+        stream = ZSTD_createDStream();
+        if (!stream) throw std::runtime_error("out of memory");
+        ZSTD_DCtx_setParameter(stream, ZSTD_d_windowLogMax, 30);  // as ZstdSource
+    }
+    ~Decoder() { ZSTD_freeDStream(stream); }
+    Decoder(const Decoder&)            = delete;
+    Decoder& operator=(const Decoder&) = delete;
+};
+
+ZstdStream::ZstdStream() : decoder_(std::make_unique<Decoder>()), buffer_(INPUT) {}
+ZstdStream::~ZstdStream() = default;
+
+bool ZstdStream::feed(std::string_view in, const std::function<bool(std::string_view)>& out,
+                      const std::function<void(std::size_t)>& frame_end) {
+    ZSTD_inBuffer input{in.data(), in.size(), 0};
+    for (;;) {
+        const auto before = input.pos;
+        ZSTD_outBuffer output{buffer_.data(), buffer_.size(), 0};
+        const auto left = ZSTD_decompressStream(decoder_->stream, &output, &input);
+        if (ZSTD_isError(left)) throw std::runtime_error(std::string("zstd: ") + ZSTD_getErrorName(left));
+        if (output.pos > 0 && !out(std::string_view(buffer_.data(), output.pos))) return false;
+        if (left == 0) {  // a frame decoded whole and its text given out (between frames, it asks for a header)
+            between_ = true;
+            if (frame_end) frame_end(input.pos);
+        } else if (input.pos > before) {
+            between_ = false;
+        }
+        if (input.pos == input.size && output.pos < output.size) return true;  // nothing more to give out
+    }
+}
+
+void ZstdStream::restart() {
+    ZSTD_DCtx_reset(decoder_->stream, ZSTD_reset_session_only);
+    between_ = true;
+}
+
 std::vector<std::unique_ptr<ByteSource>> openSources(const fs::path& file) {
     std::array<unsigned char, 4> magic{};
     {

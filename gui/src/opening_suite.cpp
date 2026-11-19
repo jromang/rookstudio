@@ -43,14 +43,6 @@ std::optional<std::pair<chess::Board, int>> replay(std::string_view pgn) {
     return std::make_pair(board, plies);
 }
 
-// The first four fields of a FEN: what an EPD position is.
-std::string epdOf(const chess::Board& board) {
-    const auto fen = board.getFen();
-    std::size_t at = 0;
-    for (int field = 0; field < 4 && at != std::string::npos; ++field) at = fen.find(' ', at + (field ? 1 : 0));
-    return at == std::string::npos ? fen : fen.substr(0, at);
-}
-
 std::string withoutQuotes(std::string_view text) {
     std::string out;
     for (const char c : text)
@@ -97,21 +89,23 @@ std::vector<SuitePosition> openingSuite(const std::vector<NamedOpening>& all, co
         if (options.one_per_name && names.count(o.name)) continue;
         const auto played = replay(o.pgn);
         if (!played || played->second < options.min_plies || played->second > options.max_plies) continue;
-        const auto epd = epdOf(played->first);
-        if (!positions.insert(epd).second) continue;  // reached by another line already
+        if (!positions.insert(played->first.getFen(false)).second) continue;  // reached by another line already
         names.insert(o.name);
-        kept.push_back(
-            {fmt::format("{} c0 \"{} {}\";", epd, o.eco, withoutQuotes(o.name)), o.eco, o.name, played->second});
+        // The four fields, then the counters (hmvc, fmvn): the games' moves numbered from there.
+        kept.push_back({fmt::format("{} c0 \"{} {}\";", played->first.getEpd(), o.eco, withoutQuotes(o.name)), o.eco,
+                        o.name, played->second});
     }
     std::stable_sort(kept.begin(), kept.end(), [](const auto& a, const auto& b) { return a.eco < b.eco; });
-    if (options.most > 0 && kept.size() > options.most) {  // an even spread over the ECO order
-        std::vector<SuitePosition> spread;
-        spread.reserve(options.most);
-        for (std::size_t i = 0; i < options.most; ++i)
-            spread.push_back(std::move(kept[i * kept.size() / options.most]));
-        kept = std::move(spread);
-    }
+    keepEvenly(kept, options.most);
     return kept;
+}
+
+void keepEvenly(std::vector<SuitePosition>& positions, std::size_t most) {
+    if (most == 0 || positions.size() <= most) return;
+    std::vector<SuitePosition> spread;
+    spread.reserve(most);
+    for (std::size_t i = 0; i < most; ++i) spread.push_back(std::move(positions[i * positions.size() / most]));
+    positions = std::move(spread);
 }
 
 void writeOpeningSuite(const std::filesystem::path& path, const std::vector<SuitePosition>& positions) {

@@ -46,6 +46,7 @@
 #include "layout.hpp"
 #include "lichess_account.hpp"
 #include "lichess_broadcasts.hpp"
+#include "lichess_evals.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
 #include "lichess_players.hpp"
@@ -1563,6 +1564,25 @@ class App {
     std::optional<std::pair<OpeningSuiteOptions, std::vector<SuitePosition>>> opening_suite_preview_;
     void drawOpeningSuite();
     void writeOpeningSuiteBook(std::string path);
+    // Its second source, the positions Lichess's players had analysed: Lichess's evaluations database read once,
+    // while it downloads or from a file, for the positions of the named lines and one move off them, kept in the
+    // profile; then the book made from them, out of an evaluation, a depth, the plies and a number.
+    bool evaluated_suite_shown_ = false;
+    EvaluatedSuiteOptions evaluated_suite_;
+    EvalsReading evals_reading_;
+    std::optional<EvalsFolder> evals_folder_;  // what the profile holds, read again when a reading stops
+    std::optional<std::vector<EvaluatedPosition>> evaluated_positions_;
+    std::future<std::vector<EvaluatedPosition>> evaluated_job_;  // what the profile kept, read off the frame
+    std::optional<std::pair<EvaluatedSuiteOptions, std::vector<SuitePosition>>> evaluated_suite_preview_;
+    std::future<EvalsSize> evals_size_job_;
+    std::optional<EvalsSize> evals_size_;
+    std::string evals_stopped_;  // why the last reading stopped before its end
+    [[nodiscard]] std::filesystem::path evalsFolderPath() const;
+    void openEvaluatedSuite();
+    void startEvalsReading(std::string source);
+    void pollEvalsReading();  // at each frame: a reading that stopped, what it kept read
+    void drawEvaluatedSuite();
+    void writeEvaluatedSuiteBook(std::string path);
     std::string book_build_error_;   // why the last build failed, shown in the form
     PolyglotBuild book_build_;
 

@@ -40,4 +40,31 @@ class ByteSource {
 [[nodiscard]] std::vector<std::unique_ptr<ByteSource>> zipFiles(
     const std::filesystem::path& file, const std::function<bool(std::string_view name)>& wanted);
 
+// A zstd stream decoded as its bytes come, a download read while it arrives: compressed bytes in, text out. It tells
+// where its frames end, so that a download cut short can go on from the last one: Lichess's big files are made of
+// frames of a few megabytes (pzstd's), each decoded without the ones before it.
+class ZstdStream {
+   public:
+    ZstdStream();
+    ~ZstdStream();
+    ZstdStream(const ZstdStream&)            = delete;
+    ZstdStream& operator=(const ZstdStream&) = delete;
+
+    // `in` decoded, its text given to `out` a piece at a time; false when `out` asked to stop. After the last text of
+    // each frame, `frame_end` is given the number of `in`'s bytes read up to the frame's end. Throws
+    // std::runtime_error on bytes that are not zstd's.
+    bool feed(std::string_view in, const std::function<bool(std::string_view text)>& out,
+              const std::function<void(std::size_t read)>& frame_end = {});
+    // Ready for a frame's first byte, forgetting the frame begun: to go on from a frame's start.
+    void restart();
+    // True between two frames: a stream cut there lost nothing.
+    [[nodiscard]] bool betweenFrames() const noexcept { return between_; }
+
+   private:
+    struct Decoder;
+    std::unique_ptr<Decoder> decoder_;
+    std::vector<char> buffer_;
+    bool between_ = true;
+};
+
 }  // namespace fcg::study

@@ -39,7 +39,9 @@ class Dialogs {
         SaveCleanBook,
         Chess324Book,
         Chess324SymmetricalBook,
-        OpeningSuiteBook,  // a book from Lichess's named openings (#53)
+        OpeningSuiteBook,    // a book from Lichess's named openings (#53)
+        EvaluatedSuiteBook,  // a book from Lichess's evaluated positions (#53)
+        EvalsFile,           // Lichess's evaluations database downloaded before (#53)
         BuildBookPgn,
         BuildBookBin,
         SuiteFile,

@@ -152,15 +152,22 @@ void App::drawBookCreateMenu() {
         ImGui::EndMenu();
     }
     if (ImGui::MenuItem(TR("From Lichess's named openings…"))) {
-        opening_suite_shown_ = true;
-        book_build_shown_    = false;
+        opening_suite_shown_   = true;
+        book_build_shown_      = false;
+        evaluated_suite_shown_ = false;
     }
     tip(
         TR("The position each named line of Lichess's opening table comes to, out of the families, the lengths and the "
            "number chosen; written to an EPD file and added to the library. Nothing is downloaded."));
+    if (ImGui::MenuItem(TR("From Lichess's evaluated positions…"))) openEvaluatedSuite();
+    tip(TR(
+        "The positions of the named openings' lines, and one move off them, that Lichess's players had analysed, "
+        "out of their evaluation, its depth, the plies and the number chosen; Lichess's evaluations database (21 GB) "
+        "is read once for them, its size said before."));
     if (ImGui::MenuItem(TR("Build a Polyglot book…"))) {
         openBookBuild();
-        opening_suite_shown_ = false;
+        opening_suite_shown_   = false;
+        evaluated_suite_shown_ = false;
     }
     tip(
         TR("From the games of a PGN file: their moves up to a depth, those played by enough games, weighted by their "
@@ -530,11 +537,14 @@ void App::drawBooks() {
         ImGui::TextUnformatted(missing || b.problems > 0 ? "!" : "·");
         ImGui::PopStyleColor();
         ImGui::SameLine();
-        if (ImGui::Selectable(fmt::format("{}##book{}", b.name, i).c_str(),
-                              selected_book_ == i && !book_build_shown_)) {
-            selected_book_    = i;
-            book_item_        = -1;
-            book_build_shown_ = false;
+        if (ImGui::Selectable(fmt::format("{}##book{}", b.name, i).c_str(), selected_book_ == i && !book_build_shown_ &&
+                                                                                !opening_suite_shown_ &&
+                                                                                !evaluated_suite_shown_)) {
+            selected_book_         = i;
+            book_item_             = -1;
+            book_build_shown_      = false;
+            opening_suite_shown_   = false;  // the book's details in place of a form
+            evaluated_suite_shown_ = false;
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", missing ? trf("File not found: {}", b.path).c_str() : b.path.c_str());
@@ -566,6 +576,8 @@ void App::drawBooks() {
     ImGui::BeginChild("##book_detail");
     if (opening_suite_shown_) {
         drawOpeningSuite();
+    } else if (evaluated_suite_shown_) {
+        drawEvaluatedSuite();
     } else if (book_build_shown_) {
         drawBookBuild();
     } else if (selected_book_ < 0 || selected_book_ >= static_cast<int>(books_.size())) {

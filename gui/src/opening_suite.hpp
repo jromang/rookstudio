@@ -29,14 +29,17 @@ struct OpeningSuiteOptions {
 };
 
 struct SuitePosition {
-    std::string epd;  // the position's four EPD fields, then its opening as c0
+    std::string epd;  // the position's four EPD fields, its counters (hmvc, fmvn), then its opening as c0
     std::string eco, name;
     int plies = 0;
+    int cp = 0, depth = 0;  // its evaluation for White and its depth, when Lichess's evaluations gave them
 };
 
 // The positions of `all` the options keep, in the ECO order; a position reached by two lines comes once.
 [[nodiscard]] std::vector<SuitePosition> openingSuite(const std::vector<NamedOpening>& all,
                                                       const OpeningSuiteOptions& options);
+// At most `most` of `positions` (0: all of them), an even spread over their order.
+void keepEvenly(std::vector<SuitePosition>& positions, std::size_t most);
 // Writes them as an EPD book, one a line; throws std::runtime_error when the file cannot be written.
 void writeOpeningSuite(const std::filesystem::path& path, const std::vector<SuitePosition>& positions);
 

@@ -27,7 +27,7 @@ TEST_CASE("opening suite: the families, the lengths, one position per name and p
     CHECK(kept[0].eco == "B27");
     CHECK(kept[0].plies == 4);
     CHECK(kept[0].epd ==
-          "rnbqkbnr/pp1ppp1p/6p1/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - c0 \"B27 Sicilian Defense: "
+          "rnbqkbnr/pp1ppp1p/6p1/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - hmvc 0; fmvn 3; c0 \"B27 Sicilian Defense: "
           "Hyperaccelerated\";");
     CHECK(kept[1].name == "Italian Game");
     CHECK(kept[2].eco == "D06");

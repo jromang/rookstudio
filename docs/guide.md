@@ -643,7 +643,26 @@ details, takes the **families** (A flank openings, B semi-open games, C open gam
 defences), the **lengths** of the lines kept, in plies (8 to 16 at first), *One position per named variation* (several
 lines share a name), and the **number** of positions, spread evenly over the ECO codes when more qualify. It says how
 many positions and openings it would hold; *Make the book…* asks where to write the EPD file, each position with its
-opening as `c0`, and adds it to the library.
+move number (`hmvc`, `fmvn`) and its opening as `c0`, and adds it to the library.
+
+### Books from the evaluated positions
+
+*From Lichess's evaluated positions…*, in **Create…**, makes a book of the positions Lichess's players had analysed:
+those of the named openings' lines and one move off them, each with its evaluation and its depth. They come from
+Lichess's evaluations database (CC0, about 21 GB and 290 million positions): its size is asked of database.lichess.org
+and said before anything is downloaded; *Download and read* reads it while it comes, and keeps only the positions
+found (a few megabytes, in the profile), not the file. *Read a file already downloaded…* reads a
+`lichess_db_eval.jsonl.zst` from the disk instead. Nothing else leaves the machine than the request for the file.
+The reading shows how much is read and kept; *Cancel*, a network cut, or the program closed keeps what was read, and
+*Go on* goes on from there (a file changed on the server since is read again from its start).
+
+Once read, the form takes the **evaluation** kept, for White (+0.30 to +0.80 at first), the **depth** at least (30), the
+**plies** from the start (8 to 16), *One position per named variation* (the one on the variation's line first, then
+the deepest evaluation, then the nearest the window's middle), and the **number** of positions, spread evenly over
+the ECO codes when more qualify. It says how many positions and openings it would hold and their average evaluation;
+*Make the book…* writes the EPD file, each position with its move number, its evaluation for the side to move and its
+depth (`ce`, `acd`) and its opening (`c0`), and adds it to the library. *Read again* reads the database again for its
+newer evaluations.
 
 ## Board
 

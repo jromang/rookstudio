@@ -301,7 +301,11 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
     out.bytes = folderBytes(entries_[index].folder);
     std::error_code ec;
     const auto written = std::filesystem::last_write_time(entries_[index].folder / "manifest.json", ec);
-    if (!ec) out.changed = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(written));
+    // The file clock's duration is not the system clock's everywhere (libc++ counts it in __int128 nanoseconds).
+    if (!ec)
+        out.changed =
+            std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                std::chrono::file_clock::to_sys(written)));
     try {
         const auto tree = study::Tree::open(entries_[index].folder);
         out.tree        = tree && !tree->stale(*snapshot) && tree->games() == snapshot->games();

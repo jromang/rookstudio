@@ -247,6 +247,10 @@ std::vector<std::string> App::commentBasis(bool from_review) {
 }
 
 void App::commentBoardMove() {
+    if (aidsLocked()) {  // fair play (#48)
+        boardToast(TR("Locked while one of your games is played on Lichess."));
+        return;
+    }
     auto& b = board_;
     if (b.ply <= 0 || !assistant_) return;
     if (!assistant_->installed()) {
@@ -315,6 +319,10 @@ void App::commentBoardMove() {
 }
 
 void App::commentKeyMoments() {
+    if (gameLocked()) {  // fair play (#48)
+        boardToast(TR("Locked while one of your games is played on Lichess."));
+        return;
+    }
     auto& b = board_;
     if (comment_job_) return;
     const auto review = boardCommentaryReview();
@@ -410,6 +418,10 @@ void App::pollBoardComments() {
 }
 
 void App::annotateBoardGame() {
+    if (gameLocked()) {  // fair play (#48)
+        boardToast(TR("Locked while one of your games is played on Lichess."));
+        return;
+    }
     auto& b           = board_;
     const auto review = boardCommentaryReview();
     if (!review || !review->report.complete) {

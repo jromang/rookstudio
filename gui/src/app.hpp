@@ -48,6 +48,7 @@
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
+#include "lichess_playing.hpp"
 #include "lichess_profile.hpp"
 #include "lichess_settings.hpp"
 #include "live.hpp"
@@ -775,6 +776,29 @@ class App {
     std::future<std::pair<std::string, lichess::Answer<lichess::PerfFigures>>> lichess_figures_job_;
     void pollLichessProfile();
     void drawLichessAccountPanel();
+    // Fair play (#48, mockup M8, board "Fairplay"): the user's games in progress on Lichess. A live one locks every
+    // aid on every position; a correspondence game the engine, the cloud, the tables and the assistant on its position
+    // and those that come from it.
+    std::vector<lichess::PlayingGame> lichess_playing_;
+    std::future<lichess::Answer<std::vector<lichess::PlayingGame>>> lichess_playing_job_;
+    std::chrono::steady_clock::time_point lichess_playing_asked_{};
+    bool lichess_playing_ask_now_   = false;  // the Home page showed: looked at again if it was a while ago
+    int lichess_playing_home_frame_ = -10;    // the frame that drew the Home page's list last
+    std::unique_ptr<lichess::EventListener> lichess_events_;  // with the right to read challenges
+    void pollLichessPlaying();
+    [[nodiscard]] const lichess::PlayingGame* liveGameOn() const;
+    // The first ply of `line`, up to `last`, whose position is a correspondence game's now, -1 when none; `game` set to
+    // that game.
+    [[nodiscard]] int correspondencePly(const ReplayGame& line, bool chess960, int last,
+                                        const lichess::PlayingGame** game = nullptr) const;
+    // The game that locks the board: a live one; a correspondence game whose position is on the board's line up to its
+    // position; with `whole_game`, anywhere on the game's main line too.
+    [[nodiscard]] const lichess::PlayingGame* fairPlayLock(bool whole_game) const;
+    [[nodiscard]] bool aidsLocked() const { return fairPlayLock(false) != nullptr; }  // on the board's position
+    [[nodiscard]] bool gameLocked() const { return fairPlayLock(true) != nullptr; }   // on the whole game
+    void drawFairPlayBanner(bool whole_game = false);
+    void drawPlayingGames();   // the Home page's list
+    void drawListenOffer();    // the Lichess page's offer of the right to read challenges
     int link_key_frame_ = -1;  // the frame whose Enter or Escape the card took
     // True when `text` is a Lichess address: its card shown, or said unknown. `databases`: pasted on the Databases
     // page, its games offered for the database chosen there.

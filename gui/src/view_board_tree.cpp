@@ -483,18 +483,36 @@ void App::drawChessColumn() {
         board_side_tab_ = i;
         if (i == 4) question_focus_ = true;  // Alt+5: the question is typed at once
     }
+    // Fair play (#48): a live game locks every tab but the notation; a correspondence game the Analysis tab on its
+    // positions and the Questions tab on its game, the tree of the databases and their reference games staying open.
+    const bool live     = liveGameOn() != nullptr;
+    const bool position = aidsLocked();
+    const bool game     = position || gameLocked();
+    const auto locked   = [&](int tab) { return (live && tab != 0) || (position && tab == 1) || (game && tab == 4); };
     if (ImGui::BeginTabBar("##chess_column")) {
         for (int i = 0; i < TABS; ++i) {
             const auto label = fmt::format("{}###chess_tab{}", names[i], i);
+            if (locked(i)) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             if (ImGui::BeginTabItem(label.c_str(), nullptr,
                                     board_side_tab_ == i ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
                 ImGui::EndTabItem();
             }
+            if (locked(i)) ImGui::PopStyleColor();
             if (ImGui::IsItemClicked()) board_side_tab_ = i;
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Alt+%d", i + 1);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", locked(i)
+                                            ? fmt::format("Alt+{} · {}", i + 1,
+                                                          TR("Locked while one of your games is played on Lichess."))
+                                                  .c_str()
+                                            : fmt::format("Alt+{}", i + 1).c_str());
         }
         ImGui::EndTabBar();
     }
+    if (locked(board_side_tab_)) {
+        drawFairPlayBanner(board_side_tab_ == 4);
+        return;
+    }
+    if (position) drawFairPlayBanner();
     switch (board_side_tab_) {
         case 0:
             drawBoardMoves(std::max(px(160), ImGui::GetContentRegionAvail().y));

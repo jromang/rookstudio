@@ -185,7 +185,7 @@ void App::drawAssistantFirstUse() {
 
 void App::askQuestion(const std::string& text, const std::string& asked_text) {
     const auto& b = board_;
-    if (text.empty() || !assistant_) return;
+    if (text.empty() || !assistant_ || gameLocked()) return;  // fair play (#48)
     // The engine that answers: the analysis's, kept while it is the same.
     const auto* engine = analysisEngine();
     if (!engine)

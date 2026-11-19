@@ -331,6 +331,11 @@ void App::setBoardAnalysis(bool on) {
         board_.analyser.halt();
         return;
     }
+    if (aidsLocked()) {  // fair play (#48)
+        board_.message       = TR("Locked while one of your games is played on Lichess.");
+        board_.message_error = false;
+        return;
+    }
     auto& s = board_.settings.analysis;
     // The engine chosen, or the first that works.
     const EngineEntry* engine = nullptr;
@@ -383,6 +388,11 @@ void App::setBoardThreat(bool on) {
         b.message_error = true;
         return;
     }
+    if (aidsLocked()) {  // fair play (#48)
+        b.message       = TR("Locked while one of your games is played on Lichess.");
+        b.message_error = false;
+        return;
+    }
     auto one    = b.settings.analysis;
     one.multipv = 1;
     if (!b.threat.active() || b.threat.engine() != engine->name) b.threat.start(*engine, one);
@@ -401,6 +411,20 @@ void App::pollBoard() {
     board_key_taken_ = false;
     board_.analyser.poll();
     board_.threat.poll();
+    // Fair play (#48): no engine on a locked position; while a live game lasts, none on any, the assistant's work
+    // stopped too (a review's passes done are kept, for later).
+    if (aidsLocked()) {
+        if (board_.analysing || board_.threat_on) {
+            board_.message       = TR("Locked while one of your games is played on Lichess.");
+            board_.message_error = false;
+        }
+        if (board_.analysing) setBoardAnalysis(false);
+        board_.threat_on = false;
+    }
+    if (board_.reviewing() &&
+        (liveGameOn() || correspondencePly(board_.review_game, board_.review_chess960, INT32_MAX) >= 0))
+        cancelGameReview();
+    if (liveGameOn() && comment_job_ && comment_job_->cancel) *comment_job_->cancel = true;
     if (board_.threat_on && board_.threat.state() == Analyser::State::Failed) board_.threat_on = false;
     if (board_.threat_on && page_ == Page::Board && !board_.editor) {
         if (const auto position = threatPosition())
@@ -500,6 +524,11 @@ void App::startReviewTask(const EngineEntry& engine, const std::vector<GameRevie
 void App::startGameReview() {
     auto& b = board_;
     if (b.reviewing() || b.tree.main.moves.empty() || (b.watching && b.match && b.match_state.running)) return;
+    if (gameLocked()) {  // fair play (#48)
+        b.message       = TR("Locked while one of your games is played on Lichess.");
+        b.message_error = false;
+        return;
+    }
     // Every analysis the game has goes on; without one, the analysis engine's.
     const auto kept = loadReviews(storage_.root() / "analyses", b.tree.main);
     std::vector<const EngineEntry*> engines;
@@ -528,6 +557,11 @@ void App::addReviewEngine(const std::string& name) {
     auto& b       = board_;
     const auto it = std::find_if(engines_.begin(), engines_.end(), [&](const auto& e) { return e.name == name; });
     if (it == engines_.end() || b.tree.main.moves.empty()) return;
+    if (gameLocked()) {  // fair play (#48)
+        b.message       = TR("Locked while one of your games is played on Lichess.");
+        b.message_error = false;
+        return;
+    }
     // The analyses of another game end first, their passes kept.
     if (b.reviewing() && b.review_game_key != reviewKey(b.tree.main)) cancelGameReview();
     if (std::any_of(b.review_tasks.begin(), b.review_tasks.end(), [&](const auto& t) { return t.engine == name; }))
@@ -2106,6 +2140,10 @@ void App::drawBoardColumn(float size) {
 }
 
 void App::drawBoardAnalysis() {
+    if (aidsLocked()) {  // fair play (#48): no analysis of a locked position, nor of any while a live game lasts
+        drawFairPlayBanner();
+        return;
+    }
     // No engine in the library: the card that offers one (M9, board 2).
     if (engines_.empty()) {
         drawFirstEngineCard(
@@ -2365,13 +2403,22 @@ void App::showBoardLine(int line, int ply) {
 }
 
 void App::updateBoardTablebase() {
-    auto& b        = board_;
-    const auto key = b.review_key + "|" + setup_.tb_paths;
+    auto& b = board_;
+    // Fair play (#48): no tables while a live game lasts, nor from a correspondence game's position on.
+    const int hidden = liveGameOn() ? 0 : correspondencePly(b.tree.main, b.chess960, INT32_MAX);
+    const auto key   = fmt::format("{}|{}|{}", b.review_key, setup_.tb_paths, hidden);
     if (key == b.tb_key) return;
+    if (hidden >= 0 && static_cast<std::size_t>(hidden) < b.tb.size()) b.tb.resize(static_cast<std::size_t>(hidden));
     // fastchess' Syzygy tables are those of the process: not while a tournament plays in it.
     if (run_->running()) return;
     b.tb_key = key;
-    b.tb     = tablebaseResults(b.tree.main, b.chess960, setup_.tb_paths);
+    if (hidden == 0) {
+        b.tb.clear();
+        return;
+    }
+    auto line = b.tree.main;  // up to the position before the hidden one
+    if (hidden > 0) line.moves.resize(std::min(line.moves.size(), static_cast<std::size_t>(hidden - 1)));
+    b.tb = tablebaseResults(line, b.chess960, setup_.tb_paths);
 }
 
 int App::boardTablebasePly() const {

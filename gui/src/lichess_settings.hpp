@@ -29,9 +29,10 @@ struct LichessSettings {
     int sync_speeds = 0;
     int sync_since  = 0;
     std::string sync_date;
+    bool listen_declined = false;  // "Not now" said to hearing the user's games start and end (#48)
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
                                                 explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
-                                                sync_speeds, sync_since, sync_date)
+                                                sync_speeds, sync_since, sync_date, listen_declined)
 
 }  // namespace fcg

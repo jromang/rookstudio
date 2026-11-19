@@ -574,6 +574,13 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             go();
             startLichessLink();
         });
+    // Fair play (#48): hearing the user's games start and end, offered again after "Not now".
+    if (lichess_account_ && !lichess_account_->has(lichess::SCOPE_CHALLENGE_READ))
+        add(TR("Know when my Lichess games start and end…"), "Lichess", [this, go = page(Page::Lichess)] {
+            go();
+            lichess_.listen_declined = false;
+            saveLichessSettings();
+        });
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {

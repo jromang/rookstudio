@@ -134,7 +134,7 @@ void App::pollBroadcastBoards() {
         if (b.url != broadcast_selected_) order.push_back(&b);
     for (auto* p : order) {
         auto& b = *p;
-        if (!shown || !with || !playing(b.result) || room <= 0) {
+        if (!shown || !with || !playing(b.result) || room <= 0 || liveGameOn()) {
             b.analyser.reset();
             continue;
         }

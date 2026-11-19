@@ -1100,6 +1100,27 @@ The database offered is the one chosen on the Databases page when the link was p
 chosen. A game is asked by its id, without an account; a private study with your token; broadcasts with an account
 allowed to read them, asked once, as for following a round; your bookmarks need a linked account.
 
+### Fair play
+
+Lichess forbids any help during a game. With your account linked, RookStudio keeps to it wherever you play, in the
+browser or on a phone:
+
+- while one of your live games lasts, the Board page locks its Analysis, Tree, References and Questions tabs, and
+  neither the engine, the threat, the tables, the cloud nor the assistant look at any position; a review under way
+  stops, the passes it has done kept. Engine tournaments go on, without analysis on their Board. Everything comes back
+  by itself when the game ends.
+- a correspondence game locks the engine, the cloud, the tables and the assistant on its position and those that come
+  from it; Lichess allows a book and a database there, so the tree of your databases and their reference games stay
+  open. Elsewhere, everything works.
+
+A banner on the Board page says which game locks what. The Home page's Lichess card lists your games in progress,
+those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*.
+
+Your games in progress are asked for with your account's token when the Home page shows, every half-minute while a
+live game lasts and every ten minutes while a correspondence game does. The Lichess page offers once to hear them start
+and end instead, while RookStudio is open: one more permission, reading your challenges. RookStudio reads no move
+during a game and plays none. Without that permission, the lock comes when the Home page shows.
+
 ### Online for the analysis
 
 Three services, each asked about at its first use (for this position, always, or not now) and changed here:

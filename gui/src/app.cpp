@@ -282,6 +282,7 @@ void App::frame() {
     updateBroadcast();
     pollLichess();    // a link, a sync, the broadcasts: whatever page shows
     pollLinkJob();    // a Lichess link pasted: its game asked, its import
+    pollLichessPlaying();  // the user's games in progress on Lichess, and what they lock (#48)
     pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
@@ -356,6 +357,36 @@ void App::frame() {
         } else if (w == "board" || w == "board-analyse") {  // the Board page; its analysis started
             page_ = Page::Board;
             if (w == "board-analyse") setBoardAnalysis(true);
+        } else if (w.rfind("lichess-playing=", 0) == 0) {
+            // lichess-playing=live|correspondence[@FILE[@PLY]]: a game of the user's in progress, as Lichess would
+            // list it (#48): live, or by correspondence at the position of the Board page's game at PLY (where it
+            // is, without PLY); FILE (.txt, .fen) read on the board first.
+            const auto spec = w.substr(16);
+            const auto at   = spec.find('@');
+            int ply         = -1;
+            if (at != std::string::npos) {
+                auto file       = spec.substr(at + 1);
+                const auto last = file.rfind('@');
+                if (last != std::string::npos) {
+                    ply  = std::atoi(file.c_str() + last + 1);
+                    file = file.substr(0, last);
+                }
+                page_ = Page::Board;
+                dropFile(file);
+            }
+            lichess::PlayingGame g;
+            g.id              = "abcd1234";
+            g.full_id         = "abcd1234wxyz";
+            g.opponent        = "Partner_3";
+            g.opponent_rating = 2016;
+            const bool live   = spec.substr(0, at) == "live";
+            g.speed           = live ? "blitz" : "correspondence";
+            g.my_turn         = !live;
+            g.seconds_left    = live ? 161 : 100800;
+            g.fen = ply >= 0
+                        ? boardAt(board_.game, board_.chess960, std::min<int>(ply, board_.game.moves.size())).getFen()
+                        : boardFen();
+            lichess_playing_.push_back(g);
         } else if (w.rfind("link=", 0) == 0) {  // link=URL: a Lichess link, as pasted on the Board page (#47)
             page_ = Page::Board;
             (void)offerLichessLink(w.substr(5));

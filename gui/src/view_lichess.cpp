@@ -198,6 +198,7 @@ void App::drawLichessHomeCard() {
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("The Lichess page ›"))) page_ = Page::Lichess;
     drawLichessAccountPanel();  // the account's ratings, figures and activity (#46)
+    drawPlayingGames();         // the user's games in progress (#48)
     if (const auto base = lichessBase()) {
         const auto facts = shelf().facts(*base);
         auto line        = trf("Lichess · {}: {}", lichess_.player, ui::exactCount(facts.games));
@@ -777,6 +778,7 @@ void App::drawLichessPage() {
         ui::TopicRegion topic(guide::topics::LichessLink);
         drawLichessAccount();
     }
+    drawListenOffer();  // the right to hear the user's games start and end (#48)
     ImGui::Dummy(ImVec2(0, px(8)));
     {
         ui::TopicRegion topic(guide::topics::LichessGames);
@@ -830,6 +832,10 @@ void App::drawLichessTreeCard(bool linked) {
 bool App::lichessTreeRows(int source, const std::string& fen) {
     tree_db_   = -1;
     tree_book_ = false;
+    if (aidsLocked()) {  // fair play (#48): the user's databases and books only
+        ImGui::TextDisabled("%s", TR("Lichess's explorer rests on the positions of your game by correspondence."));
+        return false;
+    }
     if (!lichess_account_ || !lichess_.explorer) {
         drawLichessTreeCard(lichess_account_.has_value());
         return false;

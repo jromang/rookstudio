@@ -405,6 +405,8 @@ const char* glyph(Icon icon) {
             return "\uE2B4";  // swords
         case Icon::Rook:
             return "\uE6A5";  // chess-rook
+        case Icon::Lock:
+            return "\uE10B";  // lock
     }
     return "";
 }

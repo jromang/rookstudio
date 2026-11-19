@@ -119,7 +119,8 @@ enum class Icon {
     Layers,
     Crown,
     Swords,
-    Rook
+    Rook,
+    Lock  // fair play: the aids locked (#48)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

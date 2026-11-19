@@ -140,3 +140,35 @@ TEST_CASE("review: evaluations someone wrote into the game are one analysis, not
     CHECK(two.players[0].name == "White");
     CHECK(two.available[static_cast<std::size_t>(GraphChart::Agreement)]);
 }
+
+TEST_CASE("review: the analysis written in a game's comments, as a review beside the engines'") {
+    std::string error;
+    const auto game = readPgnGame(R"([Site "https://lichess.org/abcd1234"]
+[White "Partner_3"]
+[Black "rs_sample_0000"]
+[Result "*"]
+
+1. e4 { [%eval 0.2] } 1... e5 { [%eval 0.25] } 2. Nf3 { [%eval #3] } 2... Nc6 { [%eval -1.5] } *
+)",
+                                  error);
+    REQUIRE(game);
+    CHECK(lichessGame(*game));
+    const auto review = commentsReview(*game);
+    REQUIRE(review);
+    REQUIRE(review->positions.size() == 5);
+    CHECK_FALSE(review->positions[0].score);  // the comments come after the moves
+    // Each position from its side to move's point of view: after 1. e4 (+0.20 for White), Black to move.
+    REQUIRE(review->positions[1].score);
+    CHECK(review->positions[1].score->value == -20);
+    REQUIRE(review->positions[2].score);
+    CHECK(review->positions[2].score->value == 25);  // after 1... e5, White to move
+    REQUIRE(review->positions[3].score);
+    CHECK(review->positions[3].score->type == fastchess::ScoreType::MATE);
+    CHECK(review->positions[3].score->value == -3);  // White mates in 3: Black, to move, is mated
+    REQUIRE(review->positions[4].score);
+    CHECK(review->positions[4].score->value == -150);
+    // A game without them, or another site's: none, and not Lichess's.
+    auto bare = gameOf("e4 e5 Nf3 Nc6");
+    CHECK_FALSE(commentsReview(bare));
+    CHECK_FALSE(lichessGame(bare));
+}

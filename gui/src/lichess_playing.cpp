@@ -1,10 +1,14 @@
 #include "lichess_playing.hpp"
 
+#include <algorithm>
 #include <chrono>
 
 #include <fmt/include/fmt/format.h>
+#include <study/import.hpp>
+#include <study/store.hpp>
 
 #include "https.hpp"
+#include "lichess_links.hpp"
 
 namespace fcg::lichess {
 
@@ -62,6 +66,41 @@ std::vector<PlayingGame> readPlaying(const nlohmann::json& j) {
     if (it == j.end() || !it->is_array()) return out;
     for (const auto& g : *it)
         if (auto game = readPlayingGame(g)) out.push_back(std::move(*game));
+    return out;
+}
+
+std::vector<PlayingGame> endedGames(const std::vector<PlayingGame>& before, const std::vector<PlayingGame>& after) {
+    std::vector<PlayingGame> out;
+    for (const auto& g : before)
+        if (std::none_of(after.begin(), after.end(), [&](const auto& a) { return a.id == g.id; })) out.push_back(g);
+    return out;
+}
+
+Arrival bringGame(const std::string& id, const std::string& token, study::Database* db,
+                  const std::atomic<bool>* cancel) {
+    Arrival out;
+    auto answer = gamePgn(id, token, cancel);
+    if (!answer.value) {
+        out.error = answer.error.empty() ? std::string("Lichess did not answer") : answer.error;
+        return out;
+    }
+    out.pgn      = std::move(*answer.value);
+    out.analysed = out.pgn.find("[%eval ") != std::string::npos;
+    study::ImportedGame g;
+    if (!study::readImportedGame(out.pgn, g)) {
+        out.error = "the game could not be read";
+        return out;
+    }
+    out.plies  = g.plies;
+    out.result = g.result;
+    if (!db || g.plies < 2) return out;  // an aborted game stays out
+    try {
+        std::vector<study::ImportedGame> one;
+        one.push_back(std::move(g));
+        out.added = db->append(std::move(one)).added > 0;
+    } catch (const std::exception& e) {
+        out.error = e.what();
+    }
     return out;
 }
 

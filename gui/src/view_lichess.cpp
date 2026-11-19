@@ -199,6 +199,7 @@ void App::drawLichessHomeCard() {
     if (ImGui::SmallButton(TR("The Lichess page ›"))) page_ = Page::Lichess;
     drawLichessAccountPanel();  // the account's ratings, figures and activity (#46)
     drawPlayingGames();         // the user's games in progress (#48)
+    drawFinishedBanner(true);   // one that ended (#49)
     if (const auto base = lichessBase()) {
         const auto facts = shelf().facts(*base);
         auto line        = trf("Lichess · {}: {}", lichess_.player, ui::exactCount(facts.games));
@@ -402,6 +403,13 @@ void App::drawLichessAccount() {
         ImGui::TextDisabled("%s",
                             TR("The token is kept in your profile, readable by you alone. Unlinking revokes it at "
                                "Lichess and deletes it here; your databases stay."));
+        // A game of the user's that ends (#49): its review started by itself.
+        if (ImGui::Checkbox(TR("Review my finished games at once"), &lichess_.review_finished)) saveLichessSettings();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s",
+                              TR("When one of your Lichess games ends, it opens on the Board and its review starts, "
+                                 "unless the Board holds a game with unsaved changes or work under way; a banner "
+                                 "offers it then."));
     } else {
         ImGui::TextDisabled("%s", TR("No account linked. Linked, it brings:"));
         ImGui::BulletText("%s", TR("Lichess's opening explorer in the Tree tab: masters, all players, one player;"));

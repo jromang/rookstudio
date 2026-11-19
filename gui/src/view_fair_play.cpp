@@ -21,6 +21,7 @@
 #include <study/game_tree.hpp>
 
 #include "app.hpp"
+#include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
@@ -140,10 +141,18 @@ void endBanner() {
 }  // namespace
 
 void App::pollLichessPlaying() {
+    pollLichessFinished();
     if (!lichess_account_) {
         lichess_playing_.clear();
         lichess_events_.reset();
+        lichess_playing_fresh_ = true;
         return;
+    }
+    // Another token (more rights, another account): the games asked again at once.
+    if (lichess_playing_token_ != lichess_account_->token) {
+        lichess_playing_token_ = lichess_account_->token;
+        lichess_playing_asked_ = {};
+        lichess_playing_fresh_ = true;
     }
     // Heard as they start and end, when the token may read challenges; Lichess sends the games in progress each time
     // the stream opens, so the list starts again then.
@@ -159,7 +168,10 @@ void App::pollLichessPlaying() {
                 continue;
             }
             std::erase_if(lichess_playing_, [&](const auto& g) { return g.id == e.game.id; });
-            if (e.kind == lichess::GameEvent::Kind::Started) lichess_playing_.push_back(std::move(e.game));
+            if (e.kind == lichess::GameEvent::Kind::Started)
+                lichess_playing_.push_back(std::move(e.game));
+            else
+                finishLichessGame(e.game);
         }
     }
     const bool listening = lichess_events_ && !lichess_events_->refused();
@@ -168,7 +180,13 @@ void App::pollLichessPlaying() {
     if (lichess_playing_job_.valid() &&
         lichess_playing_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         auto answer = lichess_playing_job_.get();
-        if (answer.value) lichess_playing_ = std::move(*answer.value);
+        if (answer.value) {
+            // Those no longer listed ended (#49).
+            if (!lichess_playing_fresh_)
+                for (const auto& g : lichess::endedGames(lichess_playing_, *answer.value)) finishLichessGame(g);
+            lichess_playing_       = std::move(*answer.value);
+            lichess_playing_fresh_ = false;
+        }
     }
     const bool shown = std::exchange(lichess_playing_ask_now_, false);
     if (listening || lichess_playing_job_.valid()) return;
@@ -329,6 +347,178 @@ void App::drawListenOffer() {
                                  "lock comes then."));
     ImGui::PopTextWrapPos();
     ui::endCard();
+}
+
+void App::finishLichessGame(const lichess::PlayingGame& game) {
+    if (!lichess_account_) return;
+    if (std::find(lichess_finished_ids_.begin(), lichess_finished_ids_.end(), game.id) != lichess_finished_ids_.end())
+        return;
+    lichess_finished_ids_.push_back(game.id);
+    // Its database: "Lichess · account", made when missing; the player's sync writing in it brings the game itself.
+    const auto name  = "Lichess · " + lichess_account_->username;
+    const auto lower = [](std::string text) {
+        for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return text;
+    };
+    auto& s = shelf();
+    std::optional<std::size_t> index;
+    for (std::size_t i = 0; i < s.entries().size(); ++i)
+        if (!s.entries()[i].source && lower(s.entries()[i].name) == lower(name)) index = i;
+    FinishedGame f;
+    f.game = game;
+    f.base = name;
+    std::shared_ptr<study::Database> db;
+    try {
+        if (!index) index = s.create(name);
+        f.index = *index;
+        f.base  = s.entries()[*index].name;
+        if (!(lichess_sync_ && lichess_sync_->index == *index)) db = s.open(*index);
+    } catch (const std::exception& e) {
+        Console::instance().add(trf("Lichess: “{}” could not be made: {}", name, e.what()), true);
+    }
+    f.arrival = std::async(std::launch::async, [id = game.id, token = lichess_account_->token, db] {
+        return lichess::bringGame(id, token, db.get());
+    });
+    lichess_finished_.push_back(std::move(f));
+}
+
+void App::pollLichessFinished() {
+    const auto ready = [](auto& job) {
+        return job.valid() && job.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    };
+    for (auto& f : lichess_finished_) {
+        if (ready(f.arrival)) {
+            f.got = f.arrival.get();
+            if (f.got->added && f.index < shelf().entries().size()) shelf().rebuildTree(f.index);
+            if (!f.got->error.empty())
+                Console::instance().add(trf("Lichess: your game against {}: {}", opponentText(f.game), f.got->error),
+                                        true);
+            // An aborted game is not worth a word; a finished one's review at once, when chosen, no live game going
+            // on and the Board holding nothing that would be lost.
+            if (!f.got->pgn.empty() && f.got->plies < 2) f.done = true;
+            if (!f.done && !f.got->pgn.empty() && lichess_.review_finished && !liveGameOn() && boardFree()) {
+                f.automatic = true;
+                reviewFinishedGame(f);
+            }
+        }
+        if (ready(f.again)) {
+            auto again = f.again.get();
+            openFinishedGame(f, again.pgn.empty() ? f.got->pgn : again.pgn);
+        }
+    }
+    std::erase_if(lichess_finished_, [](const auto& f) { return f.done && !f.arrival.valid() && !f.again.valid(); });
+}
+
+bool App::boardFree() const {
+    const auto& b = board_;
+    return !b.changes.any() && !b.editor && !b.reviewing() && !(b.watching && b.match) && !b.play_open && !link_card_;
+}
+
+void App::reviewFinishedGame(FinishedGame& f) {
+    if (!f.got || f.got->pgn.empty() || f.again.valid()) return;
+    if (f.got->analysed || !lichess_account_) {
+        openFinishedGame(f, f.got->pgn);
+        return;
+    }
+    // Asked again: Lichess's analysis may have been asked for on lichess.org since the game ended.
+    f.again = std::async(std::launch::async, [id = f.game.id, token = lichess_account_->token] {
+        return lichess::bringGame(id, token, nullptr);
+    });
+}
+
+void App::openFinishedGame(FinishedGame& f, const std::string& pgn) {
+    const auto page = page_;
+    readOnBoard(pgn, "Lichess");
+    startGameReview();
+    if (f.automatic) {  // where the user was, told where it runs
+        page_ = page;
+        Console::instance().add(
+            trf("Lichess: your game against {} is over; its review runs on the Board page.", opponentText(f.game)));
+    }
+    f.done = true;
+}
+
+void App::drawFinishedBanner(bool home) {
+    FinishedGame* shown = nullptr;
+    for (auto& f : lichess_finished_)
+        if (!f.done) shown = &f;
+    if (!shown) return;
+    auto& f = *shown;
+    const ui::TopicRegion topic(guide::topics::FinishedGames);
+    const auto against = opponentText(f.game);
+    const bool came    = f.got && !f.got->pgn.empty();
+    std::string title;
+    if (came) {
+        const auto moves  = (f.got->plies + 1) / 2;
+        const auto result = f.got->result == '1'   ? std::string("1-0")
+                            : f.got->result == '0' ? std::string("0-1")
+                            : f.got->result == '=' ? std::string("½-½")
+                                                   : std::string("*");
+        title = trn("Your game against {} is over: {} in {} move", "Your game against {} is over: {} in {} moves",
+                    moves, against, result, moves);
+    } else {
+        title = trf("Your game against {} is over", against);
+    }
+    std::string text;
+    if (f.arrival.valid())
+        text = TR("Lichess is sending it…");
+    else if (f.again.valid())
+        text = TR("Asking Lichess for its analysis…");
+    else if (!came)
+        text = trf("Lichess did not send it ({}).", f.got ? f.got->error : std::string());
+    else if (!f.got->error.empty())
+        text = trf("It could not go into “{}”: {}.", f.base, f.got->error);
+    else
+        text = f.got->analysed ? trf("It is in “{}”, with Lichess's analysis.", f.base) : trf("It is in “{}”.", f.base);
+    if (came && !f.again.valid() && !liveGameOn()) text += std::string(" ") + TR("The aids are back.");
+    const bool can_review = came && !f.again.valid();
+    if (home) {  // one line on the Home page's Lichess card
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GOOD), "%s", title.c_str());
+        if (can_review) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Review it"))) reviewFinishedGame(f);
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Not now"))) f.done = true;
+        ImGui::Dummy(ImVec2(0, px(4)));
+        return;
+    }
+    // On the Board page: Enter reviews it, Escape puts it aside.
+    if (finishedCardTakesKeys() && !ImGui::GetIO().WantTextInput) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)) {
+            link_key_frame_ = ImGui::GetFrameCount();
+            reviewFinishedGame(f);
+            return;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            link_key_frame_ = ImGui::GetFrameCount();
+            f.done          = true;
+            return;
+        }
+    }
+    beginBanner("finished_game", ui::GOOD);
+    ui::inlineIcon(ui::Icon::Check, ui::GOOD);
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GOOD), "%s", title.c_str());
+    ImGui::TextDisabled("%s", text.c_str());
+    ImGui::PopTextWrapPos();
+    if (can_review) {
+        if (ImGui::Button(TR("Review it"))) reviewFinishedGame(f);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", TR("Enter"));
+        ImGui::SameLine();
+    } else if (!came && !f.arrival.valid()) {
+        if (ImGui::SmallButton(TR("Open on lichess.org")))
+            SDL_OpenURL(fmt::format("https://lichess.org/{}", f.game.full_id).c_str());
+        ImGui::SameLine();
+    }
+    if (ImGui::SmallButton(TR("Not now"))) f.done = true;
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TR("Esc"));
+    ImGui::EndGroup();
+    endBanner();
 }
 
 }  // namespace fcg

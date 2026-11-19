@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <future>
 #include <limits>
 #include <sstream>
 
@@ -20,6 +21,7 @@
 #include <fmt/include/fmt/format.h>
 #include <core/globals/globals.hpp>
 #include <engine/uci_engine.hpp>
+#include <study/import.hpp>
 #include <tour/files.hpp>
 #include <tour/sprt_rules.hpp>
 
@@ -357,6 +359,30 @@ void App::frame() {
         } else if (w == "board" || w == "board-analyse") {  // the Board page; its analysis started
             page_ = Page::Board;
             if (w == "board-analyse") setBoardAnalysis(true);
+        } else if (w.rfind("lichess-finished=", 0) == 0) {
+            // lichess-finished=FILE: a game of the user's that ended, as Lichess would send it (#49), its PGN read
+            // from FILE; nothing asked of Lichess.
+            std::ifstream in(w.substr(17), std::ios::binary);
+            lichess::Arrival a;
+            a.pgn.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            study::ImportedGame g;
+            if (study::readImportedGame(a.pgn, g)) {
+                a.plies  = g.plies;
+                a.result = g.result;
+            }
+            a.analysed = a.pgn.find("[%eval ") != std::string::npos;
+            a.added    = true;
+            FinishedGame f;
+            f.game.id              = "abcd1234";
+            f.game.full_id         = "abcd1234wxyz";
+            f.game.opponent        = "Partner_3";
+            f.game.opponent_rating = 2016;
+            f.game.speed           = "blitz";
+            f.base                 = "Lichess · rs_sample_0000";
+            std::promise<lichess::Arrival> came;  // as if Lichess had just sent it
+            came.set_value(std::move(a));
+            f.arrival = came.get_future();
+            lichess_finished_.push_back(std::move(f));
         } else if (w.rfind("lichess-playing=", 0) == 0) {
             // lichess-playing=live|correspondence[@FILE[@PLY]]: a game of the user's in progress, as Lichess would
             // list it (#48): live, or by correspondence at the position of the Board page's game at PLY (where it

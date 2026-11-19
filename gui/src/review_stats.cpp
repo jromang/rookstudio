@@ -169,6 +169,24 @@ std::vector<KeyMoment> keyMoments(const ReplayGame& game, const GameReview& revi
     return out;
 }
 
+std::optional<GameReview> commentsReview(const ReplayGame& game) {
+    if (!evaluationsAnnotated(game)) return std::nullopt;
+    GameReview r;
+    r.engine = "comments";
+    r.positions.resize(game.moves.size() + 1);
+    for (std::size_t i = 0; i < game.moves.size(); ++i) {
+        const auto& m = game.moves[i];
+        // The position after the move, from its side to move's point of view: the mover's score turned.
+        if (m.score) r.positions[i + 1].score = fastchess::Score{m.score->type, -m.score->value};
+    }
+    return r;
+}
+
+bool lichessGame(const ReplayGame& game) {
+    const auto site = game.header("Site");
+    return site.find("lichess.org/") != std::string::npos;
+}
+
 int sawItAt(const GraphCurve& curve, int ply, int sign) {
     for (std::size_t i = 0; i < curve.x.size(); ++i) {
         if (curve.x[i] < static_cast<float>(ply - 12)) continue;

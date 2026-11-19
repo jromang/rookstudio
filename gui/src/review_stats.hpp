@@ -31,6 +31,13 @@ struct SideStats {
     std::array<std::optional<double>, 3> phase_accuracy;  // opening, middlegame, endgame
 };
 
+// The analysis written into a game's comments (Lichess's or ChessBase's [%eval]) as a review, to be set beside the
+// engines' (#49); none when its evaluations are not one analyst's (evaluationsAnnotated()). Its first position has
+// no score, the comments being after the moves.
+[[nodiscard]] std::optional<GameReview> commentsReview(const ReplayGame& game);
+// Whether the game was played on lichess.org (its Site), whose [%eval] are Lichess's analysis.
+[[nodiscard]] bool lichessGame(const ReplayGame& game);
+
 // Each side's figures (White's first) by `review` (plies + 1 positions), `judged` its judgements.
 [[nodiscard]] std::array<SideStats, 2> gameStats(const ReplayGame& game, bool chess960, const GameReview& review,
                                                  const std::vector<MoveReview>& judged, const GamePhases& phases);

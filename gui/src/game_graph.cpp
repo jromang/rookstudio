@@ -195,9 +195,11 @@ GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart
     // An analysis written into the game: one curve, its own, not the players'.
     const bool annotated = evaluationsAnnotated(game);
     if (annotated) {
-        g.players[0].key  = "game";
-        g.players[0].name = TR("The game's evaluations");
-        g.players[0].note = TR("in its comments");
+        // A game of lichess.org: its evaluations are Lichess's analysis, asked for there (#49).
+        const bool lichess = game.header("Site").find("lichess.org/") != std::string::npos;
+        g.players[0].key   = "game";
+        g.players[0].name  = lichess ? TR("Lichess's analysis") : TR("The game's evaluations");
+        g.players[0].note  = lichess ? TR("from lichess.org") : TR("in its comments");
     }
 
     // What the moves' comments hold, for the tabs; the time strip.

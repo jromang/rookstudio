@@ -1412,7 +1412,8 @@ void App::drawBoardPage() {
     ImGui::EndGroup();
     ImGui::SameLine();
     ImGui::BeginChild("##board_side", ImVec2(0, 0));
-    drawLinkCard();  // a Lichess link pasted (#47)
+    drawLinkCard();             // a Lichess link pasted (#47)
+    drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
     if (b.play_open || (b.match && b.match_state.running)) drawBoardPlay();
     if (chessBoard()) {
         drawChessColumn();
@@ -3281,6 +3282,27 @@ void App::drawBoardReview() {
         ImGui::EndGroup();
     }
     ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + box_h + px(8)));
+
+    // Two opinions on the same game (#49, mockup M8, board "Fairplay"): each analysis's accuracy, Lichess's too when
+    // the game came with its evaluations.
+    {
+        std::vector<std::pair<std::string, std::array<SideStats, 2>>> opinions;
+        for (std::size_t i = 1; i < b.reviews.size(); ++i)
+            if (b.reviews[i].complete(main.moves.size()))
+                opinions.emplace_back(
+                    b.reviews[i].engine,
+                    gameStats(main, b.chess960, b.reviews[i], reviewMoves(main, b.chess960, b.reviews[i]), phases));
+        if (const auto own = commentsReview(main))
+            opinions.emplace_back(lichessGame(main) ? TR("Lichess's analysis") : TR("The game's evaluations"),
+                                  gameStats(main, b.chess960, *own, reviewMoves(main, b.chess960, *own), phases));
+        if (!opinions.empty()) {
+            opinions.insert(opinions.begin(), {review.engine, stats});
+            for (const auto& [name, st] : opinions)
+                ImGui::TextDisabled(
+                    "%s", trf("{}: accuracy {} · {}", name, percent(st[0].accuracy), percent(st[1].accuracy)).c_str());
+            ImGui::Spacing();
+        }
+    }
 
     // The accuracy in each phase.
     {

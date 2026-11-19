@@ -20,6 +20,10 @@
 
 #include "lichess_api.hpp"
 
+namespace fcg::study {
+class Database;
+}
+
 namespace fcg::lichess {
 
 inline constexpr const char* SCOPE_CHALLENGE_READ = "challenge:read";
@@ -45,6 +49,24 @@ struct PlayingGame {
 [[nodiscard]] std::optional<PlayingGame> readPlayingGame(const nlohmann::json& j);
 // /api/account/playing's answer: its "nowPlaying".
 [[nodiscard]] std::vector<PlayingGame> readPlaying(const nlohmann::json& j);
+
+// The games of `before` that `after` no longer lists: they ended (#49).
+[[nodiscard]] std::vector<PlayingGame> endedGames(const std::vector<PlayingGame>& before,
+                                                  const std::vector<PlayingGame>& after);
+
+// A game of the user's that ended, brought in (#49): its PGN as Lichess exports it (its clocks, its opening, Lichess's
+// evaluations when it was analysed there), added to `db` when one is given and it has two plies or more (Lichess
+// aborts a game left before them).
+struct Arrival {
+    std::string pgn;         // empty when Lichess did not send it
+    bool added     = false;  // to the database (false: it had the game already, or none was given)
+    uint32_t plies = 0;
+    char result    = '*';    // '1' 1-0, '0' 0-1, '=' a draw, '*' none
+    bool analysed  = false;  // Lichess's evaluations in it ([%eval])
+    std::string error;
+};
+[[nodiscard]] Arrival bringGame(const std::string& id, const std::string& token, study::Database* db,
+                                const std::atomic<bool>* cancel = nullptr);
 
 // The games in progress, with the link's token (no scope more).
 [[nodiscard]] Answer<std::vector<PlayingGame>> playingGames(const std::string& token,

@@ -3,6 +3,7 @@
 #include <doctest/doctest.hpp>
 
 #include <atomic>
+#include <filesystem>
 #include <string>
 #include <thread>
 
@@ -13,6 +14,8 @@
 #include "lichess_api.hpp"
 #include "lichess_playing.hpp"
 #include "scripted_server.hpp"
+
+#include <study/store.hpp>
 
 using namespace fcg;
 using namespace fcg::lichess;
@@ -106,5 +109,72 @@ TEST_CASE("Lichess playing: the stream heard on its own thread; a refused token 
         CHECK(listener.refused());
         CHECK(listener.error() == "Lichess refused the token");
     }
+    servers() = Servers{};
+}
+
+TEST_CASE("Lichess playing: the games that ended, those no longer listed") {
+    std::vector<PlayingGame> before(3), after(2);
+    before[0].id     = "aaaa1111";
+    before[1].id     = "bbbb2222";
+    before[2].id     = "cccc3333";
+    after[0].id      = "cccc3333";
+    after[1].id      = "dddd4444";  // a new one
+    const auto ended = endedGames(before, after);
+    REQUIRE(ended.size() == 2);
+    CHECK(ended[0].id == "aaaa1111");
+    CHECK(ended[1].id == "bbbb2222");
+    CHECK(endedGames({}, after).empty());
+}
+
+TEST_CASE("Lichess playing: a finished game brought into a database, once") {
+    const char* const PGN = R"([Event "Rated blitz game"]
+[Site "https://lichess.org/abcd1234"]
+[White "Partner_3"]
+[Black "rs_sample_0000"]
+[Result "1-0"]
+
+1. e4 { [%eval 0.2] [%clk 0:03:00] } 1... e5 { [%eval 0.25] [%clk 0:03:00] } 2. Qh5 { [%eval -0.1] } 2... Nc6 { [%eval 0.0] }
+3. Bc4 { [%eval -0.1] } 3... Nf6 { [%eval 6.0] } 4. Qxf7# 1-0
+)";
+    const auto port       = freePort();
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        const auto path    = requestPath(head);
+        const bool aborted = path.rfind("/game/export/abor1234", 0) == 0;
+        if (path.rfind("/game/export/abcd1234", 0) != 0 && !aborted) {
+            c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            return;
+        }
+        const std::string body =
+            aborted ? std::string("[Site \"https://lichess.org/abor1234\"]\n[Result \"*\"]\n\n1. e4 *\n") : PGN;
+        c.sendAll(
+            fmt::format("HTTP/1.1 200 OK\r\nContent-Type: application/x-chess-pgn\r\nContent-Length: {}\r\n"
+                        "Connection: close\r\n\r\n{}",
+                        body.size(), body));
+    });
+    REQUIRE(server.ok());
+    servers().api  = fmt::format("http://127.0.0.1:{}", port);
+    const auto dir = std::filesystem::temp_directory_path() / "fcg-lichess-finished";
+    std::filesystem::remove_all(dir);
+    const auto db = study::Database::create(dir);
+    REQUIRE(db);
+    const auto first = bringGame("abcd1234", "a-token", db.get());
+    CHECK(first.error.empty());
+    CHECK(first.added);
+    CHECK(first.analysed);
+    CHECK(first.plies == 7);
+    CHECK(first.result == '1');
+    const auto again = bringGame("abcd1234", "a-token", db.get());
+    CHECK(again.error.empty());
+    CHECK_FALSE(again.added);  // the database has it
+    const auto without = bringGame("abcd1234", "a-token", nullptr);
+    CHECK(without.pgn == PGN);
+    CHECK_FALSE(without.added);
+    const auto aborted = bringGame("abor1234", "a-token", db.get());
+    CHECK(aborted.error.empty());
+    CHECK(aborted.plies == 1);
+    CHECK_FALSE(aborted.added);  // Lichess aborted it: it stays out
+    const auto missing = bringGame("zzzz9999", "a-token", db.get());
+    CHECK(missing.pgn.empty());
+    CHECK_FALSE(missing.error.empty());
     servers() = Servers{};
 }

@@ -1121,6 +1121,18 @@ live game lasts and every ten minutes while a correspondence game does. The Lich
 and end instead, while RookStudio is open: one more permission, reading your challenges. RookStudio reads no move
 during a game and plays none. Without that permission, the lock comes when the Home page shows.
 
+### Your finished games
+
+When one of your games ends, RookStudio brings it into *Lichess · your name*, a database made when missing, with its
+clocks, its opening and, when you asked Lichess to analyse it, Lichess's evaluations. A banner on the Board page, and a
+line on the Home page, say how it ended; *Review it* (Enter) asks Lichess once more for its analysis, which may have
+been asked for since, opens the game and starts its review. *Not now* (Escape) puts the banner aside.
+
+Lichess's analysis then shows beside your engine's: its curve on the graph, and each analysis's accuracy under the
+two sides' figures in the Review tab, the same formula for both. The Lichess page's *Review my finished games at
+once* starts the review by itself, unless the Board holds a game with unsaved changes or work under way; the banner
+offers it then.
+
 ### Online for the analysis
 
 Three services, each asked about at its first use (for this position, always, or not now) and changed here:

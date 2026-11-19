@@ -785,6 +785,7 @@ class App {
     bool lichess_playing_ask_now_   = false;  // the Home page showed: looked at again if it was a while ago
     int lichess_playing_home_frame_ = -10;    // the frame that drew the Home page's list last
     std::unique_ptr<lichess::EventListener> lichess_events_;  // with the right to read challenges
+    std::string lichess_playing_token_;                       // the token the games were asked with
     void pollLichessPlaying();
     [[nodiscard]] const lichess::PlayingGame* liveGameOn() const;
     // The first ply of `line`, up to `last`, whose position is a correspondence game's now, -1 when none; `game` set to
@@ -799,6 +800,33 @@ class App {
     void drawFairPlayBanner(bool whole_game = false);
     void drawPlayingGames();   // the Home page's list
     void drawListenOffer();    // the Lichess page's offer of the right to read challenges
+    // A game of the user's that ended (#49, mockup M8, board "Fairplay"): brought into "Lichess · account", made when
+    // missing; a banner offers its review (Enter), which asks Lichess again for its analysis first.
+    struct FinishedGame {
+        lichess::PlayingGame game;  // as it was listed while played
+        std::string base;           // the database it goes into
+        std::size_t index = SIZE_MAX;
+        std::future<lichess::Arrival> arrival;
+        std::optional<lichess::Arrival> got;
+        std::future<lichess::Arrival> again;  // "Review it": its PGN asked again, for Lichess's analysis
+        bool automatic = false;               // reviewed at once, as chosen on the Lichess page
+        bool done      = false;               // reviewed or put aside: forgotten once nothing waits for Lichess
+    };
+    std::vector<FinishedGame> lichess_finished_;
+    std::vector<std::string> lichess_finished_ids_;  // each game once, however it was heard ending
+    bool lichess_playing_fresh_ = true;  // the list starts again (another token): what leaves it did not end
+    void finishLichessGame(const lichess::PlayingGame& game);
+    void pollLichessFinished();
+    void reviewFinishedGame(FinishedGame& f);
+    void openFinishedGame(FinishedGame& f, const std::string& pgn);
+    [[nodiscard]] bool boardFree() const;  // nothing unsaved nor under way on the Board: a game may replace its own
+    void drawFinishedBanner(bool home);
+    [[nodiscard]] bool finishedCardTakesKeys() const {
+        if (page_ != Page::Board) return false;
+        for (const auto& f : lichess_finished_)
+            if (!f.done && f.got && !f.got->pgn.empty() && !f.again.valid()) return true;
+        return false;
+    }
     int link_key_frame_ = -1;  // the frame whose Enter or Escape the card took
     // True when `text` is a Lichess address: its card shown, or said unknown. `databases`: pasted on the Databases
     // page, its games offered for the database chosen there.
@@ -807,7 +835,7 @@ class App {
     void actOnLink();
     void drawLinkCard();
     [[nodiscard]] bool linkCardTakesKeys() const {
-        return link_card_.has_value() || link_key_frame_ == ImGui::GetFrameCount();
+        return link_card_.has_value() || link_key_frame_ == ImGui::GetFrameCount() || finishedCardTakesKeys();
     }
     struct LichessSync {
         std::size_t index = 0;  // the database's

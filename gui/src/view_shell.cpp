@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <ctime>
+#include <functional>
 
 #include <SDL3/SDL.h>
 #include <imgui.h>
@@ -910,10 +911,25 @@ void App::drawSettings() {
     ImGui::TextDisabled("%s", TR("A request to GitHub per engine taken from them, kept a day."));
     ImGui::EndGroup();
 
+    // The sections of the view's pages next, in its order; the others folded under Other settings (M6, board 3).
+    const auto& v          = view();
+    const bool board       = v.holds(views::PageId::Board) || v.holds(views::PageId::Play);
+    const bool tournaments = v.holds(views::PageId::Tournaments);
+    const bool engines     = v.holds(views::PageId::Engines);
+    const bool lichess     = v.holds(views::PageId::Lichess);
+    std::vector<std::function<void()>> others;
+    const auto section = [&](bool mine, std::function<void()> draw) {
+        if (!mine) {
+            others.push_back(std::move(draw));
+            return;
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+        draw();
+    };
+
     // The boards' colours, the pieces, the move sounds.
-    ImGui::Spacing();
-    ImGui::Separator();
-    drawAppearanceSettings(label);
+    section(board, [&] { drawAppearanceSettings(label); });
 
     // Where the program keeps its files, and whether that is beside the program (the portable mode).
     ImGui::Spacing();
@@ -944,53 +960,51 @@ void App::drawSettings() {
         }
     }
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ui::label(TR("Tournaments folder"), label);
-    ui::topic(guide::topics::Files);
-    ImGui::TextUnformatted(storage_.runsDir().string().c_str());
-    ImGui::SetCursorPosX(label);  // under the path: ui::label() places it at `label` from the window's left
-    if (ImGui::Button(TR("Change…"))) {
-        dialogs_.openFolder(Dialogs::Purpose::TournamentsFolder, storage_.runsDir().string());
-    }
-    ImGui::SameLine();
-    if (ImGui::Button(TR("Open the folder"))) openFolder(storage_.runsDir());
-    if (storage_.runsDir() != storage_.defaultRunsDir()) {
+    section(tournaments, [&] {
+        ui::label(TR("Tournaments folder"), label);
+        ui::topic(guide::topics::Files);
+        ImGui::TextUnformatted(storage_.runsDir().string().c_str());
+        ImGui::SetCursorPosX(label);  // under the path: ui::label() places it at `label` from the window's left
+        if (ImGui::Button(TR("Change…"))) {
+            dialogs_.openFolder(Dialogs::Purpose::TournamentsFolder, storage_.runsDir().string());
+        }
         ImGui::SameLine();
-        if (ImGui::Button(TR("Back to the default"))) {
-            storage_.setRunsDir({});
-            tournaments_dirty_ = true;
-            game_db_dirty_     = true;
-            unfinished_        = unfinishedMatch(storage_.runsDir());
+        if (ImGui::Button(TR("Open the folder"))) openFolder(storage_.runsDir());
+        if (storage_.runsDir() != storage_.defaultRunsDir()) {
+            ImGui::SameLine();
+            if (ImGui::Button(TR("Back to the default"))) {
+                storage_.setRunsDir({});
+                tournaments_dirty_ = true;
+                game_db_dirty_     = true;
+                unfinished_        = unfinishedMatch(storage_.runsDir());
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s",
+                                  trf("New tournaments go to {} again.", storage_.defaultRunsDir().string()).c_str());
+            }
         }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", trf("New tournaments go to {} again.", storage_.defaultRunsDir().string()).c_str());
-        }
-    }
-    ImGui::SetCursorPosX(label);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", TR("New tournaments go there, and the lists show the tournaments found there. Tournaments "
-                                "already played are not moved: a tournament is a folder, move it yourself."));
-    ImGui::PopStyleColor();
+        ImGui::SetCursorPosX(label);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("%s",
+                           TR("New tournaments go there, and the lists show the tournaments found there. Tournaments "
+                              "already played are not moved: a tournament is a folder, move it yourself."));
+        ImGui::PopStyleColor();
+    });
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    drawMachineBudget(label);
+    section(tournaments, [&] { drawMachineBudget(label); });
 
     // The remote machines (view_machines.cpp).
-    ImGui::Spacing();
-    ImGui::Separator();
-    drawMachineSettings(label);
+    section(tournaments || engines, [&] { drawMachineSettings(label); });
 
     // lichess, for the broadcasts of the Broadcast tab.
-    ImGui::Spacing();
-    ImGui::Separator();
-    ui::label("lichess", label);
-    ImGui::BeginGroup();
-    ImGui::PushItemWidth(px(420));
-    lichessTokenField();
-    ImGui::PopItemWidth();
-    ImGui::EndGroup();
+    section(tournaments || lichess, [&] {
+        ui::label("lichess", label);
+        ImGui::BeginGroup();
+        ImGui::PushItemWidth(px(420));
+        lichessTokenField();
+        ImGui::PopItemWidth();
+        ImGui::EndGroup();
+    });
 
     ImGui::Spacing();
     ImGui::Separator();
@@ -1023,11 +1037,20 @@ void App::drawSettings() {
         ImGui::SameLine();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("Applies at the next launch."));
     }
-    if (!chessBoard()) {
+    if (!chessBoard()) others.push_back([&] { drawAssistantSettings(label); });
+
+    // What the view's pages do not use, folded.
+    if (!others.empty()) {
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
-        drawAssistantSettings(label);
+        if (ImGui::CollapsingHeader(TR("Other settings"))) {
+            for (const auto& draw : others) {
+                ImGui::Spacing();
+                ImGui::Separator();
+                draw();
+            }
+        }
     }
 
     if (changed) saveSetupSoon();

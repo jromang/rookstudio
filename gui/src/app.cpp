@@ -273,6 +273,7 @@ void App::frame() {
     applyThemeSetting();
     updateBroadcast();
     pollLichess();    // a link, a sync, the broadcasts: whatever page shows
+    pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
     // --shot and --focus: show the requested page or tab once the first frames are drawn.

@@ -641,6 +641,13 @@ void App::drawEngines() {
         ui::endPanel();
         return;
     }
+    // The engine picker in place of the page while it is open.
+    if (picker_.open) {
+        drawEnginePicker();
+        ui::endPanel();
+        return;
+    }
+    checkEngineUpdates();
 
     // List on the left.
     const float page   = ImGui::GetContentRegionAvail().x;
@@ -683,6 +690,13 @@ void App::drawEngines() {
                                    "and options."));
     }
     ui::topic(guide::topics::EngineChecks);
+    ui::sameLineOrWrap(TR("Popular engines…"));
+    if (ImGui::Button(TR("Popular engines…"))) openEnginePicker();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", TR("The strongest engines, from their authors' GitHub releases: the build this "
+                                   "processor runs, downloaded, checked and added in a click."));
+    }
+    ui::topic(guide::topics::PopularEngines);
     ui::sameLineOrWrap(TR("Import…"));
     if (ImGui::Button(TR("Import…"))) ImGui::OpenPopup("import_menu");
     ui::topic(guide::topics::Import);
@@ -783,6 +797,9 @@ void App::drawEngines() {
         }
         ImGui::EndPopup();
     }
+
+    // The new versions of the engines taken from the picker.
+    drawEngineUpdates();
 
     // Search, groups and health.
     std::vector<std::string> groups;

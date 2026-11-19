@@ -537,6 +537,24 @@ void App::drawNewMatch() {
         ImGui::TextDisabled("%s", waiting.c_str());
     }
     ImGui::Spacing();
+    // No engine yet: the popular engines, a click away (M9, board 2).
+    if (engines_.empty()) {
+        ui::beginCard("no_engines");
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("No engine in the library yet."));
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
+        if (ImGui::Button(TR("Popular engines…"))) {
+            page_ = Page::Engines;
+            openEnginePicker();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", TR("the strongest engines, from their authors' GitHub releases"));
+        ui::endCard();
+        ImGui::Spacing();
+    }
 
     // The summary on the right, the form beside it, centred when it leaves room; the participants and the library
     // side by side when both are wide enough to read. A narrow window gets the summary under the form, in the same
@@ -976,6 +994,22 @@ void App::drawSettings() {
         TR("When the program ended while a tournament was running (a crash, a power cut, a reboot, or quitting "
            "while it ran), it resumes at the next launch, and the queue goes on after it. A tournament paused or "
            "stopped waits for you."));
+
+    // The new versions of the engines taken from the engine picker (M9, board 2).
+    ImGui::Spacing();
+    ui::label(TR("Popular engines"), label);
+    ImGui::BeginGroup();
+    if (ImGui::RadioButton(TR("Look for their new versions once a day, when the Engines page opens"),
+                           setup_.engine_updates_daily)) {
+        setup_.engine_updates_daily = true;
+        changed                     = true;
+    }
+    if (ImGui::RadioButton(TR("Only when I open the popular engines"), !setup_.engine_updates_daily)) {
+        setup_.engine_updates_daily = false;
+        changed                     = true;
+    }
+    ImGui::TextDisabled("%s", TR("A request to GitHub per engine taken from them, kept a day."));
+    ImGui::EndGroup();
 
     // The boards' colours, the pieces, the move sounds.
     ImGui::Spacing();

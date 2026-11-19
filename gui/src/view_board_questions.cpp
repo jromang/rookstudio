@@ -318,6 +318,11 @@ void App::addAssistantComment(const std::string& text, int line, int ply, const 
 }
 
 void App::drawBoardQuestions() {
+    // The questions are answered with an engine: without one, the card that offers one (M9, board 2).
+    if (engines_.empty()) {
+        drawFirstEngineCard(TR("The assistant answers with an engine's analysis: the questions need one."));
+        return;
+    }
     auto& a = *assistant_;
     // The first use, where it is asked, never at start (M5, board 1).
     if (!a.installed() || a.downloading()) {

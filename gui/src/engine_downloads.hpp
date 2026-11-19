@@ -7,8 +7,10 @@
 // here is made, at the user's request.
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -32,6 +34,24 @@ struct Releases {
 // The engine's releases: its latest; when that one is not the engine's or has no file for this machine, its 20
 // latest (a second request). `api`: GitHub's API, a test's server otherwise. Blocks for up to 40 seconds.
 [[nodiscard]] Releases fetchReleases(const Engine& engine, const CpuFeatures& cpu, std::string_view api = GITHUB_API);
+
+// Where the program reads the catalogue as the repository has it now: a file renamed by an engine's new version is
+// fixed by a commit, without a new version of the program.
+inline constexpr std::string_view CATALOGUE_URL =
+    "https://raw.githubusercontent.com/jromang/rookstudio/main/gui/assets/engines.json";
+
+// The catalogue: the one read from `url` and kept in the profile (<profile>/engines/catalogue.json) when it is less
+// than a day old; else, with `fetch`, read again; else, or when it cannot be read (offline, a format this program does
+// not read), the copy built into the program.
+[[nodiscard]] Catalogue currentCatalogue(const std::filesystem::path& profile, bool fetch,
+                                         std::string_view url = CATALOGUE_URL);
+
+// The releases of an engine as GitHub gave them, kept in the profile (<profile>/engines/releases/<id>.json) so that
+// it is asked once a day at most: nullopt when none is kept, or what is kept is older than `max_age`.
+[[nodiscard]] std::optional<std::vector<Release>> keptReleases(const std::filesystem::path& profile,
+                                                               std::string_view id,
+                                                               std::chrono::seconds max_age = std::chrono::hours(24));
+void keepReleases(const std::filesystem::path& profile, std::string_view id, const std::vector<Release>& list);
 
 // An engine installed from the catalogue, as <profile>/engines/installed.json keeps it.
 struct Installed {

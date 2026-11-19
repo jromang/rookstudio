@@ -37,6 +37,7 @@
 #include "databases.hpp"
 #include "dialogs.hpp"
 #include "engine_changes.hpp"
+#include "engine_downloads.hpp"
 #include "engine_import.hpp"
 #include "engines.hpp"
 #include "game_graph.hpp"
@@ -905,6 +906,62 @@ class App {
     std::map<std::string, std::vector<std::string>> assistant_basis_;
     [[nodiscard]] std::vector<std::string> commentBasis(bool from_review);
     std::unique_ptr<AssistantService> assistant_;
+
+    // The engine picker (#59, mockup M9; view_engine_picker.cpp): the strongest engines from their authors' GitHub
+    // releases, the build this processor runs downloaded, checked, started and added to the library; the card that
+    // offers Gaia where an engine is first needed; the new versions of the engines taken from it.
+    struct PickerEngine {
+        std::string id;
+        bool asked = false;  // its releases are asked of GitHub (or read from the profile), or were
+        std::optional<catalogue::Releases> releases;
+        catalogue::Pick pick;
+        std::shared_ptr<DownloadProgress> progress;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::future<catalogue::InstallResult> install;
+        bool install_when_known = false;  // asked to install before its releases came
+        bool keep_old           = false;  // an update keeps the version before as an engine of its own
+        bool for_board          = false;  // from the first-need card: the analysis engine once installed
+        std::string result;               // how its last install ended
+        bool result_error = false;
+    };
+    struct EnginePicker {
+        bool open = false;
+        catalogue::Catalogue catalogue;
+        bool catalogue_read    = false;
+        bool catalogue_fetched = false;
+        std::future<catalogue::Catalogue> catalogue_job;  // the repository's, once a day
+        std::vector<PickerEngine> engines;                // in the catalogue's order
+        std::deque<std::string> to_ask;                   // ids whose releases are to be asked, one at a time
+        std::string asking;
+        std::future<catalogue::Releases> answer;
+        bool limited = false;                         // GitHub refused more requests: none asked again this session
+        std::vector<catalogue::Installed> installed;  // installed.json, read again after an install
+        bool installed_read = false;
+        std::chrono::steady_clock::time_point updates_checked{};  // when the library's engines were last looked at
+        bool updates_asked = false;
+    } picker_;
+    std::optional<CpuFeatures> cpu_;  // detected once
+    [[nodiscard]] const CpuFeatures& cpu();
+    // The kept or built-in catalogue, at once; with `fetch`, the repository's in the background, once a session.
+    // The engines are made from it the first time only (syncPickerEngines): a PickerEngine& stays valid across it.
+    void readPickerCatalogue(bool fetch);
+    void syncPickerEngines();
+    [[nodiscard]] PickerEngine* pickerEngine(std::string_view id);
+    void askReleases(PickerEngine& e);  // queued; the profile's copy of the last day, else GitHub
+    void openEnginePicker();
+    void pollEnginePicker();  // every frame: the catalogue, the answers, the installs
+    void drawEnginePicker();  // in place of the Engines page while open
+    void installPicked(PickerEngine& e, bool keep_old = false);
+    void pickerInstalled(PickerEngine& e, catalogue::InstallResult result);
+    // An engine for what needs one (the analysis, the questions, the review), Gaia offered first (M9, board 2). `why`
+    // says what needs it.
+    void drawFirstEngineCard(const char* why);
+    // The version installed of a library engine taken from the catalogue, and the newer one its releases offer: empty
+    // when there is none, or it is not known yet.
+    [[nodiscard]] std::string installedVersion(const EngineEntry& e);
+    [[nodiscard]] std::string newerVersion(const EngineEntry& e);
+    void checkEngineUpdates();  // the Engines page shown: the library's engines from the catalogue, once a day
+    void drawEngineUpdates();   // their new versions, above the engine list
     std::shared_ptr<EngineOracle> oracle_;  // the engine that answers, the analysis's, kept while it is the same
     struct QuestionResult {
         std::variant<commentary::Answered, commentary::Problem> answer = commentary::Problem::NoEngine;

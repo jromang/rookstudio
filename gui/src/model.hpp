@@ -112,6 +112,9 @@ struct EngineEntry {
     // Its logo: a file name in the profile's logos folder (Storage::logosDir), a copy of the picture chosen, so that
     // the original can move and the profile be moved whole. Saved only when set.
     std::string logo;
+    // Taken from the engine picker's catalogue (engine_catalogue.hpp): its id there, whose new versions it follows.
+    // Saved only when set.
+    std::string catalogue;
 
     // Last health check: -1 never, 0 failed, 1 passed.
     int check_ok = -1;
@@ -173,6 +176,7 @@ void to_json(BasicJsonType& nlohmann_json_j, const EngineEntry& nlohmann_json_t)
     if (nlohmann_json_t.start_timeout > 0) nlohmann_json_j["start_timeout"] = nlohmann_json_t.start_timeout;
     if (!nlohmann_json_t.aliases.empty()) nlohmann_json_j["aliases"] = nlohmann_json_t.aliases;
     if (!nlohmann_json_t.logo.empty()) nlohmann_json_j["logo"] = nlohmann_json_t.logo;
+    if (!nlohmann_json_t.catalogue.empty()) nlohmann_json_j["catalogue"] = nlohmann_json_t.catalogue;
     if (nlohmann_json_t.read_from.size > 0) nlohmann_json_j["read_from"] = nlohmann_json_t.read_from;
     if (nlohmann_json_t.changes) nlohmann_json_j["changes"] = *nlohmann_json_t.changes;
     if (nlohmann_json_t.gpu) nlohmann_json_j["gpu"] = true;
@@ -190,6 +194,7 @@ void from_json(const BasicJsonType& nlohmann_json_j, EngineEntry& nlohmann_json_
     NLOHMANN_JSON_FROM_WITH_DEFAULT(start_timeout)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(aliases)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(logo)
+    NLOHMANN_JSON_FROM_WITH_DEFAULT(catalogue)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(read_from)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(gpu)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(machine)
@@ -370,6 +375,9 @@ struct MatchSetup {
     bool check_mate_pvs = false;  // fastchess' -check-mate-pvs: a mate score's PV must end in mate
     bool notify         = true;
     bool resume_at_launch = true;  // the tournament running when the program ended, then the queue
+    // The new versions of the engines taken from the engine picker: looked for once a day when the Engines page opens,
+    // or only when the picker opens.
+    bool engine_updates_daily = true;
 
     std::string language = "auto";       // "auto" (system), "en" or "fr"
     std::string theme    = "light";      // "light", "dark" or "system"
@@ -436,6 +444,7 @@ inline void keepProgramSettings(MatchSetup& next, const MatchSetup& current) {
     next.panes            = current.panes;
     next.notify           = current.notify;
     next.resume_at_launch = current.resume_at_launch;
+    next.engine_updates_daily = current.engine_updates_daily;
 }
 // More fields than NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT takes (64): its expansion, in two halves.
 #define FCG_MATCH_SETUP_FIELDS_1                                                                                      \
@@ -465,6 +474,7 @@ void to_json(BasicJsonType& nlohmann_json_j, const MatchSetup& nlohmann_json_t) 
     NLOHMANN_JSON_TO(team_b)
     NLOHMANN_JSON_TO(colours)
     NLOHMANN_JSON_TO(live_white_score)
+    NLOHMANN_JSON_TO(engine_updates_daily)
     NLOHMANN_JSON_TO(big_lines)
     if (!nlohmann_json_t.machine.empty()) nlohmann_json_j["machine"] = nlohmann_json_t.machine;
 }
@@ -480,6 +490,7 @@ void from_json(const BasicJsonType& nlohmann_json_j, MatchSetup& nlohmann_json_t
     NLOHMANN_JSON_FROM_WITH_DEFAULT(team_b)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(colours)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(live_white_score)
+    NLOHMANN_JSON_FROM_WITH_DEFAULT(engine_updates_daily)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(big_lines)
     NLOHMANN_JSON_FROM_WITH_DEFAULT(machine)
 }

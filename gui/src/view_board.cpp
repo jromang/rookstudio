@@ -2101,6 +2101,13 @@ void App::drawBoardColumn(float size) {
 }
 
 void App::drawBoardAnalysis() {
+    // No engine in the library: the card that offers one (M9, board 2).
+    if (engines_.empty()) {
+        drawFirstEngineCard(
+            TR("The analysis, the game's review, the questions and the assistant's comments need an "
+               "engine."));
+        return;
+    }
     auto& b          = board_;
     auto& s          = b.settings.analysis;
     auto& a          = b.analyser;
@@ -3153,6 +3160,10 @@ std::string App::boardSan(std::string san) const {
 void App::drawBoardReview() {
     auto& b          = board_;
     const auto& main = b.tree.main;
+    if (b.reviews.empty() && engines_.empty()) {
+        drawFirstEngineCard(TR("The game's review needs an engine: it analyses each position of the game."));
+        return;
+    }
     if (b.reviews.empty() || !b.reviews.front().complete(main.moves.size())) {
         ImGui::TextWrapped("%s", TR("Analyse the game (G) to review it: each side's accuracy, its mistakes, the key "
                                     "moments, and who saw them coming."));

@@ -371,6 +371,28 @@ sent with `setoption` at the start of every game. `Threads` and `Hash` come firs
   *Import…* > *A rating list, for the reference Elo…* sets it for many engines at once (see [Importing engines and
   ratings](#importing-engines-and-ratings)).
 
+### Popular engines
+
+*Popular engines…*, beside *Add…*, lists the strongest engines whose authors publish builds for Linux, Windows and
+macOS on GitHub (Gaia, Stockfish, Triumviratus, Reckless, PlentyChess, pawnocchio, Coda, Cinder, Stormphrax,
+Viridithas), each at its latest version, with the file this processor runs (the fastest of its builds that the
+processor supports: AVX2, BMI2, AVX-512, a build made for its Zen generation…), its size and its licence. *Add*
+downloads it from its author's release, checks it against the SHA-256 hash GitHub publishes, takes it out of its
+archive, starts it once (`uci`) and adds it to the library, each version in a folder of its own in the profile's
+`engines` folder; a file that does not start is replaced by the next build. *Cancel* stops a download, and the next
+try goes on from where it stopped. The list comes from a catalogue kept in RookStudio's repository, read again once
+a day, the program's own copy otherwise. What leaves the machine: the catalogue, a request to api.github.com per
+engine (kept a day), and the file chosen; only while the page is open or an engine is added.
+
+An engine added this way follows its new versions: they are looked for once a day when the Engines page opens (or
+only when *Popular engines…* opens, in *Settings*), and shown above the list with *Update*. The new version goes in a
+folder of its own and the engine takes it once it has answered `uci`; *Keep … too* keeps the version before as an
+engine of its own, for a match between them. A tournament that is not over keeps the files it started with.
+
+Where an engine is first needed (the Board page's analysis, its questions and its review) and the library has none,
+a card offers Gaia, downloaded with a click (or Enter) and made the engine of the analysis and of the assistant; the
+other popular engines and an engine from the disk are a click away there too.
+
 ### Starting engines
 
 - **Reading the options** never blocks a start. *Resume* starts at once: a tournament plays the engines copied in

@@ -4,6 +4,7 @@
 #include <doctest/doctest.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -377,4 +378,51 @@ TEST_CASE("engine downloads: archives with long names, pax paths, './', and what
     CHECK(take(zipArchive("engine/other", "x", 0, 0x21), "engine/sf").error == "the program is not in the archive");
     CHECK_FALSE(take("short", "engine/sf").error.empty());
     CHECK(take(tarOf({{"engine/sf", "x"}}), "engine/(").error.find("regular expression") != std::string::npos);
+}
+
+TEST_CASE("engine downloads: the releases kept a day, the catalogue read from the repository and kept") {
+    Profile profile;
+    FakeGitHub github;
+    const auto base = github.url();
+
+    // What GitHub gave, kept and read back as it was.
+    std::vector<Release> list;
+    list.push_back(*parseRelease(releaseJson("v1.0", {"mover-file", "mover.zip"}, base)));
+    list.front().assets.front().sha256 = std::string(64, 'a');
+    keepReleases(profile.path, "mover", list);
+    const auto kept = keptReleases(profile.path, "mover");
+    REQUIRE(kept);
+    REQUIRE(kept->size() == 1);
+    CHECK(kept->front().tag == "v1.0");
+    CHECK(kept->front().published == "2026-11-18T00:00:00Z");
+    REQUIRE(kept->front().assets.size() == 2);
+    CHECK(kept->front().assets.front().name == "mover-file");
+    CHECK(kept->front().assets.front().sha256 == std::string(64, 'a'));
+    CHECK(kept->front().assets.front().url == base + "/download/mover-file");
+    CHECK(kept->front().assets.front().uploaded);
+    // Older than asked for, or never asked: nothing.
+    CHECK_FALSE(keptReleases(profile.path, "mover", std::chrono::seconds(0)));
+    CHECK_FALSE(keptReleases(profile.path, "stockfish"));
+
+    // The repository's catalogue, kept a day: read again only when older.
+    const std::string catalogue = R"({"format":1,"engines":[{"id":"mover","name":"Mover","repo":"test/mover",)"
+                                  R"("licence":"MIT","tag":"v{ver}","files":{"linux-x64":[{"asset":"mover-file",)"
+                                  R"("needs":"x86-64"}]}}]})";
+    github.set("/engines.json", catalogue);
+    const auto read = currentCatalogue(profile.path, true, base + "/engines.json");
+    REQUIRE(read.engines.size() == 1);
+    CHECK(read.engines.front().id == "mover");
+    CHECK(fs::exists(enginesFolder(profile.path) / "catalogue.json"));
+    const auto asked = github.requests().size();
+    const auto again = currentCatalogue(profile.path, true, base + "/engines.json");
+    CHECK(again.engines.size() == 1);
+    CHECK(github.requests().size() == asked);  // the kept one, less than a day old
+
+    // None kept, the repository out of reach (a private repository answers 404): the program's own copy.
+    fs::remove(enginesFolder(profile.path) / "catalogue.json");
+    const auto built_in = currentCatalogue(profile.path, true, base + "/missing.json");
+    CHECK(built_in.engines.size() == builtInCatalogue().engines.size());
+    CHECK(built_in.find("gaia"));
+    // Without asking: the kept copy or the program's.
+    CHECK(currentCatalogue(profile.path, false, base + "/engines.json").find("gaia"));
 }

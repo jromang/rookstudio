@@ -36,6 +36,7 @@ inline constexpr const char* Library            = "a-large-library";
 inline constexpr const char* StartingEngines    = "starting-engines";
 inline constexpr const char* Rebuilt            = "rebuilt-programs";
 inline constexpr const char* Import             = "importing-engines-and-ratings";
+inline constexpr const char* PopularEngines     = "popular-engines";
 inline constexpr const char* WinBoard           = "winboard-engines";
 inline constexpr const char* Books              = "books";
 inline constexpr const char* BookChecks         = "checking-a-book";

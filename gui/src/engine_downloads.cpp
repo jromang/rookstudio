@@ -223,6 +223,100 @@ Releases fetchReleases(const Engine& engine, const CpuFeatures& cpu, std::string
 
 fs::path enginesFolder(const fs::path& profile) { return profile / "engines"; }
 
+namespace {
+
+nlohmann::json releaseJson(const Release& r) {
+    nlohmann::json assets = nlohmann::json::array();
+    for (const auto& a : r.assets) {
+        assets.push_back(
+            {{"name", a.name}, {"size", a.size}, {"sha256", a.sha256}, {"url", a.url}, {"uploaded", a.uploaded}});
+    }
+    return {{"tag", r.tag},
+            {"published", r.published},
+            {"draft", r.draft},
+            {"prerelease", r.prerelease},
+            {"assets", std::move(assets)}};
+}
+
+std::optional<Release> releaseOf(const nlohmann::json& j) {
+    if (!j.is_object()) return std::nullopt;
+    Release r;
+    r.tag        = j.value("tag", "");
+    r.published  = j.value("published", "");
+    r.draft      = j.value("draft", false);
+    r.prerelease = j.value("prerelease", false);
+    if (const auto it = j.find("assets"); it != j.end() && it->is_array()) {
+        for (const auto& a : *it) {
+            if (!a.is_object()) continue;
+            r.assets.push_back({a.value("name", ""), a.value("size", uint64_t{0}), a.value("sha256", ""),
+                                a.value("url", ""), a.value("uploaded", false)});
+        }
+    }
+    if (r.tag.empty()) return std::nullopt;
+    return r;
+}
+
+// A file of the profile, whole: empty when it cannot be read.
+std::string readWhole(const fs::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return {};
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+bool youngerThan(const fs::path& file, std::chrono::seconds age) {
+    std::error_code ec;
+    const auto written = fs::last_write_time(file, ec);
+    if (ec) return false;
+    return fs::file_time_type::clock::now() - written < age;
+}
+
+}  // namespace
+
+Catalogue currentCatalogue(const fs::path& profile, bool fetch, std::string_view url) {
+    const auto kept = enginesFolder(profile) / "catalogue.json";
+    if (youngerThan(kept, std::chrono::hours(24))) {
+        if (auto catalogue = parseCatalogue(readWhole(kept))) return *catalogue;
+    }
+    if (fetch) {
+        HttpRequest request;
+        request.url       = std::string(url);
+        request.method    = "GET";
+        request.timeout_s = 20;
+        const auto answer = httpRequest(request);
+        if (answer.status == 200) {
+            if (auto catalogue = parseCatalogue(answer.body)) {
+                std::error_code ec;
+                fs::create_directories(kept.parent_path(), ec);
+                tour::replaceFile(kept, answer.body);
+                return *catalogue;
+            }
+        }
+    }
+    return builtInCatalogue();
+}
+
+std::optional<std::vector<Release>> keptReleases(const fs::path& profile, std::string_view id,
+                                                 std::chrono::seconds max_age) {
+    const auto file = enginesFolder(profile) / "releases" / (tour::fileNameOf(std::string(id)) + ".json");
+    if (!youngerThan(file, max_age)) return std::nullopt;
+    const auto j = nlohmann::json::parse(readWhole(file), nullptr, false);
+    if (j.is_discarded() || !j.is_array()) return std::nullopt;
+    std::vector<Release> out;
+    for (const auto& r : j) {
+        if (auto release = releaseOf(r)) out.push_back(std::move(*release));
+    }
+    return out;
+}
+
+void keepReleases(const fs::path& profile, std::string_view id, const std::vector<Release>& list) {
+    const auto folder = enginesFolder(profile) / "releases";
+    std::error_code ec;
+    fs::create_directories(folder, ec);
+    nlohmann::json j = nlohmann::json::array();
+    for (const auto& r : list) j.push_back(releaseJson(r));
+    tour::replaceFile(folder / (tour::fileNameOf(std::string(id)) + ".json"), j.dump());
+}
+
 fs::path versionFolder(const fs::path& profile, std::string_view id, std::string_view version) {
     return enginesFolder(profile) / tour::fileNameOf(std::string(id)) / tour::fileNameOf(std::string(version));
 }

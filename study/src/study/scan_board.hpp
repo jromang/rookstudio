@@ -88,4 +88,7 @@ class ScanBoard {
     uint64_t key_      = 0;
 };
 
+// The legal move of `board` that a code of the same position (`scan`, set to it) names; none when no move does.
+[[nodiscard]] std::optional<chess::Move> moveOfCode(const chess::Board& board, const ScanBoard& scan, int code);
+
 }  // namespace fcg::study

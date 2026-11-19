@@ -140,7 +140,8 @@ const std::vector<const char*>& allTopics() {
                                               FairPlay,
                                               FinishedGames,
                                               FollowedPlayers,
-                                              LichessCast};
+                                              LichessCast,
+                                              Prep};
     return all;
 }
 

@@ -43,21 +43,6 @@ int ratingDifference(double score) {
     return below ? -dp : dp;
 }
 
-// The legal move of `board` that a code of the same position names.
-std::optional<chess::Move> moveOfCode(const chess::Board& board, const study::ScanBoard& scan, int code) {
-    const auto wanted = scan.decode(code);
-    chess::Movelist list;
-    chess::movegen::legalmoves(list, board);
-    for (const auto& m : list) {
-        const int promotion = m.typeOf() == chess::Move::PROMOTION ? static_cast<int>(m.promotionType())
-                                                                   : static_cast<int>(study::NO_KIND);
-        const bool castle   = m.typeOf() == chess::Move::CASTLING;
-        if (m.from().index() == wanted.from && m.to().index() == wanted.to && promotion == wanted.promotion &&
-            castle == ((wanted.flags & (study::MOVE_SHORT_CASTLE | study::MOVE_LONG_CASTLE)) != 0))
-            return m;
-    }
-    return std::nullopt;
-}
 
 }  // namespace
 
@@ -728,7 +713,7 @@ void App::drawBoardTree() {
                             std::lround(100.0 * t.draws / decided), std::lround(100.0 * t.black / decided));
                 for (const auto& m : answer->moves) {
                     if (m.code == study::TreeMove::END) continue;
-                    const auto move = moveOfCode(board, scan, m.code);
+                    const auto move = study::moveOfCode(board, scan, m.code);
                     if (!move) continue;
                     TreeRow row;
                     row.move              = *move;

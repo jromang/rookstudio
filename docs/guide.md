@@ -1145,6 +1145,16 @@ eight at most, as Lichess allows; Lichess shows their moves three moves late, to
 result until another takes its place. Reading whom your account follows needs one more permission, asked the first
 time; *Without it*, the players added by name are followed. Your own account and your own games never come there.
 
+### Preparing a game
+
+The Lichess page's *Prepare a game against* card takes a Lichess name. Their games of the last year, blitz, rapid and
+classical, come into a database of their own, *Lichess · name*, synced again the next time, and their public profile
+gives their level. Then, from that database's tree: their games and years, your games against them (your account
+linked), what they play with White, and with Black against the first moves they meet most, and the lines they play
+often that your repertoires do not answer, the most frequent first. A click on one opens it on the Board, its Tree tab
+on their games. Only their name and those filters go to Lichess. While a game of yours against them is played on
+Lichess, the card shows nothing of them.
+
 ### Online for the analysis
 
 Three services, each asked about at its first use (for this position, always, or not now) and changed here:

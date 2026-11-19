@@ -73,6 +73,8 @@ struct PerfFigures {
 // The account, its ratings and their history, its activity: three requests with `token` (/api/account, then the
 // account's rating history and activity).
 [[nodiscard]] Answer<Profile> accountProfile(const std::string& token, const std::atomic<bool>* cancel = nullptr);
+// Another player's ratings, from their public profile (/api/user/{username}, no account): preparing a game (#52).
+[[nodiscard]] Answer<Profile> publicProfile(const std::string& username, const std::atomic<bool>* cancel = nullptr);
 // A speed's figures.
 [[nodiscard]] Answer<PerfFigures> perfFigures(const std::string& username, std::string_view speed,
                                               const std::string& token, const std::atomic<bool>* cancel = nullptr);

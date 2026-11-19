@@ -225,6 +225,25 @@ Progress progressOf(const SpeedRating& speed, int64_t today) {
     return p;
 }
 
+Answer<Profile> publicProfile(const std::string& username, const std::atomic<bool>* cancel) {
+    Answer<Profile> a;
+    const auto user = getJson(fmt::format("{}/api/user/{}", servers().api, urlEncode(username)), {}, cancel);
+    a.status        = user.status;
+    if (!user.json) {
+        a.error = user.status == 404 ? std::string("no such player on Lichess") : user.error;
+        return a;
+    }
+    Profile p;
+    readAccount(*user.json, p);
+    if (p.username.empty()) {
+        a.error = "Lichess's answer could not be read";
+        return a;
+    }
+    p.read_at = static_cast<int64_t>(std::time(nullptr));
+    a.value   = std::move(p);
+    return a;
+}
+
 Answer<Profile> accountProfile(const std::string& token, const std::atomic<bool>* cancel) {
     Answer<Profile> a;
     const auto& api = servers().api;

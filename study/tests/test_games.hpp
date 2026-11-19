@@ -37,6 +37,7 @@ struct Spec {
     std::string date{"2020.01.01"};
     std::string fen;
     bool chess960 = false;
+    std::string white, black;  // the players, when the test needs them
 };
 
 inline ImportedGame make(const Spec& s, std::size_t n) {
@@ -44,6 +45,8 @@ inline ImportedGame make(const Spec& s, std::size_t n) {
     std::string text         = "[Event \"Tree\"]\n[Round \"" + std::to_string(n) + "\"]\n[Date \"" + s.date + "\"]\n";
     if (s.white_elo) text += "[WhiteElo \"" + std::to_string(s.white_elo) + "\"]\n";
     if (s.black_elo) text += "[BlackElo \"" + std::to_string(s.black_elo) + "\"]\n";
+    if (!s.white.empty()) text += "[White \"" + s.white + "\"]\n";
+    if (!s.black.empty()) text += "[Black \"" + s.black + "\"]\n";
     text += "[Result \"" + result + "\"]\n";
     if (s.chess960) text += "[Variant \"Chess960\"]\n";
     if (!s.fen.empty()) text += "[SetUp \"1\"]\n[FEN \"" + s.fen + "\"]\n";

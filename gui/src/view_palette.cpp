@@ -583,6 +583,11 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         });
     // The followed players' games, in the broadcasts' mosaic (#50).
     add(TR("Followed players' games in the mosaic"), "Lichess", [this] { openPlayersMosaic(); });
+    // A game prepared against an opponent (#52).
+    add(TR("Prepare a game against…"), "Lichess", [this, go = page(Page::Lichess)] {
+        go();
+        prep_focus_ = true;
+    });
     // The tournament on the user's own Lichess broadcast (#51).
     if (run_->running() && !setup_.broadcast_lichess)
         add(TR("Broadcast on Lichess…"), TR("Tournament"), [this] {

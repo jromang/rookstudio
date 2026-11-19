@@ -280,3 +280,50 @@ TEST_CASE("repertoire: the trees of two databases summed") {
     // None at all.
     CHECK_FALSE(treeMoves({})(scan));
 }
+
+TEST_CASE("repertoire: a player's moves, out of the games they had that colour, and a repertoire's gaps against them") {
+    std::vector<Spec> specs;
+    const auto add = [&](int times, const std::string& moves, const std::string& white, const std::string& black) {
+        for (int i = 0; i < times; ++i) {
+            Spec s{moves, '='};
+            s.white = white;
+            s.black = black;
+            specs.push_back(s);
+        }
+    };
+    add(12, "1. e4 c5", "Someone", "Opponent_A");  // their answer to 1. e4, with Black
+    add(4, "1. e4 e5", "Someone", "Opponent_A");
+    add(9, "1. e4 e5", "Opponent_A", "Another");  // their opponents' answer, when they had White
+    add(5, "1. d4 d5", "Opponent_A", "Another");
+    add(30, "1. e4 e6", "Another", "Someone");  // nothing of theirs
+    const auto base = treeBase("repertoire-player", specs);
+
+    ScanBoard start;
+    REQUIRE(start.set(chess::Board()));
+    ScanBoard after_e4;
+    REQUIRE(after_e4.set(boardAfter({"e4"})));
+    // With Black, against 1. e4: their own moves only, whatever the case of the name.
+    const auto black = playerMoves(base, "opponent_a", false)(after_e4);
+    REQUIRE(black);
+    CHECK(black->total.games == 16);
+    REQUIRE(black->moves.size() == 2);
+    CHECK(black->moves[0].code == codeAfter({"e4"}, "c5"));
+    CHECK(black->moves[0].stats.games == 12);
+    // With White, from the start: 1. e4 and 1. d4, their games alone.
+    const auto white = playerMoves(base, "Opponent_A", true)(start);
+    REQUIRE(white);
+    CHECK(white->total.games == 14);
+    CHECK(white->moves[0].code == codeAfter({}, "e4"));
+    CHECK(white->moves[0].stats.games == 9);
+    CHECK_FALSE(playerMoves(base, "Nobody", true)(start));
+
+    // A repertoire with White against their games with Black: 1... c5 is the gap, 1... e6 is not theirs.
+    const Repertoire rep(linesOf("1. e4 e5 2. Nf3 *"), chess::Color::WHITE);
+    CoverageOptions options;
+    options.least_games = 3;
+    const auto cover    = coverage(rep, playerMoves(base, "Opponent_A", false), options);
+    REQUIRE_FALSE(cover.gaps.empty());
+    CHECK(cover.gaps[0].line == std::vector<std::string>{"e4"});
+    CHECK(cover.gaps[0].move == "c5");
+    CHECK(cover.gaps[0].games == 12);
+}

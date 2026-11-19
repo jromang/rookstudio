@@ -814,6 +814,8 @@ void App::drawLichessPage() {
         ui::TopicRegion topic(guide::topics::LichessGames);
         drawLichessGames();
     }
+    ImGui::Dummy(ImVec2(0, px(8)));
+    drawPrepCard();  // a game prepared against an opponent (#52)
     ImGui::EndChild();
     if (two) ImGui::SameLine(0, px(14));
     ImGui::BeginChild("##lichess_right", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);

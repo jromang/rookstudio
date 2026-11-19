@@ -59,6 +59,7 @@
 #include "notice.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
+#include "prep.hpp"
 #include "profiles.hpp"
 #include "qr.hpp"
 #include "remote_run.hpp"
@@ -776,6 +777,30 @@ class App {
     void pollCast();
     void drawCastSheet();
     void drawCastBanner();
+    // Preparing a game against an opponent (#52, mockup M8, board "Prep"): their games of the last year into "Lichess ·
+    // opponent", their level; then, from that database's tree, what they play and the user's repertoires against it.
+    struct Prep {
+        std::string opponent;
+        std::size_t index = SIZE_MAX;  // their database
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<lichess::SyncProgress> progress;
+        std::future<lichess::SyncReport> sync;
+        std::string error;
+        std::future<lichess::Answer<lichess::Profile>> profile_job;
+        std::optional<lichess::Profile> profile;
+        std::string profile_error;
+        std::future<PrepReport> report_job;
+        std::optional<PrepReport> report;
+        uint64_t reported = UINT64_MAX;  // the snapshot and tree the report was made from
+    };
+    std::optional<Prep> prep_;
+    std::array<char, 40> prep_name_{};
+    bool prep_focus_     = false;
+    bool prep_prefilled_ = false;
+    void startPrep(const std::string& opponent);
+    void pollPrep();
+    void drawPrepCard();
+    void openPrepLine(const std::vector<std::string>& line, const std::string& move);
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;

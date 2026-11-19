@@ -1,6 +1,7 @@
 #include "repertoire.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <unordered_set>
 #include <utility>
@@ -160,6 +161,40 @@ MovesAt treeMoves(std::vector<TreeBase> bases) {
         });
         return out;
     };
+}
+
+MovesAt playerMoves(TreeBase base, std::string_view player, bool white) {
+    const auto lower = [](std::string_view text) {
+        std::string out(text);
+        for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return out;
+    };
+    std::vector<uint32_t> ids;  // the player's name in the database's table of names
+    if (base.snapshot) {
+        const auto wanted = lower(player);
+        for (uint32_t i = 0; i < base.snapshot->names(); ++i)
+            if (lower(base.snapshot->name(i)) == wanted) ids.push_back(i);
+    }
+    return
+        [base = std::move(base), ids = std::move(ids), white](const ScanBoard& position) -> std::optional<TreeAnswer> {
+            if (ids.empty() || !base.snapshot || !base.tree || base.tree->stale(*base.snapshot)) return std::nullopt;
+            TreeAnswer out;
+            std::map<int, TreeStats> by_code;
+            for (const auto& g : base.tree->gamesAt(*base.snapshot, position.key())) {
+                const auto names = base.snapshot->rowIds(g.id);
+                if (std::find(ids.begin(), ids.end(), white ? names.white : names.black) == ids.end()) continue;
+                const auto numbers = base.snapshot->numbers(g.id);
+                out.total.add(numbers);
+                by_code[g.code].add(numbers);
+            }
+            if (out.total.games == 0) return std::nullopt;
+            for (const auto& [code, stats] : by_code) out.moves.push_back({code, stats});
+            std::stable_sort(out.moves.begin(), out.moves.end(), [](const TreeMove& a, const TreeMove& b) {
+                if ((a.code == TreeMove::END) != (b.code == TreeMove::END)) return b.code == TreeMove::END;
+                return a.stats.games > b.stats.games;
+            });
+            return out;
+        };
 }
 
 Coverage coverage(const Repertoire& repertoire, const MovesAt& moves, const CoverageOptions& options) {

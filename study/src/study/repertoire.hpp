@@ -101,6 +101,10 @@ struct TreeBase {
 // The opening trees of several databases, their numbers summed; a tree older than its database's edits is left out.
 [[nodiscard]] MovesAt treeMoves(std::vector<TreeBase> bases);
 
+// The moves of a database's games where `player` (its name, whatever the case) had White, or Black: what the player
+// and their opponents played from each position, out of those games alone (#52, preparing a game against them).
+[[nodiscard]] MovesAt playerMoves(TreeBase base, std::string_view player, bool white);
+
 struct CoverageOptions {
     double least_share   = 0.02;  // an opponent's move under this share of the position's games is no gap
     uint64_t least_games = 10;    // nor one fewer games played; nor a line's end that fewer games go on from

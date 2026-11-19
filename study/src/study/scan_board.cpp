@@ -515,4 +515,19 @@ std::optional<CodedMove> ScanBoard::parseSan(std::string_view san) const {
     return found;
 }
 
+std::optional<chess::Move> moveOfCode(const chess::Board& board, const ScanBoard& scan, int code) {
+    const auto wanted = scan.decode(code);
+    chess::Movelist list;
+    chess::movegen::legalmoves(list, board);
+    for (const auto& m : list) {
+        const int promotion =
+            m.typeOf() == chess::Move::PROMOTION ? static_cast<int>(m.promotionType()) : static_cast<int>(NO_KIND);
+        const bool castle = m.typeOf() == chess::Move::CASTLING;
+        if (m.from().index() == wanted.from && m.to().index() == wanted.to && promotion == wanted.promotion &&
+            castle == ((wanted.flags & (MOVE_SHORT_CASTLE | MOVE_LONG_CASTLE)) != 0))
+            return m;
+    }
+    return std::nullopt;
+}
+
 }  // namespace fcg::study

@@ -34,10 +34,11 @@ struct LichessSettings {
     // The players followed live (#50): those added by name; "Without it" said to reading whom the account follows.
     std::vector<std::string> followed;
     bool follow_declined = false;
+    std::string prep_player;  // the opponent prepared against last (#52)
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
                                                 explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
                                                 sync_speeds, sync_since, sync_date, listen_declined, review_finished,
-                                                followed, follow_declined)
+                                                followed, follow_declined, prep_player)
 
 }  // namespace fcg

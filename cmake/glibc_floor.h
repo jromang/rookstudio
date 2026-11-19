@@ -3,7 +3,8 @@
  * and which a build on 2.38 links to. Included in every C and C++ source of a release build (FCG_STATIC_RUNTIME);
  * the CI fails when the program asks for a newer glibc all the same (.github/workflows/gui.yml).
  *
- * The math functions whose only older version is the first one, from `objdump -T libm.so.6` on glibc 2.43. Not
+ * The math functions whose only older version is the first one, from `objdump -T libm.so.6` on glibc 2.43 and 2.44
+ * (a release built on a machine newer than the CI's, preview 1 the first). Not
  * pinned: functions new since 2.38, which have no older version, and the termios speed functions of 2.42, whose
  * arguments changed meaning with their version. */
 #if defined(__gnu_linux__) && defined(__x86_64__)
@@ -29,4 +30,7 @@ __asm__(".symver tgammaf,tgammaf@GLIBC_2.2.5");
 __asm__(".symver y0f,y0f@GLIBC_2.2.5");
 __asm__(".symver y1f,y1f@GLIBC_2.2.5");
 __asm__(".symver ynf,ynf@GLIBC_2.2.5");
+/* glibc 2.44 */
+__asm__(".symver cosh,cosh@GLIBC_2.2.5");
+__asm__(".symver sinh,sinh@GLIBC_2.2.5");
 #endif

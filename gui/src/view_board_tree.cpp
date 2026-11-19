@@ -772,6 +772,18 @@ void App::drawBoardTree() {
     ImGui::TextUnformatted(tree_summary_.c_str());
     ImGui::PopTextWrapPos();
     if (tree_db_ >= 0) drawTreeNovelty(static_cast<std::size_t>(tree_db_));
+    // Lichess's players: each move's games month by month, when asked for (#56).
+    const bool lichess_players = online && tree_source_ - lichess_at == 1;
+    if (lichess_players) {
+        if (ImGui::Checkbox(TR("Each move month by month"), &lichess_.explorer_months)) {
+            tree_rows_of_.clear();  // the rows made again, with their months' keys
+            saveLichessSettings();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("Asks Lichess, for each move listed, how many games played it month by month: "
+                                       "a request a move, its position sent with the filters chosen."));
+        pollExplorerMonths();
+    }
 
     // The star of the active repertoire: a move of it, added or taken out by a click (any side to move).
     const auto path  = boardPath();
@@ -805,8 +817,11 @@ void App::drawBoardTree() {
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
     const int columns    = tree_book_ ? 3 : 9;
     // Room under the table for the star's Undo and the line of keys.
+    const float games_h = online && !tree_games_.empty()
+                              ? ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(tree_games_.size() + 2)
+                              : 0.0f;  // the games the explorer names, under the moves (#56)
     const float toast_h = (star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f) +
-                          ImGui::GetTextLineHeightWithSpacing() * 2;
+                          ImGui::GetTextLineHeightWithSpacing() * 2 + games_h;
     if (!tree_rows_.empty() && ImGui::BeginTable("##tree_rows", columns, flags, ImVec2(0, -toast_h))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
@@ -820,7 +835,7 @@ void App::drawBoardTree() {
             ImGui::TableSetupColumn(TR("Avg. Elo"));
             ImGui::TableSetupColumn(TR("Perf."));
             ImGui::TableSetupColumn(TR("Last"));
-            ImGui::TableSetupColumn("");
+            ImGui::TableSetupColumn(lichess_players && lichess_.explorer_months ? TR("By month") : "");
         }
         ImGui::TableHeadersRow();
         for (std::size_t r = 0; r < tree_rows_.size(); ++r) {
@@ -887,9 +902,11 @@ void App::drawBoardTree() {
             ImGui::TableNextColumn();
             if (row.last > 0) ImGui::TextDisabled("%d", row.last);
             ImGui::TableNextColumn();
+            if (!row.months.empty()) drawTreeMonths(row.months);
         }
         ImGui::EndTable();
     }
+    if (online) drawTreeGames();
     if (star && path) {
         const auto index = active >= 0 ? static_cast<std::size_t>(active) : reps.activeOrNew(mover);
         auto before      = reps.entries()[index].lines;
@@ -925,6 +942,49 @@ void App::drawBoardTree() {
     if (play) {
         tree_row_ = -1;
         boardPlay(*play);
+    }
+}
+
+void App::drawTreeMonths(const std::string& key) {
+    const auto known = explorer_answers_.find(key);
+    if (known == explorer_answers_.end() || !known->second.value) {
+        ImGui::TextDisabled("%s", known == explorer_answers_.end() ? "…" : "–");
+        return;
+    }
+    const auto& history = known->second.value->history;
+    // Its last two years, the month under way left out, as a line; where it goes beside it.
+    const std::size_t end  = history.empty() ? 0 : history.size() - 1;
+    const std::size_t from = end > 24 ? end - 24 : 0;
+    std::vector<float> values;
+    for (std::size_t i = from; i < end; ++i) values.push_back(static_cast<float>(history[i].games));
+    const auto trend = lichess::trendOf(history);
+    const float w = px(64), h = ImGui::GetTextLineHeight();
+    const auto at    = ImGui::GetCursorScreenPos();
+    auto* dl         = ImGui::GetWindowDrawList();
+    const float most = values.empty() ? 0.f : *std::max_element(values.begin(), values.end());
+    const ImU32 tone = trend == lichess::Trend::Rising    ? ui::GOOD
+                       : trend == lichess::Trend::Falling ? ui::BAD
+                                                          : ui::MUTED;
+    for (std::size_t i = 1; i < values.size() && most > 0; ++i) {
+        const auto point = [&](std::size_t k) {
+            return ImVec2(at.x + w * static_cast<float>(k) / static_cast<float>(values.size() - 1),
+                          at.y + h - 2 - (h - 4) * values[k] / most);
+        };
+        dl->AddLine(point(i - 1), point(i), tone, px(1.5f));
+    }
+    ImGui::Dummy(ImVec2(w, h));
+    if (ImGui::IsItemHovered() && end >= 12) {
+        uint64_t recent = 0, before = 0;
+        for (std::size_t i = end - 6; i < end; ++i) recent += history[i].games;
+        for (std::size_t i = end - 12; i < end - 6; ++i) before += history[i].games;
+        const char* says = trend == lichess::Trend::Rising    ? TR("more played lately")
+                           : trend == lichess::Trend::Falling ? TR("less played lately")
+                           : trend == lichess::Trend::Steady  ? TR("played as much lately")
+                                                              : TR("too few games to tell");
+        ImGui::SetTooltip(
+            "%s", trf("{}: {} games in the last six months, {} in the six before ({} to {})", says,
+                      ui::exactCount(recent), ui::exactCount(before), history[from].month, history[end - 1].month)
+                      .c_str());
     }
 }
 

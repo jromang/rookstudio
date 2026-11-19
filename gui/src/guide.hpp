@@ -86,6 +86,7 @@ inline constexpr const char* OpeningSuite       = "books-from-the-named-openings
 inline constexpr const char* EvaluatedSuite     = "books-from-the-evaluated-positions";
 inline constexpr const char* ToLichess          = "positions-and-games-to-lichess";
 inline constexpr const char* BroadcastMore      = "more-of-a-broadcast";
+inline constexpr const char* ExplorerMore       = "the-explorer-more";
 inline constexpr const char* Assistant          = "the-assistant";
 inline constexpr const char* AssistantModel     = "its-model";
 inline constexpr const char* Questions          = "questions";

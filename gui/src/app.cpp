@@ -390,10 +390,11 @@ void App::frame() {
             f.arrival = came.get_future();
             lichess_finished_.push_back(std::move(f));
         } else if (w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
-            // lichess-api=http://127.0.0.1:PORT[,WORD]: a test's server in place of lichess.org's API, on this machine
-            // only; then WORD, another of these.
-            const auto comma       = w.find(',');
-            lichess::servers().api = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
+            // lichess-api=http://127.0.0.1:PORT[,WORD]: a test's server in place of lichess.org's API, explorer
+            // (under /explorer) and tablebase (under /tb), on this machine only; then WORD, another of these.
+            const auto comma   = w.find(',');
+            const auto base    = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
+            lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};
             if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
         } else if (w.rfind("lichess-playing=", 0) == 0) {
             // lichess-playing=live|correspondence[@FILE[@PLY]]: a game of the user's in progress, as Lichess would

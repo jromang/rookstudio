@@ -114,6 +114,12 @@ Explorer explorerOf(const nlohmann::json& j) {
         e.eco     = textOf(*o, "eco");
         e.opening = textOf(*o, "name");
     }
+    if (const auto h = j.find("history"); h != j.end() && h->is_array()) {
+        for (const auto& m : *h) {
+            if (!m.is_object()) continue;
+            e.history.push_back({textOf(m, "month"), countOf(m, "white") + countOf(m, "draws") + countOf(m, "black")});
+        }
+    }
     return e;
 }
 
@@ -227,6 +233,31 @@ Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cance
     return a;
 }
 
+Trend trendOf(const std::vector<ExplorerMonth>& history) {
+    if (history.size() < 13) return Trend::Unknown;
+    uint64_t recent = 0, before = 0;
+    const auto end = history.size() - 1;  // the month under way left out
+    for (std::size_t i = end - 6; i < end; ++i) recent += history[i].games;
+    for (std::size_t i = end - 12; i < end - 6; ++i) before += history[i].games;
+    if (recent + before < 30) return Trend::Unknown;
+    const double ratio = before == 0 ? 2.0 : static_cast<double>(recent) / static_cast<double>(before);
+    return ratio > 1.15 ? Trend::Rising : ratio < 0.87 ? Trend::Falling : Trend::Steady;
+}
+
+Answer<std::string> mastersGame(const std::string& id, const std::string& token, const std::atomic<bool>* cancel) {
+    Answer<std::string> a;
+    auto request                  = get(servers().explorer + "/masters/pgn/" + urlEncode(id), token);
+    request.headers.back().second = "application/x-chess-pgn";
+    const auto r                  = politeRequest(request, cancel);
+    a.status                      = r.status;
+    if (r.status != 200) {
+        a.error = r.status == 404 ? std::string("Lichess has no such game") : reason(r);
+        return a;
+    }
+    a.value = r.body;
+    return a;
+}
+
 Answer<Explorer> explorer(const ExplorerQuery& q, const std::atomic<bool>* cancel) {
     Answer<Explorer> a;
     std::string url = servers().explorer;
@@ -243,6 +274,7 @@ Answer<Explorer> explorer(const ExplorerQuery& q, const std::atomic<bool>* cance
                 for (const int r : q.ratings) groups.push_back(std::to_string(r));
                 url += "&ratings=" + joined(groups);
             }
+            if (q.history) url += "&history=true";
             break;
         case ExplorerSource::Player:
             url += "/player?variant=standard&player=" + urlEncode(q.player) +

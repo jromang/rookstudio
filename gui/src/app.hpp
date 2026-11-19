@@ -1303,6 +1303,7 @@ class App {
         uint64_t games = 0;                           // or a book's weight, in thousandths
         double white = 0, draws = 0, black = 0;       // the shares of the games with a result
         int score = -1, elo = 0, perf = 0, last = 0;  // for the side to move; -1 or 0 when not known
+        std::string months;  // Lichess's explorer: where its position's games month by month are kept (#56)
     };
     std::vector<TreeRow> tree_rows_;
     std::string tree_rows_of_;  // the position and the source the rows are of
@@ -1341,6 +1342,17 @@ class App {
     // The Tree tab's rows from Lichess's explorer (0 the masters, 1 Lichess's players, 2 the player), asked when the
     // position has stayed a moment; false when the card that source needs is drawn instead.
     bool lichessTreeRows(int source, const std::string& fen);
+    // The tree, more (#56, mockup M8, board "Prep"): each move's games month by month for Lichess's players (a
+    // request a move, when the user asks for it), and the games the explorer names, opened on the board by a click.
+    std::future<lichess::Answer<lichess::Explorer>> explorer_month_job_;
+    std::string explorer_month_asked_;
+    std::vector<lichess::ExplorerGame> tree_games_;  // those of the answer shown
+    int tree_games_source_ = -1;                     // 0 the masters', 1 Lichess's
+    std::future<lichess::Answer<std::string>> explorer_game_job_;
+    std::string explorer_game_title_, explorer_game_fen_, explorer_game_error_;
+    void pollExplorerMonths();
+    void drawTreeGames();
+    void drawTreeMonths(const std::string& key);  // a move's months, as a line in its row
     std::string explorer_seen_;
     double explorer_since_ = 0;
     std::map<std::string, std::shared_ptr<tour::PolyglotBook>> tree_books_;

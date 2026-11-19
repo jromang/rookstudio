@@ -260,3 +260,58 @@ TEST_CASE("Lichess: too many requests pause its host, and an answer that is not 
     CHECK(odd.status == 200);
     CHECK(odd.error.starts_with("Lichess's answer could not be read"));
 }
+
+TEST_CASE("Lichess: a position's games month by month, where they go, and a master's game") {
+    Lichess lichess([](const std::string& path, const std::string& head, net::TcpConnection& c) {
+        if (path.starts_with("/explorer/masters/pgn/")) {
+            if (head.find("Authorization: Bearer lip_test") == std::string::npos) {
+                answer(c, 401, "{}");
+            } else if (path == "/explorer/masters/pgn/aAbqI4ey") {
+                answer(c, 200, "[White \"Master, A\"]\n[Black \"Master, B\"]\n\n1. e4 c5 1-0\n",
+                       "application/x-chess-pgn");
+            } else {
+                answer(c, 404, "{}");
+            }
+            return;
+        }
+        // Thirteen months: six of 10 games, six of 20, the month under way.
+        std::string months;
+        for (int m = 1; m <= 13; ++m)
+            months += fmt::format(R"({}{{"month":"2025-{:02}","white":{},"draws":0,"black":0}})", m > 1 ? "," : "", m,
+                                  m <= 6    ? 10
+                                  : m <= 12 ? 20
+                                            : 1);
+        answer(c, 200, R"({"white":10,"draws":5,"black":5,"moves":[],"topGames":[],"history":[)" + months + "]}");
+    });
+    lichess::ExplorerQuery q;
+    q.source     = lichess::ExplorerSource::Lichess;
+    q.fen        = AFTER_E4;
+    q.token      = "lip_test";
+    q.history    = true;
+    const auto e = lichess::explorer(q);
+    REQUIRE(e.value);
+    CHECK(lichess.lastPath().find("&history=true") != std::string::npos);
+    REQUIRE(e.value->history.size() == 13);
+    CHECK(e.value->history[0].month == "2025-01");
+    CHECK(e.value->history[6].games == 20);
+    CHECK(lichess::trendOf(e.value->history) == lichess::Trend::Rising);
+    // Where they go: falling, steady, too few months, too few games.
+    std::vector<lichess::ExplorerMonth> h(13);
+    for (std::size_t i = 0; i < 13; ++i) h[i].games = i < 6 ? 30 : 10;
+    CHECK(lichess::trendOf(h) == lichess::Trend::Falling);
+    for (auto& m : h) m.games = 20;
+    CHECK(lichess::trendOf(h) == lichess::Trend::Steady);
+    CHECK(lichess::trendOf(std::vector<lichess::ExplorerMonth>(12, {"", 50})) == lichess::Trend::Unknown);
+    CHECK(lichess::trendOf(std::vector<lichess::ExplorerMonth>(13, {"", 1})) == lichess::Trend::Unknown);
+    // The masters' history is not asked: Lichess's explorer has none for them.
+    q.source = lichess::ExplorerSource::Masters;
+    (void)lichess::explorer(q);
+    CHECK(lichess.lastPath().find("history") == std::string::npos);
+
+    const auto game = lichess::mastersGame("aAbqI4ey", "lip_test");
+    REQUIRE(game.value);
+    CHECK(game.value->find("[White \"Master, A\"]") != std::string::npos);
+    CHECK(lichess.lastPath() == "/explorer/masters/pgn/aAbqI4ey");
+    CHECK(lichess::mastersGame("missing1", "lip_test").error == "Lichess has no such game");
+    CHECK(lichess::mastersGame("aAbqI4ey", "").status == 401);
+}

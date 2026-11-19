@@ -20,6 +20,7 @@ struct LichessSettings {
     // The Tree tab's "Lichess" source: the speeds and the rating groups of its games.
     std::vector<std::string> explorer_speeds{"blitz", "rapid", "classical"};
     std::vector<int> explorer_ratings{2000, 2200, 2500};
+    bool explorer_months = false;  // each move's games month by month there (#56): a request a move
     // The broadcast mosaic (M4, board 4): the engine of the library that analyses its games, none when empty, and
     // its threads for each game.
     std::string broadcast_engine;
@@ -39,6 +40,6 @@ struct LichessSettings {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
                                                 explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
                                                 sync_speeds, sync_since, sync_date, listen_declined, review_finished,
-                                                followed, follow_declined, prep_player)
+                                                followed, follow_declined, prep_player, explorer_months)
 
 }  // namespace fcg

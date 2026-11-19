@@ -994,6 +994,17 @@ strongest first (by the players' mean rating), then the newest; a click opens on
 games reach the position to look for the strongest: the Tree tab tells more. *All the games of the position in “…”*
 lists them in the database.
 
+### The explorer, more
+
+With Lichess's sources in the Tree tab, **the games the explorer names** come under the moves: the masters' games
+reaching the position (*Masters' games*), or the strong ones played on Lichess; a click asks Lichess for the game and
+opens it on the board, at the position the tree showed.
+
+For Lichess's players, *Each move month by month* asks Lichess, for each move listed, how many games played it month
+by month: a line of its last two years in the *By month* column, green when it is played more lately, red when less;
+under the mouse, its games in the last six months against the six before. The summary says the same of the position.
+It costs a request a move, so it stays off until asked for; the masters' explorer has no months.
+
 ### The review of a game
 
 On the study Board, the *Review* tab beside the notation reads the game's analysis (G) as a coach would:

@@ -81,6 +81,7 @@ struct ExplorerQuery {
     int top_games    = 4;
     int recent_games = 0;  // not for Masters
     std::string token;     // an account's: the explorer answers 401 without it
+    bool history = false;  // Lichess: the position's games month by month too (#56)
 };
 struct ExplorerMove {
     std::string uci, san;
@@ -97,13 +98,26 @@ struct ExplorerGame {
     std::string month;  // "YYYY-MM", when told
     std::string uci;    // the move it played from the position, when told
 };
+// A month of a position's games on Lichess.
+struct ExplorerMonth {
+    std::string month;  // "YYYY-MM"
+    uint64_t games = 0;
+};
 struct Explorer {
     uint64_t white = 0, draws = 0, black = 0;
     std::vector<ExplorerMove> moves;
     std::vector<ExplorerGame> top_games, recent_games;
-    std::string eco, opening;  // the opening's code and name, when known
+    std::string eco, opening;            // the opening's code and name, when known
+    std::vector<ExplorerMonth> history;  // with ExplorerQuery::history, the oldest first
 };
 [[nodiscard]] Answer<Explorer> explorer(const ExplorerQuery& query, const std::atomic<bool>* cancel = nullptr);
+// Where a position's games go (#56): its last six whole months against the six before them, the month still under way
+// left out; Unknown with fewer than a year of months or too few games.
+enum class Trend { Unknown, Rising, Steady, Falling };
+[[nodiscard]] Trend trendOf(const std::vector<ExplorerMonth>& history);
+// A master's game the explorer names, as PGN (#56): an account's token.
+[[nodiscard]] Answer<std::string> mastersGame(const std::string& id, const std::string& token,
+                                              const std::atomic<bool>* cancel = nullptr);
 
 // A value as a URL's query holds it (RFC 3986's unreserved characters as they are, the others %XX).
 [[nodiscard]] std::string urlEncode(std::string_view value);

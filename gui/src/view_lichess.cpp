@@ -962,6 +962,7 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
     if (source == 1) {
         q.speeds  = lichess_.explorer_speeds;
         q.ratings = lichess_.explorer_ratings;
+        q.history = lichess_.explorer_months;  // the position's months too (#56)
     }
     if (source == 2) {
         q.player       = lichess_.player;
@@ -971,6 +972,11 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
     for (const auto& s : q.speeds) key += "|" + s;
     for (const auto r : q.ratings) key += fmt::format("|{}", r);
     key += "|" + q.player;
+    if (q.history) key += "|months";
+    // The filters of a move's months: those of the rows.
+    std::string filters;
+    for (const auto& s : q.speeds) filters += "|" + s;
+    for (const auto r : q.ratings) filters += fmt::format("|{}", r);
     const auto found = explorer_answers_.find(key);
     if (found == explorer_answers_.end()) {
         // Asked once the position has stayed a moment: stepping through a game asks nothing on the way.
@@ -995,6 +1001,7 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
     if (tree_rows_of_ == key) return true;
     tree_rows_of_ = key;
     tree_rows_.clear();
+    tree_games_.clear();
     tree_row_     = -1;
     const auto& a = found->second;
     if (!a.value) {
@@ -1022,6 +1029,22 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
         tree_summary_ += trf(" · White {} % · draws {} % · Black {} %", std::lround(100.0 * e.white / all),
                              std::lround(100.0 * e.draws / all), std::lround(100.0 * e.black / all));
     if (!e.opening.empty()) tree_summary_ += fmt::format(" · {} {}", e.eco, e.opening);
+    // Where its games go, month by month (#56).
+    switch (lichess::trendOf(e.history)) {
+        case lichess::Trend::Rising:
+            tree_summary_ += std::string(" · ") + TR("more played lately");
+            break;
+        case lichess::Trend::Falling:
+            tree_summary_ += std::string(" · ") + TR("less played lately");
+            break;
+        case lichess::Trend::Steady:
+            tree_summary_ += std::string(" · ") + TR("played as much lately");
+            break;
+        case lichess::Trend::Unknown:
+            break;
+    }
+    tree_games_        = e.top_games;  // the games the explorer names, a click away (#56)
+    tree_games_source_ = source;
     for (const auto& m : e.moves) {
         chess::Move move = chess::Move::NO_MOVE;
         try {
@@ -1042,10 +1065,102 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
                 std::lround(100.0 * (static_cast<double>(side ? m.white : m.black) + m.draws / 2.0) / done));
         }
         row.elo = m.average_rating;
+        if (q.history) {  // its position's months, asked on their own
+            auto after = board;
+            after.makeMove(move);
+            row.months = fmt::format("months|{}{}", after.getFen(), filters);
+        }
         tree_rows_.push_back(std::move(row));
     }
     if (tree_rows_.empty() && all == 0) tree_summary_ = TR("No game of this source reaches this position.");
     return true;
+}
+
+void App::pollExplorerMonths() {
+    using namespace std::chrono_literals;
+    if (explorer_month_job_.valid() && explorer_month_job_.wait_for(0s) == std::future_status::ready) {
+        auto answer = explorer_month_job_.get();
+        if (!answer.value) explorer_failed_[explorer_month_asked_] = ImGui::GetTime();
+        explorer_answers_[explorer_month_asked_] = std::move(answer);
+    }
+    if (explorer_month_job_.valid() || !lichess_account_ || !lichess_.explorer_months || aidsLocked()) return;
+    if (ImGui::GetTime() - explorer_since_ < 0.4) return;  // the position stayed a moment
+    // A move's months at a time, those Lichess did not answer asked again after a minute.
+    for (const auto& row : tree_rows_) {
+        if (row.months.empty()) continue;
+        if (const auto known = explorer_answers_.find(row.months); known != explorer_answers_.end()) {
+            if (known->second.value || ImGui::GetTime() - explorer_failed_[row.months] < 60) continue;
+            explorer_answers_.erase(known);
+        }
+        const auto from = row.months.find('|') + 1;
+        lichess::ExplorerQuery q;
+        q.source              = lichess::ExplorerSource::Lichess;
+        q.fen                 = row.months.substr(from, row.months.find('|', from) - from);
+        q.speeds              = lichess_.explorer_speeds;
+        q.ratings             = lichess_.explorer_ratings;
+        q.token               = lichess_account_->token;
+        q.history             = true;
+        q.moves               = 1;
+        q.top_games           = 0;
+        explorer_month_asked_ = row.months;
+        explorer_month_job_   = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+        return;
+    }
+}
+
+void App::drawTreeGames() {
+    using namespace std::chrono_literals;
+    if (explorer_game_job_.valid() && explorer_game_job_.wait_for(0s) == std::future_status::ready) {
+        const auto answer = explorer_game_job_.get();
+        if (answer.value) {
+            readOnBoard(*answer.value, explorer_game_title_);
+            // At the position the tree showed, which the game went through.
+            const auto fields = [](const std::string& fen) {
+                std::size_t at = 0;
+                for (int i = 0; i < 3 && at != std::string::npos; ++i) at = fen.find(' ', at + 1);
+                return fen.substr(0, at);
+            };
+            auto& b      = board_;
+            auto board   = boardAt(b.game, b.chess960, 0);
+            const auto n = static_cast<int>(b.game.moves.size());
+            for (int ply = 0; ply <= n; ++ply) {
+                if (fields(board.getFen()) == fields(explorer_game_fen_)) {
+                    b.ply = ply;
+                    break;
+                }
+                if (ply < n) board.makeMove(b.game.moves[static_cast<std::size_t>(ply)].move);
+            }
+        } else {
+            explorer_game_error_ = answer.error;
+        }
+    }
+    if (tree_games_.empty() || !lichess_account_) return;
+    const ui::TopicRegion topic(guide::topics::ExplorerMore);
+    ImGui::TextDisabled("%s", tree_games_source_ == 0 ? TR("Masters' games") : TR("Strong games on Lichess"));
+    for (const auto& g : tree_games_) {
+        const char* result = g.winner == 'w' ? "1-0" : g.winner == 'b' ? "0-1" : "½-½";
+        const auto title   = fmt::format("{} – {} · {} · {}", g.white, g.black, result, g.year);
+        ImGui::BeginDisabled(explorer_game_job_.valid());
+        if (ImGui::Selectable(fmt::format("{}##tree_game_{}", title, g.id).c_str(), false)) {
+            explorer_game_title_ = title;
+            explorer_game_fen_   = boardFen();
+            explorer_game_error_.clear();
+            explorer_game_job_ = std::async(
+                std::launch::async, [id = g.id, token = lichess_account_->token, masters = tree_games_source_ == 0] {
+                    return masters ? lichess::mastersGame(id, token) : lichess::gamePgn(id, token);
+                });
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", trf("{} – {} ({} – {}): a click opens it on the board, asked of Lichess.", g.white,
+                                        g.black, g.white_rating, g.black_rating)
+                                        .c_str());
+    }
+    if (explorer_game_job_.valid())
+        ImGui::TextDisabled("%s", TR("Asking Lichess for the game…"));
+    else if (!explorer_game_error_.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           trf("Lichess did not give the game: {}", explorer_game_error_).c_str());
 }
 
 }  // namespace fcg

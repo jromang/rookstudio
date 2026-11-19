@@ -945,6 +945,19 @@ players opens its headers first.
 
 A database that another program writes to is read-only meanwhile: the game stays changed here until it can be saved.
 
+### Positions and games to Lichess
+
+**lichess.org…**, under the board, sends the position or the game to Lichess; each action says what it sends.
+*Open the position on lichess.org* opens Lichess's analysis board on it in the browser: the position goes in the
+address, nothing else. *Share the game* imports it on Lichess without an account and copies its address: whoever has
+the address sees the game, its players' names too. *Have the position played out*, with a time control (3+2 to 30+20,
+or days a move), makes an open challenge from the position: a link for each side, to send to its player; such a game
+is not rated. *Bookmark the game on Lichess*, for a game that comes from there, puts it in your bookmarks: it sends
+the game's id with your token, and asks Lichess once for the permission to change your preferences.
+
+While you play a game on Lichess, none of them touches its line: a position on the way to its position, or the game
+that passes through it, does not leave the machine (see [Fair play](#fair-play)). The rest stays possible.
+
 ### Recent games and the list
 
 Ctrl+Tab shows the recent games, the one on the board first (twelve at most): Ctrl+Tab again goes down the list,

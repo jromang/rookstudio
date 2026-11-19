@@ -210,9 +210,14 @@ const lichess::PlayingGame* App::liveGameOn() const {
 }
 
 int App::correspondencePly(const ReplayGame& line, bool chess960, int last, const lichess::PlayingGame** game) const {
+    return playingPly(line, chess960, last, game, false);
+}
+
+int App::playingPly(const ReplayGame& line, bool chess960, int last, const lichess::PlayingGame** game,
+                    bool live_too) const {
     std::vector<std::pair<Men, const lichess::PlayingGame*>> wanted;
     for (const auto& g : lichess_playing_)
-        if (!g.live())
+        if (live_too || !g.live())
             if (const auto men = menOf(std::string_view(g.fen))) wanted.emplace_back(*men, &g);
     if (wanted.empty()) return -1;
     auto board    = boardAt(line, chess960, 0);
@@ -239,6 +244,23 @@ const lichess::PlayingGame* App::fairPlayLock(bool whole_game) const {
     if (correspondencePly(b.game, b.chess960, INT32_MAX, &game) >= 0) return game;
     // The main line does: the whole game, and a position of it shown from a variation.
     if (correspondencePly(b.tree.main, b.chess960, INT32_MAX, &game) >= 0) {
+        if (whole_game) return game;
+        const auto shown = menOf(boardAt(b.game, b.chess960, b.ply));
+        auto board       = boardAt(b.tree.main, b.chess960, 0);
+        for (std::size_t ply = 0;; ++ply) {
+            if (menOf(board) == shown) return game;
+            if (ply >= b.tree.main.moves.size()) break;
+            board.makeMove(b.tree.main.moves[ply].move);
+        }
+    }
+    return nullptr;
+}
+
+const lichess::PlayingGame* App::toLichessLock(bool whole_game) const {
+    const auto& b                    = board_;
+    const lichess::PlayingGame* game = nullptr;
+    if (playingPly(b.game, b.chess960, INT32_MAX, &game, true) >= 0) return game;
+    if (playingPly(b.tree.main, b.chess960, INT32_MAX, &game, true) >= 0) {
         if (whole_game) return game;
         const auto shown = menOf(boardAt(b.game, b.chess960, b.ply));
         auto board       = boardAt(b.tree.main, b.chess960, 0);

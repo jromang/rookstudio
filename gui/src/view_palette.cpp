@@ -583,6 +583,28 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         });
     // The followed players' games, in the broadcasts' mosaic (#50).
     add(TR("Followed players' games in the mosaic"), "Lichess", [this] { openPlayersMosaic(); });
+    // To lichess.org, from the Board (#54).
+    if (page_ == Page::Board) {
+        if (!toLichessLock(false)) {
+            add(TR("Open the position on lichess.org"), "Lichess", [this] { openPositionOnLichess(); });
+            add(TR("Have the position played out on Lichess…"), "Lichess", [this] { open_to_lichess_ = true; });
+        }
+        if (!toLichessLock(true) && !board_.tree.main.moves.empty())
+            add(TR("Share the game on Lichess"), "Lichess", [this] { shareGameOnLichess(); });
+        if (lichess_account_ && !boardLichessGameId().empty())
+            add(TR("Bookmark the game on Lichess"), "Lichess", [this] { bookmarkGameOnLichess(); });
+    }
+    // The books from Lichess's open data (#53).
+    add(TR("From Lichess's named openings…"), TR("Books"), [this] {
+        page_                  = Page::Books;
+        opening_suite_shown_   = true;
+        evaluated_suite_shown_ = false;
+        book_build_shown_      = false;
+    });
+    add(TR("From Lichess's evaluated positions…"), TR("Books"), [this] {
+        page_ = Page::Books;
+        openEvaluatedSuite();
+    });
     // A game prepared against an opponent (#52).
     add(TR("Prepare a game against…"), "Lichess", [this, go = page(Page::Lichess)] {
         go();

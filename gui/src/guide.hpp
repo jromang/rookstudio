@@ -84,6 +84,7 @@ inline constexpr const char* LichessCast        = "your-own-lichess-broadcast";
 inline constexpr const char* Prep               = "preparing-a-game";
 inline constexpr const char* OpeningSuite       = "books-from-the-named-openings";
 inline constexpr const char* EvaluatedSuite     = "books-from-the-evaluated-positions";
+inline constexpr const char* ToLichess          = "positions-and-games-to-lichess";
 inline constexpr const char* Assistant          = "the-assistant";
 inline constexpr const char* AssistantModel     = "its-model";
 inline constexpr const char* Questions          = "questions";

@@ -53,6 +53,7 @@
 #include "lichess_playing.hpp"
 #include "lichess_profile.hpp"
 #include "lichess_settings.hpp"
+#include "lichess_share.hpp"
 #include "live.hpp"
 #include "machine_jobs.hpp"
 #include "machine_run.hpp"
@@ -852,12 +853,46 @@ class App {
     // that game.
     [[nodiscard]] int correspondencePly(const ReplayGame& line, bool chess960, int last,
                                         const lichess::PlayingGame** game = nullptr) const;
+    // The same of any game being played, live ones too.
+    [[nodiscard]] int playingPly(const ReplayGame& line, bool chess960, int last, const lichess::PlayingGame** game,
+                                 bool live_too) const;
+    // The game whose line the board shows, for what leaves the machine (#54): any game being played, live or not,
+    // whose position is on the line shown, or on the main line when the position shown is one of its; with
+    // `whole_game`, anywhere on the main line. The rest stays possible during a live game.
+    [[nodiscard]] const lichess::PlayingGame* toLichessLock(bool whole_game) const;
     // The game that locks the board: a live one; a correspondence game whose position is on the line shown, or on the
     // main line when the position shown is one of its; with `whole_game`, anywhere on the main line.
     [[nodiscard]] const lichess::PlayingGame* fairPlayLock(bool whole_game) const;
     [[nodiscard]] bool aidsLocked() const { return fairPlayLock(false) != nullptr; }  // on the board's position
     [[nodiscard]] bool gameLocked() const { return fairPlayLock(true) != nullptr; }   // on the whole game
     void drawFairPlayBanner(bool whole_game = false);
+    // From the Board to lichess.org (#54, mockup M8, board "Lien"): the position opened on the analysis board, the
+    // game shared, the position played out (an open challenge), a game of Lichess bookmarked; what each sends said
+    // beside it, and nothing on the line of a game being played (R17).
+    struct ToLichess {
+        enum class Kind { Share, Challenge, Bookmark } kind = Kind::Share;
+        bool busy                                           = false;
+        std::string url;                                  // the game shared
+        std::optional<lichess::OpenChallenge> challenge;  // its links
+        lichess::ChallengeClock clock;
+        std::string error;
+    };
+    std::optional<ToLichess> to_lichess_;  // what was asked last, under the board until closed
+    std::future<lichess::Answer<std::string>> lichess_share_job_;
+    std::future<lichess::Answer<lichess::OpenChallenge>> lichess_challenge_job_;
+    std::future<lichess::Answer<bool>> lichess_bookmark_job_;
+    std::string lichess_bookmark_pending_;                 // a game to bookmark once preference:write is allowed
+    bool open_to_lichess_ = false;                         // the menu opened from Ctrl+K
+    std::string focus_next_;                               // --focus: the word after a lichess-api= one
+    [[nodiscard]] std::string boardLichessGameId() const;  // the game's on Lichess, when it comes from there
+    void openPositionOnLichess();
+    void shareGameOnLichess();
+    void playPositionOnLichess(const lichess::ChallengeClock& clock);
+    void bookmarkGameOnLichess();
+    void pollToLichess();
+    void drawToLichessMenu();               // its button under the board, and its menu
+    void drawToLichessActions();            // the menu's actions
+    void drawToLichessResult(float width);  // what came, under the board, as wide as it
     void drawPlayingGames();   // the Home page's list
     void drawListenOffer();    // the Lichess page's offer of the right to read challenges
     // A game of the user's that ended (#49, mockup M8, board "Fairplay"): brought into "Lichess · account", made when

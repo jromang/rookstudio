@@ -2120,6 +2120,8 @@ void App::drawBoardColumn(float size) {
     }
     if (ImGui::Button(TR("Copy FEN"))) ImGui::SetClipboardText(board.getFen().c_str());
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", board.getFen().c_str());
+    ImGui::SameLine();
+    drawToLichessMenu();  // the position, the game, to lichess.org (#54)
     if (b.line >= 0) {
         ImGui::SameLine();
         if (ImGui::Button(TR("Back to the game"))) showBoardLine(-1, boardMainPly());
@@ -2138,6 +2140,7 @@ void App::drawBoardColumn(float size) {
             board_back_.reset();
         }
     }
+    drawToLichessResult(size);  // a game shared, a position played out (#54)
 }
 
 void App::drawBoardAnalysis() {

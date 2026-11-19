@@ -289,6 +289,7 @@ void App::frame() {
     pollCast();             // a tournament on the user's own Lichess broadcast, once allowed (#51)
     pollPrep();             // a game prepared against an opponent: their games, then the report (#52)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
+    pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
     pollEnginePicker();
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
@@ -387,6 +388,12 @@ void App::frame() {
             came.set_value(std::move(a));
             f.arrival = came.get_future();
             lichess_finished_.push_back(std::move(f));
+        } else if (w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
+            // lichess-api=http://127.0.0.1:PORT[,WORD]: a test's server in place of lichess.org's API, on this machine
+            // only; then WORD, another of these.
+            const auto comma       = w.find(',');
+            lichess::servers().api = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
+            if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
         } else if (w.rfind("lichess-playing=", 0) == 0) {
             // lichess-playing=live|correspondence[@FILE[@PLY]]: a game of the user's in progress, as Lichess would
             // list it (#48): live, or by correspondence at the position of the Board page's game at PLY (where it
@@ -650,6 +657,7 @@ void App::frame() {
                                                 : Tab::Overview;
         }
         focus_done_ = true;
+        if (!focus_next_.empty()) focusWindow(std::exchange(focus_next_, {}));  // a word after another
     }
 
     // The big screen takes the main window's place: the panels taken out of it stay on screen.

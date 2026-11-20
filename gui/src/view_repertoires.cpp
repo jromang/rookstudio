@@ -1,5 +1,5 @@
 // The Openings page of the Chess space (mockup M3, board 2): the repertoires, the active one's coverage of the
-// databases' games and its gaps, the most often met first.
+// databases' games and its gaps, the most often met first. Its Theory part is view_theory.cpp's (#77).
 
 #include <algorithm>
 #include <chrono>
@@ -54,6 +54,12 @@ void App::showLineOnBoard(const std::vector<std::string>& line, const std::strin
 void App::drawOpeningsPage() {
     auto& r = repertoires();
     ui::pageTitle(TR("Openings"), guideSection());
+    // Its two parts (M11, board 2): the repertoires, and the theory (view_theory.cpp).
+    drawOpeningsParts();
+    if (openings_theory_) {
+        drawTheoryPart();
+        return;
+    }
     // At the right, as wide as its label in the language of the interface.
     const char* new_label = TR("New repertoire");
     const auto& style     = ImGui::GetStyle();

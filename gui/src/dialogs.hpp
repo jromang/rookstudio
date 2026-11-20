@@ -57,6 +57,8 @@ class Dialogs {
         BoardPgn,        // a PGN file for the Board page
         SaveBoardPgn,    // the Board page's game saved as a PGN file
         AppendBoardPgn,  // the same, after the games of a PGN file
+        TheoryPgn,       // an annotated PGN added to the theory (#77)
+        TheoryFind,      // a theory study's file found where it went
         AssistantModel,  // a GGUF file for the assistant, instead of the catalogue's model
         EngineLogo,
         PieceFolder,

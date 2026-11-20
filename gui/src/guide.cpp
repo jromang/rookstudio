@@ -127,6 +127,7 @@ const std::vector<const char*>& allTopics() {
                                               Searching,
                                               ReadWithoutCopy,
                                               OpeningsPage,
+                                              TheoryStudies,
                                               LichessPage,
                                               LichessLink,
                                               LichessGames,

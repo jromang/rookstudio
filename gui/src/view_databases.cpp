@@ -132,6 +132,7 @@ void App::pollDatabases() {
     const auto index = job->index;
     const auto read = job->progress.bytes.load(), total = job->progress.total_bytes;
     if (const auto report = shelf_->finishedImport()) {
+        if (twicImportEnded(path, *report)) return;  // an issue of TWIC: its own report, once they are all in
         // The outcome, said on the database: the disk full and what the rest would take, the damaged games and why.
         ImportOutcome o;
         o.file           = path;
@@ -451,11 +452,12 @@ void App::drawDatabases() {
     ui::pageTitle(TR("Databases"), guideSection());
     // The tools, on the title's line.
     {
-        const char* make   = TR("New database");
-        const char* import = TR("Import a file…");
-        const char* add    = TR("Add a database…");
-        float width        = px(36);
-        for (const char* label : {make, import, add}) width += ImGui::CalcTextSize(label).x + px(44);
+        const char* make    = TR("New database");
+        const char* import  = TR("Import a file…");
+        const char* sources = TR("From a source…");
+        const char* add     = TR("Add a database…");
+        float width         = px(36);
+        for (const char* label : {make, import, sources, add}) width += ImGui::CalcTextSize(label).x + px(44);
         width += ImGui::CalcTextSize("Ctrl+I").x + px(8);
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - width));
         if (ui::iconButton("db_new", ui::Icon::Plus, make)) {
@@ -470,6 +472,12 @@ void App::drawDatabases() {
         ImGui::EndDisabled();
         ImGui::SameLine(0, px(4));
         ImGui::TextDisabled("Ctrl+I");
+        ImGui::SameLine();
+        // The sources of games (#70, mockup M10): each with what it brings, its terms, the database it goes into.
+        if (ui::iconButton("db_sources", ui::Icon::Globe, sources)) ImGui::OpenPopup("##sources");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("Games from a site, downloaded when you ask: TWIC's issues of the week."));
+        drawSourcesMenu();
         ImGui::SameLine();
         if (ui::iconButton("db_add", ui::Icon::Database, add)) dialogs_.openFolder(Dialogs::Purpose::AddDatabase);
         if (ImGui::IsItemHovered())
@@ -522,6 +530,11 @@ void App::drawDatabases() {
             db_linked_key_ = key;
         }
     }
+    drawTwicReport();
+    if (twic_sheet_) {
+        drawTwicSheet();
+        return;
+    }
     const auto& entries = s.entries();
     if (entries.empty()) {
         ui::beginCard("db_empty");
@@ -566,6 +579,7 @@ void App::drawDatabases() {
         }
         ImGui::PopID();
     }
+    drawFollowedSources();
     ImGui::EndChild();
     ImGui::SameLine(0, px(14));
 

@@ -1107,6 +1107,22 @@ The tournaments of the profile, and the PGN file open on the Board page, show un
 databases: their games listed and searched like a database's, brought up to date in the background when shown (the
 games a tournament finishes, a file that grew or changed). They are neither imported nor removed.
 
+### TWIC
+
+*From a source…* brings games from a site, downloaded only when you ask. **TWIC**, The Week in Chess, publishes an
+issue of the week's games every Monday: its sheet asks theweekinchess.com for its list of issues and shows the latest
+ones, with their Monday, their games and whether each is already in the database chosen. Tick some, choose the
+database (*A new database, “TWIC”* at first), then *Download and add*: each issue's PGN is downloaded, then imported,
+one after the other, the database read all along; *Cancel* stops after what was added. A game the database already
+has, the same tags and moves, is not added twice. Then a report gives the strongest tournaments of the games added (the
+average rating of their players) and the best-rated players; a name opens its games in the list.
+
+*Every Monday, look for a new issue* is off until you tick it. Ticked, RookStudio asks for the list of issues while it
+is open, four times a day at most; a new issue shows under the list of databases, in *Followed sources*, and on the
+Home page's *My databases* card, with *Add*: it is never added without you. What leaves the machine: the request for
+the list of issues, then for the PGN files of the issues chosen, nothing else. TWIC is free for personal use; nothing of
+it ships with RookStudio.
+
 ## The Openings page
 
 Your repertoires: each a PGN file of the profile (one game and its variations, for White or for Black), which the

@@ -237,6 +237,7 @@ void App::drawChessHome() {
         }
         if (shown == 0)
             ImGui::TextDisabled("%s", TR("No database yet: import a PGN file, or drop one on the Databases page."));
+        drawTwicHomeNotice();  // a new issue of TWIC, when the weekly look found one (#71)
         ui::endCard();
     }
     if (reopen) restoreRecentGame(*reopen);

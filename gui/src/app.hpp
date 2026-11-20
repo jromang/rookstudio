@@ -45,6 +45,7 @@
 #include "game_graph.hpp"
 #include "guide_view.hpp"
 #include "home.hpp"
+#include "https.hpp"
 #include "layout.hpp"
 #include "lichess_account.hpp"
 #include "lichess_broadcasts.hpp"
@@ -76,6 +77,7 @@
 #include "suite_run.hpp"
 #include "tablebases.hpp"
 #include "topology.hpp"
+#include "twic.hpp"
 #include "ui.hpp"
 #include "views.hpp"
 
@@ -322,6 +324,56 @@ class App {
     };
     std::optional<ImportOutcome> db_outcome_;
     void drawImportOutcome(std::size_t index);
+    // Sources of games (#70, #71, mockup M10): the Databases page's "From a source…"; TWIC's sheet, its issues
+    // downloaded then imported one after the other, its report; the weekly look for a new issue, off until ticked;
+    // the followed sources under the list of databases, and a new issue on the Home page.
+    void drawSourcesMenu();
+    void drawTwicSheet();
+    void drawTwicReport();
+    void drawFollowedSources();
+    void drawTwicHomeNotice();
+    void startTwicIndex(bool weekly);
+    void startTwicAdd(std::vector<twic::Issue> issues, int database);  // database: the shelf's index, -1 a new one
+    bool twicImportEnded(const std::filesystem::path& file, const study::DatabaseImport& report);
+    void pollTwic();
+    void loadTwic();
+    void saveTwic();
+    twic::State twic_;
+    bool twic_loaded_ = false;
+    bool twic_sheet_  = false;
+    std::set<int> twic_ticked_;
+    int twic_target_ = -2;  // the database chosen in the sheet: the shelf's index, -1 a new one, -2 not chosen yet
+    struct TwicIndexJob {
+        std::future<std::pair<std::vector<twic::Issue>, std::string>> done;
+        bool weekly = false;
+    };
+    std::optional<TwicIndexJob> twic_index_job_;
+    std::vector<twic::Issue> twic_issues_;  // the index's, this session
+    std::string twic_error_;
+    struct TwicAdd {
+        std::vector<twic::Issue> issues;
+        std::size_t index = 0;  // the database
+        std::filesystem::path folder;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<DownloadProgress> progress;
+        std::future<std::vector<std::pair<std::filesystem::path, std::string>>> downloads;  // each file, or why not
+        std::vector<std::filesystem::path> files;
+        std::size_t next = 0;  // the next file to import
+        bool downloaded  = false;
+        bool importing   = false;
+        uint64_t added = 0, duplicates = 0;
+        study::GameId from = 0;  // the database's games before
+    };
+    std::optional<TwicAdd> twic_add_;
+    struct TwicDone {
+        std::vector<int> numbers;
+        std::size_t index = 0;
+        std::string database;
+        uint64_t added = 0, duplicates = 0;
+        twic::Report report;
+        std::string error;
+    };
+    std::optional<TwicDone> twic_done_;
     // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
     // background, its move shown.
     struct FileLines {

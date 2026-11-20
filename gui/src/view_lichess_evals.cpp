@@ -194,9 +194,9 @@ void App::drawLichessOfflineEvals() {
     ImGui::SameLine();
     ui::guideLink("offline_evals_help", guide::topics::OfflineEvals);
     ImGui::TextDisabled(
-        "%s", trf("{} million positions evaluated by Stockfish on Lichess, with their lines and depth "
-                  "(database.lichess.org, CC0). Kept on your disk, they give an evaluation at once where Lichess "
-                  "has one, without asking the network.",
+        "%s", trf("{} million positions evaluated by Stockfish on Lichess (database.lichess.org, CC0). Kept on "
+                  "your disk with their evaluation, depth and best move, they give an evaluation at once where "
+                  "Lichess has one, without asking the network.",
                   (EVALS_POSITIONS + 500000) / 1000000)
                   .c_str());
     ImGui::Spacing();

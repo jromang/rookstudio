@@ -452,20 +452,23 @@ void App::drawImportOutcome(std::size_t index) {
     // A ChessBase database: what its games left out, by kind (M10, board 2).
     if (o.report.chessbase) {
         const auto& c   = *o.report.chessbase;
-        const auto many = [](uint64_t n) { return static_cast<int>(std::min<uint64_t>(n, 1000000000)); };
         std::vector<std::string> left;
-        const auto add = [&](uint64_t n, const char* one, const char* more) {
-            if (n) left.push_back(trn(one, more, many(n), ui::exactCount(n)));
+        // Each count's two forms written in its trn(), where gui/i18n/update.py finds them as one plural message.
+        const auto add = [&](uint64_t n, std::string said) {
+            if (n) left.push_back(std::move(said));
         };
-        add(c.texts, N_("{} text"), N_("{} texts"));
-        add(c.training, N_("{} training question"), N_("{} training questions"));
-        add(c.pictures + c.sounds + c.videos, N_("{} picture, sound or video"), N_("{} pictures, sounds or videos"));
-        add(c.web_links, N_("{} web link"), N_("{} web links"));
-        add(c.quotations, N_("{} game quoted"), N_("{} games quoted"));
-        add(c.pawn_structures + c.piece_paths, N_("{} pawn structure or piece path"),
-            N_("{} pawn structures or piece paths"));
-        add(c.variation_colours, N_("{} variation colour"), N_("{} variation colours"));
-        add(c.correspondence + c.undecoded + c.other, N_("{} other annotation"), N_("{} other annotations"));
+        const uint64_t media = c.pictures + c.sounds + c.videos, drawn = c.pawn_structures + c.piece_paths,
+                       other = c.correspondence + c.undecoded + c.other;
+        add(c.texts, trn("{} text", "{} texts", c.texts, ui::exactCount(c.texts)));
+        add(c.training, trn("{} training question", "{} training questions", c.training, ui::exactCount(c.training)));
+        add(media, trn("{} picture, sound or video", "{} pictures, sounds or videos", media, ui::exactCount(media)));
+        add(c.web_links, trn("{} web link", "{} web links", c.web_links, ui::exactCount(c.web_links)));
+        add(c.quotations, trn("{} game quoted", "{} games quoted", c.quotations, ui::exactCount(c.quotations)));
+        add(drawn,
+            trn("{} pawn structure or piece path", "{} pawn structures or piece paths", drawn, ui::exactCount(drawn)));
+        add(c.variation_colours, trn("{} variation colour", "{} variation colours", c.variation_colours,
+                                     ui::exactCount(c.variation_colours)));
+        add(other, trn("{} other annotation", "{} other annotations", other, ui::exactCount(other)));
         std::string said;
         for (const auto& l : left) said += (said.empty() ? "" : ", ") + l;
         ImGui::TextDisabled(
@@ -527,7 +530,9 @@ void App::drawDatabases() {
         // The sources of games (#70, mockup M10): each with what it brings, its terms, the database it goes into.
         if (ui::iconButton("db_sources", ui::Icon::Globe, sources)) ImGui::OpenPopup("##sources");
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", TR("Games from a site, downloaded when you ask: TWIC's issues of the week."));
+            ImGui::SetTooltip("%s",
+                              TR("Games from a site, downloaded when you ask: TWIC's issues of the week, Lichess's "
+                                 "broadcasts and monthly files, a chess.com player's games, Lumbra's Gigabase."));
         drawSourcesMenu();
         ImGui::SameLine();
         if (ui::iconButton("db_add", ui::Icon::Database, add)) dialogs_.openFolder(Dialogs::Purpose::AddDatabase);
@@ -1716,12 +1721,12 @@ void App::drawChessBaseAsk() {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", a.error.c_str());
     } else {
         if (!a.archive)
-            ImGui::TextUnformatted(trn("Read in its headers, without opening its moves: {} record (a game, or a text)",
-                                       "Read in its headers, without opening its moves: {} records (games, and texts "
-                                       "if it has some)",
-                                       static_cast<int>(std::min<uint32_t>(a.records, 1000000000)),
-                                       ui::exactCount(a.records))
-                                       .c_str());
+            ImGui::TextUnformatted(
+                trn("According to its header file (.cbh), without opening its moves: {} record (a game, or a text)",
+                    "According to its header file (.cbh), without opening its moves: {} records (games, and texts "
+                    "if it has some)",
+                    static_cast<int>(std::min<uint32_t>(a.records, 1000000000)), ui::exactCount(a.records))
+                    .c_str());
         else
             ImGui::TextUnformatted(TR("An archive: unpacked while it is read, its games counted as they come."));
         ImGui::Spacing();

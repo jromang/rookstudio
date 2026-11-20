@@ -1,7 +1,7 @@
 #pragma once
 
 // The positions Lichess's players had analysed (#53, mockup M8, board "Moteurs"), the second source of a book of
-// starting positions: Lichess's evaluations database (lichess_db_eval.jsonl.zst, CC0; 22.5 GB and some 290 million
+// starting positions: Lichess's evaluations database (lichess_db_eval.jsonl.zst, CC0; 22.5 GB and some 418 million
 // positions in November 2026), read once while it downloads and not kept. Only the positions of the named openings'
 // lines (opening_suite), and those one move off them, are kept with their deepest evaluation: a few megabytes, from
 // which a book is made as often as wanted, out of an evaluation, a depth, the lines' plies and a number.

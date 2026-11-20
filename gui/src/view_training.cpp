@@ -286,7 +286,7 @@ void App::drawTrainingCard(std::size_t index) {
         } else {
             bigCount(c.due, TR("due today"));
             ImGui::SameLine(0, px(30));
-            bigCount(c.today, TR("new"));
+            bigCount(c.today, TR("new today"));
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip(
                     "%s",
@@ -326,7 +326,7 @@ void App::drawTrainingCard(std::size_t index) {
                         ? c.today
                         : std::min<std::size_t>(c.fresh, static_cast<std::size_t>(std::max(1, settings.new_per_day)));
                 ImGui::SetTooltip("%s", c.fresh == 0 ? TR("Every position has been learnt.")
-                                                     : trn("{} new position, the most met in your databases first",
+                                                     : trn("{} new position",
                                                            "{} new positions, the most met in your databases first",
                                                            batch, ui::exactCount(batch))
                                                            .c_str());
@@ -1074,10 +1074,10 @@ void App::drawTrainingColumn() {
                      "frequent in your databases comes first."),
             true);
     if (t.left_out > 0)
-        wrapped(trn("{} position left out while your correspondence game on Lichess goes through it.",
-                    "{} positions left out while your correspondence games on Lichess go through them.", t.left_out,
-                    t.left_out),
-                true);
+        wrapped(
+            trn("{} position left out while a correspondence game on Lichess goes through it.",
+                "{} positions left out while correspondence games on Lichess go through them.", t.left_out, t.left_out),
+            true);
     // With the answer, the tree, the engine and the notes come back.
     if (t.phase == Ask::Right || t.phase == Ask::Wrong) {
         ImGui::Separator();
@@ -1167,7 +1167,9 @@ void App::drawTrainingEnd() {
     }
     ImGui::Dummy(ImVec2(0, px(6)));
     if (!missed.empty()) {
-        if (primaryButton(trn("Review the {} now", "Review the {} now", missed.size(), missed.size()).c_str()))
+        if (primaryButton(trn("Review the {} missed position now", "Review the {} missed positions now", missed.size(),
+                              missed.size())
+                              .c_str()))
             return reviewMissed();
         ImGui::SameLine();
         if (ImGui::Button(TR("Back to the Openings"))) return closeTraining(true);

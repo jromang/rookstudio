@@ -36,7 +36,7 @@ def extract():
         text = open(os.path.join(SOURCES, name), encoding='utf-8').read()
         for m in re.finditer(r'\b(TR|trf|N_)\(\s*' + LITS, text):
             messages.setdefault(joined(m.group(2)).split('##')[0], None)
-        for m in re.finditer(r'\btrn\(\s*' + LITS + r',\s*' + LITS, text):
+        for m in re.finditer(r'\b(?:trn|trPlural)\(\s*' + LITS + r',\s*' + LITS, text):
             messages[joined(m.group(1))] = joined(m.group(2))
     messages.pop('', None)
     return messages

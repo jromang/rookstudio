@@ -962,7 +962,7 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
     tree_book_ = false;
     tree_ctg_  = false;
     if (aidsLocked()) {  // fair play (#48): the user's databases and books only
-        ImGui::TextDisabled("%s", TR("Lichess's explorer rests on the positions of your game by correspondence."));
+        ImGui::TextDisabled("%s", TR("Lichess's explorer is paused on the positions of your correspondence game."));
         return false;
     }
     if (!lichess_account_ || !lichess_.explorer) {

@@ -653,7 +653,7 @@ move number (`hmvc`, `fmvn`) and its opening as `c0`, and adds it to the library
 
 *From Lichess's evaluated positions…*, in **Create…**, makes a book of the positions Lichess's players had analysed:
 those of the named openings' lines and one move off them, each with its evaluation and its depth. They come from
-Lichess's evaluations database (CC0, about 21 GB and 290 million positions): its size is asked of database.lichess.org
+Lichess's evaluations database (CC0, 22.5 GB and 418 million positions): its size is asked of database.lichess.org
 and said before anything is downloaded; *Download and read* reads it while it comes, and keeps only the positions
 found (a few megabytes, in the profile), not the file. *Read a file already downloaded…* reads a
 `lichess_db_eval.jsonl.zst` from the disk instead. Nothing else leaves the machine than the request for the file.
@@ -1064,7 +1064,7 @@ With Lichess's sources in the Tree tab, **the games the explorer names** come un
 reaching the position (*Masters' games*), or the strong ones played on Lichess; a click asks Lichess for the game and
 opens it on the board, at the position the tree showed.
 
-For Lichess's players, *Each move month by month* asks Lichess, for each move listed, how many games played it month
+With the *Lichess* source (all its players), *Each move month by month* asks Lichess, for each move listed, how many games played it month
 by month: a line of its last two years in the *By month* column, green when it is played more lately, red when less;
 under the mouse, its games in the last six months against the six before. The summary says the same of the position.
 It costs a request a move, so it stays off until asked for; the masters' explorer has no months.
@@ -1090,7 +1090,7 @@ facts: its verdicts and evaluations, the key moments, the opening, the endgame a
 Lichess's tables said. Each passage is held to those facts by the checker of the comments: every move, evaluation and
 name it quotes must come from the review. A passage refused is written again; refused twice, it gives way to the
 template's. A card in the assistant's colour says that the model wrote the story and that it was checked, and what
-the checker refused. *The template version* shows the templates' story beside it, *Write it again* has the model tell
+the checker refused. *The template version* shows the templates' story in its place, *Write it again* has the model tell
 it otherwise (Ctrl+K too), *Copy it* copies the story shown. Without the model (not downloaded, or another GGUF file
 that has not learnt RookStudio's comments), or while a tournament on this machine has the processor, the story is the
 templates', as it says. Nothing leaves the machine.
@@ -1189,7 +1189,7 @@ average rating of their players) and the best-rated players; a name opens its ga
 
 *Every Monday, look for a new issue* is off until you tick it. Ticked, RookStudio asks for the list of issues while it
 is open, four times a day at most; a new issue shows under the list of databases, in *Followed sources*, and on the
-Home page's *My databases* card, with *Add*: it is never added without you. What leaves the machine: the request for
+Home page's *My databases* card, with *Add to “…”*: it is never added without you. What leaves the machine: the request for
 the list of issues, then for the PGN files of the issues chosen, nothing else. TWIC is free for personal use; nothing of
 it ships with RookStudio.
 
@@ -1246,10 +1246,10 @@ RookStudio asks them again and again, further apart each time you know them, wit
 uses: a position answered right comes back in a few days, then in weeks; one you miss comes back later in the session,
 then the next day.
 
-The **Train** card of the Openings page counts the positions due today, today's new ones, and those you know, due
-later. *Start* (Enter) asks the positions due, then today's new ones; *Only the new ones* asks the new ones alone. New
-positions come in the order your databases meet them most, the most played first, 20 a day at most (the button beside,
-*20 a day*, changes it). Under them: what comes back tomorrow, within three days and within a week.
+The **Train** card of the Openings page counts the positions due today, today's new ones, and those you know, due later.
+*Start · N positions* (Enter) asks the positions due, then today's new ones; *Only the new ones* asks the new ones
+alone. New positions come in the order your databases meet them most, the most played first, 20 a day at most (the
+button beside, *20 a day*, changes it). Under them: what comes back tomorrow, within three days and within a week.
 
 A session takes the Board page, its column becoming the training's; the game that was on the board waits among the
 recent games and comes back after it. RookStudio plays your opponent's moves along the repertoire up to each position,
@@ -1269,7 +1269,7 @@ changes it, and the mouse on the answer holds it). A wrong one shows your repert
 makes the move you played a second answer accepted there (Ctrl+Z takes it back).
 
 At the end: the counts, the moves you missed (a click shows the position, with your repertoire's move) and *Review
-them now*.
+the … missed positions now*.
 
 The reviews are kept in the profile beside the repertoire (`Najdorf.training.json`, and `Najdorf.reviews.jsonl`, a line
 per answer): its PGN does not change. A move changed in the repertoire makes its position new again. Nothing leaves
@@ -1391,7 +1391,7 @@ twelve or all of them; for a team event, the teams first, by match points then g
 an account; they are asked again every two minutes while the mosaic shows.
 
 *The whole tournament*, beside a round's name, follows all of the tournament's ongoing rounds, and each next one as it
-starts: the mosaic shows the round live, and **Rounds** above it shows another (a click on the live one follows the
+starts: the mosaic shows the round live, and **The rounds** above it shows another (a click on the live one follows the
 next ones again). Each round goes into the *Broadcasts* database as it ends.
 
 **Search the broadcasts**, at the top of the official broadcasts, looks for a recent one by its name: Lichess answers
@@ -2330,7 +2330,7 @@ supported.
 ### Your own Lichess broadcast
 
 *Broadcast on Lichess…*, in the header of a tournament that plays on this machine, opens a sheet: the broadcast's name
-(the tournament's at first), unlisted (for those who have its link) unless *Public* is chosen, and what goes to
+(the tournament's at first), unlisted (for those who have its link) unless *Public: listed on Lichess* is chosen, and what goes to
 Lichess, the name, the tournament's format and time control, and each game's PGN. *Create the broadcast* asks your
 linked account for one more permission the first time, creating studies and broadcasts (Lichess's page opens for it),
 or links the account with it; the token pasted in the lichess card above serves when no account is linked. Then the

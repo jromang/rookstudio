@@ -172,7 +172,7 @@ void App::drawFollowedPlayers() {
         if (s)
             ImGui::TextDisabled(
                 "%s", s->playing
-                          ? (s->clock.empty() ? std::string(TR("playing")) : trf("playing · {}", s->clock)).c_str()
+                          ? (s->clock.empty() ? std::string(TR("in a game")) : trf("in a game · {}", s->clock)).c_str()
                       : s->online ? TR("online")
                                   : TR("offline"));
         const auto hand = std::find_if(lichess_.followed.begin(), lichess_.followed.end(),

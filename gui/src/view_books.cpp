@@ -920,12 +920,12 @@ void App::pollCtgJob() {
             ctg_said_ = trf("From the starting position: {} positions reached of the {} the book holds, {} moves.",
                             ui::exactCount(done.walk.positions), ui::exactCount(held), ui::exactCount(done.walk.moves));
             if (done.walk.skipped)
-                ctg_said_ +=
-                    " " + trn("{} move cannot be read on its position.", "{} moves cannot be read on their position.",
-                              static_cast<int>(std::min<uint64_t>(done.walk.skipped, 1000000)),
-                              ui::exactCount(done.walk.skipped));
+                ctg_said_ += " " + trn("{} move of the book could not be decoded in its position.",
+                                       "{} moves of the book could not be decoded in their positions.",
+                                       static_cast<int>(std::min<uint64_t>(done.walk.skipped, 1000000)),
+                                       ui::exactCount(done.walk.skipped));
             else
-                ctg_said_ += " " + std::string(TR("Every move reads on its position."));
+                ctg_said_ += " " + std::string(TR("Every move of the book was decoded in its position."));
             if (done.walk.beyond)
                 ctg_said_ += " " + trn("{} move leads past the depth the book was made to.",
                                        "{} moves lead past the depth the book was made to.",

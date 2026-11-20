@@ -590,7 +590,7 @@ void App::drawBroadcastMosaic() {
         shown_round = chosen ? broadcast_tour_round_ : !live.empty() ? live : rounds.empty() ? "" : rounds.back().first;
         if (!rounds.empty()) {
             ImGui::AlignTextToFramePadding();
-            ImGui::TextDisabled("%s", TR("Rounds"));
+            ImGui::TextDisabled("%s", TR("The rounds"));
             for (const auto& [id, n] : rounds) {
                 ImGui::SameLine();
                 const bool on_now = std::any_of(broadcast_boards_.begin(), broadcast_boards_.end(),

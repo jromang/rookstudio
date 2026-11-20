@@ -94,7 +94,7 @@ void App::drawCastSheet() {
     ImGui::SameLine();
     if (ImGui::RadioButton(TR("Unlisted: for those who have the link"), !cast_public_)) cast_public_ = false;
     ImGui::SameLine();
-    if (ImGui::RadioButton(TR("Public"), cast_public_)) cast_public_ = true;
+    if (ImGui::RadioButton(TR("Public: listed on Lichess"), cast_public_)) cast_public_ = true;
     ImGui::TextDisabled("%s",
                         TR("Each round of the tournament becomes a round of the broadcast, and each game is sent "
                            "there while it is played: its moves, its clocks, the engines' names. It is not rated; "

@@ -946,7 +946,7 @@ void App::drawReviewStory(const CommentaryReview& review) {
         else if (why.empty() && written)
             why = TR("the checker refused each of the model's passages twice");
         else if (why.empty() && story_cancelled_of_ == review_story_of_)
-            why = TR("the model's was cancelled");
+            why = TR("the model's story was cancelled");
         if (why.empty())
             ImGui::TextDisabled("%s",
                                 TR("Written from the review's facts: its verdicts, its evaluations, the positions."));

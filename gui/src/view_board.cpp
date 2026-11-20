@@ -35,6 +35,11 @@ namespace fcg {
 
 namespace {
 
+// The nodes of the Chess space's review in each position (#61): "320,000 nodes per position".
+std::string reviewNodesText(uint64_t nodes) {
+    return trn("{} node per position", "{} nodes per position", nodes, ui::exactCount(nodes));
+}
+
 // A letter a move can begin with: a file, a piece (English or French letters), castling.
 bool moveStart(ImWchar c) {
     return (c >= 'a' && c <= 'h') || c == 'K' || c == 'Q' || c == 'R' || c == 'B' || c == 'N' || c == 'O' || c == '0' ||
@@ -566,13 +571,22 @@ void App::startReviewTask(const EngineEntry& engine, const std::vector<GameRevie
     setup.game       = b.review_game;
     setup.chess960   = b.review_chess960;
     setup.ceiling_ms = b.settings.review_ceiling_ms;
-    // The Chess space: Lichess's evaluations kept offline, deep enough, taken as they are (#58); the Engines space's
-    // review does not change.
-    if (chessBoard()) setup.known = reviewKnown();
-    // Resumed after the passes this engine completed, unless it went as far as asked: then again from the start.
+    // The Chess space: Lichess's evaluations kept offline, deep enough, taken as they are (#58); each position searched
+    // for a number of nodes from an empty hash, so that the same game gets the same review, as many engine processes
+    // side by side as the analysis has threads (#61); the engine's second line where a move can be the only one (#63).
+    // The Engines space's review does not change.
+    if (chessBoard()) {
+        setup.known        = reviewKnown();
+        setup.reproducible = true;
+        setup.processes    = analysisTotal();
+        setup.second_line  = secondLines(b.review_game, b.review_chess960);
+    }
+    // Resumed after the passes this engine completed the same way, unless it went as far as asked: then again from the
+    // start.
     for (const auto& r : kept) {
+        const bool same_way = setup.reproducible ? r.passes > 0 && r.nodes == passNodes(r.passes - 1) : r.nodes == 0;
         if (r.engine == engine.name && r.passes > 0 && r.complete(b.review_game.moves.size()) &&
-            r.passes < reviewPasses(setup.ceiling_ms))
+            r.passes < reviewPasses(setup.ceiling_ms) && same_way)
             setup.resume = r;
     }
     BoardPage::ReviewTask task;
@@ -1281,10 +1295,17 @@ void App::drawBoardPage() {
         const char* play    = TR("Play a game…");
         const char* analyse = b.analysing ? TR("Stop the analysis") : TR("Analyse");
         const char* review  = b.reviewing() ? TR("Stop the game's analysis") : TR("Analyse the game");
-        float width         = 0;
+        // Their keys: G and A, under Alt in the Chess space, where letters begin typed moves (g3, a4).
+        const bool alt          = chessBoard();
+        const char* review_key  = alt ? "Alt+G" : "G";
+        const char* analyse_key = alt ? "Alt+A" : "A";
+        float width             = 0;
         for (const char* label : {open, paste, edit, play, review, analyse})
             width += ImGui::CalcTextSize(label).x + px(44);
-        width += ImGui::CalcTextSize("Ctrl+V").x + ImGui::CalcTextSize("A").x * 2 + ImGui::GetFrameHeight() + px(28);
+        width += ImGui::CalcTextSize("Ctrl+V").x +
+                 (alt ? ImGui::CalcTextSize(review_key).x + ImGui::CalcTextSize(analyse_key).x
+                      : ImGui::CalcTextSize("A").x * 2) +
+                 ImGui::GetFrameHeight() + px(28);
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - width));
         ImGui::BeginDisabled(b.editor.has_value());
         if (ui::iconButton("board_open", ui::Icon::Folder, open)) {
@@ -1321,12 +1342,15 @@ void App::drawBoardPage() {
         if (ui::iconButton("board_review", b.reviewing() ? ui::Icon::Stop : ui::Icon::Chart, review))
             b.reviewing() ? cancelGameReview() : startGameReview();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip("%s", live_game
-                                        ? TR("Once the game is over.")
-                                        : TR("G: the analysis engine goes through every position of the game, in "
-                                             "the background, then again for longer at each pass: the graph comes "
-                                             "at once and sharpens. Its inaccuracies, mistakes and blunders are "
-                                             "marked."));
+            ImGui::SetTooltip("%s", live_game ? TR("Once the game is over.")
+                                    : alt ? TR("Alt+G: the analysis engine goes through every position of the game, in "
+                                               "the background, then again further at each pass: the graph comes at "
+                                               "once and sharpens. Its inaccuracies, mistakes and blunders are marked, "
+                                               "the same ones each time.")
+                                          : TR("G: the analysis engine goes through every position of the game, in "
+                                               "the background, then again for longer at each pass: the graph comes "
+                                               "at once and sharpens. Its inaccuracies, mistakes and blunders are "
+                                               "marked."));
         }
         ImGui::EndDisabled();
         ImGui::SameLine(0, px(2));
@@ -1335,8 +1359,10 @@ void App::drawBoardPage() {
         if (ImGui::BeginPopup("##review_ceiling_menu")) {
             ImGui::TextDisabled("%s", TR("Refine the analysis of the game up to"));
             for (const int64_t ceiling : {int64_t{320}, int64_t{1280}, int64_t{5120}, int64_t{20480}, int64_t{0}}) {
-                const auto label =
-                    ceiling > 0 ? trf("{} per position", ui::formatClock(ceiling)) : std::string(TR("until stopped"));
+                // The Chess space's passes are of nodes (#61): its last one, as many thousands as milliseconds.
+                const auto label = ceiling <= 0 ? std::string(TR("until stopped"))
+                                   : alt        ? reviewNodesText(passNodes(reviewPasses(ceiling) - 1))
+                                                : trf("{} per position", ui::formatClock(ceiling));
                 if (ImGui::MenuItem(label.c_str(), nullptr, b.settings.review_ceiling_ms == ceiling)) {
                     b.settings.review_ceiling_ms = ceiling;
                     saveBoardSettings();
@@ -1345,13 +1371,15 @@ void App::drawBoardPage() {
             ImGui::EndPopup();
         }
         ImGui::SameLine(0, px(4));
-        ImGui::TextDisabled("G");
+        ImGui::TextDisabled("%s", review_key);
         ImGui::SameLine();
         if (ui::iconButton("board_analyse", b.analysing ? ui::Icon::Stop : ui::Icon::Analyse, analyse))
             setBoardAnalysis(!b.analysing);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A: an engine of the library analyses the position."));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", alt ? TR("Alt+A: the engines analyse the position shown, and follow the board.")
+                                        : TR("A: an engine of the library analyses the position."));
         ImGui::SameLine(0, px(4));
-        ImGui::TextDisabled("A");
+        ImGui::TextDisabled("%s", analyse_key);
     }
 
     // Keys, unless a text field has them.
@@ -2142,7 +2170,8 @@ void App::drawBoardColumn(float size) {
     if (setup_.nav_buttons || (live && b.ply < total)) {
         const float copy = ImGui::CalcTextSize(TR("Copy FEN")).x + ImGui::GetStyle().FramePadding.x * 2 +
                            ImGui::GetStyle().ItemSpacing.x;
-        const auto click = drawBoardNav("##board_nav", b.ply, total, b.flip, setup_.nav_buttons, live, size - copy);
+        const auto click =
+            drawBoardNav("##board_nav", b.ply, total, b.flip, setup_.nav_buttons, live, size - copy, !chessBoard());
         b.ply            = stepPly(click.step, b.ply, total);
         if (click.hide) {
             setup_.nav_buttons = false;
@@ -2157,13 +2186,16 @@ void App::drawBoardColumn(float size) {
         if (ImGui::Button("< ?##prev_judged")) showBoardLine(-1, prev);
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", TR("Shift+N: the previous move the analysis marked (?!, ?, ?\?)."));
+            ImGui::SetTooltip("%s", chessBoard()
+                                        ? TR("Alt+Shift+N: the previous move the analysis marked (?!, ?, ?\?).")
+                                        : TR("Shift+N: the previous move the analysis marked (?!, ?, ?\?)."));
         ImGui::SameLine(0, px(2));
         ImGui::BeginDisabled(next < 0);
         if (ImGui::Button("? >##next_judged")) showBoardLine(-1, next);
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", TR("N: the next move the analysis marked (?!, ?, ?\?)."));
+            ImGui::SetTooltip("%s", chessBoard() ? TR("Alt+N: the next move the analysis marked (?!, ?, ?\?).")
+                                                 : TR("N: the next move the analysis marked (?!, ?, ?\?)."));
         ImGui::SameLine();
     }
     if (ImGui::Button(TR("Copy FEN"))) ImGui::SetClipboardText(board.getFen().c_str());
@@ -3268,11 +3300,20 @@ void App::drawBoardGraph(float height) {
             }
             all += t.state.done.size();
         }
-        draw.progress = ceiling > 0 ? trf("pass {} of {} · {} per position · {}/{}", pass + 1, passes,
-                                          ui::formatClock(passTime(pass)), done, all)
-                                    : trf("pass {} · {} per position · {}/{}", pass + 1,
-                                          ui::formatClock(passTime(pass)), done, all);
-        if (b.analysing) draw.progress += " · " + std::string(TR("paused while A analyses"));
+        // The Chess space's passes are of nodes (#61).
+        if (chessBoard())
+            draw.progress =
+                ceiling > 0
+                    ? trf("pass {} of {} · {} · {}/{}", pass + 1, passes, reviewNodesText(passNodes(pass)), done, all)
+                    : trf("pass {} · {} · {}/{}", pass + 1, reviewNodesText(passNodes(pass)), done, all);
+        else
+            draw.progress = ceiling > 0 ? trf("pass {} of {} · {} per position · {}/{}", pass + 1, passes,
+                                              ui::formatClock(passTime(pass)), done, all)
+                                        : trf("pass {} · {} per position · {}/{}", pass + 1,
+                                              ui::formatClock(passTime(pass)), done, all);
+        if (b.analysing)
+            draw.progress +=
+                " · " + std::string(chessBoard() ? TR("paused while Alt+A analyses") : TR("paused while A analyses"));
         const auto& job = b.review_tasks.front().state;
         // The positions Lichess's evaluations kept offline know deep enough, taken as they are (#58).
         const auto known = static_cast<int>(std::count_if(job.live.positions.begin(), job.live.positions.end(),
@@ -3285,15 +3326,27 @@ void App::drawBoardGraph(float height) {
             graph.level.push_back(level < 0 ? 0.0f : static_cast<float>(level + 1) / static_cast<float>(top));
         draw.action = TR("Stop");
         draw.action_tip =
-            TR("G: stop the analysis of the game. Its passes done are kept, and it goes on from there "
-               "next time.");
+            chessBoard() ? TR("Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from "
+                              "there next time.")
+                         : TR("G: stop the analysis of the game. Its passes done are kept, and it goes on from there "
+                              "next time.");
     } else if (!b.reviewing() && draw.can_add) {
-        bool more = false;
-        for (const auto& r : b.reviews) more |= r.passes > 0 && r.passes < reviewPasses(b.settings.review_ceiling_ms);
-        draw.action     = more ? TR("Continue the analysis") : b.reviews.empty() ? TR("Analyse the game") : nullptr;
+        // An analysis goes on from the passes done the same way: a number of nodes in the Chess space (#61), a time
+        // in the Engines space; done the other way, it is made again.
+        bool more = false, other_way = false;
+        for (const auto& r : b.reviews) {
+            const bool same_way = chessBoard() ? r.passes > 0 && r.nodes == passNodes(r.passes - 1) : r.nodes == 0;
+            more |= same_way && r.passes > 0 && r.passes < reviewPasses(b.settings.review_ceiling_ms);
+            other_way |= !same_way && r.passes > 0;
+        }
+        draw.action = more                                               ? TR("Continue the analysis")
+                      : b.reviews.empty() || (other_way && chessBoard()) ? TR("Analyse the game")
+                                                                         : nullptr;
         draw.action_tip =
-            TR("G: the analysis engine goes through every position of the game, in the background, "
-               "then again for longer at each pass: the graph comes at once and sharpens.");
+            chessBoard() ? TR("Alt+G: the analysis engine goes through every position of the game, in the background, "
+                              "then again further at each pass: the graph comes at once and sharpens.")
+                         : TR("G: the analysis engine goes through every position of the game, in the background, "
+                              "then again for longer at each pass: the graph comes at once and sharpens.");
     }
     const auto ev = drawGameGraph("##board_graph", graph, b.settings.graph, draw,
                                   ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().y));
@@ -3344,8 +3397,10 @@ void App::drawBoardReview() {
         return;
     }
     if (b.reviews.empty() || !b.reviews.front().complete(main.moves.size())) {
-        ImGui::TextWrapped("%s", TR("Analyse the game (G) to review it: each side's accuracy, its mistakes, the key "
-                                    "moments, and who saw them coming."));
+        ImGui::TextWrapped("%s", chessBoard() ? TR("Analyse the game (Alt+G) to review it: each side's accuracy, its "
+                                                   "mistakes, the key moments, and who saw them coming.")
+                                              : TR("Analyse the game (G) to review it: each side's accuracy, its "
+                                                   "mistakes, the key moments, and who saw them coming."));
         if (!b.reviewing() && !main.moves.empty() && ImGui::Button(TR("Analyse the game"))) startGameReview();
         return;
     }
@@ -3473,7 +3528,11 @@ void App::drawBoardReview() {
     // The key moments, each a click away.
     ImGui::Spacing();
     ImGui::TextDisabled("%s", TR("KEY MOMENTS"));
-    const auto moments = keyMoments(main, review, b.judged, phases, boardTablebasePly());
+    // In the Chess space, the review's own: the dots of its curve, the verdicts of its symbols and words.
+    const auto commentary = chessBoard() ? boardCommentaryReview() : nullptr;
+    const auto moments    = commentary && commentary->report.complete
+                                ? reviewKeyMoments(*commentary, main, review, b.judged, phases, boardTablebasePly())
+                                : keyMoments(main, review, b.judged, phases, boardTablebasePly());
     if (moments.empty())
         ImGui::TextDisabled("%s", TR("No mistake: the game was lost little by little, or not at all."));
     const auto pawns = [](double v) {
@@ -3499,9 +3558,18 @@ void App::drawBoardReview() {
                 break;
             case KeyMoment::Kind::Judged:
                 what = trf("{}: {:.0f} % of the winning chances lost.",
-                           m.judgement == Judgement::Blunder ? TR("Blunder") : TR("Mistake"),
+                           m.judgement == Judgement::Blunder   ? TR("Blunder")
+                           : m.judgement == Judgement::Mistake ? TR("Mistake")
+                                                               : TR("Inaccuracy"),
                            b.judged[static_cast<std::size_t>(m.ply - 1)].loss);
                 if (const auto best = best_of(m.ply); !best.empty()) what += " " + trf("Best {}.", best);
+                break;
+            case KeyMoment::Kind::OnlyMove:
+                // The engine's next best beside it (#63, mockup M5: "Gaia: +0.62, the next +0.31").
+                what = m.exact ? std::string(TR("Only move, according to the tablebases."))
+                       : std::isnan(m.after)
+                           ? std::string(TR("Only move."))
+                           : trf("Only move. {}: {}, the next {}.", review.engine, pawns(m.before), pawns(m.after));
                 break;
             case KeyMoment::Kind::Disagreement:
                 what = trf("The engines disagreed: {} against {}.", pawns(m.before), pawns(m.after));
@@ -3569,7 +3637,10 @@ void App::drawBoardReview() {
     ImGui::SameLine();
     if (ImGui::Button(TR("Copy as BBCode"))) {
         std::string out = fmt::format("[b]{} – {}[/b] {}\n", name_of(0), name_of(1), main.result);
-        out += trf("Analysed by {}, {} per position.", review.engine, ui::formatClock(review.movetime_ms)) + "\n";
+        out += (review.nodes > 0
+                    ? trf("Analysed by {}, {}.", review.engine, reviewNodesText(review.nodes))
+                    : trf("Analysed by {}, {} per position.", review.engine, ui::formatClock(review.movetime_ms))) +
+               "\n";
         for (int side = 0; side < 2; ++side) {
             const auto& st = stats[static_cast<std::size_t>(side)];
             out += fmt::format("[b]{}[/b]: {} {} · ?! {} · ? {} · ?? {} · {} {}\n", name_of(side), TR("accuracy"),
@@ -3627,8 +3698,9 @@ void App::drawGameReview() {
     };
     ImGui::TextWrapped("%s", trf("Analysis: {} · {}", side(0), side(1)).c_str());
     if (ImGui::IsItemHovered()) {
-        const auto how = review.depth > 0 ? trf("depth {}", review.depth)
-                                          : trf("{:g} s per move", static_cast<double>(review.movetime_ms) / 1000.0);
+        const auto how = review.nodes > 0   ? reviewNodesText(review.nodes)
+                         : review.depth > 0 ? trf("depth {}", review.depth)
+                                            : trf("{:g} s per move", static_cast<double>(review.movetime_ms) / 1000.0);
         ImGui::SetTooltip("%s", trf("By {}, {}. Losses of 10, 20 and 30 % of the winning chances are an "
                                     "inaccuracy (?!), a mistake (?) and a blunder (?\?).",
                                     review.engine, how)

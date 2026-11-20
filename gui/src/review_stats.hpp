@@ -43,12 +43,14 @@ struct SideStats {
                                                  const std::vector<MoveReview>& judged, const GamePhases& phases);
 
 struct KeyMoment {
-    enum class Kind : uint8_t { TurningPoint, Judged, Disagreement, Endgame, Tablebase };
+    enum class Kind : uint8_t { TurningPoint, Judged, Disagreement, Endgame, Tablebase, OnlyMove };
     Kind kind           = Kind::Judged;
     int ply             = 0;  // the position after the move (for the endgame and the tablebase: the position it starts)
     double before       = 0;  // TurningPoint, Judged: White's pawns before the move and after it; Disagreement: the two
-    double after        = 0;  // engines' evaluations (White's), the mover's first
+    double after        = 0;  // engines' evaluations (White's), the mover's first; OnlyMove: the engine's best line and
+                              // its next best (White's pawns; NaN without one)
     Judgement judgement = Judgement::None;
+    bool exact          = false;  // OnlyMove: the tablebases' verdict, not the engine's
 };
 
 // The moments worth a look, in the game's order: the move that lost the most (when it is a mistake or a blunder),

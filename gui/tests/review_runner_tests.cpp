@@ -8,6 +8,7 @@
 #include <chrono>
 #include <filesystem>
 #include <map>
+#include <mutex>
 #include <thread>
 
 #include "../../tournament/tests/self_path.hpp"
@@ -342,4 +343,176 @@ TEST_CASE("continuous analysis: positions known deep enough already are taken as
     REQUIRE(back);
     CHECK(back->positions[0].known);
     CHECK_FALSE(back->positions[4].known);
+}
+
+namespace {
+
+// The settled analysis of `setup`, run to its end (or to `stop_after` complete passes, then stopped).
+ReviewRunner::State runToEnd(ReviewRunner& runner, const ReviewRunner::Setup& setup, int stop_after = 0) {
+    runner.start(setup);
+    ReviewRunner::State st;
+    uint64_t version = 0;
+    const auto until = std::chrono::steady_clock::now() + 120s;
+    while (std::chrono::steady_clock::now() < until) {
+        (void)runner.state(st, version);
+        if (!st.running || (stop_after > 0 && st.settled.passes >= stop_after)) break;
+        std::this_thread::sleep_for(10ms);
+    }
+    if (stop_after > 0) runner.stop();
+    (void)runner.state(st, version);
+    return st;
+}
+
+ReviewRunner::Setup reproducibleSetup() {
+    ReviewRunner::Setup setup;
+    setup.engine.name     = "mover";
+    setup.engine.cmd      = randomMover();
+    setup.engine.protocol = "uci";
+    setup.game            = shortGame();
+    setup.ceiling_ms      = passTime(1);  // two passes
+    setup.reproducible    = true;
+    return setup;
+}
+
+bool sameScore(const std::optional<fastchess::Score>& a, const std::optional<fastchess::Score>& b) {
+    if (!a || !b) return !a && !b;
+    return a->type == b->type && a->value == b->value;
+}
+
+// The same analysis, position by position: scores, moves, lines and second lines.
+void checkSame(const GameReview& a, const GameReview& b) {
+    REQUIRE(a.positions.size() == b.positions.size());
+    for (std::size_t p = 0; p < a.positions.size(); ++p) {
+        CAPTURE(p);
+        const auto &x = a.positions[p], &y = b.positions[p];
+        CHECK(sameScore(x.score, y.score));
+        CHECK(x.best == y.best);
+        CHECK(x.pv == y.pv);
+        CHECK(x.depth == y.depth);
+        CHECK(sameScore(x.second_score, y.second_score));
+        CHECK(x.second_pv == y.second_pv);
+    }
+}
+
+}  // namespace
+
+TEST_CASE(
+    "the Chess space's review: each position for a number of nodes from an empty hash, the same whatever the "
+    "order, the processes, a stop") {
+    if (!fs::is_regular_file(randomMover())) return;
+    ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
+    ScopedEnv hash("FCG_MOCK_HASH", "1");  // what a search finds depends on the searches made before it
+    CHECK(passNodes(0) == FIRST_PASS_NODES);
+    CHECK(passNodes(2) == 16 * FIRST_PASS_NODES);
+    CHECK(passNodes(reviewPasses(5120) - 1) == 5120000);  // a ceiling of 5.12 s: up to 5,120,000 nodes
+    const int before = boardThreads();
+
+    ReviewRunner runner;
+    auto setup     = reproducibleSetup();
+    const auto one = runToEnd(runner, setup);
+    REQUIRE(one.error.empty());
+    REQUIRE_FALSE(one.running);
+    CHECK(one.settled.passes == 2);
+    CHECK(one.settled.nodes == passNodes(1));
+    CHECK(one.settled.movetime_ms == 0);
+    REQUIRE(one.settled.positions.size() == 5);
+    for (const auto& p : one.settled.positions) {
+        REQUIRE(p.score.has_value());
+        CHECK_FALSE(p.best.empty());
+        CHECK_FALSE(p.second_score.has_value());  // none asked for
+    }
+    CHECK(runner.threads() == 0);
+    CHECK(boardThreads() == before);
+
+    // Three processes side by side, the board on the third position first: the same analysis.
+    setup.processes = 3;
+    runner.start(setup);
+    runner.setFirst(2);
+    ReviewRunner::State three;
+    uint64_t version = 0;
+    const auto until = std::chrono::steady_clock::now() + 120s;
+    while (std::chrono::steady_clock::now() < until) {
+        (void)runner.state(three, version);
+        if (!three.running) break;
+        std::this_thread::sleep_for(10ms);
+    }
+    REQUIRE(three.error.empty());
+    checkSame(one.settled, three.settled);
+    CHECK(boardThreads() == before);
+
+    // Stopped after its first pass, then resumed: the same again, a longer search of the board's not taken.
+    setup.processes  = 1;
+    const auto first = runToEnd(runner, setup, 1);
+    REQUIRE(first.settled.passes >= 1);
+    setup.resume = first.settled;
+    runner.start(setup);
+    PositionEval longer = one.settled.positions[1];
+    longer.score        = cp(999);
+    longer.time_ms      = 60000;
+    runner.offer(1, longer);
+    version = 0;
+    ReviewRunner::State resumed;
+    while (std::chrono::steady_clock::now() < until + 120s) {
+        (void)runner.state(resumed, version);
+        if (!resumed.running) break;
+        std::this_thread::sleep_for(10ms);
+    }
+    REQUIRE(resumed.error.empty());
+    CHECK(resumed.settled.passes == 2);
+    checkSame(one.settled, resumed.settled);
+
+    // The time per position on one engine process, its hash kept: what the same position gets depends on what was
+    // searched before it.
+    ReviewRunner::Setup timed = setup;
+    timed.reproducible        = false;
+    timed.resume              = {};
+    const auto by_time        = runToEnd(runner, timed);
+    REQUIRE(by_time.error.empty());
+    REQUIRE(by_time.settled.positions.size() == 5);
+    CHECK_FALSE(sameScore(by_time.settled.positions[0].score, one.settled.positions[0].score));
+}
+
+TEST_CASE("the Chess space's review: the engine's second line where it is asked for, two lines searched") {
+    if (!fs::is_regular_file(randomMover())) return;
+    ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
+    std::vector<int> asked;
+    std::mutex mutex;
+    auto setup        = reproducibleSetup();
+    setup.ceiling_ms  = passTime(0);  // one pass
+    setup.processes   = 2;
+    setup.second_line = [&](int ply, const PositionEval& first) {
+        std::lock_guard lock(mutex);
+        asked.push_back(ply);
+        CHECK(first.score.has_value());
+        return ply == 1 || ply == 3;
+    };
+    ReviewRunner runner;
+    const auto st = runToEnd(runner, setup);
+    REQUIRE(st.error.empty());
+    std::sort(asked.begin(), asked.end());
+    CHECK(asked == std::vector<int>{0, 1, 2, 3, 4});  // once per position searched
+    REQUIRE(st.settled.positions.size() == 5);
+    for (int ply = 0; ply < 5; ++ply) {
+        CAPTURE(ply);
+        const auto& p = st.settled.positions[static_cast<std::size_t>(ply)];
+        if (ply == 1 || ply == 3) {
+            // The mock's second line: its second legal move, a score 15 below.
+            REQUIRE(p.second_score.has_value());
+            REQUIRE(p.score.has_value());
+            CHECK(p.second_score->value == p.score->value - 15);
+            CHECK_FALSE(p.second_pv.empty());
+            CHECK(p.second_pv.substr(0, 4) != p.best);
+        } else {
+            CHECK_FALSE(p.second_score.has_value());
+        }
+    }
+
+    // Kept with the game, and read back; a file without them, as before, still opens.
+    const auto dir = fs::temp_directory_path() / "second-lines";
+    fs::remove_all(dir);
+    REQUIRE(saveReview(dir, setup.game, st.settled));
+    const auto back = loadReview(dir, setup.game);
+    REQUIRE(back);
+    CHECK(back->nodes == passNodes(0));
+    checkSame(st.settled, *back);
 }

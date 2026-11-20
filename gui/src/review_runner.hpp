@@ -12,6 +12,12 @@
 // total work (8 games each, about 1,000 positions): backward rather than forward cut the error of the winning chances
 // by about 16 % and found the reference's best move 5 points more often, with Stockfish 19 as with Gaia 4.4.3; the
 // replayed variation then lost a little (error +3 % and +9 %). Both stay as switches.
+//
+// The Chess space's review is reproducible (#61): a position is searched for a number of nodes, on one thread, from an
+// empty hash, so that its result depends on the engine and the position alone (a time on several threads, a hash
+// that holds what was searched before, never give the same search twice). The same game then gets the same scores,
+// symbols, key moments and comments, whatever the order of the positions, the machine's load, or the passes stopped
+// and resumed; and since a position no longer needs the ones after it, several engine processes search side by side.
 
 #include <atomic>
 #include <condition_variable>
@@ -33,6 +39,9 @@ namespace fcg {
 
 inline constexpr bool REVIEW_BACKWARD  = true;
 inline constexpr bool REVIEW_PV_REPLAY = false;
+// The hash of each engine process of a reproducible review: of a fixed size, the same on every machine (as the
+// assistant's oracle has it), since a search of a number of nodes also depends on the size of its hash.
+inline constexpr int REVIEW_HASH_MB = 64;
 
 // The passes a ceiling allows: those whose time per position is at most `ceiling_ms`; 0, until stopped (as many as
 // there are times).
@@ -55,6 +64,16 @@ class ReviewRunner {
         // A position's value known already (Lichess's evaluations kept offline, deep enough: #58), taken as it is at
         // every pass instead of a search; asked once per position, on the analysis's thread.
         std::function<std::optional<PositionEval>(const chess::Board&)> known;
+        // The Chess space's review (#61): each position searched for passNodes(pass) nodes (`limit` may say another
+        // limit, for the measures) instead of passTime(pass), on one thread, from an empty hash (ucinewgame) of
+        // REVIEW_HASH_MB, by `processes` engine processes side by side. The board's longer searches are not taken
+        // (offer()): they are searched for a time.
+        bool reproducible = false;
+        int processes     = 1;
+        std::function<SearchLimit(int pass)> limit;
+        // With `reproducible`, whether the position `ply` also gets the engine's second line (#63), given its first
+        // line: a search of as many nodes with two lines (MultiPV 2), the best of the other moves kept.
+        std::function<bool(int ply, const PositionEval& first)> second_line;
     };
     struct State {
         uint64_t version = 0;
@@ -89,11 +108,12 @@ class ReviewRunner {
     // The state, copied when it changed since `version`; false when it did not.
     bool state(State& out, uint64_t& version) const;
     [[nodiscard]] bool running() const;
-    // The threads its engine uses now, counted in the core budget.
-    [[nodiscard]] int threads() const noexcept { return claim_.threads(); }
+    // The threads its engines use now, counted in the core budget.
+    [[nodiscard]] int threads() const noexcept { return claim_.threads() + searching_.load(); }
 
    private:
     void run(Setup setup, std::vector<AnalysisPosition> positions);
+    void runReproducible(Setup setup, std::vector<AnalysisPosition> positions);
     template <typename F>
     void update(F f);
 
@@ -103,6 +123,8 @@ class ReviewRunner {
     std::atomic<int> pass_limit_{1 << 20};
     std::atomic<int> first_{-1};
     std::atomic<int64_t> ceiling_{0};
+    std::atomic<bool> reproducible_{false};
+    std::atomic<int> searching_{0};  // the reproducible review's processes searching now, one thread each
     mutable std::mutex mutex_;
     State state_;
     std::vector<std::pair<int, PositionEval>> offers_;

@@ -2,8 +2,8 @@
 
 // An engine of the library answering the assistant's questions (commentary::Oracle): what a side would play, a move's
 // worth, the threat. A process of its own, one thread, a fixed number of nodes per search (300,000, as the prototype
-// confirmed its facts), started at the first question and kept until the oracle goes; so its answers do not depend on
-// the machine's load nor on the Board page's analysis.
+// confirmed its facts), each from an empty hash, started at the first question and kept until the oracle goes; so its
+// answers depend neither on the machine's load, nor on the Board page's analysis, nor on the questions before.
 
 #include <memory>
 #include <mutex>

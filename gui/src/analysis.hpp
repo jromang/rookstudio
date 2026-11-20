@@ -61,14 +61,15 @@ struct AnalysisPosition {
     [[nodiscard]] bool empty() const noexcept { return fen.empty(); }
 };
 
-// How long a search lasts: both 0, until it is stopped.
+// How long a search lasts: all 0, until it is stopped.
 struct SearchLimit {
     int64_t movetime_ms = 0;
     int depth           = 0;
-    [[nodiscard]] bool infinite() const noexcept { return movetime_ms <= 0 && depth <= 0; }
+    uint64_t nodes      = 0;
+    [[nodiscard]] bool infinite() const noexcept { return movetime_ms <= 0 && depth <= 0 && nodes == 0; }
 };
 
-// "go infinite", "go movetime 1000", "go depth 20".
+// "go infinite", "go movetime 1000", "go depth 20", "go nodes 300000".
 [[nodiscard]] std::string goCommand(const SearchLimit& limit);
 
 // "position fen <fen> moves e2e4 e7e5".

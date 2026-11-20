@@ -46,10 +46,11 @@ struct NavClick {
 };
 
 // The row of small buttons under a board showing a game, at the cursor: first, previous, next and last position, and
-// Flip, the keys in their tooltips. Without `buttons` (the setting hides them), nothing but what follows. With `live`
-// (a game being played) and an earlier position shown, "Back to the current move" after them, or only its icon when
-// the row, `width` wide, has no room for the words.
-NavClick drawBoardNav(const char* id, int ply, int total, bool& flip, bool buttons, bool live, float width);
+// Flip, the keys in their tooltips (Alt+F for Flip without `flip_key`, as navKeys()). Without `buttons` (the setting
+// hides them), nothing but what follows. With `live` (a game being played) and an earlier position shown, "Back to the
+// current move" after them, or only its icon when the row, `width` wide, has no room for the words.
+NavClick drawBoardNav(const char* id, int ply, int total, bool& flip, bool buttons, bool live, float width,
+                      bool flip_key = true);
 
 // Over the bottom of the board just drawn (the last item), "Back to the current move", for a board that no longer
 // follows its game while the buttons under it are hidden. Takes no room. True when clicked.

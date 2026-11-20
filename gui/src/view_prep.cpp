@@ -220,16 +220,16 @@ void App::drawPrepCard() {
     if (ImGui::BeginTable("##prep_figures", 3, ImGuiTableFlags_SizingStretchSame)) {
         ImGui::TableNextColumn();
         if (p.sync.valid()) {
-            figure(TR("Their games"), ui::exactCount(p.progress->games.load()), TR("coming from Lichess…"));
+            figure(TR("The opponent's games"), ui::exactCount(p.progress->games.load()), TR("coming from Lichess…"));
         } else if (r) {
             const auto years = r->first == 0                       ? std::string()
                                : (r->first >> 9) == (r->last >> 9) ? fmt::format("{}", r->first >> 9)
                                                                    : fmt::format("{}–{}", r->first >> 9, r->last >> 9);
-            figure(TR("Their games"), ui::exactCount(r->games),
+            figure(TR("The opponent's games"), ui::exactCount(r->games),
                    r->games == 0 ? std::string(TR("none in a year of blitz, rapid and classical"))
                                  : trf("blitz, rapid and classical, {}, in their database", years));
         } else {
-            figure(TR("Their games"), "…", TR("their database's tree is being built…"));
+            figure(TR("The opponent's games"), "…", TR("their database's tree is being built…"));
         }
         ImGui::TableNextColumn();
         if (!lichess_account_) {

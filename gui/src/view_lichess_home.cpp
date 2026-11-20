@@ -156,7 +156,7 @@ void App::drawLichessAccountPanel() {
         std::string lately;
         ImU32 tone = ui::MUTED;
         if (s.games > 0 && s.provisional) {
-            lately = TR("not rated yet");
+            lately = TR("provisional rating");
         } else if (progress.known) {
             const auto signed_delta = (progress.delta > 0   ? "+"
                                        : progress.delta < 0 ? "−"

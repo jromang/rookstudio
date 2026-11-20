@@ -120,7 +120,7 @@ std::string gameSummary(const GameTree& tree) {
     count(tree.main.moves);
     for (const auto& v : tree.variations) count(v.moves);
     const auto moves = static_cast<int>((tree.main.moves.size() + 1) / 2);
-    auto out         = trn("{} move", "{} moves", moves, moves);
+    auto out         = trn("{} move long", "{} moves long", moves, moves);
     if (comments > 0) out += " · " + trn("{} comment", "{} comments", comments, comments);
     if (!tree.variations.empty())
         out += " · " + trn("{} variation", "{} variations", tree.variations.size(), tree.variations.size());
@@ -672,7 +672,7 @@ void App::drawLichessStudies() {
             if (r && changedOnLichess(*r, &s))
                 add(TR("changed since the last reading"));
             else if (s.updated > 0)
-                add(trf("changed {}", dayOf(s.updated / 1000)));
+                add(trf("changed on Lichess {}", dayOf(s.updated / 1000)));
             if (!r || r->read_at == 0) add(TR("not read yet"));
             dl->AddText(ImVec2(at.x + px(6), at.y + px(4) + line), ImGui::GetColorU32(ImGuiCol_TextDisabled),
                         fitted(sub, w - px(12)).c_str());

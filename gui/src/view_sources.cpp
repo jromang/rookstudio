@@ -45,7 +45,8 @@ std::string shortDate(uint32_t packed) {
                                    N_("Jul"), N_("Aug"), N_("Sep"), N_("Oct"), N_("Nov"), N_("Dec")};
     const unsigned month = (packed >> 5) & 15, day = packed & 31;
     if (month < 1 || month > 12 || day == 0) return {};
-    return fmt::format("{} {}", day, TR(months[month - 1]));
+    // Named, so that a language can put the month first: « 11月9日 ».
+    return trf("{day} {month}", fmt::arg("day", day), fmt::arg("month", TR(months[month - 1])));
 }
 
 }  // namespace

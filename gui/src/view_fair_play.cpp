@@ -322,7 +322,7 @@ void App::drawPlayingGames() {
     for (const auto* p : games) {
         const auto& g = *p;
         ImGui::PushID(g.id.c_str());
-        chip(g.live()    ? TR("Live")
+        chip(g.live()    ? TR("Live game")
              : g.my_turn ? TR("Your turn")
                          : TR("Their turn"),
              g.live()    ? ui::ACCENT

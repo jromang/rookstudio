@@ -73,8 +73,9 @@ random_mover
 *.pgn
 *.epd
 UHO*
-# The study layer's test games
+# The study layer's test games, in their subfolders too (a ChessBase database's .cbp is not a project file)
 !study/tests/data/*
+!study/tests/data/**
 
 # Build
 tmp

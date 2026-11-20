@@ -1,0 +1,406 @@
+[Event "RookStudio CB test"]
+[Site "Lyon FRA"]
+[Date "2026.11.20"]
+[Round "3.2"]
+[White "Müller, Jörg"]
+[Black "Étienne, Zoé"]
+[Result "1-0"]
+[WhiteElo "2410"]
+[BlackElo "2388"]
+[ECO "B90"]
+[Annotator "RookStudio"]
+[WhiteTeam "Lyon"]
+[BlackTeam "Paris"]
+[EventDate "2026.11.18"]
+
+{ A game of our own, annotated for the tests. } 1. e4 { [%clk 1:29:50] [%emt 0:00:10] } 1... c5 { [%clk 1:29:40] } 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 { The Najdorf. } 6. Be3 $1 { [%csl Gd4,Re5,Yf6][%cal Ge3h6,Rd8a5,Yf1e2] } 6... e5 $5 ( 6... e6 $10 7. f3 b5 ( 7... Be7 8. Qd2 $14 ) 8. g4 $16 ) 7. Nb3 Be6 8. f3 Be7 9. Qd2 O-O 10. O-O-O $146 { [%eval 0.31,24] A new idea. } 10... Nbd7 11. g4 $3 b5 $2 12. g5 $18 b4 $4 13. Nd5 $6 Nxd5 14. exd5 Bf5 { before the end } 15. Bd3 Bxd3 16. Qxd3 f5 17. gxf6 Nxf6 18. Rhg1 $13 Qc7 19. Kb1 a5 20. Rg2 a4 21. Nc1 Rfc8 22. Rdg1 Bf8 23. Bh6 g6 24. Bxf8 Rxf8 25. h4 1-0
+
+[Event "RookStudio CB test"]
+[Site "Paris FRA"]
+[Date "2026.??.??"]
+[Round "1"]
+[White "O'Brien, Seán"]
+[Black "Dvořák, Antonín"]
+[Result "1/2-1/2"]
+[FEN "8/5pk1/6p1/8/5P2/6P1/5K2/3R1r2 w - - 0 50"]
+[SetUp "1"]
+
+50. Kxf1 Kf6 51. Ke2 Ke6 52. Rf1 Kf6 53. Rf2 Ke6 54. g4 Kd7 55. Ke3 Kd8 56. Ke4 Ke7 57. Kd3 Ke6 58. Re2+ Kf6 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "2"]
+[White "White A"]
+[Black "Black B"]
+[Result "0-1"]
+[WhiteElo "1850"]
+
+1. a4 b5 2. axb5 a6 3. bxa6 Bb7 4. axb7 Nc6 5. bxa8=N Nb8 6. h4 h5 7. Ra3 c6 8. e3 Nf6 9. Ne2 g6 10. c4 Rh6 11. f4 Qc7 12. Qb3 Qc8 13. Qb5 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "4"]
+[White "White C"]
+[Black "Black D"]
+[Result "*"]
+
+1. e4 Nf6 2. e5 d5 3. exd6 cxd6 4. Be2 g6 5. Bd3 e6 6. Bxg6 b5 7. Qh5 Na6 8. h3 Rg8 9. Qh4 Qa5 *
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "5"]
+[White "White E"]
+[Black "Black F"]
+[Result "1-0"]
+[WhiteElo "2201"]
+[BlackElo "2150"]
+
+1. Nf3 d5 2. Nc3 d4 3. e4 dxe3 4. fxe3 e5 5. Bc4 Bd6 6. O-O Nf6 7. d3 O-O 8. Ne1 Bg4 9. Rf4 Bh3 10. Kf1 Bxg2+ 11. Kg1 a5 12. Qd2 Bf1 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "10"]
+[White "Player 00"]
+[Black "Player 30"]
+[Result "0-1"]
+
+1. Nh3 e6 2. a4 e5 3. Ra2 b5 4. c3 c5 5. g3 Nc6 6. f3 Qc7 7. d4 c4 8. Bd2 Nxd4 9. e4 Bd6 10. Bxc4 Ba6 11. axb5 Bb4 12. Ra3 Rd8 13. Ng1 Bxb5 14. Ra4 Qxc4 15. Rxa7 Ba3 16. Bc1 Qc5 17. c4 Bc6 18. Bh6 Nxh6 19. Qd3 Bxb2 20. Ra2 Qa3 21. f4 Ba1 22. Qc2 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "11"]
+[White "Player 01"]
+[Black "Player 31"]
+[Result "1/2-1/2"]
+[WhiteElo "2499"]
+[BlackElo "2403"]
+
+1. c4 d5 2. a3 Bf5 3. b3 Nd7 4. g3 Rc8 5. a4 g6 6. Nc3 Bc2 7. h3 Ngf6 8. Nb5 dxc4 9. Nf3 Nh5 10. Rb1 f5 11. d4 Ndf6 12. h4 f4 13. Bxf4 Bf5 14. Nc3 Ng7 15. h5 Qd6 16. Bg5 Qb6 17. a5 c5 18. Bf4 Nd7 19. Bd6 h6 20. Nb5 Kd8 21. Bc7+ Ke8 22. Qd2 Qe6 23. Nh2 Nb6 24. e3 a6 25. axb6 Qf7 26. Qd1 c3 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "12"]
+[White "Player 02"]
+[Black "Player 32"]
+[Result "0-1"]
+[WhiteElo "1979"]
+[BlackElo "1877"]
+
+1. d4 Nc6 2. e4 g5 3. Be2 h5 4. g4 Ne5 5. dxe5 Rb8 6. a4 h4 7. b4 Ra8 8. Qd5 f6 9. Kf1 Nh6 10. a5 Nxg4 11. Qg8 d5 12. Bxg4 Be6 13. Kg2 Qd7 14. Ne2 Qd8 15. Kh3 c6 16. Bd2 b5 17. Rg1 Rh7 18. a6 Kd7 19. Bxe6+ Ke8 20. Rg4 f5 21. Ng1 f4 22. Kg2 Rh6 23. Qf7# 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "13"]
+[White "Player 03"]
+[Black "Player 33"]
+[Result "1/2-1/2"]
+[WhiteElo "2528"]
+[BlackElo "2499"]
+
+1. e3 c5 2. Qg4 g6 3. Nh3 Nf6 4. d4 Bh6 5. c3 b5 6. dxc5 e6 7. Nd2 Rf8 8. Nf4 Ng8 9. a3 Bb7 10. Be2 Qb6 11. Qf5 gxf5 12. Bd3 Ke7 13. h3 e5 14. Be2 Re8 15. c4 Qf6 16. Nb1 e4 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "14"]
+[White "Player 04"]
+[Black "Player 34"]
+[Result "1/2-1/2"]
+
+1. g4 c6 2. Bg2 d6 3. Bh3 b5 4. a3 Be6 5. Bf1 Bd7 6. d4 Nh6 7. Bg5 Bxg4 8. Qc1 Nd7 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "15"]
+[White "Player 05"]
+[Black "Player 35"]
+[Result "1/2-1/2"]
+[WhiteElo "2188"]
+[BlackElo "1898"]
+
+1. a3 h5 2. d3 f5 3. c3 g5 4. Nd2 h4 5. Nh3 Kf7 6. Qb3+ d5 7. Qa4 Qd6 8. Qb4 Kg7 9. Nc4 Qg3 10. Bxg5 Rh7 11. Qxe7+ Kg6 12. Qxc7 Nh6 13. Rb1 dxc4 14. Rg1 Qxc7 15. dxc4 Rg7 16. b4 Qe7 17. e3 Qc5 18. f4 Qe5 19. Bxh6 Qb5 20. Be2 Rg8 21. cxb5 Rh8 22. Kf2 Be7 23. Ke1 Bd8 24. Bg7 Bg5 25. Bf3 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "16"]
+[White "Player 06"]
+[Black "Player 36"]
+[Result "0-1"]
+[WhiteElo "2699"]
+[BlackElo "2600"]
+
+1. b3 a6 2. h3 f6 3. Ba3 g5 4. Qc1 d6 5. Nc3 Be6 6. Kd1 Nh6 7. Qb1 c5 8. Bxc5 Bf5 9. Kc1 b6 10. h4 Be4 11. Ba3 Bg6 12. Nb5 Bg7 13. f3 g4 14. g3 Rg8 15. b4 e5 16. f4 Ra7 17. Nh3 Nd7 18. Rg1 Kf8 19. Kd1 Qb8 20. Bc1 Ke8 21. Qb3 Bf8 22. a3 Bf5 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "17"]
+[White "Player 07"]
+[Black "Player 37"]
+[Result "1-0"]
+[WhiteElo "1790"]
+[BlackElo "2470"]
+
+1. b4 f5 2. a3 c6 3. e4 Qa5 4. h4 Na6 5. Rh3 Kf7 6. Bb2 Qxa3 7. Nxa3 Nb8 8. Qe2 d6 9. Nc4 b6 10. exf5 d5 11. Nd6+ exd6 12. Qe6+ Bxe6 13. Ke2 Bxf5 14. Ra4 Be6 15. Rh1 Ke7 16. Rxa7+ 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "18"]
+[White "Player 08"]
+[Black "Player 38"]
+[Result "1/2-1/2"]
+
+1. a3 d5 2. h4 Nh6 3. a4 Kd7 4. b3 Kc6 5. c3 Rg8 6. Nh3 Qd7 7. Na3 g6 8. d3 Qg4 9. Rh2 d4 10. Ng1 a5 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "19"]
+[White "Player 09"]
+[Black "Player 39"]
+[Result "0-1"]
+[WhiteElo "2333"]
+[BlackElo "1853"]
+
+1. f4 Nc6 2. Nc3 Na5 3. f5 g5 4. fxg6 a6 5. d3 h6 6. g4 Nb3 7. g7 Ra7 8. h3 Nxc1 9. a4 h5 10. gxh8=R Na2 11. Qd2 e5 12. Rh7 d6 13. h4 Qd7 14. Nd5 Qd8 15. c3 Bxg4 16. Qe3 b5 17. Rb1 e4 18. Kf2 c5 19. Rh6 Qf6+ 20. Nxf6+ Kd8 21. Qf3 Bh3 22. Nxh3 exd3 23. Ke3 b4 24. Qd5 Ke7 25. Qe6+ 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "20"]
+[White "Player 10"]
+[Black "Player 40"]
+[Result "1-0"]
+[WhiteElo "2517"]
+[BlackElo "2038"]
+
+1. h3 h6 2. Nc3 Na6 3. Nb5 d6 4. d4 Bf5 5. Nxa7 e6 6. a4 Qe7 7. Nc8 Nb8 8. b3 b6 9. c3 Be4 10. d5 Bh7 11. b4 Qh4 12. Bxh6 c5 13. a5 Ra6 14. Na7 Qxh6 15. Rh2 Be7 16. Qa4+ b5 17. f3 Rxa5 18. Rh1 f5 19. Qxb5+ Kd8 20. Nc6+ Ke8 21. Qd3 Qxh3 22. Qd2 g5 23. Rd1 Bf6 24. Qb2 c4 25. g4 Kf8 26. b5 Ra1 27. Na7 Qxf1+ 28. Kxf1 Kg7 29. Nc8 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "21"]
+[White "Player 11"]
+[Black "Player 41"]
+[Result "0-1"]
+[WhiteElo "2079"]
+[BlackElo "2006"]
+
+1. b3 d5 2. h3 Bxh3 3. Rxh3 e5 4. f3 a6 5. Kf2 a5 6. e4 dxe4 7. Rxh7 Na6 8. Rh1 Qf6 9. Rh5 Qb6+ 10. Ke2 Rb8 11. g4 Qf2+ 12. Kxf2 Nh6 13. Rh1 Bc5+ 14. d4 Bd6 15. Ke2 Nc5 16. Na3 O-O 17. Qe1 Be7 18. Rb1 g5 19. Qg3 Rfe8 20. Rh2 Nxb3 21. dxe5 Nxg4 22. f4 Rbd8 23. Qd3 exd3+ 24. Ke1 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "22"]
+[White "Player 12"]
+[Black "Player 42"]
+[Result "1-0"]
+
+1. h3 b5 2. f3 a5 3. g4 e6 4. c3 a4 5. e4 g6 6. Qxa4 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "23"]
+[White "Player 13"]
+[Black "Player 43"]
+[Result "1/2-1/2"]
+[WhiteElo "2426"]
+[BlackElo "2122"]
+
+1. b3 Nf6 2. b4 Nc6 3. Na3 e5 4. Nc4 Bc5 5. e3 a6 6. b5 Ne4 7. c3 Bf8 8. Qf3 Ng3 9. fxg3 Na5 10. e4 axb5 11. Qf6 Qxf6 12. h3 Kd8 13. Ke2 c6 14. Nb6 Qg5 15. Nf3 Qxd2+ 16. Bxd2 Rb8 17. Rg1 d5 18. Nxe5 Kc7 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "24"]
+[White "Player 14"]
+[Black "Player 44"]
+[Result "1/2-1/2"]
+[WhiteElo "2274"]
+[BlackElo "2062"]
+
+1. h4 d5 2. Nf3 a6 3. h5 Ra7 4. a3 Nc6 5. Rh4 Bd7 6. c3 Bg4 7. d3 Nb4 8. Ng5 Qd6 9. Ne4 Qe5 10. Qa4+ Bd7 11. Nc5 g6 12. e4 f6 13. Kd1 f5 14. Qc2 d4 15. Be3 Bh6 16. axb4 Qd6 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "25"]
+[White "Player 15"]
+[Black "Player 45"]
+[Result "1-0"]
+[WhiteElo "2034"]
+[BlackElo "2192"]
+
+1. h4 g6 2. e4 Nc6 3. Nc3 Na5 4. b4 d5 5. a3 c6 6. Ke2 b5 7. Kd3 Nh6 8. Ke3 Qb6+ 9. Kf4 Nb7 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "26"]
+[White "Player 16"]
+[Black "Player 46"]
+[Result "1-0"]
+
+1. a3 Nh6 2. b3 a6 3. Bb2 g5 4. f3 Ra7 5. e4 d5 6. a4 d4 7. Bd3 f6 8. g3 Kf7 9. Kf2 Kg6 10. Be2 b6 11. Ke1 Ra8 12. Bxd4 b5 13. Qc1 Kf7 14. Kf2 Bg4 15. b4 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "27"]
+[White "Player 17"]
+[Black "Player 47"]
+[Result "1/2-1/2"]
+[WhiteElo "1860"]
+[BlackElo "2348"]
+
+1. d3 Nc6 2. g4 a6 3. Be3 h5 4. h3 b6 5. a3 Na5 6. Rh2 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "28"]
+[White "Player 18"]
+[Black "Player 48"]
+[Result "0-1"]
+[WhiteElo "2488"]
+[BlackElo "1963"]
+
+1. g4 Nf6 2. Bg2 c6 3. h4 Na6 4. Na3 Nb8 5. Kf1 d6 6. e4 b5 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "29"]
+[White "Player 19"]
+[Black "Player 49"]
+[Result "1/2-1/2"]
+[WhiteElo "2132"]
+[BlackElo "2037"]
+
+1. Nc3 g5 2. g3 Nf6 3. Nb1 Nd5 4. e3 b6 5. c4 Nf4 6. a4 Nh5 7. Qg4 Nxg3 8. Nc3 Ne2 9. Na2 e6 10. h4 a5 11. Bxe2 Ba6 12. Qxe6+ Be7 13. Nf3 c5 14. b3 Nc6 15. Ne5 Na7 16. Kd1 f5 17. Rb1 gxh4 18. f3 d6 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "30"]
+[White "Player 20"]
+[Black "Player 50"]
+[Result "0-1"]
+
+1. b4 d6 2. e3 c5 3. Bd3 Qc7 4. g4 Nh6 5. c3 Nd7 6. Bxh7 Ng8 7. g5 a6 8. Kf1 Rb8 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "31"]
+[White "Player 21"]
+[Black "Player 51"]
+[Result "1-0"]
+[WhiteElo "2553"]
+[BlackElo "2112"]
+
+1. f4 h6 2. Nh3 d5 3. Rg1 Be6 4. Rh1 Qc8 5. Nf2 b5 6. h4 c5 7. Na3 Na6 8. Ng4 Bd7 9. Rb1 g5 10. c4 Nb8 11. Ra1 Be6 12. Nh2 Rh7 13. d3 Na6 14. Nb1 f5 15. Kd2 d4 16. e4 Qb7 17. Qf3 Rb8 18. exf5 gxh4 19. b4 h5 20. cxb5 Nxb4 21. Ke1 Rh6 22. Qc6+ Kd8 23. Qe8+ Kxe8 24. fxe6 Rg6 25. Bb2 Nxd3+ 26. Kd1 c4 27. Ba3 Nb4 28. Ng4 Kd8 29. Rxh4 Na6 30. Rh3 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "32"]
+[White "Player 22"]
+[Black "Player 52"]
+[Result "1-0"]
+[WhiteElo "2512"]
+[BlackElo "1868"]
+
+1. g3 Nc6 2. Bg2 e6 3. b3 Qg5 4. g4 Qg6 5. e3 Qe4 6. g5 Bc5 7. c4 Be7 8. Bf3 b6 9. Na3 Bf6 10. d4 Qg6 11. Be4 Ne5 12. Nf3 Bd8 13. Rg1 h5 14. Bd5 Nxf3+ 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "33"]
+[White "Player 23"]
+[Black "Player 53"]
+[Result "1-0"]
+[WhiteElo "2583"]
+[BlackElo "1707"]
+
+1. Nf3 h5 2. e4 e5 3. Bd3 g6 4. h4 Qxh4 5. b3 f6 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "34"]
+[White "Player 24"]
+[Black "Player 54"]
+[Result "0-1"]
+
+1. Na3 g6 2. Nf3 d5 3. g4 e5 4. Nb1 Qg5 5. d4 h5 6. h3 a6 7. Bf4 Qxf4 8. b4 g5 9. a4 b5 10. Ng1 Nh6 11. Ra3 Qxg4 12. Qd2 Ng8 13. c3 Qf4 14. c4 exd4 15. Qe3+ 0-1
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "35"]
+[White "Player 25"]
+[Black "Player 55"]
+[Result "1-0"]
+[WhiteElo "1721"]
+[BlackElo "1782"]
+
+1. c4 a6 2. Qa4 Nc6 3. a3 e5 4. Qa5 d5 5. a4 h5 6. Kd1 Nb4 7. Qb5+ Ke7 8. Qxb4+ c5 9. Na3 Ra7 10. Nb1 Rh6 11. Qb5 g5 12. a5 Ra8 13. Qe8+ Kxe8 14. d3 Be7 15. Bxg5 Bd7 16. Nh3 Bxg5 17. Rg1 Qf6 18. Nd2 Be6 19. Ra2 Qg6 20. Kc2 Bf4 21. Ra4 f5 22. Nb1 Rh8 23. Kd1 Qg4 24. f3 Ra7 25. g3 Rh6 26. gxf4 Qg7 1-0
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "36"]
+[White "Player 26"]
+[Black "Player 56"]
+[Result "1/2-1/2"]
+[WhiteElo "2563"]
+[BlackElo "2550"]
+
+1. e3 d5 2. g4 Bf5 3. Bc4 dxc4 4. Qf3 a6 5. Nh3 Bd7 6. Ng5 c6 7. Na3 b5 8. b4 c5 9. Bb2 h6 10. Rf1 e5 11. Nxb5 Bc6 12. d3 Qxg5 13. Qd1 Bxb5 14. Rb1 Ne7 15. Qf3 Nc8 16. Qf5 Ne7 17. bxc5 cxd3 18. Qxd3 e4 19. h4 Nc8 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "37"]
+[White "Player 27"]
+[Black "Player 57"]
+[Result "1/2-1/2"]
+[WhiteElo "1836"]
+[BlackElo "1746"]
+
+1. f3 d5 2. e3 Nh6 3. Ke2 Qd7 4. Kf2 Rg8 5. Bb5 g6 6. Bc6 Rh8 7. c4 Nf5 8. Ne2 e6 9. h4 Nh6 10. e4 Nf5 11. Ng1 Ng7 12. Na3 Bb4 13. Nc2 h5 14. b3 g5 15. Bb5 Ba5 16. b4 gxh4 17. Kf1 dxe4 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "38"]
+[White "Player 28"]
+[Black "Player 58"]
+[Result "1/2-1/2"]
+
+1. e4 d5 2. a4 e6 3. Bc4 Bd7 4. exd5 a6 5. d4 b5 6. Ne2 Ke7 7. Nf4 bxc4 8. Ra2 f5 9. Qe2 Ke8 10. d6 g5 11. O-O h5 12. Qg4 cxd6 13. Qe2 gxf4 14. Qxe6+ Be7 15. h3 Kf8 16. g3 Rh7 17. Qxf5+ Ke8 18. Kh1 Bxa4 19. Qxh7 c3 1/2-1/2
+
+[Event "RookStudio CB test"]
+[Site "?"]
+[Date "2026.11.19"]
+[Round "39"]
+[White "Player 29"]
+[Black "Player 59"]
+[Result "1/2-1/2"]
+[WhiteElo "2427"]
+[BlackElo "1965"]
+
+1. e4 b6 2. a3 Nh6 3. Ne2 b5 4. g3 f5 5. Nf4 Nc6 6. f3 Rg8 7. Nc3 e6 8. Ncd5 Qe7 9. exf5 Kd8 10. f6 Qc5 11. Nb4 g5 12. Bc4 Na5 13. Ke2 Ng4 14. Na2 c6 15. fxg4 Nb3 16. Nh5 Rg7 17. Bxb3 a6 18. Rf1 Ra7 19. f7 1/2-1/2
+

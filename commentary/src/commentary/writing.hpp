@@ -36,4 +36,10 @@ using Theories = std::map<std::size_t, Theory>;
     const MainLine& line, const GameReport& report, const Analyses& analyses, const Theories& theories,
     const Tablebases* tables, const Oracle* oracle, Lang lang, PieceLetters letters);
 
+// The same comments as they are shown and written: each read sentence by sentence with the checks of the boards against
+// its move's facts (Brief::heldTemplate(), #64), a sentence they refuse left out, a comment left with none dropped.
+[[nodiscard]] std::vector<std::pair<std::size_t, std::string>> heldTemplateComments(
+    const MainLine& line, const GameReport& report, const Analyses& analyses, const Theories& theories,
+    const Tablebases* tables, const Oracle* oracle, Lang lang, PieceLetters letters);
+
 }  // namespace fcg::commentary

@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -184,6 +185,14 @@ struct PlacedIn {
 // Words that say something else than what is meant: a king taken, won or given; « parier » for « parer ».
 [[nodiscard]] std::optional<Refusal> checkWording(std::string_view text, Lang lang);
 
+// The sentences of a text as the checks read them, each as written: a word that ends with a full stop, an exclamation
+// or a question mark ends one (a move keeps its dots).
+[[nodiscard]] std::vector<std::string_view> sentenceTexts(std::string_view text);
+// A text with the sentences `refused` refuses left out, those kept as written, one space between two; none when no
+// sentence is left.
+[[nodiscard]] std::optional<std::string> keptSentences(std::string_view text,
+                                                       const std::function<bool(std::string_view)>& refused);
+
 // The pieces a fact is about, and the squares it names.
 [[nodiscard]] std::vector<Placed> factPieces(const Fact& fact);
 [[nodiscard]] std::vector<Square> factSquares(const Fact& fact);
@@ -209,6 +218,15 @@ class Brief {
     // Whether a comment holds to the facts, and is one the grammar lets through (none when it does): a model writing
     // without the grammar is held to it this way.
     [[nodiscard]] std::optional<Refusal> check(std::string_view text) const;
+
+    // A sentence of the template's comment (comment.hpp) read with the checks of the boards (#64) a model's comment
+    // gets: none when it holds. The templates are the prototype's, held by the golden files, and some of the facts
+    // they are written from are false, so some of their sentences are: "After 29…Qf7, a discovered attack hits the pawn
+    // on f2" where 31…Nd5 makes the attack, "Leaves doubled pawns on the c-file" where the recapture undoes them.
+    [[nodiscard]] std::optional<Refusal> checkTemplate(std::string_view sentence) const;
+    // The template's comment read so, sentence by sentence: those refused left out, none when no sentence is left.
+    // What is shown and written of a template, wherever a comment of the move's context is.
+    [[nodiscard]] std::optional<std::string> heldTemplate(std::string_view text) const;
 
    private:
     friend class StoryBrief;  // a passage of the story about a move is held to the move's facts (story_model.hpp)

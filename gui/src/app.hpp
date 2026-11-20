@@ -1657,11 +1657,13 @@ class App {
     commentary::Opening board_theory_used_;      // the same, ended before the first error the engine sees
     std::string board_theory_base_;              // the database's name, for what the review says
     [[nodiscard]] std::string boardTheoryKey();  // the game and the database its theory is looked for in; empty: none
-    // The moves the review singles out, each with its template comment: the review tab's key moments in words.
+    // The moves the review singles out, each with its template comment held to the boards (#64): the review tab's key
+    // moments in words.
     std::vector<std::pair<std::size_t, std::string>> review_moments_;
     std::string review_moments_of_;
-    // The story of the game and what each side should work on, from the same review.
-    std::vector<commentary::Passage> review_story_;
+    // The story of the game as the templates tell it, held to the boards (commentary::heldStory()), and what each side
+    // should work on, from the same review.
+    std::vector<commentary::StoryPassage> review_story_;
     std::vector<commentary::WorkOn> review_work_on_;
     std::string review_story_of_;
     // The story told by the assistant's model (#62, mockup M11, board 5): written in the background once per review and

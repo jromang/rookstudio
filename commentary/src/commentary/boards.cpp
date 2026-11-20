@@ -492,15 +492,28 @@ std::optional<std::size_t> doneIn(const Fact& fact, const Shown& line) {
     return std::nullopt;
 }
 
+// Whether the words right after the tactic named at the token `k` tell it as what comes next: "a fork follows", "a
+// discovered attack can follow", « une fourchette suit », « un échec double suit ».
+bool followsAfter(const Sentence& s, std::size_t k) {
+    static constexpr std::string_view FOLLOWS[] = {"follows", "follow", "followed", "comes",  "suit",
+                                                   "suivent", "suivra", "vient",    "viendra"};
+    for (std::size_t i = k + 1; i < s.size() && i <= k + 2; ++i) {
+        if (s[i - 1].pause || s[i].move) return false;
+        if (in(s[i].word, FOLLOWS)) return true;
+    }
+    return false;
+}
+
 std::optional<Refusal> checkTactics(const Sentence& s, const std::vector<Anchor>& anchors, const MoveFacts& facts,
                                     const Allowed& a) {
     for (std::size_t k = 0; k < s.size(); ++k) {
         const auto tactic = tacticAt(s, k);
         if (!tactic) continue;
         // Told after a move of a line ("after 29…Qf7, Black uncovers"), or as that move's doing, in its clause ("29…Qf7
-        // uncovers", "25…Qxb1+ wins it with a double check"), the tactic is that move's, or an earlier one's.
+        // uncovers", "25…Qxb1+ wins it with a double check"), the tactic is that move's, or an earlier one's; unless it
+        // is told as what follows ("after 22…Bxe5, a fork follows").
         const Anchor* since = lastBefore(anchors, k);
-        if (!since || since->played || laterBetween(s, since->token, k)) continue;
+        if (!since || since->played || laterBetween(s, since->token, k) || followsAfter(s, k)) continue;
         static constexpr std::string_view JOINS[] = {"and", "et", "while", "alors", "but", "mais", "since", "car"};
         bool clause                               = true;
         for (std::size_t i = since->token; i < k && clause; ++i) clause = !s[i].pause && !in(s[i + 1].word, JOINS);
@@ -939,6 +952,34 @@ std::optional<Refusal> checkWording(std::string_view text, Lang lang) {
             return Refusal{Refusal::Kind::Wording, "parier"};
     }
     return std::nullopt;
+}
+
+std::vector<std::string_view> sentenceTexts(std::string_view text) {
+    // Cut as sentencesOf() and plainSentences() cut them.
+    std::vector<std::string_view> out;
+    const char* start = nullptr;
+    const char* end   = nullptr;
+    for (const auto piece : text::splitWhitespace(text)) {
+        if (!start) start = piece.data();
+        end = piece.data() + piece.size();
+        if (piece.ends_with('.') || piece.ends_with('!') || piece.ends_with('?')) {
+            out.emplace_back(start, static_cast<std::size_t>(end - start));
+            start = nullptr;
+        }
+    }
+    if (start) out.emplace_back(start, static_cast<std::size_t>(end - start));
+    return out;
+}
+
+std::optional<std::string> keptSentences(std::string_view text, const std::function<bool(std::string_view)>& refused) {
+    std::string out;
+    for (const auto sentence : sentenceTexts(text)) {
+        if (refused(sentence)) continue;
+        if (!out.empty()) out += ' ';
+        out += sentence;
+    }
+    if (out.empty()) return std::nullopt;
+    return out;
 }
 
 }  // namespace fcg::commentary::brief_detail

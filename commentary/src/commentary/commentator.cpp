@@ -22,9 +22,11 @@ std::optional<Written> writtenComment(Model& model, const MoveContext& ctx, Lang
         if (!answer) break;
         if (!brief.check(answer->text)) return Written{answer->text, true, attempt};
     }
-    auto text = comment(ctx, lang, letters);
+    const auto text = comment(ctx, lang, letters);
     if (!text) return std::nullopt;
-    return Written{std::move(*text), false, attempts};
+    auto held = brief.heldTemplate(*text);  // its sentences read against the boards, as the model's are (#64)
+    if (!held) return std::nullopt;
+    return Written{std::move(*held), false, attempts};
 }
 
 }  // namespace fcg::commentary

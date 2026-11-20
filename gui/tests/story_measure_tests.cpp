@@ -13,7 +13,8 @@
 // - -tc='story by the model: the passages*' and FCG_STORY_RECHECK=an earlier FCG_STORY_OUT puts that measure's
 //   passages to the checker as it is now, without the model (FCG_STORY_PLIES="3:21,4:50" prints those moves' positions
 //   and lines, for tests);
-// - -tc='comments by the model*' has the model comment the key moments as the Board page has it do.
+// - -tc='comments by the model*' has the model comment the key moments as the Board page has it do;
+// - -tc='templates*' and FCG_STORY_TEMPLATES=1 counts the templates' sentences the checks of the boards leave out.
 // FCG_STORY_PROMPTS=1 prints each prompt, the position and the engine's lines.
 
 #include <doctest/doctest.hpp>
@@ -287,6 +288,85 @@ TEST_CASE("story by the model: the passages of FCG_STORY_RECHECK checked again, 
     out << "\n"
         << n << " games: " << compared << " passages of the model compared, " << kept << " kept, " << refused
         << " refused; " << unmatched << " passages whose template the earlier measure did not have\n";
+    CHECK(n > 0);
+}
+
+// The templates' sentences the checks of the boards leave out (#64): the key moments' comments as the Review tab and
+// "Comment the key moments" without the model have them, and the story's passages, each sentence read against the
+// facts it is told from. No model is asked. FCG_STORY_TEMPLATES=1 runs it; each sentence left out is written with the
+// prompt the model would have had for it and the engine's lines, to be read against the board.
+TEST_CASE("templates: the sentences the checks of the boards leave out, by hand") {
+    const auto measure = Measure::fromEnv(false);
+    if (!measure || env("FCG_STORY_TEMPLATES").empty()) return;  // by hand only
+    const auto lang    = measure->lang;
+    const auto letters = measure->letters;
+    std::ofstream file;
+    if (!env("FCG_STORY_OUT").empty()) file.open(env("FCG_STORY_OUT"), std::ios::binary);
+    std::ostream& out = file.is_open() ? static_cast<std::ostream&>(file) : std::cout;
+
+    struct Count {
+        int texts = 0, sentences = 0, refused = 0, emptied = 0;
+    };
+    Count comments, passages;
+    std::map<std::string, int> kinds;
+    const auto read = [&](const std::string& what, const std::string& text, const auto& brief, Count& count,
+                          const std::string& context) {
+        ++count.texts;
+        int kept = 0;
+        for (const auto sentence : commentary::brief_detail::sentenceTexts(text)) {
+            ++count.sentences;
+            const auto why = brief.checkTemplate(sentence);
+            if (!why) {
+                ++kept;
+                continue;
+            }
+            ++count.refused;
+            ++kinds[commentary::debug(*why).substr(0, commentary::debug(*why).find('('))];
+            out << "  [" << what << "] LEFT OUT " << commentary::debug(*why) << ": " << sentence
+                << "\n      in: " << text << "\n"
+                << context << "\n";
+        }
+        if (kept == 0) ++count.emptied;
+    };
+    int n = 0;
+    for (const auto pgn : study::splitGames(measure->text)) {
+        const auto game_read = study::readPgnGame(pgn);
+        if (!game_read.tree || game_read.tree->main.moves.empty()) continue;
+        const auto& game = game_read.tree->main;
+        ++n;
+        const auto settled = analysed(game, measure->engine, measure->ceiling, measure->analyses);
+        const auto review  = commentaryReview(game, false, settled);
+        REQUIRE(review);
+        const auto result = game.result.empty() ? std::string("*") : game.result;
+        const commentary::Players players{game.header("White"), game.header("Black")};
+        out << "\n=== game " << n << ": " << game.header("White") << " - " << game.header("Black") << ", " << result
+            << "\n";
+        for (const auto& [ply, templ] : commentary::templateComments(review->line, review->report, review->analyses, {},
+                                                                     nullptr, nullptr, lang, letters)) {
+            const auto* m = review->report.get(ply);
+            REQUIRE(m);
+            const auto ctx = commentary::moveContext(review->line, *m, review->analyses, nullptr, nullptr, nullptr);
+            const commentary::Brief brief(ctx, lang, letters);
+            read("comment " + commentary::moveText(*ctx.before, ctx.played, letters), templ, brief, comments,
+                 "    prompt:\n" + brief.prompt + "\n" + linesAt(review->line, ply, review->analyses));
+        }
+        for (const auto& t : commentary::story_detail::told(review->line, result, review->report, review->analyses,
+                                                            nullptr, lang, letters)) {
+            if (t.passage.lesson) continue;
+            const commentary::StoryBrief brief(t, review->line, review->analyses, nullptr, lang, letters, players);
+            read("passage", t.passage.text, brief, passages,
+                 "    prompt:\n" + brief.prompt + "\n" +
+                     (t.source.move ? linesAt(review->line, t.source.move->ply, review->analyses) : std::string()));
+        }
+    }
+    out << "\n"
+        << n << " games. Key moments' comments: " << comments.texts << ", " << comments.sentences << " sentences, "
+        << comments.refused << " left out, " << comments.emptied
+        << " comments left with none. Story passages: " << passages.texts << ", " << passages.sentences
+        << " sentences, " << passages.refused << " left out, " << passages.emptied
+        << " passages left with none.\nrefusals:";
+    for (const auto& [kind, count] : kinds) out << " " << kind << " " << count;
+    out << "\n";
     CHECK(n > 0);
 }
 

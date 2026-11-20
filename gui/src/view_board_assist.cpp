@@ -420,9 +420,9 @@ void App::commentKeyMoments() {
         oracle_ = std::make_shared<EngineOracle>(*engine);
     // The moves that deserve a comment: mistakes, only moves, turning points, plans, the novelty; those without the
     // assistant's yet. A move that has another comment (Lichess's analysis, the user's, an annotator's) gets the
-    // assistant's beside it (#60).
-    const auto picked = commentary::templateComments(review->line, review->report, review->analyses, {}, reviewTables(),
-                                                     nullptr, lang(), letters());
+    // assistant's beside it (#60). The templates' sentences the checks of the boards refuse are left out (#64).
+    const auto picked = commentary::heldTemplateComments(review->line, review->report, review->analyses, {},
+                                                         reviewTables(), nullptr, lang(), letters());
     CommentJob job;
     job.key_moments = true;
     job.game        = board_game_serial_;
@@ -658,8 +658,8 @@ void App::drawReviewAssistant() {
     // The moves the review singles out, in words: a click goes to the move.
     if (review->report.complete) {
         if (review_moments_of_ != board_commentary_of_) {
-            review_moments_    = commentary::templateComments(review->line, review->report, review->analyses, {},
-                                                              reviewTables(), nullptr, lang(), letters());
+            review_moments_    = commentary::heldTemplateComments(review->line, review->report, review->analyses, {},
+                                                                  reviewTables(), nullptr, lang(), letters());
             review_moments_of_ = board_commentary_of_;
         }
         if (!review_moments_.empty()) {
@@ -686,8 +686,8 @@ void App::drawReviewAssistant() {
     const std::string result = b.tree.main.result.empty() ? "*" : b.tree.main.result;
     const auto story_of      = fmt::format("{}|{}|{}", board_commentary_of_, result, static_cast<int>(lang()));
     if (review_story_of_ != story_of) {
-        review_story_    = commentary::story(review->line, result, review->report, review->analyses, reviewTables(),
-                                             lang(), letters());
+        review_story_    = commentary::heldStory(review->line, result, review->report, review->analyses, reviewTables(),
+                                                 lang(), letters());
         review_work_on_  = commentary::workOn(review->line, result, review->report, review->analyses, reviewTables(),
                                               lang(), letters());
         review_story_of_ = story_of;
@@ -786,8 +786,7 @@ void App::writeStory(bool again) {
     StoryJob job;
     job.of    = review_story_of_;
     job.round = again ? model_story_round_ + 1 : 0;
-    for (const auto& p : review_story_)
-        if (!p.lesson) job.templ.push_back(p.text);
+    for (const auto& p : review_story_) job.templ.push_back(p.templ);
     job.total                = static_cast<int>(job.templ.size());
     const std::string result = b.tree.main.result.empty() ? "*" : b.tree.main.result;
     commentary::Players players{b.tree.main.header("White"), b.tree.main.header("Black")};
@@ -826,22 +825,20 @@ std::string App::storyText() const {
     const bool model = model_story_of_ == review_story_of_ && !story_template_shown_ &&
                        std::any_of(model_story_.begin(), model_story_.end(), [](const auto& p) { return p.by_model; });
     std::string out;
-    const auto add = [&](const std::string& text) { out += (out.empty() ? "" : "\n\n") + text; };
-    if (model)
-        for (const auto& p : model_story_) add(p.passage.text);
-    else
-        for (const auto& p : review_story_)
-            if (!p.lesson) add(p.text);
+    // A passage none of whose sentences holds to the boards is not shown (#64).
+    const auto add = [&](const std::string& text) {
+        if (!text.empty()) out += (out.empty() ? "" : "\n\n") + text;
+    };
+    for (const auto& p : model ? model_story_ : review_story_) add(p.passage.text);
     return out;
 }
 
 void App::drawReviewStory(const CommentaryReview& review) {
-    if (std::none_of(review_story_.begin(), review_story_.end(), [](const auto& p) { return !p.lesson; })) return;
+    if (review_story_.empty()) return;
     // A later pass of the analysis that tells the same story (the templates' passages the same) keeps the model's, or
     // the one it is writing: its facts did not change. Another story is written again.
     std::vector<std::string> told;
-    for (const auto& p : review_story_)
-        if (!p.lesson) told.push_back(p.text);
+    for (const auto& p : review_story_) told.push_back(p.templ);
     const auto same = [&](const std::vector<commentary::StoryPassage>& story) {
         return story.size() == told.size() && std::equal(story.begin(), story.end(), told.begin(),
                                                          [](const auto& p, const auto& t) { return p.templ == t; });
@@ -863,13 +860,13 @@ void App::drawReviewStory(const CommentaryReview& review) {
     const bool by_model =
         written && std::any_of(model_story_.begin(), model_story_.end(), [](const auto& p) { return p.by_model; });
     const auto passage = [&](const std::string& text, const std::optional<std::size_t>& ply) {
+        if (text.empty()) return;  // none of its sentences holds to the boards (#64)
         ImGui::TextUnformatted(text.c_str());
         if (ply && ImGui::IsItemClicked()) showBoardLine(-1, static_cast<int>(*ply));
         if (ply && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A click goes to the move it is about"));
     };
     const auto templates = [&] {
-        for (const auto& p : review_story_)
-            if (!p.lesson) passage(p.text, p.ply);  // the lessons in a section of their own, below
+        for (const auto& p : review_story_) passage(p.passage.text, p.passage.ply);  // the lessons: below, apart
     };
     ImGui::TextDisabled("%s", TR("THE STORY OF THE GAME"));
     ImGui::PushTextWrapPos();
@@ -899,7 +896,7 @@ void App::drawReviewStory(const CommentaryReview& review) {
             for (const auto& p : model_story_) {
                 if (p.by_model && p.attempts <= 1) ++first;
                 if (p.by_model && p.attempts >= 2) ++second;
-                if (!p.by_model && p.attempts > 0) ++fallen;
+                if (!p.by_model && p.attempts > 0 && !p.passage.text.empty()) ++fallen;  // the template shown instead
                 for (const auto& [text, why] : p.refused) refused.push_back(refusalWords(why));
             }
             std::string note = TR("Every move, evaluation and name it quotes comes from the review.");

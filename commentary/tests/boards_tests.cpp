@@ -161,6 +161,9 @@ TEST_CASE("checker: a tactic is not told right after a move that only prepares i
                "gagnante.") == R"(Board("découvrent"))");
     CHECK(says("Après 31…Cd5, les Noirs découvrent une attaque sur le pion f2.") == "Ok");
     CHECK(says("29.Te3 permet une attaque à la découverte sur le pion f2.") == "Ok");
+    // Told as what follows the move, it may come later: « une attaque à la découverte suit », not « vise ».
+    CHECK(says("Après 29…Df7, une attaque à la découverte suit sur le pion f2.") == "Ok");
+    CHECK(says("Après 29…Df7, une attaque à la découverte vise le pion en f2.") == R"(Board("découverte"))");
     // The better move that prepares it, as 29…Qf7 does before 29…Nd5.
     const auto b = shown("5r1k/1pp1q1pp/6r1/p3P3/P4n2/2P1RN1P/2Q2PPK/6R1 b - - 8 29", "f4d5",
                          "e3e4 d5f4 f3d4 e7h4 e4e3 c7c5", 4, "e7f7 f3d4 c7c5 d4b5 f4d5 e3e4 f7f2 c2f2", 5, Lang::Fr);

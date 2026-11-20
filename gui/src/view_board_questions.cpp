@@ -281,6 +281,7 @@ void App::pollQuestions() {
     assistant_->setGpuTaken(gpuTournament());
     assistant_->poll();
     pollBoardComments();
+    pollStory();
     for (auto& q : questions_)
         if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             q.done = q.answer.get();
@@ -302,17 +303,14 @@ void App::addAssistantComment(const std::string& text, int line, int ply, const 
     auto before      = boardSnapshot();
     MoveNotes* notes = notesAt(b.tree, line, ply);
     if (!notes) return;
-    if (notes->after.find(text) != std::string::npos) {
+    if (notes->after.find(text) != std::string::npos || notes->assistant.find(text) != std::string::npos) {
         boardToast(TR("The answer is in the notation already"));
         return;
     }
-    if (notes->after.empty()) {
-        notes->after = text;
-        markByAssistant(*notes, true);
-        if (!basis.empty()) assistant_basis_[text] = basis;
-    } else {
-        notes->after += " " + text;  // added by the user to their own comment: it stays theirs
-    }
+    // The assistant's comment, beside the one the move may have, which stays as it is (#60); after its earlier one.
+    if (!notes->assistant.empty()) notes->assistant += ' ';
+    notes->assistant += text;
+    if (!basis.empty()) assistant_basis_[notes->assistant] = basis;
     boardChanged(std::move(before));
     b.game = lineOf(b.tree, b.line);
     boardToast(TR("Answer added to the notation · Ctrl+Z takes it back"));

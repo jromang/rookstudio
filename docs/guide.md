@@ -974,9 +974,10 @@ The notation is written in place, without a dialog:
   under the notation says what was done and how to undo it.
 
 *Figurines in the notation* (*Settings* > *Appearance*) shows the pieces as figures. The assistant's comments show
-apart from yours, in blue grey and in italics, after a bubble (see [Comments by the
-assistant](#comments-by-the-assistant)). When your theory studies comment the position shown, *Theory · 3* above the
-moves leads to their notes in the Tree tab (see [Theory studies](#theory-studies)).
+apart from yours, in blue grey and in italics, after a bubble, or in a box under its name after a comment that was
+there already (see [Comments by the assistant](#comments-by-the-assistant)). When your theory studies comment the
+position shown, *Theory · 3* above the moves leads to their notes in the Tree tab (see [Theory
+studies](#theory-studies)).
 
 ### Arrows and squares
 
@@ -1080,9 +1081,19 @@ On the study Board, the *Review* tab beside the notation reads the game's analys
   that show it; a click goes to the move.
 
 The endgame's positions of seven pieces or fewer can be judged exactly by Lichess's tables, asked once for this game
-or always. *Comment the key moments* writes a comment by the assistant on each, in the background (a comment already
-there is never replaced); *Annotate the game* writes the evaluations, the symbols and the better lines into the
-notation. Ctrl+Z takes either back.
+or always. *Comment the key moments* writes a comment by the assistant on each, in the background, beside the comment a
+move may have already (Lichess's analysis, yours, an annotator's), which is never replaced; *Annotate the game* writes
+the evaluations, the symbols and the better lines into the notation. Ctrl+Z takes either back.
+
+**The story of the game** is written by the assistant's model when it is there, in the background, from the review's
+facts: its verdicts and evaluations, the key moments, the opening, the endgame and how the game ended, with what
+Lichess's tables said. Each passage is held to those facts by the checker of the comments: every move, evaluation and
+name it quotes must come from the review. A passage refused is written again; refused twice, it gives way to the
+template's. A card in the assistant's colour says that the model wrote the story and that it was checked, and what
+the checker refused. *The template version* shows the templates' story beside it, *Write it again* has the model tell
+it otherwise (Ctrl+K too), *Copy it* copies the story shown. Without the model (not downloaded, or another GGUF file
+that has not learnt RookStudio's comments), or while a tournament on this machine has the processor, the story is the
+templates', as it says. Nothing leaves the machine.
 
 ## Databases
 
@@ -1346,10 +1357,10 @@ the reading before are marked.
 **From the Board**, *lichess.org…* › *To a Lichess study…* opens a card beside the board that sends the game into one
 of your studies (a full one, at 64 chapters, is not offered) or into a new one, whose name and visibility are chosen
 there: private, unlisted or public, private first. The chapter's name, the side it is seen from and whether the
-assistant's comments go too are chosen in the same card; Enter sends, Escape leaves it. What goes is the game as PGN:
-its headers, moves and variations, your comments and symbols, its arrows and squares, its clocks; the engines' data,
-the evaluations and anything else of yours stay here. The first send asks Lichess for the permission to write in your
-studies. Once sent, *Open it on lichess.org* or *Copy its link*.
+assistant's comments go too (as plain comments after the move's own) are chosen in the same card; Enter sends, Escape
+leaves it. What goes is the game as PGN: its headers, moves and variations, your comments and symbols, its arrows and
+squares, its clocks; the engines' data, the evaluations and anything else of yours stay here. The first send asks
+Lichess for the permission to write in your studies. Once sent, *Open it on lichess.org* or *Copy its link*.
 
 Later, the strip over the moves says *Sent to Lichess · 2 changes since*, with *Send the changes*: the chapter's moves,
 variations and notes are replaced on Lichess by the game's, its tags too when they changed. Nothing goes on its own. A
@@ -1549,10 +1560,16 @@ questions need an engine in the library.
 ### Comments by the assistant
 
 *Comment this move* (Alt+C, or Ctrl+K) writes the assistant's comment on the move shown, and *Comment the key
-moments*, in the review, one on each key moment. Its comments are marked in the PGN (`[%rs assistant]`) and shown in
-blue grey and in italics, after a bubble; at the cursor, what each rests on: the engine, the facts of the positions,
-the database of the theory, the model or a template. A double click corrects one, and it becomes yours. Without the
-model, the comments are templates, written from the same facts.
+moments*, in the review, one on each key moment. Its comments are shown in blue grey and in italics, after a bubble; at
+the cursor, what each rests on: the engine, the facts of the positions, the database of the theory, the model or a
+template. Without the model, the comments are templates, written from the same facts.
+
+A move that has a comment already (yours, Lichess's analysis of a game, a game's annotator's) keeps it as it is: the
+assistant's comes after it, apart, in a box of its colour under its name. In the PGN they are two comments in a row,
+the assistant's marked `[%rs assistant]`; another program reads two comments, and RookStudio gives each its place
+again. Ctrl+Z takes the assistant's comment back. A double click corrects it, and it becomes yours: on a move that has
+a comment of yours already, the corrected text is added after it, as one comment. An answer of the Questions tab added
+to the notation is the assistant's comment too.
 
 ## Test suites
 

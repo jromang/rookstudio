@@ -298,6 +298,47 @@ TEST_CASE("PGN reader: the next game, the text's code page, Chess960 and null mo
     roundTrip(null_move);
 }
 
+TEST_CASE("PGN reader and writer: the assistant's comment beside another, two comments in a row, back to its slot") {
+    // A game analysed by Lichess, its comment on 3...Nd4?! kept as it was; the assistant's after it, marked (#60).
+    const std::string pgn =
+        "[Event \"?\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bc4 Nd4?! { [%eval 0.85] Inaccuracy. Nxd4 was best. } "
+        "{ [%rs assistant] Black moves the knight a second time, and the pawn on e5 is left. } 4. Nxe5 "
+        "{ [%clk 0:02:50] [%rs assistant] The knight takes the pawn. } 4... Qg5 *\n";
+    const auto read = readPgnGame(pgn);
+    REQUIRE(read.tree);
+    CHECK(read.error.empty());
+    const auto& moves = read.tree->main.moves;
+    REQUIRE(moves.size() == 8);
+    CHECK(moves[5].notes.after == "Inaccuracy. Nxd4 was best.");
+    CHECK(moves[5].notes.assistant == "Black moves the knight a second time, and the pawn on e5 is left.");
+    CHECK(moves[5].notes.commands.empty());  // the mark is the slot, not a command kept
+    CHECK(moves[5].notes.eval_tag);
+    CHECK(moves[6].notes.after.empty());
+    CHECK(moves[6].notes.assistant == "The knight takes the pawn.");
+    CHECK(moves[6].clock_ms == 170000);
+    // Written: the other comment first, as it was, then the assistant's, a comment of its own; alone, the assistant's
+    // is one comment with the move's commands, as before.
+    auto text = writePgnGame(*read.tree);
+    for (auto& c : text) c = c == '\n' ? ' ' : c;
+    CHECK_MESSAGE(text.find("Nd4?! {[%eval 0.85] Inaccuracy. Nxd4 was best.} {[%rs assistant] Black moves the knight a "
+                            "second time, and the pawn on e5 is left.} 4. Nxe5 {[%clk 0:02:50] [%rs assistant] The "
+                            "knight takes the pawn.}") != std::string::npos,
+                  text);
+    roundTrip(pgn.c_str());
+    // The marked comment first: it still goes to its slot, the other to the comment's.
+    const auto swapped = readPgnGame("[Event \"?\"]\n\n1. e4 { [%rs assistant] The centre. } { Mine. } *\n");
+    REQUIRE(swapped.tree);
+    CHECK(swapped.tree->main.moves[0].notes.after == "Mine.");
+    CHECK(swapped.tree->main.moves[0].notes.assistant == "The centre.");
+    // For another program, without the mark: two plain comments.
+    PgnWriteOptions plain;
+    plain.assistant_mark = false;
+    auto unmarked        = writePgnGame(*read.tree, plain);
+    for (auto& c : unmarked) c = c == '\n' ? ' ' : c;
+    CHECK(unmarked.find("[%rs") == std::string::npos);
+    CHECK(unmarked.find("Nxd4 was best.} {Black moves the knight") != std::string::npos);
+}
+
 TEST_CASE("PGN writer: a long comment wraps between its words, and reads back whole") {
     std::string comment;
     for (int i = 0; i < 40; ++i) comment += "word" + std::to_string(i) + " ";

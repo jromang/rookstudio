@@ -456,8 +456,8 @@ GameTree studyGame(const GameTree& tree, bool assistant) {
             m.fields = 0;
             m.book   = false;
             auto& n  = m.notes;
-            if (byAssistant(n) && !assistant) n.after.clear();
-            n.commands.clear();  // the assistant's mark, other programs' commands
+            if (!assistant) n.assistant.clear();  // with them, a comment after the move's, without the mark
+            n.commands.clear();                   // other programs' commands
             n.eval_tag = false;
         }
     };
@@ -469,14 +469,16 @@ GameTree studyGame(const GameTree& tree, bool assistant) {
 }
 
 std::string studyGamePgn(const GameTree& tree, bool chess960, bool assistant) {
-    return study::writePgnGame(studyGame(tree, assistant), study::PgnWriteOptions{chess960, nullptr});
+    study::PgnWriteOptions options{chess960, nullptr};
+    options.assistant_mark = false;  // Lichess reads plain comments
+    return study::writePgnGame(studyGame(tree, assistant), options);
 }
 
 int assistantComments(const GameTree& tree) {
     int n            = 0;
     const auto count = [&](const std::vector<ReplayMove>& moves) {
         for (const auto& m : moves)
-            if (byAssistant(m.notes) && !m.notes.after.empty()) ++n;
+            if (byAssistant(m.notes)) ++n;
     };
     count(tree.main.moves);
     for (const auto& v : tree.variations) count(v.moves);

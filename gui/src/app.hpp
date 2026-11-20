@@ -23,11 +23,13 @@
 #include <commentary/references.hpp>
 #include <commentary/review.hpp>
 #include <commentary/story.hpp>
+#include <commentary/story_model.hpp>
 #include <commentary/tablebase.hpp>
 #include <study/ctg.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
 #include <tour/polyglot.hpp>
+#include "assistant_notes.hpp"
 #include "board_3d.hpp"
 #include "board_nav.hpp"
 #include "board_page.hpp"
@@ -1508,7 +1510,8 @@ class App {
     void boardMoveKeys();  // a letter that begins a move opens the move field
     void boardTypeNag(char sign);
     void boardSetNag(uint8_t nag);
-    void boardComment(bool before);  // the field opened on the move shown
+    // The field opened on the move shown: its comment before it, after it, or the assistant's after it (#60).
+    void boardComment(bool before, bool assistant = false);
     void boardCommentDone();
     void boardToast(std::string text);
     void drawBoardNagBar();
@@ -1533,8 +1536,8 @@ class App {
     [[nodiscard]] std::string assistantStatus() const;
     // The running tournament whose engines use the GPU, by its name; empty when none.
     [[nodiscard]] std::string gpuTournament() const;
-    // An answer put in the notation, on the move it was asked after: the assistant's comment when the move had none,
-    // added to the user's own otherwise.
+    // An answer put in the notation, on the move it was asked after: the assistant's comment, beside the one the move
+    // may have (#60), after the assistant's earlier one.
     void addAssistantComment(const std::string& text, int line, int ply, const std::string& fen,
                              const std::vector<std::string>& basis = {});
     // What the assistant's comments written in this session rest on, by their text: said when one is hovered (R9).
@@ -1630,11 +1633,7 @@ class App {
     // The commentary's review of the board's game, from its judging analysis; made again when that changes.
     [[nodiscard]] std::shared_ptr<const CommentaryReview> boardCommentaryReview();
     struct CommentJob {
-        struct Target {
-            int line = -1, ply = 0;
-            std::string fen;  // the position after the move: the move is still the game's when it leads there
-        };
-        std::vector<Target> targets;
+        std::vector<AssistantTarget> targets;
         int total                                 = 0;
         bool key_moments                          = false;
         uint64_t game                             = 0;  // the board's game it was asked for (board_game_serial_)
@@ -1665,6 +1664,32 @@ class App {
     std::vector<commentary::Passage> review_story_;
     std::vector<commentary::WorkOn> review_work_on_;
     std::string review_story_of_;
+    // The story told by the assistant's model (#62, mockup M11, board 5): written in the background once per review and
+    // language when the model is there, again on "Write it again"; the templates' meanwhile, and without the model.
+    struct StoryJob {
+        std::string of;  // the review it is written for (review_story_of_)
+        uint32_t round                            = 0;
+        int total                                 = 0;  // its passages
+        std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        std::vector<std::string> templ;  // the templates' passages it tells again
+        // The passages, and why the model gave no answer when it gave none.
+        std::future<std::pair<std::vector<commentary::StoryPassage>, std::string>> story;
+    };
+    std::optional<StoryJob> story_job_;
+    std::vector<commentary::StoryPassage> model_story_;
+    std::string model_story_of_;      // the review it was written for
+    std::string model_story_error_;   // why the model gave no answer
+    std::string story_cancelled_of_;  // the review whose story was cancelled: the templates' until "Write it again"
+    uint32_t model_story_round_ = 0;
+    bool story_template_shown_  = false;  // "The template version" asked
+    // Why the story stays the templates': the model is not there, it has not learnt RookStudio's comments, or a
+    // tournament has the processor; empty when the model can write it.
+    [[nodiscard]] std::string storyWithoutModel() const;
+    void writeStory(bool again);  // the model writes the review's story, in the background; `again`: told otherwise
+    void pollStory();             // once a frame: the story written
+    void drawReviewStory(const CommentaryReview& review);  // the review tab's story, the model's or the templates'
+    [[nodiscard]] std::string storyText() const;           // the story shown, as "Copy it" copies it
     // Lichess's tables for the review's endgame (#42, M5 board 4): the game's positions of seven men or fewer asked
     // once each, with « Always » for the tables on the Lichess page or for this game alone, in the background; taught
     // to tables the review is then held to (review_tables.hpp).

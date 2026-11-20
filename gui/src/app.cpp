@@ -138,6 +138,7 @@ App::~App() {
     if (lichess_sync_) *lichess_sync_->cancel = true;
     *lichess_count_cancel_ = true;
     if (review_tables_job_) *review_tables_job_->cancel = true;  // the tables of a review, within a quarter of a second
+    if (story_job_) *story_job_->cancel = true;                  // the story by the model, at its next passage (#62)
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once, and the window goes away first rather than freeze while it does.
     if (probe_.valid() || check_.valid()) {

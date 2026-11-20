@@ -39,6 +39,11 @@ inline ImU32 HEAD_BG = IM_COL32(21, 24, 29, 255);  // page and tournament header
 inline ImU32 CARD_BG = IM_COL32(26, 29, 35, 255);  // cards on a page
 inline ImU32 CARD_BD = IM_COL32(38, 42, 50, 255);  // card borders
 inline ImU32 SELECT  = IM_COL32(30, 38, 51, 255);  // selected rail item
+// The assistant's colour (mockup M5, board 3): its comments, its name, what it wrote. Blue grey, darker in the light
+// theme.
+[[nodiscard]] inline ImU32 assistantColour() noexcept {
+    return currentTheme() == Theme::Light ? IM_COL32(84, 104, 138, 255) : IM_COL32(150, 168, 198, 255);
+}
 
 // "1:02:03", "2:03.4" or "4.2s".
 std::string formatClock(int64_t ms);

@@ -18,6 +18,8 @@ namespace fcg::commentary {
 
 using story_detail::Motif;
 using story_detail::Oversight;
+using story_detail::Source;
+using story_detail::Told;
 
 namespace {
 
@@ -103,23 +105,23 @@ class Teller {
           lang_(lang),
           letters_(letters) {}
 
-    std::vector<Passage> tell() const {
+    std::vector<Told> tell() const {
         // The course of the game in the order it was played: its swings, the plans the books have a name for, and where
         // it went into an endgame.
         auto course = this->course();
         std::vector<std::size_t> told;
-        for (const auto& p : course) {
-            if (p.ply) told.push_back(*p.ply);
+        for (const auto& t : course) {
+            if (t.passage.ply) told.push_back(*t.passage.ply);
         }
-        for (auto& p : plans(told)) course.push_back(std::move(p));
-        if (auto p = endgame()) course.push_back(std::move(*p));
+        for (auto& t : plans(told)) course.push_back(std::move(t));
+        if (auto t = endgame()) course.push_back(std::move(*t));
         std::stable_sort(course.begin(), course.end(),
-                         [&](const Passage& a, const Passage& b) { return order(a.ply) < order(b.ply); });
-        std::vector<Passage> passages;
-        if (auto p = opening()) passages.push_back(std::move(*p));
-        for (auto& p : course) passages.push_back(std::move(p));
-        for (auto& p : lessons()) passages.push_back(std::move(p));
-        if (auto p = ended()) passages.push_back(std::move(*p));
+                         [&](const Told& a, const Told& b) { return order(a.passage.ply) < order(b.passage.ply); });
+        std::vector<Told> passages;
+        if (auto t = opening()) passages.push_back(std::move(*t));
+        for (auto& t : course) passages.push_back(std::move(t));
+        for (auto& t : lessons()) passages.push_back(std::move(t));
+        if (auto t = ended()) passages.push_back(std::move(*t));
         return passages;
     }
 
@@ -199,11 +201,16 @@ class Teller {
     }
 
     // The opening by name, how the sides stand when it is over, and the formation it left.
-    std::optional<Passage> opening() const {
+    std::optional<Told> opening() const {
         const auto& moves = report_.moves;
         if (line_.moves().empty()) return std::nullopt;
         std::vector<std::string> sentences;
-        if (const auto name = openingAt(line_, line_.moves().size())) sentences.push_back(*name + ".");
+        Source source;
+        source.kind = Source::Kind::Opening;
+        if (const auto name = openingAt(line_, line_.moves().size())) {
+            sentences.push_back(*name + ".");
+            source.said.push_back(fr() ? fmt::format("Ouverture : {}.", *name) : fmt::format("Opening: {}.", *name));
+        }
         const auto joined = [&] {
             std::string out;
             for (std::size_t i = 0; i < sentences.size(); ++i) out += (i ? " " : "") + sentences[i];
@@ -216,11 +223,13 @@ class Teller {
         }
         if (!last || *last + 1 >= moves.size()) {
             if (sentences.empty()) return std::nullopt;
-            return Passage{joined(), std::nullopt};
+            return Told{Passage{joined(), std::nullopt}, std::move(source)};
         }
         const auto& m      = moves[*last];
         const double white = m.mover == Color::White ? m.win_after : 100.0 - m.win_after;
         sentences.push_back(outOfTheOpening(white));
+        source.move = &m;
+        source.said.push_back(sentences.back());
         // What the pawns look like by then: a formation with a name, hanging pawns, or simply more space for one side.
         const auto& position = line_.positions()[m.ply];
         const auto& board    = position.board();
@@ -240,15 +249,22 @@ class Teller {
             }
         }
         std::optional<std::string> said;
-        if (!shapes.empty())
+        if (!shapes.empty()) {
             said = formationSentence(shapes.front().first, shapes.front().second, lang_);
-        else if (hanging)
+            source.facts.emplace_back(fact::Formation{shapes.front().first, shapes.front().second});
+        } else if (hanging) {
             said = brief_detail::factSentence(*hanging, lang_);
-        else if (roomy)
+            source.facts.push_back(*hanging);
+        } else if (roomy) {
             said = fr() ? fmt::format("{} ont plus d'espace", side(*roomy))
                         : fmt::format("{} has more space", side(*roomy));
-        if (said) sentences.push_back(capitalize(*said) + ".");
-        return Passage{joined(), m.ply};
+            source.facts.emplace_back(fact::Space{*roomy});
+        }
+        if (said) {
+            sentences.push_back(capitalize(*said) + ".");
+            source.said.push_back(sentences.back());
+        }
+        return Told{Passage{joined(), m.ply}, std::move(source)};
     }
 
     std::string outOfTheOpening(double white) const {
@@ -298,7 +314,7 @@ class Teller {
 
     // The mistakes that made the course of the game, in the order they were played: the one that first gave a side a
     // clear advantage, the advantages let go, and the one after which the loser never came back.
-    std::vector<Passage> course() const {
+    std::vector<Told> course() const {
         const auto judged = this->judged();
         std::vector<std::pair<const MoveReport*, Swing>> swings;
         const auto* turn       = decisive();
@@ -348,23 +364,32 @@ class Teller {
                                   "The game is decided little by little, without a big mistake; the move that costs "
                                   "{} most is {}.",
                                   side(!*w), mv);
-                    return {Passage{text, worst->ply}};
+                    Source source;
+                    source.kind = Source::Kind::Gradual;
+                    source.move = worst;
+                    return {Told{Passage{text, worst->ply}, std::move(source)}};
                 }
             }
         }
-        std::vector<Passage> out;
+        std::vector<Told> out;
         for (const auto& [m, swing] : swings) {
             auto text = this->swing(*m, swing);
             if (const auto said = comment(*m)) text += " " + *said;
-            out.push_back(Passage{text, m->ply});
+            Source source;
+            source.kind  = Source::Kind::Swing;
+            source.move  = m;
+            source.swing = swing == Swing::Lead   ? Source::Swing::Lead
+                           : swing == Swing::Slip ? Source::Swing::Slip
+                                                  : Source::Swing::Turn;
+            out.push_back(Told{Passage{text, m->ply}, std::move(source)});
         }
         return out;
     }
 
     // The plans the books have a name for, at the moves the review marks for carrying one out. The moves in `told` have
     // their passage already, and the space and the formation the opening leaves are told with the opening.
-    std::vector<Passage> plans(const std::vector<std::size_t>& told) const {
-        std::vector<Passage> out;
+    std::vector<Told> plans(const std::vector<std::size_t>& told) const {
+        std::vector<Told> out;
         for (const auto& m : report_.moves) {
             if (!m.plan || std::find(told.begin(), told.end(), m.ply) != told.end()) continue;
             const auto facts = this->facts(m);
@@ -373,7 +398,11 @@ class Teller {
             const bool left = m.phase == Phase::Opening && is<fact::Space, fact::Formation>(*it);
             auto text       = plan(*it, m);
             if (!text || left) continue;
-            out.push_back(Passage{std::move(*text), m.ply});
+            Source source;
+            source.kind = Source::Kind::Plan;
+            source.move = &m;
+            source.facts.push_back(*it);
+            out.push_back(Told{Passage{std::move(*text), m.ply}, std::move(source)});
         }
         return out;
     }
@@ -447,10 +476,10 @@ class Teller {
 
     // For each side, what its mistakes say it should work on: the kinds it made most, each twice at least or the one
     // that decided the game, with the moves that show them, and the advice the first one calls for.
-    std::vector<Passage> lessons() const {
+    std::vector<Told> lessons() const {
         const auto* decided                           = decisive();
         const std::optional<std::size_t> decisive_ply = decided ? std::optional(decided->ply) : std::nullopt;
-        std::vector<Passage> passages;
+        std::vector<Told> passages;
         for (const auto c : COLORS) {
             const auto found = lessonsOf(c, decisive_ply);
             if (found.empty()) continue;
@@ -475,8 +504,12 @@ class Teller {
                 }
             }
             const auto& first_moves = found.front().second;
+            Source source;
+            source.kind = Source::Kind::Lesson;
+            source.move = first_moves.empty() ? nullptr : first_moves.front();
             passages.push_back(
-                Passage{text, first_moves.empty() ? std::nullopt : std::optional(first_moves.front()->ply), true});
+                Told{Passage{text, first_moves.empty() ? std::nullopt : std::optional(first_moves.front()->ply), true},
+                     std::move(source)});
         }
         return passages;
     }
@@ -675,7 +708,7 @@ class Teller {
     }
 
     // The endgame the game went into, when it lasted.
-    std::optional<Passage> endgame() const {
+    std::optional<Told> endgame() const {
         const auto& moves = report_.moves;
         std::optional<std::size_t> first;
         for (std::size_t i = 0; i < moves.size(); ++i) {
@@ -721,15 +754,26 @@ class Teller {
         auto text =
             f ? fmt::format("La partie passe {} au {}{} coup, {}.", kind, number, number == 1 ? "er" : "e", material)
               : fmt::format("The game goes into {} on move {}, {}.", kind, number, material);
+        // The model is told the move, the number being out of its words.
+        Source source;
+        source.kind         = Source::Kind::Endgame;
+        source.move         = &m;
+        const auto entering = moveText(line_.positions()[m.ply - 1], line_.moves()[m.ply - 1], letters_);
+        source.said.push_back(f ? fmt::format("La partie passe {} avec {}, {}.", kind, entering, material)
+                                : fmt::format("The game goes into {} with {}, {}.", kind, entering, material));
         // The pawn majorities each side takes into it.
         for (const auto c : COLORS) {
             for (const auto wing : majorities(board, c)) {
+                const auto said =
+                    capitalize(f ? fmt::format("{} ont la majorité de pions {}.", side(c), ofWing(wing, lang_))
+                                 : fmt::format("{} has the pawn majority {}.", side(c), ofWing(wing, lang_)));
                 text += " ";
-                text += capitalize(f ? fmt::format("{} ont la majorité de pions {}.", side(c), ofWing(wing, lang_))
-                                     : fmt::format("{} has the pawn majority {}.", side(c), ofWing(wing, lang_)));
+                text += said;
+                source.said.push_back(said);
+                source.facts.emplace_back(fact::Majority{c, wing});
             }
         }
-        return Passage{text, m.ply};
+        return Told{Passage{text, m.ply}, std::move(source)};
     }
 
     // Who is ahead in material, and by what: « avec la qualité de plus pour les Noirs ».
@@ -752,7 +796,7 @@ class Teller {
     }
 
     // How the game ended.
-    std::optional<Passage> ended() const {
+    std::optional<Told> ended() const {
         const std::optional<std::size_t> last =
             line_.moves().empty() ? std::nullopt : std::optional(line_.moves().size());
         std::optional<Color> mated;
@@ -768,7 +812,12 @@ class Teller {
         else if (const auto w = winner())
             text = f ? fmt::format("{} l'emportent.", side(*w)) : fmt::format("{} wins.", side(*w));
         if (!text) return std::nullopt;
-        return Passage{capitalize(*text), last};
+        Source source;
+        source.kind  = Source::Kind::End;
+        source.move  = last ? report_.get(*last) : nullptr;
+        source.mated = mated;
+        source.said.push_back(capitalize(*text));
+        return Told{Passage{capitalize(*text), last}, std::move(source)};
     }
 
     const MainLine& line_;
@@ -784,8 +833,10 @@ class Teller {
 
 std::vector<Passage> story(const MainLine& line, std::string_view result, const GameReport& report,
                            const Analyses& analyses, const Tablebases* tables, Lang lang, PieceLetters letters) {
-    if (!report.complete || report.moves.size() < MIN_PLIES) return {};
-    return Teller(line, result, report, analyses, tables, lang, letters).tell();
+    std::vector<Passage> out;
+    for (auto& t : story_detail::told(line, result, report, analyses, tables, lang, letters))
+        out.push_back(std::move(t.passage));
+    return out;
 }
 
 std::vector<WorkOn> workOn(const MainLine& line, std::string_view result, const GameReport& report,
@@ -795,6 +846,12 @@ std::vector<WorkOn> workOn(const MainLine& line, std::string_view result, const 
 }
 
 namespace story_detail {
+
+std::vector<Told> told(const MainLine& line, std::string_view result, const GameReport& report,
+                       const Analyses& analyses, const Tablebases* tables, Lang lang, PieceLetters letters) {
+    if (!report.complete || report.moves.size() < MIN_PLIES) return {};
+    return Teller(line, result, report, analyses, tables, lang, letters).tell();
+}
 
 std::optional<Oversight> oversight(const MoveFacts& facts, bool takes) {
     using K = Oversight::Kind;

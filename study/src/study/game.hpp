@@ -37,6 +37,10 @@ struct BoardMark {
     bool operator==(const BoardMark&) const = default;
 };
 
+// The mark of the assistant's comments (mockups M5, board 3, and M11, board 5): a comment of their own, marked so at
+// the next reading; another program reads an ordinary comment.
+inline constexpr std::string_view ASSISTANT_MARK = "[%rs assistant]";
+
 // What a person, or a program other than a tournament's engines, wrote about a move. Kept as it was read, to be
 // written back.
 struct MoveNotes {
@@ -48,10 +52,13 @@ struct MoveNotes {
     std::optional<int64_t> emt_ms;      // [%emt]: the time the move took
     std::vector<std::string> commands;  // other [%...] commands, verbatim and in their order ("[%tqu ...]")
     bool eval_tag = false;              // the move's score came from [%eval], to be written back as [%eval]
+    // The assistant's comment after the move, apart from `after`, which it never changes (#60): written as a comment
+    // of its own that follows it, marked ASSISTANT_MARK; read back here, beside another comment or alone.
+    std::string assistant;
 
     [[nodiscard]] bool empty() const noexcept {
         return before.empty() && after.empty() && nags.empty() && arrows.empty() && squares.empty() && !emt_ms &&
-               commands.empty() && !eval_tag;
+               commands.empty() && !eval_tag && assistant.empty();
     }
     bool operator==(const MoveNotes&) const = default;
 };

@@ -1,6 +1,7 @@
 // The assistant's comments on the Board page (mockup M5, boards 3 and 4): Alt+C comments the move shown, "Comment the
 // key moments" the moves the review singles out, in the background; "Annotate the game" writes the review in. Each is
-// one change, taken back by one Ctrl+Z; a comment already there, the user's or the assistant's, is never replaced.
+// one change, taken back by one Ctrl+Z; a comment already there, the user's or the assistant's, is never replaced: the
+// assistant's goes beside another's (#60, mockup M11, board 5).
 
 #include <algorithm>
 #include <atomic>
@@ -17,6 +18,7 @@
 #include <commentary/commentator.hpp>
 #include <commentary/question.hpp>
 #include <commentary/story.hpp>
+#include <commentary/story_model.hpp>
 #include <commentary/theory.hpp>
 #include <commentary/writing.hpp>
 #include <study/game_tree.hpp>
@@ -43,6 +45,78 @@ commentary::PieceLetters letters() {
 }
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
+
+// What the checker refused in a passage of the story, in words (#62). A motif or a notion is known to the checker by
+// its French word, quoted only to a reader of French.
+std::string refusalWords(const commentary::Refusal& r) {
+    using K       = commentary::Refusal::Kind;
+    const bool fr = lang() == commentary::Lang::Fr;
+    switch (r.kind) {
+        case K::Notation:
+            return trf("it quoted “{}”, a move the review does not give", r.what);
+        case K::Motif:
+            return fr ? trf("it said “{}”, a tactic the review's facts do not show", r.what)
+                      : std::string(TR("it named a tactic the review's facts do not show"));
+        case K::Colour:
+            return trf("it gave “{}” the wrong colour", r.what);
+        case K::Piece:
+            return trf("it put “{}” where the board has no such piece", r.what);
+        case K::Unsupported:
+            return fr ? trf("it said “{}”, which the review's facts do not support", r.what)
+                      : std::string(TR("it named an idea the review's facts do not support"));
+        case K::TooManyMoves:
+            return TR("it quoted too many moves: a story is not a variation");
+        case K::Aside:
+            return trf("it spoke of its sources (“{}”) instead of the game", r.what);
+        case K::Verdict:
+            return trf("it said “{}”, which is not the review's verdict", r.what);
+        case K::Evaluation:
+            return trf("it said “{}”, which the evaluation contradicts", r.what);
+        case K::Elision:
+            return trf("its French forgot an elision: “{}”", r.what);
+        case K::Name:
+            return trf("it named “{}”, a name the review does not give", r.what);
+        case K::Number:
+            return trf("it said “{}”, a number the review does not give", r.what);
+        case K::Grammar:
+            return TR("it was cut short, or wrote outside the words it may use");
+        default:
+            return TR("it wrote nothing");
+    }
+}
+
+// A card tinted with the assistant's colour, as its story is shown (M11, board 5); pair with endTintedCard().
+void beginTintedCard(const char* id) {
+    const auto tint = ImGui::ColorConvertU32ToFloat4(ui::assistantColour());
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tint.x, tint.y, tint.z, 0.08f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(tint.x, tint.y, tint.z, 0.40f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(14), px(12)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, px(8));
+    ImGui::BeginChild(id, ImVec2(0, 0),
+                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
+}
+
+void endTintedCard() {
+    ImGui::EndChild();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+}
+
+// The assistant's bubble and a line in its colour, in semi-bold.
+void assistantTitle(const char* text) {
+    const ImU32 col   = ui::assistantColour();
+    const float fs    = ImGui::GetFontSize();
+    const ImVec2 at   = ImGui::GetCursorScreenPos();
+    auto* dl          = ImGui::GetWindowDrawList();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ui::drawIcon(dl, ui::Icon::Comment, ImVec2(at.x + fs / 2, at.y + ImGui::GetTextLineHeight() / 2), fs * 0.85f, col);
+    const ImVec2 text_at(at.x + fs + px(6), at.y);
+    const float wrap = std::max(px(80), width - fs - px(6));
+    dl->AddText(ImGui::GetFont(), fs, text_at, col, text, nullptr, wrap);
+    dl->AddText(ImGui::GetFont(), fs, ImVec2(text_at.x + 0.6f, text_at.y), col, text, nullptr, wrap);
+    const auto size = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, wrap, text);
+    ImGui::Dummy(ImVec2(width, size.y));
+}
 
 }  // namespace
 
@@ -265,8 +339,9 @@ void App::commentBoardMove() {
     }
     const MoveNotes* notes = notesAt(b.tree, b.line, b.ply);
     if (!notes) return;
-    if (!notes->after.empty()) {
-        boardToast(TR("The move has a comment already · a double click corrects it"));
+    // Beside another comment, never instead (#60): only its own is never written twice.
+    if (byAssistant(*notes)) {
+        boardToast(TR("The assistant has commented the move already · a double click corrects it"));
         return;
     }
     const auto* engine = analysisEngine();
@@ -335,7 +410,9 @@ void App::commentKeyMoments() {
         oracle_.reset();
     else if (!oracle_ || oracle_->engine() != engine->name)
         oracle_ = std::make_shared<EngineOracle>(*engine);
-    // The moves that deserve a comment: mistakes, only moves, turning points, plans, the novelty; those with none yet.
+    // The moves that deserve a comment: mistakes, only moves, turning points, plans, the novelty; those without the
+    // assistant's yet. A move that has another comment (Lichess's analysis, the user's, an annotator's) gets the
+    // assistant's beside it (#60).
     const auto picked = commentary::templateComments(review->line, review->report, review->analyses, {}, reviewTables(),
                                                      nullptr, lang(), letters());
     CommentJob job;
@@ -344,14 +421,14 @@ void App::commentKeyMoments() {
     std::vector<std::pair<std::size_t, std::string>> wanted;
     for (const auto& [ply, text] : picked) {
         const MoveNotes* notes = notesAt(b.tree, -1, static_cast<int>(ply));
-        if (!notes || !notes->after.empty()) continue;
+        if (!notes || byAssistant(*notes)) continue;
         job.targets.push_back(
             {-1, static_cast<int>(ply), boardAt(b.tree.main, b.chess960, static_cast<int>(ply)).getFen()});
         wanted.push_back({ply, text});
     }
     if (wanted.empty()) {
         boardToast(picked.empty() ? TR("Nothing in the game calls for a comment")
-                                  : TR("Every key moment has a comment already"));
+                                  : TR("Every key moment has the assistant's comment already"));
         return;
     }
     job.total = static_cast<int>(wanted.size());
@@ -389,21 +466,12 @@ void App::pollBoardComments() {
     const auto texts = job.texts.get();
     if (job.game != board_game_serial_) return;  // another game is on the board since
     auto& b = board_;
-    // All of them in one change, on the moves that still lead where they did and have no comment yet.
-    auto before = boardSnapshot();
-    int added   = 0;
-    for (std::size_t i = 0; i < texts.size() && i < job.targets.size(); ++i) {
-        const auto& t = job.targets[i];
-        if (texts[i].empty() || t.line >= static_cast<int>(b.tree.variations.size())) continue;
-        const auto game = lineOf(b.tree, t.line);
-        if (t.ply > static_cast<int>(game.moves.size()) || boardAt(game, b.chess960, t.ply).getFen() != t.fen) continue;
-        MoveNotes* notes = notesAt(b.tree, t.line, t.ply);
-        if (!notes || !notes->after.empty()) continue;
-        notes->after = texts[i];
-        markByAssistant(*notes, true);
-        assistant_basis_[texts[i]] = job.basis;
-        ++added;
-    }
+    // All of them in one change, on the moves that still lead where they did and have no comment of the assistant's
+    // yet; a comment of another's stays as it is, the assistant's after it (#60).
+    auto before      = boardSnapshot();
+    const auto put   = placeAssistantComments(b.tree, b.chess960, job.targets, texts);
+    const auto added = static_cast<int>(put.size());
+    for (const auto& text : put) assistant_basis_[text] = job.basis;
     if (added == 0) {
         boardToast(texts.empty() || std::all_of(texts.begin(), texts.end(), [](const auto& s) { return s.empty(); })
                        ? TR("The assistant found nothing to say")
@@ -616,19 +684,7 @@ void App::drawReviewAssistant() {
                                               lang(), letters());
         review_story_of_ = story_of;
     }
-    if (std::any_of(review_story_.begin(), review_story_.end(), [](const auto& p) { return !p.lesson; })) {
-        ImGui::TextDisabled("%s", TR("THE STORY OF THE GAME"));
-        ImGui::PushTextWrapPos();
-        for (const auto& p : review_story_) {
-            if (p.lesson) continue;  // in a section of their own, below
-            ImGui::TextUnformatted(p.text.c_str());
-            if (p.ply && ImGui::IsItemClicked()) showBoardLine(-1, static_cast<int>(*p.ply));
-            if (p.ply && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A click goes to the move it is about"));
-        }
-        ImGui::TextDisabled("%s", TR("Written from the review's facts: its verdicts, its evaluations, the positions."));
-        ImGui::PopTextWrapPos();
-        ImGui::Spacing();
-    }
+    drawReviewStory(*review);
     // What each side should work on: the kinds of mistakes it made most, the moves that show them a click away, and
     // the advice they call for.
     if (!review_work_on_.empty()) {
@@ -680,8 +736,8 @@ void App::drawReviewAssistant() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", assistant_ && assistant_->installed()
-                                    ? TR("A comment by the assistant on each, in the background; a comment already "
-                                         "there is never replaced; Ctrl+Z takes them all back")
+                                    ? TR("A comment by the assistant on each, in the background, beside the comment a "
+                                         "move has already, which is never replaced; Ctrl+Z takes them all back")
                                     : TR("Template comments, without the assistant's model: the Questions tab offers "
                                          "it, for fuller ones"));
     ImGui::SameLine();
@@ -697,6 +753,208 @@ void App::drawReviewAssistant() {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", b.toast.c_str());
         ImGui::PopTextWrapPos();
     }
+}
+
+std::string App::storyWithoutModel() const {
+    if (!assistant_) return TR("the program was built without the assistant");
+    const auto& a = *assistant_;
+    if (!a.installed()) return TR("the assistant's model is not downloaded (the Questions tab offers it)");
+    if (!a.knowsComments()) return TR("the model chosen has not learnt RookStudio's comments");
+    // A tournament on this machine has the processor: the model, which would take it from its engines, waits (M11,
+    // board 5), unless it runs on a GPU no tournament uses.
+    const bool on_gpu = a.onGpu() && a.gpuTaken().empty();
+    for (const auto& r : runs_) {
+        const auto* t = r.run->tournament();
+        if (r.run->running() && !r.run->remote() && t && !on_gpu)
+            return trf("the tournament “{}” has the processor", t->spec().name);
+    }
+    return {};
+}
+
+void App::writeStory(bool again) {
+    auto& b           = board_;
+    const auto review = boardCommentaryReview();
+    if (!review || !review->report.complete || story_job_ || gameLocked() || !storyWithoutModel().empty()) return;
+    StoryJob job;
+    job.of    = review_story_of_;
+    job.round = again ? model_story_round_ + 1 : 0;
+    for (const auto& p : review_story_)
+        if (!p.lesson) job.templ.push_back(p.text);
+    job.total                = static_cast<int>(job.templ.size());
+    const std::string result = b.tree.main.result.empty() ? "*" : b.tree.main.result;
+    commentary::Players players{b.tree.main.header("White"), b.tree.main.header("Black")};
+    job.story  = std::async(std::launch::async, [review, model = assistant_.get(), result, players, round = job.round,
+                                                 tables = reviewTables() ? review_tables_ : nullptr, l = lang(),
+                                                 letters = letters(), cancel = job.cancel, done = job.done]() {
+        std::string error;
+        auto told =
+            commentary::writtenStory(*model, review->line, result, review->report, review->analyses, tables.get(), l,
+                                     letters, players, round, cancel.get(), done.get(), &error);
+        return std::pair{std::move(told), std::move(error)};
+    });
+    story_job_ = std::move(job);
+    story_template_shown_ = false;
+    story_cancelled_of_.clear();
+}
+
+void App::pollStory() {
+    if (!story_job_ || !story_job_->story.valid() ||
+        story_job_->story.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        return;
+    auto job = std::move(*story_job_);
+    story_job_.reset();
+    auto [told, why] = job.story.get();
+    if (*job.cancel) {
+        story_cancelled_of_ = job.of;  // the templates' until "Write it again"
+        return;
+    }
+    model_story_       = std::move(told);
+    model_story_of_    = job.of;
+    model_story_round_ = job.round;
+    model_story_error_ = std::move(why);
+}
+
+std::string App::storyText() const {
+    const bool model = model_story_of_ == review_story_of_ && !story_template_shown_ &&
+                       std::any_of(model_story_.begin(), model_story_.end(), [](const auto& p) { return p.by_model; });
+    std::string out;
+    const auto add = [&](const std::string& text) { out += (out.empty() ? "" : "\n\n") + text; };
+    if (model)
+        for (const auto& p : model_story_) add(p.passage.text);
+    else
+        for (const auto& p : review_story_)
+            if (!p.lesson) add(p.text);
+    return out;
+}
+
+void App::drawReviewStory(const CommentaryReview& review) {
+    if (std::none_of(review_story_.begin(), review_story_.end(), [](const auto& p) { return !p.lesson; })) return;
+    // A later pass of the analysis that tells the same story (the templates' passages the same) keeps the model's, or
+    // the one it is writing: its facts did not change. Another story is written again.
+    std::vector<std::string> told;
+    for (const auto& p : review_story_)
+        if (!p.lesson) told.push_back(p.text);
+    const auto same = [&](const std::vector<commentary::StoryPassage>& story) {
+        return story.size() == told.size() && std::equal(story.begin(), story.end(), told.begin(),
+                                                         [](const auto& p, const auto& t) { return p.templ == t; });
+    };
+    if (model_story_of_ != review_story_of_ && !model_story_.empty() && same(model_story_))
+        model_story_of_ = review_story_of_;
+    if (story_job_ && story_job_->of != review_story_of_) {
+        if (story_job_->templ == told)
+            story_job_->of = review_story_of_;
+        else
+            *story_job_->cancel = true;
+    }
+    const auto without = storyWithoutModel();
+    if (without.empty() && review.report.complete && model_story_of_ != review_story_of_ && !story_job_ &&
+        story_cancelled_of_ != review_story_of_)
+        writeStory(false);
+    const bool writing = story_job_ && story_job_->of == review_story_of_;
+    const bool written = model_story_of_ == review_story_of_ && !model_story_.empty();
+    const bool by_model =
+        written && std::any_of(model_story_.begin(), model_story_.end(), [](const auto& p) { return p.by_model; });
+    const auto passage = [&](const std::string& text, const std::optional<std::size_t>& ply) {
+        ImGui::TextUnformatted(text.c_str());
+        if (ply && ImGui::IsItemClicked()) showBoardLine(-1, static_cast<int>(*ply));
+        if (ply && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A click goes to the move it is about"));
+    };
+    const auto templates = [&] {
+        for (const auto& p : review_story_)
+            if (!p.lesson) passage(p.text, p.ply);  // the lessons in a section of their own, below
+    };
+    ImGui::TextDisabled("%s", TR("THE STORY OF THE GAME"));
+    ImGui::PushTextWrapPos();
+    if (writing) {
+        // The model writes it in the background: the templates' meanwhile.
+        assistantTitle(trf("The assistant's model is writing the story: {} of {} passages…", story_job_->done->load(),
+                           story_job_->total)
+                           .c_str());
+        if (ImGui::SmallButton(TR("Cancel"))) *story_job_->cancel = true;
+        ImGui::BeginDisabled();
+        templates();
+        ImGui::EndDisabled();
+    } else if (by_model) {
+        // The model's story, in a card of the assistant's colour (M11, board 5).
+        beginTintedCard("##model_story");
+        ImGui::PushTextWrapPos();
+        if (story_template_shown_) {
+            ImGui::TextDisabled("%s", TR("The templates' version, written from the same facts"));
+            templates();
+        } else {
+            assistantTitle(TR("Written by the assistant's model, checked against the review's facts"));
+            for (const auto& p : model_story_) passage(p.passage.text, p.passage.ply);
+            // What the checker did: each move, evaluation and name comes from the review; what it refused, and which
+            // passages are the templates'.
+            int first = 0, second = 0, fallen = 0;
+            std::vector<std::string> refused;
+            for (const auto& p : model_story_) {
+                if (p.by_model && p.attempts <= 1) ++first;
+                if (p.by_model && p.attempts >= 2) ++second;
+                if (!p.by_model && p.attempts > 0) ++fallen;
+                for (const auto& [text, why] : p.refused) refused.push_back(refusalWords(why));
+            }
+            std::string note = TR("Every move, evaluation and name it quotes comes from the review.");
+            if (refused.empty()) {
+                note += " " + std::string(TR("The checker refused nothing."));
+            } else {
+                if (second > 0)
+                    note += " " + trn("{} passage was refused, then written again.",
+                                      "{} passages were refused, then written again.", second, second);
+                if (fallen > 0)
+                    note += " " + trn("{} passage refused twice is the template's.",
+                                      "{} passages refused twice are the templates'.", fallen, fallen);
+                std::string listed;
+                for (const auto& r : refused) listed += (listed.empty() ? "" : "; ") + r;
+                note += " " + trf("What the checker refused: {}.", listed);
+            }
+            ImGui::TextDisabled("%s", note.c_str());
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", trf("{} passages at the first try, {} at the second, {} the templates'", first,
+                                            second, fallen)
+                                            .c_str());
+        }
+        ImGui::PopTextWrapPos();
+        if (ImGui::SmallButton(story_template_shown_ ? TR("The model's version") : TR("The template version")))
+            story_template_shown_ = !story_template_shown_;
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!storyWithoutModel().empty());
+        if (ImGui::SmallButton(TR("Write it again"))) writeStory(true);
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", TR("The model tells it otherwise, held to the same facts"));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Copy it"))) {
+            ImGui::SetClipboardText(storyText().c_str());
+            boardToast(TR("The story is copied"));
+        }
+        endTintedCard();
+    } else {
+        // The templates': without the model, or when it could not answer, and said so.
+        templates();
+        std::string why = without;
+        if (why.empty() && written && !model_story_error_.empty())
+            why = trf("the model gave no answer ({})", model_story_error_);
+        else if (why.empty() && written)
+            why = TR("the checker refused each of the model's passages twice");
+        else if (why.empty() && story_cancelled_of_ == review_story_of_)
+            why = TR("the model's was cancelled");
+        if (why.empty())
+            ImGui::TextDisabled("%s",
+                                TR("Written from the review's facts: its verdicts, its evaluations, the positions."));
+        else
+            ImGui::TextDisabled("%s", trf("Written by the templates from the review's facts: {}.", why).c_str());
+        if ((written || story_cancelled_of_ == review_story_of_) && without.empty()) {
+            if (ImGui::SmallButton(TR("Write it again"))) writeStory(written);
+            ImGui::SameLine();
+        }
+        if (ImGui::SmallButton(TR("Copy it"))) {
+            ImGui::SetClipboardText(storyText().c_str());
+            boardToast(TR("The story is copied"));
+        }
+    }
+    ImGui::PopTextWrapPos();
+    ImGui::Spacing();
 }
 
 }  // namespace fcg

@@ -669,6 +669,16 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             toStudyBoard();
             annotateBoardGame();
         });
+        // The story of the game (#62): written again by the model, told otherwise; copied as it is shown.
+        if (!review_story_.empty()) {
+            if (storyWithoutModel().empty())
+                add(TR("Write the story of the game again"), TR("The assistant's model, held to the review's facts"),
+                    [this] { writeStory(model_story_of_ == review_story_of_); });
+            add(TR("Copy the story of the game"), TR("Board"), [this] {
+                ImGui::SetClipboardText(storyText().c_str());
+                boardToast(TR("The story is copied"));
+            });
+        }
     }
     if (assistant_ && assistant_->state() == AssistantService::State::Ready)
         add(TR("Unload the assistant's model"), TR("Its memory freed; loaded again at the next question"),

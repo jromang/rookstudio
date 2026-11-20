@@ -123,6 +123,43 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
             x = o.x, ++line, line_started = false;
             continue;
         }
+        if (it.kind == NotationItem::Kind::Block) {
+            if (line_started) y += lh, ++line;
+            const float bx = o.x + it.indent, bw = std::max(px(120), o.x + room - bx - px(2));
+            const float padx = px(10), pady = px(6), wrap = bw - 2 * padx, hs = fs * 0.85f;
+            const float th     = ImGui::GetTextLineHeight();
+            const float body_h = font->CalcTextSizeA(fs, FLT_MAX, wrap, it.text.c_str()).y;
+            const float hint_h =
+                it.hint.empty() ? 0.0f : font->CalcTextSizeA(hs, FLT_MAX, wrap, it.hint.c_str()).y + px(3);
+            const ImVec2 b0(bx, y + px(3)), b1(bx + bw, y + px(3) + pady + th + px(3) + body_h + hint_h + pady);
+            const ImU32 tint = it.colour ? it.colour : ui::MUTED;
+            dl->AddRectFilled(b0, b1, (tint & ~IM_COL32_A_MASK) | IM_COL32(0, 0, 0, 22), px(8));
+            dl->AddRect(b0, b1, (tint & ~IM_COL32_A_MASK) | IM_COL32(0, 0, 0, 90), px(8));
+            // The box answers the mouse as a comment's words do.
+            if (it.id >= 0 && window_hovered && mouse.x >= b0.x && mouse.x < b1.x && mouse.y >= b0.y &&
+                mouse.y < b1.y) {
+                ev.hovered = it.id;
+                ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) ev.clicked = it.id;
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) ev.right_clicked = it.id;
+                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ev.double_clicked = it.id;
+            }
+            float tx = b0.x + padx, ty = b0.y + pady;
+            if (it.icon) {
+                ui::drawIcon(dl, *it.icon, ImVec2(tx + fs / 2, ty + th / 2), fs * 0.85f, tint);
+                tx += fs + px(6);
+            }
+            dl->AddText(font, fs, ImVec2(tx, ty), tint, it.title.c_str());
+            dl->AddText(font, fs, ImVec2(tx + 0.6f, ty), tint, it.title.c_str());
+            tx = b0.x + padx;
+            ty += th + px(3);
+            dl->AddText(font, fs, ImVec2(tx, ty), text_col, it.text.c_str(), nullptr, wrap);
+            if (!it.hint.empty())
+                dl->AddText(font, hs, ImVec2(tx, ty + body_h + px(3)), ui::MUTED, it.hint.c_str(), nullptr, wrap);
+            // The next item starts a line under the box.
+            y = b1.y + px(5), x = o.x, ++line, line_started = false;
+            continue;
+        }
         std::optional<Figurine> fig;
         const float w = measure(it, fig);
         // A move number stays with its move: wrapped together.

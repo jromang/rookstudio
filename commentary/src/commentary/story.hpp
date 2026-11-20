@@ -85,6 +85,44 @@ struct Oversight {
 // What a mistake overlooked, by what its facts say of it; `takes` is whether the answer to it takes something.
 [[nodiscard]] std::optional<Oversight> oversight(const MoveFacts& facts, bool takes);
 
+// What a passage of the story is told from: the language model tells it again from the same facts (#62,
+// story_model.hpp).
+struct Source {
+    enum class Kind : uint8_t {
+        Opening,  // the opening's name, how the sides stand when it is over (`move`, its last move), the pawns
+                  // (`facts`)
+        Swing,    // a mistake that made the course of the game (`move`), and what it did (`swing`)
+        Gradual,  // the costliest mistake of a game decided little by little (`move`)
+        Plan,     // a plan the books have a name for (`facts`), carried out by `move`
+        Endgame,  // the endgame the game went into, from `move` on, and the pawn majorities taken into it (`facts`)
+        Lesson,   // what a side should work on
+        End,      // how the game ended; `move`, the last one, when it was reviewed
+    };
+    enum class Swing : uint8_t {
+        Lead,  // the first clear advantage of the game, given away
+        Slip,  // a clear advantage let go
+        Turn,  // after it, its side never came back
+    };
+    Kind kind              = Kind::End;
+    const MoveReport* move = nullptr;  // in the report the story is told from
+    Swing swing            = Swing::Turn;
+    std::vector<Fact> facts;
+    std::optional<Color> mated;  // End: the side that gave mate
+    // Opening, Endgame, End: the facts in sentences, as the model is told them: the passage's own, a move named where
+    // the passage gives its number ("into a rook endgame with 34.Rxd5" for "on move 34").
+    std::vector<std::string> said;
+};
+
+struct Told {
+    Passage passage;
+    Source source;
+};
+
+// The story's passages, each with what it is told from; story() gives the passages alone.
+[[nodiscard]] std::vector<Told> told(const MainLine& line, std::string_view result, const GameReport& report,
+                                     const Analyses& analyses, const Tablebases* tables, Lang lang,
+                                     PieceLetters letters);
+
 }  // namespace story_detail
 
 }  // namespace fcg::commentary

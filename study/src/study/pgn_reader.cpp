@@ -196,6 +196,7 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
     const auto text = utf8Text(comment);
     std::string rest;
     std::size_t at = 0;
+    bool assistant = false;  // the comment has the assistant's mark: its text goes to its own slot (#60)
     while (at < text.size()) {
         const auto open = text.find("[%", at);
         if (open == std::string::npos) {
@@ -216,7 +217,10 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
         const auto name  = body.substr(0, space);
         const auto args  = space == std::string_view::npos ? std::string_view{} : body.substr(space + 1);
         bool taken       = false;
-        if (name == "clk") {
+        if (command == ASSISTANT_MARK) {
+            assistant = true;
+            taken     = true;
+        } else if (name == "clk") {
             ReplayMove probe;
             parseClockTag(command, probe);
             if (probe.clock_ms) {
@@ -252,6 +256,11 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
     // A "[%" left in the text has no end in this comment: kept as "[ %", it can never become a command when the
     // comment is joined to the next one, or written and read back.
     for (auto at = words.find("[%"); at != std::string::npos; at = words.find("[%", at + 3)) words.insert(at + 1, " ");
+    // The assistant's comment, beside another or alone: never an engine's, never joined to the other.
+    if (assistant) {
+        join(move.notes.assistant, words);
+        return {};
+    }
     if (engineComment(words)) {
         parseFastchessComment(words, move);
         return words;

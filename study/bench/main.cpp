@@ -9,6 +9,14 @@
 //   fcg-study-bench search <database> [--threads N]
 //   fcg-study-bench repertoire <database> <repertoire.pgn> white|black   (the database's tree built before)
 //   fcg-study-bench chessbase <file> [--quiet]   (a ChessBase database or archive, every game read, nothing written)
+//   fcg-study-bench chessbase-dump <file.2cbh> <record>...   (a few records' bytes in hex: header, moves, annotations)
+//   fcg-study-bench chessbase-scan <file.2cbh>   (its kinds of records, how its games start, their castling words, the
+//                                                 types of annotations met, those of a size not known, the records
+//                                                 whose annotations do not read to their end: a few records of each
+//                                                 named)
+//   fcg-study-bench chessbase-item <file.2cbh> <type>|@<offset> <bytes> <record>...   (the first annotation of a type
+//                                                 (hex) in each record, or its annotations from an offset: that many
+//                                                 bytes in hex)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -18,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 #include <random>
 #include <string>
 #include <string_view>
@@ -28,6 +37,7 @@
 
 #include <study/chessbase.hpp>
 #include <study/import.hpp>
+#include <study/mapped_file.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/query.hpp>
 #include <study/repertoire.hpp>
@@ -338,8 +348,9 @@ int runChessBase(const Args& a) {
     ChessBaseDatabase db{fs::path(std::string(a.words[1]))};
     std::printf("%s: %s, %u records\n", std::string(a.words[1]).c_str(),
                 db.format() == ChessBaseFormat::CBH ? "CBH" : "2CBH", db.records());
-    uint64_t games = 0, damaged = 0, plies = 0, variations = 0;
+    uint64_t games = 0, damaged = 0, plies = 0, variations = 0, undecoded = 0;
     std::vector<std::string> problems;
+    std::vector<uint32_t> undecoded_in;  // the first games with notes that could not be read or placed
     auto last = start;
     db.forEach([&](ChessBaseGame&& g) {
         ++games;
@@ -348,6 +359,10 @@ int runChessBase(const Args& a) {
         if (g.damaged) {
             ++damaged;
             if (problems.size() < 20) problems.push_back(std::to_string(g.record) + ": " + g.problem);
+        }
+        if (db.report().undecoded != undecoded) {
+            undecoded = db.report().undecoded;
+            if (undecoded_in.size() < 50) undecoded_in.push_back(g.record);
         }
         const auto now = std::chrono::steady_clock::now();
         if (!a.quiet && now - last > std::chrono::seconds(10)) {
@@ -378,7 +393,412 @@ int runChessBase(const Args& a) {
         static_cast<unsigned long long>(r.variation_colours), static_cast<unsigned long long>(r.correspondence),
         static_cast<unsigned long long>(r.undecoded), static_cast<unsigned long long>(r.other));
     for (const auto& p : problems) std::printf("  problem %s\n", p.c_str());
+    if (!undecoded_in.empty()) {
+        std::printf("  undecoded notes in games");
+        for (const auto record : undecoded_in) std::printf(" %u", record);
+        std::printf("\n");
+    }
     for (std::size_t i = 0; i < r.problems.size() && i < 20; ++i) std::printf("  report %s\n", r.problems[i].c_str());
+    return 0;
+}
+
+// The files of a 2CBH database, mapped, read raw: what its records hold, in hex.
+struct TwoCbhFiles {
+    explicit TwoCbhFiles(const fs::path& any) {
+        auto stem = any;
+        stem.replace_extension();
+        const auto open = [&](const char* ext) {
+            auto p = stem;
+            p += ext;
+            return MappedFile(p);
+        };
+        header = open(".2cbh");
+        moves  = open(".2cbg");
+        notes  = open(".2cba");
+    }
+    static uint64_t le(const uint8_t* p, int n) {
+        uint64_t v = 0;
+        for (int i = n - 1; i >= 0; --i) v = v << 8 | p[i];
+        return v;
+    }
+    [[nodiscard]] uint32_t records() const { return static_cast<uint32_t>(header.size() / 192); }
+    [[nodiscard]] const uint8_t* record(uint32_t id) const { return header.data() + uint64_t{id} * 192; }
+    // A framed record's content: none when its frame is not one.
+    static std::pair<const uint8_t*, std::size_t> content(const MappedFile& f, uint64_t at) {
+        static const uint8_t magic[8] = {0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11};
+        if (at < 12 || at + 24 > f.size() || !std::equal(magic, magic + 8, f.data() + at)) return {nullptr, 0};
+        const uint64_t a = le(f.data() + at + 8, 4), b = le(f.data() + at + 12, 4);
+        if (at + 34 + a + b > f.size()) return {nullptr, 0};
+        return {f.data() + at + 24, static_cast<std::size_t>(a)};
+    }
+    MappedFile header, moves, notes;
+};
+
+void hexLine(const char* label, const uint8_t* p, std::size_t n) {
+    std::printf("%s", label);
+    for (std::size_t i = 0; i < n; ++i) std::printf("%s%02x", i % 2 == 0 ? " " : "", p[i]);
+    std::printf("\n");
+}
+
+int runChessBaseDump(const Args& a) {
+    if (a.words.size() < 3) return 2;
+    const TwoCbhFiles db{fs::path(std::string(a.words[1]))};
+    for (std::size_t w = 2; w < a.words.size(); ++w) {
+        const auto id = static_cast<uint32_t>(std::stoul(std::string(a.words[w])));
+        if (id >= db.records()) continue;
+        const uint8_t* r = db.record(id);
+        std::printf("record %u: kind %02x %02x %02x %02x\n", id, r[0], r[1], r[2], r[3]);
+        for (int row = 0; row < 192; row += 32) {
+            char label[16];
+            std::snprintf(label, sizeof label, "  h%02x:", row);
+            hexLine(label, r + row, 32);
+        }
+        const auto [m, mn] = TwoCbhFiles::content(db.moves, TwoCbhFiles::le(r + 8, 8));
+        std::printf("  moves at %llu: %zu bytes\n", static_cast<unsigned long long>(TwoCbhFiles::le(r + 8, 8)), mn);
+        if (m)
+            for (std::size_t at = 0; at < std::min<std::size_t>(mn, 160); at += 32)
+                hexLine("   ", m + at, std::min<std::size_t>(32, mn - at));
+        const auto [n, nn] = TwoCbhFiles::content(db.notes, TwoCbhFiles::le(r + 16, 8));
+        std::printf("  annotations at %llu: %zu bytes\n", static_cast<unsigned long long>(TwoCbhFiles::le(r + 16, 8)),
+                    nn);
+        if (n)
+            for (std::size_t at = 0; at < std::min<std::size_t>(nn, 256); at += 32)
+                hexLine("   ", n + at, std::min<std::size_t>(32, nn - at));
+    }
+    return 0;
+}
+
+// The size of an annotation's data, as the reader reads it (chessbase_2cbh.cpp): 0 for a type it does not know.
+std::size_t twoCbhItemSize(uint32_t type, const uint8_t* p, std::size_t left) {
+    switch (type) {
+        case 0x02:
+        case 0x82:
+            return left >= 8 ? 8 + TwoCbhFiles::le(p + 4, 4) : 0;
+        case 0x03:
+            return 3;
+        case 0x04:
+        case 0x05:
+            return left >= 4 ? 4 + TwoCbhFiles::le(p, 4) : 0;
+        case 0x07:
+            return 4;
+        case 0x21:
+            return 6;
+        case 0x24:
+            return 38;
+        case 0x26:
+            return left >= 5 ? 5 + TwoCbhFiles::le(p + 1, 4) : 0;
+        case 0x16:
+        case 0x17:
+        case 0x22:
+        case 0x23:
+        case 0x25:
+            return 4;
+        case 0x18:
+        case 0x14:
+            return 1;
+        case 0x08:
+            return 4;
+        case 0x15:
+            return left >= 4 ? 4 + TwoCbhFiles::le(p, 4) : 0;
+        case 0x09: {
+            // 12 bytes, four lists, the answers: as trainingSize() in chessbase_2cbh.cpp.
+            if (left < 12) return 0;
+            std::size_t at  = 12;
+            const auto list = [&] {
+                if (at + 2 > left) return false;
+                const auto count = TwoCbhFiles::le(p + at, 2);
+                at += 2;
+                for (uint64_t k = 0; k < count; ++k) {
+                    if (at + 6 > left) return false;
+                    at += 6 + TwoCbhFiles::le(p + at + 2, 4);
+                }
+                return true;
+            };
+            for (int k = 0; k < 4; ++k)
+                if (!list()) return 0;
+            // The answers. A move to find (kind 1): from, to, a byte, the points, a list. A choice (kind 2): the
+            // points, its list, a list.
+            if (at + 1 > left) return 0;
+            const unsigned answers = p[at++];
+            const auto kind        = TwoCbhFiles::le(p + 2, 4);
+            for (unsigned i = 0; i < answers; ++i) {
+                if (kind == 1) {
+                    at += 4;
+                    if (!list()) return 0;
+                } else if (kind == 2) {
+                    at += 1;
+                    if (!list() || !list()) return 0;
+                } else {
+                    return 0;
+                }
+            }
+            return at;
+        }
+        case 0x13: {
+            // 10 bytes, six texts, 79 bytes, the two ratings' kinds, 26 bytes, a byte (0: the 64 bytes of a board and
+            // 11 more follow), 2 bytes, the moves, 4 zero bytes: as quotationSize() in chessbase_2cbh.cpp.
+            std::size_t at = 10;
+            for (int i = 0; i < 6; ++i) {
+                if (at + 1 > left) return 0;
+                at += 1 + p[at];
+            }
+            at += 79;
+            for (int i = 0; i < 2; ++i) {
+                if (at + 9 > left) return 0;
+                at += 9 + TwoCbhFiles::le(p + at + 5, 4);
+            }
+            at += 26;
+            if (at + 1 > left) return 0;
+            if (p[at] == 0) at += 75;
+            at += 3;
+            if (at + 4 > left) return 0;
+            at += 4 + 5 * TwoCbhFiles::le(p + at, 4);
+            if (at + 4 > left || TwoCbhFiles::le(p + at, 4) != 0) return 0;
+            return at + 4;
+        }
+        case 0x20:
+            return left >= 8 ? 8 + TwoCbhFiles::le(p + 4, 4) : 0;
+        case 0x1c: {
+            if (left < 5) return 0;
+            const std::size_t first = 5 + TwoCbhFiles::le(p + 1, 4);
+            return left >= first + 4 ? first + 4 + TwoCbhFiles::le(p + first, 4) : 0;
+        }
+        default:
+            return 0;
+    }
+}
+
+int runChessBaseItem(const Args& a) {
+    if (a.words.size() < 5) return 2;
+    const TwoCbhFiles db{fs::path(std::string(a.words[1]))};
+    // A type in hex, or @offset for the bytes from there.
+    const std::string what = std::string(a.words[2]);
+    const bool at_offset   = what.starts_with("@");
+    const auto want =
+        static_cast<uint32_t>(std::stoul(at_offset ? what.substr(1) : what, nullptr, at_offset ? 10 : 16));
+    const auto bytes = std::stoul(std::string(a.words[3]));
+    for (std::size_t w = 4; w < a.words.size(); ++w) {
+        const auto id = static_cast<uint32_t>(std::stoul(std::string(a.words[w])));
+        if (id >= db.records()) continue;
+        const auto [n, nn] = TwoCbhFiles::content(db.notes, TwoCbhFiles::le(db.record(id) + 16, 8));
+        if (!n) continue;
+        if (at_offset) {
+            std::printf("record %u: bytes %u of %zu\n", id, want, nn);
+            for (std::size_t i = want; i < std::min<std::size_t>(nn, want + bytes); i += 32)
+                hexLine("   ", n + i, std::min<std::size_t>({32, nn - i, want + bytes - i}));
+            continue;
+        }
+        std::size_t at = 2;
+        bool found     = false;
+        while (!found && at + 8 <= nn) {
+            const auto position  = static_cast<int32_t>(TwoCbhFiles::le(n + at, 4));
+            const uint64_t count = TwoCbhFiles::le(n + at + 4, 4);
+            at += 8;
+            for (uint64_t k = 0; k < count && at + 2 <= nn; ++k) {
+                const auto type = static_cast<uint32_t>(TwoCbhFiles::le(n + at, 2));
+                if (type == want) {
+                    std::printf("record %u: type %x at %zu of %zu (position %d, item %llu of %llu)\n", id, type, at, nn,
+                                position, static_cast<unsigned long long>(k + 1),
+                                static_cast<unsigned long long>(count));
+                    for (std::size_t i = at; i < std::min<std::size_t>(nn, at + bytes); i += 32)
+                        hexLine("   ", n + i, std::min<std::size_t>({32, nn - i, at + bytes - i}));
+                    found = true;
+                    break;
+                }
+                const std::size_t size = twoCbhItemSize(type, n + at + 2, nn - at - 2);
+                if (size == 0 || at + 2 + size > nn) {
+                    at = nn;
+                    break;
+                }
+                at += 2 + size;
+            }
+        }
+        if (!found) std::printf("record %u: no type %x reached\n", id, want);
+    }
+    return 0;
+}
+
+int runChessBaseScan(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    const TwoCbhFiles db{fs::path(std::string(a.words[1]))};
+    struct Seen {
+        uint64_t count = 0;
+        std::vector<uint32_t> records;
+        void add(uint32_t id) {
+            ++count;
+            if (records.size() < 8) records.push_back(id);
+        }
+    };
+    std::map<uint32_t, Seen> kinds, types, stops, fails;
+    std::map<std::string, Seen> starts, words;
+    uint64_t clean = 0, unclean = 0;
+    std::map<uint32_t, std::vector<std::string>> fail_samples, oracle;
+    const auto itemSize = twoCbhItemSize;
+    const auto hex      = [](const uint8_t* p, std::size_t n) {
+        std::string out;
+        for (std::size_t i = 0; i < n; ++i) {
+            char b[4];
+            std::snprintf(b, sizeof b, "%02x ", p[i]);
+            out += b;
+        }
+        return out;
+    };
+    // Whether the annotations from `at` on parse to their end, `left` items of the current group first.
+    const auto parsesFrom = [&](const uint8_t* n, std::size_t nn, std::size_t at, uint64_t left) {
+        for (int groups = 0; groups < 100000; ++groups) {
+            for (; left > 0; --left) {
+                if (at + 2 > nn) return false;
+                const auto type        = static_cast<uint32_t>(TwoCbhFiles::le(n + at, 2));
+                const std::size_t size = itemSize(type, n + at + 2, nn - at - 2);
+                if (size == 0 || at + 2 + size > nn) return false;
+                at += 2 + size;
+            }
+            if (nn - at == 2 && TwoCbhFiles::le(n + at, 2) == 0xFFFF) return true;
+            if (at + 8 > nn) return false;
+            const auto position = static_cast<int32_t>(TwoCbhFiles::le(n + at, 4));
+            left                = TwoCbhFiles::le(n + at + 4, 4);
+            if (position < -1 || left == 0 || left > 64) return false;
+            at += 8;
+        }
+        return false;
+    };
+    for (uint32_t id = 1; id < db.records(); ++id) {
+        const uint8_t* r = db.record(id);
+        kinds[r[0]].add(id);
+        if ((r[0] & 0x83) != 1) continue;
+        // How its moves start (the first word, then fffc, fffb and a set-up, or fffb, a number and fffc), and the
+        // words of castling and above the table's moves they hold.
+        const auto [m, mn] = TwoCbhFiles::content(db.moves, TwoCbhFiles::le(r + 8, 8));
+        if (m && mn >= 4) {
+            const auto word = [&](std::size_t i) {
+                return i < mn / 2 ? static_cast<uint32_t>(TwoCbhFiles::le(m + 2 * i, 2)) : 0u;
+            };
+            const uint32_t first = word(0);
+            std::string start    = "its moves";
+            int64_t number       = -1;
+            std::size_t i        = 2;
+            if (word(1) == 0xFFFB && word(3) == 0xFFFC) {
+                start  = word(2) < 960 ? "a number below 960" : "a number of 960 or more";
+                number = word(2);
+                i      = 4;
+            } else if (word(1) == 0xFFFB) {
+                start = "a set-up position";
+                for (i = 5; i < mn / 2 && word(i) != 0xFFFC; ++i) {
+                }
+                ++i;
+            }
+            starts["first word " + std::to_string(first) + ", " + start].add(id);
+            for (; i < mn / 2; ++i) {
+                const uint32_t w = word(i);
+                std::string what;
+                if (w >= 0xB129 && w < 0xC02D) {
+                    const uint32_t group = (w - 0xB129) / 4;
+                    what = group == 0                           ? "castling of the standard group"
+                           : number >= 0 && group == number + 1 ? "castling of its number's group (number + 1)"
+                           : number >= 0 && group == number     ? "castling of its number's group (number)"
+                                                                : "castling of another group";
+                } else if (w >= 0xC02D && w < 0xFFFA) {
+                    what = "a word between the castling and fffa";
+                } else {
+                    continue;
+                }
+                words["first word " + std::to_string(first) + ", " + start + ": " + what].add(id);
+            }
+        }
+        const auto [n, nn] = TwoCbhFiles::content(db.notes, TwoCbhFiles::le(r + 16, 8));
+        if (!n || nn < 2) continue;
+        if (parsesFrom(n, nn, 2, 0)) {
+            ++clean;
+        } else {
+            ++unclean;
+            // Where it stops: the first item whose size is not known or runs past the record.
+            std::size_t at     = 2;
+            uint32_t where     = 0xFFFF;
+            std::size_t offset = 0;
+            for (int guard = 0; guard < 100000 && at + 8 <= nn && where == 0xFFFF; ++guard) {
+                const uint64_t count = TwoCbhFiles::le(n + at + 4, 4);
+                if (static_cast<int32_t>(TwoCbhFiles::le(n + at, 4)) < -1 || count == 0 || count > 64) {
+                    where  = 0xFFFE;
+                    offset = at;
+                    break;
+                }
+                at += 8;
+                for (uint64_t k = 0; k < count; ++k) {
+                    const auto type        = at + 2 <= nn ? static_cast<uint32_t>(TwoCbhFiles::le(n + at, 2)) : 0xFFFD;
+                    const std::size_t size = at + 2 <= nn ? itemSize(type, n + at + 2, nn - at - 2) : 0;
+                    if (size == 0 || at + 2 + size > nn) {
+                        where  = type;
+                        offset = at;
+                        break;
+                    }
+                    at += 2 + size;
+                }
+                if (nn - at == 2 && TwoCbhFiles::le(n + at, 2) == 0xFFFF) break;
+            }
+            fails[where].add(id);
+            auto& samples = fail_samples[where];
+            if (samples.size() < 6)
+                samples.push_back("record " + std::to_string(id) + " +" + std::to_string(offset) + "/" +
+                                  std::to_string(nn) + ": " + hex(n + offset, std::min<std::size_t>(nn - offset, 48)));
+        }
+        std::size_t at = 2;
+        while (at + 8 <= nn) {
+            const uint64_t count = TwoCbhFiles::le(n + at + 4, 4);
+            at += 8;
+            bool stop = false;
+            for (uint64_t k = 0; k < count && at + 2 <= nn; ++k) {
+                const auto type        = static_cast<uint32_t>(TwoCbhFiles::le(n + at, 2));
+                const uint8_t* d       = n + at + 2;
+                const std::size_t size = itemSize(type, d, nn - at - 2);
+                types[type].add(id);
+                if (size == 0 || at + 2 + size > nn) {
+                    auto& found = oracle[type];
+                    if (found.size() < 24) {
+                        std::string line = "record " + std::to_string(id) + " data " +
+                                           hex(d, std::min<std::size_t>(nn - at - 2, 28)) + "-> sizes";
+                        int candidates   = 0;
+                        for (std::size_t s = 0; at + 2 + s <= nn && s <= 8192 && candidates < 6; ++s)
+                            if (parsesFrom(n, nn, at + 2 + s, count - k - 1)) {
+                                line += " " + std::to_string(s);
+                                ++candidates;
+                            }
+                        found.push_back(line);
+                    }
+                    stops[type].add(id);
+                    stop = true;
+                    break;
+                }
+                at += 2 + size;
+            }
+            if (stop) break;
+            if (nn - at == 2 && TwoCbhFiles::le(n + at, 2) == 0xFFFF) break;
+        }
+    }
+    const auto show = [](const char* what, const auto& map) {
+        std::printf("%s:\n", what);
+        for (const auto& [key, seen] : map) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(key)>, std::string>)
+                std::printf("  %s: %llu (", key.c_str(), static_cast<unsigned long long>(seen.count));
+            else
+                std::printf("  %llx: %llu (", static_cast<unsigned long long>(key),
+                            static_cast<unsigned long long>(seen.count));
+            for (const auto id : seen.records) std::printf(" %u", id);
+            std::printf(" )\n");
+        }
+    };
+    show("record kinds", kinds);
+    show("how games start", starts);
+    show("castling words and words above them", words);
+    show("annotation types met", types);
+    show("annotation types of unknown size (where reading stops)", stops);
+    std::printf("annotation records that parse to their end: %llu, that do not: %llu\n",
+                static_cast<unsigned long long>(clean), static_cast<unsigned long long>(unclean));
+    show("where those that do not stop (type, fffe a group's head)", fails);
+    for (const auto& [type, samples] : fail_samples)
+        for (const auto& line : samples) std::printf("  %x %s\n", type, line.c_str());
+    std::printf("the sizes after which the rest parses to its end:\n");
+    for (const auto& [type, lines] : oracle)
+        for (const auto& line : lines) std::printf("  %x %s\n", type, line.c_str());
     return 0;
 }
 
@@ -794,6 +1214,9 @@ int main(int argc, char** argv) {
         if (a.words[0] == "search") rc = runSearch(a);
         if (a.words[0] == "repertoire") rc = runRepertoire(a);
         if (a.words[0] == "chessbase") rc = runChessBase(a);
+        if (a.words[0] == "chessbase-dump") rc = runChessBaseDump(a);
+        if (a.words[0] == "chessbase-scan") rc = runChessBaseScan(a);
+        if (a.words[0] == "chessbase-item") rc = runChessBaseItem(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

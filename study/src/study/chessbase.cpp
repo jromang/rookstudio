@@ -12,6 +12,7 @@
 #include <cctype>
 
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <stdexcept>
 
@@ -339,6 +340,39 @@ NoteKind noteKind(uint16_t code) noexcept {
 // Moves and the tree
 // ---------------------------------------------------------------------------------------------------------------
 
+std::array<char, 64> chess960Placement(int index) {
+    std::array<char, 64> board{};
+    if (index < 0 || index >= 960) return board;
+    static constexpr std::array<std::pair<int, int>, 10> knights = {
+        {{0, 1}, {0, 2}, {0, 3}, {0, 4}, {1, 2}, {1, 3}, {1, 4}, {2, 3}, {2, 4}, {3, 4}}};
+    std::array<char, 8> files;
+    files.fill('R');
+    const int light = 2 * (index % 4) + 1, dark = 2 * ((index / 4) % 4);
+    files[light] = files[dark] = 'B';
+    std::vector<int> free;
+    for (int f = 0; f < 8; ++f)
+        if (f != light && f != dark) free.push_back(f);
+    const auto take = [&](std::size_t i) {
+        const int f = free[i];
+        free.erase(free.begin() + static_cast<std::ptrdiff_t>(i));
+        return f;
+    };
+    files[take(static_cast<std::size_t>((index / 16) % 6))] = 'Q';
+    const auto [k1, k2]                                     = knights[static_cast<std::size_t>(index / 96)];
+    files[take(static_cast<std::size_t>(k1))]               = 'N';
+    files[take(static_cast<std::size_t>(k2 - 1))]           = 'N';
+    files[take(0)]                                          = 'R';
+    files[take(0)]                                          = 'K';
+    files[take(0)]                                          = 'R';
+    for (int f = 0; f < 8; ++f) {
+        board[f]      = files[f];
+        board[56 + f] = static_cast<char>(files[f] + 32);
+        board[8 + f]  = 'P';
+        board[48 + f] = 'p';
+    }
+    return board;
+}
+
 std::optional<chess::Move> legalMove(const chess::Board& board, int from, int to, int promotion, int castle) {
     chess::Movelist list;
     chess::movegen::legalmoves(list, board);
@@ -375,6 +409,8 @@ void TreeBuilder::play(chess::Move move) {
     m.move          = move;
     m.mover         = board_.sideToMove();
     const bool null = move == chess::Move(chess::Move::NULL_MOVE);
+    // A side in check cannot pass: the position after would leave its king to be taken.
+    if (null && board_.inCheck()) throw Damage("a null move in check");
     m.san           = null ? "--" : chess::uci::moveToSan(board_, move);
     before_         = board_;
     if (null)
@@ -575,6 +611,20 @@ fastchess::Score scoreOf(int64_t value, bool mate, chess::Color mover) {
     return fastchess::Score{mate ? fastchess::ScoreType::MATE : fastchess::ScoreType::CP, sign * value};
 }
 
+// A clock's time as [%clk] writes it: h:mm:ss, with the milliseconds when there are some.
+std::string clockText(int64_t ms) {
+    const int64_t s = ms / 1000;
+    char out[48];
+    std::snprintf(out, sizeof out, "%lld:%02lld:%02lld", static_cast<long long>(s / 3600),
+                  static_cast<long long>(s / 60 % 60), static_cast<long long>(s % 60));
+    std::string text = out;
+    if (ms % 1000 != 0) {
+        std::snprintf(out, sizeof out, ".%03lld", static_cast<long long>(ms % 1000));
+        text += out;
+    }
+    return text;
+}
+
 void setTag(GameTree& tree, const std::string& name, const std::string& value) {
     for (auto& [k, v] : tree.main.headers)
         if (k == name) {
@@ -690,6 +740,8 @@ void place(RawGame& raw, ChessBaseReport& report) {
             case NoteKind::ClockBlack:
                 if (move && (move->mover == chess::Color::WHITE) == (n.kind == NoteKind::ClockWhite))
                     move->clock_ms = n.value;
+                else if (n.position < 0)  // the game's, not a move's: a tag
+                    setTag(tree, n.kind == NoteKind::ClockWhite ? "WhiteClock" : "BlackClock", clockText(n.value));
                 else
                     ++report.undecoded;
                 break;

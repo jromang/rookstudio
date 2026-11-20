@@ -13,7 +13,8 @@
 // What a game's annotations become:
 // - texts after and before a move: its comments (a text in several languages: English first, the others after);
 // - symbols: NAGs; coloured squares and arrows: the marks of MoveNotes;
-// - clocks: the move's clock; the time a move took: [%emt]; an engine's evaluation: the move's evaluation;
+// - clocks: the move's clock, those of the game as a whole the WhiteClock and BlackClock tags; the time a move took:
+//   [%emt]; an engine's evaluation: the move's evaluation;
 // - medals: a Medals tag (their bits, as stored); a time control: the TimeControl tag; a critical position: a comment.
 // What is left out is counted, by kind, in the reader's report: training questions, pictures, sounds, videos, web
 // links, games quoted, pawn structures and piece paths, variation colours, correspondence moves' dates, the texts

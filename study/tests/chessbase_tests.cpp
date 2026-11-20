@@ -333,6 +333,161 @@ std::vector<ArchiveMember> cbhMembers(const std::string& base) {
     return members;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// 2CBH databases made by the tests, record by record
+// ---------------------------------------------------------------------------------------------------------------
+
+// A record: its kind (1 a game, 3 a text), the words of its moves, its annotations (none when empty).
+struct TwoCbhRecord {
+    uint8_t kind = 1;
+    std::vector<uint16_t> moves;
+    std::string notes;
+};
+
+// Words of the moves' table: moves, castling, the pieces of a set-up position.
+constexpr uint16_t E2E4 = 0xAD3F, E7E5 = 0xB02D, F7F6 = 0xB08C, D2D4 = 0xACE1, D1H5 = 0x167B;
+constexpr uint16_t WHITE_SHORT = 0xB12A, BLACK_LONG = 0xB12B;
+constexpr uint16_t WHITE_KING_E1 = 0xC04D, WHITE_ROOK_A1 = 0xC12D, WHITE_ROOK_H1 = 0xC165, BLACK_KING_E8 = 0xC194,
+                   BLACK_ROOK_A8 = 0xC274, BLACK_ROOK_H8 = 0xC2AC;
+constexpr uint16_t PASS = 0xFFFA, SETUP = 0xFFFB, MOVES = 0xFFFC, END = 0xFFFF;
+
+std::string le32Of(uint32_t v) {
+    std::string out;
+    put32(out, v);
+    return out;
+}
+
+// The .2cbh, .2cbg, .2cba and .2lid of a database of `records`, in a folder of the test's own; no names.
+fs::path twoCbhDatabase(const std::string& folder, const std::vector<TwoCbhRecord>& records) {
+    const auto dir = fs::temp_directory_path() / folder;
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    // Records that frame themselves after a 12-byte header (the file's size, where the first record starts).
+    std::string moves(12, '\0'), notes(12, '\0');
+    const auto frame = [](std::string& file, const std::string& content) {
+        const uint64_t at = file.size();
+        file += std::string("\x88\x77\x66\x55\x44\x33\x22\x11", 8);
+        put32(file, static_cast<uint32_t>(content.size()));
+        put32(file, 0);
+        file += std::string(8, '\0');
+        file += content + "\xff\xff";
+        put64(file, 34 + content.size());
+        return at;
+    };
+    std::string headers;
+    std::string head(192, '\0');
+    head[0x0A] = static_cast<char>(192);
+    head.replace(0x10, 4, le32Of(static_cast<uint32_t>(records.size() + 1)));
+    headers += head;
+    for (const auto& r : records) {
+        std::string words;
+        for (const uint16_t w : r.moves) put16(words, w);
+        std::string record;
+        record += static_cast<char>(r.kind);
+        record += std::string(7, '\0');
+        put64(record, frame(moves, words));
+        put64(record, r.notes.empty() ? 0 : frame(notes, r.notes));
+        for (int id = 0; id < 7; ++id) put64(record, ~uint64_t{0});  // no player, tournament, annotator ... team
+        record.resize(192, '\0');
+        record[0x58] = 2;  // 1-0
+        headers += record;
+    }
+    for (auto* file : {&moves, &notes}) {
+        std::string size;
+        put64(size, file->size());
+        put16(size, 12);
+        file->replace(0, 10, size);
+    }
+    // The names: a header of five kinds of 8-byte records, none of them.
+    std::string names;
+    for (const uint32_t v : {108u, 5u}) names += std::string{0, 0, 0, static_cast<char>(v)};
+    for (int kind = 0; kind < 5; ++kind) names += std::string{0, 0, 0, 8} + std::string(16, '\0');
+    spit(dir / "Made.2cbh", headers);
+    spit(dir / "Made.2cbg", moves);
+    spit(dir / "Made.2cba", notes);
+    spit(dir / "Made.2lid", names);
+    return dir / "Made.2cbh";
+}
+
+// Annotations: the word that starts them, groups of annotations by their move, ffff.
+class TwoCbhNotes {
+   public:
+    TwoCbhNotes() { put16(bytes_, 0x2000); }
+    // The annotations of move `position` (-1 the game), each its type and its data.
+    void at(int32_t position, const std::vector<std::pair<uint16_t, std::string>>& items) {
+        put32(bytes_, static_cast<uint32_t>(position));
+        put32(bytes_, static_cast<uint32_t>(items.size()));
+        for (const auto& [type, data] : items) {
+            put16(bytes_, type);
+            bytes_ += data;
+        }
+    }
+    [[nodiscard]] std::string done() const { return bytes_ + "\xff\xff"; }
+
+   private:
+    std::string bytes_;
+};
+
+// A text with its length in 4 bytes.
+std::string sized(const std::string& text) { return le32Of(static_cast<uint32_t>(text.size())) + text; }
+
+// A comment after a move (type 02) in any language.
+std::pair<uint16_t, std::string> comment(const std::string& text) {
+    return {0x02, std::string(2, '\0') + std::string{static_cast<char>(chessbase::ANY_LANGUAGE), 0} + sized(text)};
+}
+
+// A list of a training question's: texts in languages 0, 1 ..., then arrows.
+std::string trainingList(const std::vector<std::string>& texts, const std::string& arrows = {}) {
+    std::string out;
+    put16(out, static_cast<uint32_t>(texts.size() + (arrows.empty() ? 0 : 1)));
+    for (std::size_t i = 0; i < texts.size(); ++i) {
+        put16(out, static_cast<uint32_t>(i));
+        out += sized(texts[i]);
+    }
+    if (!arrows.empty()) {
+        put16(out, 7);
+        out += sized(arrows);
+    }
+    return out;
+}
+
+// A training question of a move to find, with a hint of a text and arrows, and its answer.
+std::string trainingMove() {
+    std::string out = "\x01\x01" + le32Of(1) + le32Of(300) + std::string("\x0a\x00", 2);
+    out += trainingList({"Find the move."}) + trainingList({}) + trainingList({"Not a sacrifice."}) +
+           trainingList({"A pawn."}, "\x02\x2d\x2c");
+    return out + "\x01" + std::string("\x1c\x1e\x00\x0a", 4) + trainingList({"Right."});
+}
+
+// A training question of a choice among two answers, in two languages.
+std::string trainingChoice() {
+    std::string out = "\x01\x01" + le32Of(2) + le32Of(600) + std::string("\x0f\x00", 2);
+    out += trainingList({"The move is...", "Der Zug ist..."}) + trainingList({}) + trainingList({}) + trainingList({});
+    out += "\x02";
+    out += std::string(1, '\0') + trainingList({"...a mistake."}) + trainingList({});
+    out += "\x0f" + trainingList({"...strong."}) + trainingList({"Right.", "Richtig."});
+    return out;
+}
+
+// A game quoted: its names, its ratings' kinds, its start position when it is given (the standard one), its moves.
+std::string quotation(bool with_board, int moves) {
+    std::string out("\x01\x02\x00\x00\x00\x01\x00\x00\x00\x00", 10);
+    for (const std::string text : {"White", "First", "Black", "Second", "Lyon", "Our own"})
+        out += static_cast<char>(text.size() + 1) + text + '\0';
+    out += std::string(79, '\0');
+    for (int k = 0; k < 2; ++k) out += std::string("\x01\x00\x01\x00\x00", 5) + sized("FIDE");
+    out += std::string(26, '\0');
+    out += with_board ? '\0' : '\x01';
+    if (with_board) {
+        const std::string back = "\x05\x03\x04\x02\x01\x04\x03\x05";
+        for (int f = 0; f < 8; ++f) out += std::string{back[f], 6, 0, 0, 0, 0, 14, static_cast<char>(back[f] + 8)};
+        out += std::string(11, '\0');
+    }
+    out += std::string(2, '\0') + le32Of(static_cast<uint32_t>(moves));
+    for (int k = 0; k < moves; ++k) out += std::string("\x21\x23\x00\x00\x00", 5);  // e2-e4, again and again
+    return out + le32Of(0);
+}
+
 }  // namespace
 
 TEST_CASE("ChessBase CBH database: the 35 games as the PGN they were made of") {
@@ -722,4 +877,151 @@ TEST_CASE("ChessBase databases: copied into a database, then again: only new gam
         }
     }
     CHECK(db->snapshot()->games() >= 35);
+}
+
+TEST_CASE("ChessBase 2CBH records: a null move, refused in check") {
+    const std::vector<TwoCbhRecord> records = {{1, {1, MOVES, E2E4, PASS, D2D4, END}, {}},
+                                               {1, {1, MOVES, E2E4, F7F6, D1H5, PASS, END}, {}}};
+    ChessBaseDatabase db(twoCbhDatabase("chessbase-2cbh-null", records));
+    const auto passes = db.read(1);
+    REQUIRE(passes);
+    CHECK_FALSE(passes->damaged);
+    REQUIRE(passes->tree.main.moves.size() == 3);
+    CHECK(passes->tree.main.moves[1].san == "--");
+    CHECK(passes->tree.main.moves[2].san == "d4");
+    // Black in check after 1. e4 f6 2. Qh5+ cannot pass: the moves before are kept.
+    const auto in_check = db.read(2);
+    REQUIRE(in_check);
+    CHECK(in_check->damaged);
+    CHECK(in_check->problem.find("a null move in check") != std::string::npos);
+    CHECK(in_check->tree.main.moves.size() == 3);
+}
+
+TEST_CASE("ChessBase 2CBH records: texts, deleted games and records of no kind, counted apart from the games") {
+    const std::vector<TwoCbhRecord> records = {{3, {1, MOVES, END}, {}},
+                                               {1, {1, MOVES, E2E4, END}, {}},
+                                               {0x81, {1, MOVES, E2E4, END}, {}},
+                                               {0, {1, MOVES, END}, {}}};
+    ChessBaseDatabase db(twoCbhDatabase("chessbase-2cbh-kinds", records));
+    int games = 0;
+    db.forEach([&](ChessBaseGame&&) {
+        ++games;
+        return true;
+    });
+    CHECK(games == 1);
+    CHECK(db.report().texts == 1);
+    CHECK(db.report().deleted == 1);
+    CHECK(db.report().unknown == 1);
+    CHECK_FALSE(db.read(1));
+}
+
+TEST_CASE("ChessBase 2CBH records: a set-up position's side to move and castling rights") {
+    // Black to move, White's king's side and Black's queen's side: 0x06 in the high byte, 1 in the low.
+    std::vector<uint16_t> start = {1, SETUP, 20, 0x0601, 0};
+    start.insert(start.end(),
+                 {WHITE_KING_E1, WHITE_ROOK_A1, WHITE_ROOK_H1, BLACK_KING_E8, BLACK_ROOK_A8, BLACK_ROOK_H8, MOVES});
+    auto castles = start;
+    castles.insert(castles.end(), {BLACK_LONG, WHITE_SHORT, END});
+    auto none = start;
+    none.push_back(END);
+    ChessBaseDatabase db(twoCbhDatabase("chessbase-2cbh-setup", {{1, none, {}}, {1, castles, {}}}));
+    const auto still = db.read(1);
+    REQUIRE(still);
+    CHECK(still->tree.main.start_fen == "r3k2r/8/8/8/8/8/8/R3K2R b Kq - 0 20");
+    const auto castled = db.read(2);
+    REQUIRE(castled);
+    CHECK_FALSE(castled->damaged);
+    REQUIRE(castled->tree.main.moves.size() == 2);
+    CHECK(castled->tree.main.moves[0].san == "O-O-O");
+    CHECK(castled->tree.main.moves[1].san == "O-O");
+}
+
+TEST_CASE("ChessBase 2CBH records: a Chess960 game, its start by its number, its castling that start's") {
+    // Start 292 is QBBNRKRN: the king on f1 between rooks on e1 and g1, either side may castle short at once. Its
+    // castling words are the 294th four (the standard start's first): b5bd to b5c0.
+    const uint16_t white_short = 0xB129 + 4 * 293 + 1, black_short = 0xB129 + 4 * 293 + 3;
+    const std::vector<TwoCbhRecord> records = {{1, {2, SETUP, 292, MOVES, white_short, black_short, END}, {}},
+                                               {1, {2, SETUP, 292, MOVES, WHITE_SHORT, END}, {}},
+                                               {1, {2, SETUP, 960, MOVES, END}, {}}};
+    ChessBaseDatabase db(twoCbhDatabase("chessbase-2cbh-960", records));
+    const auto game = db.read(1);
+    REQUIRE(game);
+    CHECK(game->chess960);
+    CHECK_FALSE(game->damaged);
+    CHECK(game->tree.main.header("Variant") == "Chess960");
+    CHECK(game->tree.main.start_fen == "qbbnrkrn/pppppppp/8/8/8/8/PPPPPPPP/QBBNRKRN w GEge - 0 1");
+    REQUIRE(game->tree.main.moves.size() == 2);
+    CHECK(game->tree.main.moves[0].san == "O-O");
+    CHECK(game->tree.main.moves[1].san == "O-O");
+    // The standard start's castling in a Chess960 game, a start numbered 960: damaged.
+    const auto other = db.read(2);
+    REQUIRE(other);
+    CHECK(other->damaged);
+    CHECK(other->problem.find("the castling of another start") != std::string::npos);
+    const auto past = db.read(3);
+    REQUIRE(past);
+    CHECK(past->damaged);
+    CHECK(past->problem.find("its Chess960 start is not one") != std::string::npos);
+    // Every start, its four castling rights those of its rooks.
+    std::vector<TwoCbhRecord> starts;
+    for (uint16_t number = 0; number < 960; ++number) starts.push_back({1, {2, SETUP, number, MOVES, END}, {}});
+    ChessBaseDatabase all(twoCbhDatabase("chessbase-2cbh-960-all", starts));
+    int read = 0;
+    all.forEach([&](ChessBaseGame&& g) {
+        CHECK_FALSE(g.damaged);
+        chess::Board board;
+        board.set960(true);
+        board.setFen(g.tree.main.start_fen);
+        using Side = chess::Board::CastlingRights::Side;
+        for (const auto colour : {chess::Color::WHITE, chess::Color::BLACK})
+            for (const auto side : {Side::KING_SIDE, Side::QUEEN_SIDE}) CHECK(board.castlingRights().has(colour, side));
+        ++read;
+        return true;
+    });
+    CHECK(read == 960);
+    CHECK(all.read(519)->tree.main.start_fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w HAha - 0 1");
+}
+
+TEST_CASE("ChessBase 2CBH records: annotations of every type, those after each still read") {
+    TwoCbhNotes notes;
+    // The game's clocks and medals.
+    notes.at(-1, {{0x16, le32Of(306700)}, {0x17, le32Of(228200)}, {0x22, le32Of(0x1008)}});
+    // A training question of a move to find, a game quoted, a pawn structure, a piece's path.
+    notes.at(
+        0,
+        {{0x09, trainingMove()}, {0x13, quotation(false, 0)}, {0x14, "\x01"}, {0x15, sized("path")}, comment("one")});
+    // A web link, a video and a time in it, a variation's colour, a type not named, a game quoted with its start
+    // position, a choice, a critical position.
+    notes.at(1, {{0x1C, "\x01" + sized("https://example.org") + sized("a page")},
+                 {0x20, std::string(4, '\0') + sized("video")},
+                 {0x25, le32Of(1000)},
+                 {0x23, le32Of(2)},
+                 {0x08, le32Of(0)},
+                 {0x13, quotation(true, 2)},
+                 {0x09, trainingChoice()},
+                 {0x18, "\x02"},
+                 comment("two")});
+    ChessBaseDatabase db(twoCbhDatabase("chessbase-2cbh-notes", {{1, {1, MOVES, E2E4, E7E5, END}, notes.done()}}));
+    const auto game = db.read(1);
+    REQUIRE(game);
+    CHECK_FALSE(game->damaged);
+    const auto& main = game->tree.main;
+    CHECK(main.header("WhiteClock") == "0:05:06.700");
+    CHECK(main.header("BlackClock") == "0:03:48.200");
+    CHECK(main.header("Medals") == "4104");
+    REQUIRE(main.moves.size() == 2);
+    CHECK(main.moves[0].notes.after == "one");
+    CHECK(main.moves[1].notes.after.find("two") != std::string::npos);
+    CHECK(main.moves[1].notes.after.find("Critical position") != std::string::npos);
+    const auto& report = db.report();
+    CHECK(report.training == 2);
+    CHECK(report.quotations == 2);
+    CHECK(report.pawn_structures == 1);
+    CHECK(report.piece_paths == 1);
+    CHECK(report.web_links == 1);
+    CHECK(report.videos == 2);
+    CHECK(report.variation_colours == 1);
+    CHECK(report.other == 1);
+    CHECK(report.undecoded == 0);
+    CHECK(report.damaged == 0);
 }

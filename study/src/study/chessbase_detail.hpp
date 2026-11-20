@@ -232,4 +232,8 @@ void addTag(RawGame& game, std::string name, std::string value);
 [[nodiscard]] std::optional<chess::Move> legalMove(const chess::Board& board, int from, int to, int promotion,
                                                    int castle = 0);
 
+// The pieces of Chess960 start `index` (0 to 959, 518 the standard start) by square (rank * 8 + file), as FEN letters;
+// all empty for another number.
+[[nodiscard]] std::array<char, 64> chess960Placement(int index);
+
 }  // namespace fcg::study::chessbase

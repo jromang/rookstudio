@@ -1,15 +1,15 @@
 // The record framing of .2cbh, .2cbg and .2cba is ported from cbvault 0.1.6, MIT License, Copyright (c) 2026 cbvault
 // Contributors (twocbh/header.rs, record.rs, segment.rs). cbvault reads no more of this format; its moves, names and
-// annotations are read here by code written for RookStudio, checked on the databases of our own games in
-// study/tests/data/chessbase.
+// annotations are read here by code written for RookStudio, which the tests check on the databases of our own games in
+// study/tests/data/chessbase and on records of their own.
 //
 // The newer ChessBase format, all its integers little-endian except the header of the names. Its files share a name:
 // - .2cbh: 192-byte records, the first the file's own (the record size at 0x0a, the record count with it at 0x10).
-//   A game's: its kind (1 a game) at 0x00; where its moves are in .2cbg (0x08) and its annotations in .2cba (0x10);
-//   its white and black players, tournament, annotator, source, white and black teams by their number in .2lid (an
-//   8-byte integer each from 0x18, -1 none); its result (0x58), round and sub-round (0x5a, 0x5c); the ratings of White
-//   (0x60) and Black (0x70), each with its kind ("FIDE") 8 bytes after; its ECO (0x80); its date (0xbc), packed as in
-//   the older format.
+//   A record's kind at 0x00, as in the older format: bit 0 a game or a text, bit 1 a text, bit 7 deleted. A game's:
+//   where its moves are in .2cbg (0x08) and its annotations in .2cba (0x10); its white and black players, tournament,
+//   annotator, source, white and black teams by their number in .2lid (an 8-byte integer each from 0x18, -1 none); its
+//   result (0x58), round and sub-round (0x5a, 0x5c); the ratings of White (0x60) and Black (0x70), each with its kind
+//   ("FIDE") 8 bytes after; its ECO (0x80); its date (0xbc), packed as in the older format.
 // - .2cbg and .2cba: a 12-byte header (the file's size, where its first record starts), then records that frame
 //   themselves: a magic of 8 bytes, the content's length a and the padding's b, 8 bytes not used here, the content,
 //   ff ff, b zero bytes, and the record's whole length (34 + a + b).
@@ -17,7 +17,8 @@
 //   size of its record and its count), then rows of one record of each kind: players (who annotate too),
 //   tournaments, sources, teams. A record is its length and its content; a text in it its length and its UTF-8 bytes.
 //
-// A game's moves are 16-bit words. The first is 1. Then fffc and the moves, or fffb, a set-up position, fffc and the
+// A game's moves are 16-bit words. The first is 1, then fffc and the moves, or fffb, a set-up position, fffc and the
+// moves; or 2 for a Chess960 game, then fffb, the number of its start (0 to 959, 518 the standard one), fffc and the
 // moves. A move's word names the move in a table of every move a piece may make anywhere: for White then Black, the
 // king, the queen, the knights, the bishops and the rooks, each from a1, a2 ... h8 (file by file) in turn, along
 // directions in an order of their own, nearest square first, each of those moves six times (nothing taken, or a queen,
@@ -25,16 +26,29 @@
 // file, a file at a time: their moves forward (two squares then one from the start), then their captures towards the
 // a-file then towards the h-file (five each, by what they take), an en passant capture after the captures on its side
 // where one may be made; a promotion forward four times (queen, knight, bishop, rook), and on each side sixteen
-// times (by what it takes, then what it becomes); then castling: White's long and short, Black's. The table starts at
-// 1 and ends at b12c. fffd after a move: the move has an alternative, which follows once the line has ended (several:
-// the one met last first, as the older format stores them; the games checked here hold one variation with one of its
-// own); ffff ends a line. A set-up position: the move number, two words (0 in every game checked here; the side to move
-// is the first move's), and a word per piece: c02d plus its place in a table of every piece on every square (as the
-// moves' table, pawns on the second to the seventh rank alone).
+// times (by what it takes, then what it becomes). The table starts at 1 and ends at b128. Then castling, four words a
+// start (White's long castling and short, then Black's): b129 to b12c the standard start's, then each Chess960 start's
+// by its number, b12d to b130 number 0's up to c029 to c02c number 959's. fffa: a null move. fffd after a move: the
+// move has an alternative, which follows once the line has ended (several: the one met last first, as the older format
+// stores them; the games checked here hold one variation with one of its own); ffff ends a line. A set-up position:
+// the move number; a word with the side to move in its low byte (1 Black) and the castling rights in its high byte (a
+// bit each: White's queen's side, White's king's side, Black's queen's side, Black's king's side); a word not used
+// here; and a word per piece: c02d plus its place in a table of every piece on every square (as the moves' table,
+// pawns on the second to the seventh rank alone).
 //
 // A game's annotations: a word (0x2000), then per move its number (moves counted as PGN writes them, -1 the game),
 // the annotations' count and each annotation: its type in two bytes and its data, of a size the type sets; ffff ends
-// them.
+// them. The types:
+// - 02 and 82, a comment after the move and before it; 03, symbols; 04 and 05, coloured squares and arrows; 07, the
+//   time the move took; 21, an engine's evaluation; 24, the time control; 26, the main line's evaluations: see
+//   annotations();
+// - 09, a training question; 13, a game quoted: see trainingSize() and quotationSize();
+// - 14, a pawn structure, and 18, a critical position: a byte (1, 2 or 3 for the latter);
+// - 15, a piece's path: a length in 4 bytes and its data;
+// - 16 and 17, White's clock and Black's, in milliseconds; 22, medals, a bit each; 23, a variation's colour; 25, a time
+//   in a video; 08, of a kind not named here: 4 bytes each;
+// - 1c, a web link: a byte, then its address and its text, each a length in 4 bytes and its bytes;
+// - 20, a video: 4 bytes, a length in 4 bytes and its data.
 
 #include <algorithm>
 #include <array>
@@ -52,20 +66,18 @@ constexpr std::size_t FRAME      = 34;
 constexpr std::size_t MAX_RECORD = 16 << 20;
 constexpr uint8_t MAGIC[8]       = {0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11};
 
-constexpr uint32_t SETUP = 0xFFFB, MOVES = 0xFFFC, ALTERNATIVE = 0xFFFD, END = 0xFFFF;
-constexpr uint32_t FIRST_PIECE = 0xC02D;
+constexpr uint32_t PASS = 0xFFFA, SETUP = 0xFFFB, MOVES = 0xFFFC, ALTERNATIVE = 0xFFFD, END = 0xFFFF;
+constexpr uint32_t CASTLING = 0xB129, FIRST_PIECE = 0xC02D;
 
 // A move of the table: its squares (rank * 8 + file), what a pawn becomes (a chess::PieceType, 7 none), its side,
-// castling (1 the king's side, 2 the queen's), en passant.
+// en passant.
 struct TableMove {
-    uint8_t from = 0, to = 0, promotion = 7, white = 1, castle = 0, en_passant = 0;
+    uint8_t from = 0, to = 0, promotion = 7, white = 1, en_passant = 0;
 };
-
-constexpr uint32_t TABLE_END = 0xB12D;
 
 const std::vector<TableMove>& moveTable() {
     static const std::vector<TableMove> table = [] {
-        std::vector<TableMove> t(TABLE_END);
+        std::vector<TableMove> t(CASTLING);
         using Dirs        = std::vector<std::pair<int, int>>;
         const Dirs king   = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
         const Dirs knight = {{-2, -1}, {-2, 1}, {2, -1}, {2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}};
@@ -74,11 +86,11 @@ const std::vector<TableMove>& moveTable() {
         Dirs queen        = bishop;
         queen.insert(queen.end(), rook.begin(), rook.end());
         uint32_t code  = 1;
-        const auto add = [&](int from, int to, int promotion, bool white, int castle, bool ep, int times) {
+        const auto add = [&](int from, int to, int promotion, bool white, bool ep, int times) {
             for (int i = 0; i < times; ++i)
-                t.at(code++) = TableMove{static_cast<uint8_t>(from),      static_cast<uint8_t>(to),
-                                         static_cast<uint8_t>(promotion), static_cast<uint8_t>(white),
-                                         static_cast<uint8_t>(castle),    static_cast<uint8_t>(ep)};
+                t.at(code++) =
+                    TableMove{static_cast<uint8_t>(from), static_cast<uint8_t>(to), static_cast<uint8_t>(promotion),
+                              static_cast<uint8_t>(white), static_cast<uint8_t>(ep)};
         };
         for (const bool white : {true, false}) {
             for (const auto& [dirs, slide] : std::vector<std::pair<Dirs, bool>>{
@@ -87,7 +99,7 @@ const std::vector<TableMove>& moveTable() {
                     for (int r = 0; r < 8; ++r)
                         for (const auto& [df, dr] : dirs)
                             for (int x = f + df, y = r + dr; x >= 0 && x < 8 && y >= 0 && y < 8; x += df, y += dr) {
-                                add(r * 8 + f, y * 8 + x, 7, white, 0, false, 6);
+                                add(r * 8 + f, y * 8 + x, 7, white, false, 6);
                                 if (!slide) break;
                             }
             }
@@ -98,27 +110,23 @@ const std::vector<TableMove>& moveTable() {
                 for (int r = 1; r <= 6; ++r) {
                     const int from = r * 8 + f, ahead = (r + forward) * 8;
                     if (r == last) {
-                        for (const int p : {4, 1, 2, 3}) add(from, ahead + f, p, white, 0, false, 1);
+                        for (const int p : {4, 1, 2, 3}) add(from, ahead + f, p, white, false, 1);
                         for (const int df : {-1, 1}) {
                             if (f + df < 0 || f + df > 7) continue;
                             for (int taken = 0; taken < 4; ++taken)
-                                for (const int p : {4, 1, 2, 3}) add(from, ahead + f + df, p, white, 0, false, 1);
+                                for (const int p : {4, 1, 2, 3}) add(from, ahead + f + df, p, white, false, 1);
                         }
                         continue;
                     }
-                    if (r == start) add(from, (r + 2 * forward) * 8 + f, 7, white, 0, false, 1);
-                    add(from, ahead + f, 7, white, 0, false, 1);
+                    if (r == start) add(from, (r + 2 * forward) * 8 + f, 7, white, false, 1);
+                    add(from, ahead + f, 7, white, false, 1);
                     for (const int df : {-1, 1}) {
                         if (f + df < 0 || f + df > 7) continue;
-                        add(from, ahead + f + df, 7, white, 0, false, 5);
-                        if (r == ep) add(from, ahead + f + df, 7, white, 0, true, 1);
+                        add(from, ahead + f + df, 7, white, false, 5);
+                        if (r == ep) add(from, ahead + f + df, 7, white, true, 1);
                     }
                 }
         }
-        add(4, 2, 7, true, 2, false, 1);
-        add(4, 6, 7, true, 1, false, 1);
-        add(60, 58, 7, false, 2, false, 1);
-        add(60, 62, 7, false, 1, false, 1);
         return t;
     }();
     return table;
@@ -138,6 +146,75 @@ std::optional<std::pair<char, int>> setupPiece(uint32_t word) {
         return std::pair{i < 688 ? 'P' : 'p', static_cast<int>((p % 6 + 1) * 8 + p / 6)};
     }
     return std::nullopt;
+}
+
+// The size of a training question's data (type 09), 0 when it does not fit in `d`: 12 bytes (1, 1, its kind in 4: 1
+// a move to find, 2 a choice among answers; the seconds it gives, 4 bytes; its points, 2), four lists (the question
+// first, the hints last), the answers' count (a byte) and the answers. A list: its count (2 bytes), then per item its
+// kind (2 bytes: a text's language, 7 arrows, 8 coloured squares), its length (4) and its data. An answer to a move to
+// find: its two squares, a byte, its points, a list (what is said when it is played); to a choice: its points, a list
+// (the answer), a list (what is said when it is chosen).
+std::size_t trainingSize(std::span<const uint8_t> d) {
+    std::size_t at  = 0;
+    const auto fits = [&](std::size_t n) { return at <= d.size() && d.size() - at >= n; };
+    const auto list = [&] {
+        if (!fits(2)) return false;
+        const uint32_t count = le16(d.data() + at);
+        at += 2;
+        for (uint32_t k = 0; k < count; ++k) {
+            if (!fits(6)) return false;
+            at += 6 + static_cast<std::size_t>(le32(d.data() + at + 2));
+        }
+        return true;
+    };
+    if (!fits(12)) return 0;
+    const uint32_t kind = le32(d.data() + 2);
+    at                  = 12;
+    for (int k = 0; k < 4; ++k)
+        if (!list()) return 0;
+    if (!fits(1)) return 0;
+    const unsigned answers = d[at++];
+    for (unsigned k = 0; k < answers; ++k) {
+        if (kind == 1) {
+            at += 4;
+            if (!list()) return 0;
+        } else if (kind == 2) {
+            at += 1;
+            if (!list() || !list()) return 0;
+        } else {
+            return 0;
+        }
+    }
+    return fits(0) ? at : 0;
+}
+
+// The size of a game quoted (type 13), 0 when it does not fit in `d`: 10 bytes; six texts (a byte, their length with
+// the zero that ends them, then their bytes): White's last and first names, Black's, the place and the tournament; 79
+// bytes (the date, round, ratings, ECO and result among them); the kinds of the two ratings (5 bytes, a length in 4,
+// the text); 26 bytes; a byte, 0 when the start position follows in 75 bytes (a byte a square, file by file from a1: 0
+// empty, 1 to 6 a white king, queen, knight, bishop, rook or pawn, 9 to 14 a black one; then 11 bytes); 2 bytes; the
+// moves (their count in 4 bytes, then 5 bytes each: the squares from and to, file by file from 0, and 3 more); 4 zero
+// bytes.
+std::size_t quotationSize(std::span<const uint8_t> d) {
+    std::size_t at  = 10;
+    const auto fits = [&](std::size_t n) { return at <= d.size() && d.size() - at >= n; };
+    for (int k = 0; k < 6; ++k) {
+        if (!fits(1)) return 0;
+        at += 1 + std::size_t{d[at]};
+    }
+    at += 79;
+    for (int k = 0; k < 2; ++k) {
+        if (!fits(9)) return 0;
+        at += 9 + static_cast<std::size_t>(le32(d.data() + at + 5));
+    }
+    at += 26;
+    if (!fits(1)) return 0;
+    if (d[at] == 0) at += 75;
+    at += 3;
+    if (!fits(4)) return 0;
+    at += 4 + 5 * static_cast<std::size_t>(le32(d.data() + at));
+    if (!fits(4) || le32(d.data() + at) != 0) return 0;
+    return at + 4;
 }
 
 // A record of .2cbg or .2cba, framed.
@@ -284,8 +361,10 @@ class TwoCbhReader final : public FormatReader {
         std::array<uint8_t, RECORD> b{};
         const auto r = headers_->read(uint64_t{id} * RECORD, RECORD);
         std::copy(r.begin(), r.end(), b.begin());
+        // As in the older format: bit 0 a game or a text, bit 1 a text, bit 7 deleted.
+        if (!(b[0] & 1)) return RecordKind::Unknown;
+        if (b[0] & 2) return RecordKind::Text;
         if (b[0] & 0x80) return RecordKind::Deleted;
-        if ((b[0] & 0x7F) != 1) return RecordKind::Unknown;
         out.order = Order::Pgn;
         tags(b, out);
         out.builder.reset(chess::Board());
@@ -349,18 +428,66 @@ class TwoCbhReader final : public FormatReader {
         addTag(out, "EventDate", event_date);
     }
 
+    // The pieces of a board (FEN letters by square, rank * 8 + file) as a FEN writes them.
+    static std::string placementText(const std::array<char, 64>& board) {
+        std::string fen;
+        for (int rank = 7; rank >= 0; --rank) {
+            int empty = 0;
+            for (int f = 0; f < 8; ++f) {
+                const char c = board[rank * 8 + f];
+                if (!c) {
+                    ++empty;
+                    continue;
+                }
+                if (empty) fen += static_cast<char>('0' + empty);
+                empty = 0;
+                fen += c;
+            }
+            if (empty) fen += static_cast<char>('0' + empty);
+            if (rank) fen += '/';
+        }
+        return fen;
+    }
+
     void walk(const std::vector<uint8_t>& content, RawGame& out) {
         missing_ = 0;
+        group_   = 0;
         std::vector<uint32_t> words(content.size() / 2);
         for (std::size_t i = 0; i < words.size(); ++i) words[i] = le16(content.data() + 2 * i);
-        if (words.empty() || words[0] != 1) throw Damage("a move record of an unknown kind");
+        if (words.empty() || (words[0] != 1 && words[0] != 2)) throw Damage("a move record of an unknown kind");
+        if (words[0] == 2) {
+            // A Chess960 game: fffb, its start's number, fffc, its moves, whose castling is that of its start.
+            if (words.size() < 4 || words[1] != SETUP || words[3] != MOVES || words[2] >= 960)
+                throw Damage("its Chess960 start is not one");
+            const auto board = chess960Placement(static_cast<int>(words[2]));
+            std::array<int, 2> rooks{-1, -1};  // the files of the queen's side's rook and the king's side's
+            for (int f = 0; f < 8; ++f)
+                if (board[f] == 'R') rooks[rooks[0] < 0 ? 0 : 1] = f;
+            const std::string castling = {static_cast<char>('A' + rooks[1]), static_cast<char>('A' + rooks[0]),
+                                          static_cast<char>('a' + rooks[1]), static_cast<char>('a' + rooks[0])};
+            chess::Board start;
+            start.set960(true);
+            start.setFen(placementText(board) + " w " + castling + " - 0 1");
+            out.chess960 = true;
+            addTag(out, "Variant", "Chess960");
+            out.fen = start.getFen();
+            out.builder.reset(start);
+            group_ = words[2] + 1;
+            play(std::span<const uint32_t>(words).subspan(4), out);
+            return;
+        }
         std::size_t i = 1;
         std::array<char, 64> board{};
         int move_number  = 1;
+        bool black       = false;
+        uint32_t rights  = 0;
         const bool setup = i < words.size() && words[i] == SETUP;
         if (setup) {
             if (i + 4 > words.size()) throw Damage("its start position is cut");
             move_number = static_cast<int>(words[i + 1]);
+            if ((words[i + 2] & 0xFF) > 1) throw Damage("its start position is not one");
+            black  = (words[i + 2] & 0xFF) == 1;
+            rights = (words[i + 2] >> 8) & 0x0F;
             for (i += 4; i < words.size() && words[i] != MOVES; ++i) {
                 const auto piece = setupPiece(words[i]);
                 if (!piece || board[piece->second]) throw Damage("its start position is not one");
@@ -369,45 +496,31 @@ class TwoCbhReader final : public FormatReader {
         }
         if (i >= words.size() || words[i] != MOVES) throw Damage("its moves do not start");
         const std::span<const uint32_t> moves(words.data() + i + 1, words.size() - i - 1);
-        const auto& table = moveTable();
         if (!setup) {
             play(moves, out);
             return;
         }
-        // The side to move is the first move's; the castling rights those its castling needs, the en passant
-        // square that of a first move taking en passant.
-        bool black     = false;
+        // The en passant square: that of a first move taking en passant.
         std::string ep = "-";
-        for (const uint32_t w : moves) {
-            if (w == 0 || w >= TABLE_END) break;
-            black = !table[w].white;
-            if (table[w].en_passant)
-                ep = std::string{static_cast<char>('a' + table[w].to % 8), static_cast<char>('1' + table[w].to / 8)};
-            break;
+        if (!moves.empty() && moves[0] >= 1 && moves[0] < CASTLING && moveTable()[moves[0]].en_passant) {
+            const int to = moveTable()[moves[0]].to;
+            ep           = std::string{static_cast<char>('a' + to % 8), static_cast<char>('1' + to / 8)};
         }
+        // The castling rights where the king and the rook stand for them. A castling whose right the start lacks
+        // is given it when they do.
+        const auto stands = [&](char right) {
+            const int back = right < 'a' ? 0 : 56, rook = right == 'K' || right == 'k' ? 7 : 0;
+            return board[back + 4] == (right < 'a' ? 'K' : 'k') && board[back + rook] == (right < 'a' ? 'R' : 'r');
+        };
         std::string castling;
+        for (const auto& [bit, right] : {std::pair{1, 'K'}, std::pair{0, 'Q'}, std::pair{3, 'k'}, std::pair{2, 'q'}})
+            if ((rights >> bit & 1) && stands(right)) castling += right;
         for (int attempt = 0;; ++attempt) {
-            std::string fen;
-            for (int rank = 7; rank >= 0; --rank) {
-                int empty = 0;
-                for (int f = 0; f < 8; ++f) {
-                    const char c = board[rank * 8 + f];
-                    if (!c) {
-                        ++empty;
-                        continue;
-                    }
-                    if (empty) fen += static_cast<char>('0' + empty);
-                    empty = 0;
-                    fen += c;
-                }
-                if (empty) fen += static_cast<char>('0' + empty);
-                if (rank) fen += '/';
-            }
             std::string sorted;
             for (const char c : {'K', 'Q', 'k', 'q'})
                 if (castling.find(c) != std::string::npos) sorted += c;
-            fen += std::string(black ? " b " : " w ") + (sorted.empty() ? "-" : sorted) + " " + ep + " 0 " +
-                   std::to_string(std::max(1, move_number));
+            const auto fen = placementText(board) + (black ? " b " : " w ") + (sorted.empty() ? "-" : sorted) + " " +
+                             ep + " 0 " + std::to_string(std::max(1, move_number));
             if (!tour::readableFen(fen)) throw Damage("its start position is not one");
             chess::Board start(fen);
             if (!tour::legalPosition(start)) throw Damage("its start position is not legal");
@@ -417,17 +530,11 @@ class TwoCbhReader final : public FormatReader {
                 play(moves, out);
                 return;
             } catch (const Damage&) {
-                // A castling the start's rights lack: the right added, when the king and the rook allow it.
                 const char want = missing_;
                 missing_        = 0;
-                if (want && attempt < 4 && castling.find(want) == std::string::npos) {
+                if (want && attempt < 4 && castling.find(want) == std::string::npos && stands(want)) {
                     castling += want;
-                    chess::Board check(fen.substr(0, fen.find(' ')) + (black ? " b " : " w ") + std::string(1, want) +
-                                       " - 0 1");
-                    using Side      = chess::Board::CastlingRights::Side;
-                    const auto side = want == 'K' || want == 'k' ? Side::KING_SIDE : Side::QUEEN_SIDE;
-                    if (check.castlingRights().has(want < 'a' ? chess::Color::WHITE : chess::Color::BLACK, side))
-                        continue;
+                    continue;
                 }
                 throw;
             }
@@ -440,6 +547,10 @@ class TwoCbhReader final : public FormatReader {
         for (std::size_t i = 0; i < words.size(); ++i) {
             const uint32_t w = words[i];
             const auto where = "word " + std::to_string(i + 1) + " of its moves";
+            if (w == PASS) {
+                tree.play(chess::Move(chess::Move::NULL_MOVE));
+                continue;
+            }
             if (w == ALTERNATIVE) {
                 if (tree.pendingCount() >= 1024) throw Damage(where + ": variations nested too deep");
                 tree.branchLast();
@@ -449,22 +560,30 @@ class TwoCbhReader final : public FormatReader {
                 if (!tree.endLine()) return;  // the tree's end: what follows is left over
                 continue;
             }
-            if (w == 0 || w >= TABLE_END) throw Damage(where + ": " + std::to_string(w) + " is not a move");
-            const auto& m     = table[w];
             const auto& board = tree.board();
             const bool white  = board.sideToMove() == chess::Color::WHITE;
-            if (static_cast<bool>(m.white) != white) throw Damage(where + ": a move of the side not to move");
-            const auto move = m.castle ? legalMove(board, -1, -1, -1, m.castle)
-                                       : legalMove(board, m.from, m.to, m.promotion == 7 ? -1 : m.promotion);
-            if (!move) {
-                if (m.castle) {
-                    using Side      = chess::Board::CastlingRights::Side;
-                    const auto side = m.castle == 1 ? Side::KING_SIDE : Side::QUEEN_SIDE;
-                    if (!board.castlingRights().has(board.sideToMove(), side))
-                        missing_ = static_cast<char>((m.castle == 1 ? 'K' : 'Q') + (white ? 0 : 32));
+            if (w >= CASTLING && w < FIRST_PIECE) {
+                // Four words a start: White's long castling and short, then Black's.
+                const uint32_t group = (w - CASTLING) / 4, which = (w - CASTLING) % 4;
+                if (group != group_) throw Damage(where + ": the castling of another start");
+                if ((which < 2) != white) throw Damage(where + ": a move of the side not to move");
+                const int castle = which % 2 ? 1 : 2;
+                const auto move  = legalMove(board, -1, -1, -1, castle);
+                if (!move) {
+                    using Side = chess::Board::CastlingRights::Side;
+                    if (!board.castlingRights().has(board.sideToMove(),
+                                                    castle == 1 ? Side::KING_SIDE : Side::QUEEN_SIDE))
+                        missing_ = static_cast<char>((castle == 1 ? 'K' : 'Q') + (white ? 0 : 32));
+                    throw Damage(where + ": a move that is not legal");
                 }
-                throw Damage(where + ": a move that is not legal");
+                tree.play(*move);
+                continue;
             }
+            if (w == 0 || w >= CASTLING) throw Damage(where + ": " + std::to_string(w) + " is not a move");
+            const auto& m = table[w];
+            if (static_cast<bool>(m.white) != white) throw Damage(where + ": a move of the side not to move");
+            const auto move = legalMove(board, m.from, m.to, m.promotion == 7 ? -1 : m.promotion);
+            if (!move) throw Damage(where + ": a move that is not legal");
             tree.play(*move);
         }
     }
@@ -529,6 +648,63 @@ class TwoCbhReader final : public FormatReader {
                                                         item == 3 ? square(c[i + 2]) : static_cast<int8_t>(-1)});
                         }
                         at += len;
+                        break;
+                    }
+                    case 0x08:
+                    case 0x16:
+                    case 0x17:
+                    case 0x22:
+                    case 0x23:
+                    case 0x25:
+                        // Of a kind not named here; White's clock and Black's in milliseconds; medals, a bit each; a
+                        // variation's colour; a time in a video.
+                        need(4);
+                        n.value = le32(c.data() + at);
+                        at += 4;
+                        break;
+                    case 0x14:
+                    case 0x18:
+                        // A pawn structure; a critical position.
+                        need(1);
+                        at += 1;
+                        break;
+                    case 0x15:
+                    case 0x20: {
+                        // A piece's path: a length, its data. A video: 4 bytes, a length, its data.
+                        const std::size_t head = type == 0x15 ? 4 : 8;
+                        need(head);
+                        const uint32_t len = le32(c.data() + at + head - 4);
+                        at += head;
+                        need(len);
+                        at += len;
+                        break;
+                    }
+                    case 0x1C: {
+                        // A web link: a byte, then its address and its text, each a length and its bytes.
+                        need(5);
+                        const uint32_t address = le32(c.data() + at + 1);
+                        at += 5;
+                        need(address);
+                        at += address;
+                        need(4);
+                        const uint32_t text = le32(c.data() + at);
+                        at += 4;
+                        need(text);
+                        at += text;
+                        break;
+                    }
+                    case 0x09:
+                    case 0x13: {
+                        // A training question, a game quoted: their size alone is read.
+                        const std::span rest(c.data() + at, c.size() - at);
+                        const std::size_t size = type == 0x09 ? trainingSize(rest) : quotationSize(rest);
+                        if (size == 0) {
+                            // A layout not known here: the annotations after it cannot be found.
+                            n.decoded = false;
+                            out.notes.push_back(std::move(n));
+                            return;
+                        }
+                        at += size;
                         break;
                     }
                     case 0x07:
@@ -625,7 +801,8 @@ class TwoCbhReader final : public FormatReader {
     std::optional<Segment> moves_, notes_;
     std::optional<Names> names_;
     uint32_t records_ = 0;
-    char missing_     = 0;
+    char missing_     = 0;  // the castling right whose lack made the last walk fail
+    uint32_t group_   = 0;  // the castling words' group of the game's start: 0 the standard one
 };
 
 }  // namespace

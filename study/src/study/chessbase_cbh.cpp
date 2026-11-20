@@ -280,39 +280,6 @@ int rookFile(const Setup& s, bool white, bool king_side) {
     return king_file == 4 && wing(home) ? home : -1;
 }
 
-std::array<char, 64> chess960Placement(int index) {
-    std::array<char, 64> board{};
-    if (index < 0 || index >= 960) return board;
-    static constexpr std::array<std::pair<int, int>, 10> knights = {
-        {{0, 1}, {0, 2}, {0, 3}, {0, 4}, {1, 2}, {1, 3}, {1, 4}, {2, 3}, {2, 4}, {3, 4}}};
-    std::array<char, 8> files;
-    files.fill('R');
-    const int light = 2 * (index % 4) + 1, dark = 2 * ((index / 4) % 4);
-    files[light] = files[dark] = 'B';
-    std::vector<int> free;
-    for (int f = 0; f < 8; ++f)
-        if (f != light && f != dark) free.push_back(f);
-    const auto take = [&](std::size_t i) {
-        const int f = free[i];
-        free.erase(free.begin() + static_cast<std::ptrdiff_t>(i));
-        return f;
-    };
-    files[take(static_cast<std::size_t>((index / 16) % 6))] = 'Q';
-    const auto [k1, k2]                                     = knights[static_cast<std::size_t>(index / 96)];
-    files[take(static_cast<std::size_t>(k1))]               = 'N';
-    files[take(static_cast<std::size_t>(k2 - 1))]           = 'N';
-    files[take(0)]                                          = 'R';
-    files[take(0)]                                          = 'K';
-    files[take(0)]                                          = 'R';
-    for (int f = 0; f < 8; ++f) {
-        board[f]      = files[f];
-        board[56 + f] = static_cast<char>(files[f] + 32);
-        board[8 + f]  = 'P';
-        board[48 + f] = 'p';
-    }
-    return board;
-}
-
 // The start section; none when its board holds a piece of an unknown kind.
 std::optional<Setup> decodeStart(std::span<const uint8_t> start, std::span<const uint8_t> extra) {
     Setup s;

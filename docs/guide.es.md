@@ -724,11 +724,11 @@ y aperturas contendría; *Crear el libro…* pregunta dónde escribir el archivo
 (`hmvc`, `fmvn`) y su apertura como `c0`, y lo añade a la biblioteca.
 
 ### Libros a partir de las posiciones evaluadas
-<!-- en: books-from-the-evaluated-positions 48770901 -->
+<!-- en: books-from-the-evaluated-positions 82dd002c -->
 
 *A partir de las posiciones evaluadas de Lichess…*, en **Crear…**, crea un libro con las posiciones que habían analizado
 los jugadores de Lichess: las de las líneas de las aperturas con nombre y a una jugada de ellas, cada una con su
-evaluación y su profundidad. Vienen de la base de datos de evaluaciones de Lichess (CC0, unos 21 GB y 290 millones de
+evaluación y su profundidad. Vienen de la base de datos de evaluaciones de Lichess (CC0, 22,5 GB y 418 millones de
 posiciones): su tamaño se pregunta a database.lichess.org y se indica antes de descargar nada; *Descargar y leer* la lee
 a medida que llega, y solo conserva las posiciones encontradas (unos pocos megabytes, en el perfil), no el archivo.
 *Leer un archivo ya descargado…* lee en su lugar un `lichess_db_eval.jsonl.zst` del disco. De la máquina no sale nada
@@ -854,7 +854,7 @@ El análisis espera mientras se muestra otra página, y continúa cuando se vuel
 análisis* (o A) lo detiene, y un punto en el botón *Tablero* de la barra indica cuándo está en marcha. Su motor no es
 uno de los procesos del torneo: el final de un torneo no lo detiene. Detenido el análisis, su motor sigue iniciado para
 la siguiente búsqueda, con su tabla hash (y la memoria de GPU de un motor de red neuronal): el botón de encendido junto
-al motor, *Descargar el motor* (también en la paleta de comandos), lo cierra, y también el de la amenaza.
+al motor, *Liberar el motor* (también en la paleta de comandos), lo cierra, y también el de la amenaza.
 
 ### Analizar una partida entera
 <!-- en: analysing-a-whole-game a7e6166c -->
@@ -1063,7 +1063,7 @@ evaluaciones de cada motor en las posiciones de la partida que buscó se muestra
 color (*análisis en directo*), y las del primer motor como la curva mientras la partida no tiene análisis.
 
 Mientras se juega en Lichess una de tus partidas, todos los motores se detienen al momento, y el Tablero de estudio no
-muestra ninguna de sus flechas (consulta [Juego limpio](#juego-limpio)). *Descargar los motores del análisis*, en el
+muestra ninguna de sus flechas (consulta [Juego limpio](#juego-limpio)). *Liberar los motores del análisis*, en el
 menú de un motor o en la paleta de comandos, termina sus procesos. Cada gesto de la pestaña está en la paleta de
 comandos (Ctrl+K): un motor añadido, hecho el primero o quitado, sus ajustes, los hilos del análisis.
 
@@ -1183,20 +1183,20 @@ apertura, demasiadas partidas llegan a la posición para buscar las más fuertes
 partidas de la posición en «…»* las lista en la base de datos.
 
 ### Más sobre el explorador
-<!-- en: the-explorer-more 40c92109 -->
+<!-- en: the-explorer-more 1471aca0 -->
 
 Con las fuentes de Lichess en la pestaña Árbol, **las partidas que nombra el explorador** aparecen bajo las jugadas: las
 partidas de maestros que llegan a la posición (*Partidas de maestros*), o las partidas fuertes jugadas en Lichess; un
 clic pide la partida a Lichess y la abre en el tablero, en la posición que mostraba el árbol.
 
-Para los jugadores de Lichess, *Cada jugada mes a mes* pregunta a Lichess, para cada jugada de la lista, cuántas
-partidas la jugaron mes a mes: una línea de sus dos últimos años en la columna *Por mes*, verde cuando se juega más
-últimamente, roja cuando menos; bajo el ratón, sus partidas de los últimos seis meses frente a las de los seis
+Con la fuente *Lichess* (todos sus jugadores), *Cada jugada mes a mes* pregunta a Lichess, para cada jugada de la lista,
+cuántas partidas la jugaron mes a mes: una línea de sus dos últimos años en la columna *Por mes*, verde cuando se juega
+más últimamente, roja cuando menos; bajo el ratón, sus partidas de los últimos seis meses frente a las de los seis
 anteriores. El resumen dice lo mismo de la posición. Cuesta una petición por jugada, así que sigue desactivado hasta que
 lo pides; el explorador de los maestros no tiene meses.
 
 ### La revisión de una partida
-<!-- en: the-review-of-a-game 7cf820c0 -->
+<!-- en: the-review-of-a-game 4c333a51 -->
 
 En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (G) como lo haría un
 entrenador:
@@ -1219,7 +1219,7 @@ los hechos de la revisión: sus veredictos y evaluaciones, los momentos clave, l
 partida, con lo que dijeron las tablas de Lichess. El verificador de los comentarios ciñe cada pasaje a esos hechos:
 cada jugada, evaluación y nombre que cita debe venir de la revisión. Un pasaje rechazado se escribe de nuevo; rechazado
 dos veces, cede su sitio al de la plantilla. Una tarjeta del color del asistente dice que el modelo escribió la
-historia y que se comprobó, y lo que rechazó el verificador. *La versión de las plantillas* muestra a su lado la
+historia y que se comprobó, y lo que rechazó el verificador. *La versión de las plantillas* muestra en su lugar la
 historia de las plantillas, *Escribirla de nuevo* hace que el modelo la cuente de otra manera (también con Ctrl+K),
 *Copiarla* copia la historia mostrada. Sin el modelo (no descargado, u otro archivo GGUF que no ha aprendido los
 comentarios de RookStudio), o mientras un torneo en esta máquina ocupa el procesador, la historia es la de las
@@ -1321,7 +1321,7 @@ entonces), solo entran las partidas nuevas. Los nombres de los jugadores se escr
 «Apellido, Nombre».
 
 ### TWIC
-<!-- en: twic fa3a19dd -->
+<!-- en: twic d0572313 -->
 
 *Desde una fuente…* trae partidas de un sitio web, descargadas solo cuando lo pides. **TWIC**, The Week in Chess,
 publica cada lunes un número con las partidas de la semana: su hoja pide a theweekinchess.com su lista de números y
@@ -1334,8 +1334,8 @@ jugadores con mejor rating; un nombre abre sus partidas en la lista.
 
 *Cada lunes, buscar un número nuevo* está desactivado hasta que lo marcas. Marcado, RookStudio pide la lista de números
 mientras está abierto, cuatro veces al día como máximo; un número nuevo aparece bajo la lista de bases de datos, en
-*Fuentes seguidas*, y en la tarjeta *Mis bases de datos* de la página Inicio, con *Añadir*: nunca se añade sin ti. Lo
-que sale de la máquina: la petición de la lista de números, y luego de los archivos PGN de los números elegidos, nada
+*Fuentes seguidas*, y en la tarjeta *Mis bases de datos* de la página Inicio, con *Añadir a «…»*: nunca se añade sin ti.
+Lo que sale de la máquina: la petición de la lista de números, y luego de los archivos PGN de los números elegidos, nada
 más. TWIC es gratis para uso personal; nada de él se distribuye con RookStudio.
 
 ### Meses de Lichess
@@ -1394,7 +1394,7 @@ siguen el repertorio que encuentran respuesta hasta el final de sus líneas, o h
 línea que termina en una jugada del rival. Un clic muestra la posición, con el árbol al lado.
 
 ### Entrenar un repertorio
-<!-- en: training-a-repertoire d1994455 -->
+<!-- en: training-a-repertoire d5d14dcc -->
 
 Cada posición de un repertorio en la que te toca jugar, y en la que el repertorio tiene tu jugada, es una posición que
 entrenar. RookStudio te las pregunta una y otra vez, cada vez más espaciadas a medida que las sabes, con FSRS, la
@@ -1402,10 +1402,10 @@ repetición espaciada que usa Anki: una posición bien respondida vuelve a los p
 que fallas vuelve más tarde en la sesión, y luego al día siguiente.
 
 La tarjeta **Entrenar** de la página Aperturas cuenta las posiciones previstas para hoy, las nuevas de hoy, y las que
-sabes, previstas para más tarde. *Iniciar* (Intro) pregunta las posiciones previstas y luego las nuevas de hoy; *Solo
-las nuevas* pregunta solo las nuevas. Las posiciones nuevas llegan en el orden en que más las encuentran tus bases de
-datos, las más jugadas primero, 20 al día como máximo (el botón de al lado, *20 al día*, lo cambia). Debajo: lo que
-vuelve mañana, en tres días y en una semana.
+sabes, previstas para más tarde. *Iniciar · N posiciones* (Intro) pregunta las posiciones previstas y luego las nuevas
+de hoy; *Solo las nuevas* pregunta solo las nuevas. Las posiciones nuevas llegan en el orden en que más las encuentran
+tus bases de datos, las más jugadas primero, 20 al día como máximo (el botón de al lado, *20 al día*, lo cambia).
+Debajo: lo que vuelve mañana, en tres días y en una semana.
 
 Una sesión ocupa la página Tablero, cuya columna pasa a ser la del entrenamiento; la partida que estaba en el tablero
 espera entre las partidas recientes y vuelve después. RookStudio juega las jugadas de tu rival siguiendo el repertorio
@@ -1426,7 +1426,7 @@ posición con la pestaña Árbol; *Añadir … al repertorio* hace de la jugada 
 ahí (Ctrl+Z la quita).
 
 Al final: las cifras, las jugadas que fallaste (un clic muestra la posición, con la jugada de tu repertorio) y *Repasar
-… ahora*.
+ahora las … posiciones falladas*.
 
 Los repasos se guardan en el perfil junto al repertorio (`Najdorf.training.json`, y `Najdorf.reviews.jsonl`, una línea
 por respuesta): su PGN no cambia. Una jugada cambiada en el repertorio vuelve a hacer nueva su posición. Nada sale de la
@@ -1557,7 +1557,7 @@ retransmisión seguida sin una cuenta autorizada a leer retransmisiones: la prim
 *Retransmisiones*.
 
 ### Más sobre una retransmisión
-<!-- en: more-of-a-broadcast d4233fd7 -->
+<!-- en: more-of-a-broadcast eed19086 -->
 
 A la derecha del mosaico de una retransmisión, bajo la ronda, **la clasificación**: el puesto, el título, el rating y
 los puntos de cada jugador tal como los dan los organizadores (la federación, el equipo, el rendimiento y la variación
@@ -1566,8 +1566,8 @@ y luego por puntos de partida. Lichess los da sin cuenta; se vuelven a pedir cad
 mosaico.
 
 *Todo el torneo*, junto al nombre de una ronda, sigue todas las rondas en curso del torneo, y cada una de las siguientes
-en cuanto empieza: el mosaico muestra la ronda en directo, y **Rondas**, encima, muestra otra (un clic en la que está en
-directo vuelve a seguir las siguientes). Cada ronda pasa a la base de datos *Retransmisiones* al terminar.
+en cuanto empieza: el mosaico muestra la ronda en directo, y **Las rondas**, encima, muestra otra (un clic en la que
+está en directo vuelve a seguir las siguientes). Cada ronda pasa a la base de datos *Retransmisiones* al terminar.
 
 **Buscar en las retransmisiones**, arriba de las retransmisiones oficiales, busca una reciente por su nombre: Lichess
 solo responde a una cuenta con permiso para leer retransmisiones, que se pide la primera vez. *Volver a la lista*
@@ -2653,15 +2653,16 @@ también en Windows el proxy viene de estas variables, no de la configuración d
 compatibles.
 
 ### Tu propia retransmisión de Lichess
-<!-- en: your-own-lichess-broadcast 9acdf587 -->
+<!-- en: your-own-lichess-broadcast 114edd02 -->
 
 *Retransmitir en Lichess…*, en la cabecera de un torneo que se juega en esta máquina, abre una hoja: el nombre de la
-retransmisión (al principio, el del torneo), no listada (para quienes tengan su enlace) salvo que se elija *Pública*, y
-lo que se envía a Lichess: el nombre, el formato y el control de tiempo del torneo, y el PGN de cada partida. *Crear la
-retransmisión* pide a tu cuenta vinculada un permiso más la primera vez, crear estudios y retransmisiones (para ello se
-abre la página de Lichess), o vincula la cuenta con él; el token pegado en la tarjeta lichess de arriba sirve cuando no
-hay ninguna cuenta vinculada. Luego las partidas van a la retransmisión como se describe arriba, y un aviso bajo la
-cabecera dice cuántas se enviaron y cuándo se envió la última, con *Abrir en lichess.org* y *Detener*.
+retransmisión (al principio, el del torneo), no listada (para quienes tengan su enlace) salvo que se elija *Pública:
+listada en Lichess*, y lo que se envía a Lichess: el nombre, el formato y el control de tiempo del torneo, y el PGN de
+cada partida. *Crear la retransmisión* pide a tu cuenta vinculada un permiso más la primera vez, crear estudios y
+retransmisiones (para ello se abre la página de Lichess), o vincula la cuenta con él; el token pegado en la tarjeta
+lichess de arriba sirve cuando no hay ninguna cuenta vinculada. Luego las partidas van a la retransmisión como se
+describe arriba, y un aviso bajo la cabecera dice cuántas se enviaron y cuándo se envió la última, con *Abrir en
+lichess.org* y *Detener*.
 
 ### Un encuentro por equipos en directo
 <!-- en: a-team-match-on-the-air fd32027f -->

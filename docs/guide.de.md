@@ -747,14 +747,14 @@ EPD-Datei geschrieben werden soll, jede Stellung mit ihrer Zugnummer (`hmvc`, `f
 fügt sie zur Bibliothek hinzu.
 
 ### Bücher aus den bewerteten Stellungen
-<!-- en: books-from-the-evaluated-positions 48770901 -->
+<!-- en: books-from-the-evaluated-positions 82dd002c -->
 
 *Aus den bewerteten Stellungen von Lichess…* in **Erstellen…** erstellt ein Buch aus den Stellungen, die die Spieler von
 Lichess analysiert hatten: denen der Varianten der benannten Eröffnungen und denen, die einen Zug davon abweichen, jede
-mit ihrer Bewertung und deren Tiefe. Sie stammen aus der Bewertungsdatenbank von Lichess (CC0, etwa 21 GB und 290
-Millionen Stellungen): Ihre Größe wird bei database.lichess.org abgefragt und genannt, bevor irgendetwas heruntergeladen
-wird; *Herunterladen und lesen* liest sie, während sie ankommt, und behält nur die gefundenen Stellungen (ein paar
-Megabyte, im Profil), nicht die Datei. *Eine schon heruntergeladene Datei lesen…* liest stattdessen eine
+mit ihrer Bewertung und deren Tiefe. Sie stammen aus der Bewertungsdatenbank von Lichess (CC0, 22,5 GB und 418 Millionen
+Stellungen): Ihre Größe wird bei database.lichess.org abgefragt und genannt, bevor irgendetwas heruntergeladen wird;
+*Herunterladen und lesen* liest sie, während sie ankommt, und behält nur die gefundenen Stellungen (ein paar Megabyte,
+im Profil), nicht die Datei. *Eine schon heruntergeladene Datei lesen…* liest stattdessen eine
 `lichess_db_eval.jsonl.zst` von der Festplatte. Außer der Anfrage nach der Datei verlässt nichts den Computer. Das Lesen
 zeigt, wie viel gelesen und behalten ist; *Abbrechen*, eine Netzunterbrechung oder das geschlossene Programm behält, was
 gelesen wurde, und *Fortsetzen* macht dort weiter (eine seither auf dem Server geänderte Datei wird von vorn gelesen).
@@ -1216,20 +1216,20 @@ viele Partien die Stellung, um nach den stärksten zu suchen: Der Tab Baum sagt 
 „…“* listet sie in der Datenbank auf.
 
 ### Mehr vom Explorer
-<!-- en: the-explorer-more 40c92109 -->
+<!-- en: the-explorer-more 1471aca0 -->
 
 Mit den Quellen von Lichess im Tab Baum erscheinen **die Partien, die der Explorer nennt**, unter den Zügen: die
 Meisterpartien, die die Stellung erreichen (*Meisterpartien*), oder die starken auf Lichess gespielten; ein Klick fragt
 Lichess nach der Partie und öffnet sie auf dem Brett, bei der Stellung, die der Baum zeigte.
 
-Für die Spieler von Lichess fragt *Jeder Zug Monat für Monat* Lichess für jeden aufgelisteten Zug, wie viele Partien ihn
-Monat für Monat gespielt haben: eine Linie seiner letzten zwei Jahre in der Spalte *Pro Monat*, grün, wenn er zuletzt
-häufiger gespielt wird, rot, wenn seltener; unter der Maus seine Partien der letzten sechs Monate gegenüber den sechs
-davor. Die Zusammenfassung sagt dasselbe über die Stellung. Das kostet eine Anfrage pro Zug, deshalb bleibt es aus, bis
-es verlangt wird; der Explorer der Meister hat keine Monate.
+Mit der Quelle *Lichess* (alle ihre Spieler) fragt *Jeder Zug Monat für Monat* Lichess für jeden aufgelisteten Zug, wie
+viele Partien ihn Monat für Monat gespielt haben: eine Linie seiner letzten zwei Jahre in der Spalte *Pro Monat*, grün,
+wenn er zuletzt häufiger gespielt wird, rot, wenn seltener; unter der Maus seine Partien der letzten sechs Monate
+gegenüber den sechs davor. Die Zusammenfassung sagt dasselbe über die Stellung. Das kostet eine Anfrage pro Zug, deshalb
+bleibt es aus, bis es verlangt wird; der Explorer der Meister hat keine Monate.
 
 ### Die Auswertung einer Partie
-<!-- en: the-review-of-a-game 7cf820c0 -->
+<!-- en: the-review-of-a-game 4c333a51 -->
 
 Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (G), wie es ein Trainer
 täte:
@@ -1359,7 +1359,7 @@ in ChessBase hinzugefügte Partien) kommen nur die neuen Partien hinzu. Die Name
 die Datenbank sie schreibt, „Nachname, Vorname“.
 
 ### TWIC
-<!-- en: twic fa3a19dd -->
+<!-- en: twic d0572313 -->
 
 *Aus einer Quelle…* holt Partien von einer Website, nur heruntergeladen, wenn du es verlangst. **TWIC**, The Week in
 Chess, veröffentlicht jeden Montag eine Ausgabe mit den Partien der Woche: Sein Bereich fragt theweekinchess.com nach
@@ -1373,9 +1373,10 @@ Partien in der Liste.
 
 *Jeden Montag nach einer neuen Ausgabe suchen* ist aus, bis du es anhakst. Angehakt fragt RookStudio, solange es offen
 ist, nach der Liste der Ausgaben, höchstens viermal am Tag; eine neue Ausgabe erscheint unter der Liste der Datenbanken
-in *Verfolgte Quellen* und auf der Karte *Meine Datenbanken* der Startseite, mit *Hinzufügen*: Sie wird nie ohne dich
-hinzugefügt. Was den Computer verlässt: die Anfrage nach der Liste der Ausgaben, dann nach den PGN-Dateien der gewählten
-Ausgaben, sonst nichts. TWIC ist für den persönlichen Gebrauch frei; nichts davon wird mit RookStudio ausgeliefert.
+in *Verfolgte Quellen* und auf der Karte *Meine Datenbanken* der Startseite, mit *Zu „…“ hinzufügen*: Sie wird nie ohne
+dich hinzugefügt. Was den Computer verlässt: die Anfrage nach der Liste der Ausgaben, dann nach den PGN-Dateien der
+gewählten Ausgaben, sonst nichts. TWIC ist für den persönlichen Gebrauch frei; nichts davon wird mit RookStudio
+ausgeliefert.
 
 ### Lichess-Monate
 <!-- en: lichess-months 26060e4f -->
@@ -1435,7 +1436,7 @@ Partien entlang des Repertoires, die bis zum Ende seiner Varianten eine Antwort 
 eine Variante, die mit einem Zug des Gegners endet. Ein Klick zeigt die Stellung, mit dem Baum daneben.
 
 ### Ein Repertoire trainieren
-<!-- en: training-a-repertoire d1994455 -->
+<!-- en: training-a-repertoire d5d14dcc -->
 
 Jede Stellung eines Repertoires, in der du am Zug bist und für die das Repertoire deinen Zug hat, ist eine
 Trainingsstellung. RookStudio fragt sie immer wieder ab, in immer größeren Abständen, je öfter du sie weißt, mit FSRS,
@@ -1443,10 +1444,10 @@ der verteilten Wiederholung, die Anki verwendet: Eine richtig beantwortete Stell
 dann nach Wochen; eine, die du verfehlst, kommt später in der Sitzung wieder, dann am nächsten Tag.
 
 Die Karte **Trainieren** der Seite Eröffnungen zählt die heute fälligen Stellungen, die neuen von heute und die, die du
-weißt und die später fällig sind. *Start* (Enter) fragt die fälligen Stellungen ab, dann die neuen von heute; *Nur die
-neuen* fragt nur die neuen ab. Neue Stellungen kommen in der Reihenfolge, in der deine Datenbanken sie am häufigsten
-antreffen, die meistgespielten zuerst, höchstens 20 pro Tag (der Knopf daneben, *20 pro Tag*, ändert das). Darunter: was
-morgen, innerhalb von drei Tagen und innerhalb einer Woche wiederkommt.
+weißt und die später fällig sind. *Start · N Stellungen* (Enter) fragt die fälligen Stellungen ab, dann die neuen von
+heute; *Nur die neuen* fragt nur die neuen ab. Neue Stellungen kommen in der Reihenfolge, in der deine Datenbanken sie
+am häufigsten antreffen, die meistgespielten zuerst, höchstens 20 pro Tag (der Knopf daneben, *20 pro Tag*, ändert das).
+Darunter: was morgen, innerhalb von drei Tagen und innerhalb einer Woche wiederkommt.
 
 Eine Sitzung nimmt die Seite Brett ein, deren Spalte zu der des Trainings wird; die Partie, die auf dem Brett war,
 wartet unter den letzten Partien und kommt danach zurück. RookStudio spielt die Züge deines Gegners entlang des
@@ -1467,8 +1468,8 @@ deines Repertoires auf seinen Feldern, in Grün: *Noch einmal* (Enter) fragt sie
 die Stellung mit dem Tab Baum; *… zum Repertoire hinzufügen* macht den gespielten Zug zu einer zweiten dort akzeptierten
 Antwort (Strg+Z nimmt das zurück).
 
-Am Ende: die Zahlen, die verfehlten Züge (ein Klick zeigt die Stellung, mit dem Zug deines Repertoires) und *Die … jetzt
-wiederholen*.
+Am Ende: die Zahlen, die verfehlten Züge (ein Klick zeigt die Stellung, mit dem Zug deines Repertoires) und *Die …
+verfehlten Stellungen jetzt wiederholen*.
 
 Die Wiederholungen werden im Profil neben dem Repertoire aufbewahrt (`Najdorf.training.json` und
 `Najdorf.reviews.jsonl`, eine Zeile pro Antwort): Sein PGN ändert sich nicht. Ein im Repertoire geänderter Zug macht
@@ -1602,7 +1603,7 @@ RookStudio nach dieser Berechtigung (*Auf Lichess erlauben…* oder *Ohne sie ve
 beendet sind, kommt in die Datenbank *Übertragungen*.
 
 ### Mehr von einer Übertragung
-<!-- en: more-of-a-broadcast d4233fd7 -->
+<!-- en: more-of-a-broadcast eed19086 -->
 
 Rechts vom Mosaik einer Übertragung, unter der Runde, **die Tabelle**: Rang, Titel, Wertung und Punkte jedes Spielers,
 wie die Veranstalter sie angeben (die Föderation, die Mannschaft, die Performance und die Wertungsänderung unter der
@@ -1611,7 +1612,7 @@ dann nach Brettpunkten. Lichess liefert sie ohne Konto; sie werden alle zwei Min
 zu sehen ist.
 
 *Das ganze Turnier*, neben dem Namen einer Runde, verfolgt alle laufenden Runden des Turniers und jede nächste, sobald
-sie beginnt: Das Mosaik zeigt die Runde live, und **Runden** darüber zeigt eine andere (ein Klick auf die laufende
+sie beginnt: Das Mosaik zeigt die Runde live, und **Die Runden** darüber zeigt eine andere (ein Klick auf die laufende
 verfolgt wieder die nächsten). Jede Runde kommt an ihrem Ende in die Datenbank *Übertragungen*.
 
 **Übertragungen durchsuchen**, oben bei den offiziellen Übertragungen, sucht eine neuere nach ihrem Namen: Lichess
@@ -2723,16 +2724,16 @@ Hosts von `NO_PROXY`; auch unter Windows kommt der Proxy aus diesen Variablen, n
 SOCKS-Proxys werden nicht unterstützt.
 
 ### Deine eigene Lichess-Übertragung
-<!-- en: your-own-lichess-broadcast 9acdf587 -->
+<!-- en: your-own-lichess-broadcast 114edd02 -->
 
 *Auf Lichess übertragen…* in der Kopfzeile eines Turniers, das auf diesem Computer spielt, öffnet einen Bereich: den
 Namen der Übertragung (anfangs den des Turniers), nicht gelistet (für alle, die ihren Link haben), es sei denn,
-*Öffentlich* ist gewählt, und was an Lichess geht: der Name, Format und Bedenkzeit des Turniers und das PGN jeder
-Partie. *Übertragung erstellen* bittet dein verknüpftes Konto beim ersten Mal um eine weitere Berechtigung, Studien und
-Übertragungen zu erstellen (dafür öffnet sich die Seite von Lichess), oder verknüpft das Konto mit ihr; das in der
-lichess-Karte oben eingefügte Token dient, wenn kein Konto verknüpft ist. Danach gehen die Partien wie oben beschrieben
-an die Übertragung, und ein Banner unter der Kopfzeile sagt, wie viele gesendet wurden und wann die letzte, mit *Auf
-lichess.org öffnen* und *Stopp*.
+*Öffentlich: auf Lichess gelistet* ist gewählt, und was an Lichess geht: der Name, Format und Bedenkzeit des Turniers
+und das PGN jeder Partie. *Übertragung erstellen* bittet dein verknüpftes Konto beim ersten Mal um eine weitere
+Berechtigung, Studien und Übertragungen zu erstellen (dafür öffnet sich die Seite von Lichess), oder verknüpft das Konto
+mit ihr; das in der lichess-Karte oben eingefügte Token dient, wenn kein Konto verknüpft ist. Danach gehen die Partien
+wie oben beschrieben an die Übertragung, und ein Banner unter der Kopfzeile sagt, wie viele gesendet wurden und wann die
+letzte, mit *Auf lichess.org öffnen* und *Stopp*.
 
 ### Ein Mannschaftskampf auf Sendung
 <!-- en: a-team-match-on-the-air fd32027f -->

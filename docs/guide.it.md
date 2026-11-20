@@ -417,8 +417,8 @@ La pagina **Home** di una vista raccoglie in schede le pagine della vista, a com
 - **Lichess**: l'account, le partite di un giocatore con *Sincronizza*, le nuove partite contate se l'hai scelto, le
   trasmissioni in diretta (vedi [La pagina Lichess](#la-pagina-lichess)).
 - **In corso**: l'analisi della partita, quella della posizione, un'importazione, l'assistente (il suo download, il
-  suo modello caricato, *Scarica*), e le posizioni dei tuoi repertori da ripassare, che un clic allena (vedi
-  [Allenare un repertorio](#allenare-un-repertorio)).
+  suo modello caricato, *Scarica dalla memoria*), e le posizioni dei tuoi repertori da ripassare, che un clic allena
+  (vedi [Allenare un repertorio](#allenare-un-repertorio)).
 
 Il pulsante di ricerca in alto, o Ctrl+K, trova un comando, una partita, un database.
 
@@ -720,11 +720,11 @@ distribuite in modo uniforme sui codici ECO quando ce ne sono di più. Dice quan
 apertura come `c0`, e lo aggiunge alla libreria.
 
 ### Libri dalle posizioni valutate
-<!-- en: books-from-the-evaluated-positions 48770901 -->
+<!-- en: books-from-the-evaluated-positions 82dd002c -->
 
 *Dalle posizioni valutate di Lichess…*, in **Crea…**, genera un libro delle posizioni che i giocatori di Lichess avevano
 analizzato: quelle delle linee delle aperture denominate e a una mossa da esse, ciascuna con la sua valutazione e la
-sua profondità. Vengono dal database delle valutazioni di Lichess (CC0, circa 21 GB e 290 milioni di posizioni): la
+sua profondità. Vengono dal database delle valutazioni di Lichess (CC0, 22,5 GB e 418 milioni di posizioni): la
 sua dimensione viene chiesta a database.lichess.org e indicata prima di scaricare qualsiasi cosa; *Scarica e leggi* lo
 legge mentre arriva, e conserva solo le posizioni trovate (qualche megabyte, nel profilo), non il file. *Leggi un file
 già scaricato…* legge invece un `lichess_db_eval.jsonl.zst` dal disco. Dalla macchina non esce nient'altro che la
@@ -849,7 +849,8 @@ L'analisi attende mentre è mostrata un'altra pagina, e prosegue quando si torna
 l'analisi* (o A) la ferma, e un punto sul pulsante *Scacchiera* della barra indica quando è in corso. Il suo motore non
 è uno dei processi del torneo: la fine di un torneo non lo termina. Fermata l'analisi, il suo motore resta avviato per
 la ricerca successiva, con la sua tabella hash (e la memoria GPU di un motore a rete neurale): il pulsante di accensione
-accanto al motore, *Scarica il motore* (anche nella tavolozza dei comandi), lo termina, insieme a quello della minaccia.
+accanto al motore, *Scarica dalla memoria il motore* (anche nella tavolozza dei comandi), lo termina, insieme a quello
+della minaccia.
 
 ### Analizzare una partita intera
 <!-- en: analysing-a-whole-game a7e6166c -->
@@ -1181,20 +1182,20 @@ raggiungono la posizione per cercare le più forti: la scheda Albero dice di pi�
 «…»* le elenca nel database.
 
 ### Ancora sull'esploratore
-<!-- en: the-explorer-more 40c92109 -->
+<!-- en: the-explorer-more 1471aca0 -->
 
 Con le fonti di Lichess nella scheda Albero, **le partite che l'esploratore indica** compaiono sotto le mosse: le
 partite dei maestri che raggiungono la posizione (*Partite dei maestri*), o quelle forti giocate su Lichess; un clic
 chiede la partita a Lichess e la apre sulla scacchiera, alla posizione che mostrava l'albero.
 
-Per i giocatori di Lichess, *Ogni mossa mese per mese* chiede a Lichess, per ogni mossa elencata, quante partite l'hanno
-giocata mese per mese: una linea dei suoi ultimi due anni nella colonna *Per mese*, verde quando è giocata di più di
-recente, rossa quando di meno; sotto il mouse, le sue partite negli ultimi sei mesi contro i sei precedenti. Il
-riepilogo dice lo stesso della posizione. Costa una richiesta per mossa, quindi resta disattivato finché non lo chiedi;
-l'esploratore dei maestri non ha i mesi.
+Con la fonte *Lichess* (tutti i suoi giocatori), *Ogni mossa mese per mese* chiede a Lichess, per ogni mossa elencata,
+quante partite l'hanno giocata mese per mese: una linea dei suoi ultimi due anni nella colonna *Per mese*, verde quando
+è giocata di più di recente, rossa quando di meno; sotto il mouse, le sue partite negli ultimi sei mesi contro i sei
+precedenti. Il riepilogo dice lo stesso della posizione. Costa una richiesta per mossa, quindi resta disattivato finché
+non lo chiedi; l'esploratore dei maestri non ha i mesi.
 
 ### Il resoconto di una partita
-<!-- en: the-review-of-a-game 7cf820c0 -->
+<!-- en: the-review-of-a-game 4c333a51 -->
 
 Sulla Scacchiera per lo studio, la scheda *Resoconto* accanto alla notazione legge l'analisi della partita (G) come
 farebbe un allenatore:
@@ -1219,7 +1220,7 @@ partita, con ciò che hanno detto le tablebase di Lichess. Ogni brano è vincola
 commenti: ogni mossa, valutazione e nome che cita deve venire dal resoconto. Un brano rifiutato viene riscritto;
 rifiutato due volte, lascia il posto a quello predefinito. Una scheda del colore dell'assistente dice che la storia
 l'ha scritta il modello e che è stata verificata, e cosa ha rifiutato il verificatore. *La versione predefinita*
-mostra accanto la storia dei testi predefiniti, *Riscrivila* la fa raccontare al modello in un altro modo (anche
+mostra al suo posto la storia dei testi predefiniti, *Riscrivila* la fa raccontare al modello in un altro modo (anche
 Ctrl+K), *Copiala* copia la storia mostrata. Senza il modello (non scaricato, o un altro file GGUF che non ha imparato
 i commenti di RookStudio), o mentre un torneo su questa macchina occupa il processore, la storia è quella dei testi
 predefiniti, come indica. Niente esce dalla macchina.
@@ -1323,7 +1324,7 @@ ChessBase nel frattempo), entrano solo le nuove partite. I nomi dei giocatori ve
 database, «Cognome, Nome».
 
 ### TWIC
-<!-- en: twic fa3a19dd -->
+<!-- en: twic d0572313 -->
 
 *Da una fonte…* porta partite da un sito, scaricate solo quando lo chiedi. **TWIC**, The Week in Chess, pubblica ogni
 lunedì un numero con le partite della settimana: la sua scheda chiede a theweekinchess.com l'elenco dei numeri e
@@ -1336,8 +1337,8 @@ giocatori) e i giocatori con l'Elo più alto; un nome apre le sue partite nella 
 
 *Ogni lunedì, cerca un nuovo numero* è disattivato finché non lo spunti. Spuntato, RookStudio chiede l'elenco dei
 numeri mentre è aperto, al massimo quattro volte al giorno; un nuovo numero compare sotto l'elenco dei database, in
-*Fonti seguite*, e nella scheda *I miei database* della pagina Home, con *Aggiungi*: non viene mai aggiunto senza di
-te. Cosa esce dalla macchina: la richiesta dell'elenco dei numeri, poi dei file PGN dei numeri scelti, nient'altro.
+*Fonti seguite*, e nella scheda *I miei database* della pagina Home, con *Aggiungi a «…»*: non viene mai aggiunto
+senza di te. Cosa esce dalla macchina: la richiesta dell'elenco dei numeri, poi dei file PGN dei numeri scelti, nient'altro.
 TWIC è gratuito per uso personale; niente di esso è distribuito con RookStudio.
 
 ### Mesi di Lichess
@@ -1395,7 +1396,7 @@ frequenti per prime: una mossa dell'avversario giocata abbastanza spesso senza u
 su una mossa dell'avversario. Un clic mostra la posizione, con l'albero accanto.
 
 ### Allenare un repertorio
-<!-- en: training-a-repertoire d1994455 -->
+<!-- en: training-a-repertoire d5d14dcc -->
 
 Ogni posizione di un repertorio in cui tocca a te, e in cui il repertorio ha la tua mossa, è una posizione da allenare.
 RookStudio te le chiede ancora e ancora, a intervalli sempre più lunghi ogni volta che le sai, con FSRS, la
@@ -1403,8 +1404,8 @@ ripetizione dilazionata usata da Anki: una posizione a cui rispondi giusto ritor
 settimane; una che sbagli ritorna più avanti nella sessione, poi il giorno dopo.
 
 La scheda **Allenamento** della pagina Aperture conta le posizioni da ripassare oggi, le nuove di oggi e quelle che
-sai, da ripassare più avanti. *Inizia* (Invio) chiede le posizioni da ripassare, poi le nuove di oggi; *Solo le nuove*
-chiede soltanto quelle nuove. Le nuove posizioni arrivano nell'ordine in cui i tuoi database le incontrano più spesso,
+sai, da ripassare più avanti. *Inizia · N posizioni* (Invio) chiede le posizioni da ripassare, poi le nuove di oggi;
+*Solo le nuove* chiede soltanto quelle nuove. Le nuove posizioni arrivano nell'ordine in cui i tuoi database le incontrano più spesso,
 prima le più giocate, al massimo 20 al giorno (il pulsante accanto, *20 al giorno*, cambia il limite). Sotto: ciò che
 torna domani, entro tre giorni ed entro una settimana.
 
@@ -1428,7 +1429,7 @@ la scheda Albero; *Aggiungi … al repertorio* fa della mossa che hai giocato un
 la toglie).
 
 Alla fine: i conteggi, le mosse che hai sbagliato (un clic mostra la posizione, con la mossa del tuo repertorio) e
-*Ripassa ora le …*.
+*Ripassa ora le … posizioni sbagliate*.
 
 I ripassi vengono conservati nel profilo accanto al repertorio (`Najdorf.training.json`, e `Najdorf.reviews.jsonl`,
 una riga per risposta): il suo PGN non cambia. Una mossa cambiata nel repertorio rende di nuovo nuova la sua posizione.
@@ -1559,7 +1560,7 @@ quel permesso (*Autorizza su Lichess…*, o *Segui senza*). Un turno le cui part
 *Trasmissioni*.
 
 ### Ancora sulle trasmissioni
-<!-- en: more-of-a-broadcast d4233fd7 -->
+<!-- en: more-of-a-broadcast eed19086 -->
 
 A destra del mosaico di una trasmissione, sotto il turno, **la classifica**: il posto, il titolo, l'Elo e i punti di
 ogni giocatore come li danno gli organizzatori (la federazione, la squadra, la performance e la variazione Elo passando
@@ -1567,7 +1568,7 @@ il mouse), i primi dodici o tutti; per un evento a squadre, prima le squadre, pe
 individuali. Lichess la dà senza account; viene richiesta di nuovo ogni due minuti mentre il mosaico è visibile.
 
 *Tutto il torneo*, accanto al nome di un turno, segue tutti i turni in corso del torneo, e ogni turno successivo appena
-inizia: il mosaico mostra il turno in diretta, e **Turni** sopra di esso ne mostra un altro (un clic su quello in
+inizia: il mosaico mostra il turno in diretta, e **I turni** sopra di esso ne mostra un altro (un clic su quello in
 diretta segue di nuovo i successivi). Ogni turno va nel database *Trasmissioni* quando finisce.
 
 **Cerca tra le trasmissioni**, in cima alle trasmissioni ufficiali, cerca una trasmissione recente per nome: Lichess
@@ -1738,10 +1739,12 @@ risposte restano sulla macchina.
 
 Gira in un processo proprio, sulla GPU quando ce n'è una utilizzabile (un commento in circa un quarto di secondo),
 altrimenti sul processore (circa 3 secondi). Viene caricato alla prima domanda o al primo commento, e scaricato dalla
-memoria dopo un quarto d'ora di inattività, o con *Scarica* (nella pagina Home, in **Impostazioni**, o in Ctrl+K).
+memoria dopo un quarto d'ora di inattività, o con *Scarica dalla memoria* (nella pagina Home, in **Impostazioni**, o in
+Ctrl+K).
 Mentre un torneo usa la GPU, risponde sul processore (*Usa comunque la GPU* se vuoi); un driver grafico che non
 funziona lo manda sul processore, e *Riprova la GPU* riprova. *Impostazioni* > *Assistente*: il suo modello, la GPU o
-il processore, i minuti prima che venga scaricato dalla memoria (0: resta caricato finché non premi *Scarica*).
+il processore, i minuti prima che venga scaricato dalla memoria (0: resta caricato finché non premi *Scarica dalla
+memoria*).
 
 Senza il modello, tutto il resto funziona: l'analisi, i numeri del resoconto, i commenti predefiniti, l'albero.
 
@@ -2644,16 +2647,16 @@ La connessione usa Mbed TLS, integrato nel programma, e si fida solo dei certifi
 sono supportati.
 
 ### La tua trasmissione su Lichess
-<!-- en: your-own-lichess-broadcast 9acdf587 -->
+<!-- en: your-own-lichess-broadcast 114edd02 -->
 
 *Trasmetti su Lichess…*, nell'intestazione di un torneo che si gioca su questa macchina, apre un riquadro: il nome
-della trasmissione (all'inizio quello del torneo), non in elenco (per chi ha il suo link) a meno che non si scelga
-*Pubblico*, e cosa va a Lichess, il nome, il formato e la cadenza del torneo, e il PGN di ogni partita. *Crea la
-trasmissione* chiede la prima volta al tuo account collegato un permesso in più, creare studi e trasmissioni (per
-questo si apre la pagina di Lichess), o collega l'account con quel permesso; il token incollato nella scheda lichess qui
-sopra serve quando nessun account è collegato. Poi le partite vanno alla trasmissione come descritto sopra, e un banner
-sotto l'intestazione dice quante ne sono state inviate e quando è stata inviata l'ultima, con *Apri su lichess.org* e
-*Ferma*.
+della trasmissione (all'inizio quello del torneo), non elencata (per chi ha il suo link) a meno che non si scelga
+*Pubblica: elencata su Lichess*, e cosa va a Lichess, il nome, il formato e la cadenza del torneo, e il PGN di ogni
+partita. *Crea la trasmissione* chiede la prima volta al tuo account collegato un permesso in più, creare studi e
+trasmissioni (per questo si apre la pagina di Lichess), o collega l'account con quel permesso; il token incollato nella
+scheda lichess qui sopra serve quando nessun account è collegato. Poi le partite vanno alla trasmissione come descritto
+sopra, e un banner sotto l'intestazione dice quante ne sono state inviate e quando è stata inviata l'ultima, con *Apri
+su lichess.org* e *Ferma*.
 
 ### Un incontro a squadre in onda
 <!-- en: a-team-match-on-the-air fd32027f -->

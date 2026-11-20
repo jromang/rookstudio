@@ -663,6 +663,11 @@ msgstr ""
 msgid "About {} {}"
 msgstr ""
 
+msgid "According to its header file (.cbh), without opening its moves: {} record (a game, or a text)"
+msgid_plural "According to its header file (.cbh), without opening its moves: {} records (games, and texts if it has some)"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Accuracy by each analysis: {}"
 msgstr ""
 
@@ -2734,7 +2739,7 @@ msgstr ""
 msgid "Every move is searched to this depth (go depth), however long it takes: no time loss."
 msgstr ""
 
-msgid "Every move reads on its position."
+msgid "Every move of the book was decoded in its position."
 msgstr ""
 
 msgid "Every move searches this many nodes: the same moves however fast the machine, and as many games at once as it has hardware threads."
@@ -3204,7 +3209,7 @@ msgstr ""
 msgid "Games for Ordo…"
 msgstr ""
 
-msgid "Games from a site, downloaded when you ask: TWIC's issues of the week."
+msgid "Games from a site, downloaded when you ask: TWIC's issues of the week, Lichess's broadcasts and monthly files, a chess.com player's games, Lumbra's Gigabase."
 msgstr ""
 
 msgid "Games lost on time, by a crash or an illegal move"
@@ -4243,10 +4248,10 @@ msgstr ""
 msgid "Lichess's explorer (the masters, all the players, one player) now asks for a linked account. Nothing is required: the local databases and the books stay."
 msgstr ""
 
-msgid "Lichess's explorer is turned off on the Lichess page."
+msgid "Lichess's explorer is paused on the positions of your correspondence game."
 msgstr ""
 
-msgid "Lichess's explorer rests on the positions of your game by correspondence."
+msgid "Lichess's explorer is turned off on the Lichess page."
 msgstr ""
 
 msgid "Lichess's explorer, in the Tree tab"
@@ -4369,6 +4374,9 @@ msgid "Live PGN, standings and crosstable, to publish anywhere (FTP, rsync, a we
 msgstr ""
 
 msgid "Live from Lichess"
+msgstr ""
+
+msgid "Live game"
 msgstr ""
 
 msgid "Live on Lichess"
@@ -5878,6 +5886,9 @@ msgstr ""
 msgid "Public study: anyone sees it, and Lichess lists it."
 msgstr ""
 
+msgid "Public: listed on Lichess"
+msgstr ""
+
 msgid "Publish on the internet"
 msgstr ""
 
@@ -5990,11 +6001,6 @@ msgstr ""
 
 msgid "Read from {} without a copy, brought up to date when shown."
 msgstr ""
-
-msgid "Read in its headers, without opening its moves: {} record (a game, or a text)"
-msgid_plural "Read in its headers, without opening its moves: {} records (games, and texts if it has some)"
-msgstr[0] ""
-msgstr[1] ""
 
 msgid "Read it"
 msgstr ""
@@ -6303,8 +6309,8 @@ msgstr ""
 msgid "Review my finished games at once"
 msgstr ""
 
-msgid "Review the {} now"
-msgid_plural "Review the {} now"
+msgid "Review the {} missed position now"
+msgid_plural "Review the {} missed positions now"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -8102,6 +8108,9 @@ msgstr ""
 msgid "The opponent's best move if it could move again, as a red arrow (another process of the first engine, its threads counted)."
 msgstr ""
 
+msgid "The opponent's games"
+msgstr ""
+
 msgid "The order is the one of the pairings' table."
 msgstr ""
 
@@ -8329,6 +8338,9 @@ msgid "The round"
 msgstr ""
 
 msgid "The round could not be saved in “{}”: {}"
+msgstr ""
+
+msgid "The rounds"
 msgstr ""
 
 msgid "The running tournament starts no new game pair (the games in progress play to the end), and the queue starts no tournament until Resume all."
@@ -9946,6 +9958,9 @@ msgstr ""
 msgid "changed here since"
 msgstr ""
 
+msgid "changed on Lichess {}"
+msgstr ""
+
 msgid "changed since"
 msgstr ""
 
@@ -10187,6 +10202,12 @@ msgid "illegal positions"
 msgstr ""
 
 msgid "import of {}: {} %"
+msgstr ""
+
+msgid "in a game"
+msgstr ""
+
+msgid "in a game · {}"
 msgstr ""
 
 msgid "in a knockout, only the games of the round being played can have their result set"
@@ -10444,6 +10465,9 @@ msgstr ""
 msgid "new"
 msgstr ""
 
+msgid "new today"
+msgstr ""
+
 msgid "no decision before {} game"
 msgid_plural "no decision before {} games"
 msgstr[0] ""
@@ -10525,9 +10549,6 @@ msgid "not in the library"
 msgstr ""
 
 msgid "not in the library any more"
-msgstr ""
-
-msgid "not rated yet"
 msgstr ""
 
 msgid "not read yet"
@@ -10682,9 +10703,6 @@ msgstr ""
 msgid "playing · move {}, White to move"
 msgstr ""
 
-msgid "playing · {}"
-msgstr ""
-
 msgid "plies"
 msgstr ""
 
@@ -10706,6 +10724,9 @@ msgid "preset"
 msgstr ""
 
 msgid "private"
+msgstr ""
+
+msgid "provisional rating"
 msgstr ""
 
 msgid "public"
@@ -10884,7 +10905,7 @@ msgstr ""
 msgid "the model gave no answer ({})"
 msgstr ""
 
-msgid "the model's was cancelled"
+msgid "the model's story was cancelled"
 msgstr ""
 
 msgid "the new tournament"
@@ -11146,6 +11167,9 @@ msgid "{:.1f} GB"
 msgstr ""
 
 msgid "{:g} s per move"
+msgstr ""
+
+msgid "{day} {month}"
 msgstr ""
 
 msgid "{}  ({} openings)"
@@ -11623,7 +11647,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "{} game quoted"
-msgstr ""
+msgid_plural "{} games quoted"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} game reaches this position"
 msgid_plural "{} games reach this position"
@@ -11659,9 +11685,6 @@ msgid "{} games +{} ={} -{} · {} lost on time, {} crashes, {} illegal moves · 
 msgstr ""
 
 msgid "{} games per engine of team A, {} of team B"
-msgstr ""
-
-msgid "{} games quoted"
 msgstr ""
 
 msgid "{} games received"
@@ -11925,7 +11948,7 @@ msgstr ""
 msgid "{} men or more"
 msgstr ""
 
-msgid "{} million positions evaluated by Stockfish on Lichess, with their lines and depth (database.lichess.org, CC0). Kept on your disk, they give an evaluation at once where Lichess has one, without asking the network."
+msgid "{} million positions evaluated by Stockfish on Lichess (database.lichess.org, CC0). Kept on your disk with their evaluation, depth and best move, they give an evaluation at once where Lichess has one, without asking the network."
 msgstr ""
 
 msgid "{} min"
@@ -11960,11 +11983,6 @@ msgid_plural "{} moves"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{} move cannot be read on its position."
-msgid_plural "{} moves cannot be read on their position."
-msgstr[0] ""
-msgstr[1] ""
-
 msgid "{} move in the book"
 msgid_plural "{} moves in the book"
 msgstr[0] ""
@@ -11972,6 +11990,16 @@ msgstr[1] ""
 
 msgid "{} move leads past the depth the book was made to."
 msgid_plural "{} moves lead past the depth the book was made to."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} move long"
+msgid_plural "{} moves long"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} move of the book could not be decoded in its position."
+msgid_plural "{} moves of the book could not be decoded in their positions."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -12004,7 +12032,7 @@ msgstr[1] ""
 msgid "{} new in all, {} a day at most"
 msgstr ""
 
-msgid "{} new position, the most met in your databases first"
+msgid "{} new position"
 msgid_plural "{} new positions, the most met in your databases first"
 msgstr[0] ""
 msgstr[1] ""
@@ -12083,10 +12111,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "{} other annotation"
-msgstr ""
-
-msgid "{} other annotations"
-msgstr ""
+msgid_plural "{} other annotations"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} other line: {}"
 msgid_plural "{} other lines: {}"
@@ -12140,10 +12167,9 @@ msgid "{} passages at the first try, {} at the second, {} the templates'"
 msgstr ""
 
 msgid "{} pawn structure or piece path"
-msgstr ""
-
-msgid "{} pawn structures or piece paths"
-msgstr ""
+msgid_plural "{} pawn structures or piece paths"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} per game"
 msgstr ""
@@ -12160,10 +12186,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "{} picture, sound or video"
-msgstr ""
-
-msgid "{} pictures, sounds or videos"
-msgstr ""
+msgid_plural "{} pictures, sounds or videos"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} pieces"
 msgstr ""
@@ -12277,8 +12302,8 @@ msgid_plural "{} positions known from Lichess"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "{} position left out while your correspondence game on Lichess goes through it."
-msgid_plural "{} positions left out while your correspondence games on Lichess go through them."
+msgid "{} position left out while a correspondence game on Lichess goes through it."
+msgid_plural "{} positions left out while correspondence games on Lichess go through them."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -12412,6 +12437,11 @@ msgid_plural "{} seeds"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{} sees {}"
+msgid_plural "{} see {}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{} selected"
 msgid_plural "{} selected"
 msgstr[0] ""
@@ -12454,10 +12484,9 @@ msgid "{} takes these settings, for every tournament and template that uses it."
 msgstr ""
 
 msgid "{} text"
-msgstr ""
-
-msgid "{} texts"
-msgstr ""
+msgid_plural "{} texts"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} that two library engines may be"
 msgid_plural "{} that two library engines may be"
@@ -12499,10 +12528,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "{} training question"
-msgstr ""
-
-msgid "{} training questions"
-msgstr ""
+msgid_plural "{} training questions"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} unbalanced"
 msgid_plural "{} unbalanced"
@@ -12520,10 +12548,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "{} variation colour"
-msgstr ""
-
-msgid "{} variation colours"
-msgstr ""
+msgid_plural "{} variation colours"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} views: {}; {} shown first, Ctrl+1 to Ctrl+{}."
 msgstr ""
@@ -12554,10 +12581,9 @@ msgid "{} was running when the program ended: it resumes."
 msgstr ""
 
 msgid "{} web link"
-msgstr ""
-
-msgid "{} web links"
-msgstr ""
+msgid_plural "{} web links"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} went from {} to {}: its hash checked, it answered uci."
 msgstr ""

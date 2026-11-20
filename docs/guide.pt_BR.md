@@ -711,11 +711,11 @@ pelos códigos ECO quando há mais posições que se qualificam. Ele diz quantas
 como `c0`, e o adiciona à biblioteca.
 
 ### Livros a partir das posições avaliadas
-<!-- en: books-from-the-evaluated-positions 48770901 -->
+<!-- en: books-from-the-evaluated-positions 82dd002c -->
 
 *Das posições avaliadas do Lichess…*, em **Criar…**, gera um livro com as posições que os jogadores do Lichess
 analisaram: as das linhas das aberturas nomeadas e a um lance delas, cada uma com a avaliação e a profundidade. Elas
-vêm da base de avaliações do Lichess (CC0, cerca de 21 GB e 290 milhões de posições): o tamanho dela é pedido a
+vêm da base de avaliações do Lichess (CC0, 22,5 GB e 418 milhões de posições): o tamanho dela é pedido a
 database.lichess.org e informado antes de qualquer download; *Baixar e ler* a lê enquanto ela chega, e guarda só as
 posições encontradas (alguns megabytes, no perfil), não o arquivo. *Ler um arquivo já baixado…* lê em vez disso um
 `lichess_db_eval.jsonl.zst` do disco. Nada sai da máquina além do pedido do arquivo. A leitura mostra quanto foi lido e
@@ -1159,20 +1159,20 @@ chegam à posição para procurar as mais fortes: a aba Árvore diz mais. *Todas
 na base.
 
 ### Mais sobre o explorador
-<!-- en: the-explorer-more 40c92109 -->
+<!-- en: the-explorer-more 1471aca0 -->
 
 Com as fontes do Lichess na aba Árvore, **as partidas que o explorador cita** aparecem sob os lances: as partidas de
 mestres que chegam à posição (*Partidas de mestres*), ou as partidas fortes jogadas no Lichess; um clique pede a
 partida ao Lichess e a abre no tabuleiro, na posição que a árvore mostrava.
 
-Para os jogadores do Lichess, *Cada lance mês a mês* pergunta ao Lichess, para cada lance listado, quantas partidas o
-jogaram mês a mês: uma linha dos dois últimos anos dele na coluna *Por mês*, verde quando ele é mais jogado
-ultimamente, vermelha quando é menos; sob o mouse, as partidas dele nos últimos seis meses contra os seis anteriores.
-O resumo diz o mesmo da posição. Isso custa um pedido por lance, então fica desligado até ser pedido; o explorador dos
-mestres não tem meses.
+Com a fonte *Lichess* (todos os jogadores dele), *Cada lance mês a mês* pergunta ao Lichess, para cada lance listado,
+quantas partidas o jogaram mês a mês: uma linha dos dois últimos anos dele na coluna *Por mês*, verde quando ele é
+mais jogado ultimamente, vermelha quando é menos; sob o mouse, as partidas dele nos últimos seis meses contra os seis
+anteriores. O resumo diz o mesmo da posição. Isso custa um pedido por lance, então fica desligado até ser pedido; o
+explorador dos mestres não tem meses.
 
 ### A revisão de uma partida
-<!-- en: the-review-of-a-game 7cf820c0 -->
+<!-- en: the-review-of-a-game 4c333a51 -->
 
 No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da partida (G) como um treinador leria:
 
@@ -1194,7 +1194,7 @@ fatos da revisão: os veredictos e as avaliações dela, os momentos-chave, a ab
 com o que as tablebases do Lichess disseram. Cada trecho é mantido fiel a esses fatos pelo verificador dos comentários:
 cada lance, avaliação e nome que ele cita deve vir da revisão. Um trecho recusado é escrito de novo; recusado duas
 vezes, ele dá lugar ao texto padronizado. Um cartão na cor do assistente diz que o modelo escreveu a história e que ela
-foi verificada, e o que o verificador recusou. *A versão padronizada* mostra ao lado a história escrita com os textos
+foi verificada, e o que o verificador recusou. *A versão padronizada* mostra no lugar dela a história escrita com os textos
 padronizados, *Escrever de novo* faz o modelo contá-la de outro jeito (também no Ctrl+K), *Copiar* copia a história
 mostrada. Sem o modelo (não baixado, ou outro arquivo GGUF que não aprendeu os comentários do RookStudio), ou enquanto
 um torneio nesta máquina está usando o processador, a história é a padronizada, como ela mesma diz. Nada sai da
@@ -1296,7 +1296,7 @@ novas adicionadas no ChessBase desde então), a base traz só as partidas novas.
 a base os escreve, "Sobrenome, Nome".
 
 ### TWIC
-<!-- en: twic fa3a19dd -->
+<!-- en: twic d0572313 -->
 
 *De uma fonte…* traz partidas de um site, baixadas só quando você pede. **TWIC**, The Week in Chess, publica toda
 segunda-feira uma edição com as partidas da semana: o painel dele pede a theweekinchess.com a lista de edições e mostra
@@ -1309,7 +1309,7 @@ um nome abre as partidas dele na lista.
 
 *Toda segunda-feira, procurar uma nova edição* fica desligado até você marcá-lo. Marcado, o RookStudio pede a lista de
 edições enquanto está aberto, no máximo quatro vezes por dia; uma edição nova aparece sob a lista de bases, em *Fontes
-acompanhadas*, e no cartão *Minhas bases* da página Início, com *Adicionar*: ela nunca é adicionada sem você. O que sai
+acompanhadas*, e no cartão *Minhas bases* da página Início, com *Adicionar a “…”*: ela nunca é adicionada sem você. O que sai
 da máquina: o pedido da lista de edições, depois o dos arquivos PGN das edições escolhidas, nada mais. O TWIC é grátis
 para uso pessoal; nada dele vem com o RookStudio.
 
@@ -1366,7 +1366,7 @@ seguida, as mais frequentes primeiro: um lance do adversário jogado com frequê
 linha que termina num lance do adversário. Um clique mostra a posição, com a árvore ao lado.
 
 ### Treinar um repertório
-<!-- en: training-a-repertoire d1994455 -->
+<!-- en: training-a-repertoire d5d14dcc -->
 
 Cada posição de um repertório em que é a sua vez, e em que o repertório tem o seu lance, é uma posição a treinar. O
 RookStudio as pergunta de novo e de novo, com intervalos maiores a cada vez que você as sabe, com o FSRS, a repetição
@@ -1374,9 +1374,10 @@ espaçada que o Anki usa: uma posição respondida certo volta em alguns dias, d
 mais tarde na sessão, depois no dia seguinte.
 
 O cartão **Treino** da página Aberturas conta as posições para hoje, as novas de hoje e as que você sabe, para mais
-tarde. *Começar* (Enter) pergunta as posições pendentes, depois as novas de hoje; *Só as novas* pergunta apenas as
-novas. As posições novas vêm na ordem em que suas bases mais as encontram, as mais jogadas primeiro, no máximo 20 por
-dia (o botão ao lado, *20 por dia*, muda isso). Abaixo delas: o que volta amanhã, em até três dias e em até uma semana.
+tarde. *Começar · N posições* (Enter) pergunta as posições pendentes, depois as novas de hoje; *Só as novas* pergunta
+apenas as novas. As posições novas vêm na ordem em que suas bases mais as encontram, as mais jogadas primeiro, no
+máximo 20 por dia (o botão ao lado, *20 por dia*, muda isso). Abaixo delas: o que volta amanhã, em até três dias e em
+até uma semana.
 
 Uma sessão ocupa a página Tabuleiro, cuja coluna passa a ser a do treino; a partida que estava no tabuleiro espera entre
 as partidas recentes e volta depois. O RookStudio joga os lances do seu adversário seguindo o repertório até cada
@@ -1396,7 +1397,7 @@ verde: *Tentar de novo* (Enter) pergunta a posição outra vez; *Ver a árvore a
 *Adicionar … ao repertório* torna o lance que você jogou uma segunda resposta aceita ali (Ctrl+Z o desfaz).
 
 No fim: as contagens, os lances que você errou (um clique mostra a posição, com o lance do seu repertório) e *Revisar
-os … agora*.
+agora as … posições erradas*.
 
 As revisões ficam guardadas no perfil ao lado do repertório (`Najdorf.training.json`, e `Najdorf.reviews.jsonl`, uma
 linha por resposta): o PGN dele não muda. Um lance alterado no repertório torna a posição dele nova de novo. Nada sai da
@@ -1524,7 +1525,7 @@ essa permissão (*Autorizar no Lichess…*, ou *Acompanhar sem ela*). Uma rodada
 a base *Transmissões*.
 
 ### Mais sobre uma transmissão
-<!-- en: more-of-a-broadcast d4233fd7 -->
+<!-- en: more-of-a-broadcast eed19086 -->
 
 À direita do mosaico de uma transmissão, sob a rodada, **a classificação**: a posição, o título, o rating e os pontos
 de cada jogador como os organizadores os informam (a federação, a equipe, a performance e a variação de rating ao
@@ -1533,7 +1534,7 @@ depois por pontos de partida. O Lichess os dá sem conta; eles são consultados 
 mosaico está à vista.
 
 *O torneio inteiro*, ao lado do nome de uma rodada, acompanha todas as rodadas em andamento do torneio, e cada rodada
-seguinte assim que ela começa: o mosaico mostra a rodada ao vivo, e **Rodadas** acima dele mostra outra (um clique na
+seguinte assim que ela começa: o mosaico mostra a rodada ao vivo, e **As rodadas** acima dele mostra outra (um clique na
 rodada ao vivo volta a acompanhar as seguintes). Cada rodada vai para a base *Transmissões* quando termina.
 
 **Pesquisar as transmissões**, no alto das transmissões oficiais, procura uma recente pelo nome: o Lichess só responde
@@ -2600,13 +2601,14 @@ Trust Services) e nos do Let's Encrypt. Ela passa pelo proxy HTTP que `HTTPS_PRO
 no Windows o proxy vem dessas variáveis, não das configurações do sistema. Proxies SOCKS não são suportados.
 
 ### Sua própria transmissão no Lichess
-<!-- en: your-own-lichess-broadcast 9acdf587 -->
+<!-- en: your-own-lichess-broadcast 114edd02 -->
 
 *Transmitir no Lichess…*, no cabeçalho de um torneio que é jogado nesta máquina, abre um painel: o nome da transmissão
-(o do torneio no início), não listada (para quem tem o link) a menos que *Público* seja escolhido, e o que vai para o
-Lichess: o nome, o formato e o controle de tempo do torneio, e o PGN de cada partida. *Criar a transmissão* pede à sua
-conta vinculada mais uma permissão na primeira vez, a de criar estudos e transmissões (a página do Lichess se abre para
-isso), ou vincula a conta com ela; o token colado no cartão do lichess acima serve quando nenhuma conta está vinculada.
+(o do torneio no início), não listada (para quem tem o link) a menos que você escolha *Pública: listada no Lichess*,
+e o que vai para o Lichess: o nome, o formato e o controle de tempo do torneio, e o PGN de cada partida. *Criar a
+transmissão* pede à sua conta vinculada mais uma permissão na primeira vez, a de criar estudos e transmissões (a
+página do Lichess se abre para isso), ou vincula a conta com ela; o token colado no cartão do lichess acima serve
+quando nenhuma conta está vinculada.
 Depois as partidas vão para a transmissão como descrito acima, e um aviso sob o cabeçalho diz quantas foram enviadas e
 quando foi a última, com *Abrir em lichess.org* e *Parar*.
 

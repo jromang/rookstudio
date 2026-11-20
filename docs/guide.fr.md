@@ -737,11 +737,11 @@ d'ouvertures le livre contiendrait ; *Créer le livre…* demande où écrire le
 numéro de coup (`hmvc`, `fmvn`) et son ouverture en `c0`, et l'ajoute à la bibliothèque.
 
 ### Livres à partir des positions évaluées
-<!-- en: books-from-the-evaluated-positions 48770901 -->
+<!-- en: books-from-the-evaluated-positions 82dd002c -->
 
 *À partir des positions évaluées de Lichess…*, dans **Créer…**, fait un livre des positions que les joueurs de Lichess
 avaient analysées : celles des lignes des ouvertures nommées et à un coup de celles-ci, chacune avec son évaluation et
-sa profondeur. Elles viennent de la base d'évaluations de Lichess (CC0, environ 21 Go et 290 millions de positions) :
+sa profondeur. Elles viennent de la base d'évaluations de Lichess (CC0, 22,5 Go et 418 millions de positions) :
 sa taille est demandée à database.lichess.org et annoncée avant tout téléchargement ; *Télécharger et lire* la lit à
 mesure qu'elle arrive, et ne garde que les positions trouvées (quelques mégaoctets, dans le profil), pas le fichier.
 *Lire un fichier déjà téléchargé…* lit à la place un `lichess_db_eval.jsonl.zst` du disque. Rien d'autre que la
@@ -1203,20 +1203,20 @@ l'ouverture, trop de parties atteignent la position pour chercher les plus forte
 *Toutes les parties de la position dans « … »* les liste dans la base.
 
 ### Plus loin avec l'explorateur
-<!-- en: the-explorer-more 40c92109 -->
+<!-- en: the-explorer-more 1471aca0 -->
 
 Avec les sources de Lichess dans l'onglet Arbre, **les parties que nomme l'explorateur** viennent sous les coups : les
 parties de maîtres qui atteignent la position (*Parties de maîtres*), ou les parties fortes jouées sur Lichess ; un
 clic demande la partie à Lichess et l'ouvre sur l'échiquier, à la position que montrait l'arbre.
 
-Pour les joueurs de Lichess, *Chaque coup mois par mois* demande à Lichess, pour chaque coup listé, combien de parties
-l'ont joué mois par mois : une ligne de ses deux dernières années dans la colonne *Par mois*, verte quand il est plus
-joué ces derniers temps, rouge quand il l'est moins ; sous la souris, ses parties des six derniers mois contre celles
-des six mois d'avant. Le résumé dit la même chose de la position. Cela coûte une requête par coup, aussi l'option
-reste-t-elle désactivée tant que tu ne la demandes pas ; l'explorateur des maîtres n'a pas de mois.
+Avec la source *Lichess* (tous ses joueurs), *Chaque coup mois par mois* demande à Lichess, pour chaque coup listé,
+combien de parties l'ont joué mois par mois : une ligne de ses deux dernières années dans la colonne *Par mois*, verte
+quand il est plus joué ces derniers temps, rouge quand il l'est moins ; sous la souris, ses parties des six derniers
+mois contre celles des six mois d'avant. Le résumé dit la même chose de la position. Cela coûte une requête par coup,
+aussi l'option reste-t-elle désactivée tant que tu ne la demandes pas ; l'explorateur des maîtres n'a pas de mois.
 
 ### Le bilan d'une partie
-<!-- en: the-review-of-a-game 7cf820c0 -->
+<!-- en: the-review-of-a-game 4c333a51 -->
 
 Sur l'Échiquier d'étude, l'onglet *Bilan* à côté de la notation lit l'analyse de la partie (G) comme le ferait un
 entraîneur :
@@ -1239,7 +1239,7 @@ faits du bilan : ses verdicts et ses évaluations, les moments clés, l'ouvertur
 s'est terminée, avec ce qu'ont dit les tables de Lichess. Chaque passage est tenu à ces faits par le vérificateur des
 commentaires : chaque coup, évaluation et nom qu'il cite doit venir du bilan. Un passage refusé est réécrit ; refusé
 deux fois, il cède la place à celui de la version type. Une carte de la couleur de l'assistant dit que le modèle a
-écrit l'histoire et qu'elle a été vérifiée, et ce que le vérificateur a refusé. *La version type* montre à côté
+écrit l'histoire et qu'elle a été vérifiée, et ce que le vérificateur a refusé. *La version type* montre à sa place
 l'histoire écrite par les commentaires types, *La réécrire* la fait raconter autrement par le modèle (Ctrl+K aussi),
 *La copier* copie l'histoire affichée. Sans le modèle (pas téléchargé, ou un autre fichier GGUF qui n'a pas appris les
 commentaires de RookStudio), ou pendant qu'un tournoi occupe le processeur de cette machine, l'histoire est la version
@@ -1344,7 +1344,7 @@ par type. Importée de nouveau (après l'ajout de nouvelles parties dans ChessBa
 parties. Les noms des joueurs sont écrits comme la base les écrit, « Nom, Prénom ».
 
 ### TWIC
-<!-- en: twic fa3a19dd -->
+<!-- en: twic d0572313 -->
 
 *Depuis une source…* apporte des parties d'un site, téléchargées seulement quand tu le demandes. **TWIC**, The Week in
 Chess, publie chaque lundi un numéro des parties de la semaine : sa feuille demande à theweekinchess.com sa liste de
@@ -1357,9 +1357,9 @@ et les joueurs les mieux classés ; un nom ouvre ses parties dans la liste.
 
 *Chaque lundi, chercher un nouveau numéro* est désactivé tant que tu ne le coches pas. Coché, RookStudio demande la
 liste des numéros pendant qu'il est ouvert, quatre fois par jour au plus ; un nouveau numéro s'affiche sous la liste
-des bases, dans *Sources suivies*, et sur la carte *Mes bases* de la page Accueil, avec *Ajouter* : il n'est jamais
-ajouté sans toi. Ce qui quitte la machine : la demande de la liste des numéros, puis des fichiers PGN des numéros
-choisis, rien d'autre. TWIC est gratuit pour un usage personnel ; rien de lui n'est livré avec RookStudio.
+des bases, dans *Sources suivies*, et sur la carte *Mes bases* de la page Accueil, avec *Ajouter à « … »* : il n'est
+jamais ajouté sans toi. Ce qui quitte la machine : la demande de la liste des numéros, puis des fichiers PGN des
+numéros choisis, rien d'autre. TWIC est gratuit pour un usage personnel ; rien de lui n'est livré avec RookStudio.
 
 ### Les mois de Lichess
 <!-- en: lichess-months 26060e4f -->
@@ -1416,7 +1416,7 @@ fréquentes d'abord : un coup de l'adversaire joué assez souvent sans ta répon
 coup de l'adversaire. Un clic montre la position, avec l'arbre à côté.
 
 ### S'entraîner sur un répertoire
-<!-- en: training-a-repertoire d1994455 -->
+<!-- en: training-a-repertoire d5d14dcc -->
 
 Chaque position d'un répertoire où c'est à toi de jouer, et où le répertoire a ton coup, est une position à
 travailler. RookStudio te les redemande encore et encore, à intervalles plus longs chaque fois que tu les sais, avec
@@ -1424,10 +1424,10 @@ FSRS, la répétition espacée qu'utilise Anki : une position bien répondue rev
 quelques semaines ; une position que tu manques revient plus tard dans la séance, puis le lendemain.
 
 La carte **Entraînement** de la page Ouvertures compte les positions à revoir aujourd'hui, les nouvelles du jour, et
-celles que tu sais, à revoir plus tard. *Commencer* (Entrée) demande les positions à revoir, puis les nouvelles du
-jour ; *Seulement les nouvelles* ne demande que les nouvelles. Les nouvelles positions viennent dans l'ordre où tes
-bases les rencontrent le plus, les plus jouées d'abord, 20 par jour au plus (le bouton à côté, *20 par jour*, le
-change). En dessous : ce qui revient demain, d'ici trois jours et d'ici une semaine.
+celles que tu sais, à revoir plus tard. *Commencer · N positions* (Entrée) demande les positions à revoir, puis les
+nouvelles du jour ; *Seulement les nouvelles* ne demande que les nouvelles. Les nouvelles positions viennent dans
+l'ordre où tes bases les rencontrent le plus, les plus jouées d'abord, 20 par jour au plus (le bouton à côté, *20 par
+jour*, le change). En dessous : ce qui revient demain, d'ici trois jours et d'ici une semaine.
 
 Une séance prend la page Échiquier, dont la colonne devient celle de l'entraînement ; la partie qui était sur
 l'échiquier attend parmi les parties récentes et revient après. RookStudio joue les coups de ton adversaire en suivant
@@ -1448,7 +1448,7 @@ position avec l'onglet Arbre ; *Ajouter … au répertoire* fait du coup que tu 
 (Ctrl+Z la retire).
 
 À la fin : les comptes, les coups que tu as manqués (un clic montre la position, avec le coup de ton répertoire) et
-*Réviser les … maintenant*.
+*Réviser maintenant les … positions manquées*.
 
 Les révisions sont gardées dans le profil à côté du répertoire (`Najdorf.training.json`, et `Najdorf.reviews.jsonl`,
 une ligne par réponse) : son PGN ne change pas. Un coup modifié dans le répertoire rend sa position de nouveau
@@ -1581,7 +1581,7 @@ cette permission (*Autoriser sur Lichess…*, ou *Suivre sans elle*). Une ronde 
 dans la base *Diffusions*.
 
 ### Plus loin avec une diffusion
-<!-- en: more-of-a-broadcast d4233fd7 -->
+<!-- en: more-of-a-broadcast eed19086 -->
 
 À droite de la mosaïque d'une diffusion, sous la ronde, **le classement** : le rang, le titre, le classement Elo et les
 points de chaque joueur tels que les organisateurs les donnent (la fédération, l'équipe, la performance et la
@@ -1590,7 +1590,7 @@ d'abord, par points de match puis par points de partie. Lichess les donne sans c
 deux minutes tant que la mosaïque est affichée.
 
 *Tout le tournoi*, à côté du nom d'une ronde, suit toutes les rondes en cours du tournoi, et chaque suivante dès
-qu'elle commence : la mosaïque montre la ronde en direct, et **Rondes** au-dessus en montre une autre (un clic sur
+qu'elle commence : la mosaïque montre la ronde en direct, et **Les rondes** au-dessus en montre une autre (un clic sur
 celle en direct suit de nouveau les suivantes). Chaque ronde va dans la base *Diffusions* quand elle se termine.
 
 **Chercher dans les diffusions**, en haut des diffusions officielles, cherche une diffusion récente par son nom :
@@ -2683,16 +2683,16 @@ les hôtes de `NO_PROXY` ; sous Windows aussi, le proxy vient de ces variables, 
 SOCKS ne sont pas pris en charge.
 
 ### Ta propre diffusion Lichess
-<!-- en: your-own-lichess-broadcast 9acdf587 -->
+<!-- en: your-own-lichess-broadcast 114edd02 -->
 
 *Diffuser sur Lichess…*, dans l'en-tête d'un tournoi qui joue sur cette machine, ouvre une feuille : le nom de la
-diffusion (celui du tournoi par défaut), non listée (pour ceux qui ont son lien) sauf si tu choisis *Publique*, et ce
-qui part chez Lichess, le nom, le format et la cadence du tournoi, et le PGN de chaque partie. *Créer la diffusion*
-demande la première fois une permission de plus à ton compte associé, créer des études et des diffusions (la page de
-Lichess s'ouvre pour cela), ou associe le compte avec elle ; le jeton collé dans la carte lichess ci-dessus sert quand
-aucun compte n'est associé. Ensuite, les parties vont à la diffusion comme décrit plus haut, et un bandeau sous
-l'en-tête dit combien de parties ont été envoyées et quand la dernière l'a été, avec *Ouvrir sur lichess.org* et
-*Arrêter*.
+diffusion (celui du tournoi par défaut), non listée (pour ceux qui ont son lien) sauf si tu choisis *Publique : listée
+sur Lichess*, et ce qui part chez Lichess, le nom, le format et la cadence du tournoi, et le PGN de chaque partie.
+*Créer la diffusion* demande la première fois une permission de plus à ton compte associé, créer des études et des
+diffusions (la page de Lichess s'ouvre pour cela), ou associe le compte avec elle ; le jeton collé dans la carte
+lichess ci-dessus sert quand aucun compte n'est associé. Ensuite, les parties vont à la diffusion comme décrit plus
+haut, et un bandeau sous l'en-tête dit combien de parties ont été envoyées et quand la dernière l'a été, avec *Ouvrir
+sur lichess.org* et *Arrêter*.
 
 ### Un match par équipes à l'antenne
 <!-- en: a-team-match-on-the-air fd32027f -->

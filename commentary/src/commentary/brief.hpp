@@ -6,6 +6,7 @@
 // The model gets the move's facts as plain sentences and may only write what they support: a grammar keeps every move
 // and square it writes within those of the facts, and a checker reads the result for motifs the facts do not contain.
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -47,6 +48,15 @@ struct Refusal {
         // The story's (story_model.hpp):
         Name,    // a name the facts do not give: a player, an opening, a place
         Number,  // a number in words that the facts do not give: "on move thirty-four"
+        // What a sentence says of the boards (#64):
+        Board,     // a pawn structure or a tactic said of a position that does not have it: "doubled pawns" after the
+                   // recapture that undid them, a discovered attack told right after a move that only prepares it
+        Material,  // material said to be won, given up or taken that the line spoken of does not count: "wins the
+                   // bishop and two pawns" for two pawns, "takes the queen on f3" where a knight stands
+        Reason,    // the better move praised for what the move played does too: "misses 30.Rg7, which won a pawn"
+                   // where 30.Bxh7 wins one
+        Wording,   // words that say something else than what is meant: « la partie se termine » for the opening,
+                   // « donne le roi », « parier » for « parer »
     };
     Kind kind = Kind::Empty;
     // The words refused: the move, the motif, the piece, the name; empty for TooManyMoves, Grammar and Empty.
@@ -57,6 +67,42 @@ struct Refusal {
 [[nodiscard]] std::string debug(const Refusal& refusal);
 
 namespace brief_detail {
+
+// A line the prompt shows, from the position it starts in: the boards a sentence may speak of (#64).
+struct Shown {
+    enum class Kind : uint8_t {
+        Played,  // the move played, then the engine's answer to it
+        Best,    // the engine's best line, the better move first
+        Other,   // for an only move, the next best move and its refutation
+        Theory,  // the surveys' main move
+    };
+    Kind kind = Kind::Played;
+    Position start;
+    // The engine's whole line, the prompt showing its first `shown` plies: material is counted further, as the facts
+    // count it.
+    std::vector<Move> moves;
+    std::size_t shown = 0;
+    // The ways a sentence may write each move shown (forms()).
+    std::vector<std::vector<std::string>> texts;
+    // The position before each move shown, then the one after the last: boards[i + 1] follows moves[i].
+    std::vector<Position> boards;
+
+    [[nodiscard]] static Shown of(Kind kind, const Position& start, std::span<const Move> moves, std::size_t shown,
+                                  PieceLetters letters);
+};
+
+// Whether a side's position is lost beyond doubt, before the move and after it: its expected score, as the engine sees
+// it, is below this, the review's "beyond saving" (review.cpp), which a mate and the tables' loss are too. The prompt
+// calls a position lost from 10 % (standingOf()): Gaia gave Black 9.7 % at −1.48 on November 18's reread, which "lost
+// anyway" must not repeat (#64).
+inline constexpr double LOST_BEYOND_DOUBT = 3.0;
+struct Lost {
+    std::array<bool, 2> before{}, after{};  // White, Black
+    // From the mover's expected scores before and after its move.
+    [[nodiscard]] static Lost of(const MoveReport& move);
+    // From White's expected score in a position, both before and after.
+    [[nodiscard]] static Lost at(std::optional<double> white_expected);
+};
 
 // The moves and squares the facts mention: the only ones the model may write.
 struct Allowed {
@@ -72,6 +118,9 @@ struct Allowed {
     std::vector<std::string> noted;
     // The pieces of the positions the prompt shows, and of the facts: a comment may put no other piece on a square.
     std::vector<Placed> pieces;
+    // The lines the prompt shows, the move played first: each sentence is read against the boards it speaks of.
+    // Without them, as in the prototype, a piece may stand on any board of the prompt.
+    std::vector<Shown> lines;
 
     // GBNF: words without digits, the allowed moves and squares, one to three sentences, punctuated the language's way.
     [[nodiscard]] std::string grammar(Lang lang) const;
@@ -121,6 +170,20 @@ struct PlacedIn {
 };
 [[nodiscard]] std::vector<PlacedIn> placedIn(std::string_view text);
 
+// What each sentence says of the boards it speaks of (#64), read against the lines the prompt shows (Allowed::lines;
+// nothing to check without them). A piece it names on a square stands there: around the move played when it quotes no
+// move of a line; after "after 27…Qf7", « après 27…Df7 », around that move and those it quotes next; told with a move
+// of a line quoted otherwise ("7…e5 was better: ..."), somewhere along that line; told as what follows ("then",
+// "allows", "becomes", « ensuite »), where the line brings it later. A pawn called doubled, backward, isolated or
+// passed is so after the last move quoted before the word, as its line goes on; a tactic is not told after a move of
+// the line that comes before the one doing it; material said to be won, given up or taken is counted along the lines,
+// kind by kind; the better move is not praised for material the move played takes itself.
+[[nodiscard]] std::optional<Refusal> checkBoards(std::string_view text, const MoveFacts& facts, const Allowed& allowed);
+// A position called lost ("lost anyway", « perdue de toute façon », "White is lost") only when it is so beyond doubt.
+[[nodiscard]] std::optional<Refusal> checkLost(std::string_view text, const Lost& lost);
+// Words that say something else than what is meant: a king taken, won or given; « parier » for « parer ».
+[[nodiscard]] std::optional<Refusal> checkWording(std::string_view text, Lang lang);
+
 // The pieces a fact is about, and the squares it names.
 [[nodiscard]] std::vector<Placed> factPieces(const Fact& fact);
 [[nodiscard]] std::vector<Square> factSquares(const Fact& fact);
@@ -162,6 +225,8 @@ class Brief {
     // Whether the prompt tells what theory says of the move.
     bool theory_ = false;
     Lang lang_   = Lang::En;
+    // Whose position is lost beyond doubt, before the move and after it.
+    brief_detail::Lost lost_;
 };
 
 }  // namespace fcg::commentary

@@ -54,6 +54,10 @@ class StoryBrief {
     Lang lang_ = Lang::En;
     // The prompt's words in lower case: the names and the numbers in words a passage may use.
     std::vector<std::string> told_;
+    // Whose position is lost beyond doubt, around the passage's move.
+    brief_detail::Lost lost_;
+    // Whether the passage may say that the game ends: the passage about the end, or one about the last moves.
+    bool ends_ = false;
 };
 
 // The request for an attempt (from 1) of a round (from 0): the likeliest answer at the first attempt of the first
@@ -91,6 +95,9 @@ namespace story_detail {
 [[nodiscard]] std::optional<Refusal> checkNames(std::string_view text, const std::vector<std::string>& told,
                                                 const brief_detail::Allowed& allowed);
 [[nodiscard]] std::optional<Refusal> checkNumbers(std::string_view text, const std::vector<std::string>& told);
+// "The game ends", « la partie se termine », in a passage that is not about the end (`ends` false): the opening's end
+// told as the game's.
+[[nodiscard]] std::optional<Refusal> checkEnd(std::string_view text, bool ends);
 
 }  // namespace story_detail
 

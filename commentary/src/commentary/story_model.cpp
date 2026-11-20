@@ -188,6 +188,7 @@ StoryBrief::StoryBrief(const Told& told, const MainLine& line, const Analyses& a
         standing_   = brief.standing_;
         only_       = brief.only_;
         forward_to_ = brief.forward_to_;
+        lost_       = brief.lost_;
     } else {
         // The opening, the endgame, the end: the facts told in sentences, the moves they name, the board they leave.
         for (const auto& said : s.said) lines.push_back(said);
@@ -203,6 +204,9 @@ StoryBrief::StoryBrief(const Told& told, const MainLine& line, const Analyses& a
             addMove(allowed_, before, mv, letters);
             addBoard(allowed_, before);
             addBoard(allowed_, ps[m->ply]);
+            allowed_.lines.push_back(
+                brief_detail::Shown::of(brief_detail::Shown::Kind::Played, before, std::vector<Move>{mv}, 1, letters));
+            lost_ = brief_detail::Lost::of(*m);
         }
         switch (s.kind) {
             case Source::Kind::Opening:
@@ -234,7 +238,13 @@ StoryBrief::StoryBrief(const Told& told, const MainLine& line, const Analyses& a
                         addMove(allowed_, ps[last - 1], line.moves()[last - 1], letters);
                         addBoard(allowed_, ps[last - 1]);
                         addBoard(allowed_, ps[last]);
+                        allowed_.lines.push_back(
+                            brief_detail::Shown::of(brief_detail::Shown::Kind::Played, ps[last - 1],
+                                                    std::vector<Move>{line.moves()[last - 1]}, 1, letters));
                     }
+                    // Whose position the final one loses beyond doubt.
+                    lost_ = brief_detail::Lost::at(
+                        last < analyses.size() && analyses[last] ? analyses[last]->whiteExpected() : std::nullopt);
                     // What the tables said of the final position, when they know it.
                     if (const auto v = tables ? tables->verdict(ps[last]) : std::nullopt) {
                         const auto mover = ps[last].turn();
@@ -269,6 +279,8 @@ StoryBrief::StoryBrief(const Told& told, const MainLine& line, const Analyses& a
             allowed_.name_words = brief_detail::wordsOf(*name);
         }
     }
+    // The game ends in the passage about the end, or in one about its last moves.
+    ends_ = s.kind == Source::Kind::End || (s.move && s.move->ply + 1 >= line.moves().size());
     namesOf(white, allowed_.names);
     namesOf(black, allowed_.names);
     tidy(allowed_.moves);
@@ -293,7 +305,11 @@ std::optional<Refusal> StoryBrief::check(std::string_view text) const {
         if (auto r = checkElision(text)) return r;
     if (auto r = story_detail::checkNames(text, told_, allowed_)) return r;
     if (auto r = story_detail::checkNumbers(text, told_)) return r;
-    return checkWinning(text, told_);
+    if (auto r = checkWinning(text, told_)) return r;
+    if (auto r = checkBoards(text, facts_, allowed_)) return r;
+    if (auto r = checkLost(text, lost_)) return r;
+    if (auto r = checkWording(text, lang_)) return r;
+    return story_detail::checkEnd(text, ends_);
 }
 
 Request storyRequest(const StoryBrief& brief, uint32_t round, uint32_t attempt) {
@@ -384,6 +400,21 @@ std::optional<Refusal> checkNames(std::string_view text, const std::vector<std::
             first = false;
         }
         opens = raw.ends_with('.') || raw.ends_with('!') || raw.ends_with('?');
+    }
+    return std::nullopt;
+}
+
+std::optional<Refusal> checkEnd(std::string_view text, bool ends) {
+    if (ends) return std::nullopt;
+    const auto w  = brief_detail::wordsOf(text);
+    const auto at = [&](std::size_t i, std::string_view word) { return i < w.size() && w[i] == word; };
+    for (std::size_t i = 0; i < w.size(); ++i) {
+        // « la partie se termine », « s'achève », « finit », « prend fin »; "the game ends", "is over", "finishes".
+        if (at(i, "partie") && ((at(i + 1, "se") && at(i + 2, "termine")) || (at(i + 1, "s") && at(i + 2, "achève")) ||
+                                at(i + 1, "finit") || (at(i + 1, "prend") && at(i + 2, "fin"))))
+            return Refusal{Refusal::Kind::Wording, "la partie se termine"};
+        if (at(i, "game") && (at(i + 1, "ends") || at(i + 1, "finishes") || (at(i + 1, "is") && at(i + 2, "over"))))
+            return Refusal{Refusal::Kind::Wording, "the game ends"};
     }
     return std::nullopt;
 }

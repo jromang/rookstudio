@@ -78,6 +78,14 @@ std::string refusalWords(const commentary::Refusal& r) {
             return trf("it named “{}”, a name the review does not give", r.what);
         case K::Number:
             return trf("it said “{}”, a number the review does not give", r.what);
+        case K::Board:
+            return trf("it said “{}” of a position that does not have it", r.what);
+        case K::Material:
+            return trf("it said “{}” changes hands, which the line it speaks of does not count", r.what);
+        case K::Reason:
+            return trf("it praised the better move for “{}”, which the move played does too", r.what);
+        case K::Wording:
+            return trf("its words say something else: “{}”", r.what);
         case K::Grammar:
             return TR("it was cut short, or wrote outside the words it may use");
         default:

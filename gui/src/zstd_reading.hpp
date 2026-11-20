@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -46,6 +47,7 @@ struct ZstdReadingOptions {
     double checkpoint_every = 5;                 // seconds between saved places; the tests make it 0
     std::chrono::milliseconds retry_wait{2000};  // before going on after a cut, doubled each time
     int retries = 5;
+    std::function<void()> on_saved;  // after each place saved (the tests copy the files there, as a crash leaves them)
 };
 
 // Reads `source` (an http:// or https:// URL, else a file) through `consumer`, its place kept in `state_file`, on the

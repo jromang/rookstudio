@@ -40,6 +40,7 @@ struct PositionEval {
     int64_t time_ms = 0;                        // how long it was searched
     std::string pv;                             // its principal variation, UCI moves from the position
     std::optional<std::array<int64_t, 3>> wdl;  // win, draw, loss in permille, the side to move's (UCI_ShowWDL)
+    bool known = false;                         // taken from Lichess's evaluations kept offline (#58), not searched
 };
 
 // A whole game's analysis by one engine: one PositionEval per position, from the start (plies + 1 of them).

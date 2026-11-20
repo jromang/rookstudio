@@ -902,10 +902,20 @@ void App::drawLichessPage() {
     drawFollowedPlayers();  // the players followed live (#50)
     ImGui::Dummy(ImVec2(0, px(8)));
     {
+        ui::TopicRegion topic(guide::topics::OfflineEvals);
+        drawLichessOfflineEvals();  // Lichess's evaluations kept offline (#58)
+    }
+    ImGui::Dummy(ImVec2(0, px(8)));
+    {
         ui::TopicRegion topic(guide::topics::LichessOnline);
         drawLichessOnline();
     }
     ImGui::EndChild();
+    // The evaluations' card asked for (Ctrl+K): the page scrolled to it.
+    if (offline_evals_y_ >= 0) {
+        ImGui::SetScrollFromPosY(offline_evals_y_ - ImGui::GetWindowPos().y, 0.0f);
+        offline_evals_y_ = -1;
+    }
 }
 
 }  // namespace fcg

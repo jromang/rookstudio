@@ -227,6 +227,8 @@ build/fcg-study-bench decode <database>                        # every game repl
 build/fcg-study-bench crash <games> <database> [--kills N]     # imports killed (SIGKILL) at random moments
 build/fcg-study-bench tree <database> [--plies N] [--memory MB] # the opening tree built, then asked
 build/fcg-study-bench search <database>                        # positions, material, patterns, a cancel
+build/fcg-study-bench evals <lichess_db_eval.jsonl.zst> <folder> [--min-men N]  # Lichess's evaluations kept offline
+build/fcg-study-bench evals-lookup <folder>                    # their lookups again, cold then warm
 ```
 
 ### Results
@@ -260,6 +262,10 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 - The opening tree keeps 15.01 M positions of the 11.7 M games (60 plies): 5.1 M that games share by the same moves
   (1.55 M of them by several orders), 9.9 M that only games' own moves share. Followed to 40 plies it keeps 14.77 M,
   to 80 plies 15.05 M; what grows is the work of the build (258 M, 446 M, 578 M positions of single games' moves).
+- Lichess's evaluations kept offline (#58), measured on 2026-11-20 on Lichess's file of 1 November 2026 (22.5 GB,
+  417 862 375 positions): read and made into the index from the disk in 7 min 37 s, with other work beside; the index
+  3.83 GB (9.16 bytes a position), 1.57 GB for the openings only; a lookup 118 µs cold, 0.39 µs warm (median). The
+  file's own figures, the format and the rest: `docs/design/offline-evals.md`.
 
 ### What the benchmark changed
 
@@ -276,3 +282,11 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 - A program killed in a commit left its new manifest, not renamed yet, and a database killed while it was being made
   could be neither opened nor made again: both are now cleared.
 - The import's memory grew with the machine's cores: now bounded to 24 pieces in flight, those being read included.
+- Lichess's evaluations, keyed first by Polyglot's hash: the file holds 19 positions made to share the keys of the start
+  position and of 1. e4, and one of them (a mate searched deeper) took the start position's place. A position's key is
+  now SipHash-2-4 under a secret drawn for each preparation.
+- The evaluations' index, mapped without advice: 20 000 random lookups read most of its 3.8 GB (the system read 128 KB
+  around each page). It is now read with `POSIX_MADV_RANDOM`.
+- chess.hpp keeps an en passant square after a move that its FEN reader rightly drops (a capture that would leave the
+  king in check): a position's key for the evaluations leaves that square out.
+- The 64 481 positions of more than 32 men (boards set up by hand) were not read: a position now holds up to 64.

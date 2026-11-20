@@ -605,6 +605,33 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         page_ = Page::Books;
         openEvaluatedSuite();
     });
+    // Lichess's evaluations kept offline (#58): their card, and what it does.
+    if (offline_evals_) {
+        const auto show = [this, go = page(Page::Lichess)] {
+            go();
+            offline_evals_focus_ = true;
+        };
+        const auto st = offline_evals_->state();
+        if (offline_evals_->busy()) {
+            add(TR("Lichess's evaluations offline: the preparation"), "Lichess", show);
+            add(TR("Cancel the preparation of Lichess's evaluations"), "Lichess", [this] { offline_evals_->cancel(); });
+        } else if (st.ready) {
+            add(TR("Lichess's evaluations offline"), "Lichess", show);
+            add(TR("Update Lichess's evaluations offline"), "Lichess", [this, show] {
+                show();
+                offline_evals_note_.clear();
+                if (!offline_evals_update_.valid())
+                    offline_evals_update_ =
+                        std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
+            });
+            add(TR("Remove Lichess's evaluations offline…"), "Lichess", [this, show] {
+                show();
+                offline_evals_remove_ = true;
+            });
+        } else {
+            add(TR("Lichess's evaluations offline: download and prepare…"), "Lichess", show);
+        }
+    }
     // A game prepared against an opponent (#52).
     add(TR("Prepare a game against…"), "Lichess", [this, go = page(Page::Lichess)] {
         go();

@@ -17,6 +17,12 @@
 //   fcg-study-bench chessbase-item <file.2cbh> <type>|@<offset> <bytes> <record>...   (the first annotation of a type
 //                                                 (hex) in each record, or its annotations from an offset: that many
 //                                                 bytes in hex)
+//   fcg-study-bench evals <lichess_db_eval.jsonl.zst> <folder> [--min-men N] [--run-entries N]
+//                                                 (Lichess's evaluations database read whole: its positions, searches,
+//                                                 depths and men counted, the offline index made in <folder> as the
+//                                                 program makes it, its size, the lookups' speed cold and warm on the
+//                                                 runs and on the index; a sample kept in <folder>/sample.tsv)
+//   fcg-study-bench evals-lookup <folder>          (the lookups again, on the folder's index and its sample)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -26,6 +32,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <random>
 #include <string>
@@ -34,8 +41,10 @@
 #include <vector>
 
 #include <chess.hpp>
+#include <tour/chess_text.hpp>
 
 #include <study/chessbase.hpp>
+#include <study/evals_index.hpp>
 #include <study/import.hpp>
 #include <study/mapped_file.hpp>
 #include <study/pgn_reader.hpp>
@@ -43,10 +52,12 @@
 #include <study/repertoire.hpp>
 #include <study/scan_board.hpp>
 #include <study/search.hpp>
+#include <study/sources.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
 #ifndef _WIN32
+#    include <fcntl.h>
 #    include <signal.h>
 #    include <spawn.h>
 #    include <sys/resource.h>
@@ -116,6 +127,8 @@ struct Args {
     int kills            = 200;
     uint32_t plies       = TREE_PLIES;
     std::size_t memory   = 2048;  // MB
+    int min_men             = 0;
+    std::size_t run_entries = std::size_t{1} << 23;
 };
 
 Args parse(int argc, char** argv) {
@@ -139,6 +152,10 @@ Args parse(int argc, char** argv) {
             a.memory = std::stoul(value());
         } else if (word == "--kills") {
             a.kills = std::stoi(value());
+        } else if (word == "--min-men") {
+            a.min_men = std::stoi(value());
+        } else if (word == "--run-entries") {
+            a.run_entries = std::stoul(value());
         } else if (word == "--keep-duplicates") {
             a.keep_duplicates = true;
         } else if (word == "--quiet") {
@@ -1197,6 +1214,461 @@ int runRepertoire(const Args& a) {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Lichess's evaluations kept offline (#58)
+
+// A file's pages dropped from the system's cache, so that the next reads of it come from the disk (a clean page is
+// dropped without rights). False where it cannot be done.
+bool dropFromCache(const fs::path& file) {
+#ifndef _WIN32
+    const int fd = ::open(file.c_str(), O_RDONLY);
+    if (fd < 0) return false;
+    const bool ok = ::posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED) == 0;
+    ::close(fd);
+    return ok;
+#else
+    (void)file;
+    return false;
+#endif
+}
+
+struct LookupTimes {
+    std::vector<double> us;
+    std::size_t found = 0;
+};
+
+void printTimes(const char* what, LookupTimes t) {
+    if (t.us.empty()) return;
+    std::sort(t.us.begin(), t.us.end());
+    const auto at = [&](double q) {
+        return t.us[std::min(t.us.size() - 1, static_cast<std::size_t>(q * t.us.size()))];
+    };
+    double sum = 0;
+    for (const auto v : t.us) sum += v;
+    std::printf("  %-34s %7zu lookups, %7zu found: mean %8.2f us, median %8.2f, p90 %8.2f, p99 %8.2f, max %9.2f\n",
+                what, t.us.size(), t.found, sum / static_cast<double>(t.us.size()), at(0.5), at(0.9), at(0.99),
+                t.us.back());
+}
+
+template <typename F>
+LookupTimes timeLookups(const std::vector<EvalsPosition>& positions, F&& find) {
+    LookupTimes t;
+    t.us.reserve(positions.size());
+    for (const auto& position : positions) {
+        const auto start = Clock::now();
+        const bool found = find(position);
+        t.us.push_back(seconds(start) * 1e6);
+        t.found += found ? 1 : 0;
+    }
+    return t;
+}
+
+struct EvalsSample {
+    std::string fen;
+    EvalsPosition position;
+    PackedEval eval;
+};
+
+// Positions no file has: men put at random (a king of each side, a few others).
+std::vector<EvalsPosition> randomPositions(std::size_t n, uint64_t seed) {
+    std::mt19937_64 rng(seed);
+    std::vector<EvalsPosition> out;
+    const char men[] = "QRBNPqrbnp";
+    while (out.size() < n) {
+        std::string squares(64, '.');
+        squares[rng() % 64] = 'K';
+        for (int k = 0; k < 30;) {
+            const auto at = rng() % 64;
+            if (squares[at] != '.') continue;
+            squares[at] = k == 0 ? 'k' : men[rng() % 10];
+            ++k;
+        }
+        std::string fen;
+        for (int rank = 7; rank >= 0; --rank) {
+            int empty = 0;
+            for (int file = 0; file < 8; ++file) {
+                const char c = squares[static_cast<std::size_t>(rank * 8 + file)];
+                if (c == '.') {
+                    ++empty;
+                    continue;
+                }
+                if (empty) fen += static_cast<char>('0' + empty);
+                empty = 0;
+                fen += c;
+            }
+            if (empty) fen += static_cast<char>('0' + empty);
+            if (rank) fen += '/';
+        }
+        EvalsPosition p;
+        if (evalsPosition(fen + " w - -", p)) out.push_back(p);
+    }
+    return out;
+}
+
+// The lookups of a sample: cold (the files' pages dropped first, then each position once), then warm (the same again).
+void measureLookups(const char* what, const std::vector<fs::path>& files, const std::vector<EvalsSample>& sample,
+                    const std::function<std::optional<PackedEval>(const EvalsPosition&)>& find,
+                    const std::function<void()>& reopen) {
+    std::vector<EvalsPosition> keys;
+    for (const auto& s : sample) keys.push_back(s.position);
+    bool dropped = true;
+    for (const auto& f : files) dropped &= dropFromCache(f);
+    reopen();  // mapped after the drop
+    std::printf("%s (%zu file%s%s)\n", what, files.size(), files.size() == 1 ? "" : "s",
+                dropped ? ", pages dropped from the cache first" : ", NOT dropped from the cache");
+    const auto take = [&](const EvalsPosition& p) { return find(p).has_value(); };
+    std::vector<EvalsPosition> cold_keys(keys.begin(), keys.begin() + static_cast<std::ptrdiff_t>(keys.size() / 2));
+    const auto cold_misses = randomPositions(std::min<std::size_t>(5000, keys.size() / 2), 7);
+    printTimes("cold, positions it has", timeLookups(cold_keys, take));
+    printTimes("cold, positions it has not", timeLookups(cold_misses, take));
+    printTimes("warm, the same positions again", timeLookups(cold_keys, take));
+    printTimes("warm, the same misses again", timeLookups(cold_misses, take));
+    // Correct answers: each sampled position's evaluation, or a deeper one of the same position met elsewhere.
+    std::size_t wrong = 0, missing = 0;
+    for (const auto& s : sample) {
+        const auto got = find(s.position);
+        if (!got)
+            ++missing;
+        else if (!(*got == s.eval) && packedDepth(*got) < packedDepth(s.eval))
+            ++wrong;
+    }
+    std::printf("  checked: %zu sampled positions, %zu missing, %zu with another evaluation not deeper\n",
+                sample.size(), missing, wrong);
+}
+
+int runEvals(const Args& a) {
+    if (a.words.size() != 3) return 2;
+    const fs::path dump = a.words[1], folder = a.words[2];
+    fs::create_directories(folder);
+    const auto build = folder / "build";
+    fs::remove_all(build);
+    EvalsBuilder::Options options;
+    options.min_men     = a.min_men;
+    options.run_entries = a.run_entries;
+    EvalsBuilder builder(build, options);
+    builder.startAgain();
+
+    // The counts.
+    uint64_t text = 0, lines = 0, unread = 0, slow = 0, mates = 0, with_passant = 0, odd_castling = 0;
+    uint64_t key_checked = 0, key_wrong = 0, key_unreadable = 0, line_bytes_max = 0;
+    uint64_t pvs_all = 0, moves_all = 0, pvs_best = 0, all_searches = 0, over_32 = 0;
+    std::map<std::string, uint64_t> odd_castlings;
+    std::vector<uint64_t> searches(12, 0), lines_of(12, 0), men(33, 0), depth_best(256, 0), depth_all(256, 0);
+    std::vector<uint64_t> depth_by_men_sum(33, 0);
+    std::vector<int> depths;
+    std::vector<EvalsSample> sample;
+    std::string pending;
+    const auto one = [&](std::string_view line) {
+        if (line.empty()) return;
+        ++lines;
+        line_bytes_max = std::max<uint64_t>(line_bytes_max, line.size());
+        depths.clear();
+        EvalsLine l;
+        if (!readEvalsLine(line, l, &depths)) {
+            ++unread;
+            builder.add(EvalsLine{});  // counted as read, not kept
+            return;
+        }
+        slow += l.slow ? 1 : 0;
+        // The lines (PVs) and their moves, of every search and of the deepest: what keeping them would take.
+        all_searches += static_cast<uint64_t>(l.searches);
+        pvs_best += static_cast<uint64_t>(l.lines);
+        for (std::size_t at = line.find("\"line\":\""); at != std::string_view::npos;
+             at             = line.find("\"line\":\"", at + 8)) {
+            const auto from = at + 8, to = line.find('"', from);
+            if (to == std::string_view::npos) break;
+            ++pvs_all;
+            if (to > from)
+                moves_all += 1 + static_cast<uint64_t>(std::count(line.begin() + from, line.begin() + to, ' '));
+        }
+        ++searches[std::min<std::size_t>(11, static_cast<std::size_t>(l.searches))];
+        ++lines_of[std::min<std::size_t>(11, static_cast<std::size_t>(l.lines))];
+        const int all_men = evalsMen(l.fen);
+        over_32 += all_men > 32 ? 1 : 0;
+        const int m = std::min(32, all_men);
+        ++men[static_cast<std::size_t>(m)];
+        ++depth_best[static_cast<std::size_t>(std::clamp(l.depth, 0, 255))];
+        depth_by_men_sum[static_cast<std::size_t>(m)] += static_cast<uint64_t>(std::clamp(l.depth, 0, 255));
+        for (const auto d : depths) ++depth_all[static_cast<std::size_t>(std::clamp(d, 0, 255))];
+        mates += l.mate != 0 ? 1 : 0;
+        // The FEN's fields: an en passant square, castling rights other than standard chess's letters.
+        const auto f2 = l.fen.find(' ', l.fen.find(' ') + 1), f3 = l.fen.find(' ', f2 + 1);
+        if (f3 != std::string_view::npos && l.fen.substr(f3 + 1, 1) != "-") ++with_passant;
+        if (f2 != std::string_view::npos) {
+            const auto castling =
+                l.fen.substr(f2 + 1, f3 == std::string_view::npos ? std::string_view::npos : f3 - f2 - 1);
+            if (castling.find_first_not_of("KQkq-") != std::string_view::npos) {
+                ++odd_castling;
+                ++odd_castlings[std::string(castling)];
+            }
+        }
+        // The FEN's position read the fast way against the board chess.hpp reads, on one line in 97.
+        if (lines % 97 == 0) {
+            const std::string fen(l.fen);
+            if (fcg::tour::readableFen(fen)) {
+                chess::Board board;
+                EvalsPosition position;
+                if (board.setFen(fen)) {
+                    ++key_checked;
+                    if (!evalsPosition(fen, position) || !(position == evalsPosition(board))) {
+                        if (++key_wrong <= 10) std::printf("position differs: %s\n", fen.c_str());
+                    }
+                }
+            } else {
+                ++key_unreadable;
+            }
+        }
+        if (lines % 10007 == 0 && (options.min_men == 0 || m >= options.min_men)) {
+            EvalsSample s;
+            if (evalsPosition(l.fen, s.position)) {
+                s.fen  = std::string(l.fen);
+                s.eval = packEval(l.cp, l.mate, l.depth, l.move);
+                sample.push_back(std::move(s));
+            }
+        }
+        builder.add(l);
+    };
+    const auto text_piece = [&](std::string_view piece) {
+        text += piece.size();
+        for (std::size_t from = 0;;) {
+            const auto end = piece.find('\n', from);
+            if (end == std::string_view::npos) {
+                pending.append(piece.substr(from));
+                return true;
+            }
+            if (pending.empty()) {
+                one(piece.substr(from, end - from));
+            } else {
+                pending.append(piece.substr(from, end - from));
+                one(pending);
+                pending.clear();
+            }
+            from = end + 1;
+        }
+    };
+    auto last_commit = Clock::now(), last_print = Clock::now();
+    double cut_seconds   = 0;
+    uint64_t frames      = 0;
+    const auto frame_end = [&](std::size_t) {
+        ++frames;
+        const auto before = builder.runs().size();
+        const auto t0     = Clock::now();
+        (void)builder.mark();
+        if (builder.runs().size() != before) cut_seconds += seconds(t0);
+        if (seconds(last_commit) >= 5) {
+            builder.commit();
+            last_commit = Clock::now();
+        }
+    };
+    ZstdStream zstd;
+    std::FILE* in = std::fopen(dump.string().c_str(), "rb");
+    if (!in) throw std::runtime_error("cannot open " + dump.string());
+    const auto size = fs::file_size(dump);
+    std::vector<char> buffer(std::size_t{4} << 20);
+    uint64_t read    = 0;
+    const auto start = Clock::now();
+    for (;;) {
+        const auto n = std::fread(buffer.data(), 1, buffer.size(), in);
+        if (n == 0) break;
+        read += n;
+        zstd.feed(std::string_view(buffer.data(), n), text_piece, frame_end);
+        if (seconds(last_print) >= 30) {
+            last_print = Clock::now();
+            std::fprintf(stderr, "%5.1f %% · %.1f GB of text · %llu lines · %zu runs · %.0f s\n", 100.0 * read / size,
+                         text / 1e9, static_cast<unsigned long long>(lines), builder.runs().size(), seconds(start));
+        }
+        if (!builder.error().empty()) throw std::runtime_error(builder.error());
+    }
+    std::fclose(in);
+    if (!pending.empty()) one(pending);
+    const double read_seconds = seconds(start);
+
+    // The runs answer before the index is made: their lookups measured too.
+    builder.commit();
+    {
+        // The last positions in memory go into a run first, as finish() does, for the measure to see them all.
+        uint64_t runs_bytes  = 0;
+        const auto run_files = builder.runs();
+        for (const auto& f : run_files) runs_bytes += fs::file_size(f);
+        std::printf("read: %.0f s for %.2f GB compressed, %.1f GB of text (%llu frames), %.1f s of it writing runs\n",
+                    read_seconds, size / 1e9, text / 1e9, static_cast<unsigned long long>(frames), cut_seconds);
+        std::printf("runs: %zu, %.2f GB (12 bytes a position, plus 256 KB each)\n", run_files.size(), runs_bytes / 1e9);
+        std::vector<std::unique_ptr<EvalsRun>> runs;
+        measureLookups(
+            "lookups in the runs (while it prepares)", run_files, sample,
+            [&](const EvalsPosition& position) -> std::optional<PackedEval> {
+                // The runs share their secret: the key made once, as the program does.
+                if (runs.empty()) return std::nullopt;
+                const auto key = evalsKey(position, runs.front()->secret());
+                std::optional<PackedEval> best;
+                for (const auto& r : runs)
+                    if (auto f = r->findKey(key); f && (!best || packedDepth(*f) > packedDepth(*best))) best = f;
+                return best;
+            },
+            [&] {
+                runs.clear();
+                for (const auto& f : run_files) runs.push_back(std::make_unique<EvalsRun>(f));
+            });
+    }
+
+    const auto index = nextEvalsIndex(folder);
+    std::atomic<uint64_t> merged{0}, total{0};
+    const auto merge_start = Clock::now();
+    uint64_t peak_disk     = 0;
+    for (const auto& f : builder.runs()) peak_disk += fs::file_size(f);
+    const auto why = builder.finish(index, "", &merged, &total);
+    if (!why.empty()) throw std::runtime_error(why);
+    const double merge_seconds = seconds(merge_start);
+    const auto index_bytes     = fs::file_size(index);
+    peak_disk += index_bytes;
+    tidyEvalsFolder(folder);
+
+    // The sample, for evals-lookup.
+    {
+        std::FILE* out = std::fopen((folder / "sample.tsv").string().c_str(), "wb");
+        for (const auto& s : sample) {
+            std::fprintf(out, "%s", s.fen.c_str());
+            for (const auto b : s.eval.bytes) std::fprintf(out, "\t%u", b);
+            std::fprintf(out, "\n");
+        }
+        std::fclose(out);
+    }
+
+    const auto pct = [&](uint64_t n) {
+        return lines ? 100.0 * static_cast<double>(n) / static_cast<double>(lines) : 0.0;
+    };
+    std::printf("\nthe database: %s, %.2f GB compressed, %.1f GB of text, %llu lines (the longest %llu bytes)\n",
+                dump.filename().string().c_str(), size / 1e9, text / 1e9, static_cast<unsigned long long>(lines),
+                static_cast<unsigned long long>(line_bytes_max));
+    std::printf("  not read: %llu; read as JSON (another order of the fields): %llu; mates: %llu (%.2f %%)\n",
+                static_cast<unsigned long long>(unread), static_cast<unsigned long long>(slow),
+                static_cast<unsigned long long>(mates), pct(mates));
+    std::printf("  en passant squares: %llu; castling rights other than KQkq: %llu; more than 32 men: %llu\n",
+                static_cast<unsigned long long>(with_passant), static_cast<unsigned long long>(odd_castling),
+                static_cast<unsigned long long>(over_32));
+    std::printf("  castling rights other than KQkq, the most common:");
+    {
+        std::vector<std::pair<uint64_t, std::string>> odd;
+        for (const auto& [c, n] : odd_castlings) odd.emplace_back(n, c);
+        std::sort(odd.rbegin(), odd.rend());
+        for (std::size_t i = 0; i < odd.size() && i < 8; ++i)
+            std::printf(" %s %llu", odd[i].second.c_str(), static_cast<unsigned long long>(odd[i].first));
+        std::printf("\n");
+    }
+    std::printf(
+        "  searches %llu; lines (PVs) of every search %llu, of the deepest %llu; moves in every line %llu "
+        "(%.2f a line)\n",
+        static_cast<unsigned long long>(all_searches), static_cast<unsigned long long>(pvs_all),
+        static_cast<unsigned long long>(pvs_best), static_cast<unsigned long long>(moves_all),
+        pvs_all ? static_cast<double>(moves_all) / static_cast<double>(pvs_all) : 0.0);
+    std::printf(
+        "  positions read the fast way, checked against chess.hpp's board: %llu, %llu different, %llu FENs it "
+        "cannot read\n",
+        static_cast<unsigned long long>(key_checked), static_cast<unsigned long long>(key_wrong),
+        static_cast<unsigned long long>(key_unreadable));
+    std::printf("searches per position:");
+    for (std::size_t i = 1; i < searches.size(); ++i)
+        if (searches[i]) std::printf(" %zu%s: %.2f %%", i, i == 11 ? "+" : "", pct(searches[i]));
+    std::printf("\nlines of the deepest search (MultiPV):");
+    for (std::size_t i = 1; i < lines_of.size(); ++i)
+        if (lines_of[i]) std::printf(" %zu%s: %.2f %%", i, i == 11 ? "+" : "", pct(lines_of[i]));
+    std::printf("\n");
+    const auto depthTable = [&](const char* what, const std::vector<uint64_t>& h) {
+        uint64_t n = 0;
+        for (const auto v : h) n += v;
+        std::printf("%s (%llu):", what, static_cast<unsigned long long>(n));
+        const int edges[] = {0, 10, 20, 25, 30, 35, 40, 45, 50, 60, 70, 100, 256};
+        for (std::size_t e = 0; e + 1 < std::size(edges); ++e) {
+            uint64_t c = 0;
+            for (int d = edges[e]; d < edges[e + 1]; ++d) c += h[static_cast<std::size_t>(d)];
+            std::printf(" %d-%d: %.2f %%", edges[e], edges[e + 1] - 1, n ? 100.0 * c / n : 0.0);
+        }
+        uint64_t acc = 0;
+        int median   = 0;
+        double mean  = 0;
+        for (int d = 0; d < 256; ++d) {
+            mean += static_cast<double>(d) * h[static_cast<std::size_t>(d)];
+            if (acc * 2 < n && (acc += h[static_cast<std::size_t>(d)]) * 2 >= n) median = d;
+        }
+        std::printf("; median %d, mean %.1f\n", median, n ? mean / n : 0.0);
+        // At least: for a threshold.
+        std::printf("  at least:");
+        for (const int t : {20, 25, 30, 35, 40, 45, 50}) {
+            uint64_t c = 0;
+            for (int d = t; d < 256; ++d) c += h[static_cast<std::size_t>(d)];
+            std::printf(" %d: %.1f %%", t, n ? 100.0 * c / n : 0.0);
+        }
+        std::printf("\n");
+    };
+    depthTable("depth of each position's deepest search", depth_best);
+    depthTable("depth of every search", depth_all);
+    std::printf("men on the board (positions, then the mean depth of their deepest search):\n");
+    uint64_t acc = 0;
+    for (int m = 32; m >= 2; --m) {
+        acc += men[static_cast<std::size_t>(m)];
+        std::printf(
+            "  %2d: %6.2f %%, %llu or more: %6.2f %%, depth %.1f\n", m, pct(men[static_cast<std::size_t>(m)]),
+            static_cast<unsigned long long>(m), pct(acc),
+            men[static_cast<std::size_t>(m)]
+                ? static_cast<double>(depth_by_men_sum[static_cast<std::size_t>(m)]) / men[static_cast<std::size_t>(m)]
+                : 0.0);
+    }
+    std::printf(
+        "\nthe index: %s, %llu positions (%llu merged), %.3f GB (%.2f bytes a position); merged in %.0f s; "
+        "at most %.2f GB on the disk while it prepares (runs and index)\n",
+        index.filename().string().c_str(), static_cast<unsigned long long>(merged.load()),
+        static_cast<unsigned long long>(total.load()), index_bytes / 1e9,
+        static_cast<double>(index_bytes) / std::max<uint64_t>(1, merged.load()), merge_seconds, peak_disk / 1e9);
+    std::printf("total: %.0f s, peak memory %.0f MB\n", seconds(start), peakMb());
+    std::unique_ptr<EvalsIndex> opened;
+    measureLookups(
+        "lookups in the index", {index}, sample,
+        [&](const EvalsPosition& position) -> std::optional<PackedEval> {
+            const auto f = opened->find(position);
+            if (!f) return std::nullopt;
+            return packEval(f->cp, f->mate, f->depth, f->best);
+        },
+        [&] { opened = std::make_unique<EvalsIndex>(index); });
+    return 0;
+}
+
+int runEvalsLookup(const Args& a) {
+    if (a.words.size() != 2) return 2;
+    const fs::path folder = a.words[1];
+    const auto index      = newestEvalsIndex(folder);
+    if (index.empty()) throw std::runtime_error("no index in " + folder.string());
+    std::vector<EvalsSample> sample;
+    std::FILE* in = std::fopen((folder / "sample.tsv").string().c_str(), "rb");
+    if (!in) throw std::runtime_error("no sample.tsv in " + folder.string());
+    char line[512];
+    while (std::fgets(line, sizeof line, in)) {
+        const std::string_view text(line);
+        const auto tab = text.find('\t');
+        if (tab == std::string_view::npos) continue;
+        EvalsSample s;
+        s.fen = std::string(text.substr(0, tab));
+        unsigned b[5];
+        if (std::sscanf(line + tab, "\t%u\t%u\t%u\t%u\t%u", &b[0], &b[1], &b[2], &b[3], &b[4]) != 5 ||
+            !evalsPosition(s.fen, s.position))
+            continue;
+        for (int i = 0; i < 5; ++i) s.eval.bytes[i] = static_cast<uint8_t>(b[i]);
+        sample.push_back(std::move(s));
+    }
+    std::fclose(in);
+    std::unique_ptr<EvalsIndex> opened;
+    measureLookups(
+        "lookups in the index", {index}, sample,
+        [&](const EvalsPosition& position) -> std::optional<PackedEval> {
+            const auto f = opened->find(position);
+            if (!f) return std::nullopt;
+            return packEval(f->cp, f->mate, f->depth, f->best);
+        },
+        [&] { opened = std::make_unique<EvalsIndex>(index); });
+    std::printf("index: %s, %llu positions, %.3f GB\n", index.filename().string().c_str(),
+                static_cast<unsigned long long>(opened->positions()), opened->bytes() / 1e9);
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1217,6 +1689,8 @@ int main(int argc, char** argv) {
         if (a.words[0] == "chessbase-dump") rc = runChessBaseDump(a);
         if (a.words[0] == "chessbase-scan") rc = runChessBaseScan(a);
         if (a.words[0] == "chessbase-item") rc = runChessBaseItem(a);
+        if (a.words[0] == "evals") rc = runEvals(a);
+        if (a.words[0] == "evals-lookup") rc = runEvalsLookup(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

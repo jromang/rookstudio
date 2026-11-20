@@ -1315,6 +1315,36 @@ often that your repertoires do not answer, the most frequent first. A click on o
 on their games. Only their name and those filters go to Lichess. While a game of yours against them is played on
 Lichess, the card shows nothing of them.
 
+### Lichess's evaluations, offline
+
+The card *Lichess's evaluations, offline* keeps on your disk what Lichess's servers have computed for 418 million
+positions (database.lichess.org, CC0): for each, the evaluation, the depth and the first move of its deepest search.
+Nothing is asked of the network afterwards, and an evaluation shows at once wherever Lichess has one.
+
+- **What is kept**: every position (about 3.6 GB), or the openings only (about 1.5 GB), the positions with 24 men
+  or more on the board. Lichess's file gives no move number: in Lichess's games, 24 men or more is 89 % of the
+  positions of the first 20 moves and 8 % of the later ones. Lichess's lines are left out: they would take nearly five
+  times the room, for what your engine finds again in a second.
+- **Download and prepare** (Enter) reads Lichess's file, about 21 GB, while it downloads, and keeps of it only what
+  you chose; *A file already downloaded…* reads `lichess_db_eval.jsonl.zst` from your disk instead. While it
+  prepares, it needs a little more than twice the room of what it keeps; the card says what your disk has free.
+- The positions read answer a few million at a time, without waiting for the end. *Cancel*, a network cut or the
+  program closed: *Go on* takes up the file where it stopped, *Start again* forgets what was read.
+- Ready, the card gives the positions, the size and the file's date. Lichess publishes the file again each month:
+  *Update* asks database.lichess.org for its date and reads a newer file, the evaluations kept answering until it is
+  ready. *Remove them* frees the disk.
+
+They show in three places:
+
+- the Analysis tab: a line above the engine, *Lichess offline · +0.31 · depth 46 · 6…e6*, White's score (a click
+  shows the move on the board);
+- the review of a game: a position known at depth 30 or more is taken as it is, without a search, and the engine
+  searches the others (its last pass, 5 seconds a position by default, seldom goes deeper);
+- the Tree tab: an *Eval.* column, the evaluation after each move.
+
+What leaves the machine: the request for the file to database.lichess.org, and nothing else. While one of your games
+is played on Lichess, they hide as the engine does (see [Fair play](#fair-play)).
+
 ### Online for the analysis
 
 Three services, each asked about at its first use (for this position, always, or not now) and changed here:

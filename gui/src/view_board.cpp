@@ -506,6 +506,9 @@ void App::startReviewTask(const EngineEntry& engine, const std::vector<GameRevie
     setup.game       = b.review_game;
     setup.chess960   = b.review_chess960;
     setup.ceiling_ms = b.settings.review_ceiling_ms;
+    // The Chess space: Lichess's evaluations kept offline, deep enough, taken as they are (#58); the Engines space's
+    // review does not change.
+    if (chessBoard()) setup.known = reviewKnown();
     // Resumed after the passes this engine completed, unless it went as far as asked: then again from the start.
     for (const auto& r : kept) {
         if (r.engine == engine.name && r.passes > 0 && r.complete(b.review_game.moves.size()) &&
@@ -3091,9 +3094,11 @@ std::string App::boardGraphTip(int ply) const {
         const auto& pos = review->positions[static_cast<std::size_t>(ply)];
         if (const float v = graphPawns(pos.score, ~b.tree.main.moves[static_cast<std::size_t>(ply - 1)].mover);
             std::isfinite(v)) {
-            tip += "\n" + trf("Analysis ({}): {}", review->engine,
-                              ui::formatScore(
-                                  whiteScore(*pos.score, ~b.tree.main.moves[static_cast<std::size_t>(ply - 1)].mover)));
+            const auto score =
+                ui::formatScore(whiteScore(*pos.score, ~b.tree.main.moves[static_cast<std::size_t>(ply - 1)].mover));
+            // A position taken as Lichess's evaluations kept offline have it (#58), not searched.
+            tip += "\n" + (pos.known ? trf("Lichess offline, depth {}: {}", pos.depth, score)
+                                     : trf("Analysis ({}): {}", review->engine, score));
         }
     }
     return tip;
@@ -3153,6 +3158,12 @@ void App::drawBoardGraph(float height) {
                                           ui::formatClock(passTime(pass)), done, all);
         if (b.analysing) draw.progress += " · " + std::string(TR("paused while A analyses"));
         const auto& job = b.review_tasks.front().state;
+        // The positions Lichess's evaluations kept offline know deep enough, taken as they are (#58).
+        const auto known = static_cast<int>(std::count_if(job.live.positions.begin(), job.live.positions.end(),
+                                                          [](const PositionEval& p) { return p.known; }));
+        if (known > 0)
+            draw.progress +=
+                " · " + trn("{} position known from Lichess", "{} positions known from Lichess", known, known);
         const int top   = ceiling > 0 ? passes : pass + 1;
         for (const int level : job.level)
             graph.level.push_back(level < 0 ? 0.0f : static_cast<float>(level + 1) / static_cast<float>(top));

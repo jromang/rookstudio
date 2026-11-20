@@ -873,9 +873,12 @@ void App::drawBoardTree() {
         }
     }
 
-    // The moves: a click plays one.
+    // The moves: a click plays one. Lichess's evaluation of the position after each, when they are kept offline
+    // (#58), beside it.
+    const auto here      = boardAt(b.game, b.chess960, b.ply);
+    const bool evals     = offline_evals_ && offline_evals_->lookup() && !b.chess960 && !aidsLocked();
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
-    const int columns    = tree_book_ ? 3 : 9;
+    const int columns    = (tree_book_ ? 3 : 9) + (evals ? 1 : 0);
     // Room under the table for the star's Undo and the line of keys.
     const float games_h = online && !tree_games_.empty()
                               ? ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(tree_games_.size() + 2)
@@ -886,6 +889,7 @@ void App::drawBoardTree() {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
         ImGui::TableSetupColumn(TR("Move"));
+        if (evals) ImGui::TableSetupColumn(TR("Eval."));
         if (tree_book_) {
             ImGui::TableSetupColumn(TR("Weight"), ImGuiTableColumnFlags_WidthStretch);
         } else {
@@ -928,7 +932,21 @@ void App::drawBoardTree() {
                                                : TR("A click adds it to the active repertoire"));
             }
             ImGui::PopID();
-            ImGui::TableSetColumnIndex(2);
+            if (evals) {
+                ImGui::TableSetColumnIndex(2);
+                auto after = here;
+                after.makeMove(row.move);
+                if (const auto e = offlineEval(after)) {
+                    ImGui::TextUnformatted(e->mate ? fmt::format("#{}", e->mate).c_str()
+                                                   : fmt::format("{:+.2f}", e->cp / 100.0).c_str());
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s", trf("Lichess's evaluation after {}, depth {}, kept offline. Scores "
+                                                    "are White's.",
+                                                    row.san, e->depth)
+                                                    .c_str());
+                }
+            }
+            ImGui::TableSetColumnIndex(evals ? 3 : 2);
             if (tree_book_) {
                 ImGui::ProgressBar(static_cast<float>(row.games) / 1000.0f, ImVec2(-1, 0),
                                    fmt::format("{} %", std::lround(row.games / 10.0)).c_str());

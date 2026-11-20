@@ -66,6 +66,12 @@ MappedFile::MappedFile(const std::filesystem::path& file) {
 
 MappedFile::~MappedFile() { close(); }
 
+void MappedFile::adviseRandom() const noexcept {
+#ifndef _WIN32
+    if (data_ && size_ > 0) (void)::posix_madvise(const_cast<uint8_t*>(data_), size_, POSIX_MADV_RANDOM);
+#endif
+}
+
 MappedFile::MappedFile(MappedFile&& other) noexcept { *this = std::move(other); }
 
 MappedFile& MappedFile::operator=(MappedFile&& other) noexcept {

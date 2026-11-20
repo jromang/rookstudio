@@ -70,7 +70,19 @@ bool Analyser::hasOption(const std::string& name) const {
     return std::any_of(options_.begin(), options_.end(), [&](const UciOptionInfo& o) { return o.name == name; });
 }
 
-int Analyser::effectiveThreads() const { return hasOption("Threads") ? std::max(1, settings_.threads) : 1; }
+int Analyser::effectiveThreads() const {
+    if (!hasOption("Threads")) return 1;
+    if (settings_.threads > 0) return settings_.threads;
+    // Its own: what it declared.
+    for (const auto& o : options_) {
+        if (o.name != "Threads") continue;
+        try {
+            return std::max(1, std::stoi(o.default_value));
+        } catch (...) {
+        }
+    }
+    return 1;
+}
 
 double Analyser::searchSeconds() const {
     if (state_ != State::Searching) return 0;
@@ -188,7 +200,8 @@ void Analyser::sendOptions(bool all) {
         set("UCI_ShowWDL", "true");
         set("UCI_AnalyseMode", "true");
     }
-    if (all || settings_.threads != sent_.threads) set("Threads", std::to_string(std::max(1, settings_.threads)));
+    if (settings_.threads > 0 && (all || settings_.threads != sent_.threads))
+        set("Threads", std::to_string(settings_.threads));
     if (settings_.hash > 0 && (all || settings_.hash != sent_.hash)) set("Hash", std::to_string(settings_.hash));
     if (all || settings_.multipv != sent_.multipv) set("MultiPV", std::to_string(std::clamp(settings_.multipv, 1, 64)));
     sent_ = settings_;

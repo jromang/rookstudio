@@ -22,7 +22,7 @@ namespace fcg {
 
 struct AnalysisSettings {
     std::string engine;  // a library engine's name
-    int threads = 1;
+    int threads = 1;     // 0: the engine's own, not sent (a GPU engine beside others, side_by_side.hpp)
     int hash    = 0;  // MB, 0: the engine's own (its library value, or its default)
     int multipv = 3;
 };

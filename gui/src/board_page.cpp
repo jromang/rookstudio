@@ -12,6 +12,37 @@
 
 namespace fcg {
 
+std::vector<SideEngine> analysisEngines(const BoardSettings& settings) {
+    std::vector<SideEngine> out;
+    const auto& a = settings.analysis;
+    if (!a.engine.empty()) out.push_back({a.engine, std::max(0, settings.first_threads), a.hash, a.multipv});
+    for (const auto& e : settings.side_engines) {
+        if (out.size() >= MAX_SIDE_ENGINES) break;
+        if (e.engine.empty() ||
+            std::any_of(out.begin(), out.end(), [&](const SideEngine& o) { return o.engine == e.engine; }))
+            continue;
+        out.push_back(e);
+        out.back().threads = std::max(0, e.threads);
+    }
+    return out;
+}
+
+void setAnalysisEngines(BoardSettings& settings, std::vector<SideEngine> engines) {
+    if (engines.size() > MAX_SIDE_ENGINES) engines.resize(MAX_SIDE_ENGINES);
+    auto& a = settings.analysis;
+    if (engines.empty()) {
+        a.engine.clear();
+        settings.first_threads = 0;
+        settings.side_engines.clear();
+        return;
+    }
+    a.engine               = engines.front().engine;
+    a.hash                 = engines.front().hash;
+    a.multipv              = engines.front().multipv;
+    settings.first_threads = engines.front().threads;
+    settings.side_engines.assign(engines.begin() + 1, engines.end());
+}
+
 AnalysisPosition analysisPosition(const ReplayGame& game, bool chess960, int ply) {
     AnalysisPosition position;
     position.chess960 = chess960;

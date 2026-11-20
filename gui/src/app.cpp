@@ -368,6 +368,21 @@ void App::frame() {
         else if (w == "engines-card") {
             page_            = Page::Engines;
             selected_engine_ = engines_.empty() ? -1 : 0;
+        } else if (w.rfind("board-analysis", 0) == 0) {
+            // The study Board's Analysis tab (#78); board-analysis=FILE[@PLY]: FILE on the board (at that ply once
+            // read), analysed; board-analysis-menu[=FILE[@PLY]]: its "+ An engine" open too.
+            toStudyBoard();
+            board_side_tab_ = 1;
+            if (const auto eq = w.find('='); eq != std::string::npos) {
+                auto file = w.substr(eq + 1);
+                if (const auto at = file.rfind('@'); at != std::string::npos && at > 1) {
+                    ply_when_read_ = std::atoi(file.c_str() + at + 1);
+                    file           = file.substr(0, at);
+                }
+                dropFile(file);
+                setBoardAnalysis(true);
+            }
+            if (w.rfind("board-analysis-menu", 0) == 0) side_menu_open_ = true;
         } else if (w == "board-tree" || w == "board-references") {  // the Chess space's column at that tab
             toStudyBoard();
             board_side_tab_ = w == "board-tree" ? 2 : 3;

@@ -327,7 +327,7 @@ void App::drawRail(float width) {
 void App::drawBoardRailButton(float width, float button) {
     if (ui::railButton("rail_board", ui::Icon::Board, TR("Board"), page_ == Page::Board, width, button))
         page_ = Page::Board;
-    if (board_.analysing || board_.analyser.active()) {
+    if (board_.analysing || board_.analyser->active()) {
         // The analysis runs: a dot at the icon's top right.
         const auto min = ImGui::GetItemRectMin();
         ImGui::GetWindowDrawList()->AddCircleFilled(

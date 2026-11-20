@@ -276,6 +276,18 @@ void drawBoard(const PieceAtlas& atlas, const std::array<chess::Piece, 64>& piec
         dl->AddTriangleFilled(tip, ImVec2(base.x + n.x * head, base.y + n.y * head),
                               ImVec2(base.x - n.x * head, base.y - n.y * head), arrow.colour);
     }
+    // The engines that agree on an arrow's move, counted beside its start (#78), over every arrow.
+    for (const auto& arrow : decor.arrows) {
+        if (arrow.count.empty()) continue;
+        const ImVec2 a = squareCentre(arrow.move.from(), origin, size, decor.flipped);
+        const ImVec2 b = squareCentre(displayedTarget(arrow.move), origin, size, decor.flipped);
+        const float r  = sq * 0.18f;
+        const ImVec2 c = arrowCountCentre(a, b, sq);
+        drawArrowCount(dl,
+                       ImVec2(std::clamp(c.x, origin.x + r, origin.x + size - r),
+                              std::clamp(c.y, origin.y + r, origin.y + size - r)),
+                       r, arrow);
+    }
 
     // A move's judgement on the corner of its square.
     if (decor.badge) {
@@ -316,6 +328,28 @@ void drawDraggedPiece(const PieceAtlas& atlas, chess::Piece piece, float size) {
     ImGui::GetForegroundDrawList()->AddImage(atlas.texture(sq * ImGui::GetIO().DisplayFramebufferScale.x),
                                              ImVec2(at.x - sq / 2, at.y - sq / 2), ImVec2(at.x + sq / 2, at.y + sq / 2),
                                              uv0, uv1);
+}
+
+ImVec2 arrowCountCentre(ImVec2 from, ImVec2 to, float square) {
+    const float dx = to.x - from.x, dy = to.y - from.y;
+    const float length = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+    const ImVec2 u(dx / length, dy / length);
+    // Across the shaft, a little along it: the piece on the square stays in sight.
+    return ImVec2(from.x + u.y * square * 0.4f + u.x * square * 0.12f,
+                  from.y - u.x * square * 0.4f + u.y * square * 0.12f);
+}
+
+void drawArrowCount(ImDrawList* dl, ImVec2 centre, float radius, const BoardArrow& arrow) {
+    ImFont* font = ImGui::GetFont();
+    dl->AddCircleFilled(ImVec2(centre.x + 1, centre.y + 1.5f), radius, IM_COL32(0, 0, 0, 70), 24);
+    dl->AddCircleFilled(centre, radius, arrow.colour | IM_COL32_A_MASK, 24);
+    dl->AddCircle(centre, radius, IM_COL32(255, 255, 255, 220), 24, std::max(1.0f, radius * 0.12f));
+    const float fs  = radius * 1.35f;
+    const ImVec2 ts = font->CalcTextSizeA(fs, FLT_MAX, 0, arrow.count.c_str());
+    dl->AddText(font, fs, ImVec2(centre.x - ts.x / 2, centre.y - ts.y / 2), IM_COL32_WHITE, arrow.count.c_str());
+    if (arrow.count.size() == 1)
+        dl->AddText(font, fs, ImVec2(centre.x - ts.x / 2 + 0.6f, centre.y - ts.y / 2), IM_COL32_WHITE,
+                    arrow.count.c_str());
 }
 
 void drawBoardBadge(ImDrawList* dl, ImVec2 centre, float radius, const BoardBadge& badge) {

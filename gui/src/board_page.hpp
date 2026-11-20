@@ -7,6 +7,7 @@
 #include <atomic>
 #include <filesystem>
 #include <future>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -27,6 +28,7 @@
 #include "lichess_studies.hpp"
 #include "pgn_store.hpp"
 #include "review_runner.hpp"
+#include "side_by_side.hpp"
 
 namespace fcg {
 
@@ -52,7 +54,13 @@ struct EngineConsole {
 
 // What the Board page keeps between two launches (board.json in the profile): the analysis's own settings.
 struct BoardSettings {
+    // The analysis's engine (the review's, the assistant's and the threat's too) and its settings; its threads are the
+    // analysis's: the engine's in the engines' Board, shared between the study Board's engines side by side.
     AnalysisSettings analysis;
+    // The study Board's engines side by side (#78, mockup M11, board 3): the first is `analysis`, whose threads set by
+    // hand there are first_threads (0: its share); the others, up to MAX_SIDE_ENGINES in all.
+    int first_threads = 0;
+    std::vector<SideEngine> side_engines;
     bool arrows = true;  // the first move of each line drawn on the board
     // The analysis of a whole game, refined pass after pass up to this time per position; 0: until stopped.
     int64_t review_ceiling_ms = 5120;
@@ -68,9 +76,16 @@ struct BoardSettings {
     bool ask_new_move = false;
     std::string save_database;  // the folder of the database a game from elsewhere was last saved into
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BoardSettings, analysis, arrows, review_ceiling_ms, game_first,
-                                                game_second, first_clock, second_clock, same_clock, game_pair,
-                                                game_human, graph, ask_new_move, save_database)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BoardSettings, analysis, first_threads, side_engines, arrows,
+                                                review_ceiling_ms, game_first, game_second, first_clock, second_clock,
+                                                same_clock, game_pair, game_human, graph, ask_new_move, save_database)
+
+// The analysis's engines in their order (#78): the first from `analysis` (none while it names no engine) and
+// first_threads, then side_engines; each engine once, MAX_SIDE_ENGINES at most.
+[[nodiscard]] std::vector<SideEngine> analysisEngines(const BoardSettings& settings);
+// The other way: the first into `analysis` (its threads, the analysis's total, kept) and first_threads, the others
+// into side_engines.
+void setAnalysisEngines(BoardSettings& settings, std::vector<SideEngine> engines);
 
 // The same, for the analysis engine: the start position and the moves to it.
 [[nodiscard]] AnalysisPosition analysisPosition(const ReplayGame& game, bool chess960, int ply);
@@ -208,8 +223,16 @@ struct BoardPage {
 
     BoardSettings settings;
     bool settings_loaded = false;
-    Analyser analyser;
-    bool analysing = false;  // asked for: the analysis follows the board while the page is shown
+    // The analysis's engine; the study Board's others beside it (#78), in the order of settings.side_engines. Held by
+    // pointer, so that an engine moved in the list keeps its process.
+    std::unique_ptr<Analyser> analyser = std::make_unique<Analyser>();
+    std::vector<std::unique_ptr<Analyser>> side;
+    bool side_new_game = true;   // another game came: the engines beside get ucinewgame at their next search
+    bool analysing     = false;  // asked for: the analysis follows the board while the page is shown
+    // Each engine's evaluations along the game shown, for the graph's thin lines (#78): the positions of the game its
+    // search reached, by engine, for the game whose reviewKey() is trails_key.
+    std::map<std::string, GameReview> trails;
+    std::string trails_key;
     Analyser threat;         // the opponent's best move were it to move again (X), on an engine of its own
     bool threat_on = false;
     bool new_game  = true;   // another game came: the engine gets ucinewgame

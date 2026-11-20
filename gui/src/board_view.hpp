@@ -55,7 +55,14 @@ struct BoardArrow {
     chess::Move move;
     ImU32 colour = 0;
     bool dashed  = false;  // a move expected rather than found: a shaft in dashes
+    std::string count = {};  // a disc of its colour beside its start, with this in it: the engines that play it (#78)
 };
+
+// Where an arrow's count goes: beside its start square's centre `from`, off the shaft going to `to`, `square` the
+// size of a square.
+[[nodiscard]] ImVec2 arrowCountCentre(ImVec2 from, ImVec2 to, float square);
+// The disc of an arrow's count, `radius` wide.
+void drawArrowCount(ImDrawList* dl, ImVec2 centre, float radius, const BoardArrow& arrow);
 
 // A square coloured over the board, as a person marks one ([%csl]).
 struct BoardTint {

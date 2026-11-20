@@ -57,6 +57,7 @@ inline constexpr const char* BoardMoves         = "the-moves-the-table-and-the-r
 inline constexpr const char* BoardTablebases    = "tablebases-on-the-board-page";
 inline constexpr const char* BoardPlay          = "playing-a-game-from-a-position";
 inline constexpr const char* StudyBoard         = "the-study-board";
+inline constexpr const char* SideBySide         = "several-engines-side-by-side";
 inline constexpr const char* Notation           = "notation";
 inline constexpr const char* Marks              = "arrows-and-squares";
 inline constexpr const char* Headers            = "headers";

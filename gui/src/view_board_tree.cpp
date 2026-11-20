@@ -522,7 +522,7 @@ void App::drawChessColumn() {
             break;
         case 1: {
             drawBoardOnline();  // Lichess's tables and cloud, when the user has chosen them (M4, board 5)
-            drawBoardAnalysis();
+            drawSideBySide();   // up to four engines side by side (#78, M11 board 3)
             const float graph = boardGraphHeight();
             drawBoardGraph(std::max(graph, ImGui::GetContentRegionAvail().y));
             break;

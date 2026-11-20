@@ -1123,6 +1123,15 @@ Home page's *My databases* card, with *Add*: it is never added without you. What
 the list of issues, then for the PGN files of the issues chosen, nothing else. TWIC is free for personal use; nothing of
 it ships with RookStudio.
 
+### Lichess months
+
+*From a source… › Lichess broadcasts* adds a month of Lichess's official broadcasts (database.lichess.org, CC BY-SA
+4.0): its sheet asks for the site's page of files and lists the latest months with their size and games. Choose one and
+the database (*A new database, “Lichess broadcasts”* at first), then *Download and add*: the month's file is downloaded,
+resumable, then imported, and a report gives its strongest tournaments and best-rated players. A game the database
+already has is not added twice. The games keep their source, the broadcast's page in their Site tag: what you share of
+them is shared under the same licence. What leaves the machine: the request for the page, then for the month's file.
+
 ## The Openings page
 
 Your repertoires: each a PGN file of the profile (one game and its variations, for White or for Black), which the

@@ -542,6 +542,15 @@ void App::frame() {
             const auto from  = std::string_view("twic-server=").size();
             twic::setServer(w.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
             if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w.rfind("lichess-database=http://127.0.0.1:", 0) == 0) {
+            // lichess-database=http://127.0.0.1:PORT[,WORD]: a test's server in place of database.lichess.org (#73).
+            const auto comma = w.find(',');
+            const auto from  = std::string_view("lichess-database=").size();
+            lichess::setDatabaseServer(w.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+            if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w == "databases-broadcasts") {  // the sheet of Lichess's broadcasts by month
+            page_            = Page::Databases;
+            broadcast_sheet_ = true;
         } else if (w == "databases-twic") {  // TWIC's sheet on the Databases page
             page_       = Page::Databases;
             twic_sheet_ = true;

@@ -52,6 +52,7 @@
 #include "lichess_evals.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
+#include "lichess_months.hpp"
 #include "lichess_players.hpp"
 #include "lichess_playing.hpp"
 #include "lichess_profile.hpp"
@@ -351,7 +352,10 @@ class App {
     std::vector<twic::Issue> twic_issues_;  // the index's, this session
     std::string twic_error_;
     struct TwicAdd {
-        std::vector<twic::Issue> issues;
+        std::string title;                          // what is added, said by the report: "TWIC 1671", "…broadcasts of…"
+        std::vector<twic::Issue> issues;            // TWIC's; empty for another source
+        std::vector<std::string> urls;              // the files to download, one after the other
+        std::vector<std::filesystem::path> wanted;  // where each goes
         std::size_t index = 0;  // the database
         std::filesystem::path folder;
         std::shared_ptr<std::atomic<bool>> cancel;
@@ -366,6 +370,7 @@ class App {
     };
     std::optional<TwicAdd> twic_add_;
     struct TwicDone {
+        std::string title;
         std::vector<int> numbers;
         std::size_t index = 0;
         std::string database;
@@ -374,6 +379,17 @@ class App {
         std::string error;
     };
     std::optional<TwicDone> twic_done_;
+    // A month of Lichess's broadcasts (#73): its page of files asked for once, read for both kinds of months.
+    void drawBroadcastSheet();
+    void drawFileAddProgress();  // the downloads and imports under way, with Cancel
+    void startLichessMonths();
+    void startFileAdd(TwicAdd add, int database, const std::string& new_name);  // the downloads, then the imports
+    bool broadcast_sheet_ = false;
+    int broadcast_pick_   = 0;
+    int broadcast_target_ = -2;                                                           // as twic_target_
+    std::optional<std::future<std::pair<std::string, std::string>>> lichess_months_job_;  // the page, or why not
+    std::vector<lichess::Month> lichess_broadcast_months_, lichess_standard_months_;
+    std::string lichess_months_error_;
     // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
     // background, its move shown.
     struct FileLines {

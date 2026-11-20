@@ -17,6 +17,7 @@
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "lichess_months.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -84,39 +85,50 @@ void App::startTwicIndex(bool weekly) {
 
 void App::startTwicAdd(std::vector<twic::Issue> issues, int database) {
     if (twic_add_ || issues.empty() || !shelf_) return;
+    std::sort(issues.begin(), issues.end(), [](const auto& a, const auto& b) { return a.number < b.number; });
+    TwicAdd add;
+    add.issues = issues;
+    std::string numbers;
+    for (const auto& issue : issues) {
+        numbers += (numbers.empty() ? "" : ", ") + std::to_string(issue.number);
+        add.urls.push_back(twic::pgnUrl(issue.number));
+        add.wanted.push_back(storage_.root() / "sources" / "twic" / twic::pgnFile(issue.number));
+    }
+    add.title = "TWIC " + numbers;
+    startFileAdd(std::move(add), database, "TWIC");
+}
+
+void App::startFileAdd(TwicAdd add, int database, const std::string& new_name) {
     auto& s = shelf();
     if (database < 0 || database >= static_cast<int>(s.entries().size())) {
         try {
-            database     = static_cast<int>(s.create("TWIC"));
-            twic_target_ = database;  // the sheet shows the new database's issues from now on
+            database = static_cast<int>(s.create(new_name));
+            // The sheet shows the new database from now on.
+            (add.issues.empty() ? broadcast_target_ : twic_target_) = database;
         } catch (const std::exception& e) {
             twic_done_        = TwicDone{};
             twic_done_->error = e.what();
             return;
         }
     }
-    std::sort(issues.begin(), issues.end(), [](const auto& a, const auto& b) { return a.number < b.number; });
-    TwicAdd add;
-    add.issues   = issues;
     add.index    = static_cast<std::size_t>(database);
     add.folder   = s.entries()[add.index].folder;
     add.cancel   = std::make_shared<std::atomic<bool>>(false);
     add.progress = std::make_shared<DownloadProgress>();
     if (const auto db = s.open(add.index)) add.from = static_cast<study::GameId>(db->snapshot()->games());
-    const auto dir = storage_.root() / "sources" / "twic";
-    add.downloads  = std::async(std::launch::async, [issues, dir, cancel = add.cancel, progress = add.progress] {
-        std::vector<std::pair<fs::path, std::string>> out;
-        for (const auto& issue : issues) {
-            if (cancel->load()) break;
-            const auto file = dir / twic::pgnFile(issue.number);
-            progress->bytes = 0;
-            progress->size  = 0;
-            const auto got  = httpDownload(twic::pgnUrl(issue.number), file, progress.get(), cancel.get());
-            out.emplace_back(file, got.ok ? std::string() : got.error);
-            if (!got.ok) break;
-        }
-        return out;
-    });
+    add.downloads = std::async(std::launch::async,
+                               [urls = add.urls, wanted = add.wanted, cancel = add.cancel, progress = add.progress] {
+                                   std::vector<std::pair<fs::path, std::string>> out;
+                                   for (std::size_t i = 0; i < urls.size() && i < wanted.size(); ++i) {
+                                       if (cancel->load()) break;
+                                       progress->bytes = 0;
+                                       progress->size  = 0;
+                                       const auto got  = httpDownload(urls[i], wanted[i], progress.get(), cancel.get());
+                                       out.emplace_back(wanted[i], got.ok ? std::string() : got.error);
+                                       if (!got.ok) break;
+                                   }
+                                   return out;
+                               });
     twic_done_.reset();
     twic_add_ = std::move(add);
 }
@@ -129,7 +141,7 @@ bool App::twicImportEnded(const fs::path& file, const study::DatabaseImport& rep
     add.added += report.added;
     add.duplicates += report.duplicates;
     if (report.error.empty() && !report.read.cancelled) {
-        twic_.added[add.folder.string()].insert(add.issues[add.next].number);
+        if (add.next < add.issues.size()) twic_.added[add.folder.string()].insert(add.issues[add.next].number);
         std::error_code ec;
         fs::remove(file, ec);  // its games are in the database now
     } else {
@@ -166,6 +178,19 @@ void App::pollTwic() {
         }
         saveTwic();
     }
+    // Lichess's page of monthly files, asked for by a sheet.
+    if (lichess_months_job_ && lichess_months_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto [html, error] = lichess_months_job_->get();
+        lichess_months_job_.reset();
+        if (!error.empty()) {
+            lichess_months_error_ = error;
+        } else {
+            lichess_broadcast_months_ = lichess::parseMonths(html, lichess::MonthKind::Broadcast);
+            lichess_standard_months_  = lichess::parseMonths(html, lichess::MonthKind::Standard);
+            if (lichess_broadcast_months_.empty())
+                lichess_months_error_ = TR("The page lists no month the program can read.");
+        }
+    }
     if (!twic_add_ || !shelf_) return;
     auto& add = *twic_add_;
     // The downloads, then the imports one after the other.
@@ -194,6 +219,7 @@ void App::pollTwic() {
     // All of them in: the report.
     if (!twic_done_ || twic_done_->error.empty()) {
         TwicDone done;
+        done.title      = add.title;
         done.index      = add.index;
         done.database   = add.index < shelf_->entries().size() ? shelf_->entries()[add.index].name : std::string();
         done.added      = add.added;
@@ -205,7 +231,8 @@ void App::pollTwic() {
             done.report     = twic::reportOf(*snap, add.from, static_cast<study::GameId>(snap->games()));
         }
         twic_done_ = std::move(done);
-        if (twic_.database.empty() || twic_.database == add.folder.string() || twic_.added[twic_.database].empty())
+        if (!add.issues.empty() &&
+            (twic_.database.empty() || twic_.database == add.folder.string() || twic_.added[twic_.database].empty()))
             twic_.database = add.folder.string();
         saveTwic();
     }
@@ -220,11 +247,15 @@ void App::drawSourcesMenu() {
         const char* terms;
     };
     const Source twic{"TWIC", TR("the week's games, every Monday"), TR("theweekinchess.com · free for personal use")};
-    for (const auto& source : {twic}) {
-        ImGui::PushID(source.name);
+    const Source broadcasts{TR("Lichess broadcasts"), TR("a month of official broadcasts"),
+                            TR("database.lichess.org · CC BY-SA 4.0")};
+    int i = 0;
+    for (const auto& source : {twic, broadcasts}) {
+        ImGui::PushID(i++);
         const auto start = ImGui::GetCursorPos();
         if (ImGui::Selectable("##source", false, 0, ImVec2(px(420), ImGui::GetTextLineHeightWithSpacing() * 2.1f))) {
-            twic_sheet_ = true;
+            twic_sheet_      = i == 1;
+            broadcast_sheet_ = i == 2;
             twic_done_.reset();
         }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(2)));
@@ -356,23 +387,7 @@ void App::drawTwicSheet() {
     ImGui::SameLine();
     if (ImGui::Button(TR("Close"))) twic_sheet_ = false;
 
-    // The issues coming in.
-    if (twic_add_) {
-        const auto& add = *twic_add_;
-        std::string doing;
-        if (!add.downloaded) {
-            const auto size = add.progress->size.load(), bytes = add.progress->bytes.load();
-            doing = size ? trf("Downloading: {} %", static_cast<int>(100 * bytes / size)) : TR("Downloading…");
-        } else if (add.next < add.issues.size()) {
-            doing = trf("Adding TWIC {} ({} of {})", add.issues[add.next].number, add.next + 1, add.issues.size());
-        }
-        ImGui::TextDisabled("%s", doing.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Cancel"))) {
-            add.cancel->store(true);
-            if (add.importing) s.cancelImport();
-        }
-    }
+    drawFileAddProgress();
     ImGui::PushTextWrapPos();
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for its list of issues, then for the PGN files "
                                  "of the issues ticked (twicNNNNg.zip), nothing else. TWIC is free for personal use; "
@@ -388,14 +403,12 @@ void App::drawTwicReport() {
     if (!d.error.empty()) {
         ImGui::PushTextWrapPos();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           trf("TWIC: the issues could not be added: {}", d.error).c_str());
+                           trf("The games could not be added: {}", d.error).c_str());
         ImGui::PopTextWrapPos();
     } else {
-        std::string numbers;
-        for (const int n : d.numbers) numbers += (numbers.empty() ? "" : ", ") + std::to_string(n);
         ui::inlineIcon(ui::Icon::Check, ui::GOOD);
         ImGui::SameLine();
-        ImGui::TextUnformatted(trf("TWIC {} added to “{}”: {}, {} already there", numbers, d.database,
+        ImGui::TextUnformatted(trf("{} added to “{}”: {}, {} already there", d.title, d.database,
                                    trn("{} game", "{} games", many(d.added), ui::exactCount(d.added)),
                                    ui::exactCount(d.duplicates))
                                    .c_str());
@@ -476,6 +489,132 @@ void App::drawTwicHomeNotice() {
         startTwicAdd({*next}, static_cast<int>(index));
         page_ = Page::Databases;
     }
+}
+
+void App::drawFileAddProgress() {
+    if (!twic_add_) return;
+    auto& add = *twic_add_;
+    std::string doing;
+    if (!add.downloaded) {
+        const auto size = add.progress->size.load(), bytes = add.progress->bytes.load();
+        doing = size ? trf("Downloading: {} %", static_cast<int>(100 * bytes / size)) : TR("Downloading…");
+    } else if (add.next < add.files.size()) {
+        doing = add.files.size() > 1 ? trf("Adding the games: file {} of {}", add.next + 1, add.files.size())
+                                     : std::string(TR("Adding the games…"));
+    }
+    ImGui::TextDisabled("%s", doing.c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Cancel"))) {
+        add.cancel->store(true);
+        if (add.importing) shelf().cancelImport();
+    }
+}
+
+void App::startLichessMonths() {
+    if (lichess_months_job_) return;
+    lichess_months_error_.clear();
+    lichess_months_job_ = std::async(std::launch::async, [] {
+        HttpRequest request;
+        request.url       = lichess::databaseUrl();
+        request.method    = "GET";
+        request.timeout_s = 30;
+        const auto answer = politeRequest(request);
+        if (answer.status != 200)
+            return std::pair<std::string, std::string>{
+                "", answer.error.empty() ? fmt::format("HTTP {}", answer.status) : answer.error};
+        return std::pair<std::string, std::string>{answer.body, ""};
+    });
+}
+
+void App::drawBroadcastSheet() {
+    auto& s = shelf();
+    ui::beginCard("broadcast_sheet");
+    ImGui::TextUnformatted(TR("Lichess broadcasts"));
+    ImGui::SameLine(0, px(10));
+    ImGui::TextDisabled("%s", TR("a month of official broadcasts, from database.lichess.org"));
+    ui::topic(guide::topics::LichessMonths);
+    const auto& entries = s.entries();
+    const auto new_name = std::string(TR("Lichess broadcasts"));
+    if (broadcast_target_ == -2 || broadcast_target_ >= static_cast<int>(entries.size())) {
+        broadcast_target_ = -1;
+        for (std::size_t i = 0; i < entries.size(); ++i)
+            if (!entries[i].source && entries[i].name == new_name) broadcast_target_ = static_cast<int>(i);
+    }
+    if (lichess_broadcast_months_.empty()) {
+        if (!lichess_months_job_ && lichess_months_error_.empty()) startLichessMonths();
+        if (lichess_months_job_) {
+            ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its months…"));
+        } else {
+            ImGui::PushTextWrapPos();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+                               trf("database.lichess.org did not answer: {}", lichess_months_error_).c_str());
+            ImGui::PopTextWrapPos();
+            if (ImGui::Button(TR("Try again"))) startLichessMonths();
+        }
+    } else {
+        const int shown = static_cast<int>(std::min<std::size_t>(lichess_broadcast_months_.size(), 12));
+        broadcast_pick_ = std::clamp(broadcast_pick_, 0, shown - 1);
+        if (ImGui::BeginTable("##broadcast_months", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit)) {
+            ImGui::TableSetupColumn("##picked", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
+            ImGui::TableSetupColumn(TR("Month"));
+            ImGui::TableSetupColumn(TR("Size"));
+            ImGui::TableSetupColumn(TR("Games"));
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < shown; ++i) {
+                const auto& m = lichess_broadcast_months_[static_cast<std::size_t>(i)];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::RadioButton(fmt::format("##month{}", i).c_str(), broadcast_pick_ == i)) broadcast_pick_ = i;
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(m.month.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextDisabled("%s", m.size.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(m.games ? ui::exactCount(m.games).c_str() : "");
+            }
+            ImGui::EndTable();
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("Into"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(260));
+        const auto offer   = trf("A new database, “{}”", new_name);
+        const auto current = broadcast_target_ >= 0 ? entries[static_cast<std::size_t>(broadcast_target_)].name : offer;
+        if (ImGui::BeginCombo("##broadcast_into", current.c_str())) {
+            if (ImGui::Selectable(offer.c_str(), broadcast_target_ < 0)) broadcast_target_ = -1;
+            for (std::size_t i = 0; i < entries.size(); ++i) {
+                if (entries[i].source) continue;
+                if (ImGui::Selectable(fmt::format("{}##broadcast_db{}", entries[i].name, i).c_str(),
+                                      broadcast_target_ == static_cast<int>(i)))
+                    broadcast_target_ = static_cast<int>(i);
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", TR("a game the database has already (the same tags and moves) is not added twice"));
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", TR("Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the "
+                                     "broadcast's page in their Site tag; what you share of them is shared alike."));
+        ImGui::PopTextWrapPos();
+        const auto& m = lichess_broadcast_months_[static_cast<std::size_t>(broadcast_pick_)];
+        ImGui::BeginDisabled(twic_add_.has_value() || s.import() != nullptr);
+        if (ImGui::Button(trf("Download and add {} ({})", m.month, m.size).c_str())) {
+            TwicAdd add;
+            add.title = trf("Lichess broadcasts of {}", m.month);
+            add.urls.push_back(lichess::monthUrl(m));
+            add.wanted.push_back(storage_.root() / "sources" / "lichess" / lichess::monthFile(m));
+            startFileAdd(std::move(add), broadcast_target_, new_name);
+        }
+        ImGui::EndDisabled();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(TR("Close##broadcasts"))) broadcast_sheet_ = false;
+    drawFileAddProgress();
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("What leaves the machine: the request for database.lichess.org's page, then for the "
+                                 "month's file, nothing else."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
 }
 
 }  // namespace fcg

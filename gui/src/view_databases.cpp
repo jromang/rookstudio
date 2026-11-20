@@ -535,6 +535,10 @@ void App::drawDatabases() {
         drawTwicSheet();
         return;
     }
+    if (broadcast_sheet_) {
+        drawBroadcastSheet();
+        return;
+    }
     const auto& entries = s.entries();
     if (entries.empty()) {
         ui::beginCard("db_empty");

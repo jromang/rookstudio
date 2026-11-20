@@ -789,4 +789,15 @@ std::optional<Refusal> Brief::check(std::string_view text) const {
     return checkWording(text, lang_);
 }
 
+std::optional<Refusal> Brief::checkTemplate(std::string_view sentence) const {
+    // The template keeps to the facts' words and moves by itself: only what its facts may get wrong is read.
+    if (auto r = checkBoards(sentence, facts_, allowed_)) return r;
+    if (auto r = checkLost(sentence, lost_)) return r;
+    return checkWording(sentence, lang_);
+}
+
+std::optional<std::string> Brief::heldTemplate(std::string_view text) const {
+    return brief_detail::keptSentences(text, [&](std::string_view s) { return checkTemplate(s).has_value(); });
+}
+
 }  // namespace fcg::commentary

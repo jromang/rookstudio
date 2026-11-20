@@ -70,6 +70,22 @@ TEST_CASE("continuous analysis: four times longer at each pass, as many passes a
     CHECK(reviewPasses(0) == 13);  // until stopped
 }
 
+TEST_CASE("the Chess space's review: its engine processes by default") {
+    // The analysis's threads, at least half the physical cores up to four.
+    CHECK(reviewProcesses(1, 16, 32, 0) == 4);
+    CHECK(reviewProcesses(1, 6, 12, 0) == 3);
+    CHECK(reviewProcesses(1, 4, 8, 0) == 2);
+    CHECK(reviewProcesses(1, 2, 4, 0) == 1);
+    CHECK(reviewProcesses(1, 1, 1, 0) == 1);
+    CHECK(reviewProcesses(6, 16, 32, 0) == 6);
+    CHECK(reviewProcesses(0, 2, 2, 0) == 1);
+    // A tournament playing keeps its cores: the review takes what it leaves, one process at least.
+    CHECK(reviewProcesses(1, 16, 32, 30) == 2);
+    CHECK(reviewProcesses(6, 16, 32, 20) == 6);
+    CHECK(reviewProcesses(1, 16, 32, 32) == 1);
+    CHECK(reviewProcesses(1, 4, 8, 7) == 1);
+}
+
 TEST_CASE("continuous analysis: the positions a principal variation goes through, legal and before the end") {
     const AnalysisPosition start{std::string(chess::constants::STARTPOS), {"e2e4"}, false};
     // Its last move left out: nothing searched after it.

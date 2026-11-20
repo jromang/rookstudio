@@ -312,6 +312,35 @@ std::optional<Refusal> StoryBrief::check(std::string_view text) const {
     return story_detail::checkEnd(text, ends_);
 }
 
+std::optional<Refusal> StoryBrief::checkTemplate(std::string_view sentence) const {
+    using namespace brief_detail;
+    if (auto r = checkBoards(sentence, facts_, allowed_)) return r;
+    if (auto r = checkLost(sentence, lost_)) return r;
+    if (auto r = checkWording(sentence, lang_)) return r;
+    return story_detail::checkEnd(sentence, ends_);
+}
+
+std::optional<std::string> StoryBrief::heldTemplate(std::string_view text) const {
+    return brief_detail::keptSentences(text, [&](std::string_view s) { return checkTemplate(s).has_value(); });
+}
+
+std::vector<StoryPassage> heldStory(const MainLine& line, std::string_view result, const GameReport& report,
+                                    const Analyses& analyses, const Tablebases* tables, Lang lang,
+                                    PieceLetters letters) {
+    std::vector<StoryPassage> out;
+    for (const auto& t : story_detail::told(line, result, report, analyses, tables, lang, letters)) {
+        if (t.passage.lesson) continue;
+        StoryPassage p;
+        p.passage      = t.passage;
+        p.templ        = t.passage.text;
+        p.passage.text = StoryBrief(t, line, analyses, tables, lang, letters, Players{})
+                             .heldTemplate(t.passage.text)
+                             .value_or(std::string());
+        out.push_back(std::move(p));
+    }
+    return out;
+}
+
 Request storyRequest(const StoryBrief& brief, uint32_t round, uint32_t attempt) {
     Request r;
     r.messages    = {{Speaker::System, brief.system}, {Speaker::User, brief.prompt}};
@@ -333,8 +362,9 @@ std::vector<StoryPassage> writtenStory(Model& model, const MainLine& line, std::
         StoryPassage p;
         p.passage = t.passage;
         p.templ   = t.passage.text;
+        const StoryBrief brief(t, line, analyses, tables, lang, letters, players);
+        p.passage.text = brief.heldTemplate(t.passage.text).value_or(std::string());  // the model's, if it holds
         if (!failed && !(cancel && cancel->load())) {
-            const StoryBrief brief(t, line, analyses, tables, lang, letters, players);
             for (uint32_t attempt = 1; attempt <= STORY_ATTEMPTS; ++attempt) {
                 if (cancel && cancel->load()) break;
                 std::string why;

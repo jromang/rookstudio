@@ -1,10 +1,15 @@
 #include <doctest/doctest.hpp>
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <optional>
 #include <string>
 #include <thread>
+
+#include <study/chessbase.hpp>
 
 #include "databases.hpp"
 
@@ -30,6 +35,20 @@ fs::path pgnFile(const fs::path& dir, int count) {
             << "\"]\n[Result \"1-0\"]\n\n1. e4 " << replies[i % 8] << " 2. Nf3 1-0\n\n";
     }
     return file;
+}
+
+// The study's test data: archives of our own test games.
+fs::path studyData(const std::string& name) {
+    const char* env = std::getenv("FCG_SOURCE_DIR");
+    return fs::path(env ? env : FCG_SOURCE_DIR) / "study" / "tests" / "data" / name;
+}
+
+std::optional<study::DatabaseImport> imported(DatabaseShelf& shelf) {
+    std::optional<study::DatabaseImport> report;
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    while (!(report = shelf.finishedImport()) && std::chrono::steady_clock::now() < give_up)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    return report;
 }
 
 }  // namespace
@@ -159,4 +178,49 @@ TEST_CASE("databases: a PGN file read as a database without a copy, after the us
     }
     DatabaseShelf again(profile);
     CHECK(again.entries().size() == 2);  // databases.json keeps the user's own only
+}
+
+TEST_CASE("databases: an archive's wrong password, a file that is no text: nothing imported, the database discarded") {
+    const auto profile = freshDir("shelf-refused");
+    DatabaseShelf shelf(profile);
+    // Archives of our own test games, enciphered with this password.
+    const std::string password = "rstest20";
+    for (const char* name : {"cbtest1.cbz", "cbtest2.2cbz"}) {
+        INFO(name);
+        const auto file = studyData(std::string("chessbase/") + name);
+        CHECK(study::archivePasswordFits(file, password));
+        CHECK_FALSE(study::archivePasswordFits(file, "wrongpwd"));
+        const auto index = shelf.create(fs::path(name).stem().string());
+        REQUIRE(shelf.startImport(index, file, "wrongpwd"));
+        auto report = imported(shelf);
+        REQUIRE(report);
+        CHECK(report->added == 0);
+        CHECK(report->read.error.find("wrong password") != std::string::npos);
+        // Made for it, it is not kept.
+        const auto folder = shelf.entries()[index].folder;
+        shelf.discard(index);
+        CHECK(shelf.entries().empty());
+        CHECK_FALSE(fs::exists(folder));
+        // With its password, its 35 games.
+        const auto again = shelf.create(fs::path(name).stem().string());
+        REQUIRE(shelf.startImport(again, file, password));
+        report = imported(shelf);
+        REQUIRE(report);
+        CHECK(report->read.error.empty());
+        CHECK(report->added == 35);
+        CHECK(report->damaged == 0);
+        shelf.remove(again);
+    }
+    // A file of bytes that are not text, given as a PGN.
+    std::ifstream in(studyData("chessbase/cbtest2.2cbz"), std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const auto binary = profile / "games.pgn";
+    std::ofstream(binary, std::ios::binary).write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    const auto index = shelf.create("games");
+    REQUIRE(shelf.startImport(index, binary));
+    const auto report = imported(shelf);
+    REQUIRE(report);
+    CHECK(report->added == 0);
+    CHECK(report->read.games == 0);
+    CHECK(report->read.error == "games.pgn is not a PGN file: its bytes are not text");
 }

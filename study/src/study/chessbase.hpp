@@ -4,7 +4,8 @@
 // - CBH, the older format: a .cbh of 46-byte records (one a game), the moves in .cbg, the annotations in .cba, the
 //   names in .cbp (players), .cbt (tournaments), .cbc (annotators), .cbs (sources), .cbe (teams);
 // - 2CBH, the newer one: .2cbh (192-byte records), .2cbg, .2cba, and the names in .2lid;
-// - an archive of either: .cbv, or .cbz enciphered with a password, its members unpacked as they are read.
+// - an archive of either: .cbv, or .cbz enciphered with a password; a 2CBH database's, .2cbv (a zip archive of its
+//   files), or .2cbz enciphered so; its members unpacked as they are read.
 //
 // A database is opened from any of its files, then read record by record, in order or not: each game as a GameTree
 // (tags, start position, moves with their notes and variations). The files are mapped and read where each record
@@ -37,12 +38,19 @@ namespace fcg::study {
 
 enum class ChessBaseFormat : uint8_t { CBH, TwoCBH };
 
-// The file is one of a ChessBase database's (.cbh, .2cbh and their companions) or an archive of one (.cbv, .cbz),
-// whatever the case of its name.
+// The file is one of a ChessBase database's (.cbh, .2cbh and their companions) or an archive of one (.cbv, .cbz,
+// .2cbv, .2cbz), whatever the case of its name.
 [[nodiscard]] bool isChessBase(const std::filesystem::path& file);
+// The file is an archive of a ChessBase database (.cbv, .cbz, .2cbv, .2cbz); enciphered with a password (.cbz,
+// .2cbz).
+[[nodiscard]] bool isChessBaseArchive(const std::filesystem::path& file);
+[[nodiscard]] bool isEncipheredArchive(const std::filesystem::path& file);
+// Whether `password` deciphers the enciphered archive `file`: its first block becomes an archive's header. One block
+// read, before a copy starts. False for a file that cannot be read.
+[[nodiscard]] bool archivePasswordFits(const std::filesystem::path& file, const std::string& password);
 
 struct ChessBaseOptions {
-    std::string password;  // a .cbz's
+    std::string password;  // a .cbz's or a .2cbz's
     // An archive's member of at most this many bytes is unpacked whole when the database is opened; a larger one a
     // block at a time as it is read (files of names are unpacked whole whatever their size, up to 1 GiB).
     uint64_t unpack_whole = 16u << 20;

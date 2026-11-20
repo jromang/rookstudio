@@ -313,7 +313,8 @@ class App {
     struct ImportStart {
         std::filesystem::path folder;
         uint64_t games = 0, bytes = 0;  // the database's before it
-        bool pasted = false;
+        bool pasted  = false;
+        bool created = false;  // the database was made for it: discarded when the file brings nothing
     };
     std::optional<ImportStart> db_import_start_;
     struct ImportOutcome {
@@ -333,7 +334,8 @@ class App {
     std::optional<ImportOutcome> db_outcome_;
     void drawImportOutcome(std::size_t index);
     // A ChessBase database dropped or chosen (#69, mockup M10, board 1): what it brings and leaves, asked before its
-    // copy into a RookStudio database; a .cbz's password asked there, not kept.
+    // copy into a RookStudio database; an enciphered archive's password (.cbz, .2cbz) asked there, not kept, and
+    // tried on the archive's first block before the copy starts: a wrong one is said there, to be typed again.
     struct ChessBaseAsk {
         int index = -1;  // the database it goes into; -1, a new one named after it
         std::filesystem::path file;
@@ -342,6 +344,8 @@ class App {
         bool archive = false, enciphered = false;
         std::string error;
         std::array<char, 128> password{};
+        bool wrong_password = false;  // the last one tried does not decipher the archive
+        bool focus          = true;   // the password field takes the keyboard (when the card opens, after a wrong one)
     };
     std::optional<ChessBaseAsk> db_chessbase_;
     bool db_chessbase_go_ = false;
@@ -469,7 +473,8 @@ class App {
     void closeFileLines();
     void drawFileLines();
     void drawEmptyDatabase(std::size_t index);  // a database of the user's with no game: what to put in it
-    int db_named_frame_ = -1;                   // the frame a name was given with Enter: not the list's Enter too
+    // The frame a name was given, or a ChessBase copy started, with Enter: not the list's Enter too.
+    int db_named_frame_ = -1;
     void pollDatabases();  // each frame: an import's end said
     std::unique_ptr<DatabaseShelf> shelf_;
     int db_selected_ = -1;
@@ -1657,11 +1662,13 @@ class App {
     commentary::Opening board_theory_used_;      // the same, ended before the first error the engine sees
     std::string board_theory_base_;              // the database's name, for what the review says
     [[nodiscard]] std::string boardTheoryKey();  // the game and the database its theory is looked for in; empty: none
-    // The moves the review singles out, each with its template comment: the review tab's key moments in words.
+    // The moves the review singles out, each with its template comment held to the boards (#64): the review tab's key
+    // moments in words.
     std::vector<std::pair<std::size_t, std::string>> review_moments_;
     std::string review_moments_of_;
-    // The story of the game and what each side should work on, from the same review.
-    std::vector<commentary::Passage> review_story_;
+    // The story of the game as the templates tell it, held to the boards (commentary::heldStory()), and what each side
+    // should work on, from the same review.
+    std::vector<commentary::StoryPassage> review_story_;
     std::vector<commentary::WorkOn> review_work_on_;
     std::string review_story_of_;
     // The story told by the assistant's model (#62, mockup M11, board 5): written in the background once per review and

@@ -188,6 +188,15 @@ void DatabaseShelf::remove(std::size_t index) {
     save();
 }
 
+void DatabaseShelf::discard(std::size_t index) {
+    if (index >= entries_.size() || entries_[index].source) return;
+    const auto folder = entries_[index].folder;
+    trees_.erase(folder);
+    remove(index);  // closed: its lock let go
+    std::error_code ec;
+    fs::remove_all(folder, ec);
+}
+
 void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::LinkedSource>>& sources) {
     // The user's own first, as they are; then the sources, those listed already keeping what they hold.
     std::vector<DatabaseEntry> entries;

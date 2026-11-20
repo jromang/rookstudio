@@ -40,6 +40,25 @@ class ByteSource {
 [[nodiscard]] std::vector<std::unique_ptr<ByteSource>> zipFiles(
     const std::filesystem::path& file, const std::function<bool(std::string_view name)>& wanted);
 
+// One file of a zip archive, as its central directory lists it.
+struct ZipEntry {
+    std::string name;
+    uint32_t method     = 0;  // 0 stored, 8 deflated
+    uint64_t compressed = 0;
+    uint64_t size       = 0;
+    uint64_t header     = 0;  // where its local header starts
+    uint32_t crc        = 0;  // its data's CRC-32
+};
+// An archive's bytes from an offset: fewer at its end.
+using ArchiveBytes = std::function<std::vector<unsigned char>(uint64_t offset, std::size_t size)>;
+// A zip archive's files by its central directory (zip64 included), `size` bytes read through `read`: a file on the
+// disk, or one deciphered as it is read (a ChessBase .2cbz). `label` names it in the messages. Throws
+// std::runtime_error when it is not a zip archive or its directory is damaged.
+[[nodiscard]] std::vector<ZipEntry> zipEntries(uint64_t size, const ArchiveBytes& read, const std::string& label);
+// Where an entry's data starts: after its local header, whose name and extra field may differ from the directory's.
+// Throws std::runtime_error when its local header is not one.
+[[nodiscard]] uint64_t zipData(const ZipEntry& entry, const ArchiveBytes& read, const std::string& label);
+
 // A zstd stream decoded as its bytes come, a download read while it arrives: compressed bytes in, text out. It tells
 // where its frames end, so that a download cut short can go on from the last one: Lichess's big files are made of
 // frames of a few megabytes (pzstd's), each decoded without the ones before it.

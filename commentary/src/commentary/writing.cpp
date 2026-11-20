@@ -1,5 +1,6 @@
 #include "writing.hpp"
 
+#include "brief.hpp"
 #include "comment.hpp"
 #include "openings.hpp"
 
@@ -50,6 +51,23 @@ std::vector<std::pair<std::size_t, std::string>> templateComments(const MainLine
         if (auto text = comment(ctx, lang, letters)) comments.emplace_back(m.ply, std::move(*text));
     }
     return comments;
+}
+
+std::vector<std::pair<std::size_t, std::string>> heldTemplateComments(const MainLine& line, const GameReport& report,
+                                                                      const Analyses& analyses,
+                                                                      const Theories& theories,
+                                                                      const Tablebases* tables, const Oracle* oracle,
+                                                                      Lang lang, PieceLetters letters) {
+    std::vector<std::pair<std::size_t, std::string>> held;
+    for (auto& [ply, text] : templateComments(line, report, analyses, theories, tables, oracle, lang, letters)) {
+        const auto* m = report.get(ply);
+        if (!m) continue;
+        const auto theory = theories.find(ply);
+        const auto ctx =
+            moveContext(line, *m, analyses, theory != theories.end() ? &theory->second : nullptr, tables, oracle);
+        if (auto kept = Brief(ctx, lang, letters).heldTemplate(text)) held.emplace_back(ply, std::move(*kept));
+    }
+    return held;
 }
 
 }  // namespace fcg::commentary

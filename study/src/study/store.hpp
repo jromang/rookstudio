@@ -160,6 +160,7 @@ class Database {
     struct Appended {
         uint64_t added      = 0;
         uint64_t duplicates = 0;  // left out: a game it has, the same in all that duplicateKey() reads
+        uint64_t damaged    = 0;  // of the games added, those kept up to what could not be read
     };
     // The games added, in segments of at most SEGMENT_GAMES, committed together: after a crash the database has all
     // of them or none. A game the database already has, or the batch had before it, is left out unless
@@ -202,6 +203,7 @@ struct DatabaseImport {
     std::optional<ChessBaseReport> chessbase;  // a ChessBase database's: what its games left out
     uint64_t added      = 0;
     uint64_t duplicates = 0;
+    uint64_t damaged    = 0;  // of the games added, those damaged (read.damaged counts the duplicates too)
     uint64_t commits    = 0;
     std::string error;  // why the disk refused; the games committed before stay
     // The first damaged games read, 64 at most: their duplicateKey(), which Snapshot::key() gives back, and the line

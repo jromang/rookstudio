@@ -42,6 +42,11 @@ class StoryBrief {
 
     // Whether a passage holds to the facts: none when it does.
     [[nodiscard]] std::optional<Refusal> check(std::string_view text) const;
+    // A sentence of the template's passage read with the checks of the boards (#64) a model's passage gets, as
+    // Brief::checkTemplate() reads a comment's: none when it holds.
+    [[nodiscard]] std::optional<Refusal> checkTemplate(std::string_view sentence) const;
+    // The template's passage read so, sentence by sentence: those refused left out, none when no sentence is left.
+    [[nodiscard]] std::optional<std::string> heldTemplate(std::string_view text) const;
 
    private:
     brief_detail::Allowed allowed_;
@@ -66,8 +71,8 @@ class StoryBrief {
 
 // A passage of the story as it is shown.
 struct StoryPassage {
-    Passage passage;    // the model's text, or the template's
-    std::string templ;  // the template's text
+    Passage passage;    // the model's text, or the template's held to the boards (empty: none of it holds)
+    std::string templ;  // the template's text, as story() tells it
     bool by_model     = false;
     uint32_t attempts = 0;  // the model's, 0 when it was not asked
     // The answers the checker refused, each with why, in their order.
@@ -75,10 +80,18 @@ struct StoryPassage {
     bool operator==(const StoryPassage&) const = default;
 };
 
-// The story of the reviewed game written by the model: the passages of story() but the lessons (workOn() tells them),
-// each the model's when it holds to its facts at the first attempt or the second, else the template's. `cancel` stops
-// it between two requests, the passages left the templates'; `done` counts the passages dealt with. A model that gives
-// no answer is not asked again: `error` says why.
+// The story of the reviewed game as the templates tell it, as it is shown: the passages of story() but the lessons
+// (workOn() tells them), each read sentence by sentence with the checks of the boards against the facts it is told
+// from (StoryBrief::heldTemplate(), #64), a sentence they refuse left out. A passage left with no sentence keeps its
+// place, its text empty: it is not shown.
+[[nodiscard]] std::vector<StoryPassage> heldStory(const MainLine& line, std::string_view result,
+                                                  const GameReport& report, const Analyses& analyses,
+                                                  const Tablebases* tables, Lang lang, PieceLetters letters);
+
+// The story of the reviewed game written by the model: the passages of heldStory(), each the model's when it holds to
+// its facts at the first attempt or the second, else the template's held to the boards. `cancel` stops it between two
+// requests, the passages left the templates'; `done` counts the passages dealt with. A model that gives no answer is
+// not asked again: `error` says why.
 [[nodiscard]] std::vector<StoryPassage> writtenStory(Model& model, const MainLine& line, std::string_view result,
                                                      const GameReport& report, const Analyses& analyses,
                                                      const Tablebases* tables, Lang lang, PieceLetters letters,

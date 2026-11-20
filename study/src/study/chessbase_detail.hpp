@@ -77,11 +77,16 @@ class Members {
 
 // The files of the database whose files share `stem`'s path, their extensions in any case.
 [[nodiscard]] std::unique_ptr<Members> folderMembers(const std::filesystem::path& stem);
-// The database in the archive `file` (.cbv, or .cbz deciphered with `password`), its members unpacked as they are
-// read: whole up to `whole` bytes. Throws std::runtime_error with a readable message when the archive is damaged or
-// holds no database.
+// The database in the archive `file` (.cbv, or .cbz deciphered with `password`; .2cbv, a zip archive, or .2cbz
+// deciphered so), its members unpacked as they are read: whole up to `whole` bytes. What it is shows in its first
+// block, deciphered. Throws std::runtime_error with a readable message when the archive is damaged, holds no database,
+// or the password does not decipher it.
 [[nodiscard]] std::unique_ptr<Members> archiveMembers(const std::filesystem::path& file, const std::string& password,
                                                       uint64_t whole);
+
+// Whether `password` deciphers the enciphered archive `file` (.cbz, .2cbz): its first block becomes an archive's
+// header. False for a file that cannot be read.
+[[nodiscard]] bool passwordFits(const std::filesystem::path& file, const std::string& password);
 
 // DES in ECB mode over `data`'s whole blocks of 8 bytes, the key made of `password` as a .cbz's is.
 void desBlocks(const std::string& password, std::span<uint8_t> data, bool decrypt);

@@ -304,6 +304,14 @@ std::vector<std::string_view> splitGames(std::string_view text) {
     return games;
 }
 
+bool looksLikeText(std::string_view head) {
+    if (head.find('\0') != std::string_view::npos) return false;
+    std::size_t control = 0;
+    for (const unsigned char c : head)
+        control += c < 0x20 && c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != '\v' && c != 0x1A;
+    return control * 32 <= head.size();
+}
+
 ImportReport importGames(const fs::path& file, const ImportOptions& options, ImportProgress& progress,
                          const std::atomic<bool>& cancel,
                          const std::function<void(std::vector<ImportedGame>&&)>& sink) {
@@ -392,6 +400,7 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
         };
         try {
             for (auto& source : sources) {
+                bool first = true;
                 for (;;) {
                     if (cancel.load(std::memory_order_relaxed)) {
                         std::lock_guard lock(mutex);
@@ -400,6 +409,11 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
                     }
                     const auto n = source->read(buffer.data(), buffer.size());
                     progress.bytes.store(before + source->consumed(), std::memory_order_relaxed);
+                    // A file of bytes that are no text is refused before it makes junk games.
+                    if (first && n > 0 &&
+                        !looksLikeText(std::string_view(buffer.data(), std::min<std::size_t>(n, 4096))))
+                        throw std::runtime_error(source->name() + " is not a PGN file: its bytes are not text");
+                    first = first && n == 0;
                     if (n > 0) pending.append(buffer.data(), n);
                     if (n == 0 || pending.size() >= piece) {
                         auto cut = n == 0 ? pending.size() : lastGameStart(pending);

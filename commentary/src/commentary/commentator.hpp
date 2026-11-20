@@ -58,7 +58,8 @@ inline constexpr uint32_t ATTEMPTS = 3;
 [[nodiscard]] Request commentRequest(const Brief& brief, uint32_t attempt);
 
 // A comment on the move: the model's when it passes the checks, else the template's, which is also what a move with
-// nothing for the model to explain gets (no attempt). None when neither has anything to say.
+// nothing for the model to explain gets (no attempt), its sentences the checks of the boards refuse left out
+// (Brief::heldTemplate()). None when neither has anything to say.
 [[nodiscard]] std::optional<Written> writtenComment(Model& model, const MoveContext& ctx, Lang lang,
                                                     PieceLetters letters);
 

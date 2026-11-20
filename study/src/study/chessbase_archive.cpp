@@ -1,6 +1,8 @@
 // Ported from cbvault 0.1.6, MIT License, Copyright (c) 2026 cbvault Contributors (archive/, des.rs).
 //
-// The .cbv archive and the .cbz, a .cbv enciphered with a password.
+// The .cbv archive and the .cbz, a .cbv enciphered with a password; and, written for RookStudio, the archive of a 2CBH
+// database: a .2cbv, a plain zip archive of the database's files, or a .2cbz, that zip enciphered as a .cbz is, padded
+// with zeros to the cipher's blocks of eight bytes.
 //
 // A .cbv is a header (08 00, the member count in two bytes, AD 00 03 00), a table of 173-byte member records (a
 // NUL-terminated name in 128 bytes, then the member's offset, stored size and size, in 32 bits and again in 64), and
@@ -23,8 +25,11 @@
 #include <optional>
 #include <stdexcept>
 
+#include <zlib.h>
+
 #include "chessbase_detail.hpp"
 #include "mapped_file.hpp"
+#include "sources.hpp"
 
 namespace fcg::study::chessbase {
 
@@ -145,57 +150,18 @@ bool containerHeader(const uint8_t* h) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The archive: its file, deciphered where it is read, and its member table
+// An archive's file, deciphered where it is read
 // ---------------------------------------------------------------------------------------------------------------
 
-constexpr uint64_t TABLE_AT   = 8;
-constexpr uint64_t ENTRY_SIZE = 173;
-constexpr std::size_t TRIO    = 128;
-constexpr std::size_t QUARTET = TRIO + 12 + 9;
-
-struct Member {
-    std::string name;
-    uint64_t offset = 0, packed = 0, size = 0;
-};
-
-class Archive {
+class CipheredFile {
    public:
-    Archive(const fs::path& path, const std::string& password) : path_(path.string()), file_(path) {
-        if (file_.size() < TABLE_AT + ENTRY_SIZE)
-            throw std::runtime_error(path_ + ": not a ChessBase archive (shorter than its table)");
-        if (!password.empty()) {
-            des_.emplace(keyOf(password));
-            uint8_t head[8];
-            std::memcpy(head, file_.data(), 8);
-            des_->decrypt(head);
-            if (!containerHeader(head)) throw std::runtime_error(path_ + ": wrong password");
-        }
-        const auto head = bytes(0, 8);
-        if (!containerHeader(head.data())) {
-            throw std::runtime_error(path_ + (des_ ? ": wrong password"
-                                                   : ": not a ChessBase archive (its header is not one); a .cbz needs "
-                                                     "its password"));
-        }
-        const uint32_t declared = le16(head.data() + 2);
-        const auto first        = bytes(TABLE_AT, ENTRY_SIZE);
-        const uint64_t pool     = le32(first.data() + TRIO);
-        if (pool < TABLE_AT + ENTRY_SIZE || (pool - TABLE_AT) % ENTRY_SIZE != 0 || pool > file_.size())
-            throw std::runtime_error(path_ +
-                                     ": damaged archive (its member table does not end where its first member "
-                                     "starts)");
-        const uint64_t count = (pool - TABLE_AT) / ENTRY_SIZE;
-        if (count != declared)
-            throw std::runtime_error(path_ + ": damaged archive (its header says " + std::to_string(declared) +
-                                     " members, its table holds " + std::to_string(count) + ")");
-        for (uint64_t i = 0; i < count; ++i) members_.push_back(member(i));
-        for (std::size_t i = 1; i < members_.size(); ++i)
-            if (members_[i].offset < members_[i - 1].offset + members_[i - 1].packed)
-                throw std::runtime_error(path_ + ": damaged archive (" + members_[i].name + " starts inside " +
-                                         members_[i - 1].name + ")");
+    CipheredFile(const fs::path& path, const std::string& password) : path_(path.string()), file_(path) {
+        if (!password.empty()) des_.emplace(keyOf(password));
     }
 
     [[nodiscard]] const std::string& path() const noexcept { return path_; }
-    [[nodiscard]] const std::vector<Member>& members() const noexcept { return members_; }
+    [[nodiscard]] uint64_t size() const noexcept { return file_.size(); }
+    [[nodiscard]] bool enciphered() const noexcept { return des_.has_value(); }
 
     // `size` bytes of the file from `offset`, deciphered; valid until the next call.
     std::span<const uint8_t> bytes(uint64_t offset, std::size_t size) {
@@ -213,11 +179,64 @@ class Archive {
     }
 
    private:
+    std::string path_;
+    MappedFile file_;
+    std::optional<Des> des_;
+    std::vector<uint8_t> clear_;
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// The .cbv archive: its member table
+// ---------------------------------------------------------------------------------------------------------------
+
+constexpr uint64_t TABLE_AT   = 8;
+constexpr uint64_t ENTRY_SIZE = 173;
+constexpr std::size_t TRIO    = 128;
+constexpr std::size_t QUARTET = TRIO + 12 + 9;
+
+struct Member {
+    std::string name;
+    uint64_t offset = 0, packed = 0, size = 0;
+};
+
+class Archive {
+   public:
+    // `file`, whose first bytes (deciphered) are a .cbv's header.
+    explicit Archive(std::shared_ptr<CipheredFile> file) : file_(std::move(file)) {
+        if (file_->size() < TABLE_AT + ENTRY_SIZE)
+            throw std::runtime_error(path() + ": not a ChessBase archive (shorter than its table)");
+        const auto head         = bytes(0, 8);
+        const uint32_t declared = le16(head.data() + 2);
+        const auto first        = bytes(TABLE_AT, ENTRY_SIZE);
+        const uint64_t pool     = le32(first.data() + TRIO);
+        if (pool < TABLE_AT + ENTRY_SIZE || (pool - TABLE_AT) % ENTRY_SIZE != 0 || pool > file_->size())
+            throw std::runtime_error(path() +
+                                     ": damaged archive (its member table does not end where its first member "
+                                     "starts)");
+        const uint64_t count = (pool - TABLE_AT) / ENTRY_SIZE;
+        if (count != declared)
+            throw std::runtime_error(path() + ": damaged archive (its header says " + std::to_string(declared) +
+                                     " members, its table holds " + std::to_string(count) + ")");
+        for (uint64_t i = 0; i < count; ++i) members_.push_back(member(i));
+        for (std::size_t i = 1; i < members_.size(); ++i)
+            if (members_[i].offset < members_[i - 1].offset + members_[i - 1].packed)
+                throw std::runtime_error(path() + ": damaged archive (" + members_[i].name + " starts inside " +
+                                         members_[i - 1].name + ")");
+    }
+
+    [[nodiscard]] const std::string& path() const noexcept { return file_->path(); }
+    [[nodiscard]] const std::vector<Member>& members() const noexcept { return members_; }
+
+    // `size` bytes of the file from `offset`, deciphered; valid until the next call.
+    std::span<const uint8_t> bytes(uint64_t offset, std::size_t size) { return file_->bytes(offset, size); }
+
+   private:
     Member member(uint64_t index) {
         const uint64_t at = TABLE_AT + index * ENTRY_SIZE;
         const auto r      = bytes(at, ENTRY_SIZE);
         const auto bad    = [&](const std::string& what) {
-            return std::runtime_error(path_ + ": damaged archive (member " + std::to_string(index) + ": " + what + ")");
+            return std::runtime_error(path() + ": damaged archive (member " + std::to_string(index) + ": " + what +
+                                      ")");
         };
         const auto nul = std::find(r.begin(), r.begin() + TRIO, uint8_t{0});
         if (nul == r.begin() + TRIO) throw bad("its name has no end");
@@ -233,15 +252,12 @@ class Archive {
                        size = le64(r.data() + QUARTET + 16);
         if (offset != m.offset || packed != m.packed || size != m.size) throw bad("its two sizes disagree");
         if (m.packed == 0) throw bad("it stores nothing");
-        if (m.offset + m.packed > file_.size()) throw bad("it runs past the archive's end");
+        if (m.offset + m.packed > file_->size()) throw bad("it runs past the archive's end");
         return m;
     }
 
-    std::string path_;
-    MappedFile file_;
-    std::optional<Des> des_;
+    std::shared_ptr<CipheredFile> file_;
     std::vector<Member> members_;
-    std::vector<uint8_t> clear_;
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -601,8 +617,8 @@ std::string lower(std::string s) {
 
 class ArchiveMembers final : public Members {
    public:
-    ArchiveMembers(const fs::path& file, const std::string& password, uint64_t whole)
-        : archive_(std::make_shared<Archive>(file, password)), whole_(whole) {
+    ArchiveMembers(std::shared_ptr<CipheredFile> file, uint64_t whole)
+        : archive_(std::make_shared<Archive>(std::move(file))), whole_(whole) {
         // The database: the member at the archive's root named <base>.cbh, else <base>.2cbh.
         for (const char* header : {".cbh", ".2cbh"}) {
             for (const auto& m : archive_->members()) {
@@ -644,6 +660,209 @@ class ArchiveMembers final : public Members {
     std::string base_;
 };
 
+// ---------------------------------------------------------------------------------------------------------------
+// The zip archive of a 2CBH database (.2cbv, .2cbz)
+// ---------------------------------------------------------------------------------------------------------------
+
+// The archive's directory read through its file, deciphered: zip's own (sources.hpp).
+ArchiveBytes zipBytes(const std::shared_ptr<CipheredFile>& file) {
+    return [file](uint64_t offset, std::size_t size) {
+        if (offset >= file->size()) return std::vector<unsigned char>{};
+        const auto n     = static_cast<std::size_t>(std::min<uint64_t>(size, file->size() - offset));
+        const auto bytes = file->bytes(offset, n);
+        return std::vector<unsigned char>(bytes.begin(), bytes.end());
+    };
+}
+
+// A member stored as it is: read where it lies, into a buffer of its own (the file's is shared by the members).
+class StoredMember final : public Source {
+   public:
+    StoredMember(std::shared_ptr<CipheredFile> file, std::string name, uint64_t data, uint64_t size)
+        : file_(std::move(file)), name_(std::move(name)), data_(data), size_(size) {}
+    [[nodiscard]] const std::string& name() const noexcept override { return name_; }
+    [[nodiscard]] uint64_t size() const noexcept override { return size_; }
+    std::span<const uint8_t> read(uint64_t offset, std::size_t size) override {
+        if (offset > size_ || size > size_ - offset) outside(offset, size);
+        const auto bytes = file_->bytes(data_ + offset, size);
+        scratch_.assign(bytes.begin(), bytes.end());
+        return scratch_;
+    }
+
+   private:
+    std::shared_ptr<CipheredFile> file_;
+    std::string name_;
+    uint64_t data_ = 0, size_ = 0;
+    std::vector<uint8_t> scratch_;
+};
+
+// A deflated member, inflated as it is read: on from where the reads have got to, from its start again for a read
+// before what is kept. A database's files are mostly read in order (the moves and annotations of one game after
+// another): a few megabytes are kept behind the last read, for one a little back.
+class InflatedMember final : public Source {
+   public:
+    InflatedMember(std::shared_ptr<CipheredFile> file, std::string name, uint64_t data, uint64_t compressed,
+                   uint64_t size)
+        : file_(std::move(file)), name_(std::move(name)), data_(data), compressed_(compressed), size_(size) {
+        if (inflateInit2(&z_, -15) != Z_OK) throw std::runtime_error("out of memory");
+    }
+    ~InflatedMember() override { inflateEnd(&z_); }
+    InflatedMember(const InflatedMember&)            = delete;
+    InflatedMember& operator=(const InflatedMember&) = delete;
+
+    [[nodiscard]] const std::string& name() const noexcept override { return name_; }
+    [[nodiscard]] uint64_t size() const noexcept override { return size_; }
+
+    std::span<const uint8_t> read(uint64_t offset, std::size_t size) override {
+        if (offset > size_ || size > size_ - offset) outside(offset, size);
+        if (size == 0) return {};
+        if (offset < kept_at_) restart();
+        while (kept_at_ + kept_.size() < offset + size) {
+            // What lies well before the read is let go, once there is much of it.
+            if (offset - kept_at_ > BEHIND && kept_.size() > 4 * BEHIND) {
+                const auto drop =
+                    static_cast<std::size_t>(std::min<uint64_t>(kept_.size(), offset - kept_at_ - BEHIND));
+                kept_.erase(kept_.begin(), kept_.begin() + static_cast<std::ptrdiff_t>(drop));
+                kept_at_ += drop;
+            }
+            more();
+        }
+        return {kept_.data() + (offset - kept_at_), size};
+    }
+
+    // The whole member, its CRC-32 checked against `crc`.
+    std::vector<uint8_t> all(uint32_t crc) {
+        restart();
+        kept_.reserve(static_cast<std::size_t>(std::min<uint64_t>(size_, 64u << 20)));
+        while (kept_.size() < size_) more();
+        uLong sum = crc32(0L, Z_NULL, 0);
+        for (std::size_t at = 0; at < kept_.size(); at += 1u << 30)
+            sum = crc32(sum, kept_.data() + at, static_cast<uInt>(std::min<std::size_t>(kept_.size() - at, 1u << 30)));
+        if (static_cast<uint32_t>(sum) != crc)
+            throw Damage(name_ + ": damaged archive (its bytes are not those its CRC-32 says)");
+        return std::move(kept_);
+    }
+
+   private:
+    static constexpr std::size_t BEHIND = 1u << 20;
+
+    void restart() {
+        inflateReset(&z_);
+        z_.avail_in = 0;
+        consumed_   = 0;
+        kept_.clear();
+        kept_at_ = 0;
+        ended_   = false;
+    }
+
+    // Inflates the member's next bytes into what is kept.
+    void more() {
+        std::array<uint8_t, 1u << 16> out{};
+        for (;;) {
+            if (ended_) throw Damage(name_ + ": damaged archive (it unpacks to fewer bytes than its size)");
+            if (z_.avail_in == 0) {
+                if (consumed_ >= compressed_) throw Damage(name_ + ": damaged archive (its data is cut short)");
+                const auto n     = static_cast<std::size_t>(std::min<uint64_t>(input_.size(), compressed_ - consumed_));
+                const auto bytes = file_->bytes(data_ + consumed_, n);
+                std::copy(bytes.begin(), bytes.end(), input_.begin());
+                consumed_ += n;
+                z_.next_in  = input_.data();
+                z_.avail_in = static_cast<uInt>(n);
+            }
+            z_.next_out    = out.data();
+            z_.avail_out   = static_cast<uInt>(out.size());
+            const auto had = z_.avail_in;
+            const int ret  = inflate(&z_, Z_NO_FLUSH);
+            if (ret == Z_STREAM_END)
+                ended_ = true;
+            else if (ret != Z_OK && !(ret == Z_BUF_ERROR && z_.avail_in == 0 && had == 0))
+                throw Damage(name_ + ": damaged archive (" + (z_.msg ? z_.msg : "its deflated data is not") + ")");
+            const std::size_t produced = out.size() - z_.avail_out;
+            if (kept_at_ + kept_.size() + produced > size_)
+                throw Damage(name_ + ": damaged archive (it unpacks to more bytes than its size)");
+            if (produced > 0) {
+                kept_.insert(kept_.end(), out.begin(), out.begin() + static_cast<std::ptrdiff_t>(produced));
+                return;
+            }
+        }
+    }
+
+    std::shared_ptr<CipheredFile> file_;
+    std::string name_;
+    uint64_t data_ = 0, compressed_ = 0, size_ = 0;
+    z_stream z_{};
+    std::array<uint8_t, 1u << 16> input_{};
+    uint64_t consumed_ = 0;  // of the compressed data
+    std::vector<uint8_t> kept_;
+    uint64_t kept_at_ = 0;  // where what is kept starts in the member
+    bool ended_       = false;
+};
+
+class ZipMembers final : public Members {
+   public:
+    ZipMembers(std::shared_ptr<CipheredFile> file, uint64_t whole) : file_(std::move(file)), whole_(whole) {
+        try {
+            entries_ = zipEntries(file_->size(), zipBytes(file_), file_->path());
+        } catch (const Damage& e) {
+            throw std::runtime_error(e.what());
+        }
+        // The database: the file at the archive's root named <base>.2cbh, else <base>.cbh.
+        for (const char* header : {".2cbh", ".cbh"}) {
+            for (const auto& e : entries_) {
+                const auto name = lower(e.name);
+                if (name.find('\\') != std::string::npos || name.find('/') != std::string::npos) continue;
+                if (name.size() > std::strlen(header) && name.ends_with(header)) {
+                    base_ = e.name.substr(0, e.name.size() - std::strlen(header));
+                    return;
+                }
+            }
+        }
+        throw std::runtime_error(file_->path() + ": the archive holds no ChessBase database (no .2cbh or .cbh)");
+    }
+
+    [[nodiscard]] std::string label() const override { return file_->path() + ": " + base_; }
+
+    [[nodiscard]] bool has(std::string_view extension) const override { return find(extension) != nullptr; }
+
+    std::unique_ptr<Source> open(std::string_view extension, bool random) override {
+        const ZipEntry* e = find(extension);
+        if (!e) return nullptr;
+        const auto name = file_->path() + ": " + e->name;
+        if (e->method != 0 && e->method != 8)
+            throw Damage(name + ": stored in a way this program does not read (method " + std::to_string(e->method) +
+                         ")");
+        const auto data = zipData(*e, zipBytes(file_), file_->path());
+        if (e->method == 0) {
+            if (e->compressed != e->size)
+                throw Damage(name + ": damaged archive (a file stored as it is, of two sizes)");
+            if (data > file_->size() || e->size > file_->size() - data)
+                throw Damage(name + ": damaged archive (it runs past the archive's end)");
+            return std::make_unique<StoredMember>(file_, name, data, e->size);
+        }
+        if (data > file_->size() || e->compressed > file_->size() - data)
+            throw Damage(name + ": damaged archive (it runs past the archive's end)");
+        auto stream = std::make_unique<InflatedMember>(file_, name, data, e->compressed, e->size);
+        // A file of names is read anywhere, often: unpacked whole. So is a small file.
+        if ((random && e->size <= (uint64_t{1} << 30)) || e->size <= whole_)
+            return memorySource(name, stream->all(e->crc));
+        return stream;
+    }
+
+   private:
+    [[nodiscard]] const ZipEntry* find(std::string_view extension) const {
+        const auto want = lower(base_ + std::string(extension));
+        for (const auto& e : entries_)
+            if (lower(e.name) == want) return &e;
+        return nullptr;
+    }
+
+    std::shared_ptr<CipheredFile> file_;
+    uint64_t whole_ = 0;
+    std::vector<ZipEntry> entries_;
+    std::string base_;
+};
+
+bool zipHeader(const uint8_t* h) { return h[0] == 'P' && h[1] == 'K' && h[2] == 3 && h[3] == 4; }
+
 }  // namespace
 
 void desBlocks(const std::string& password, std::span<uint8_t> data, bool decrypt) {
@@ -653,9 +872,33 @@ void desBlocks(const std::string& password, std::span<uint8_t> data, bool decryp
 
 std::unique_ptr<Members> archiveMembers(const fs::path& file, const std::string& password, uint64_t whole) {
     try {
-        return std::make_unique<ArchiveMembers>(file, password, whole);
+        auto ciphered    = std::make_shared<CipheredFile>(file, password);
+        const auto& path = ciphered->path();
+        if (ciphered->size() < 8)
+            throw std::runtime_error(path + ": not a ChessBase archive (shorter than its header)");
+        // What it is shows in its first block, once deciphered: a .cbv's header, or a zip's first file.
+        std::array<uint8_t, 8> head{};
+        const auto first = ciphered->bytes(0, 8);
+        std::copy(first.begin(), first.end(), head.begin());
+        if (containerHeader(head.data())) return std::make_unique<ArchiveMembers>(std::move(ciphered), whole);
+        if (zipHeader(head.data())) return std::make_unique<ZipMembers>(std::move(ciphered), whole);
+        if (ciphered->enciphered()) throw std::runtime_error(path + ": wrong password");
+        throw std::runtime_error(path +
+                                 ": not a ChessBase archive (its header is not one); a .cbz or a .2cbz needs its "
+                                 "password");
     } catch (const Damage& e) {
         throw std::runtime_error(e.what());
+    }
+}
+
+bool passwordFits(const fs::path& file, const std::string& password) {
+    try {
+        CipheredFile ciphered(file, password);
+        if (ciphered.size() < 8) return false;
+        const auto head = ciphered.bytes(0, 8);
+        return containerHeader(head.data()) || zipHeader(head.data());
+    } catch (const std::exception&) {
+        return false;
     }
 }
 

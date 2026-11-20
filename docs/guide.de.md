@@ -346,7 +346,7 @@ bleiben die Bretter flach, und die *Darstellung* sagt, warum. Die Figuren sind c
 der MIT-Lizenz; die *Darstellung* verlinkt sie.
 
 ## Tastenkürzel
-<!-- en: keyboard-shortcuts 58e8e12c -->
+<!-- en: keyboard-shortcuts 88be4815 -->
 
 | Tasten | Wo | Was sie tun |
 |---|---|---|
@@ -384,7 +384,7 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | Das Brett fürs Studium | Die Kopfdaten der Partie aufklappen |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | Das Brett fürs Studium | Die Tabs Notation, Analyse, Baum, Referenzen und Fragen |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | Das Brett fürs Studium | Der Assistent kommentiert den Zug |
-| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | Das Brett fürs Studium | Was F, A, X, G und N auf dem Brett für die Engine-Analyse tun (auf diesem Brett tippen die Buchstaben Züge) |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Umschalt</kbd>+<kbd>N</kbd> | Das Brett fürs Studium | Was F, A, X, G, N und Umschalt+N auf dem Brett für die Engine-Analyse tun (auf diesem Brett tippen die Buchstaben Züge) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | Der Tab Baum | Einen Zug wählen, ihn spielen, ihn im aktiven Repertoire markieren |
 | <kbd>Enter</kbd> | Die Seite Eröffnungen | Das Training des gezeigten Repertoires starten |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Leertaste</kbd>, <kbd>Esc</kbd> | Eine Trainingssitzung | Ein Hinweis, „Ich weiß es nicht“, anhalten |
@@ -1028,7 +1028,7 @@ gespeichert, und nur die Engine zählt im Kernbudget. Zurücknehmen geht nicht, 
 außer ihre Karte stellt eine geringere ein (`UCI_LimitStrength` und `UCI_Elo` oder `Skill Level`, wo sie diese hat).
 
 ### Das Brett fürs Studium
-<!-- en: the-study-board e70e0006 -->
+<!-- en: the-study-board 60138fbd -->
 
 In einer Ansicht, deren Brett *Fürs Studium* ist (siehe [Ansichten](#ansichten)), ist die Seite Brett der Ort, an dem
 Partien gelesen und geschrieben werden. Das Brett steht links; rechts der Streifen der Partie, dann fünf Tabs, Alt+1
@@ -1054,8 +1054,8 @@ und Auswertung an, Gaia mit einem Klick herunterzuladen.
 Ein Zug lässt sich ebenso tippen wie spielen: Sein erster Buchstabe öffnet ein Feld über den Tabs, das die legalen Züge
 anbietet, die so beginnen (mit den englischen Buchstaben K Q R B N; in der französischen Oberfläche R D T F C), und
 Enter spielt ihn. Die Buchstaben des Bretts für die Engine-Analyse liegen dann unter Alt: Alt+F dreht das Brett um,
-Alt+A startet oder beendet die Analyse, Alt+X zeigt die Drohung, Alt+G analysiert die Partie, Alt+N geht zum nächsten
-Zug, den die Analyse markiert hat.
+Alt+A startet oder beendet die Analyse, Alt+X zeigt die Drohung, Alt+G analysiert die Partie, Alt+N und Alt+Umschalt+N
+gehen zum nächsten und zum vorigen Zug, den die Analyse markiert hat.
 
 ### Mehrere Engines nebeneinander
 <!-- en: several-engines-side-by-side 43f5e1fe -->
@@ -1229,7 +1229,7 @@ gegenüber den sechs davor. Die Zusammenfassung sagt dasselbe über die Stellung
 bleibt es aus, bis es verlangt wird; der Explorer der Meister hat keine Monate.
 
 ### Die Auswertung einer Partie
-<!-- en: the-review-of-a-game b1237d38 -->
+<!-- en: the-review-of-a-game 66d8cf1e -->
 
 Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (Alt+G), wie es ein
 Trainer täte:
@@ -1245,14 +1245,15 @@ Trainer täte:
 - **Die Schlüsselmomente in Worten**, **Die Geschichte der Partie** und **Woran zu arbeiten ist**, für jede Seite, mit
   den Zügen, die es zeigen; ein Klick springt zum Zug.
 
-Dieselbe Partie bekommt immer dieselbe Auswertung: dieselben Bewertungen, Symbole, Schlüsselmomente und Kommentare,
-egal was der Computer gerade tut. Die Analyse der Partie auf dem Brett fürs Studium zählt Knoten statt Zeit: Jede
-Stellung wird beim ersten Durchgang mit 20.000 Knoten durchsucht, bei jedem weiteren Durchgang mit viermal so vielen,
-bis zu der Wahl neben dem Knopf (320.000, 1.280.000, 5.120.000 oder 20.480.000 Knoten pro Stellung oder *bis zum
-Stoppen*), mit einem einzigen Thread und leerem Hash, sodass das Ergebnis einer Stellung nur von der Engine und der
-Stellung abhängt. Es werden so viele Stellungen gleichzeitig durchsucht, wie die Analyse Threads hat, jede von einem
-eigenen Engine-Prozess. Wo der gespielte Zug die Wahl der Engine war und die Stellung nicht einseitig ist, liefert eine
-zweite Suche der Stellung mit zwei Linien den nächstbesten Zug: Ein einziger Zug wird mit ihm genannt.
+Dieselbe Partie bekommt immer dieselbe Auswertung: dieselben Bewertungen, Symbole, Schlüsselmomente und Kommentare, egal
+was der Computer gerade tut. Die Analyse der Partie auf dem Brett fürs Studium zählt Knoten statt Zeit: Jede Stellung
+wird beim ersten Durchgang mit 20.000 Knoten durchsucht, bei jedem weiteren Durchgang mit viermal so vielen, bis zu der
+Wahl neben dem Knopf (320.000, 1.280.000, 5.120.000 oder 20.480.000 Knoten pro Stellung oder *bis zum Stoppen*), mit
+einem einzigen Thread und leerem Hash, sodass das Ergebnis einer Stellung nur von der Engine und der Stellung abhängt.
+Mehrere Stellungen werden gleichzeitig durchsucht, jede von einem eigenen Engine-Prozess: so viele, wie die Analyse
+Threads hat, und mindestens die Hälfte der Kerne des Prozessors, bis zu vier; weniger, während auf diesem Computer ein
+Turnier spielt, das seine Kerne behält. Wo der gespielte Zug die Wahl der Engine war und die Stellung nicht einseitig
+ist, liefert eine zweite Suche der Stellung mit zwei Linien den nächstbesten Zug: Ein einziger Zug wird mit ihm genannt.
 
 Die Stellungen des Endspiels mit sieben Steinen oder weniger können die Lichess-Tablebases exakt beurteilen, einmal für
 diese Partie oder immer abgefragt. *Schlüsselmomente kommentieren* schreibt im Hintergrund zu jedem einen Kommentar
@@ -1278,7 +1279,7 @@ Die Seite **Datenbanken** enthält deine Partiedatenbanken: ihre Liste links, di
 Datenbank ist ein eigener Ordner (`Name.fcgdb`), schnell gelesen, selbst mit Millionen Partien.
 
 ### Partien importieren
-<!-- en: importing-games 4997becc -->
+<!-- en: importing-games d6a0c0eb -->
 
 *Neue Datenbank* erstellt eine, direkt benannt; *Datenbank hinzufügen…* listet einen anderswo erstellten
 Datenbankordner auf, seine Dateien bleiben, wo sie sind. *In diese Datenbank importieren…* nimmt eine PGN-Datei oder
@@ -1290,11 +1291,15 @@ und am Ende), und ein erneuter Import der Datei fügt nur die fehlenden hinzu; P
 werden ausgelassen.
 
 Am Ende sagt ein Banner auf der Datenbank, was gekommen ist: die hinzugefügten Partien, die schon vorhandenen und die
-beschädigten (ein Zug, der sich nicht lesen lässt oder illegal ist, ein abgeschnittener Text, eine Ausgangsstellung, die
-keine ist), jede bis zu diesem Zug behalten, ihr Text unverändert; *In der Liste zeigen* oder ein Klick auf eine zeigt
-die Datei an ihrer Zeile. Eine volle Festplatte, ein gewünschter Abbruch oder ein anderer Fehler sagt, was behalten ist
-und was gebraucht wird, mit *Import fortsetzen* und *Ordner der Datenbank öffnen*. Danach wird der Eröffnungsbaum der
-Datenbank im Hintergrund erstellt.
+beschädigten unter den hinzugefügten (ein Zug, der sich nicht lesen lässt oder illegal ist, ein abgeschnittener Text,
+eine Ausgangsstellung, die keine ist), jede bis zu diesem Zug behalten, ihr Text unverändert; *In der Liste zeigen* oder
+ein Klick auf eine zeigt die Datei an ihrer Zeile. Eine volle Festplatte, ein gewünschter Abbruch oder ein anderer
+Fehler sagt, was behalten ist und was gebraucht wird, mit *Import fortsetzen* und *Ordner der Datenbank öffnen*; eine
+Datei, die sich nicht weiterlesen lässt, sagt, warum, und die davor gelesenen Partien bleiben. Danach wird der
+Eröffnungsbaum der Datenbank im Hintergrund erstellt.
+
+Eine Datei, deren Bytes kein Text sind (ein Programm, ein Bild, ein Archiv, das der Import nicht kennt), wird abgelehnt,
+bevor sie als PGN gelesen wird: Nichts wird importiert, und eine dafür angelegte neue Datenbank wird nicht behalten.
 
 Eine Datenbank, in die ein anderes Programm schreibt (zum Beispiel ein anderes RookStudio, das in sie importiert),
 öffnet sich schreibgeschützt: Die Liste, der Baum und die Suchen funktionieren; Importieren und Speichern von Partien
@@ -1354,14 +1359,16 @@ Hintergrund aktualisiert (die Partien, die ein Turnier beendet, eine Datei, die 
 Sie werden weder importiert noch entfernt.
 
 ### ChessBase-Datenbanken
-<!-- en: chessbase-databases 2582d418 -->
+<!-- en: chessbase-databases 3da99106 -->
 
 Eine ChessBase-Datenbank, auf die Seite Datenbanken gezogen oder mit *Datei importieren…* gewählt, wird in eine
 RookStudio-Datenbank kopiert: ihre .cbh oder .2cbh (oder eine beliebige ihrer Dateien) oder ein Archiv davon, .cbv oder
-.cbz. Eine Karte sagt zuerst, was sie enthält, aus ihren Kopfdaten gelesen, was übernommen und was ausgelassen wird,
-wohin sie kommt und wie lange es ungefähr dauert; *Importieren* (Enter) startet die Kopie, *Nicht jetzt* (Esc) lässt
-sie. Die ChessBase-Dateien werden nur gelesen, nichts wird daneben geschrieben; ein Archiv wird beim Lesen entpackt, und
-das Passwort einer .cbz wird auf der Karte abgefragt und nicht gespeichert.
+.cbz für eine .cbh, .2cbv oder .2cbz für eine .2cbh. Eine Karte sagt zuerst, was sie enthält, aus ihren Kopfdaten
+gelesen, was übernommen und was ausgelassen wird, wohin sie kommt und wie lange es ungefähr dauert; *Importieren*
+(Enter) startet die Kopie, *Nicht jetzt* (Esc) lässt sie. Die ChessBase-Dateien werden nur gelesen, nichts wird daneben
+geschrieben; ein Archiv wird beim Lesen entpackt. Das Passwort einer .cbz oder einer .2cbz wird auf der Karte eingetippt
+(Enter im Feld startet die Kopie) und nicht gespeichert; ein falsches wird dort sofort gemeldet, um es erneut
+einzutippen, bevor irgendetwas kopiert wird.
 
 Die Kopie behält die Züge und ihre Varianten, die Kommentare vor und nach den Zügen (ein Text in mehreren Sprachen:
 Englisch zuerst, die anderen danach), die Symbole, die farbigen Felder und Pfeile, die Uhren und die verbrauchte Zeit,

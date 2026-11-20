@@ -332,7 +332,7 @@ tabuleiros continuam planos e *Aparência* diz por quê. As peças são as Staun
 MIT; *Aparência* tem o link para elas.
 
 ## Atalhos de teclado
-<!-- en: keyboard-shortcuts 58e8e12c -->
+<!-- en: keyboard-shortcuts 88be4815 -->
 
 | Teclas | Onde | O que fazem |
 |---|---|---|
@@ -370,7 +370,7 @@ MIT; *Aparência* tem o link para elas.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | O Tabuleiro de estudo | Expandir os cabeçalhos da partida |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | O Tabuleiro de estudo | As abas Notação, Análise, Árvore, Referências e Perguntas |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | O Tabuleiro de estudo | O assistente comenta o lance |
-| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | O Tabuleiro de estudo | O que F, A, X, G e N fazem no Tabuleiro dos engines (aqui, as letras digitam lances) |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | O Tabuleiro de estudo | O que F, A, X, G, N e Shift+N fazem no Tabuleiro dos engines (aqui, as letras digitam lances) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | A aba Árvore | Escolher um lance, jogá-lo, marcá-lo no repertório ativo |
 | <kbd>Enter</kbd> | A página Aberturas | Iniciar o treino do repertório mostrado |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espaço</kbd>, <kbd>Esc</kbd> | Uma sessão de treino | Uma dica, "Não sei", parar |
@@ -979,7 +979,7 @@ Não dá para voltar um lance, e o engine joga com força total, a menos que o c
 (`UCI_LimitStrength` e `UCI_Elo`, ou `Skill Level`, quando ele os tem).
 
 ### O Tabuleiro de estudo
-<!-- en: the-study-board e70e0006 -->
+<!-- en: the-study-board 60138fbd -->
 
 Numa visão cujo Tabuleiro é *Para estudo* (veja [Visões](#visões)), a página Tabuleiro é onde as partidas são lidas e
 escritas. O tabuleiro fica à esquerda; à direita, a faixa da partida, depois cinco abas, de Alt+1 a Alt+5:
@@ -1004,7 +1004,7 @@ Gaia com um clique.
 Um lance pode ser digitado em vez de jogado: a primeira letra dele abre um campo acima das abas, que oferece os lances
 legais que começam assim (em letras inglesas, K Q R B N; em francês, R D T F C), e Enter o joga. As letras do
 Tabuleiro dos engines passam então para o Alt: Alt+F gira o tabuleiro, Alt+A inicia ou para a análise, Alt+X mostra a
-ameaça, Alt+G analisa a partida, Alt+N vai ao próximo lance marcado pela análise.
+ameaça, Alt+G analisa a partida, Alt+N e Alt+Shift+N vão ao próximo e ao anterior lance marcado pela análise.
 
 ### Vários engines lado a lado
 <!-- en: several-engines-side-by-side 43f5e1fe -->
@@ -1172,7 +1172,7 @@ anteriores. O resumo diz o mesmo da posição. Isso custa um pedido por lance, e
 explorador dos mestres não tem meses.
 
 ### A revisão de uma partida
-<!-- en: the-review-of-a-game b1237d38 -->
+<!-- en: the-review-of-a-game 66d8cf1e -->
 
 No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da partida (Alt+G) como um treinador leria:
 
@@ -1191,10 +1191,11 @@ A mesma partida sempre recebe a mesma revisão: as mesmas pontuações, símbolo
 que for que a máquina esteja fazendo. A análise da partida no Tabuleiro de estudo conta nós em vez de tempo: cada
 posição é buscada por 20.000 nós na primeira passada, quatro vezes mais a cada passada, até a escolha ao lado do botão
 (320.000, 1.280.000, 5.120.000 ou 20.480.000 nós por posição, ou *até ser parado*), numa só thread e com o hash vazio,
-para que o resultado de uma posição dependa só do engine e da posição. Tantas posições são buscadas ao mesmo tempo
-quantas threads a análise tem, um processo do engine para cada uma. Onde o lance jogado foi a escolha do engine e a
-posição não está decidida para um dos lados, uma segunda busca da posição com duas linhas dá o segundo melhor lance:
-um lance único é informado junto com ele.
+para que o resultado de uma posição dependa só do engine e da posição. Várias posições são buscadas ao mesmo tempo,
+um processo do engine para cada uma: tantas quantas threads a análise tem, e pelo menos metade dos núcleos do
+processador, até quatro; menos enquanto um torneio joga nesta máquina, que mantém os núcleos dele. Onde o lance jogado
+foi a escolha do engine e a posição não está decidida para um dos lados, uma segunda busca da posição com duas linhas
+dá o segundo melhor lance: um lance único é informado junto com ele.
 
 As posições do final com sete peças ou menos podem ser julgadas com exatidão pelas tablebases do Lichess, consultadas
 uma vez para esta partida ou sempre. *Comentar os momentos-chave* escreve um comentário do assistente em cada um, em
@@ -1220,7 +1221,7 @@ A página **Bases** guarda suas bases de partidas: a lista delas à esquerda, as
 base é uma pasta própria (`Name.fcgdb`), lida rapidamente mesmo com milhões de partidas.
 
 ### Importar partidas
-<!-- en: importing-games 4997becc -->
+<!-- en: importing-games d6a0c0eb -->
 
 *Nova base* cria uma, nomeada ali mesmo; *Adicionar uma base…* lista uma pasta de base criada em outro lugar, com os
 arquivos deixados onde estão. *Importar para esta base…* recebe um arquivo PGN, ou um arquivo `.zst`, `.gz` ou `.zip`
@@ -1230,11 +1231,15 @@ torneio ao lado não perde tempo), com o progresso, a velocidade e *Cancelar*. A
 parar (a cada 262.144 partidas, e no fim), e importar o arquivo de novo adiciona só as que faltam; as partidas que já
 estão na base ficam de fora.
 
-No fim, um aviso na base diz o que chegou: as partidas adicionadas, as que já existiam, e as danificadas (um lance que
-não pode ser lido ou é ilegal, um texto cortado, uma posição inicial que não é uma posição), cada uma mantida até esse
-lance com o texto como estava; *Vê-las na lista*, ou um clique numa delas, mostra o arquivo na linha dela. Um disco
-cheio, uma interrupção pedida ou outro erro diz o que foi mantido e o que é preciso, com *Retomar a importação* e
-*Abrir a pasta da base*. Depois a árvore de aberturas da base é construída, em segundo plano.
+No fim, um aviso na base diz o que chegou: as partidas adicionadas, as que já existiam, e as danificadas entre as
+partidas adicionadas (um lance que não pode ser lido ou é ilegal, um texto cortado, uma posição inicial que não é uma
+posição), cada uma mantida até esse lance com o texto como estava; *Vê-las na lista*, ou um clique numa delas, mostra o
+arquivo na linha dela. Um disco cheio, uma interrupção pedida ou outro erro diz o que foi mantido e o que é preciso,
+com *Retomar a importação* e *Abrir a pasta da base*; um arquivo que não pode mais ser lido diz por quê, e as partidas
+lidas antes disso ficam mantidas. Depois a árvore de aberturas da base é construída, em segundo plano.
+
+Um arquivo cujos bytes não são texto (um programa, uma imagem, um arquivo compactado que a importação não conhece) é
+recusado antes de ser lido como PGN: nada é importado, e uma base nova criada para ele não é mantida.
 
 Uma base em que outro programa está gravando (outro RookStudio importando para ela, por exemplo) abre somente leitura:
 a lista, a árvore e as buscas funcionam; importar e salvar partidas esperam até esse programa terminar. *Remover da
@@ -1291,14 +1296,16 @@ bases: as partidas deles são listadas e buscadas como as de uma base, e atualiz
 (as partidas que um torneio termina, um arquivo que cresceu ou mudou). Eles não são importados nem removidos.
 
 ### Bases ChessBase
-<!-- en: chessbase-databases 2582d418 -->
+<!-- en: chessbase-databases 3da99106 -->
 
 Uma base ChessBase solta na página Bases, ou escolhida com *Importar um arquivo…*, é copiada para uma base do
 RookStudio: o .cbh ou o .2cbh dela (ou qualquer um dos seus arquivos), ou um arquivo compactado de uma base, .cbv ou
-.cbz. Um cartão diz primeiro o que ela contém, lido nos cabeçalhos dela, o que entra e o que fica de fora, para onde
-ela vai e quanto tempo leva, aproximadamente; *Importar* (Enter) inicia a cópia, *Agora não* (Esc) a deixa de lado. Os
-arquivos ChessBase são apenas lidos, nada é gravado ao lado deles; um arquivo compactado é descompactado enquanto é
-lido, e a senha de um .cbz é pedida no cartão e não é guardada.
+.cbz para um .cbh, .2cbv ou .2cbz para um .2cbh. Um cartão diz primeiro o que ela contém, lido nos cabeçalhos dela, o
+que entra e o que fica de fora, para onde ela vai e quanto tempo leva, aproximadamente; *Importar* (Enter) inicia a
+cópia, *Agora não* (Esc) a deixa de lado. Os arquivos ChessBase são apenas lidos, nada é gravado ao lado deles; um
+arquivo compactado é descompactado enquanto é lido. A senha de um .cbz ou de um .2cbz é digitada no cartão (Enter no
+campo inicia a cópia) e não é guardada; uma senha errada é informada ali na hora, para ser digitada de novo, antes que
+qualquer coisa seja copiada.
 
 A cópia mantém os lances e suas variantes, os comentários antes e depois dos lances (um texto em vários idiomas: o
 inglês primeiro, os outros depois dele), os símbolos, as casas coloridas e as setas, os relógios e o tempo gasto, as

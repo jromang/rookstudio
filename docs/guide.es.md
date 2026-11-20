@@ -338,7 +338,7 @@ tableros siguen planos y *Apariencia* dice por qué. Las piezas son las Staunton
 licencia MIT; *Apariencia* enlaza con ellas.
 
 ## Atajos de teclado
-<!-- en: keyboard-shortcuts 58e8e12c -->
+<!-- en: keyboard-shortcuts 88be4815 -->
 
 | Teclas | Dónde | Qué hacen |
 |---|---|---|
@@ -376,7 +376,7 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | El Tablero de estudio | Desplegar las cabeceras de la partida |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | El Tablero de estudio | Las pestañas Notación, Análisis, Árbol, Referencias y Preguntas |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | El Tablero de estudio | El asistente comenta la jugada |
-| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | El Tablero de estudio | Lo que hacen F, A, X, G y N en el Tablero de los motores (aquí las letras escriben jugadas) |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>N</kbd> | El Tablero de estudio | Lo que hacen F, A, X, G, N y Mayús+N en el Tablero de los motores (aquí las letras escriben jugadas) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Intro</kbd>, <kbd>*</kbd> | La pestaña Árbol | Elegir una jugada, jugarla, marcarla en el repertorio activo |
 | <kbd>Intro</kbd> | La página Aperturas | Iniciar el entrenamiento del repertorio mostrado |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espacio</kbd>, <kbd>Esc</kbd> | Una sesión de entrenamiento | Una pista, «No lo sé», detener |
@@ -1001,7 +1001,7 @@ puede deshacer una jugada, y el motor juega a plena fuerza salvo que su tarjeta 
 `UCI_Elo`, o `Skill Level`, si los tiene).
 
 ### El Tablero de estudio
-<!-- en: the-study-board e70e0006 -->
+<!-- en: the-study-board 60138fbd -->
 
 En una vista cuyo Tablero es *Para estudiar* (consulta [Vistas](#vistas)), la página Tablero es donde se leen y se
 escriben las partidas. El tablero está a la izquierda; a la derecha, la franja de la partida y luego cinco pestañas, de
@@ -1027,7 +1027,8 @@ ofrecen descargar Gaia con un clic.
 Una jugada se puede escribir además de jugarla: su primera letra abre un campo sobre las pestañas, que ofrece las
 jugadas legales que empiezan así (con letras inglesas, K Q R B N; en francés, R D T F C), e Intro la juega. Las letras
 del Tablero de los motores pasan entonces a Alt: Alt+F gira el tablero, Alt+A inicia o detiene el análisis, Alt+X
-muestra la amenaza, Alt+G analiza la partida, Alt+N va a la siguiente jugada que marcó el análisis.
+muestra la amenaza, Alt+G analiza la partida, Alt+N y Alt+Mayús+N van a la siguiente y a la anterior jugada que marcó el
+análisis.
 
 ### Varios motores uno junto a otro
 <!-- en: several-engines-side-by-side 43f5e1fe -->
@@ -1196,7 +1197,7 @@ anteriores. El resumen dice lo mismo de la posición. Cuesta una petición por j
 lo pides; el explorador de los maestros no tiene meses.
 
 ### La revisión de una partida
-<!-- en: the-review-of-a-game b1237d38 -->
+<!-- en: the-review-of-a-game 66d8cf1e -->
 
 En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (Alt+G) como lo
 haría un entrenador:
@@ -1216,10 +1217,11 @@ La misma partida recibe siempre la misma revisión: las mismas evaluaciones, sí
 lo que haga la máquina. El análisis de la partida del Tablero de estudio cuenta nodos en lugar de tiempo: cada posición
 se busca durante 20.000 nodos en la primera pasada, cuatro veces más en cada pasada, hasta lo elegido junto al botón
 (320.000, 1.280.000, 5.120.000 o 20.480.000 nodos por posición, o *hasta que lo detengas*), con un solo hilo y con la
-tabla hash vacía, para que el resultado de una posición dependa solo del motor y de la posición. Se buscan a la vez
-tantas posiciones como hilos tiene el análisis, con un proceso del motor para cada una. Donde la jugada hecha era la
-elegida por el motor y la posición no está decidida, una segunda búsqueda de la posición con dos líneas da la siguiente
-mejor jugada: una jugada única se indica con ella.
+tabla hash vacía, para que el resultado de una posición dependa solo del motor y de la posición. Se buscan varias
+posiciones a la vez, con un proceso del motor para cada una: tantas como hilos tiene el análisis, y al menos la mitad de
+los núcleos del procesador, hasta cuatro; menos mientras se juega un torneo en esta máquina, que conserva sus núcleos.
+Donde la jugada hecha era la elegida por el motor y la posición no está decidida, una segunda búsqueda de la posición
+con dos líneas da la siguiente mejor jugada: una jugada única se indica con ella.
 
 Las posiciones del final con siete piezas o menos pueden juzgarse con exactitud con las tablas de Lichess, consultadas
 una vez para esta partida o siempre. *Comentar los momentos clave* escribe un comentario del asistente en cada uno, en
@@ -1245,7 +1247,7 @@ La página **Bases de datos** reúne tus bases de datos de partidas: su lista a 
 la derecha. Una base de datos es una carpeta propia (`Name.fcgdb`), que se lee rápido incluso con millones de partidas.
 
 ### Importar partidas
-<!-- en: importing-games 4997becc -->
+<!-- en: importing-games d6a0c0eb -->
 
 *Nueva base de datos* crea una, con su nombre escrito en el sitio; *Añadir una base de datos…* lista una carpeta de base
 de datos creada en otro sitio, y sus archivos se quedan donde están. *Importar a esta base de datos…* toma un archivo
@@ -1256,11 +1258,15 @@ en segundo plano con baja prioridad (un torneo que se juegue al lado no pierde t
 nuevo el archivo solo añade las que faltan; las partidas que ya están en la base de datos se omiten.
 
 Al final, un aviso sobre la base de datos dice lo que llegó: las partidas añadidas, las que ya estaban y las dañadas
-(una jugada que no se puede leer o es ilegal, un texto cortado, una posición inicial que no es válida), cada una
-conservada hasta esa jugada con su texto tal como estaba; *Verlas en la lista*, o un clic en una, muestra el archivo en
-su línea. Un disco lleno, una detención pedida u otro error dicen lo que se conserva y lo que hace falta, con *Reanudar
-la importación* y *Abrir la carpeta de la base de datos*. Luego se construye el árbol de aperturas de la base de datos,
-en segundo plano.
+entre las añadidas (una jugada que no se puede leer o es ilegal, un texto cortado, una posición inicial que no es
+válida), cada una conservada hasta esa jugada con su texto tal como estaba; *Verlas en la lista*, o un clic en una,
+muestra el archivo en su línea. Un disco lleno, una detención pedida u otro error dicen lo que se conserva y lo que hace
+falta, con *Reanudar la importación* y *Abrir la carpeta de la base de datos*; un archivo que no se puede seguir leyendo
+dice por qué, y las partidas leídas antes se conservan. Luego se construye el árbol de aperturas de la base de datos, en
+segundo plano.
+
+Un archivo cuyos bytes no son texto (un programa, una imagen, un archivo comprimido que la importación no conoce) se
+rechaza antes de leerlo como PGN: no se importa nada, y una base de datos nueva creada para él no se conserva.
 
 Una base de datos en la que escribe otro programa (otro RookStudio que importa en ella, por ejemplo) se abre en solo
 lectura: la lista, el árbol y las búsquedas funcionan; la importación y el guardado de partidas esperan a que ese
@@ -1315,14 +1321,15 @@ bases de datos: sus partidas se listan y se buscan como las de una base de datos
 mostrarse (las partidas que termina un torneo, un archivo que creció o cambió). No se importan ni se eliminan.
 
 ### Bases de datos ChessBase
-<!-- en: chessbase-databases 2582d418 -->
+<!-- en: chessbase-databases 3da99106 -->
 
 Una base de datos ChessBase soltada en la página Bases de datos, o elegida con *Importar un archivo…*, se copia en una
 base de datos de RookStudio: su .cbh o .2cbh (o cualquiera de sus archivos), o un archivo comprimido que la contenga,
-.cbv o .cbz. Una tarjeta dice primero lo que contiene, según sus cabeceras, lo que entra y lo que queda fuera, adónde va
-y cuánto tarda aproximadamente; *Importar* (Intro) inicia la copia, *Ahora no* (Esc) la cierra. Los archivos ChessBase
-solo se leen, no se escribe nada junto a ellos; un archivo comprimido se descomprime mientras se lee, y la contraseña de
-un .cbz se pide en la tarjeta y no se guarda.
+.cbv o .cbz para un .cbh, .2cbv o .2cbz para un .2cbh. Una tarjeta dice primero lo que contiene, según sus cabeceras, lo
+que entra y lo que queda fuera, adónde va y cuánto tarda aproximadamente; *Importar* (Intro) inicia la copia, *Ahora no*
+(Esc) la cierra. Los archivos ChessBase solo se leen, no se escribe nada junto a ellos; un archivo comprimido se
+descomprime mientras se lee. La contraseña de un .cbz o un .2cbz se escribe en la tarjeta (Intro en el campo inicia la
+copia) y no se guarda; una incorrecta se indica allí al momento, para escribirla de nuevo, antes de copiar nada.
 
 La copia conserva las jugadas y sus variantes, los comentarios antes y después de las jugadas (un texto en varios
 idiomas: primero el inglés, los demás después), los símbolos, las casillas y flechas de colores, los relojes y el

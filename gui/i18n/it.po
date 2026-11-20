@@ -165,8 +165,8 @@ msgstr ", {} già presenti escluse"
 
 msgid ", {} damaged game among them (kept up to the move that cannot be read)"
 msgid_plural ", {} damaged games among them (kept up to the move that cannot be read)"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] ", di cui {} danneggiata (conservata fino alla mossa illeggibile)"
+msgstr[1] ", di cui {} danneggiate (conservate fino alla mossa illeggibile)"
 
 msgid "0 = a new random order for every match."
 msgstr "0 = un nuovo ordine casuale per ogni match."
@@ -1839,7 +1839,7 @@ msgid "ChessBase / Lichess: {[%eval 0.35,18] [%emt 0:00:01.234]}, eval from Whit
 msgstr "ChessBase / Lichess: {[%eval 0.35,18] [%emt 0:00:01.234]}, valutazione dal punto di vista del Bianco.\ncutechess: {+0.35/18 1.234s}, punteggio dal punto di vista del lato che ha mosso."
 
 msgid "ChessBase archive · {} · only read"
-msgstr ""
+msgstr "Archivio ChessBase · {} · solo in lettura"
 
 msgid "ChessBase database · {} · only read"
 msgstr "Database ChessBase · {} · solo in lettura"
@@ -2430,10 +2430,10 @@ msgid "Draws."
 msgstr "Patte."
 
 msgid "Drop a PGN (.pgn, .zst, .gz, .zip, .7z) or a ChessBase database (.cbh, .2cbh) or archive (.cbv, .cbz, .2cbv, .2cbz) here: it goes into the chosen database, or into a new one named after it."
-msgstr ""
+msgstr "Trascina qui un PGN (.pgn, .zst, .gz, .zip, .7z) o un database (.cbh, .2cbh) o archivio (.cbv, .cbz, .2cbv, .2cbz) ChessBase: va nel database scelto, o in uno nuovo che prende il suo nome."
 
 msgid "Drop a PGN, .zst, .gz, .zip or .7z file, or a ChessBase database or archive, here, or:"
-msgstr ""
+msgstr "Trascina qui un file PGN, .zst, .gz, .zip o .7z, o un database o un archivio ChessBase, oppure:"
 
 msgid "Drop an annotated PGN here: its notes will show in the Tree tab, at each position it comments."
 msgstr "Trascina qui un PGN annotato: le sue note compariranno nella scheda Albero, in ogni posizione che commenta."
@@ -3520,8 +3520,8 @@ msgstr[1] "Importazione di {} completata: {} partite aggiunte"
 
 msgid "Import of {} done: {} game added."
 msgid_plural "Import of {} done: {} games added."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Importazione di {} completata: {} partita aggiunta."
+msgstr[1] "Importazione di {} completata: {} partite aggiunte."
 
 msgid "Import of {} stopped at your request: {} games kept."
 msgstr "Importazione di {} interrotta su tua richiesta: {} partite conservate."
@@ -5185,7 +5185,7 @@ msgid "Nothing found."
 msgstr "Nessun risultato."
 
 msgid "Nothing imported: {}."
-msgstr ""
+msgstr "Niente importato: {}."
 
 msgid "Nothing in the game calls for a comment"
 msgstr "Niente nella partita richiede un commento"
@@ -7371,7 +7371,7 @@ msgstr[0] "La pagina Scacchiera: {} core per la sua analisi e le sue partite"
 msgstr[1] "La pagina Scacchiera: {} core per la sua analisi e le sue partite"
 
 msgid "The ChessBase files are only read: nothing is written beside them. Imported again, only its new games come in. An enciphered archive's password (.cbz, .2cbz) is asked here and not kept."
-msgstr ""
+msgstr "I file ChessBase vengono solo letti: non viene scritto niente accanto a loro. Se lo importi di nuovo, entrano solo le sue nuove partite. La password di un archivio cifrato (.cbz, .2cbz) viene chiesta qui e non viene conservata."
 
 msgid "The Elo difference {}'s score stands for, with its 95 % interval, counted on the pairs of games as in a match (pentanomial); LOS: the likelihood that it is the stronger team. +{} ={} −{}."
 msgstr "La differenza Elo che il punteggio di {} rappresenta, con il suo intervallo al 95 %, contata sulle coppie di partite come in un match (pentanomiale); LOS: la probabilità che sia la squadra più forte. +{} ={} −{}."
@@ -8600,8 +8600,8 @@ msgstr[1] "Le {} GPU permettono di giocare {} partite con un motore che usa una 
 
 msgid "The {} game read before it stays in the database."
 msgid_plural "The {} games read before it stay in the database."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{} partita letta prima dell'interruzione resta nel database."
+msgstr[1] "Le {} partite lette prima dell'interruzione restano nel database."
 
 msgid "The {} games committed before stay; resuming the import adds only the missing ones."
 msgstr "Le {} partite già registrate restano; riprendere l'importazione aggiunge solo quelle mancanti."
@@ -9609,7 +9609,7 @@ msgid "Wrong PVs"
 msgstr "PV errate"
 
 msgid "Wrong password: type it again, then Enter."
-msgstr ""
+msgstr "Password sbagliata: scrivila di nuovo, poi Invio."
 
 msgid "X: the opponent's best move if it could move again, as a red arrow (another process of the engine, its threads counted)."
 msgstr "X: la mossa migliore dell'avversario se potesse muovere di nuovo, come freccia rossa (un altro processo del motore, i suoi thread contati)."
@@ -11481,8 +11481,8 @@ msgstr "mancano {} g {} h"
 
 msgid "{} damaged game among them: kept up to the move that cannot be read, its text kept as it was."
 msgid_plural "{} damaged games among them: kept up to the move that cannot be read, their text kept as it was."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Tra queste, {} partita danneggiata: conservata fino alla mossa illeggibile, con il suo testo com'era."
+msgstr[1] "Tra queste, {} partite danneggiate: conservate fino alla mossa illeggibile, con il loro testo com'era."
 
 msgid "{} day a move"
 msgid_plural "{} days a move"

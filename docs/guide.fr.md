@@ -340,7 +340,7 @@ L'échiquier 3D demande OpenGL 3.3. Là où la fenêtre est dessinée sans lui (
 licence MIT ; *Apparence* donne le lien vers elles.
 
 ## Raccourcis clavier
-<!-- en: keyboard-shortcuts 58e8e12c -->
+<!-- en: keyboard-shortcuts 88be4815 -->
 
 | Touches | Où | Ce qu'elles font |
 |---|---|---|
@@ -378,7 +378,7 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | L'Échiquier d'étude | Déplier les en-têtes de la partie |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | L'Échiquier d'étude | Les onglets Notation, Analyse, Arbre, Références et Questions |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | L'Échiquier d'étude | L'assistant commente le coup |
-| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | L'Échiquier d'étude | Ce que font F, A, X, G et N sur l'Échiquier des moteurs (ici, les lettres tapent des coups) |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Maj</kbd>+<kbd>N</kbd> | L'Échiquier d'étude | Ce que font F, A, X, G, N et Maj+N sur l'Échiquier des moteurs (ici, les lettres tapent des coups) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Entrée</kbd>, <kbd>*</kbd> | L'onglet Arbre | Choisir un coup, le jouer, le marquer dans le répertoire actif |
 | <kbd>Entrée</kbd> | La page Ouvertures | Commencer l'entraînement sur le répertoire affiché |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espace</kbd>, <kbd>Échap</kbd> | Une séance d'entraînement | Un indice, « Je ne sais pas », arrêter |
@@ -1019,7 +1019,7 @@ compte dans le budget de cœurs. On ne peut pas reprendre un coup, et le moteur 
 règle une plus faible (`UCI_LimitStrength` et `UCI_Elo`, ou `Skill Level`, s'il les a).
 
 ### L'Échiquier d'étude
-<!-- en: the-study-board e70e0006 -->
+<!-- en: the-study-board 60138fbd -->
 
 Dans une vue dont l'Échiquier est *Pour l'étude* (voir [Vues](#vues)), la page Échiquier est l'endroit où les parties
 se lisent et s'écrivent. L'échiquier est à gauche ; à droite, le bandeau de la partie, puis cinq onglets, Alt+1 à
@@ -1045,7 +1045,8 @@ et Bilan proposent de télécharger Gaia en un clic.
 Un coup se tape aussi bien qu'il se joue : sa première lettre ouvre un champ au-dessus des onglets, qui propose les
 coups légaux commençant ainsi (en lettres anglaises, K Q R B N ; en français, R D T F C), et Entrée le joue. Les
 lettres de l'Échiquier des moteurs passent alors sous Alt : Alt+F retourne l'échiquier, Alt+A lance ou arrête
-l'analyse, Alt+X montre la menace, Alt+G analyse la partie, Alt+N va au coup suivant marqué par l'analyse.
+l'analyse, Alt+X montre la menace, Alt+G analyse la partie, Alt+N et Alt+Maj+N vont au coup suivant et au coup
+précédent marqués par l'analyse.
 
 ### Plusieurs moteurs côte à côte
 <!-- en: several-engines-side-by-side 43f5e1fe -->
@@ -1216,7 +1217,7 @@ mois contre celles des six mois d'avant. Le résumé dit la même chose de la po
 aussi l'option reste-t-elle désactivée tant que tu ne la demandes pas ; l'explorateur des maîtres n'a pas de mois.
 
 ### Le bilan d'une partie
-<!-- en: the-review-of-a-game b1237d38 -->
+<!-- en: the-review-of-a-game 66d8cf1e -->
 
 Sur l'Échiquier d'étude, l'onglet *Bilan* à côté de la notation lit l'analyse de la partie (Alt+G) comme le ferait
 un entraîneur :
@@ -1236,10 +1237,11 @@ La même partie reçoit toujours le même bilan : les mêmes scores, symboles, m
 fasse la machine. L'analyse de la partie sur l'Échiquier d'étude compte des nœuds plutôt que du temps : chaque position
 est cherchée sur 20 000 nœuds à la première passe, quatre fois plus à chaque passe, jusqu'au choix à côté du bouton
 (320 000, 1 280 000, 5 120 000 ou 20 480 000 nœuds par position, ou *jusqu'à l'arrêt*), sur un seul thread et
-depuis un hash vide, pour que le résultat d'une position ne dépende que du moteur et de la position. Autant de positions
-sont cherchées à la fois que l'analyse a de threads, un processus de moteur chacune. Là où le coup joué était le choix
-du moteur et où la position n'est pas déséquilibrée, une seconde recherche de la position avec deux lignes donne le
-deuxième meilleur coup : un seul coup est annoncé avec lui.
+depuis un hash vide, pour que le résultat d'une position ne dépende que du moteur et de la position. Plusieurs
+positions sont cherchées à la fois, un processus de moteur chacune : autant que l'analyse a de threads, et au moins la
+moitié des cœurs du processeur, jusqu'à quatre ; moins pendant qu'un tournoi joue sur cette machine, qui garde ses
+cœurs. Là où le coup joué était le choix du moteur et où la position n'est pas déséquilibrée, une seconde recherche de
+la position avec deux lignes donne le deuxième meilleur coup : un seul coup est annoncé avec lui.
 
 Les positions de la finale à sept pièces ou moins peuvent être jugées exactement par les tables de Lichess,
 interrogées une fois pour cette partie ou toujours. *Commenter les moments clés* écrit un commentaire de l'assistant
@@ -1265,7 +1267,7 @@ La page **Bases** contient tes bases de parties : leur liste à gauche, les part
 est un dossier à part (`Name.fcgdb`), lu vite même avec des millions de parties.
 
 ### Importer des parties
-<!-- en: importing-games 4997becc -->
+<!-- en: importing-games d6a0c0eb -->
 
 *Nouvelle base* en crée une, nommée sur place ; *Ajouter une base…* liste un dossier de base créé ailleurs, ses
 fichiers laissés où ils sont. *Importer dans cette base…* prend un fichier PGN, ou un fichier `.zst`, `.gz` ou `.zip`
@@ -1276,11 +1278,15 @@ enregistrées restent s'il s'arrête (toutes les 262 144 parties, et à la fin
 n'ajoute que celles qui manquent ; les parties déjà dans la base sont écartées.
 
 À la fin, un bandeau sur la base dit ce qui est arrivé : les parties ajoutées, celles déjà présentes, et celles
-endommagées (un coup illisible ou illégal, un texte coupé, une position de départ qui n'en est pas une), chacune
-gardée jusqu'à ce coup avec son texte tel quel ; *Les voir dans la liste*, ou un clic sur l'une d'elles, montre le
-fichier à sa ligne. Un disque plein, un arrêt demandé ou une autre erreur dit ce qui est gardé et ce qu'il faut, avec
-*Reprendre l'import* et *Ouvrir le dossier de la base*. Puis l'arbre d'ouvertures de la base se construit, en
+endommagées parmi les parties ajoutées (un coup illisible ou illégal, un texte coupé, une position de départ qui n'en
+est pas une), chacune gardée jusqu'à ce coup avec son texte tel quel ; *Les voir dans la liste*, ou un clic sur l'une
+d'elles, montre le fichier à sa ligne. Un disque plein, un arrêt demandé ou une autre erreur dit ce qui est gardé et ce
+qu'il faut, avec *Reprendre l'import* et *Ouvrir le dossier de la base* ; un fichier dont la lecture ne peut pas
+continuer dit pourquoi, les parties lues avant étant gardées. Puis l'arbre d'ouvertures de la base se construit, en
 arrière-plan.
+
+Un fichier dont les octets ne sont pas du texte (un programme, une image, une archive que l'import ne connaît pas) est
+refusé avant d'être lu comme un PGN : rien n'est importé, et une nouvelle base créée pour lui n'est pas gardée.
 
 Une base dans laquelle un autre programme écrit (un autre RookStudio qui y importe, par exemple) s'ouvre en lecture
 seule : la liste, l'arbre et les recherches fonctionnent ; l'import et l'enregistrement de parties attendent que ce
@@ -1339,14 +1345,16 @@ bases : leurs parties listées et cherchées comme celles d'une base, mises à j
 parties qu'un tournoi termine, un fichier qui a grandi ou changé). Ils ne sont ni importés ni supprimés.
 
 ### Bases ChessBase
-<!-- en: chessbase-databases 2582d418 -->
+<!-- en: chessbase-databases 3da99106 -->
 
 Une base ChessBase déposée sur la page Bases, ou choisie avec *Importer un fichier…*, est copiée dans une base
 RookStudio : son .cbh ou son .2cbh (ou n'importe lequel de ses fichiers), ou une archive qui en contient une, .cbv ou
-.cbz. Une carte dit d'abord ce qu'elle contient, lu dans ses en-têtes, ce qui entre et ce qui reste dehors, où elle va
-et combien de temps cela prend environ ; *Importer* (Entrée) lance la copie, *Pas maintenant* (Échap) la laisse. Les
-fichiers ChessBase sont seulement lus, rien n'est écrit à côté d'eux ; une archive est décompressée pendant sa lecture,
-et le mot de passe d'un .cbz est demandé sur la carte et n'est pas gardé.
+.cbz pour un .cbh, .2cbv ou .2cbz pour un .2cbh. Une carte dit d'abord ce qu'elle contient, lu dans ses en-têtes, ce qui
+entre et ce qui reste dehors, où elle va et combien de temps cela prend environ ; *Importer* (Entrée) lance la copie,
+*Pas maintenant* (Échap) la laisse. Les fichiers ChessBase sont seulement lus, rien n'est écrit à côté d'eux ; une
+archive est décompressée pendant sa lecture. Le mot de passe d'un .cbz ou d'un .2cbz se tape sur la carte (Entrée dans
+le champ lance la copie) et n'est pas gardé ; un mauvais mot de passe y est signalé aussitôt, pour être retapé, avant
+que rien ne soit copié.
 
 La copie garde les coups et leurs variantes, les commentaires avant et après les coups (un texte en plusieurs
 langues : l'anglais d'abord, les autres après lui), les symboles, les cases et flèches colorées, les pendules et le

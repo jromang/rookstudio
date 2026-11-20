@@ -337,7 +337,7 @@ piatte e *Aspetto* dice perché. I pezzi sono gli Staunton-Pieces di clarkerubbe
 collegamento.
 
 ## Scorciatoie da tastiera
-<!-- en: keyboard-shortcuts 58e8e12c -->
+<!-- en: keyboard-shortcuts 88be4815 -->
 
 | Tasti | Dove | Cosa fanno |
 |---|---|---|
@@ -375,7 +375,7 @@ collegamento.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | La Scacchiera per lo studio | Espande le intestazioni della partita |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | La Scacchiera per lo studio | Le schede Notazione, Analisi, Albero, Riferimenti e Domande |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | La Scacchiera per lo studio | L'assistente commenta la mossa |
-| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | La Scacchiera per lo studio | Ciò che fanno F, A, X, G e N sulla Scacchiera dei motori (qui le lettere servono a digitare mosse) |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Maiusc</kbd>+<kbd>N</kbd> | La Scacchiera per lo studio | Ciò che fanno F, A, X, G, N e Maiusc+N sulla Scacchiera dei motori (qui le lettere servono a digitare mosse) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Invio</kbd>, <kbd>*</kbd> | La scheda Albero | Sceglie una mossa, la gioca, la segna nel repertorio attivo |
 | <kbd>Invio</kbd> | La pagina Aperture | Avvia l'allenamento del repertorio mostrato |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Spazio</kbd>, <kbd>Esc</kbd> | Una sessione di allenamento | Un suggerimento, «Non lo so», ferma |
@@ -998,7 +998,7 @@ nome utente, e solo il motore conta nel budget dei core. Non si può ritirare un
 a meno che la sua scheda non ne imposti una minore (`UCI_LimitStrength` e `UCI_Elo`, o `Skill Level`, se li ha).
 
 ### La Scacchiera per lo studio
-<!-- en: the-study-board e70e0006 -->
+<!-- en: the-study-board 60138fbd -->
 
 In una vista la cui Scacchiera è *Per lo studio* (vedi [Viste](#viste)), la pagina Scacchiera è dove si leggono e si
 scrivono le partite. La scacchiera è a sinistra; a destra, la striscia della partita, poi cinque schede, da Alt+1 ad
@@ -1024,7 +1024,8 @@ scaricare Gaia con un clic.
 Una mossa si può digitare oltre che giocare: la sua prima lettera apre un campo sopra le schede, che propone le mosse
 legali che iniziano così (in lettere inglesi, K Q R B N; in francese, R D T F C), e Invio la gioca. Le lettere della
 Scacchiera dei motori passano allora sotto Alt: Alt+F ruota la scacchiera, Alt+A avvia o ferma l'analisi, Alt+X mostra
-la minaccia, Alt+G analizza la partita, Alt+N va alla mossa successiva segnata dall'analisi.
+la minaccia, Alt+G analizza la partita, Alt+N e Alt+Maiusc+N vanno alla mossa successiva e alla precedente segnate
+dall'analisi.
 
 ### Più motori affiancati
 <!-- en: several-engines-side-by-side 43f5e1fe -->
@@ -1195,7 +1196,7 @@ precedenti. Il riepilogo dice lo stesso della posizione. Costa una richiesta per
 non lo chiedi; l'esploratore dei maestri non ha i mesi.
 
 ### Il resoconto di una partita
-<!-- en: the-review-of-a-game b1237d38 -->
+<!-- en: the-review-of-a-game 66d8cf1e -->
 
 Sulla Scacchiera per lo studio, la scheda *Resoconto* accanto alla notazione legge l'analisi della partita (Alt+G) come
 farebbe un allenatore:
@@ -1216,9 +1217,11 @@ commenti, qualunque cosa stia facendo la macchina. L'analisi della partita della
 anziché il tempo: ogni posizione viene cercata per 20.000 nodi al primo passaggio, quattro volte di più a ogni
 passaggio, fino alla scelta accanto al pulsante (320.000, 1.280.000, 5.120.000 o 20.480.000 nodi per posizione, o
 *fino all'arresto*), su un thread e con una tabella hash vuota, così che il risultato di una posizione dipenda solo dal
-motore e dalla posizione. Vengono cercate insieme tante posizioni quanti sono i thread dell'analisi, ciascuna con un
-processo del motore. Dove la mossa giocata era la scelta del motore e la posizione non è già decisa, una seconda
-ricerca della posizione con due linee dà la seconda scelta: una mossa unica viene indicata insieme a essa.
+motore e dalla posizione. Vengono cercate più posizioni insieme, ciascuna con un processo del motore: tante quanti sono
+i thread dell'analisi, e almeno la metà dei core del processore, fino a quattro; meno mentre su questa macchina si
+gioca un torneo, che tiene i suoi core. Dove la mossa giocata era la scelta del motore e la posizione non è già
+decisa, una seconda ricerca della posizione con due linee dà la seconda scelta: una mossa unica viene indicata insieme
+a essa.
 
 Le posizioni del finale con sette pezzi o meno possono essere giudicate esattamente dalle tablebase di Lichess,
 interrogate una volta per questa partita o sempre. *Commenta i momenti chiave* scrive un commento dell'assistente su
@@ -1244,7 +1247,7 @@ La pagina **Database** contiene i tuoi database di partite: il loro elenco a sin
 destra. Un database è una cartella a sé (`Name.fcgdb`), letta velocemente anche con milioni di partite.
 
 ### Importare partite
-<!-- en: importing-games 4997becc -->
+<!-- en: importing-games d6a0c0eb -->
 
 *Nuovo database* ne crea uno, con il nome scritto sul posto; *Aggiungi un database…* elenca una cartella di database
 creata altrove, con i suoi file lasciati dove sono. *Importa in questo database…* prende un file PGN, o un file `.zst`,
@@ -1254,12 +1257,17 @@ torneo accanto non perde tempo), con il suo avanzamento, la sua velocità e *Ann
 si interrompe (ogni 262.144 partite, e alla fine), e importare di nuovo il file aggiunge solo quelle mancanti; le
 partite già presenti nel database vengono escluse.
 
-Alla fine, un riquadro sul database dice cosa è arrivato: le partite aggiunte, quelle già presenti e quelle danneggiate
-(una mossa illeggibile o illegale, un testo troncato, una posizione iniziale non valida), ciascuna conservata fino a
-quella mossa con il suo testo com'era; *Vedile nella lista*, o un clic su una di esse, mostra il file alla sua riga. Un
-disco pieno, un'interruzione richiesta o un altro errore dicono cosa viene conservato e cosa serve, con *Riprendi
-l'importazione* e *Apri la cartella del database*. Poi viene costruito l'albero delle aperture del database, in
+Alla fine, un riquadro sul database dice cosa è arrivato: le partite aggiunte, quelle già presenti e, tra le partite
+aggiunte, quelle danneggiate (una mossa illeggibile o illegale, un testo troncato, una posizione iniziale non valida),
+ciascuna conservata fino a quella mossa con il suo testo com'era; *Vedile nella lista*, o un clic su una di esse,
+mostra il file alla sua riga. Un disco pieno, un'interruzione richiesta o un altro errore dicono cosa viene conservato
+e cosa serve, con *Riprendi l'importazione* e *Apri la cartella del database*; un file di cui non si può proseguire la
+lettura dice perché, e le partite lette prima restano. Poi viene costruito l'albero delle aperture del database, in
 background.
+
+Un file i cui byte non sono testo (un programma, un'immagine, un archivio che l'importazione non conosce) viene
+rifiutato prima di essere letto come PGN: non viene importato niente, e un nuovo database creato per esso non viene
+conservato.
 
 Un database in cui un altro programma sta scrivendo (un altro RookStudio che vi importa, per esempio) si apre in sola
 lettura: la lista, l'albero e le ricerche funzionano; l'importazione e il salvataggio di partite aspettano che quel
@@ -1318,14 +1326,15 @@ database: le loro partite si elencano e si cercano come quelle di un database, a
 mostrate (le partite che un torneo termina, un file che è cresciuto o cambiato). Non vengono né importati né rimossi.
 
 ### Database ChessBase
-<!-- en: chessbase-databases 2582d418 -->
+<!-- en: chessbase-databases 3da99106 -->
 
 Un database ChessBase trascinato sulla pagina Database, o scelto con *Importa un file…*, viene copiato in un database
-RookStudio: il suo .cbh o .2cbh (o uno qualsiasi dei suoi file), o un suo archivio, .cbv o .cbz. Una scheda dice prima
-cosa contiene, letto nelle sue intestazioni, cosa entra e cosa resta fuori, dove va e quanto tempo ci vuole
-all'incirca; *Importa* (Invio) avvia la copia, *Non ora* (Esc) la lascia stare. I file ChessBase vengono solo letti, e
-accanto a loro non viene scritto niente; un archivio viene estratto mentre viene letto, e la password di un .cbz viene
-chiesta sulla scheda e non viene conservata.
+RookStudio: il suo .cbh o .2cbh (o uno qualsiasi dei suoi file), o un suo archivio, .cbv o .cbz per un .cbh, .2cbv o
+.2cbz per un .2cbh. Una scheda dice prima cosa contiene, letto nelle sue intestazioni, cosa entra e cosa resta fuori,
+dove va e quanto tempo ci vuole all'incirca; *Importa* (Invio) avvia la copia, *Non ora* (Esc) la lascia stare. I file
+ChessBase vengono solo letti, e accanto a loro non viene scritto niente; un archivio viene estratto mentre viene letto.
+La password di un .cbz o di un .2cbz si scrive sulla scheda (Invio nel campo avvia la copia) e non viene conservata;
+una password sbagliata viene segnalata lì subito, da riscrivere, prima che venga copiato qualsiasi cosa.
 
 La copia conserva le mosse e le loro varianti, i commenti prima e dopo le mosse (un testo in più lingue: prima
 l'inglese, poi le altre), i simboli, le case e le frecce colorate, gli orologi e il tempo impiegato, le valutazioni dei

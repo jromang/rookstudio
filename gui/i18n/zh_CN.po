@@ -161,7 +161,7 @@ msgstr "，跳过已存在的 {} 局"
 
 msgid ", {} damaged game among them (kept up to the move that cannot be read)"
 msgid_plural ", {} damaged games among them (kept up to the move that cannot be read)"
-msgstr[0] ""
+msgstr[0] "，其中 {} 局已损坏（保留到无法读取的着法之前）"
 
 msgid "0 = a new random order for every match."
 msgstr "0 = 每场比赛都使用新的随机顺序。"
@@ -1827,7 +1827,7 @@ msgid "ChessBase / Lichess: {[%eval 0.35,18] [%emt 0:00:01.234]}, eval from Whit
 msgstr "ChessBase / Lichess：{[%eval 0.35,18] [%emt 0:00:01.234]}，评估以白方视角给出。\ncutechess：{+0.35/18 1.234s}，分数以走棋一方视角给出。"
 
 msgid "ChessBase archive · {} · only read"
-msgstr ""
+msgstr "ChessBase 归档 · {} · 只读"
 
 msgid "ChessBase database · {} · only read"
 msgstr "ChessBase 数据库 · {} · 只读"
@@ -2415,10 +2415,10 @@ msgid "Draws."
 msgstr "和棋。"
 
 msgid "Drop a PGN (.pgn, .zst, .gz, .zip, .7z) or a ChessBase database (.cbh, .2cbh) or archive (.cbv, .cbz, .2cbv, .2cbz) here: it goes into the chosen database, or into a new one named after it."
-msgstr ""
+msgstr "把 PGN（.pgn、.zst、.gz、.zip、.7z）或 ChessBase 数据库（.cbh、.2cbh）或归档文件（.cbv、.cbz、.2cbv、.2cbz）拖放到这里：它会导入所选的数据库，或导入以其命名的新数据库。"
 
 msgid "Drop a PGN, .zst, .gz, .zip or .7z file, or a ChessBase database or archive, here, or:"
-msgstr ""
+msgstr "把 PGN、.zst、.gz、.zip 或 .7z 文件，或者 ChessBase 数据库或归档文件拖放到这里，或者："
 
 msgid "Drop an annotated PGN here: its notes will show in the Tree tab, at each position it comments."
 msgstr "把带注解的 PGN 拖放到这里：其注解会显示在“开局树”标签页中，位于它所注解的每个局面。"
@@ -3502,7 +3502,7 @@ msgstr[0] "{} 导入完成：添加了 {} 局对局"
 
 msgid "Import of {} done: {} game added."
 msgid_plural "Import of {} done: {} games added."
-msgstr[0] ""
+msgstr[0] "{} 导入完成：添加了 {} 局对局。"
 
 msgid "Import of {} stopped at your request: {} games kept."
 msgstr "已按你的要求中止 {} 的导入：保留 {} 局。"
@@ -5162,7 +5162,7 @@ msgid "Nothing found."
 msgstr "未找到。"
 
 msgid "Nothing imported: {}."
-msgstr ""
+msgstr "未导入任何内容：{}。"
 
 msgid "Nothing in the game calls for a comment"
 msgstr "对局中没有需要注释的地方"
@@ -7332,7 +7332,7 @@ msgid_plural "The Board page: {} cores for its analysis and its games"
 msgstr[0] "棋盘页面：{} 个核心用于其分析和对局"
 
 msgid "The ChessBase files are only read: nothing is written beside them. Imported again, only its new games come in. An enciphered archive's password (.cbz, .2cbz) is asked here and not kept."
-msgstr ""
+msgstr "ChessBase 文件只读取：不会在其旁边写入任何内容。再次导入时，只导入其新对局。加密归档文件（.cbz、.2cbz）的密码在此询问，不会保存。"
 
 msgid "The Elo difference {}'s score stands for, with its 95 % interval, counted on the pairs of games as in a match (pentanomial); LOS: the likelihood that it is the stronger team. +{} ={} −{}."
 msgstr "{} 的得分所对应的 Elo 差及其 95 % 区间，按对局对计算，与对抗赛相同（五项分布）；LOS：它是较强一队的概率。+{} ={} −{}。"
@@ -8556,7 +8556,7 @@ msgstr[0] "{} 块 GPU 允许同时进行 {} 局含使用 GPU 的引擎的对局�
 
 msgid "The {} game read before it stays in the database."
 msgid_plural "The {} games read before it stay in the database."
-msgstr[0] ""
+msgstr[0] "在此之前读取的 {} 局对局保留在数据库中。"
 
 msgid "The {} games committed before stay; resuming the import adds only the missing ones."
 msgstr "之前已提交的 {} 局保留；继续导入只会添加缺少的对局。"
@@ -9558,7 +9558,7 @@ msgid "Wrong PVs"
 msgstr "错误 PV"
 
 msgid "Wrong password: type it again, then Enter."
-msgstr ""
+msgstr "密码错误：请重新输入，然后按 Enter。"
 
 msgid "X: the opponent's best move if it could move again, as a red arrow (another process of the engine, its threads counted)."
 msgstr "X：如果对手能再走一步时的最佳着法，以红色箭头显示（引擎的另一个进程，计入其线程）。"
@@ -11393,7 +11393,7 @@ msgstr "剩余 {} 天 {} 小时"
 
 msgid "{} damaged game among them: kept up to the move that cannot be read, its text kept as it was."
 msgid_plural "{} damaged games among them: kept up to the move that cannot be read, their text kept as it was."
-msgstr[0] ""
+msgstr[0] "其中 {} 局已损坏：保留到无法读取的着法之前，其文本保持原样。"
 
 msgid "{} day a move"
 msgid_plural "{} days a move"

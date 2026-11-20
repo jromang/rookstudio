@@ -37,6 +37,7 @@ class Dialogs {
         AddBook,
         BookFile,
         SaveCleanBook,
+        CtgPolyglotBook,  // a CTG book's Polyglot copy for engines (#68)
         Chess324Book,
         Chess324SymmetricalBook,
         OpeningSuiteBook,    // a book from Lichess's named openings (#53)

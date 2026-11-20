@@ -22,6 +22,7 @@
 #include "board_text.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
+#include "notation_view.hpp"
 #include "portable.hpp"
 #include "ui.hpp"
 
@@ -524,7 +525,7 @@ void App::drawChessColumn() {
 void App::drawBoardTree() {
     auto& b = board_;
     auto& s = shelf();
-    // The sources: the databases whose tree covers their games, then the library's Polyglot books.
+    // The sources: the databases whose tree covers their games, then the library's Polyglot and CTG books.
     std::vector<std::pair<std::string, std::size_t>> databases;
     for (std::size_t i = 0; i < s.entries().size(); ++i) {
         if (s.entries()[i].source) continue;
@@ -534,7 +535,7 @@ void App::drawBoardTree() {
     for (const auto& book : books_) {
         auto ext = std::filesystem::path(book.path).extension().string();
         for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (ext == ".bin") books.push_back(&book);
+        if (ext == ".bin" || study::isCtg(book.path)) books.push_back(&book);
     }
     // My databases: two or more together, their games added (M3, board 3); then each, then the books; then Lichess's
     // explorer: the masters, Lichess's players, the player whose games were imported (M3, board 2).
@@ -543,14 +544,19 @@ void App::drawBoardTree() {
     const int count           = together + static_cast<int>(databases.size() + books.size()) + lichess_sources;
     if (count == lichess_sources) {
         ImGui::PushTextWrapPos();
-        ImGui::TextDisabled("%s", TR("No database with its opening tree, nor Polyglot book: import games on the "
-                                     "Databases page (the tree is built after the import), or add a book on the Books "
-                                     "page."));
+        ImGui::TextDisabled("%s", TR("No database with its opening tree, nor book: import games on the Databases "
+                                     "page (the tree is built after the import), or add a Polyglot or CTG book on the "
+                                     "Books page."));
         ImGui::PopTextWrapPos();
     }
     tree_source_         = std::clamp(tree_source_, 0, count - 1);
     const int books_at   = together + static_cast<int>(databases.size());
     const int lichess_at = books_at + static_cast<int>(books.size());
+    if (!tree_book_request_.empty()) {  // a book the Books page opened in the tree (#68)
+        for (std::size_t i = 0; i < books.size(); ++i)
+            if (books[i]->path == tree_book_request_) tree_source_ = books_at + static_cast<int>(i);
+        tree_book_request_.clear();
+    }
     std::string ratings_label;
     if (!lichess_.explorer_ratings.empty())
         ratings_label = fmt::format(
@@ -667,7 +673,10 @@ void App::drawBoardTree() {
         tree_rows_.clear();
         tree_summary_.clear();
         tree_row_        = -1;
-        tree_book_       = book;
+        const auto* chosen_book = book && !online ? books[static_cast<std::size_t>(tree_source_ - books_at)]
+                                                  : static_cast<const BookEntry*>(nullptr);
+        tree_ctg_               = chosen_book && study::isCtg(chosen_book->path);
+        tree_book_              = book && !tree_ctg_;  // a Polyglot book's weights; a CTG book has its games
         const auto board = boardAt(b.game, b.chess960, b.ply);
         const auto mover = board.sideToMove();
         study::ScanBoard scan;
@@ -743,6 +752,57 @@ void App::drawBoardTree() {
             } else {
                 tree_summary_ = combined ? TR("No two games of these databases reach this position.")
                                          : TR("No two games of this database reach this position.");
+            }
+        } else if (tree_ctg_) {
+            // A CTG book (#68, mockup M10, board 3): the games behind each move, its colour and its symbol; green
+            // moves first, red ones last.
+            auto& opened = tree_ctg_books_[chosen_book->path];
+            try {
+                if (!opened) opened = std::make_shared<const study::CtgBook>(chosen_book->path);
+                const auto answer = opened->at(board);
+                if (!answer) {
+                    tree_summary_ = TR("The book does not have this position.");
+                } else {
+                    for (const auto& m : answer->moves) {
+                        TreeRow row;
+                        row.move       = m.move;
+                        row.san        = chess::uci::moveToSan(board, m.move);
+                        row.book       = m.main ? 1 : m.avoid ? -1 : 0;
+                        row.symbol     = static_cast<uint8_t>(m.symbol);
+                        row.evaluation = static_cast<uint8_t>(m.evaluation);
+                        if (m.games) {
+                            const auto& st        = *m.games;
+                            row.games             = st.games;
+                            const auto done       = st.white + st.draws + st.black;
+                            const bool white_side = mover == chess::Color::WHITE;
+                            if (done > 0) {
+                                row.white = static_cast<double>(st.white) / done;
+                                row.draws = static_cast<double>(st.draws) / done;
+                                row.black = static_cast<double>(st.black) / done;
+                                const double score =
+                                    (static_cast<double>(white_side ? st.white : st.black) + st.draws / 2.0) / done;
+                                row.score            = static_cast<int>(std::lround(100 * score));
+                                const auto own_rated = white_side ? st.white_rated : st.black_rated;
+                                const auto own_sum   = white_side ? st.white_elo : st.black_elo;
+                                const auto opp_rated = white_side ? st.black_rated : st.white_rated;
+                                const auto opp_sum   = white_side ? st.black_elo : st.white_elo;
+                                if (own_rated) row.elo = static_cast<int>(own_sum / own_rated);
+                                if (opp_rated)
+                                    row.perf = static_cast<int>(opp_sum / opp_rated) + ratingDifference(score);
+                            }
+                        }
+                        tree_rows_.push_back(std::move(row));
+                    }
+                    std::stable_sort(tree_rows_.begin(), tree_rows_.end(), [](const TreeRow& x, const TreeRow& y) {
+                        if (x.book != y.book) return x.book > y.book;
+                        return x.games > y.games;
+                    });
+                    tree_summary_ =
+                        trf("{} positions in the book · {} here", ui::exactCount(opened->positions()),
+                            trn("{} move", "{} moves", static_cast<int>(answer->moves.size()), answer->moves.size()));
+                }
+            } catch (const std::exception& e) {
+                tree_summary_ = e.what();
             }
         } else if (book) {
             const auto* entry = books[static_cast<std::size_t>(tree_source_ - books_at)];
@@ -834,7 +894,7 @@ void App::drawBoardTree() {
             ImGui::TableSetupColumn(TR("Score"));
             ImGui::TableSetupColumn(TR("Avg. Elo"));
             ImGui::TableSetupColumn(TR("Perf."));
-            ImGui::TableSetupColumn(TR("Last"));
+            ImGui::TableSetupColumn(tree_ctg_ ? TR("Book") : TR("Last"));
             ImGui::TableSetupColumn(lichess_players && lichess_.explorer_months ? TR("By month") : "");
         }
         ImGui::TableHeadersRow();
@@ -842,6 +902,9 @@ void App::drawBoardTree() {
             const auto& row = tree_rows_[r];
             ImGui::TableNextRow();
             ImGui::PushID(static_cast<int>(r));
+            // A CTG book's move not to play in a tournament: in the list, greyed (M10, board 3).
+            const bool greyed = row.book < 0;
+            if (greyed) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             // The move, the whole row a target: a click plays it, the mouse over it shows it as an arrow.
             ImGui::TableSetColumnIndex(1);
             if (ImGui::Selectable(row.san.c_str(), tree_row_ == static_cast<int>(r),
@@ -869,6 +932,7 @@ void App::drawBoardTree() {
             if (tree_book_) {
                 ImGui::ProgressBar(static_cast<float>(row.games) / 1000.0f, ImVec2(-1, 0),
                                    fmt::format("{} %", std::lround(row.games / 10.0)).c_str());
+                if (greyed) ImGui::PopStyleColor();
                 continue;
             }
             ImGui::TextUnformatted(ui::exactCount(row.games).c_str());
@@ -900,9 +964,14 @@ void App::drawBoardTree() {
             ImGui::TableNextColumn();
             if (row.perf > 0) ImGui::Text("%d", row.perf);
             ImGui::TableNextColumn();
-            if (row.last > 0) ImGui::TextDisabled("%d", row.last);
+            if (tree_ctg_) {
+                drawTreeBookMark(row);
+            } else if (row.last > 0) {
+                ImGui::TextDisabled("%d", row.last);
+            }
             ImGui::TableNextColumn();
             if (!row.months.empty()) drawTreeMonths(row.months);
+            if (greyed) ImGui::PopStyleColor();
         }
         ImGui::EndTable();
     }
@@ -943,6 +1012,22 @@ void App::drawBoardTree() {
         tree_row_ = -1;
         boardPlay(*play);
     }
+}
+
+void App::drawTreeBookMark(const TreeRow& row) {
+    // Its colour, then its symbol and the evaluation after it: "green · !", "red", "?!", "±".
+    std::string text;
+    if (row.book > 0) text = TR("green");
+    if (row.book < 0) text = TR("red");
+    for (const uint8_t nag : {row.symbol, row.evaluation})
+        if (nag) text += (text.empty() ? "" : " · ") + nagText(nag);
+    if (text.empty()) return;
+    const ImU32 tone = row.book > 0 ? ui::GOOD : row.book < 0 ? ui::BAD : 0;
+    if (tone) ImGui::PushStyleColor(ImGuiCol_Text, tone);
+    ImGui::TextUnformatted(text.c_str());
+    if (tone) ImGui::PopStyleColor();
+    if (ImGui::IsItemHovered() && row.book != 0)
+        ImGui::SetTooltip("%s", row.book > 0 ? TR("The book's main move") : TR("Not to play in a tournament"));
 }
 
 void App::drawTreeMonths(const std::string& key) {

@@ -270,8 +270,11 @@ bool App::ownBookButton(const char* id, OwnBook& book, float width, bool* again,
                 ImGui::EndDisabled();
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) {
                     ImGui::SetTooltip("%s",
-                                      !moves ? TR("An EPD book holds positions, not moves: it gives the tournament "
-                                                  "its openings, it cannot play for an engine.")
+                                      study::isCtg(b.path)
+                                          ? TR("fastchess reads no CTG book: make a Polyglot copy of it on the Books "
+                                               "page (For engines: make a Polyglot book…).")
+                                      : !moves ? TR("An EPD book holds positions, not moves: it gives the tournament "
+                                                    "its openings, it cannot play for an engine.")
                                       : !problem.empty() ? trf("It cannot play for an engine: {}", problem).c_str()
                                                          : (b.description.empty() ? b.path : b.description).c_str());
                 }
@@ -1207,15 +1210,23 @@ void App::setupOpenings() {
                 changed = true;
             }
             for (const auto& b : books_) {
+                // A CTG book: listed, but fastchess reads its Polyglot copy only (#68).
+                const bool ctg = study::isCtg(b.path);
                 const auto label =
-                    b.positions > 0 ? trf("{}  ({} openings)", b.name, ui::formatCount(b.positions)) : b.name;
-                if (ImGui::Selectable(label.c_str(), b.path == setup_.book)) {
+                    b.positions > 0 && !ctg ? trf("{}  ({} openings)", b.name, ui::formatCount(b.positions)) : b.name;
+                ImGui::BeginDisabled(ctg);
+                if (ImGui::Selectable(label.c_str(), b.path == setup_.book) && !ctg) {
                     setup_.book       = b.path;
                     setup_.book_plies = b.plies;
                     if (b.chess960) setup_.chess960 = true;
                     changed = true;
                 }
-                if (ImGui::IsItemHovered() && !b.description.empty()) ImGui::SetTooltip("%s", b.description.c_str());
+                ImGui::EndDisabled();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled) &&
+                    (ctg || !b.description.empty()))
+                    ImGui::SetTooltip("%s", ctg ? TR("fastchess reads no CTG book: make a Polyglot copy of it on the "
+                                                     "Books page (For engines: make a Polyglot book…).")
+                                                : b.description.c_str());
             }
             ImGui::EndCombo();
         }

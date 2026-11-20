@@ -2,8 +2,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
+#include <cmath>
 #include <fstream>
+#include <stdexcept>
 #include <string>
+#include <unordered_set>
+
+#include <tour/polyglot.hpp>
 
 namespace fcg::study {
 
@@ -308,6 +314,12 @@ std::filesystem::path sibling(const std::filesystem::path& file, char letter) {
 
 }  // namespace
 
+bool isCtg(const std::filesystem::path& file) {
+    auto ext = file.extension().string();
+    for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return ext == ".ctg" || ext == ".ctb" || ext == ".cto";
+}
+
 std::vector<uint8_t> ctgKey(const chess::Board& board) { return keyOf(bookBoard(board)); }
 
 uint32_t ctgHash(std::span<const uint8_t> key) {
@@ -322,11 +334,7 @@ uint32_t ctgHash(std::span<const uint8_t> key) {
 }
 
 CtgBook::CtgBook(const std::filesystem::path& file) {
-    auto ext = file.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (ext != ".ctg" && ext != ".ctb" && ext != ".cto")
-        throw std::runtime_error(file.filename().string() + " is not a CTG book (.ctg, .ctb or .cto)");
+    if (!isCtg(file)) throw std::runtime_error(file.filename().string() + " is not a CTG book (.ctg, .ctb or .cto)");
     ctg_path_      = sibling(file, 'g');
     const auto cto = sibling(file, 'o');
     const auto ctb = sibling(file, 'b');
@@ -405,7 +413,10 @@ std::optional<CtgAnswer> CtgBook::at(const chess::Board& board) const {
     const auto real = [&](int sq) { return (b.files ? sq ^ 7 : sq) ^ (b.colours ? 56 : 0); };
     for (std::size_t i = 0; i + 1 < entry->moves.size(); i += 2) {
         const MoveCode* code = CODES.at[entry->moves[i]];
-        if (!code) continue;
+        if (!code) {
+            ++answer.skipped;
+            continue;
+        }
         const uint8_t kind = kindOfLetter(code->piece);
         int from           = -1;
         int nth            = code->nth;
@@ -415,7 +426,10 @@ std::optional<CtgAnswer> CtgBook::at(const chess::Board& board) const {
                     from = rank * 8 + file;
                     break;
                 }
-        if (from < 0) continue;
+        if (from < 0) {
+            ++answer.skipped;
+            continue;
+        }
         const int to_file = ((from & 7) + code->files) & 7;
         const int to_rank = ((from >> 3) + code->ranks) & 7;
         const int to      = to_rank * 8 + to_file;
@@ -452,9 +466,78 @@ std::optional<CtgAnswer> CtgBook::at(const chess::Board& board) const {
                 m.symbol = entry->moves[i + 1];
                 found.push_back(m);
             }
+        if (found.empty()) ++answer.skipped;
         answer.moves.insert(answer.moves.end(), found.begin(), found.end());
     }
     return answer;
+}
+
+CtgWalk walkCtg(const CtgBook& book, const std::function<void(const chess::Board&, const CtgAnswer&)>& visit,
+                std::atomic<uint64_t>* reached, const std::atomic<bool>* cancel) {
+    CtgWalk walk;
+    std::unordered_set<uint64_t> seen;  // the positions' Polyglot keys
+    std::vector<chess::Board> stack{chess::Board()};
+    seen.insert(stack.back().hash());
+    while (!stack.empty()) {
+        if (cancel && cancel->load(std::memory_order_relaxed)) {
+            walk.cancelled = true;
+            break;
+        }
+        const chess::Board board = std::move(stack.back());
+        stack.pop_back();
+        const auto answer = book.at(board);
+        if (!answer) continue;
+        ++walk.positions;
+        if (reached) reached->fetch_add(1, std::memory_order_relaxed);
+        walk.moves += answer->moves.size();
+        walk.skipped += answer->skipped;
+        visit(board, *answer);
+        for (const auto& m : answer->moves) {
+            if (!m.games) {
+                ++walk.beyond;
+                continue;
+            }
+            auto next = board;
+            tour::playForBook(next, m.move);  // the en passant square as Polyglot keys hash it
+            if (seen.insert(next.hash()).second) stack.push_back(std::move(next));
+        }
+    }
+    return walk;
+}
+
+CtgPolyglot ctgPolyglot(const CtgBook& book, std::atomic<uint64_t>* reached, const std::atomic<bool>* cancel) {
+    CtgPolyglot out;
+    out.walk = walkCtg(
+        book,
+        [&](const chess::Board& board, const CtgAnswer& answer) {
+            const bool white = board.sideToMove() == chess::Color::WHITE;
+            std::vector<std::pair<chess::Move, uint64_t>> kept;
+            uint64_t most = 0;
+            for (const auto& m : answer.moves) {
+                if (m.avoid) {
+                    ++out.avoided;
+                    continue;
+                }
+                uint64_t weight = 1;
+                if (m.games) weight = 2 * (white ? m.games->white : m.games->black) + m.games->draws;
+                if (m.main) weight *= 2;
+                if (weight == 0) {
+                    ++out.lost;
+                    continue;
+                }
+                kept.emplace_back(m.move, weight);
+                most = std::max(most, weight);
+            }
+            const double scale = most > 65535 ? 65535.0 / static_cast<double>(most) : 1.0;
+            for (const auto& [move, weight] : kept) {
+                const auto w =
+                    std::max<uint64_t>(1, static_cast<uint64_t>(std::llround(static_cast<double>(weight) * scale)));
+                out.entries.push_back(
+                    {board.hash(), tour::polyglotMove(move), static_cast<uint16_t>(std::min<uint64_t>(w, 65535))});
+            }
+        },
+        reached, cancel);
+    return out;
 }
 
 CtgSummary CtgBook::summary(const std::atomic<bool>* cancel) const {

@@ -24,6 +24,7 @@
 #include <commentary/review.hpp>
 #include <commentary/story.hpp>
 #include <commentary/tablebase.hpp>
+#include <study/ctg.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
 #include <tour/polyglot.hpp>
@@ -1305,6 +1306,9 @@ class App {
         double white = 0, draws = 0, black = 0;       // the shares of the games with a result
         int score = -1, elo = 0, perf = 0, last = 0;  // for the side to move; -1 or 0 when not known
         std::string months;  // Lichess's explorer: where its position's games month by month are kept (#56)
+        int book           = 0;  // a CTG book's colour (#68): 1 its main move (green), -1 not for a tournament (red)
+        uint8_t symbol     = 0;  // a CTG book's symbol of the move, and its evaluation of the position after it
+        uint8_t evaluation = 0;
     };
     std::vector<TreeRow> tree_rows_;
     std::string tree_rows_of_;  // the position and the source the rows are of
@@ -1312,7 +1316,9 @@ class App {
     std::set<std::filesystem::path> tree_left_;  // the databases My databases leaves out (folders), by its menu
     int tree_row_     = -1;     // the row chosen with Up and Down: Enter plays it, * stars it; -1 none
     bool tree_scroll_ = false;  // the row chosen brought into view
-    void drawTreeNovelty(std::size_t index);  // where the game's line leaves the database, under the tree's summary
+    void drawTreeNovelty(std::size_t index);
+    void drawTreeBookMark(const TreeRow& row);  // a CTG book's colour and symbols of a move (#68)  // where the game's
+                                                // line leaves the database, under the tree's summary
     // The tree's move under the mouse or chosen, an arrow on the board the next frame, with the position it is of.
     struct TreeArrow {
         chess::Move move;
@@ -1376,6 +1382,9 @@ class App {
     std::string explorer_seen_;
     double explorer_since_ = 0;
     std::map<std::string, std::shared_ptr<tour::PolyglotBook>> tree_books_;
+    std::map<std::string, std::shared_ptr<const study::CtgBook>> tree_ctg_books_;  // the CTG books shown (#68)
+    std::string tree_book_request_;  // a book of the library the Tree tab is to show, asked by the Books page (#68)
+    bool tree_ctg_ = false;          // the rows are a CTG book's
     struct ReferencesJob {
         std::string of;
         std::future<commentary::References> done;
@@ -1625,6 +1634,13 @@ class App {
     void drawBooks();
     void drawBookDetail(BookEntry& book);
     void drawBookPositions();
+    // A CTG book of the library (#68, mockup M10, board 3): its numbers read once in the background, its lines
+    // followed from the start when it is checked or copied as a Polyglot book for engines. One job at a time.
+    enum class CtgJobKind { Summary, Check, Polyglot };
+    void drawCtgDetail(const BookEntry& book);
+    void startCtgJob(CtgJobKind kind, const std::string& path, const std::string& bin = {});
+    void pollCtgJob();
+    void openInTree(const std::string& book);  // the Board page's Tree tab, on that book of the library
     void addBook(const std::string& path);
     void startBookScan(int index);
     void pollBookScan();
@@ -2020,6 +2036,24 @@ class App {
         std::shared_ptr<std::atomic<std::size_t>> done;
     };
     std::optional<BookReading> book_reading_;
+    struct CtgDone {
+        study::CtgSummary summary;
+        study::CtgWalk walk;
+        uint64_t entries = 0, avoided = 0, lost = 0;  // the Polyglot copy's
+        std::string error;
+    };
+    struct CtgJob {
+        CtgJobKind kind = CtgJobKind::Summary;
+        std::string path, bin;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<std::atomic<uint64_t>> reached;
+        std::future<CtgDone> done;
+    };
+    std::optional<CtgJob> ctg_job_;
+    std::vector<std::future<CtgDone>> ctg_abandoned_;         // cancelled, still ending
+    std::map<std::string, study::CtgSummary> ctg_summaries_;  // by book, this session
+    std::map<std::string, std::string> ctg_failed_;           // a book that could not be read, and why
+    std::string ctg_said_, ctg_said_of_;                      // the last check's or copy's report, and its book
     std::vector<std::future<std::shared_ptr<tour::BookScan>>> abandoned_scans_;  // cancelled, still ending
     std::shared_ptr<const tour::BookScan> book_scan_;                            // of book book_scan_index_
     int book_scan_index_ = -1;

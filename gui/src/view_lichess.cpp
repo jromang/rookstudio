@@ -937,6 +937,7 @@ void App::drawLichessTreeCard(bool linked) {
 bool App::lichessTreeRows(int source, const std::string& fen) {
     tree_db_   = -1;
     tree_book_ = false;
+    tree_ctg_  = false;
     if (aidsLocked()) {  // fair play (#48): the user's databases and books only
         ImGui::TextDisabled("%s", TR("Lichess's explorer rests on the positions of your game by correspondence."));
         return false;

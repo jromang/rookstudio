@@ -779,7 +779,8 @@ char markColourKey() {
 
 bool moveNag(uint8_t nag) { return nag >= 1 && nag <= 9; }
 
-// A symbol as the notation shows it.
+}  // namespace
+
 std::string nagText(uint8_t nag) {
     switch (nag) {
         case 1:
@@ -795,6 +796,7 @@ std::string nagText(uint8_t nag) {
         case 6:
             return "?!";
         case 7:
+        case 8:
             return "□";
         case 10:
             return "=";
@@ -840,8 +842,6 @@ ImU32 nagColour(uint8_t nag) {
             return 0;
     }
 }
-
-}  // namespace
 
 BoardPage::Snapshot App::boardSnapshot() const {
     const auto& b = board_;

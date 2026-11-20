@@ -15,6 +15,8 @@
 #include <tour/polyglot.hpp>
 
 #include "app.hpp"
+#include "console.hpp"
+#include "guide.hpp"
 #include "i18n.hpp"
 #include "run.hpp"
 #include "ui.hpp"
@@ -81,6 +83,12 @@ std::string buildSummary(const std::string& pgn, const tour::PgnBookOptions& o) 
 void App::addBook(const std::string& path) {
     BookEntry book;
     book.path = path;
+    if (study::isCtg(path)) {  // the book's .ctg, whichever of its files was chosen
+        try {
+            book.path = study::CtgBook(path).path().string();
+        } catch (const std::exception&) {
+        }
+    }
     book.name = fs::path(path).stem().string();
     books_.push_back(std::move(book));
     selected_book_ = static_cast<int>(books_.size()) - 1;
@@ -441,6 +449,7 @@ void App::cancelBookScan() {
 
 void App::startBookScan(int index) {
     if (index < 0 || index >= static_cast<int>(books_.size())) return;
+    if (study::isCtg(books_[index].path)) return;  // read by its own job, when shown
     cancelBookScan();
 
     BookReading reading;
@@ -492,6 +501,7 @@ void App::drawBooks() {
         return;
     }
     pollBookScan();
+    pollCtgJob();
 
     // The library on the left.
     const float page = ImGui::GetContentRegionAvail().x;
@@ -499,11 +509,12 @@ void App::drawBooks() {
                       ImGuiChildFlags_Borders);
     if (ImGui::Button(TR("Add…"))) {
         dialogs_.openFile(Dialogs::Purpose::AddBook,
-                          {{TR("Books (EPD, PGN, Polyglot)"), "epd;pgn;bin"}, {TR("All files"), "*"}});
+                          {{TR("Books (EPD, PGN, Polyglot, CTG)"), "epd;pgn;bin;ctg"}, {TR("All files"), "*"}});
     }
     tip(
-        TR("Adds an opening book of yours, EPD, PGN or Polyglot (.bin), to the library: the setup's Openings then "
-           "offer it by name. The file stays where it is."));
+        TR("Adds an opening book of yours, EPD, PGN, Polyglot (.bin) or CTG (.ctg, with its .ctb and .cto), to the "
+           "library: the setup's Openings then offer it by name, a CTG book once copied as a Polyglot book. The file "
+           "stays where it is."));
     ui::topic(guide::topics::Books);
     ui::sameLineOrWrap(TR("Create…"));
     const bool create = ImGui::Button(TR("Create…"));
@@ -595,7 +606,8 @@ void App::drawBookDetail(BookEntry& book) {
     bool changed       = false;
 
     // The book shown is read once, in the background.
-    if (book_reading_ ? book_reading_->index != selected_book_ : book_scan_index_ != selected_book_) {
+    const bool ctg = study::isCtg(book.path);
+    if (!ctg && (book_reading_ ? book_reading_->index != selected_book_ : book_scan_index_ != selected_book_)) {
         startBookScan(selected_book_);
     }
 
@@ -608,11 +620,17 @@ void App::drawBookDetail(BookEntry& book) {
     ImGui::SameLine();
     if (ImGui::Button("…##book_file")) {
         dialogs_.openFile(Dialogs::Purpose::BookFile,
-                          {{TR("Books (EPD, PGN, Polyglot)"), "epd;pgn;bin"}, {TR("All files"), "*"}}, book.path);
+                          {{TR("Books (EPD, PGN, Polyglot, CTG)"), "epd;pgn;bin;ctg"}, {TR("All files"), "*"}},
+                          book.path);
     }
 
     ui::label(TR("Description"), label);
     changed |= editText("##book_description", book.description);
+    if (ctg) {
+        if (changed) storage_.saveBooks(books_);
+        drawCtgDetail(book);
+        return;
+    }
 
     const bool polyglot = tour::isPolyglot(book.path);
     const auto ext      = fs::path(book.path).extension().string();
@@ -824,6 +842,206 @@ void App::drawBookPositions() {
         ImGui::TextDisabled("%s", TR("Choose an opening to see it."));
     }
     ImGui::EndChild();
+}
+
+void App::startCtgJob(CtgJobKind kind, const std::string& path, const std::string& bin) {
+    if (ctg_job_) return;
+    CtgJob job;
+    job.kind    = kind;
+    job.path    = path;
+    job.bin     = bin;
+    job.cancel  = std::make_shared<std::atomic<bool>>(false);
+    job.reached = std::make_shared<std::atomic<uint64_t>>(0);
+    job.done    = std::async(std::launch::async, [kind, path, bin, cancel = job.cancel, reached = job.reached] {
+        CtgDone done;
+        try {
+            const study::CtgBook book(path);
+            switch (kind) {
+                case CtgJobKind::Summary:
+                    done.summary = book.summary(cancel.get());
+                    break;
+                case CtgJobKind::Check:
+                    done.walk = study::walkCtg(
+                        book, [](const chess::Board&, const study::CtgAnswer&) {}, reached.get(), cancel.get());
+                    break;
+                case CtgJobKind::Polyglot: {
+                    auto copy    = study::ctgPolyglot(book, reached.get(), cancel.get());
+                    done.walk    = copy.walk;
+                    done.avoided = copy.avoided;
+                    done.lost    = copy.lost;
+                    done.entries = copy.entries.size();
+                    if (!copy.walk.cancelled) {
+                        if (copy.entries.empty()) throw std::runtime_error(N_("The book has no move to copy."));
+                        tour::writePolyglotBook(bin, std::move(copy.entries));
+                    }
+                    break;
+                }
+            }
+        } catch (const std::exception& e) {
+            done.error = e.what();
+        }
+        return done;
+    });
+    ctg_job_    = std::move(job);
+}
+
+void App::pollCtgJob() {
+    std::erase_if(ctg_abandoned_,
+                  [](const auto& f) { return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
+    if (!ctg_job_ || ctg_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    auto job = std::move(*ctg_job_);
+    ctg_job_.reset();
+    const auto done = job.done.get();
+    const auto name = fs::path(job.path).stem().string();
+    if (!done.error.empty()) {
+        const std::string error = TR(done.error.c_str());  // the library's own messages are English
+        if (job.kind == CtgJobKind::Summary) ctg_failed_[job.path] = error;
+        ctg_said_of_ = job.path;
+        ctg_said_    = error;
+        if (job.kind == CtgJobKind::Polyglot) Console::instance().add(trf("Cannot write {}: {}", job.bin, error), true);
+        return;
+    }
+    switch (job.kind) {
+        case CtgJobKind::Summary:
+            if (done.summary.cancelled) return;
+            ctg_summaries_[job.path] = done.summary;
+            for (auto& b : books_) {  // its number of positions in the list
+                if (b.path != job.path) continue;
+                b.positions = done.summary.positions;
+                b.problems  = 0;
+                b.file      = tour::fingerprint(b.path);
+            }
+            storage_.saveBooks(books_);
+            break;
+        case CtgJobKind::Check: {
+            if (done.walk.cancelled) return;
+            const auto held = ctg_summaries_.count(job.path) ? ctg_summaries_[job.path].positions : 0;
+            ctg_said_of_    = job.path;
+            ctg_said_ = trf("From the starting position: {} positions reached of the {} the book holds, {} moves.",
+                            ui::exactCount(done.walk.positions), ui::exactCount(held), ui::exactCount(done.walk.moves));
+            if (done.walk.skipped)
+                ctg_said_ +=
+                    " " + trn("{} move cannot be read on its position.", "{} moves cannot be read on their position.",
+                              static_cast<int>(std::min<uint64_t>(done.walk.skipped, 1000000)),
+                              ui::exactCount(done.walk.skipped));
+            else
+                ctg_said_ += " " + std::string(TR("Every move reads on its position."));
+            if (done.walk.beyond)
+                ctg_said_ += " " + trn("{} move leads past the depth the book was made to.",
+                                       "{} moves lead past the depth the book was made to.",
+                                       static_cast<int>(std::min<uint64_t>(done.walk.beyond, 1000000)),
+                                       ui::exactCount(done.walk.beyond));
+            break;
+        }
+        case CtgJobKind::Polyglot:
+            if (done.walk.cancelled) return;
+            ctg_said_of_ = job.path;
+            ctg_said_ =
+                trf("{} written: {} moves of {} positions; left out, {} not for a tournament and {} that "
+                    "scored nothing.",
+                    fs::path(job.bin).filename().string(), ui::exactCount(done.entries),
+                    ui::exactCount(done.walk.positions), ui::exactCount(done.avoided), ui::exactCount(done.lost));
+            addWrittenBook(job.bin, trf("Polyglot copy of the CTG book {}: its red moves left out, each move "
+                                        "weighing the points its games scored, twice that for a green one.",
+                                        name));
+            Console::instance().add(trf("{} written, from the CTG book {}.", job.bin, name));
+            break;
+    }
+}
+
+void App::openInTree(const std::string& book) {
+    // A view whose Board is the study's, the one with the Tree tab: this one if it is, else the first.
+    if (!view().study_board || !viewHolds(Page::Board)) {
+        for (int i = 0; i < static_cast<int>(views_.size()); ++i) {
+            const auto& v = views_[static_cast<std::size_t>(i)];
+            if (v.study_board && v.holds(views::PageId::Board)) {
+                switchView(i);
+                break;
+            }
+        }
+    }
+    page_              = Page::Board;
+    board_side_tab_    = 2;
+    tree_book_request_ = book;
+}
+
+void App::drawCtgDetail(const BookEntry& book) {
+    // pollCtgJob() runs before the page is drawn: a Polyglot copy it adds to the library moves the books.
+    const auto& path   = book.path;
+    const auto summary = ctg_summaries_.find(path);
+    const auto failed  = ctg_failed_.find(path);
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", TR("CTG book · read only"));
+    ui::topic(guide::topics::CtgBooks);
+    if (failed != ctg_failed_.end()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ui::BAD);
+        ImGui::TextWrapped("%s", failed->second.c_str());
+        ImGui::PopStyleColor();
+        if (ImGui::Button(TR("Read it again"))) ctg_failed_.erase(failed);
+        return;
+    }
+    if (summary == ctg_summaries_.end()) {
+        if (!ctg_job_) startCtgJob(CtgJobKind::Summary, path);
+        ImGui::TextDisabled("%s", TR("Reading the book…"));
+    } else {
+        const auto& s   = summary->second;
+        const auto many = [](uint64_t n) { return static_cast<int>(std::min<uint64_t>(n, 1000000000)); };
+        ImGui::TextUnformatted((trn("{} position", "{} positions", many(s.positions), ui::exactCount(s.positions)) +
+                                " · " + trn("{} move", "{} moves", many(s.moves), ui::exactCount(s.moves)) + " · " +
+                                trn("{} marked green", "{} marked green", many(s.main), ui::exactCount(s.main)) + ", " +
+                                trn("{} red", "{} red", many(s.avoid), ui::exactCount(s.avoid)))
+                                   .c_str());
+    }
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("For each position, its moves with their games, score, average rating and "
+                                 "performance; the colour its author gave them (green: to play, red: to avoid) and "
+                                 "their symbols (!, ?, !?…)."));
+    ImGui::PopTextWrapPos();
+
+    ImGui::Spacing();
+    if (ImGui::Button(TR("Open it in the tree"))) openInTree(path);
+    tip(TR("The Board page's Tree tab, on this book: its moves at the position shown, green ones first."));
+    const bool running = ctg_job_.has_value();
+    ImGui::BeginDisabled(running);
+    ui::sameLineOrWrap(TR("For engines: make a Polyglot book…"));
+    if (ImGui::Button(TR("For engines: make a Polyglot book…"))) {
+        dialogs_.saveFile(Dialogs::Purpose::CtgPolyglotBook, {{"Polyglot", "bin"}},
+                          (fs::path(path).parent_path() / (fs::path(path).stem().string() + ".bin")).string());
+    }
+    tip(
+        TR("A Polyglot copy (.bin) added to the library, for the setup's Openings and the participants' own books: "
+           "its red moves left out, each move weighing the points its games scored, twice that for a green one. The "
+           "CTG book stays as it is."));
+    ui::sameLineOrWrap(TR("Check the book"));
+    if (ImGui::Button(TR("Check the book"))) startCtgJob(CtgJobKind::Check, path);
+    tip(
+        TR("Follows its lines from the starting position: the positions reached, the moves that cannot be read, "
+           "those that lead past the depth the book was made to."));
+    ImGui::EndDisabled();
+    if (ctg_job_ && ctg_job_->path == path && ctg_job_->kind != CtgJobKind::Summary) {
+        const auto n = ctg_job_->reached->load();
+        ImGui::TextDisabled("%s", (ctg_job_->kind == CtgJobKind::Check
+                                       ? trf("Checking: {} positions", ui::exactCount(n))
+                                       : trf("Writing the Polyglot copy: {} positions", ui::exactCount(n)))
+                                      .c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Cancel"))) {
+            *ctg_job_->cancel = true;
+            ctg_abandoned_.push_back(std::move(ctg_job_->done));
+            ctg_job_.reset();
+        }
+    }
+    if (ctg_said_of_ == path && !ctg_said_.empty()) {
+        ImGui::PushTextWrapPos();
+        ImGui::TextUnformatted(ctg_said_.c_str());
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::Spacing();
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("fastchess reads no CTG book: for a tournament, RookStudio writes a Polyglot copy "
+                                 "(.bin), its red moves left out, its weights from the games and the colours; the CTG "
+                                 "book stays as it is."));
+    ImGui::PopTextWrapPos();
 }
 
 }  // namespace fcg

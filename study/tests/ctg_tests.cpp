@@ -12,6 +12,8 @@
 #include <chess.hpp>
 #include <study/ctg.hpp>
 #include <study/pgn_reader.hpp>
+#include <tour/pgn_book.hpp>
+#include <tour/polyglot.hpp>
 
 #include "test_games.hpp"
 
@@ -274,4 +276,49 @@ TEST_CASE("CTG book: damaged pages answer nothing, never past the files") {
     cto.replace(0, 16, std::string(16, '\0'));
     std::ofstream(dir / "Book.cto", std::ios::binary) << cto;
     CHECK_FALSE(CtgBook(dir / "Book.ctg").at(chess::Board()).has_value());
+}
+
+TEST_CASE("CTG book: its lines walked from the start, each position once") {
+    const CtgBook book(data("ctgbook.ctg"));
+    std::set<std::string> visited;
+    std::atomic<uint64_t> reached{0};
+    const auto walk = walkCtg(
+        book, [&](const chess::Board& board, const CtgAnswer&) { CHECK(visited.insert(board.getFen(false)).second); },
+        &reached);
+    // Every position the games reach within the book's plies: none past it, none that could not be read.
+    CHECK(walk.positions == 404);
+    CHECK(reached.load() == 404);
+    CHECK(visited.size() == 404);
+    CHECK(walk.skipped == 0);
+    CHECK(walk.beyond == 0);
+    CHECK_FALSE(walk.cancelled);
+    std::atomic<bool> cancel{true};
+    CHECK(walkCtg(book, [](const chess::Board&, const CtgAnswer&) {}, nullptr, &cancel).cancelled);
+}
+
+TEST_CASE("CTG book: its Polyglot copy for engines") {
+    const CtgBook book(data("ctgbook.ctg"));
+    const auto copy = ctgPolyglot(book);
+    CHECK(copy.walk.positions == 404);
+    CHECK(copy.avoided == 1);  // 1.d4, not for a tournament
+    CHECK(copy.lost > 0);      // moves whose games were all lost
+    CHECK(copy.entries.size() + copy.avoided + copy.lost == copy.walk.moves);
+    const auto file = fs::temp_directory_path() / "ctgbook.bin";
+    fcg::tour::writePolyglotBook(file, copy.entries);
+    fcg::tour::PolyglotBook polyglot(file);
+    chess::Board start;
+    std::map<std::string, uint16_t> weights;
+    for (const auto& c : polyglot.moves(start)) weights[chess::uci::moveToUci(c.move)] = c.weight;
+    CHECK(weights.count("d2d4") == 0);
+    CHECK(weights.count("g2g4") == 0);  // the mate it was played in was lost: no point
+    // 1.e4: 13 wins and 5 draws for White, twice for the book's main move.
+    CHECK(weights["e2e4"] == 2 * (2 * 13 + 5));
+    // 1.c4: its games, as they ended.
+    const auto c4 = book.at(start);
+    REQUIRE(c4);
+    for (const auto& m : c4->moves)
+        if (chess::uci::moveToUci(m.move) == "c2c4") {
+            REQUIRE(m.games);
+            CHECK(weights["c2c4"] == 2 * m.games->white + m.games->draws);
+        }
 }

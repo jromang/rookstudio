@@ -147,7 +147,8 @@ const std::vector<const char*>& allTopics() {
                                               ToLichess,
                                               BroadcastMore,
                                               ExplorerMore,
-                                              FideCards};
+                                              FideCards,
+                                              CtgBooks};
     return all;
 }
 

@@ -17,6 +17,12 @@
 
 namespace fcg {
 
+// A symbol (a NAG) as the notation shows it: "!", "?!", "□", "⩲" (or "+=" when the font lacks it), "N"... "$NN" for
+// one it has no sign for.
+[[nodiscard]] std::string nagText(uint8_t nag);
+// The colour of a move's symbol (! green, ? orange...), 0 for the text's own.
+[[nodiscard]] ImU32 nagColour(uint8_t nag);
+
 struct NotationItem {
     // Break: what follows starts a new line. Field: a line of its own where text is written (field, field_size), its
     // hint in `text`.

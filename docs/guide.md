@@ -664,6 +664,25 @@ the ECO codes when more qualify. It says how many positions and openings it woul
 depth (`ce`, `acd`) and its opening (`c0`), and adds it to the library. *Read again* reads the database again for its
 newer evaluations.
 
+### CTG books
+
+**Add…** also takes a book in the CTG format, the opening books of ChessBase and Fritz: a `.ctg` with its `.ctb` and
+`.cto` beside it, any of the three chosen. It is only read, never written. Its page says how many positions and moves
+it holds, and how many moves its author marked green (to play) and red (to avoid). For each position the book has
+its moves, each with its symbol (!, ?, !?, only move…), its colour, the evaluation of the position it leads to, and
+the games behind it: how many, how they ended, the players' ratings.
+
+*Open it in the tree* shows it in the Board page's *Tree* tab, among the sources: the moves of the position shown with
+their games, score, average rating of the players who played them and performance, and a *Book* column with their
+colour and symbol. Green moves come first; red ones stay in the list, greyed. The years and the reference games come
+from the databases, not from the book.
+
+fastchess reads no CTG book. *For engines: make a Polyglot book…* writes a Polyglot copy (`.bin`) and adds it to the
+library, for the setup's *Openings* and the participants' own books: its red moves are left out, and each move weighs
+the points its games scored (two a win, one a draw), twice that for a green move; a move that scored nothing is left
+out. *Check the book* follows its lines from the starting position and says how many positions it reached of those
+the book holds, and whether any move could not be read. Nothing leaves the machine.
+
 ## Board
 
 The Board page shows one game or one position, from anywhere: **A** on any board of the program (a game of the

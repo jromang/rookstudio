@@ -1533,6 +1533,11 @@ void App::handleDialogs() {
             case Dialogs::Purpose::AddBook:
                 addBook(path);
                 break;
+            case Dialogs::Purpose::CtgPolyglotBook:
+                if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size()) &&
+                    study::isCtg(books_[selected_book_].path))
+                    startCtgJob(CtgJobKind::Polyglot, books_[selected_book_].path, path);
+                break;
             case Dialogs::Purpose::BookFile:
                 if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size())) {
                     books_[selected_book_].path = path;

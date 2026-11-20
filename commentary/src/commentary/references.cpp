@@ -52,7 +52,7 @@ std::string resultText(char result) {
     }
 }
 
-// "Masters 2026", "Masters 2026 and TWIC", "A, B and C".
+// "Club 2026", "Club 2026 and TWIC", "A, B and C".
 std::string basesText(std::span<const ReferenceBase> bases, Lang lang) {
     std::string out;
     for (std::size_t i = 0; i < bases.size(); ++i) {

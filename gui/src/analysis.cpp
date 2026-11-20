@@ -52,6 +52,7 @@ bool takeInfoLine(std::vector<AnalysisLine>& lines, const std::string& info, int
 }
 
 std::string goCommand(const SearchLimit& limit) {
+    if (limit.nodes > 0) return "go nodes " + std::to_string(limit.nodes);
     if (limit.depth > 0) return "go depth " + std::to_string(limit.depth);
     if (limit.movetime_ms > 0) return "go movetime " + std::to_string(limit.movetime_ms);
     return "go infinite";

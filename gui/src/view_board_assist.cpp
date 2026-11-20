@@ -410,7 +410,7 @@ void App::commentKeyMoments() {
     if (comment_job_) return;
     const auto review = boardCommentaryReview();
     if (!review || !review->report.complete) {
-        boardToast(TR("Analyse the game first (G): its key moments come from the review"));
+        boardToast(TR("Analyse the game first (Alt+G): its key moments come from the review"));
         return;
     }
     const auto* engine = analysisEngine();
@@ -501,7 +501,7 @@ void App::annotateBoardGame() {
     auto& b           = board_;
     const auto review = boardCommentaryReview();
     if (!review || !review->report.complete) {
-        boardToast(TR("Analyse the game first (G): the annotation is its review written in"));
+        boardToast(TR("Analyse the game first (Alt+G): the annotation is its review written in"));
         return;
     }
     auto before      = boardSnapshot();

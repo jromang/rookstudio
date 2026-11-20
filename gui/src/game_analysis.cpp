@@ -91,27 +91,47 @@ std::string reviewKey(const ReplayGame& game) {
 
 namespace {
 
+// A score and its win, draw and loss figures as an analysis file has them ("type", "value", "wdl").
+std::optional<fastchess::Score> scoreFromJson(const nlohmann::json& p) {
+    const auto type = p.value("type", "");
+    if (type != "cp" && type != "mate") return std::nullopt;
+    return fastchess::Score{type == "cp" ? fastchess::ScoreType::CP : fastchess::ScoreType::MATE,
+                            p.value("value", int64_t{0})};
+}
+
+std::optional<std::array<int64_t, 3>> wdlFromJson(const nlohmann::json& p) {
+    if (!p.contains("wdl") || !p["wdl"].is_array() || p["wdl"].size() != 3) return std::nullopt;
+    return std::array<int64_t, 3>{p["wdl"][0].get<int64_t>(), p["wdl"][1].get<int64_t>(), p["wdl"][2].get<int64_t>()};
+}
+
+void scoreToJson(nlohmann::json& e, const fastchess::Score& score) {
+    e["type"]  = score.type == fastchess::ScoreType::MATE ? "mate" : "cp";
+    e["value"] = score.value;
+}
+
 GameReview reviewFromJson(const nlohmann::json& j) {
     GameReview review;
     review.engine      = j.value("engine", "");
     review.movetime_ms = j.value("movetime_ms", int64_t{0});
     review.depth       = j.value("depth", 0);
     review.passes      = j.value("passes", 0);
+    review.nodes       = j.value("nodes", uint64_t{0});
     for (const auto& p : j.at("positions")) {
         PositionEval e;
-        const auto type = p.value("type", "");
-        if (type == "cp" || type == "mate") {
-            e.score = fastchess::Score{type == "cp" ? fastchess::ScoreType::CP : fastchess::ScoreType::MATE,
-                                       p.value("value", int64_t{0})};
-        }
+        e.score   = scoreFromJson(p);
         e.best    = p.value("best", "");
         e.depth   = p.value("depth", 0);
         e.time_ms = p.value("time_ms", int64_t{0});
         e.pv      = p.value("pv", "");
         e.known   = p.value("known", false);
-        if (p.contains("wdl") && p["wdl"].is_array() && p["wdl"].size() == 3)
-            e.wdl = std::array<int64_t, 3>{p["wdl"][0].get<int64_t>(), p["wdl"][1].get<int64_t>(),
-                                           p["wdl"][2].get<int64_t>()};
+        e.wdl     = wdlFromJson(p);
+        if (p.contains("second") && p["second"].is_object()) {
+            const auto& s  = p["second"];
+            e.second_score = scoreFromJson(s);
+            e.second_pv    = s.value("pv", "");
+            e.second_depth = s.value("depth", 0);
+            e.second_wdl   = wdlFromJson(s);
+        }
         review.positions.push_back(std::move(e));
     }
     if (j.contains("previous") && j["previous"].is_array())
@@ -125,19 +145,25 @@ nlohmann::json reviewToJson(const GameReview& review) {
     j["movetime_ms"] = review.movetime_ms;
     j["depth"]       = review.depth;
     j["passes"]      = review.passes;
-    j["positions"]   = nlohmann::json::array();
+    if (review.nodes > 0) j["nodes"] = review.nodes;
+    j["positions"] = nlohmann::json::array();
     for (const auto& p : review.positions) {
         nlohmann::json e;
-        if (p.score) {
-            e["type"]  = p.score->type == fastchess::ScoreType::MATE ? "mate" : "cp";
-            e["value"] = p.score->value;
-        }
+        if (p.score) scoreToJson(e, *p.score);
         e["best"]  = p.best;
         e["depth"] = p.depth;
         if (p.time_ms > 0) e["time_ms"] = p.time_ms;
         if (!p.pv.empty()) e["pv"] = p.pv;
         if (p.wdl) e["wdl"] = *p.wdl;
         if (p.known) e["known"] = true;
+        if (p.second_score) {
+            nlohmann::json s;
+            scoreToJson(s, *p.second_score);
+            s["pv"]    = p.second_pv;
+            s["depth"] = p.second_depth;
+            if (p.second_wdl) s["wdl"] = *p.second_wdl;
+            e["second"] = std::move(s);
+        }
         j["positions"].push_back(std::move(e));
     }
     if (!review.previous.empty()) {

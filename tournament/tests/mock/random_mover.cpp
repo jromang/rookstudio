@@ -18,9 +18,10 @@
 //
 // With FCG_MOCK_ANALYSIS=1 it also has the options Threads, MultiPV and UCI_ShowWDL, and searches as an analysis
 // engine does: "go infinite" writes info lines for depths 1 to 8, one per MultiPV line (the first legal moves in
-// order, the best first), with a WDL when asked, and gives its move only at "stop"; "go movetime" and "go depth" do
-// the same, then give it at once. Its score is the material of the side to move, minus its opponent's, and half
-// of the best piece it can take.
+// order, the best first), with a WDL when asked, and gives its move only at "stop"; "go movetime", "go depth" and "go
+// nodes" do the same, then give it at once. Its score is the material of the side to move, minus its opponent's, and
+// half of the best piece it can take; with FCG_MOCK_HASH=1, plus the searches made since the last ucinewgame, as a
+// hash table that remembers them changes what a search finds.
 
 #include <chrono>
 #include <cstdlib>
@@ -35,6 +36,7 @@ std::mt19937 gen;
 
 bool analysis_mode() { return std::getenv("FCG_MOCK_ANALYSIS") != nullptr; }
 int multipv     = 1;
+int warm        = 0;  // searches since the last ucinewgame (FCG_MOCK_HASH)
 bool show_wdl   = false;
 bool searching  = false;  // an infinite search, waiting for "stop"
 Move infinite_best;
@@ -118,6 +120,7 @@ void uci_line(Board &board, const std::string &line) {
         std::cout << "readyok" << std::endl;
     } else if (tokens[0] == "ucinewgame") {
         board = Board();
+        warm  = 0;
     } else if (tokens[0] == "setoption" && tokens.size() >= 5 && tokens[1] == "name") {
         if (tokens[2] == "MultiPV") multipv = std::max(1, std::atoi(std::string(tokens[4]).c_str()));
         if (tokens[2] == "UCI_ShowWDL") show_wdl = tokens[4] == "true";
@@ -127,7 +130,7 @@ void uci_line(Board &board, const std::string &line) {
             std::cout << "bestmove " << uci::moveToUci(infinite_best) << std::endl;
         }
     } else if (tokens[0] == "go" && analysis_mode() && tokens.size() > 1 &&
-               (tokens[1] == "infinite" || tokens[1] == "movetime" || tokens[1] == "depth")) {
+               (tokens[1] == "infinite" || tokens[1] == "movetime" || tokens[1] == "depth" || tokens[1] == "nodes")) {
         auto moves = Movelist();
         movegen::legalmoves(moves, board);
         if (moves.empty()) {
@@ -153,6 +156,7 @@ void uci_line(Board &board, const std::string &line) {
             best_take = std::max(best_take, values[static_cast<int>(victim.type())]);
         }
         material += best_take / 2;
+        if (std::getenv("FCG_MOCK_HASH")) material += warm++;
         for (int depth = 1; depth <= 8; ++depth) {
             for (int i = 0; i < lines; ++i) {
                 Board after = board;

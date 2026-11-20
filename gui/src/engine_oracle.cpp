@@ -75,6 +75,16 @@ std::optional<commentary::Searched> EngineOracle::search(const commentary::Posit
     std::lock_guard lock(mutex_);
     error_.clear();
     if (!ready()) return std::nullopt;
+    // From an empty hash: the answer depends on the position alone, not on the questions asked before it, so that the
+    // same review gives the assistant the same facts (#61).
+    process_->send("ucinewgame");
+    process_->send("isready");
+    if (!waitFor(*process_, "readyok", std::chrono::seconds(10), [](const std::string&) {})) {
+        error_ = fmt::format("{} did not answer isready", engine_.name);
+        process_->stop();
+        process_.reset();
+        return std::nullopt;
+    }
     process_->send("position fen " + pos.fen());
     std::string go = fmt::format("go nodes {}", nodes_);
     if (!only.empty()) {

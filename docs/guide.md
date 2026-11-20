@@ -44,8 +44,8 @@ next version as A and **Start**, or click *Relaunch with…* on the finished mat
 2. **A game.** A click on a game of the list shows it beside; Enter or a double click opens it on the *Board*. Ctrl+O
    opens a PGN file there, Ctrl+V pastes a game or a FEN.
 3. **An engine.** The analysis needs an engine: with an empty library, the *Analysis* tab offers to download Gaia in a
-   click (see [Popular engines](#popular-engines)). A starts and stops the analysis of the position (Alt+A on the
-   study Board), G analyses the whole game.
+   click (see [Popular engines](#popular-engines)). A starts and stops the analysis of the position, G analyses the
+   whole game (Alt+A and Alt+G on the study Board).
 4. **Your notes.** Enter writes a comment after the move, `!` and `?` put symbols, a move other than the game's starts
    a variation, the right button draws arrows and squares; Ctrl+S saves the game into its database.
 
@@ -944,7 +944,7 @@ whose *Backend* option names a GPU backend) keeps its own threads, and the share
 running on this computer keeps its cores: the analysis takes at most what its games leave, and the chip says how many
 they take. These settings are the analysis's own: neither the library's engine nor a tournament sees them.
 
-**The first engine** is the analysis's: the game's review (G), the threat (Alt+X, or the first engine's menu), the
+**The first engine** is the analysis's: the game's review (Alt+G), the threat (Alt+X, or the first engine's menu), the
 questions and the assistant's comments use it. An engine dragged by its name onto another takes its place, to the top it
 becomes the first; *Make it first* in its menu does the same. When the game has an analysis by the new first engine,
 that analysis judges the moves and draws the curve of the game graph. Each engine's evaluations of the positions of the
@@ -1071,14 +1071,26 @@ It costs a request a move, so it stays off until asked for; the masters' explore
 
 ### The review of a game
 
-On the study Board, the *Review* tab beside the notation reads the game's analysis (G) as a coach would:
+On the study Board, the *Review* tab beside the notation reads the game's analysis (Alt+G) as a coach would:
 
 - at the top, White's chances along the game, with the key moments as dots (dark for a good move, orange for a
   mistake); a click goes to the move;
 - the game's theory in one of your databases (the Tree tab's, else the first): its book moves are not judged, and
-  its novelty is named; the book stops before the first error the engine sees;
+  its novelty is named; the book stops before the first error the engine sees. The moves a tournament's opening book
+  played (`{book}` in the PGN) are not judged either;
+- **Key moments**: the moves of the dots, each with its verdict (a mistake with the chances it lost and the better
+  move, an only move with the engine's next best: *Only move. Gaia: +0.62, the next +0.31.*), and where the endgame
+  starts;
 - **The key moments, in words**, **The story of the game**, and **What to work on**, for each side, with the moves
   that show it; a click goes to the move.
+
+The same game always gets the same review: the same scores, symbols, key moments and comments, whatever the
+machine is doing. The study Board's analysis of the game counts nodes rather than time: each position is searched for
+20,000 nodes at the first pass, four times more at each pass, up to the choice beside the button (320,000, 1,280,000,
+5,120,000 or 20,480,000 nodes per position, or *until stopped*), on one thread and from an empty hash, so that a
+position's result depends on the engine and the position alone. As many positions are searched at once as the
+analysis has threads, an engine process each. Where the move played was the engine's choice and the position is not
+one-sided, a second search of the position with two lines gives the next best move: an only move is told with it.
 
 The endgame's positions of seven pieces or fewer can be judged exactly by Lichess's tables, asked once for this game
 or always. *Comment the key moments* writes a comment by the assistant on each, in the background, beside the comment a

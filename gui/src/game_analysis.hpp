@@ -41,6 +41,12 @@ struct PositionEval {
     std::string pv;                             // its principal variation, UCI moves from the position
     std::optional<std::array<int64_t, 3>> wdl;  // win, draw, loss in permille, the side to move's (UCI_ShowWDL)
     bool known = false;                         // taken from Lichess's evaluations kept offline (#58), not searched
+    // The engine's second line, where the Chess space's review asks for one (#63): the best of the other moves, its
+    // score the side to move's, its moves UCI from the position.
+    std::optional<fastchess::Score> second_score     = std::nullopt;
+    std::string second_pv                            = {};
+    int second_depth                                 = 0;
+    std::optional<std::array<int64_t, 3>> second_wdl = std::nullopt;
 };
 
 // A whole game's analysis by one engine: one PositionEval per position, from the start (plies + 1 of them).
@@ -49,6 +55,9 @@ struct GameReview {
     int64_t movetime_ms = 0;  // the time per position (of its last complete pass)
     int depth           = 0;  // the depth per position, for an analysis made at a fixed depth
     int passes          = 0;  // the continuous analysis's passes completed; 0 for an analysis made in one go
+    // The nodes per position of its last complete pass, for an analysis made at a number of nodes (the Chess space's
+    // review, #61: the same engine gives the same analysis of a game); 0 for one made at a time per position.
+    uint64_t nodes = 0;
     std::vector<PositionEval> positions;
     // Each move's judgement at the pass before the last one (Judgement as an int), to show what the last pass
     // changed; empty after one pass.
@@ -60,6 +69,11 @@ struct GameReview {
 // The continuous analysis: the time per position of a pass, 4 times longer at each from FIRST_PASS_MS.
 inline constexpr int64_t FIRST_PASS_MS = 20;
 [[nodiscard]] constexpr int64_t passTime(int pass) noexcept { return FIRST_PASS_MS << (2 * std::min(pass, 12)); }
+// The Chess space's analysis (#61): the nodes per position of a pass, 4 times more at each from FIRST_PASS_NODES; the
+// same ladder as passTime() at a thousand nodes a millisecond, about one thread's pace, so that a ceiling in time
+// stands for as many passes.
+inline constexpr uint64_t FIRST_PASS_NODES = 20000;
+[[nodiscard]] constexpr uint64_t passNodes(int pass) noexcept { return FIRST_PASS_NODES << (2 * std::min(pass, 12)); }
 
 // A move of the game, judged.
 struct MoveReview {

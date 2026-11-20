@@ -90,8 +90,12 @@ void ReviewRunner::start(Setup setup) {
         state_.done.assign(n, false);
         offers_.clear();
     }
-    thread_ = std::thread([this, setup = std::move(setup), positions = std::move(positions)]() mutable {
-        run(std::move(setup), std::move(positions));
+    reproducible_ = setup.reproducible;
+    thread_       = std::thread([this, setup = std::move(setup), positions = std::move(positions)]() mutable {
+        if (setup.reproducible)
+            runReproducible(std::move(setup), std::move(positions));
+        else
+            run(std::move(setup), std::move(positions));
     });
 }
 
@@ -107,6 +111,7 @@ void ReviewRunner::stop() {
 }
 
 void ReviewRunner::offer(int ply, PositionEval value) {
+    if (reproducible_) return;  // a search for a time: another review each time
     std::lock_guard lock(mutex_);
     std::erase_if(offers_, [&](const auto& o) { return o.first == ply; });
     offers_.emplace_back(ply, std::move(value));
@@ -385,6 +390,277 @@ void ReviewRunner::run(Setup setup, std::vector<AnalysisPosition> positions) {
     }
     claim_.set(0);
     process.stop(std::chrono::milliseconds(500));
+    update([](State& s) { s.running = false; });
+}
+
+void ReviewRunner::runReproducible(Setup setup, std::vector<AnalysisPosition> positions) {
+    const int n   = static_cast<int>(positions.size());
+    const auto at = [](int i) { return static_cast<std::size_t>(i); };
+    std::vector<bool> over(at(n));
+    for (int i = 0; i < n; ++i) over[at(i)] = endScore(boardOf(positions[at(i)])).has_value();
+    // The positions known already, deep enough: taken as they are at each pass.
+    std::vector<std::optional<PositionEval>> known(at(n));
+    if (setup.known)
+        for (int i = 0; i < n && !stop_; ++i)
+            if (!over[at(i)]) known[at(i)] = setup.known(boardOf(positions[at(i)]));
+    const auto limit_of = [&](int pass) {
+        return setup.limit ? setup.limit(pass) : SearchLimit{0, 0, passNodes(pass)};
+    };
+    int searched = 0;
+    for (int i = 0; i < n; ++i) searched += !over[at(i)] && !known[at(i)];
+
+    std::vector<bool> taken(at(n));  // under mutex_: a process searches it now
+    std::atomic<bool> failed{false};
+    const auto fail = [&](std::string message) {
+        failed = true;
+        update([&](State& s) {
+            if (s.error.empty()) s.error = std::move(message);
+            s.running = false;
+        });
+    };
+    const auto startup = setup.engine.start_timeout > 0
+                             ? std::chrono::milliseconds(setup.engine.start_timeout * 1000LL)
+                             : std::chrono::duration_cast<std::chrono::milliseconds>(ENGINE_STARTUP_TIME);
+
+    // One engine process: the positions not taken yet, one after the other, until the last pass is complete.
+    const auto work = [&] {
+        EngineProcess process;
+        CoreClaim claim;
+        std::string why;
+        if (!process.start(engineLaunch(setup.engine), why)) {
+            fail(trf("Cannot start {}: {}", setup.engine.name, toUtf8(why)));
+            return;
+        }
+        // Reads the engine's lines until one starting with `word`, passing the others to `each`. False on the
+        // deadline or the engine's end.
+        const auto wait_for = [&](std::string_view word, Clock::time_point deadline, const auto& each,
+                                  std::string* rest) {
+            while (true) {
+                for (auto& line : process.take()) {
+                    if (line.kind != EngineProcess::Line::Kind::Out) continue;
+                    const auto& text = line.text;
+                    if (text.rfind(word, 0) == 0 && (text.size() == word.size() || text[word.size()] == ' ')) {
+                        if (rest) *rest = text.substr(std::min(text.size(), word.size() + 1));
+                        return true;
+                    }
+                    each(text);
+                }
+                if (!process.running() || Clock::now() >= deadline) return false;
+                process.wait(std::chrono::milliseconds(20));
+            }
+        };
+        std::vector<UciOptionInfo> options;
+        (void)process.send("uci");
+        if (!wait_for(
+                "uciok", Clock::now() + startup,
+                [&](const std::string& line) {
+                    if (auto o = parseUciOption(line)) options.push_back(std::move(*o));
+                },
+                nullptr)) {
+            fail(trf("{} does not answer uci: is it a UCI engine?", setup.engine.name));
+            return;
+        }
+        const auto has = [&](const std::string& name) {
+            return std::any_of(options.begin(), options.end(), [&](const auto& o) { return o.name == name; });
+        };
+        const auto set = [&](const std::string& name, const std::string& value) {
+            if (has(name)) (void)process.send("setoption name " + name + " value " + value);
+        };
+        // The library's values, as a game sends them, buttons aside; then the review's own: one thread, a hash of
+        // its fixed size.
+        for (const auto& [name, value] : tour::forEngine(setup.engine.options)) {
+            if (name == "Threads" || name == "Hash" || name == "MultiPV" || name == "UCI_AnalyseMode") continue;
+            const auto it = std::find_if(options.begin(), options.end(), [&](const auto& o) { return o.name == name; });
+            if (it == options.end() || it->type == "button") continue;
+            set(name, value);
+        }
+        set("UCI_ShowWDL", "true");
+        set("UCI_AnalyseMode", "true");
+        set("Threads", "1");
+        set("Hash", std::to_string(REVIEW_HASH_MB));
+        set("MultiPV", "1");
+        if (setup.chess960) set("UCI_Chess960", "true");
+        const auto ready = [&] {
+            (void)process.send("isready");
+            return wait_for("readyok", Clock::now() + startup, [](const std::string&) {}, nullptr);
+        };
+        if (!ready()) {
+            fail(trf("{} does not answer isready.", setup.engine.name));
+            return;
+        }
+
+        enum class Searched { Done, Interrupted, Failed };
+        // One search from an empty hash: the last exact line of each of its `lines` ranks, best first.
+        const auto search = [&](const AnalysisPosition& position, const SearchLimit& limit, int lines,
+                                std::vector<AnalysisLine>& out, std::string& best) {
+            (void)process.send("ucinewgame");
+            if (!ready()) {
+                fail(trf("{} does not answer isready.", setup.engine.name));
+                return Searched::Failed;
+            }
+            (void)process.send(positionCommand(position));
+            (void)process.send(goCommand(limit));
+            claim.set(1);
+            ++searching_;
+            std::vector<AnalysisLine> seen;
+            out.assign(static_cast<std::size_t>(lines), AnalysisLine{});
+            std::vector<bool> exact(static_cast<std::size_t>(lines));
+            std::string rest;
+            // A generous deadline: an engine of 20,000 nodes a second at least, or 10 minutes for a depth.
+            auto deadline    = Clock::now() + std::chrono::seconds(30) +
+                               (limit.nodes > 0 ? std::chrono::milliseconds(static_cast<int64_t>(limit.nodes / 20))
+                                                : std::chrono::milliseconds(600000));
+            bool interrupted = false, late = false, got = false;
+            while (true) {
+                got = wait_for(
+                    "bestmove", std::min(deadline, Clock::now() + std::chrono::milliseconds(50)),
+                    [&](const std::string& line) {
+                        if (!takeInfoLine(seen, line, lines)) return;
+                        // A fail high or low has a PV of one move: each rank's last line without a bound stays.
+                        for (std::size_t r = 0; r < seen.size() && r < out.size(); ++r) {
+                            const auto& l = seen[r];
+                            if (l.score && !l.pv.empty() && !l.lowerbound && !l.upperbound) {
+                                out[r]   = l;
+                                exact[r] = true;
+                            }
+                        }
+                    },
+                    &rest);
+                if (got || !process.running()) break;
+                if ((stop_ || paused_ || failed) && !interrupted) {
+                    (void)process.send("stop");
+                    interrupted = true;
+                    deadline    = Clock::now() + std::chrono::seconds(5);
+                }
+                if (Clock::now() >= deadline) {
+                    if (interrupted) break;
+                    (void)process.send("stop");  // its move, at least
+                    interrupted = late = true;
+                    deadline           = Clock::now() + std::chrono::seconds(5);
+                }
+            }
+            claim.set(0);
+            --searching_;
+            if (!got || late) {
+                if (!failed) fail(trf("{} did not give its move in time.", setup.engine.name));
+                return Searched::Failed;
+            }
+            if (interrupted) return Searched::Interrupted;
+            // Ranks the engine did not reach (fewer moves than lines) are dropped; a rank without an exact line takes
+            // its last one.
+            for (std::size_t r = 0; r < out.size(); ++r)
+                if (!exact[r] && r < seen.size() && seen[r].score && !seen[r].pv.empty()) out[r] = seen[r];
+            while (!out.empty() && !out.back().score) out.pop_back();
+            best = rest.substr(0, rest.find(' '));
+            return Searched::Done;
+        };
+
+        while (!stop_ && !failed) {
+            int next = -1, pass = 0;
+            bool finished = false;
+            {
+                std::lock_guard lock(mutex_);
+                if (!state_.running) break;
+                pass = state_.pass;
+                offers_.clear();  // the board's searches, for a time: not taken
+                if (!paused_ && pass <= pass_limit_) {
+                    // The positions the game ended in need no engine, nor those known already.
+                    for (int i = 0; i < n; ++i) {
+                        if ((!over[at(i)] && !known[at(i)]) || state_.done[at(i)]) continue;
+                        auto& live = state_.live.positions[at(i)];
+                        if (over[at(i)]) {
+                            live = {endScore(boardOf(positions[at(i)])), "", 0, 0, "", std::nullopt};
+                        } else {
+                            live         = *known[at(i)];
+                            live.time_ms = 0;
+                        }
+                        state_.level[at(i)] = pass;
+                        state_.done[at(i)]  = true;
+                    }
+                    // The board's position first, then from the last to the first.
+                    const auto free = [&](int p) { return !state_.done[at(p)] && !taken[at(p)]; };
+                    const int first = first_;
+                    if (first >= 0 && first < n && free(first)) next = first;
+                    for (int k = 0; k < n && next < 0; ++k)
+                        if (free(n - 1 - k)) next = n - 1 - k;
+                    if (next >= 0) {
+                        taken[at(next)] = true;
+                    } else if (std::none_of(taken.begin(), taken.end(), [](bool t) { return t; })) {
+                        // The pass is complete: it is what is kept and judged; the next one, unless it was the last.
+                        auto& st          = state_;
+                        const auto lim    = limit_of(st.pass);
+                        const auto before = st.settled.passes > 0 ? reviewMoves(setup.game, setup.chess960, st.settled)
+                                                                  : std::vector<MoveReview>{};
+                        st.settled.positions   = st.live.positions;
+                        st.settled.movetime_ms = 0;
+                        st.settled.nodes       = lim.nodes;
+                        st.settled.depth       = lim.depth;
+                        st.settled.passes      = st.pass + 1;
+                        st.settled.previous.clear();
+                        for (const auto& m : before) st.settled.previous.push_back(static_cast<int8_t>(m.judgement));
+                        st.pass++;
+                        st.done.assign(at(n), false);
+                        if (st.pass >= reviewPasses(ceiling_) || st.pass >= 13) st.running = false;
+                        st.version++;
+                        finished = !st.running;
+                    }
+                }
+            }
+            if (finished) break;
+            if (next < 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                continue;
+            }
+            // The position, then its second line where it is wanted.
+            const auto limit = limit_of(pass);
+            std::vector<AnalysisLine> lines;
+            std::string best;
+            auto outcome = search(positions[at(next)], limit, 1, lines, best);
+            PositionEval value;
+            if (outcome == Searched::Done) {
+                value.best    = best;
+                value.time_ms = 0;
+                if (!lines.empty()) {
+                    const auto& l = lines.front();
+                    value.score   = l.score;
+                    value.depth   = static_cast<int>(l.depth);
+                    value.wdl     = l.wdl;
+                    for (const auto& m : l.pv) value.pv += (value.pv.empty() ? "" : " ") + m;
+                }
+                if (setup.second_line && has("MultiPV") && value.score && setup.second_line(next, value)) {
+                    set("MultiPV", "2");
+                    outcome = search(positions[at(next)], limit, 2, lines, best);
+                    set("MultiPV", "1");
+                    // The best line of the other moves: the second, or the first when this search preferred another
+                    // move than the first one did.
+                    for (const auto& l : lines) {
+                        if (l.pv.empty() || l.pv.front() == value.best) continue;
+                        value.second_score = l.score;
+                        value.second_depth = static_cast<int>(l.depth);
+                        value.second_wdl   = l.wdl;
+                        for (const auto& m : l.pv) value.second_pv += (value.second_pv.empty() ? "" : " ") + m;
+                        break;
+                    }
+                }
+            }
+            std::lock_guard lock(mutex_);
+            taken[at(next)] = false;
+            if (outcome == Searched::Failed) break;
+            if (outcome == Searched::Interrupted || state_.pass != pass) continue;  // searched again later
+            state_.live.positions[at(next)] = std::move(value);
+            state_.level[at(next)]          = pass;
+            state_.done[at(next)]           = true;
+            state_.version++;
+        }
+        claim.set(0);
+        process.stop(std::chrono::milliseconds(500));
+    };
+
+    std::vector<std::thread> others;
+    const int count = std::clamp(setup.processes, 1, std::max(1, searched));
+    for (int k = 1; k < count; ++k) others.emplace_back(work);
+    work();
+    for (auto& t : others) t.join();
     update([](State& s) { s.running = false; });
 }
 

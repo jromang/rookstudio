@@ -75,7 +75,8 @@ bool navButton(const char* id, ui::Icon icon, bool enabled, const char* tip, boo
 
 }  // namespace
 
-NavClick drawBoardNav(const char* id, int ply, int total, bool& flip, bool buttons, bool live, float width) {
+NavClick drawBoardNav(const char* id, int ply, int total, bool& flip, bool buttons, bool live, float width,
+                      bool flip_key) {
     NavClick click;
     ImGui::PushID(id);
     const float gap   = ImGui::GetStyle().ItemInnerSpacing.x;
@@ -92,7 +93,9 @@ NavClick drawBoardNav(const char* id, int ply, int total, bool& flip, bool butto
         ImGui::SameLine(0, gap);
         if (navButton("##last", ui::Icon::Last, ply < total, TR("Last move (End)"))) click.step = NavStep::Last;
         ImGui::SameLine(0, gap * 3);
-        if (navButton("##flip", ui::Icon::Flip, true, TR("Flip the board (F)"), flip)) flip = !flip;
+        if (navButton("##flip", ui::Icon::Flip, true,
+                      flip_key ? TR("Flip the board (F)") : TR("Flip the board (Alt+F)"), flip))
+            flip = !flip;
         ImGui::EndGroup();
         // Right click on the row: hide it, for those who use the keys.
         if (ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()) &&

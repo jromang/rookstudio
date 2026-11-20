@@ -169,9 +169,9 @@ msgstr ", пропущено уже имеющихся: {}"
 
 msgid ", {} of them damaged (kept up to the move that cannot be read)"
 msgid_plural ", {} of them damaged (each kept up to the move that cannot be read)"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] ", из них {} повреждённая (сохранена до хода, который не читается)"
+msgstr[1] ", из них {} повреждённые (каждая сохранена до хода, который не читается)"
+msgstr[2] ", из них {} повреждённых (каждая сохранена до хода, который не читается)"
 
 msgid "0 = a new random order for every match."
 msgstr "0 = новый случайный порядок для каждого матча."
@@ -5266,9 +5266,9 @@ msgstr "Результата одной партии. Пары: как изме�
 
 msgid "Of the games added, {} is damaged: kept up to the move that cannot be read, its text kept as it was."
 msgid_plural "Of the games added, {} are damaged: each kept up to the move that cannot be read, its text kept as it was."
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "Из добавленных партий {} повреждена: сохранена до хода, который не читается, с текстом в исходном виде."
+msgstr[1] "Из добавленных партий {} повреждены: каждая сохранена до хода, который не читается, с текстом в исходном виде."
+msgstr[2] "Из добавленных партий {} повреждено: каждая сохранена до хода, который не читается, с текстом в исходном виде."
 
 msgid "Off this machine's list (the engine stays in the library)."
 msgstr "Убрать из списка этой машины (движок остаётся в библиотеке)."

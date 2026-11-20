@@ -1196,7 +1196,7 @@ precedenti. Il riepilogo dice lo stesso della posizione. Costa una richiesta per
 non lo chiedi; l'esploratore dei maestri non ha i mesi.
 
 ### Il resoconto di una partita
-<!-- en: the-review-of-a-game 66d8cf1e -->
+<!-- en: the-review-of-a-game 1bad0f30 -->
 
 Sulla Scacchiera per lo studio, la scheda *Resoconto* accanto alla notazione legge l'analisi della partita (Alt+G) come
 farebbe un allenatore:
@@ -1218,8 +1218,8 @@ anziché il tempo: ogni posizione viene cercata per 20.000 nodi al primo passagg
 passaggio, fino alla scelta accanto al pulsante (320.000, 1.280.000, 5.120.000 o 20.480.000 nodi per posizione, o
 *fino all'arresto*), su un thread e con una tabella hash vuota, così che il risultato di una posizione dipenda solo dal
 motore e dalla posizione. Vengono cercate più posizioni insieme, ciascuna con un processo del motore: tante quanti sono
-i thread dell'analisi, e almeno la metà dei core del processore, fino a quattro; meno mentre su questa macchina si
-gioca un torneo, che tiene i suoi core. Dove la mossa giocata era la scelta del motore e la posizione non è già
+i thread dell'analisi, o la metà dei core del processore fino a quattro quando sono di più; meno mentre su questa
+macchina si gioca un torneo, che tiene i suoi core. Dove la mossa giocata era la scelta del motore e la posizione non è già
 decisa, una seconda ricerca della posizione con due linee dà la seconda scelta: una mossa unica viene indicata insieme
 a essa.
 

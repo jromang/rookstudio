@@ -1197,7 +1197,7 @@ anteriores. El resumen dice lo mismo de la posición. Cuesta una petición por j
 lo pides; el explorador de los maestros no tiene meses.
 
 ### La revisión de una partida
-<!-- en: the-review-of-a-game 66d8cf1e -->
+<!-- en: the-review-of-a-game 1bad0f30 -->
 
 En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (Alt+G) como lo
 haría un entrenador:
@@ -1218,10 +1218,10 @@ lo que haga la máquina. El análisis de la partida del Tablero de estudio cuent
 se busca durante 20.000 nodos en la primera pasada, cuatro veces más en cada pasada, hasta lo elegido junto al botón
 (320.000, 1.280.000, 5.120.000 o 20.480.000 nodos por posición, o *hasta que lo detengas*), con un solo hilo y con la
 tabla hash vacía, para que el resultado de una posición dependa solo del motor y de la posición. Se buscan varias
-posiciones a la vez, con un proceso del motor para cada una: tantas como hilos tiene el análisis, y al menos la mitad de
-los núcleos del procesador, hasta cuatro; menos mientras se juega un torneo en esta máquina, que conserva sus núcleos.
-Donde la jugada hecha era la elegida por el motor y la posición no está decidida, una segunda búsqueda de la posición
-con dos líneas da la siguiente mejor jugada: una jugada única se indica con ella.
+posiciones a la vez, con un proceso del motor para cada una: tantas como hilos tiene el análisis, o la mitad de los
+núcleos del procesador hasta cuatro cuando eso es más; menos mientras se juega un torneo en esta máquina, que conserva
+sus núcleos. Donde la jugada hecha era la elegida por el motor y la posición no está decidida, una segunda búsqueda de
+la posición con dos líneas da la siguiente mejor jugada: una jugada única se indica con ella.
 
 Las posiciones del final con siete piezas o menos pueden juzgarse con exactitud con las tablas de Lichess, consultadas
 una vez para esta partida o siempre. *Comentar los momentos clave* escribe un comentario del asistente en cada uno, en

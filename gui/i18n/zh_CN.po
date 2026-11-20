@@ -161,7 +161,7 @@ msgstr "，跳过已存在的 {} 局"
 
 msgid ", {} of them damaged (kept up to the move that cannot be read)"
 msgid_plural ", {} of them damaged (each kept up to the move that cannot be read)"
-msgstr[0] ""
+msgstr[0] "，其中 {} 局已损坏（保留到无法读取的着法之前）"
 
 msgid "0 = a new random order for every match."
 msgstr "0 = 每场比赛都使用新的随机顺序。"
@@ -5220,7 +5220,7 @@ msgstr "单局得分的。成对：按成对对局测量。"
 
 msgid "Of the games added, {} is damaged: kept up to the move that cannot be read, its text kept as it was."
 msgid_plural "Of the games added, {} are damaged: each kept up to the move that cannot be read, its text kept as it was."
-msgstr[0] ""
+msgstr[0] "添加的对局中有 {} 局已损坏：保留到无法读取的着法之前，其文本保持原样。"
 
 msgid "Off this machine's list (the engine stays in the library)."
 msgstr "从此机器的列表中移除（引擎仍保留在引擎库中）。"

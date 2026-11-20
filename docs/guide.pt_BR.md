@@ -1172,7 +1172,7 @@ anteriores. O resumo diz o mesmo da posição. Isso custa um pedido por lance, e
 explorador dos mestres não tem meses.
 
 ### A revisão de uma partida
-<!-- en: the-review-of-a-game 66d8cf1e -->
+<!-- en: the-review-of-a-game 1bad0f30 -->
 
 No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da partida (Alt+G) como um treinador leria:
 
@@ -1192,8 +1192,8 @@ que for que a máquina esteja fazendo. A análise da partida no Tabuleiro de est
 posição é buscada por 20.000 nós na primeira passada, quatro vezes mais a cada passada, até a escolha ao lado do botão
 (320.000, 1.280.000, 5.120.000 ou 20.480.000 nós por posição, ou *até ser parado*), numa só thread e com o hash vazio,
 para que o resultado de uma posição dependa só do engine e da posição. Várias posições são buscadas ao mesmo tempo,
-um processo do engine para cada uma: tantas quantas threads a análise tem, e pelo menos metade dos núcleos do
-processador, até quatro; menos enquanto um torneio joga nesta máquina, que mantém os núcleos dele. Onde o lance jogado
+um processo do engine para cada uma: tantas quantas threads a análise tem, ou metade dos núcleos do processador, até
+quatro, quando isso for mais; menos enquanto um torneio joga nesta máquina, que mantém os núcleos dele. Onde o lance jogado
 foi a escolha do engine e a posição não está decidida para um dos lados, uma segunda busca da posição com duas linhas
 dá o segundo melhor lance: um lance único é informado junto com ele.
 

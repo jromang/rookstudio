@@ -1229,7 +1229,7 @@ gegenüber den sechs davor. Die Zusammenfassung sagt dasselbe über die Stellung
 bleibt es aus, bis es verlangt wird; der Explorer der Meister hat keine Monate.
 
 ### Die Auswertung einer Partie
-<!-- en: the-review-of-a-game 66d8cf1e -->
+<!-- en: the-review-of-a-game 1bad0f30 -->
 
 Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (Alt+G), wie es ein
 Trainer täte:
@@ -1251,9 +1251,10 @@ wird beim ersten Durchgang mit 20.000 Knoten durchsucht, bei jedem weiteren Durc
 Wahl neben dem Knopf (320.000, 1.280.000, 5.120.000 oder 20.480.000 Knoten pro Stellung oder *bis zum Stoppen*), mit
 einem einzigen Thread und leerem Hash, sodass das Ergebnis einer Stellung nur von der Engine und der Stellung abhängt.
 Mehrere Stellungen werden gleichzeitig durchsucht, jede von einem eigenen Engine-Prozess: so viele, wie die Analyse
-Threads hat, und mindestens die Hälfte der Kerne des Prozessors, bis zu vier; weniger, während auf diesem Computer ein
-Turnier spielt, das seine Kerne behält. Wo der gespielte Zug die Wahl der Engine war und die Stellung nicht einseitig
-ist, liefert eine zweite Suche der Stellung mit zwei Linien den nächstbesten Zug: Ein einziger Zug wird mit ihm genannt.
+Threads hat, oder die Hälfte der Prozessorkerne, höchstens vier, wenn das mehr ist; weniger, während auf diesem Computer
+ein Turnier spielt, das seine Kerne behält. Wo der gespielte Zug die Wahl der Engine war und die Stellung nicht
+einseitig ist, liefert eine zweite Suche der Stellung mit zwei Linien den nächstbesten Zug: Ein einziger Zug wird mit
+ihm genannt.
 
 Die Stellungen des Endspiels mit sieben Steinen oder weniger können die Lichess-Tablebases exakt beurteilen, einmal für
 diese Partie oder immer abgefragt. *Schlüsselmomente kommentieren* schreibt im Hintergrund zu jedem einen Kommentar

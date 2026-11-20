@@ -1217,7 +1217,7 @@ mois contre celles des six mois d'avant. Le résumé dit la même chose de la po
 aussi l'option reste-t-elle désactivée tant que tu ne la demandes pas ; l'explorateur des maîtres n'a pas de mois.
 
 ### Le bilan d'une partie
-<!-- en: the-review-of-a-game 66d8cf1e -->
+<!-- en: the-review-of-a-game 1bad0f30 -->
 
 Sur l'Échiquier d'étude, l'onglet *Bilan* à côté de la notation lit l'analyse de la partie (Alt+G) comme le ferait
 un entraîneur :
@@ -1238,9 +1238,9 @@ fasse la machine. L'analyse de la partie sur l'Échiquier d'étude compte des n�
 est cherchée sur 20 000 nœuds à la première passe, quatre fois plus à chaque passe, jusqu'au choix à côté du bouton
 (320 000, 1 280 000, 5 120 000 ou 20 480 000 nœuds par position, ou *jusqu'à l'arrêt*), sur un seul thread et
 depuis un hash vide, pour que le résultat d'une position ne dépende que du moteur et de la position. Plusieurs
-positions sont cherchées à la fois, un processus de moteur chacune : autant que l'analyse a de threads, et au moins la
-moitié des cœurs du processeur, jusqu'à quatre ; moins pendant qu'un tournoi joue sur cette machine, qui garde ses
-cœurs. Là où le coup joué était le choix du moteur et où la position n'est pas déséquilibrée, une seconde recherche de
+positions sont cherchées à la fois, un processus de moteur chacune : autant que l'analyse a de threads, ou la moitié
+des cœurs du processeur, jusqu'à quatre, quand c'est davantage ; moins pendant qu'un tournoi joue sur cette machine,
+qui garde ses cœurs. Là où le coup joué était le choix du moteur et où la position n'est pas déséquilibrée, une seconde recherche de
 la position avec deux lignes donne le deuxième meilleur coup : un seul coup est annoncé avec lui.
 
 Les positions de la finale à sept pièces ou moins peuvent être jugées exactement par les tables de Lichess,

@@ -11,6 +11,9 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
+// The size of a tag and of a chip's text, to the notation's.
+constexpr float TAG_SCALE = 0.8f;
+
 }  // namespace
 
 std::optional<Figurine> figurineOf(const std::string& san) {
@@ -80,8 +83,12 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
             w = fig ? fs * 1.05f + ImGui::CalcTextSize(fig->rest.c_str()).x : ImGui::CalcTextSize(it.text.c_str()).x;
             if (!it.mark.empty()) w += ImGui::CalcTextSize(it.mark.c_str()).x + px(1);
             w += pad * 2;
+        } else if (it.kind == NotationItem::Kind::Tag) {
+            w = font->CalcTextSizeA(fs * TAG_SCALE, FLT_MAX, 0.0f, it.text.c_str()).x;
         } else if (it.icon) {
             w = fs;
+        } else if (it.chip) {
+            w = font->CalcTextSizeA(fs * TAG_SCALE, FLT_MAX, 0.0f, it.text.c_str()).x + px(12);
         } else if (it.italic) {
             w = ui::italicFont()->CalcTextSizeA(fs, FLT_MAX, 0.0f, it.text.c_str()).x;
         } else {
@@ -162,13 +169,19 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
         }
         std::optional<Figurine> fig;
         const float w = measure(it, fig);
-        // A move number stays with its move: wrapped together.
-        float keep = w;
-        if (it.kind == NotationItem::Kind::Number && i + 1 < items.size()) {
+        // A move number stays with its move, and a move with its tags: wrapped together.
+        float keep       = w;
+        std::size_t next = i + 1;
+        if (it.kind == NotationItem::Kind::Number && next < items.size()) {
             std::optional<Figurine> next_fig;
-            keep += measure(items[i + 1], next_fig);
+            keep += measure(items[next], next_fig);
+            ++next;
         }
-        if (line_started && x + keep > o.x + room) {
+        for (; next < items.size() && items[next].kind == NotationItem::Kind::Tag; ++next) {
+            std::optional<Figurine> tag_fig;
+            keep += gap + measure(items[next], tag_fig);
+        }
+        if (line_started && x + keep > o.x + room && it.kind != NotationItem::Kind::Tag) {
             if (max_lines > 0 && line >= max_lines) {
                 cut = true;
                 break;
@@ -222,6 +235,20 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
                 put(it.mark, it.mark_colour ? it.mark_colour : col);
             }
             x += w + gap * 0.5f;
+        } else if (it.kind == NotationItem::Kind::Tag) {
+            // Smaller and muted, on the line of its move; the move's id, its clicks the move's.
+            const bool hovered =
+                window_hovered && mouse.x >= x && mouse.x < x + w + gap && mouse.y >= y && mouse.y < y + lh - px(2);
+            if (hovered && it.id >= 0) {
+                ev.hovered = it.id;
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) ev.clicked = it.id;
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) ev.right_clicked = it.id;
+            }
+            const float ts = fs * TAG_SCALE;
+            const float ty = y + (lh - px(2) - ImGui::GetTextLineHeight()) / 2 + (fs - ts) * 0.7f;
+            dl->AddText(font, ts, ImVec2(x, ty), it.colour ? it.colour : ui::MUTED, it.text.c_str());
+            x += w + gap * 1.5f;
         } else {
             // No room inside the brackets of a variation.
             if (it.text == ")" && x > o.x + gap) x -= gap * 0.5f + pad;
@@ -236,10 +263,16 @@ NotationEvents drawNotation(const char* id, const std::vector<NotationItem>& ite
             }
             const ImU32 col = it.colour ? it.colour : ui::MUTED;
             const float ty  = y + (lh - px(2) - ImGui::GetTextLineHeight()) / 2;
-            if (it.icon)
+            if (it.icon) {
                 ui::drawIcon(dl, *it.icon, ImVec2(x + w / 2, ty + ImGui::GetTextLineHeight() / 2), fs * 0.85f, col);
-            else
+            } else if (it.chip) {
+                const float ts = fs * TAG_SCALE, th = ImGui::GetTextLineHeight();
+                dl->AddRectFilled(ImVec2(x, ty + px(1)), ImVec2(x + w, ty + th - px(1)),
+                                  ImGui::GetColorU32(ImGuiCol_FrameBg), px(6));
+                dl->AddText(font, ts, ImVec2(x + px(6), ty + (th - ts) / 2), col, it.text.c_str());
+            } else {
                 dl->AddText(it.italic ? ui::italicFont() : font, fs, ImVec2(x, ty), col, it.text.c_str());
+            }
             x += w + (it.kind == NotationItem::Kind::Number ? px(1) : it.text == "(" ? 0.0f : gap);
         }
     }

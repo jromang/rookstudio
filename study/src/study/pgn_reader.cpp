@@ -197,6 +197,9 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
     std::string rest;
     std::size_t at = 0;
     bool assistant = false;  // the comment has the assistant's mark: its text goes to its own slot (#60)
+    // What the commands were, for a tournament's comment in its ChessBase style: [%eval], [%clk] and [%emt] alone,
+    // each read, and an [%emt] among them.
+    bool engine_commands = true, emt = false;
     while (at < text.size()) {
         const auto open = text.find("[%", at);
         if (open == std::string::npos) {
@@ -243,6 +246,7 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
             if (probe.clock_ms) {
                 move.notes.emt_ms = probe.clock_ms;
                 taken             = true;
+                emt               = true;
             }
         } else if (name == "cal") {
             taken = readMarks(args, true, move.notes.arrows);
@@ -250,7 +254,8 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
             taken = readMarks(args, false, move.notes.squares);
         }
         if (!taken) move.notes.commands.push_back(command);
-        at = close + 1;
+        engine_commands = engine_commands && taken && (name == "eval" || name == "clk" || name == "emt");
+        at              = close + 1;
     }
     auto words = tidy(rest);
     // A "[%" left in the text has no end in this comment: kept as "[ %", it can never become a command when the
@@ -261,8 +266,18 @@ std::string applyMoveComment(std::string_view comment, ReplayMove& move) {
         join(move.notes.assistant, words);
         return {};
     }
+    // A tournament's comment in fastchess's style: "+0.35/18 1.234s, n=…", kept as it was read (#87).
     if (engineComment(words)) {
         parseFastchessComment(words, move);
+        if (move.engine_comment.empty() && words == tidy(text)) move.engine_comment = words;
+        return words;
+    }
+    // In its ChessBase style: [%eval], [%clk] and [%emt], then its fields after a comma (", n=…, pv=\"…\", wdl=…"),
+    // and how the game ended after its last move. The fields read as the other style's, the comment kept as it was
+    // read: none of it goes to the notes (its commands were all read into the move).
+    if (emt && engine_commands && move.engine_comment.empty() && (words.empty() || words.rfind(", ", 0) == 0)) {
+        parseEngineFields(words, move);
+        move.engine_comment = tidy(text);
         return words;
     }
     join(move.notes.after, words);
@@ -409,10 +424,13 @@ PgnRead readPgnGame(std::string_view text) {
     if (word.kind != PgnToken::Tag) read.end = lex.offset();
     if (lines.size() > 1) fail("a variation is not closed");
 
-    // How a tournament's game ended: its last move's comment, after the engine's data.
+    // How a tournament's game ended: its last move's comment, after the engine's data; a field ("dt=0.001s") is none.
     if (!game.moves.empty() && !last_engine_comment.empty()) {
-        if (const auto comma = last_engine_comment.rfind(", "); comma != std::string::npos)
-            game.final_comment = last_engine_comment.substr(comma + 2);
+        if (const auto comma = last_engine_comment.rfind(", "); comma != std::string::npos) {
+            const auto last = std::string_view(last_engine_comment).substr(comma + 2);
+            const auto key  = last.find_first_not_of("abcdefghijklmnopqrstuvwxyz_");
+            if (key == 0 || key == std::string_view::npos || last[key] != '=') game.final_comment = std::string(last);
+        }
     }
     dropEmptyVariations(tree);
     read.tree = std::move(tree);

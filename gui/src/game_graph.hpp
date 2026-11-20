@@ -117,6 +117,9 @@ struct GameGraph {
 // How many plies the PV of a move repeats of what the opponent's previous PV predicted after its own move.
 [[nodiscard]] int pvAgreement(const std::string& previous_pv, const std::string& pv);
 
+// The colour of the engine that played White (0) or Black (1), in the theme shown.
+[[nodiscard]] ImU32 graphPlayerColour(int side);
+
 // White's pawns from a score of the side `stm` (a mate ±MATE_PAWNS), NaN without one.
 [[nodiscard]] float graphPawns(const std::optional<fastchess::Score>& score, chess::Color stm);
 // White's expected score from the side's WDL (permille), or from its score with the lichess formula; NaN without

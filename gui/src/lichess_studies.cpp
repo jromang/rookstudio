@@ -455,6 +455,7 @@ GameTree studyGame(const GameTree& tree, bool assistant) {
             m.decision_ms.reset();
             m.fields = 0;
             m.book   = false;
+            m.engine_comment.clear();  // the tournament's comment as it was read (#87)
             auto& n  = m.notes;
             if (!assistant) n.assistant.clear();  // with them, a comment after the move's, without the mark
             n.commands.clear();                   // other programs' commands

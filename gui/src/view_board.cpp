@@ -17,6 +17,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include <matchmaking/syzygy.hpp>
+#include <study/pgn_writer.hpp>
 #include <tour/chess_text.hpp>
 
 #include "app.hpp"
@@ -2585,8 +2586,10 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
             x += cs.x + px(20);
         }
         if (!to_move) {
-            const auto played = m.time_ms >= 0 && !m.book ? trf("played {} in {}", m.san, ui::formatClock(m.time_ms))
-                                                          : trf("played {}", m.san);
+            // In the Chess space, a tournament's ChessBase style tells the time with its [%emt] (#87).
+            const auto spent = chessBoard() ? moveTime(m) : m.time_ms;
+            const auto played =
+                spent >= 0 && !m.book ? trf("played {} in {}", m.san, ui::formatClock(spent)) : trf("played {}", m.san);
             dl->AddText(ImVec2(x, ty), ui::MUTED, played.c_str());
         }
     }
@@ -2670,10 +2673,13 @@ void App::drawBoardMoves(float height) {
     }
     updateBoardTablebase();
 
-    // This move under the moves and the table; the review is about the whole game.
+    // This move under the moves and the table; the review is about the whole game. In the Chess space, under the moves
+    // of a tournament's game, what the notation shows beside them (#87).
     const float strip = b.ply > 0 && b.ply <= total && b.game_tab != 3 ? thisMoveHeight() : 0.0f;
+    const float chips =
+        chessBoard() && b.game_tab == 0 && hasPlayerEvaluations(main) ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
     if (chessBoard() && b.game_tab == 0) drawBoardNagBar();  // the move field is the column's, above its tabs
-    ImGui::BeginChild("##board_moves", ImVec2(0, -strip), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("##board_moves", ImVec2(0, -(strip + chips)), ImGuiChildFlags_Borders);
     std::optional<ui::TopicRegion> moves_region(
         std::in_place, b.tree.variations.empty() ? guide::topics::BoardMoves : guide::topics::Variations);
     if (b.game_tab == 3) {
@@ -2759,6 +2765,8 @@ void App::drawBoardMoves(float height) {
         int last_book = -1;
         for (int i = 0; i < static_cast<int>(main.moves.size()) && main.moves[static_cast<std::size_t>(i)].book; ++i)
             last_book = i;
+        const auto tags = engineTags();  // what shows beside a tournament engine's moves (#87)
+
         const std::function<void(int, int, chess::Board, int)> emit = [&](int line, int base, chess::Board at,
                                                                           int depth) {
             const auto& moves = line < 0 ? main.moves : b.tree.variations[static_cast<std::size_t>(line)].moves;
@@ -2813,6 +2821,17 @@ void App::drawBoardMoves(float height) {
                         sign.text = nagText(nag);
                         items.push_back(std::move(sign));
                     }
+                    // A tournament engine's evaluation (White's) and depth beside its move, the rest on hovering it
+                    // (#87, mockup M12, board 8).
+                    if (line < 0) {
+                        if (auto tag = engineTag(m, tags); !tag.empty()) {
+                            NotationItem t;
+                            t.kind = NotationItem::Kind::Tag;
+                            t.text = std::move(tag);
+                            t.id   = id_of(line, ply + 1);
+                            items.push_back(std::move(t));
+                        }
+                    }
                     const float indent = px(10) * static_cast<float>(depth);
                     if (editing && !b.comment_edit->before && !b.comment_edit->assistant) {
                         field(indent);
@@ -2837,7 +2856,8 @@ void App::drawBoardMoves(float height) {
                 if (line < 0 && ply == last_book && last_book + 1 < static_cast<int>(main.moves.size())) {
                     NotationItem book;
                     book.kind   = NotationItem::Kind::Text;
-                    book.text   = TR("· end of book ·");
+                    book.text   = proto ? TR("end of book") : TR("· end of book ·");
+                    book.chip   = proto;  // a pill in the Chess space (M12, board 8)
                     book.colour = ImGui::GetColorU32(ImGuiCol_TextDisabled);
                     items.push_back(std::move(book));
                 }
@@ -2914,10 +2934,16 @@ void App::drawBoardMoves(float height) {
                 ImGui::EndTooltip();
             }
         }
-        // A move of the game: what its engine said and its judgement.
+        // A move of the game: what its engine said and its judgement; in the Chess space, a tournament engine's every
+        // field (#87).
         if (ev.hovered >= 0 && ev.hovered < kCommentIds && ev.hovered / 100000 == 0) {
             const int i = ev.hovered % 100000 - 1;
-            if (i >= 0 && i < static_cast<int>(main.moves.size())) {
+            if (i >= 0 && i < static_cast<int>(main.moves.size()) && proto &&
+                playerEvaluation(main.moves[static_cast<std::size_t>(i)])) {
+                drawEngineMoveTip(i + 1, static_cast<std::size_t>(i) < b.judged.size()
+                                             ? b.judged[static_cast<std::size_t>(i)]
+                                             : MoveReview{});
+            } else if (i >= 0 && i < static_cast<int>(main.moves.size())) {
                 const auto& m = main.moves[static_cast<std::size_t>(i)];
                 std::string tip;
                 if (m.score && !m.book) {
@@ -2935,6 +2961,41 @@ void App::drawBoardMoves(float height) {
         if (ev.right_clicked >= 0 && ev.right_clicked < kCommentIds && ev.right_clicked / 100000 > 0) {
             b.menu_line = ev.right_clicked / 100000 - 1;
             ImGui::OpenPopup("##variation_menu");
+        }
+        // A tournament engine's move, in the Chess space: the line it expected on the board or as a variation, its
+        // comment as it is (#87, mockup M12, board 8).
+        if (proto && ev.right_clicked > 0 && ev.right_clicked < kCommentIds && ev.right_clicked / 100000 == 0 &&
+            ev.right_clicked <= static_cast<int>(main.moves.size()) &&
+            playerEvaluation(main.moves[static_cast<std::size_t>(ev.right_clicked - 1)])) {
+            engine_menu_ply_ = ev.right_clicked;
+            ImGui::OpenPopup("##engine_move_menu");
+        }
+        if (ImGui::BeginPopup("##engine_move_menu")) {
+            const int ply = engine_menu_ply_;
+            if (ply >= 1 && ply <= static_cast<int>(main.moves.size())) {
+                const auto& m    = main.moves[static_cast<std::size_t>(ply - 1)];
+                const auto line  = expectedLine(m, b.chess960);
+                const auto label = boardMoveLabel(ply);
+                ImGui::TextDisabled("%s", label.c_str());
+                ImGui::BeginDisabled(line.empty());
+                if (ImGui::MenuItem(TR("The line it expected, on the board"))) {
+                    showBoardLine(-1, ply);
+                    auto name = main.header(m.mover == chess::Color::WHITE ? "White" : "Black");
+                    if (name.empty() || name == "?") name = m.mover == chess::Color::WHITE ? TR("White") : TR("Black");
+                    b.preview = BoardPreview{
+                        ply, ply, line,
+                        trf("{} expected {}", name, localLine(pvToSan(boardAt(main, b.chess960, ply), line, 6))),
+                        false};
+                }
+                if (ImGui::MenuItem(TR("The line it expected, as a variation"))) boardExpectedVariation(ply);
+                ImGui::EndDisabled();
+                if (ImGui::MenuItem(TR("Copy its comment as it is")))
+                    ImGui::SetClipboardText(study::engineComment(m).c_str());
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", TR("The engine's comment as the PGN has it: every field the tournament "
+                                               "wrote."));
+            }
+            ImGui::EndPopup();
         }
         if (ImGui::BeginPopup("##variation_menu")) {
             if (ImGui::MenuItem(TR("Promote the variation"))) {
@@ -2970,6 +3031,7 @@ void App::drawBoardMoves(float height) {
     moves_region.reset();  // its group ends inside the child
     ImGui::EndChild();
     if (strip > 0) drawThisMove();
+    if (chips > 0) drawEngineTagChips();
     ui::endCard();
 }
 
@@ -3142,19 +3204,21 @@ void App::drawThisMove() {
         text += "   " + name_of(m.mover) + ": " + white(*m.score, m.mover);
         if (m.depth > 0)
             text += m.seldepth > 0 ? fmt::format(" · d{}/{}", m.depth, m.seldepth) : fmt::format(" · d{}", m.depth);
-        if (m.time_ms >= 0) text += " · " + ui::formatClock(m.time_ms);
+        // In the Chess space, the time of a tournament's ChessBase style too, its [%emt] (#87).
+        if (const auto t = chessBoard() ? moveTime(m) : m.time_ms; t >= 0) text += " · " + ui::formatClock(t);
         if (m.nodes > 0) text += " · " + ui::formatCount(m.nodes) + " n";
         if (m.nps > 0) text += " · " + ui::formatCount(static_cast<uint64_t>(m.nps)) + " n/s";
         if (m.tbhits > 0) text += " · TB " + ui::formatCount(m.tbhits);
     }
     row(TR("This move"), text, 0, {}, "");
-    // The line it expected after it.
+    // The line it expected after it: in the Chess space, in the reader's piece letters.
     if (!m.book) {
         auto pv = split(m.pv);
         if (pv.size() > 1) {
             pv.erase(pv.begin());
-            const auto san = pvToSan(after, pv, 10);
-            row(TR("It expected"), san, ply, pv, trf("{} expected {}", name_of(m.mover), pvToSan(after, pv, 6)));
+            const auto local = [&](std::string line) { return chessBoard() ? localLine(line) : line; };
+            const auto san   = local(pvToSan(after, pv, 10));
+            row(TR("It expected"), san, ply, pv, trf("{} expected {}", name_of(m.mover), local(pvToSan(after, pv, 6))));
         }
     }
     // The tablebases: the result after the move, and whether the move kept the one before it.
@@ -3394,6 +3458,13 @@ std::string App::boardSan(std::string san) const {
 void App::drawBoardReview() {
     auto& b          = board_;
     const auto& main = b.tree.main;
+    // A tournament's game in the Chess space: the curve of its two engines first, from the game alone, without any
+    // analysis; the review's over it once done (#87, mockup M12, board 8).
+    const bool engines_curve = chessBoard() && hasPlayerEvaluations(main);
+    if (engines_curve) {
+        drawEnginesCurve();
+        ImGui::Spacing();
+    }
     if (b.reviews.empty() && engines_.empty()) {
         drawFirstEngineCard(TR("The game's review needs an engine: it analyses each position of the game."));
         return;
@@ -3406,7 +3477,7 @@ void App::drawBoardReview() {
         if (!b.reviewing() && !main.moves.empty() && ImGui::Button(TR("Analyse the game"))) startGameReview();
         return;
     }
-    if (chessBoard()) {
+    if (chessBoard() && !engines_curve) {
         drawReviewCurve();
         ImGui::Spacing();
     }

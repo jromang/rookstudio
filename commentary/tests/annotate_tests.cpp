@@ -116,4 +116,13 @@ TEST_CASE("annotate: an only move, a novelty, and a tournament engine's evaluati
     CHECK_FALSE(t.main.moves[0].notes.eval_tag);
     CHECK(t.main.moves[1].score->value == -30);
     CHECK(t.variations.empty());
+
+    // The same engine's evaluation in the ChessBase style of a tournament's comments: kept too, with its comment (#87).
+    t = tree("1. e4 {[%eval 0.25,20] [%clk 0:00:59.000] [%emt 0:00:01.000], n=1000} e5 {[%eval 0.17] Lichess} *");
+    annotate(t, g, report, a);
+    CHECK(t.main.moves[0].score->value == 25);
+    CHECK(t.main.moves[0].depth == 20);
+    CHECK(t.main.moves[1].score->value == -30);  // an analysis's [%eval], the review's in its place
+    CHECK(study::writePgnGame(t, {}).find("1. e4 {[%eval 0.25,20] [%clk 0:00:59.000] [%emt 0:00:01.000], n=1000}") !=
+          std::string::npos);
 }

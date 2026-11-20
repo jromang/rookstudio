@@ -27,8 +27,9 @@ struct NotationItem {
     // Break: what follows starts a new line. Field: a line of its own where text is written (field, field_size), its
     // hint in `text`. Block: a box of its own across the width, `icon` and `title` on its first line in `colour`, its
     // `text` wrapped under them, and `hint` under it when there is one (the assistant's comment beside another, mockup
-    // M11, board 5).
-    enum class Kind { Move, Number, Text, Break, Field, Block };
+    // M11, board 5). Tag: a small text that stays on the line of the move before it, its id the move's (an engine's
+    // evaluation and depth, mockup M12, board 8).
+    enum class Kind { Move, Number, Text, Break, Field, Block, Tag };
     Kind kind = Kind::Move;
     std::string text;  // a move's SAN, a number ("12.", "12…"), a text
     ImU32 colour = 0;  // 0: the text's
@@ -37,6 +38,7 @@ struct NotationItem {
     bool current      = false;  // framed
     bool bold         = false;
     bool italic       = false;     // a text in italics (the assistant's comments)
+    bool chip         = false;     // a text in a pill of its own ("end of book")
     std::optional<ui::Icon> icon;  // a text that is an icon, as wide as the font is high
     int id                 = -1;  // what the mouse events give back (a text too when it has one: a comment)
     std::string title;            // a block's

@@ -139,6 +139,11 @@ Phase phaseAt(const GamePhases& phases, int ply) {
     return Phase::Opening;
 }
 
+ImU32 graphPlayerColour(int side) {
+    if (side == 0) return light() ? IM_COL32(47, 111, 222, 255) : IM_COL32(91, 157, 255, 255);
+    return light() ? IM_COL32(217, 130, 43, 255) : IM_COL32(240, 163, 91, 255);
+}
+
 float graphPawns(const std::optional<fastchess::Score>& score, chess::Color stm) {
     if (!score) return std::nanf("");
     const float sign = stm == chess::Color::WHITE ? 1.0f : -1.0f;
@@ -190,8 +195,8 @@ GameGraph buildGameGraph(const ReplayGame& game, bool chess960, GraphChart chart
     }
     g.players[0].key    = "white";
     g.players[1].key    = "black";
-    g.players[0].colour = light() ? IM_COL32(47, 111, 222, 255) : IM_COL32(91, 157, 255, 255);
-    g.players[1].colour = light() ? IM_COL32(217, 130, 43, 255) : IM_COL32(240, 163, 91, 255);
+    g.players[0].colour = graphPlayerColour(0);
+    g.players[1].colour = graphPlayerColour(1);
     // An analysis written into the game: one curve, its own, not the players'.
     const bool annotated = evaluationsAnnotated(game);
     if (annotated) {

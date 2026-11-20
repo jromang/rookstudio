@@ -7,6 +7,12 @@
 
 namespace fcg {
 
+namespace {
+
+bool isSpace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+
+}  // namespace
+
 std::string ReplayGame::header(const std::string& key) const {
     for (const auto& [k, v] : headers) {
         if (k == key) return v;
@@ -15,7 +21,7 @@ std::string ReplayGame::header(const std::string& key) const {
 }
 
 void parseFastchessComment(std::string_view comment, ReplayMove& move) {
-    while (!comment.empty() && comment.front() == ' ') comment.remove_prefix(1);
+    while (!comment.empty() && isSpace(comment.front())) comment.remove_prefix(1);
 
     if (comment.rfind("book", 0) == 0) {
         move.book = true;
@@ -57,7 +63,7 @@ void parseFastchessComment(std::string_view comment, ReplayMove& move) {
     if (ec == std::errc()) move.depth = depth;
 
     rest = rest.substr(static_cast<std::size_t>(p - rest.data()));
-    while (!rest.empty() && rest.front() == ' ') rest.remove_prefix(1);
+    while (!rest.empty() && isSpace(rest.front())) rest.remove_prefix(1);
 
     const auto s_at = rest.find('s');
     if (s_at != std::string_view::npos) {
@@ -67,16 +73,21 @@ void parseFastchessComment(std::string_view comment, ReplayMove& move) {
         }
     }
 
+    // ", key=value" fields after the time.
+    parseEngineFields(rest, move);
+}
+
+void parseEngineFields(std::string_view rest, ReplayMove& move) {
     if (const auto at = rest.find("nps="); at != std::string_view::npos) {
         const auto value = rest.substr(at + 4);
         std::from_chars(value.data(), value.data() + value.size(), move.nps);
         move.fields |= PGN_NPS;
     }
 
-    // ", key=value" fields after the time.
+    // A key at the start, or after a space: a comment written again over several lines has a line end there.
     const auto field = [&](std::string_view key) -> std::optional<std::string_view> {
         for (auto at = rest.find(key); at != std::string_view::npos; at = rest.find(key, at + 1)) {
-            if (at == 0 || rest[at - 1] == ' ') return rest.substr(at + key.size());
+            if (at == 0 || isSpace(rest[at - 1])) return rest.substr(at + key.size());
         }
         return std::nullopt;
     };
@@ -114,7 +125,10 @@ void parseFastchessComment(std::string_view comment, ReplayMove& move) {
             ok           = r.ec == std::errc() && (i == 2 || (r.ptr < end && *r.ptr == '/'));
             p            = r.ptr + 1;
         }
-        if (ok) move.wdl = wdl;
+        if (ok) {
+            move.wdl = wdl;
+            move.fields |= PGN_WDL;
+        }
     }
 }
 

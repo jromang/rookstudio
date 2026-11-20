@@ -25,6 +25,7 @@ enum PgnField : uint8_t {
     PGN_TBHITS   = 1 << 3,  // tbhits=
     PGN_PV       = 1 << 4,  // pv="..."
     PGN_DECISION = 1 << 5,  // dt=
+    PGN_WDL      = 1 << 6,  // wdl=
 };
 
 // A coloured arrow or square drawn on the board, as [%cal] and [%csl] write them: "Ge2e4" is a green arrow from e2
@@ -84,6 +85,10 @@ struct ReplayMove {
     std::optional<int64_t> clock_ms;  // the mover's clock after the move, when the comment has [%clk]
     uint8_t fields = 0;               // the PgnField found in its comment, a zero told apart from a field not written
     MoveNotes notes;
+    // The tournament's comment as it was read, its spaces and line ends made one space: "+0.35/18 1.234s, n=…", or
+    // its ChessBase style "[%eval 0.35,18] [%clk 0:00:59.200] [%emt 0:00:01.234], n=…" (#87). The PGN writer gives
+    // it back as it is while the move's data is still what it says; empty for any other comment.
+    std::string engine_comment;
 };
 
 struct ReplayGame {
@@ -113,6 +118,9 @@ struct GameTree {
 
 // "{+0.35/18 1.234s, ...}" (the body without braces) into score, depth, time and nps.
 void parseFastchessComment(std::string_view comment, ReplayMove& move);
+// The ", key=value" fields a tournament writes after a move's score and time, or after the commands of its ChessBase
+// style (", n=1297184, sd=41, nps=…, tbhits=0, pv=\"…\", wdl=111/757/132, dt=0.116s"), into the move's fields.
+void parseEngineFields(std::string_view fields, ReplayMove& move);
 
 // The "[%eval 0.17]" or "[%eval #-3]" of a comment (lichess, ChessBase: White's point of view, in pawns or a mate
 // in moves) into the move's score, from its mover's point of view; nothing when the comment has none. The mover must

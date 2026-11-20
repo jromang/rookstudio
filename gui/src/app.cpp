@@ -300,6 +300,7 @@ void App::frame() {
     pollOfflineEvals();     // Lichess's evaluations kept offline: a preparation's runs, its end (#58)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
     pollStudies();          // the user's Lichess studies: read, imported, followed, a game sent (#79)
+    pollTheory();           // the theory studies: read, read again when their files change (#77)
     pollTraining();         // a repertoire's training: its cards prepared, its first question (#76)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
@@ -359,9 +360,17 @@ void App::frame() {
         } else if (w.rfind("databases-import=", 0) == 0) {  // databases-import=FILE: into a new database named after it
             page_ = Page::Databases;
             importIntoDatabase(-1, std::filesystem::path(w.substr(17)));
-        } else if (w == "openings")
-            page_ = Page::Openings;
-        else if (w == "training" || w == "training-new") {  // a session of the active repertoire's training (#76)
+        } else if (w == "openings" || w == "openings-theory") {  // the Openings page; its Theory part (#77)
+            page_            = Page::Openings;
+            openings_theory_ = w == "openings-theory";
+        } else if (w.rfind("theory-add=", 0) == 0) {
+            // theory-add=FILE[,WORD]: FILE added to the theory (the profile left as it was in a run for captures);
+            // then WORD, another of these.
+            const auto comma = w.find(',');
+            addTheoryFile(
+                std::filesystem::path(w.substr(11, comma == std::string::npos ? std::string::npos : comma - 11)));
+            if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w == "training" || w == "training-new") {  // a session of the active repertoire's training (#76)
             if (repertoires().active() >= 0)
                 startTraining(static_cast<std::size_t>(repertoires().active()),
                               w == "training" ? TrainingRun::Kind::Due : TrainingRun::Kind::New);
@@ -390,9 +399,20 @@ void App::frame() {
                 setBoardAnalysis(true);
             }
             if (w.rfind("board-analysis-menu", 0) == 0) side_menu_open_ = true;
-        } else if (w == "board-tree" || w == "board-references") {  // the Chess space's column at that tab
+        } else if (w == "board-tree" || w == "board-references" || w.rfind("board-tree=", 0) == 0 ||
+                   w.rfind("board-notation=", 0) == 0) {
+            // The Chess space's column at that tab; board-tree=FILE[@PLY], board-notation=FILE[@PLY]: FILE on the
+            // board (at that ply once read).
             toStudyBoard();
-            board_side_tab_ = w == "board-tree" ? 2 : 3;
+            board_side_tab_ = w.rfind("board-tree", 0) == 0 ? 2 : w.rfind("board-notation", 0) == 0 ? 0 : 3;
+            if (const auto eq = w.find('='); eq != std::string::npos) {
+                auto file = w.substr(eq + 1);
+                if (const auto at = file.rfind('@'); at != std::string::npos && at > 1) {
+                    ply_when_read_ = std::atoi(file.c_str() + at + 1);
+                    file           = file.substr(0, at);
+                }
+                dropFile(file);
+            }
         } else if (w == "board" || w == "board-analyse") {  // the Board page; its analysis started
             page_ = Page::Board;
             if (w == "board-analyse") setBoardAnalysis(true);
@@ -1542,6 +1562,13 @@ void App::handleDialogs() {
         switch (answer->purpose) {
             case Dialogs::Purpose::AddEngine:
                 addEngine(path);
+                break;
+            case Dialogs::Purpose::TheoryPgn:  // a theory study (#77)
+                addTheoryFile(path);
+                break;
+            case Dialogs::Purpose::TheoryFind:
+                if (theory_chosen_ >= 0 && static_cast<std::size_t>(theory_chosen_) < theory().studies().size())
+                    theory().relocate(static_cast<std::size_t>(theory_chosen_), path);
                 break;
             case Dialogs::Purpose::TournamentsFolder:
                 storage_.setRunsDir(path);

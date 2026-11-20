@@ -312,6 +312,7 @@ void App::pollStudies() {
             }
             saveStudiesState();
             if (job.open_after) openStudyChapter(job.id, static_cast<std::size_t>(std::max(0, study_chapter_)));
+            if (job.theory_after) makeTheoryStudy(job.id);  // read to be made a theory study (#77)
         }
     }
     // The followed studies: has each changed?
@@ -829,15 +830,28 @@ void App::drawStudyDetail(const lichess::StudyInfo& study) {
     if (ui::iconButton("study_open", ui::Icon::Board, open_label))
         openStudyChapter(id, static_cast<std::size_t>(study_chapter_));
     ImGui::EndDisabled();
-    // Theory studies are not there yet (#77): shown, greyed.
-    const char* theory = TR("Make it a theory study");
+    // A theory study (#77): its notes in the Tree tab, read again with the study.
+    const auto in_theory = theory().findLichess(id);
+    const char* theory   = in_theory ? TR("In the theory ›") : TR("Make it a theory study");
     ui::sameLineOrWrap(ImGui::CalcTextSize(theory).x + px(24));
-    ImGui::BeginDisabled();
-    ImGui::Button(theory);
+    ImGui::BeginDisabled(!in_theory && study_job_.has_value());
+    if (ImGui::Button(theory)) {
+        if (in_theory)
+            showTheoryPart(*in_theory);
+        else
+            makeTheoryStudy(id);
+    }
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s", TR("Not there yet: a theory study will show its comments in the Tree tab, beside the "
-                                   "moves of the positions it covers."));
+        ImGui::SetTooltip("%s",
+                          in_theory ? TR("Its notes show in the Tree tab; the Openings page's Theory part hides "
+                                         "them or takes it out.")
+                          : chapters && !chapters->empty()
+                              ? TR("Its comments, symbols, evaluations, arrows and squares in the Tree tab, at each "
+                                   "position its chapters reach; read again with the study. Nothing more is asked "
+                                   "of Lichess.")
+                              : TR("Its PGN asked of Lichess first, then its comments, symbols, evaluations, "
+                                   "arrows and squares in the Tree tab, at each position its chapters reach."));
     // Followed: asked whether it changed when this page opens.
     bool followed = r && r->followed;
     ImGui::BeginDisabled(!r || r->read_at == 0);

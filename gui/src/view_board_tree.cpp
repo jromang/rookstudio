@@ -686,7 +686,10 @@ void App::drawBoardTree() {
     // The rows of the position shown, made again when it or the source changes.
     const auto fen      = boardFen();
     const bool online   = tree_source_ >= lichess_at;
-    if (online && !lichessTreeRows(tree_source_ - lichess_at, fen)) return;  // the card it needs instead
+    if (online && !lichessTreeRows(tree_source_ - lichess_at, fen)) {
+        drawTreeTheory(ImGui::GetContentRegionAvail().y);  // the studies' notes, whatever the source (#77)
+        return;                                            // the card it needs instead
+    }
     const bool book     = tree_source_ >= books_at;
     const bool combined = tree_source_ < together;
     tree_db_ =
@@ -904,15 +907,28 @@ void App::drawBoardTree() {
     // (#58), beside it.
     const auto here      = boardAt(b.game, b.chess960, b.ply);
     const bool evals     = offline_evals_ && offline_evals_->lookup() && !b.chess960 && !aidsLocked();
-    constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
-    const int columns    = (tree_book_ ? 3 : 9) + (evals ? 1 : 0);
+    // The theory studies' notes (#77): a Theory column marking the moves they comment, and what they say under the
+    // moves.
+    const auto& theory_here = boardTheory();
+    const bool theory_col   = theory().anyNotes();
+    constexpr auto flags    = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
+    const int columns       = (tree_book_ ? 3 : 9) + (evals ? 1 : 0) + (theory_col ? 1 : 0);
     // Room under the table for the star's Undo and the line of keys.
     const float games_h = online && !tree_games_.empty()
                               ? ImGui::GetTextLineHeightWithSpacing() * static_cast<float>(tree_games_.size() + 2)
                               : 0.0f;  // the games the explorer names, under the moves (#56)
-    const float toast_h = (star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f) +
-                          ImGui::GetTextLineHeightWithSpacing() * 2 + games_h;
-    if (!tree_rows_.empty() && ImGui::BeginTable("##tree_rows", columns, flags, ImVec2(0, -toast_h))) {
+    const float under_h = (star_undo_ && now - star_undo_->at < 8 ? ImGui::GetFrameHeightWithSpacing() : 0.0f) +
+                          ImGui::GetTextLineHeightWithSpacing() * 2;
+    const float toast_h = under_h + games_h;
+    float table_h       = -toast_h;
+    if (!theory_here.found.empty()) {
+        // The moves as high as they need, half the room at most when they need more: the notes take the rest.
+        const float row_h   = ImGui::GetTextLineHeight() + ImGui::GetStyle().CellPadding.y * 2;
+        const float natural = row_h * static_cast<float>(tree_rows_.size() + 1) + px(6);
+        const float room    = ImGui::GetContentRegionAvail().y - toast_h;
+        table_h             = std::min(natural, std::max(room * 0.5f, std::min(natural, px(140))));
+    }
+    if (!tree_rows_.empty() && ImGui::BeginTable("##tree_rows", columns, flags, ImVec2(0, table_h))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
         ImGui::TableSetupColumn(TR("Move"));
@@ -928,6 +944,7 @@ void App::drawBoardTree() {
             ImGui::TableSetupColumn(tree_ctg_ ? TR("Book") : TR("Last"));
             ImGui::TableSetupColumn(lichess_players && lichess_.explorer_months ? TR("By month") : "");
         }
+        if (theory_col) ImGui::TableSetupColumn(TR("Theory"));
         ImGui::TableHeadersRow();
         for (std::size_t r = 0; r < tree_rows_.size(); ++r) {
             const auto& row = tree_rows_[r];
@@ -977,6 +994,10 @@ void App::drawBoardTree() {
             if (tree_book_) {
                 ImGui::ProgressBar(static_cast<float>(row.games) / 1000.0f, ImVec2(-1, 0),
                                    fmt::format("{} %", std::lround(row.games / 10.0)).c_str());
+                if (theory_col) {
+                    ImGui::TableSetColumnIndex(columns - 1);
+                    drawTreeTheoryCell(row.san);
+                }
                 if (greyed) ImGui::PopStyleColor();
                 continue;
             }
@@ -1016,11 +1037,17 @@ void App::drawBoardTree() {
             }
             ImGui::TableNextColumn();
             if (!row.months.empty()) drawTreeMonths(row.months);
+            if (theory_col) {
+                ImGui::TableNextColumn();
+                drawTreeTheoryCell(row.san);
+            }
             if (greyed) ImGui::PopStyleColor();
         }
         ImGui::EndTable();
     }
     if (online) drawTreeGames();
+    // What the studies say here (#77): a note on a move under the mouse shows the move as the arrow.
+    if (const auto on = drawTreeTheory(ImGui::GetContentRegionAvail().y - under_h)) hovered = on;
     if (star && path) {
         const auto index = active >= 0 ? static_cast<std::size_t>(active) : reps.activeOrNew(mover);
         auto before      = reps.entries()[index].lines;

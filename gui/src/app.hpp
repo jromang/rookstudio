@@ -80,6 +80,7 @@
 #include "storage.hpp"
 #include "suite_run.hpp"
 #include "tablebases.hpp"
+#include "theory_shelf.hpp"
 #include "topology.hpp"
 #include "training.hpp"
 #include "twic.hpp"
@@ -706,6 +707,53 @@ class App {
     void drawTrainingHome();                       // the Home page's "In progress": the positions to review
     [[nodiscard]] bool trainingDue();
 
+    // Theory studies (#77, mockup M11, board 2; theory_shelf.hpp, view_theory.cpp): annotated PGN files read where they
+    // are, Lichess studies' PGN, the repertoires' comments. The Openings page's Theory part, the Tree tab's Theory
+    // column and "What your studies say" under its moves, the Notation tab's "Theory · N".
+    std::unique_ptr<TheoryShelf> theory_;
+    TheoryShelf& theory();          // made when first needed, its studies read in the background
+    bool openings_theory_ = false;  // the Openings page shows its Theory part
+    int theory_chosen_    = 0;      // the study the part shows
+    struct TheoryUndo {
+        TheoryShelf::Removed removed;
+        std::string said;
+        double at = 0;
+    };
+    std::optional<TheoryUndo> theory_undo_;  // a study taken out, put back by its toast
+    std::string theory_said_;                // what the last addition said
+    double theory_said_at_ = -100;
+    // What the notes say at the board's position, made again when it, the board's line or the notes change.
+    struct TheoryHere {
+        std::string of;
+        TheoryAt at;
+        std::map<std::string, chess::Move> moves;  // the moves the notes are on, as the board plays them
+    };
+    TheoryHere theory_here_;
+    // The marks of the note under the mouse in the Tree tab, on the board while it shows their position.
+    struct TheoryMarks {
+        uint64_t position = 0;  // the board's hash()
+        std::vector<BoardMark> arrows, squares;
+        int frame = 0;  // drawn the frame they were set and the next only
+    };
+    std::optional<TheoryMarks> theory_marks_;
+    std::chrono::steady_clock::time_point theory_synced_{};
+    void pollTheory();                            // each frame: the readings, the files changed, the repertoires
+    [[nodiscard]] const TheoryAt& boardTheory();  // at the Board page's position
+    void drawOpeningsParts();                     // "Repertoires · Theory", in the Openings page's title line
+    void drawTheoryPart();
+    void drawTheoryStudy(std::size_t index, std::optional<std::size_t>& open, std::optional<std::size_t>& take_out);
+    void drawTheoryUndo();
+    void drawTreeTheoryCell(const std::string& san);  // a move's Theory column in the Tree tab
+    // Under the Tree tab's moves, `height` high: the note under the mouse that is on a move gives it.
+    std::optional<chess::Move> drawTreeTheory(float height);
+    void drawTheoryChip();  // the Notation tab's, above its moves
+    void addTheoryFile(const std::filesystem::path& file);
+    void makeTheoryStudy(const std::string& id);  // a Lichess study's, read first when it never was on this machine
+    void showTheoryPart(std::optional<std::size_t> chosen = std::nullopt);
+    void openTheoryDialog();
+    void openTheoryCopy(const TheorySource& source);  // its games on the Board, a copy
+    void openTheoryNote(const TheoryFound& found);    // its game at its move, a copy
+
     // shell
     void drawShell();
     void drawRail(float width);
@@ -1154,6 +1202,7 @@ class App {
         std::string base_name;
         std::filesystem::path folder;  // that database's
         bool open_after = false;       // its chosen chapter opened on the Board once read
+        bool theory_after = false;       // made a theory study once read (#77)
         std::future<StudyRead> done;
     };
     std::optional<StudyJob> study_job_;

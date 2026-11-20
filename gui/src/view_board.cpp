@@ -1201,6 +1201,7 @@ void App::drawBoardNagBar() {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", TR(s.tip));
     }
     ImGui::EndDisabled();
+    drawTheoryChip();  // what the theory studies say here: the Tree tab (#77)
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("%s", TR("Enter: a comment after the move · Shift+Enter: before it · ! and ?: symbols · Del: "
                                 "the moves from here · Alt+↑: the variation up · Ctrl+Z, Ctrl+Y · another move: a "
@@ -1673,6 +1674,11 @@ void App::dropFile(const std::string& path) {
         importIntoDatabase(db_selected_, file);
         return;
     }
+    // On the Openings page, an annotated PGN becomes a theory study (#77).
+    if (page_ == Page::Openings && ext == ".pgn") {
+        addTheoryFile(file);
+        return;
+    }
     if (ext == ".pgn") {
         openBoardPgn(file);
         return;
@@ -2031,6 +2037,17 @@ void App::drawBoardColumn(float size) {
     // The tree's move under the mouse or chosen (the Chess space's Tree tab), in the accent's blue.
     if (chessBoard() && tree_arrow_ && tree_arrow_->position == board.hash())
         decor.arrows.push_back({tree_arrow_->move, IM_COL32(47, 111, 222, 190)});
+    // The arrows and squares of the theory note under the mouse in the Tree tab (#77), lighter than the game's own.
+    if (chessBoard() && theory_marks_ && theory_marks_->frame >= ImGui::GetFrameCount() - 1 &&
+        theory_marks_->position == board.hash()) {
+        for (const auto& a : theory_marks_->arrows)
+            if (a.from >= 0 && a.to >= 0)
+                decor.arrows.push_back(
+                    {chess::Move::make<chess::Move::NORMAL>(chess::Square(a.from), chess::Square(a.to)),
+                     (markColour(a.colour, false) & ~IM_COL32_A_MASK) | IM_COL32(0, 0, 0, 150)});
+        for (const auto& q : theory_marks_->squares)
+            if (q.from >= 0) decor.tints.push_back({chess::Square(q.from), markColour(q.colour, true)});
+    }
     // The marks of the move shown, and the arrow being drawn (the Chess space).
     if (chessBoard()) {
         const MoveNotes& notes = b.ply > 0 ? b.game.moves[static_cast<std::size_t>(b.ply - 1)].notes : b.start_notes;

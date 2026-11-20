@@ -975,7 +975,8 @@ The notation is written in place, without a dialog:
 
 *Figurines in the notation* (*Settings* > *Appearance*) shows the pieces as figures. The assistant's comments show
 apart from yours, in blue grey and in italics, after a bubble (see [Comments by the
-assistant](#comments-by-the-assistant)).
+assistant](#comments-by-the-assistant)). When your theory studies comment the position shown, *Theory · 3* above the
+moves leads to their notes in the Tree tab (see [Theory studies](#theory-studies)).
 
 ### Arrows and squares
 
@@ -1045,7 +1046,9 @@ The move under the mouse, or chosen with ↑ ↓, shows as a blue arrow on the b
 or its star marks it in the active repertoire (see [The Openings page](#the-openings-page)). When the game's line
 leaves the database, the tab says at which move, and whether that move is a **novelty**, as a position search
 confirms (*See the last known position*). A database's tree is built after each import, and again in the background
-after a game is saved into it, its progress shown with *Cancel*.
+after a game is saved into it, its progress shown with *Cancel*. Your theory studies' notes come with the moves,
+whatever the source: a *Theory* column, and *What your studies say* under the moves (see [Theory
+studies](#theory-studies)).
 
 ### Reference games
 
@@ -1263,6 +1266,37 @@ the machine. The Home page's *In progress* says how many positions are due, a cl
 repertoire* too. While one of your games is played live on Lichess, the training waits; the positions on the line of
 one of your correspondence games are left out until it ends.
 
+### Theory studies
+
+The **Theory** part of the Openings page (beside *Repertoires*, in its title's line) holds your theory studies:
+annotated PGN files, your analyses or a book in PGN, and Lichess studies. Their notes show in the Board page's Tree tab,
+at each position they comment, whatever the move order that leads there.
+
+*Add a PGN…*, or a PGN dropped on the page, adds a file: RookStudio reads it where it is, in the background, and reads it
+again by itself when it changes on the disk. The theory never writes into it, and nothing leaves the machine. *From a
+Lichess study…* adds one of your Lichess studies read on this machine (see [Your Lichess studies](#your-lichess-studies)):
+its copy in your profile is read, and read again with the study.
+
+What becomes a note: every annotated position of the file, variations included, with the comments before and after the
+move, its symbols (!, ?!, ±…), a written evaluation (`[%eval]`), and its arrows and squares; a game's comment before its
+first move is a note on its start. The assistant's comments are not (see [Comments by the
+assistant](#comments-by-the-assistant)): they are about one game's move, and the assistant comments any position on
+request. Your repertoires' comments show the same way, under their names (*Your repertoires' comments too*, under the
+list).
+
+Each study shows its numbers: the positions annotated, the comments, symbols and evaluations. *Show its notes in the
+tree* (on at first) hides them, or shows them again. *Open it on the Board* (Enter, or a double click in the list) opens
+its games there as a copy: Ctrl+S saves a game elsewhere, and the file stays as its author writes it. *Remove it from
+the theory* (Delete) leaves the file where it is, and *Undo* puts it back. A file moved away says so, with *Find it…*.
+
+In the **Tree tab**, the *Theory* column marks the moves your studies comment: their symbols, and how many notes say more
+than a symbol. Under the moves, **What your studies say** lists the notes of the position shown: each one's source,
+where it is (*after 7.f4*, *on 7…Qb6*, or *found by transposition* with its own moves when they reach the position in
+another order), its text, and its line, which a click opens on the Board at its move. The mouse over a note on a move
+shows the move as the tree's arrow; over a note about the position, its arrows and squares on the board. In the
+**Notation** tab, *Theory · 3* above the moves says how many notes the position has, and leads to the Tree tab (Alt+3).
+While one of your games is played live on Lichess, the notes are hidden with the tree.
+
 ## The Lichess page
 
 Everything here is optional: RookStudio works without an account and without the Internet, and what goes to Lichess
@@ -1301,7 +1335,8 @@ A click on a study reads it the first time: its chapters show, and stay in your 
 on the Board* (or a double click on it) opens it, seen from the side Lichess shows it from. *Import into a database*
 puts each chapter into a database as a game: *Lichess studies*, made when missing, or another chosen beside it. Done
 again, or with *Read again* once imported, only the chapters changed since are replaced and the new ones added; a game
-you deleted there stays deleted. *Make it a theory study* is not there yet.
+you deleted there stays deleted. *Make it a theory study* shows its comments in the Tree tab, read again with the study
+(see [Theory studies](#theory-studies)); a study never read is read first.
 
 *Follow it*: when the Lichess page opens (every five minutes at most), RookStudio asks Lichess whether each followed
 study changed, one request each, without downloading it. A study that changed says so, in the card and on its line

@@ -88,7 +88,7 @@ const char* App::guideSection() const {
         case Page::Databases:
             return Databases;
         case Page::Openings:
-            return OpeningsPage;
+            return openings_theory_ ? TheoryStudies : OpeningsPage;
         case Page::Lichess:
             return LichessPage;
         case Page::Count:  // the views' sheet
@@ -601,7 +601,27 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     };
     add(TR("Home"), where(Page::ChessHome), page(Page::ChessHome));
     add(TR("Databases"), where(Page::Databases), page(Page::Databases));
-    add(TR("Openings: repertoires"), where(Page::Openings), page(Page::Openings));
+    add(TR("Openings: repertoires"), where(Page::Openings), [this, go = page(Page::Openings)] {
+        go();
+        openings_theory_ = false;
+    });
+    // The theory studies (#77): their part of the Openings page, a PGN added, what they say at the board's position.
+    add(TR("Openings: theory studies"), where(Page::Openings), [this, go = page(Page::Openings)] {
+        go();
+        openings_theory_ = true;
+    });
+    add(TR("Add a PGN to the theory…"), TR("Openings"), [this, go = page(Page::Openings)] {
+        go();
+        openings_theory_ = true;
+        openTheoryDialog();
+    });
+    if (chessBoard() && !liveGameOn())
+        if (const auto n = boardTheory().found.size(); n > 0)
+            add(trn("What my studies say here · {} note", "What my studies say here · {} notes", n, n), "Alt+3",
+                [this] {
+                    toStudyBoard();
+                    board_side_tab_ = 2;
+                });
     // The repertoires' training (#76): a session of each, its new positions alone, its settings.
     for (std::size_t i = 0; i < repertoires().entries().size(); ++i) {
         const auto& counts = trainingSummary(i).counts;

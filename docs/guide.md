@@ -337,7 +337,7 @@ them.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | The study Board | The Notation, Analysis, Tree, References and Questions tabs |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
-| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G and N do on the engines' Board (on the study Board, the letters type moves) |
+| <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G, N and Shift+N do on the engines' Board (on the study Board, the letters type moves) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | The Tree tab | Choose a move, play it, mark it in the active repertoire |
 | <kbd>Enter</kbd> | The Openings page | Start the training of the repertoire shown |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | A training session | A hint, "I don't know", stop |
@@ -919,7 +919,7 @@ With an empty library, the Analysis, Questions and Review tabs offer to download
 A move is typed as well as played: its first letter opens a field above the tabs, which offers the legal moves that
 begin so (in English letters, K Q R B N; in French, R D T F C), and Enter plays it. The letters of the engines' Board
 are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis, Alt+X shows the threat, Alt+G
-analyses the game, Alt+N goes to the next move the analysis marked.
+analyses the game, Alt+N and Alt+Shift+N go to the next and the previous move the analysis marked.
 
 ### Several engines side by side
 

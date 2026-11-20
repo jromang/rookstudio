@@ -248,13 +248,16 @@ void App::drawChessHome() {
         drawLichessHomeCard();
     }
 
-    // What runs: the game's analysis, the position's, an import, the assistant (M5, board 1).
+    // What runs: the game's analysis, the position's, an import, the assistant (M5, board 1); the positions of the
+    // repertoires to review (#76).
     const bool importing = job != nullptr;
     const auto assistant = assistantStatus();
-    if (b.reviewing() || b.analysing || importing || !assistant.empty()) {
+    const bool training  = trainingDue();
+    if (b.reviewing() || b.analysing || importing || !assistant.empty() || training) {
         ImGui::Dummy(ImVec2(0, px(6)));
         ui::beginCard("chess_running");
         ImGui::TextUnformatted(TR("In progress"));
+        if (training) drawTrainingHome();
         for (const auto& task : b.review_tasks) {
             const auto& done  = task.state.done;
             const auto count  = std::count(done.begin(), done.end(), true);

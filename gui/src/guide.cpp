@@ -156,7 +156,8 @@ const std::vector<const char*>& allTopics() {
                                               ChessCom,
                                               ChessBaseImport,
                                               Lumbra,
-                                              LichessStudies};
+                                              LichessStudies,
+                                              Training};
     return all;
 }
 

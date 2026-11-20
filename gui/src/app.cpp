@@ -300,6 +300,7 @@ void App::frame() {
     pollOfflineEvals();     // Lichess's evaluations kept offline: a preparation's runs, its end (#58)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
     pollStudies();          // the user's Lichess studies: read, imported, followed, a game sent (#79)
+    pollTraining();         // a repertoire's training: its cards prepared, its first question (#76)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -360,7 +361,11 @@ void App::frame() {
             importIntoDatabase(-1, std::filesystem::path(w.substr(17)));
         } else if (w == "openings")
             page_ = Page::Openings;
-        else if (w.rfind("engines-remote-picker", 0) == 0) {
+        else if (w == "training" || w == "training-new") {  // a session of the active repertoire's training (#76)
+            if (repertoires().active() >= 0)
+                startTraining(static_cast<std::size_t>(repertoires().active()),
+                              w == "training" ? TrainingRun::Kind::Due : TrainingRun::Kind::New);
+        } else if (w.rfind("engines-remote-picker", 0) == 0) {
             // The first machine's files, as Add, A program on <machine>, shows them; engines-remote-picker=PATH: from
             // the folder of PATH there.
             page_            = Page::Engines;

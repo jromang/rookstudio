@@ -72,6 +72,7 @@ inline constexpr const char* GameList           = "the-game-list";
 inline constexpr const char* Searching          = "searching";
 inline constexpr const char* ReadWithoutCopy    = "tournaments-and-pgn-files";
 inline constexpr const char* OpeningsPage       = "the-openings-page";
+inline constexpr const char* Training           = "training-a-repertoire";
 inline constexpr const char* LichessPage        = "the-lichess-page";
 inline constexpr const char* LichessLink        = "linking-your-account";
 inline constexpr const char* LichessGames       = "a-players-games";

@@ -107,8 +107,13 @@ void App::drawOpeningsPage() {
         }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(3)));
         ImGui::TextUnformatted(e.name.c_str());
+        // Its side at the right; under it, what its training has for today (#76) and its size.
+        const char* side_name = e.side == chess::Color::WHITE ? TR("White") : TR("Black");
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX(),
+                                 ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(side_name).x - px(6)));
+        ImGui::TextDisabled("%s", side_name);
         ImGui::SetCursorPosX(start.x + px(6));
-        ImGui::TextDisabled("%s", trf("{} · {}", e.side == chess::Color::WHITE ? TR("White") : TR("Black"),
+        ImGui::TextDisabled("%s", trf("{} · {}", trainingListLine(i),
                                       trn("{} position", "{} positions", static_cast<int>(r.map(i).size()),
                                           ui::exactCount(r.map(i).size())))
                                       .c_str());
@@ -122,6 +127,16 @@ void App::drawOpeningsPage() {
     const auto& e    = r.entries()[index];
     ui::pageTitle(e.name.c_str());
     if (ui::iconButton("rep_open", ui::Icon::Board, TR("Open its file on the board"))) openBoardPgn(e.file);
+    ImGui::SameLine(0, px(12));
+    ImGui::TextDisabled(
+        "%s", trf("{} · active · {}", e.side == chess::Color::WHITE ? TR("White") : TR("Black"),
+                  trn("{} position where it is your move", "{} positions where it is your move",
+                      trainingSummary(index).counts.cards, ui::exactCount(trainingSummary(index).counts.cards)))
+                  .c_str());
+    // Its training (#76, mockup M11, board 1): what is due, the new positions, Start.
+    ImGui::Dummy(ImVec2(0, px(4)));
+    drawTrainingCard(index);
+    ImGui::Dummy(ImVec2(0, px(8)));
 
     // Its coverage of the databases' games, measured in the background.
     auto& shelf_ = shelf();

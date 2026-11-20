@@ -339,6 +339,9 @@ them.
 | <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G and N do on the engines' Board (on the study Board, the letters type moves) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | The Tree tab | Choose a move, play it, mark it in the active repertoire |
+| <kbd>Enter</kbd> | The Openings page | Start the training of the repertoire shown |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | A training session | A hint, "I don't know", stop |
+| <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | A training session | The next position, or again after a wrong answer; take back a move added to the repertoire |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A game list | Go through the list, open the game |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | The Databases page | The search panel |
 | <kbd>Escape</kbd> | The Databases page | Close the search panel, then the list |
@@ -373,8 +376,9 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
   tournaments read without a copy (see [Databases](#databases)).
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
-- **In progress**: the game's analysis, the position's, an import, and the assistant (its download, its model
-  loaded, *Unload*).
+- **In progress**: the game's analysis, the position's, an import, the assistant (its download, its model loaded,
+  *Unload*), and the positions of your repertoires to review, a click training them (see
+  [Training a repertoire](#training-a-repertoire)).
 
 The search button at the top, or Ctrl+K, finds a command, a game, a database.
 
@@ -1220,6 +1224,44 @@ for each, a click takes it out or back), in the background: the share of the gam
 answer to the end of its lines, or up to move 10 or 15. Its **gaps** follow, the most often met first: an opponent's
 move played often enough without your answer, or a line ending on an opponent's move. A click shows the position,
 with the tree beside it.
+
+### Training a repertoire
+
+Each position of a repertoire where it is your move, and where the repertoire has your move, is a position to train.
+RookStudio asks them again and again, further apart each time you know them, with FSRS, the spaced repetition Anki
+uses: a position answered right comes back in a few days, then in weeks; one you miss comes back later in the session,
+then the next day.
+
+The **Train** card of the Openings page counts the positions due today, today's new ones, and those you know, due
+later. *Start* (Enter) asks the positions due, then today's new ones; *Only the new ones* asks the new ones alone. New
+positions come in the order your databases meet them most, the most played first, 20 a day at most (the button beside,
+*20 a day*, changes it). Under them: what comes back tomorrow, within three days and within a week.
+
+A session takes the Board page, its column becoming the training's; the game that was on the board waits among the
+recent games and comes back after it. RookStudio plays your opponent's moves along the repertoire up to each position,
+the moves your databases play most first where the repertoire has several. Play your move on the board, or type it
+(its letters, then Enter). During the question, the tree, the engines and your notes are hidden; they come back with
+the answer.
+
+- **Alt+H**: a hint, the square of the piece to play in blue (H alone begins a move of the h-pawn).
+- **Space**: "I don't know", and the move is shown.
+- **Escape**: stop. What was answered is kept; the next session goes on with what is still due.
+
+Each answer is graded by itself, with no button to press: right at the first try, *good*; right after a hint or after
+more than 20 seconds, *hard*; wrong, or "I don't know", *again*. A right answer shows the repertoire's comment on the
+move and when the position comes back; the next one comes on Enter, or on its own after a second (the *…* beside
+changes it, and the mouse on the answer holds it). A wrong one shows your repertoire's move on its squares, in green:
+*Retry* (Enter) asks it again; *See the tree here* shows the position with the Tree tab; *Add … to the repertoire*
+makes the move you played a second answer accepted there (Ctrl+Z takes it back).
+
+At the end: the counts, the moves you missed (a click shows the position, with your repertoire's move) and *Review
+them now*.
+
+The reviews are kept in the profile beside the repertoire (`Najdorf.training.json`, and `Najdorf.reviews.jsonl`, a line
+per answer): its PGN does not change. A move changed in the repertoire makes its position new again. Nothing leaves
+the machine. The Home page's *In progress* says how many positions are due, a click training them; Ctrl+K *Train the
+repertoire* too. While one of your games is played live on Lichess, the training waits; the positions on the line of
+one of your correspondence games are left out until it ends.
 
 ## The Lichess page
 

@@ -145,14 +145,20 @@ void App::saveRecentGames() const {
         all.push_back(std::move(j));
     };
     const auto& b = board_;
-    if (boardHasGame(b))
+    // During a training session the board shows its position, not a game: the game put aside for it is the one shown
+    // (#76).
+    const bool aside = training_ && training_->aside && !recent_games_.empty();
+    if (boardHasGame(b) && !training_)
         entry(b.title,
               board_origin_ ? board_origin_->name
               : b.pgn       ? b.pgn->name
                             : std::string(),
               b.tree, b.line, b.ply, b.chess960, b.changes, board_origin_, true, b.sent, b.since_sent);
-    for (const auto& r : recent_games_)
-        entry(r.title, r.where, r.tree, r.line, r.ply, r.chess960, r.changes, r.origin, false, r.sent, r.since_sent);
+    for (std::size_t i = 0; i < recent_games_.size(); ++i) {
+        const auto& r = recent_games_[i];
+        entry(r.title, r.where, r.tree, r.line, r.ply, r.chess960, r.changes, r.origin, aside && i == 0, r.sent,
+              r.since_sent);
+    }
     try {
         tour::replaceFile(storage_.root() / "recent.json", all.dump(1));
     } catch (const std::exception& e) {
@@ -478,6 +484,10 @@ void App::drawChessColumn() {
     drawSentLine();         // sent to a Lichess study: the changes since (#79)
     drawMoveField();        // while a move is typed, whatever the tab
     drawCommentProgress();  // the key moments being commented, whatever the tab
+    drawChessTabs();
+}
+
+void App::drawChessTabs() {
     // The tabs, in the order of the mockups; Alt+1 to Alt+5.
     const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References"), TR("Questions")};
     constexpr int TABS  = 5;

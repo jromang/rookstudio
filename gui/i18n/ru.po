@@ -915,19 +915,19 @@ msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr "Alt+A: движки анализируют показанную позицию и следят за доской."
 
 msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
-msgstr ""
+msgstr "Alt+G: остановить анализ партии. Завершённые проходы сохраняются, в следующий раз анализ продолжится с этого места."
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
-msgstr ""
+msgstr "Alt+G: движок анализа проходит по каждой позиции партии в фоне, затем снова, глубже с каждым проходом: график появляется сразу и уточняется."
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
-msgstr ""
+msgstr "Alt+G: движок анализа проходит по каждой позиции партии в фоне, затем снова, глубже с каждым проходом: график появляется сразу и уточняется. Неточности, ошибки и грубые ошибки отмечаются, каждый раз одни и те же."
 
 msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+N: следующий ход, отмеченный анализом (?!, ?, ??)."
 
 msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+Shift+N: предыдущий ход, отмеченный анализом (?!, ?, ??)."
 
 msgid "Alternate"
 msgstr "Поочерёдно"
@@ -1017,16 +1017,16 @@ msgid "Analyse the game"
 msgstr "Анализировать партию"
 
 msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
-msgstr ""
+msgstr "Проанализируйте партию (Alt+G) для разбора: точность каждой стороны, её ошибки, ключевые моменты и кто их предвидел."
 
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr "Проанализируйте партию (G) для разбора: точность каждой стороны, её ошибки, ключевые моменты и кто их предвидел."
 
 msgid "Analyse the game first (Alt+G): its key moments come from the review"
-msgstr ""
+msgstr "Сначала проанализируйте партию (Alt+G): ключевые моменты берутся из разбора"
 
-msgid "Analyse the game first (Alt+G): the annotation is its review written in"
-msgstr ""
+msgid "Analyse the game first (Alt+G): the annotation is its review written into the game"
+msgstr "Сначала проанализируйте партию (Alt+G): аннотация — это её разбор, внесённый в нотацию"
 
 msgid "Analyse the game followed"
 msgstr "Анализировать отслеживаемую партию"
@@ -1044,7 +1044,7 @@ msgid "Analysed by {}, {} per position."
 msgstr "Проанализирована {}, {} на позицию."
 
 msgid "Analysed by {}, {}."
-msgstr ""
+msgstr "Проанализирована {}, {}."
 
 msgid "Analysis"
 msgstr "Анализ"
@@ -2976,7 +2976,7 @@ msgid "Flip"
 msgstr "Перевернуть"
 
 msgid "Flip the board (Alt+F)"
-msgstr ""
+msgstr "Перевернуть доску (Alt+F)"
 
 msgid "Flip the board (F)"
 msgstr "Перевернуть доску (F)"
@@ -5376,13 +5376,13 @@ msgid "Only move"
 msgstr "Единственный ход"
 
 msgid "Only move, according to the tablebases."
-msgstr ""
+msgstr "Единственный ход, согласно эндшпильным таблицам."
 
 msgid "Only move."
-msgstr ""
+msgstr "Единственный ход."
 
 msgid "Only move. {}: {}, the next {}."
-msgstr ""
+msgstr "Единственный ход. {}: {}, следующий лучший — {}."
 
 msgid "Only the 18 symmetrical ones…"
 msgstr "Только 18 симметричных…"
@@ -10773,19 +10773,19 @@ msgid "pass {} of {} · {} per position · {}/{}"
 msgstr "проход {} из {} · {} на позицию · {}/{}"
 
 msgid "pass {} of {} · {} · {}/{}"
-msgstr ""
+msgstr "проход {} из {} · {} · {}/{}"
 
 msgid "pass {} · {} per position · {}/{}"
 msgstr "проход {} · {} на позицию · {}/{}"
 
 msgid "pass {} · {} · {}/{}"
-msgstr ""
+msgstr "проход {} · {} · {}/{}"
 
 msgid "paused while A analyses"
 msgstr "на паузе, пока идёт анализ A"
 
 msgid "paused while Alt+A analyses"
-msgstr ""
+msgstr "на паузе, пока идёт анализ Alt+A"
 
 msgid "performance {}"
 msgstr "перфоманс {}"
@@ -12250,9 +12250,9 @@ msgstr[2] "{} узлов на ход"
 
 msgid "{} node per position"
 msgid_plural "{} nodes per position"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "{} узел на позицию"
+msgstr[1] "{} узла на позицию"
+msgstr[2] "{} узлов на позицию"
 
 msgid "{} nodes"
 msgstr "узлов: {}"

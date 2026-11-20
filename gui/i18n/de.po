@@ -906,19 +906,19 @@ msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr "Alt+A: Die Engines analysieren die gezeigte Stellung und folgen dem Brett."
 
 msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
-msgstr ""
+msgstr "Alt+G: die Analyse der Partie anhalten. Ihre fertigen Durchgänge bleiben erhalten, beim nächsten Mal geht es von dort weiter."
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
-msgstr ""
+msgstr "Alt+G: Die Analyse-Engine geht jede Stellung der Partie im Hintergrund durch, dann bei jedem Durchgang tiefer: Die Grafik ist sofort da und wird schärfer."
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
-msgstr ""
+msgstr "Alt+G: Die Analyse-Engine geht jede Stellung der Partie im Hintergrund durch, dann bei jedem Durchgang tiefer: Die Grafik ist sofort da und wird schärfer. Ungenauigkeiten, Fehler und grobe Fehler werden markiert, jedes Mal dieselben."
 
 msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+N: der nächste von der Analyse markierte Zug (?!, ?, ??)."
 
 msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+Umschalt+N: der vorige von der Analyse markierte Zug (?!, ?, ??)."
 
 msgid "Alternate"
 msgstr "Abwechselnd"
@@ -1008,16 +1008,16 @@ msgid "Analyse the game"
 msgstr "Partie analysieren"
 
 msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
-msgstr ""
+msgstr "Analysiere die Partie (Alt+G) für ihre Auswertung: die Genauigkeit jeder Seite, ihre Fehler, die Schlüsselmomente und wer sie kommen sah."
 
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr "Analysiere die Partie (G) für ihre Auswertung: die Genauigkeit jeder Seite, ihre Fehler, die Schlüsselmomente und wer sie kommen sah."
 
 msgid "Analyse the game first (Alt+G): its key moments come from the review"
-msgstr ""
+msgstr "Analysiere zuerst die Partie (Alt+G): Die Schlüsselmomente stammen aus der Auswertung"
 
-msgid "Analyse the game first (Alt+G): the annotation is its review written in"
-msgstr ""
+msgid "Analyse the game first (Alt+G): the annotation is its review written into the game"
+msgstr "Analysiere zuerst die Partie (Alt+G): Die Annotation ist ihre eingetragene Auswertung"
 
 msgid "Analyse the game followed"
 msgstr "Die verfolgte Partie analysieren"
@@ -1035,7 +1035,7 @@ msgid "Analysed by {}, {} per position."
 msgstr "Analysiert von {}, {} pro Stellung."
 
 msgid "Analysed by {}, {}."
-msgstr ""
+msgstr "Analysiert von {}, {}."
 
 msgid "Analysis"
 msgstr "Analyse"
@@ -2962,7 +2962,7 @@ msgid "Flip"
 msgstr "Drehen"
 
 msgid "Flip the board (Alt+F)"
-msgstr ""
+msgstr "Brett drehen (Alt+F)"
 
 msgid "Flip the board (F)"
 msgstr "Brett drehen (F)"
@@ -5355,13 +5355,13 @@ msgid "Only move"
 msgstr "Einziger Zug"
 
 msgid "Only move, according to the tablebases."
-msgstr ""
+msgstr "Einziger Zug, laut den Tablebases."
 
 msgid "Only move."
-msgstr ""
+msgstr "Einziger Zug."
 
 msgid "Only move. {}: {}, the next {}."
-msgstr ""
+msgstr "Einziger Zug. {}: {}, der nächstbeste {}."
 
 msgid "Only the 18 symmetrical ones…"
 msgstr "Nur die 18 symmetrischen…"
@@ -10713,19 +10713,19 @@ msgid "pass {} of {} · {} per position · {}/{}"
 msgstr "Durchgang {} von {} · {} pro Stellung · {}/{}"
 
 msgid "pass {} of {} · {} · {}/{}"
-msgstr ""
+msgstr "Durchgang {} von {} · {} · {}/{}"
 
 msgid "pass {} · {} per position · {}/{}"
 msgstr "Durchgang {} · {} pro Stellung · {}/{}"
 
 msgid "pass {} · {} · {}/{}"
-msgstr ""
+msgstr "Durchgang {} · {} · {}/{}"
 
 msgid "paused while A analyses"
 msgstr "pausiert, solange A analysiert"
 
 msgid "paused while Alt+A analyses"
-msgstr ""
+msgstr "pausiert, solange Alt+A analysiert"
 
 msgid "performance {}"
 msgstr "Performance {}"
@@ -12103,8 +12103,8 @@ msgstr[1] "{} Knoten pro Zug"
 
 msgid "{} node per position"
 msgid_plural "{} nodes per position"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{} Knoten pro Stellung"
+msgstr[1] "{} Knoten pro Stellung"
 
 msgid "{} nodes"
 msgstr "{} Knoten"

@@ -39,7 +39,7 @@ O match para sozinho assim que o SPRT decide: H1 aceita (A é mais forte, segund
 próxima vez, escolha a versão seguinte como A e clique em **Iniciar**, ou em *Relançar com…* no match terminado.
 
 ### Estudar suas partidas
-<!-- en: studying-your-games a1bb7f7a -->
+<!-- en: studying-your-games 9a78e41c -->
 
 1. **Uma base.** Na barra lateral, *Bases*, depois *Nova base*, nomeada ali mesmo, e *Importar um arquivo…*: um
    arquivo PGN, ou um arquivo `.zst`, `.gz` ou `.zip` que contenha um (um arquivo solto na página faz o mesmo). As
@@ -47,8 +47,8 @@ próxima vez, escolha a versão seguinte como A e clique em **Iniciar**, ou em *
 2. **Uma partida.** Um clique numa partida da lista a mostra ao lado; Enter ou um duplo clique a abre no
    *Tabuleiro*. Ctrl+O abre ali um arquivo PGN, Ctrl+V cola uma partida ou um FEN.
 3. **Um engine.** A análise precisa de um engine: com a biblioteca vazia, a aba *Análise* oferece baixar o Gaia com
-   um clique (veja [Engines populares](#engines-populares)). A inicia e para a análise da posição (Alt+A no Tabuleiro
-   de estudo), G analisa a partida inteira.
+   um clique (veja [Engines populares](#engines-populares)). A inicia e para a análise da posição, G analisa a partida
+   inteira (Alt+A e Alt+G no Tabuleiro de estudo).
 4. **Suas notas.** Enter escreve um comentário após o lance, `!` e `?` põem símbolos, um lance diferente do da partida
    inicia uma variante, o botão direito desenha setas e casas; Ctrl+S salva a partida na base dela.
 
@@ -1007,7 +1007,7 @@ Tabuleiro dos engines passam então para o Alt: Alt+F gira o tabuleiro, Alt+A in
 ameaça, Alt+G analisa a partida, Alt+N vai ao próximo lance marcado pela análise.
 
 ### Vários engines lado a lado
-<!-- en: several-engines-side-by-side 269f6f12 -->
+<!-- en: several-engines-side-by-side 43f5e1fe -->
 
 Na aba Análise do Tabuleiro de estudo, até quatro engines da biblioteca analisam a posição juntos, cada um num cartão:
 a cor e o nome dele, a avaliação (do ponto de vista das Brancas), a profundidade e a seldepth, a velocidade e as
@@ -1032,7 +1032,7 @@ divisão não as conta. Um torneio em andamento neste computador mantém os núc
 partidas dele deixam, e o botão diz quantas threads elas ocupam. Essas configurações são próprias da análise: nem o
 engine da biblioteca nem um torneio as veem.
 
-**O primeiro engine** é o da análise: a revisão da partida (G), a ameaça (Alt+X, ou o menu do primeiro engine), as
+**O primeiro engine** é o da análise: a revisão da partida (Alt+G), a ameaça (Alt+X, ou o menu do primeiro engine), as
 perguntas e os comentários do assistente o usam. Um engine arrastado pelo nome sobre outro toma o lugar dele; levado ao
 topo, ele passa a ser o primeiro; *Torná-lo o primeiro*, no menu dele, faz o mesmo. Quando a partida tem uma análise do
 novo primeiro engine, essa análise julga os lances e desenha a curva do gráfico da partida. As avaliações que cada
@@ -1172,16 +1172,29 @@ anteriores. O resumo diz o mesmo da posição. Isso custa um pedido por lance, e
 explorador dos mestres não tem meses.
 
 ### A revisão de uma partida
-<!-- en: the-review-of-a-game 4c333a51 -->
+<!-- en: the-review-of-a-game b1237d38 -->
 
-No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da partida (G) como um treinador leria:
+No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da partida (Alt+G) como um treinador leria:
 
 - no alto, as chances das brancas ao longo da partida, com os momentos-chave como pontos (escuros para um bom lance,
   laranja para um erro); um clique vai ao lance;
 - a teoria da partida numa das suas bases (a da aba Árvore, senão a primeira): os lances de livro dela não são
-  julgados, e a novidade dela é nomeada; o livro para antes do primeiro erro que o engine vê;
+  julgados, e a novidade dela é nomeada; o livro para antes do primeiro erro que o engine vê. Os lances que o livro de
+  aberturas de um torneio jogou (`{book}` no PGN) também não são julgados;
+- **Momentos-chave**: os lances dos pontos, cada um com o veredicto (um erro com as chances que perdeu e o lance
+  melhor, um lance único com o segundo melhor lance do engine: *Lance único. Gaia: +0.62, o segundo melhor +0.31.*), e
+  onde o final começa;
 - **Os momentos-chave, em palavras**, **A história da partida** e **Pontos a trabalhar**, para cada lado, com os
   lances que mostram isso; um clique vai ao lance.
+
+A mesma partida sempre recebe a mesma revisão: as mesmas pontuações, símbolos, momentos-chave e comentários, seja o
+que for que a máquina esteja fazendo. A análise da partida no Tabuleiro de estudo conta nós em vez de tempo: cada
+posição é buscada por 20.000 nós na primeira passada, quatro vezes mais a cada passada, até a escolha ao lado do botão
+(320.000, 1.280.000, 5.120.000 ou 20.480.000 nós por posição, ou *até ser parado*), numa só thread e com o hash vazio,
+para que o resultado de uma posição dependa só do engine e da posição. Tantas posições são buscadas ao mesmo tempo
+quantas threads a análise tem, um processo do engine para cada uma. Onde o lance jogado foi a escolha do engine e a
+posição não está decidida para um dos lados, uma segunda busca da posição com duas linhas dá o segundo melhor lance:
+um lance único é informado junto com ele.
 
 As posições do final com sete peças ou menos podem ser julgadas com exatidão pelas tablebases do Lichess, consultadas
 uma vez para esta partida ou sempre. *Comentar os momentos-chave* escreve um comentário do assistente em cada um, em

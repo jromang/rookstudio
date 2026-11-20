@@ -906,19 +906,19 @@ msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr "Alt+A: i motori analizzano la posizione mostrata e seguono la scacchiera."
 
 msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
-msgstr ""
+msgstr "Alt+G: ferma l'analisi della partita. I passaggi completati sono conservati e la prossima volta riprende da lì."
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
-msgstr ""
+msgstr "Alt+G: il motore di analisi esamina ogni posizione della partita, in background, poi di nuovo più a fondo a ogni passaggio: il grafico compare subito e si affina."
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
-msgstr ""
+msgstr "Alt+G: il motore di analisi esamina ogni posizione della partita, in background, poi di nuovo più a fondo a ogni passaggio: il grafico compare subito e si affina. Le imprecisioni, gli errori e gli errori gravi sono segnati, ogni volta gli stessi."
 
 msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+N: la prossima mossa segnata dall'analisi (?!, ?, ??)."
 
 msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+Maiusc+N: la mossa precedente segnata dall'analisi (?!, ?, ??)."
 
 msgid "Alternate"
 msgstr "Alternati"
@@ -1008,16 +1008,16 @@ msgid "Analyse the game"
 msgstr "Analizza la partita"
 
 msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
-msgstr ""
+msgstr "Analizza la partita (Alt+G) per il suo resoconto: la precisione di ciascun lato, i suoi errori, i momenti chiave e chi li ha visti arrivare."
 
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr "Analizza la partita (G) per il suo resoconto: la precisione di ciascun lato, i suoi errori, i momenti chiave e chi li ha visti arrivare."
 
 msgid "Analyse the game first (Alt+G): its key moments come from the review"
-msgstr ""
+msgstr "Prima analizza la partita (Alt+G): i suoi momenti chiave vengono dal resoconto"
 
-msgid "Analyse the game first (Alt+G): the annotation is its review written in"
-msgstr ""
+msgid "Analyse the game first (Alt+G): the annotation is its review written into the game"
+msgstr "Prima analizza la partita (Alt+G): l'annotazione è il suo resoconto scritto nella notazione"
 
 msgid "Analyse the game followed"
 msgstr "Analizza la partita seguita"
@@ -1035,7 +1035,7 @@ msgid "Analysed by {}, {} per position."
 msgstr "Analizzata da {}, {} per posizione."
 
 msgid "Analysed by {}, {}."
-msgstr ""
+msgstr "Analizzata da {}, {}."
 
 msgid "Analysis"
 msgstr "Analisi"
@@ -2962,7 +2962,7 @@ msgid "Flip"
 msgstr "Ruota"
 
 msgid "Flip the board (Alt+F)"
-msgstr ""
+msgstr "Ruota la scacchiera (Alt+F)"
 
 msgid "Flip the board (F)"
 msgstr "Ruota la scacchiera (F)"
@@ -5355,13 +5355,13 @@ msgid "Only move"
 msgstr "Unica mossa"
 
 msgid "Only move, according to the tablebases."
-msgstr ""
+msgstr "Unica mossa, secondo le tablebase."
 
 msgid "Only move."
-msgstr ""
+msgstr "Unica mossa."
 
 msgid "Only move. {}: {}, the next {}."
-msgstr ""
+msgstr "Unica mossa. {}: {}, la seconda scelta {}."
 
 msgid "Only the 18 symmetrical ones…"
 msgstr "Solo le 18 simmetriche…"
@@ -10713,19 +10713,19 @@ msgid "pass {} of {} · {} per position · {}/{}"
 msgstr "passaggio {} di {} · {} per posizione · {}/{}"
 
 msgid "pass {} of {} · {} · {}/{}"
-msgstr ""
+msgstr "passaggio {} di {} · {} · {}/{}"
 
 msgid "pass {} · {} per position · {}/{}"
 msgstr "passaggio {} · {} per posizione · {}/{}"
 
 msgid "pass {} · {} · {}/{}"
-msgstr ""
+msgstr "passaggio {} · {} · {}/{}"
 
 msgid "paused while A analyses"
 msgstr "in pausa mentre A analizza"
 
 msgid "paused while Alt+A analyses"
-msgstr ""
+msgstr "in pausa mentre Alt+A analizza"
 
 msgid "performance {}"
 msgstr "performance {}"
@@ -12103,8 +12103,8 @@ msgstr[1] "{} nodi per mossa"
 
 msgid "{} node per position"
 msgid_plural "{} nodes per position"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{} nodo per posizione"
+msgstr[1] "{} nodi per posizione"
 
 msgid "{} nodes"
 msgstr "{} nodi"

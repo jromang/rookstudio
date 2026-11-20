@@ -41,7 +41,7 @@ conservata: la volta successiva scegli la versione seguente come A e **Avvia**, 
 match terminato.
 
 ### Studiare le tue partite
-<!-- en: studying-your-games a1bb7f7a -->
+<!-- en: studying-your-games 9a78e41c -->
 
 1. **Un database.** Nella barra laterale, *Database*, poi *Nuovo database*, con il nome scritto sul posto, e *Importa un
    file…*: un file PGN, o un file `.zst`, `.gz` o `.zip` che ne contiene uno (un file trascinato sulla pagina fa lo
@@ -49,8 +49,8 @@ match terminato.
 2. **Una partita.** Un clic su una partita della lista la mostra accanto; Invio o un doppio clic la apre nella
    *Scacchiera*. Ctrl+O vi apre un file PGN, Ctrl+V incolla una partita o un FEN.
 3. **Un motore.** L'analisi richiede un motore: con la libreria vuota, la scheda *Analisi* propone di scaricare Gaia con
-   un clic (vedi [Motori popolari](#motori-popolari)). A avvia e ferma l'analisi della posizione (Alt+A sulla Scacchiera
-   per lo studio), G analizza l'intera partita.
+   un clic (vedi [Motori popolari](#motori-popolari)). A avvia e ferma l'analisi della posizione, G analizza l'intera
+   partita (Alt+A e Alt+G sulla Scacchiera per lo studio).
 4. **Le tue note.** Invio scrive un commento dopo la mossa, `!` e `?` mettono dei simboli, una mossa diversa da quella
    della partita apre una variante, il tasto destro disegna frecce e case; Ctrl+S salva la partita nel suo database.
 
@@ -1027,7 +1027,7 @@ Scacchiera dei motori passano allora sotto Alt: Alt+F ruota la scacchiera, Alt+A
 la minaccia, Alt+G analizza la partita, Alt+N va alla mossa successiva segnata dall'analisi.
 
 ### Più motori affiancati
-<!-- en: several-engines-side-by-side 269f6f12 -->
+<!-- en: several-engines-side-by-side 43f5e1fe -->
 
 Nella scheda Analisi della Scacchiera per lo studio, fino a quattro motori della libreria analizzano insieme la
 posizione, ciascuno in una scheda: il suo colore e il suo nome, la sua valutazione (dal punto di vista del Bianco), la
@@ -1054,8 +1054,8 @@ ripartizione non li conta. Un torneo in corso su questo computer tiene i suoi co
 lasciano le sue partite, e il chip dice quanti ne occupano. Queste impostazioni sono proprie dell'analisi: né il motore
 della libreria né un torneo le vedono.
 
-**Il primo motore** è quello dell'analisi: lo usano il resoconto della partita (G), la minaccia (Alt+X, o il menu del
-primo motore), le domande e i commenti dell'assistente. Un motore trascinato per il nome su un altro ne prende il
+**Il primo motore** è quello dell'analisi: lo usano il resoconto della partita (Alt+G), la minaccia (Alt+X, o il menu
+del primo motore), le domande e i commenti dell'assistente. Un motore trascinato per il nome su un altro ne prende il
 posto, e in cima diventa il primo; *Rendilo il primo* nel suo menu fa lo stesso. Quando la partita ha un'analisi del
 nuovo primo motore, è quell'analisi a giudicare le mosse e a disegnare la curva del grafico della partita. Le
 valutazioni di ogni motore sulle posizioni della partita che ha cercato compaiono sul grafico come una linea sottile
@@ -1195,18 +1195,30 @@ precedenti. Il riepilogo dice lo stesso della posizione. Costa una richiesta per
 non lo chiedi; l'esploratore dei maestri non ha i mesi.
 
 ### Il resoconto di una partita
-<!-- en: the-review-of-a-game 4c333a51 -->
+<!-- en: the-review-of-a-game b1237d38 -->
 
-Sulla Scacchiera per lo studio, la scheda *Resoconto* accanto alla notazione legge l'analisi della partita (G) come
+Sulla Scacchiera per lo studio, la scheda *Resoconto* accanto alla notazione legge l'analisi della partita (Alt+G) come
 farebbe un allenatore:
 
 - in alto, le probabilità del Bianco lungo la partita, con i momenti chiave come punti (scuri per una buona mossa,
   arancioni per un errore); un clic porta alla mossa;
 - la teoria della partita in uno dei tuoi database (quello della scheda Albero, altrimenti il primo): le sue mosse di
   libro non vengono giudicate, e la sua novità viene indicata; il libro si ferma prima del primo errore che il motore
-  vede;
+  vede. Nemmeno le mosse giocate dal libro di aperture di un torneo (`{book}` nel PGN) vengono giudicate;
+- **Momenti chiave**: le mosse dei punti, ciascuna con il suo verdetto (un errore con le probabilità che ha perso e la
+  mossa migliore, una mossa unica con la seconda scelta del motore: *Unica mossa. Gaia: +0.62, la seconda scelta
+  +0.31.*), e dove inizia il finale;
 - **I momenti chiave, in parole**, **La storia della partita** e **Su cosa lavorare**, per ciascun lato, con le mosse
   che lo mostrano; un clic porta alla mossa.
+
+La stessa partita riceve sempre lo stesso resoconto: le stesse valutazioni, gli stessi simboli, momenti chiave e
+commenti, qualunque cosa stia facendo la macchina. L'analisi della partita della Scacchiera per lo studio conta i nodi
+anziché il tempo: ogni posizione viene cercata per 20.000 nodi al primo passaggio, quattro volte di più a ogni
+passaggio, fino alla scelta accanto al pulsante (320.000, 1.280.000, 5.120.000 o 20.480.000 nodi per posizione, o
+*fino all'arresto*), su un thread e con una tabella hash vuota, così che il risultato di una posizione dipenda solo dal
+motore e dalla posizione. Vengono cercate insieme tante posizioni quanti sono i thread dell'analisi, ciascuna con un
+processo del motore. Dove la mossa giocata era la scelta del motore e la posizione non è già decisa, una seconda
+ricerca della posizione con due linee dà la seconda scelta: una mossa unica viene indicata insieme a essa.
 
 Le posizioni del finale con sette pezzi o meno possono essere giudicate esattamente dalle tablebase di Lichess,
 interrogate una volta per questa partita o sempre. *Commenta i momenti chiave* scrive un commento dell'assistente su

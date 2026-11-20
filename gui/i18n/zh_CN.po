@@ -897,19 +897,19 @@ msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr "Alt+A：引擎分析所显示的局面，并跟随棋盘。"
 
 msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
-msgstr ""
+msgstr "Alt+G：停止分析这盘棋。已完成的轮次会保留，下次从那里继续。"
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
-msgstr ""
+msgstr "Alt+G：分析引擎在后台逐一分析这盘棋的每个局面，之后每一轮更深入地再分析一遍：图表立即出现并逐渐精确。"
 
 msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
-msgstr ""
+msgstr "Alt+G：分析引擎在后台逐一分析这盘棋的每个局面，之后每一轮更深入地再分析一遍：图表立即出现并逐渐精确。不精确、错误和大错都会被标出，每次标出的都相同。"
 
 msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+N：下一个被分析标出的着法（?!、?、??）。"
 
 msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
-msgstr ""
+msgstr "Alt+Shift+N：上一个被分析标出的着法（?!、?、??）。"
 
 msgid "Alternate"
 msgstr "交替"
@@ -999,16 +999,16 @@ msgid "Analyse the game"
 msgstr "分析对局"
 
 msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
-msgstr ""
+msgstr "分析这盘棋（Alt+G）以查看复盘：双方的准确率、错误、关键时刻，以及谁先看出来。"
 
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr "分析这盘棋（G）以查看复盘：双方的准确率、错误、关键时刻，以及谁先看出来。"
 
 msgid "Analyse the game first (Alt+G): its key moments come from the review"
-msgstr ""
+msgstr "请先分析对局（Alt+G）：关键时刻来自复盘"
 
-msgid "Analyse the game first (Alt+G): the annotation is its review written in"
-msgstr ""
+msgid "Analyse the game first (Alt+G): the annotation is its review written into the game"
+msgstr "请先分析对局（Alt+G）：评注就是把复盘写入棋谱"
 
 msgid "Analyse the game followed"
 msgstr "分析正在关注的对局"
@@ -1026,7 +1026,7 @@ msgid "Analysed by {}, {} per position."
 msgstr "由 {} 分析，每个局面 {}。"
 
 msgid "Analysed by {}, {}."
-msgstr ""
+msgstr "由 {} 分析，{}。"
 
 msgid "Analysis"
 msgstr "分析"
@@ -2948,7 +2948,7 @@ msgid "Flip"
 msgstr "翻转"
 
 msgid "Flip the board (Alt+F)"
-msgstr ""
+msgstr "翻转棋盘 (Alt+F)"
 
 msgid "Flip the board (F)"
 msgstr "翻转棋盘 (F)"
@@ -5334,13 +5334,13 @@ msgid "Only move"
 msgstr "唯一着法"
 
 msgid "Only move, according to the tablebases."
-msgstr ""
+msgstr "唯一着法（依据残局库）。"
 
 msgid "Only move."
-msgstr ""
+msgstr "唯一着法。"
 
 msgid "Only move. {}: {}, the next {}."
-msgstr ""
+msgstr "唯一着法。{}：{}，次佳着法 {}。"
 
 msgid "Only the 18 symmetrical ones…"
 msgstr "仅 18 个对称局面…"
@@ -10653,19 +10653,19 @@ msgid "pass {} of {} · {} per position · {}/{}"
 msgstr "第 {} 轮，共 {} 轮 · 每个局面 {} · {}/{}"
 
 msgid "pass {} of {} · {} · {}/{}"
-msgstr ""
+msgstr "第 {} 轮，共 {} 轮 · {} · {}/{}"
 
 msgid "pass {} · {} per position · {}/{}"
 msgstr "第 {} 轮 · 每个局面 {} · {}/{}"
 
 msgid "pass {} · {} · {}/{}"
-msgstr ""
+msgstr "第 {} 轮 · {} · {}/{}"
 
 msgid "paused while A analyses"
 msgstr "A 分析时暂停"
 
 msgid "paused while Alt+A analyses"
-msgstr ""
+msgstr "Alt+A 分析时暂停"
 
 msgid "performance {}"
 msgstr "表现分 {}"
@@ -11956,7 +11956,7 @@ msgstr[0] "每步 {} 节点"
 
 msgid "{} node per position"
 msgid_plural "{} nodes per position"
-msgstr[0] ""
+msgstr[0] "每个局面 {} 节点"
 
 msgid "{} nodes"
 msgstr "{} 节点"

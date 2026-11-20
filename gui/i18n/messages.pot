@@ -1016,7 +1016,7 @@ msgstr ""
 msgid "Analyse the game first (Alt+G): its key moments come from the review"
 msgstr ""
 
-msgid "Analyse the game first (Alt+G): the annotation is its review written in"
+msgid "Analyse the game first (Alt+G): the annotation is its review written into the game"
 msgstr ""
 
 msgid "Analyse the game followed"

@@ -42,7 +42,7 @@ configuration est gardée : la prochaine fois, choisis la version suivante comme
 *Relancer avec…* sur le match terminé.
 
 ### Étudier tes parties
-<!-- en: studying-your-games a1bb7f7a -->
+<!-- en: studying-your-games 9a78e41c -->
 
 1. **Une base.** Dans la barre, *Bases*, puis *Nouvelle base*, nommée sur place, et *Importer un fichier…* : un
    fichier PGN, ou un fichier `.zst`, `.gz` ou `.zip` qui en contient un (un fichier déposé sur la page fait de
@@ -51,7 +51,7 @@ configuration est gardée : la prochaine fois, choisis la version suivante comme
    l'*Échiquier*. Ctrl+O y ouvre un fichier PGN, Ctrl+V colle une partie ou un FEN.
 3. **Un moteur.** L'analyse a besoin d'un moteur : avec une bibliothèque vide, l'onglet *Analyse* propose de
    télécharger Gaia en un clic (voir [Moteurs populaires](#moteurs-populaires)). A lance et arrête l'analyse de la
-   position (Alt+A sur l'Échiquier d'étude), G analyse toute la partie.
+   position, G analyse toute la partie (Alt+A et Alt+G sur l'Échiquier d'étude).
 4. **Tes notes.** Entrée écrit un commentaire après le coup, `!` et `?` posent des symboles, un coup autre que celui de
    la partie commence une variante, le bouton droit dessine des flèches et des cases ; Ctrl+S enregistre la partie dans
    sa base.
@@ -1048,7 +1048,7 @@ lettres de l'Échiquier des moteurs passent alors sous Alt : Alt+F retourne l'é
 l'analyse, Alt+X montre la menace, Alt+G analyse la partie, Alt+N va au coup suivant marqué par l'analyse.
 
 ### Plusieurs moteurs côte à côte
-<!-- en: several-engines-side-by-side 269f6f12 -->
+<!-- en: several-engines-side-by-side 43f5e1fe -->
 
 Dans l'onglet Analyse de l'Échiquier d'étude, jusqu'à quatre moteurs de la bibliothèque analysent la position ensemble,
 chacun dans une carte : sa couleur et son nom, son évaluation (celle des Blancs), sa profondeur et sa seldepth, sa
@@ -1074,7 +1074,7 @@ partage ne les compte pas. Un tournoi qui tourne sur cet ordinateur garde ses c�
 laissent ses parties, et la pastille dit combien elles en prennent. Ces réglages sont propres à l'analyse : ni le
 moteur de la bibliothèque ni un tournoi ne les voient.
 
-**Le premier moteur** est celui de l'analyse : le bilan de la partie (G), la menace (Alt+X, ou le menu du premier
+**Le premier moteur** est celui de l'analyse : le bilan de la partie (Alt+G), la menace (Alt+X, ou le menu du premier
 moteur), les questions et les commentaires de l'assistant l'utilisent. Un moteur glissé par son nom sur un autre prend
 sa place, et en haut il devient le premier ; *En faire le premier*, dans son menu, fait de même. Quand la partie a une
 analyse par le nouveau premier moteur, cette analyse juge les coups et dessine la courbe du graphe de la partie. Les
@@ -1216,17 +1216,30 @@ mois contre celles des six mois d'avant. Le résumé dit la même chose de la po
 aussi l'option reste-t-elle désactivée tant que tu ne la demandes pas ; l'explorateur des maîtres n'a pas de mois.
 
 ### Le bilan d'une partie
-<!-- en: the-review-of-a-game 4c333a51 -->
+<!-- en: the-review-of-a-game b1237d38 -->
 
-Sur l'Échiquier d'étude, l'onglet *Bilan* à côté de la notation lit l'analyse de la partie (G) comme le ferait un
-entraîneur :
+Sur l'Échiquier d'étude, l'onglet *Bilan* à côté de la notation lit l'analyse de la partie (Alt+G) comme le ferait
+un entraîneur :
 
 - en haut, les chances des Blancs au fil de la partie, avec les moments clés en points (foncés pour un bon coup,
   orange pour une erreur) ; un clic va au coup ;
 - la théorie de la partie dans l'une de tes bases (celle de l'onglet Arbre, sinon la première) : ses coups du livre ne
-  sont pas jugés, et sa nouveauté est nommée ; le livre s'arrête avant la première erreur que voit le moteur ;
+  sont pas jugés, et sa nouveauté est nommée ; le livre s'arrête avant la première erreur que voit le moteur. Les coups
+  qu'a joués le livre d'ouvertures d'un tournoi (`{book}` dans le PGN) ne sont pas jugés non plus ;
+- **Moments clés** : les coups des points, chacun avec son verdict (une erreur avec les chances qu'elle a perdues et le
+  meilleur coup, un seul coup avec le deuxième meilleur coup du moteur : *Seul coup. Gaia : +0.62, le suivant +0.31.*),
+  et l'endroit où commence la finale ;
 - **Les moments clés, en mots**, **L'histoire de la partie**, et **Ce qu'il faut travailler**, pour chaque camp, avec
   les coups qui le montrent ; un clic va au coup.
+
+La même partie reçoit toujours le même bilan : les mêmes scores, symboles, moments clés et commentaires, quoi que
+fasse la machine. L'analyse de la partie sur l'Échiquier d'étude compte des nœuds plutôt que du temps : chaque position
+est cherchée sur 20 000 nœuds à la première passe, quatre fois plus à chaque passe, jusqu'au choix à côté du bouton
+(320 000, 1 280 000, 5 120 000 ou 20 480 000 nœuds par position, ou *jusqu'à l'arrêt*), sur un seul thread et
+depuis un hash vide, pour que le résultat d'une position ne dépende que du moteur et de la position. Autant de positions
+sont cherchées à la fois que l'analyse a de threads, un processus de moteur chacune. Là où le coup joué était le choix
+du moteur et où la position n'est pas déséquilibrée, une seconde recherche de la position avec deux lignes donne le
+deuxième meilleur coup : un seul coup est annoncé avec lui.
 
 Les positions de la finale à sept pièces ou moins peuvent être jugées exactement par les tables de Lichess,
 interrogées une fois pour cette partie ou toujours. *Commenter les moments clés* écrit un commentaire de l'assistant

@@ -80,8 +80,13 @@ struct ImportReport {
     std::string error;  // a file that could not be read; the games before it were given
 };
 
+// Whether the first bytes of a file's text can be a PGN's: no zero byte, and control bytes (but tabs, line ends, form
+// feeds and the end-of-file mark of old files) far fewer than random bytes have.
+[[nodiscard]] bool looksLikeText(std::string_view head);
+
 // Reads `file` (PGN, .zst, .gz, .zip), giving its games to `sink` a batch at a time, in the file's order, from the
-// calling thread. `cancel` stops it between batches.
+// calling thread. `cancel` stops it between batches. A file, or a file of an archive, whose first bytes are not text
+// is refused (the report's error says so) before it makes junk games.
 ImportReport importGames(const std::filesystem::path& file, const ImportOptions& options, ImportProgress& progress,
                          const std::atomic<bool>& cancel, const std::function<void(std::vector<ImportedGame>&&)>& sink);
 

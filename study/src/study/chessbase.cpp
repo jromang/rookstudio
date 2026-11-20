@@ -25,13 +25,36 @@
 
 namespace fcg::study {
 
-bool isChessBase(const std::filesystem::path& file) {
+namespace {
+
+std::string extensionOf(const std::filesystem::path& file) {
     auto ext = file.extension().string();
     for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    for (const char* known : {".cbh", ".cbg", ".cba", ".cbp", ".cbt", ".cbc", ".cbs", ".cbe", ".cbj", ".2cbh", ".2cbg",
-                              ".2cba", ".2lid", ".cbv", ".cbz"})
+    return ext;
+}
+
+}  // namespace
+
+bool isChessBase(const std::filesystem::path& file) {
+    const auto ext = extensionOf(file);
+    for (const char* known :
+         {".cbh", ".cbg", ".cba", ".cbp", ".cbt", ".cbc", ".cbs", ".cbe", ".cbj", ".2cbh", ".2cbg", ".2cba", ".2lid"})
         if (ext == known) return true;
-    return false;
+    return isChessBaseArchive(file);
+}
+
+bool isChessBaseArchive(const std::filesystem::path& file) {
+    const auto ext = extensionOf(file);
+    return ext == ".cbv" || ext == ".2cbv" || isEncipheredArchive(file);
+}
+
+bool isEncipheredArchive(const std::filesystem::path& file) {
+    const auto ext = extensionOf(file);
+    return ext == ".cbz" || ext == ".2cbz";
+}
+
+bool archivePasswordFits(const std::filesystem::path& file, const std::string& password) {
+    return chessbase::passwordFits(file, password);
 }
 
 namespace chessbase {
@@ -857,7 +880,7 @@ ChessBaseDatabase::ChessBaseDatabase(const fs::path& file, const ChessBaseOption
     if (!fs::is_regular_file(file, ec)) throw std::runtime_error(file.string() + ": no such file");
     const auto ext = chessbase::lower(file.extension().string());
     try {
-        if (ext == ".cbv" || ext == ".cbz") {
+        if (isChessBaseArchive(file)) {
             auto members       = chessbase::archiveMembers(file, options.password, options.unpack_whole);
             const bool classic = members->has(".cbh");
             impl_->reader =

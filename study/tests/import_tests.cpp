@@ -211,6 +211,30 @@ TEST_CASE("import: cancelled between batches, and a file that cannot be read") {
     CHECK(!damaged.report.error.empty());
 }
 
+TEST_CASE("import: a file whose bytes are not text is refused, before it makes junk games") {
+    // An enciphered archive given as a PGN: DES's output, bytes of every value.
+    std::ifstream in(data("chessbase/cbtest2.2cbz"), std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    REQUIRE(bytes.size() > 4096);
+    const auto file = fs::temp_directory_path() / "binary.pgn";
+    std::ofstream(file, std::ios::binary).write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    ImportProgress progress;
+    std::atomic<bool> go{false};
+    std::size_t given = 0;
+    const auto report = importGames(file, {}, progress, go, [&](std::vector<ImportedGame>&& b) { given += b.size(); });
+    CHECK(report.error == "binary.pgn is not a PGN file: its bytes are not text");
+    CHECK(report.games == 0);
+    CHECK(given == 0);
+    // Text, as PGN files are: tabs, Windows line ends, a form feed, the end-of-file mark of old files, Latin-1, UTF-8.
+    CHECK(looksLikeText("[Event \"x\"]\r\n\t1. e4 e5\f\x1a"));
+    CHECK(looksLikeText("[White \"Dvo\xc5\x99\xc3\xa1k\"] [Black \"M\xfcller\"]"));
+    CHECK(looksLikeText(""));
+    CHECK_FALSE(looksLikeText(std::string("[Event \"x\"]\0", 12)));
+    CHECK_FALSE(looksLikeText(bytes.substr(0, 4096)));
+    // A rare control byte in a comment stays text.
+    CHECK(looksLikeText("1. e4 {a \x01 comment} e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 1-0"));
+}
+
 TEST_CASE("import: the line each game starts on, the same in pieces, with Windows line ends and in archives") {
     // The line of a game is that of its first tag: readLines gives it back, from the file as from its copies.
     const auto starts_where = [](const fs::path& file, const std::vector<ImportedGame>& games) {

@@ -25,7 +25,9 @@ using namespace fcg::test;
 namespace fs = std::filesystem;
 
 // study/tests/data/chessbase holds the 35 games of cbtest.pgn, games of our own, as a CBH database (cbtest1.*), as a
-// 2CBH database (cbtest2.*) and as an archive of the CBH one (cbtest1.cbv). Game 1 has everything: a comment before
+// 2CBH database (cbtest2.*), as archives of the CBH one (cbtest1.cbv, and cbtest1.cbz enciphered with the password
+// TEST_PASSWORD) and as archives of the 2CBH one (cbtest2.2cbv, a zip of its files, and cbtest2.2cbz, enciphered with
+// the same password). Game 1 has everything: a comment before
 // its first move, comments after moves, symbols ($1 to $6, $10, $13, $14, $16, $18, $146), a variation with one of its
 // own, coloured squares and arrows, [%clk], [%emt] and [%eval 0.31,24], accented names, teams, an annotator, round
 // 3.2. Game 2 starts from a set-up position, game 3 promotes to a knight, game 4 has no result and takes en passant;
@@ -40,6 +42,9 @@ namespace fs = std::filesystem;
 // - both add the ECO code of every game from the standard start, which the PGN has for game 1 alone.
 
 namespace {
+
+// The password of the enciphered archives of our test games (a DES key: eight characters at most).
+const std::string TEST_PASSWORD = "rstest20";
 
 fs::path chessbaseData(const std::string& name) { return data("chessbase/" + name); }
 
@@ -197,6 +202,15 @@ void put16(std::string& out, uint32_t v) {
 void put32(std::string& out, uint32_t v) {
     put16(out, v & 0xFFFF);
     put16(out, v >> 16);
+}
+// Zip's CRC-32.
+uint32_t crcOf(const std::string& bytes) {
+    uint32_t crc = 0xFFFFFFFF;
+    for (const unsigned char c : bytes) {
+        crc ^= c;
+        for (int k = 0; k < 8; ++k) crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1)));
+    }
+    return ~crc;
 }
 void put64(std::string& out, uint64_t v) {
     put32(out, static_cast<uint32_t>(v));
@@ -488,6 +502,71 @@ std::string quotation(bool with_board, int moves) {
     return out + le32Of(0);
 }
 
+// A file of a zip made by the tests: stored as it is (method 0), deflated in deflate's stored blocks (8), or said to be
+// in another method.
+struct ZipFile {
+    std::string name, bytes;
+    uint16_t method = 0;
+};
+
+// `bytes` as deflate's stored blocks, of 65,535 bytes at most each.
+std::string storedBlocks(const std::string& bytes) {
+    std::string out;
+    std::size_t at = 0;
+    do {
+        const auto n = std::min<std::size_t>(65535, bytes.size() - at);
+        out += static_cast<char>(at + n == bytes.size() ? 1 : 0);  // BFINAL, BTYPE 00
+        put16(out, static_cast<uint32_t>(n));
+        put16(out, static_cast<uint32_t>(~n & 0xFFFF));
+        out += bytes.substr(at, n);
+        at += n;
+    } while (at < bytes.size());
+    return out;
+}
+
+// A zip of `files`, their local headers, their data, the central directory and its end.
+std::string zipOf(const std::vector<ZipFile>& files) {
+    std::string data, directory;
+    for (const auto& f : files) {
+        const auto stored = f.method == 8 ? storedBlocks(f.bytes) : f.bytes;
+        const auto crc    = crcOf(f.bytes);
+        const auto offset = static_cast<uint32_t>(data.size());
+        const auto fields = [&](std::string& out) {
+            put16(out, 0);  // flags
+            put16(out, f.method);
+            put32(out, 0);  // time and date
+            put32(out, crc);
+            put32(out, static_cast<uint32_t>(stored.size()));
+            put32(out, static_cast<uint32_t>(f.bytes.size()));
+            put16(out, static_cast<uint32_t>(f.name.size()));
+            put16(out, 0);  // extra
+        };
+        std::string local = "PK\x03\x04";
+        put16(local, 20);
+        fields(local);
+        data += local + f.name + stored;
+        std::string entry = "PK\x01\x02";
+        put16(entry, 20);
+        put16(entry, 20);
+        fields(entry);
+        put16(entry, 0);  // comment
+        put16(entry, 0);  // disk
+        put16(entry, 0);  // internal attributes
+        put32(entry, 0);  // external attributes
+        put32(entry, offset);
+        directory += entry + f.name;
+    }
+    std::string end = "PK\x05\x06";
+    put16(end, 0);
+    put16(end, 0);
+    put16(end, static_cast<uint32_t>(files.size()));
+    put16(end, static_cast<uint32_t>(files.size()));
+    put32(end, static_cast<uint32_t>(directory.size()));
+    put32(end, static_cast<uint32_t>(data.size()));
+    put16(end, 0);
+    return data + directory + end;
+}
+
 }  // namespace
 
 TEST_CASE("ChessBase CBH database: the 35 games as the PGN they were made of") {
@@ -663,20 +742,200 @@ TEST_CASE("ChessBase CBZ archive: DES, and a .cbv enciphered with a password") {
     }
 }
 
+TEST_CASE("ChessBase CBZ archive: our test games enciphered, read with their password, a wrong one refused") {
+    const auto file = chessbaseData("cbtest1.cbz");
+    CHECK(isChessBase(file));
+    CHECK(isChessBaseArchive(file));
+    CHECK(isEncipheredArchive(file));
+    ChessBaseOptions options;
+    options.password = TEST_PASSWORD;
+    checkDatabase(file, ChessBaseFormat::CBH, true, options);
+    // A wrong password shows in the first block, which does not decipher to an archive's header.
+    CHECK(archivePasswordFits(file, TEST_PASSWORD));
+    CHECK_FALSE(archivePasswordFits(file, "rstest22"));
+    CHECK(archivePasswordFits(file, "rstest21"));  // DES leaves out the lowest bit of each byte of its key
+    CHECK_FALSE(archivePasswordFits(file, ""));
+    CHECK_FALSE(archivePasswordFits(chessbaseData("no such archive.cbz"), TEST_PASSWORD));
+    CHECK(throwsWith([&] { ChessBaseDatabase(file, ChessBaseOptions{"wrong"}); }, "wrong password"));
+    CHECK(throwsWith([&] { (void)ChessBaseDatabase(file); }, "needs its password"));
+}
+
+TEST_CASE("ChessBase 2CBV archive: a zip of the 2CBH database's files, its members unpacked as they are read") {
+    const auto file = chessbaseData("cbtest2.2cbv");
+    CHECK(isChessBase(file));
+    CHECK(isChessBase("Base.2CBV"));
+    CHECK(isChessBaseArchive(file));
+    CHECK_FALSE(isEncipheredArchive(file));
+    checkDatabase(file, ChessBaseFormat::TwoCBH, false);
+    // Its members are the database's files: unpacked whole, or a piece at a time.
+    for (const uint64_t whole : {uint64_t{0}, uint64_t{16} << 20}) {
+        INFO(whole);
+        auto members = chessbase::archiveMembers(file, "", whole);
+        for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid", ".2lcd", ".2lgd"}) {
+            INFO(ext);
+            auto member      = members->open(ext, false);
+            const auto loose = slurp(chessbaseData(std::string("cbtest2") + ext));
+            REQUIRE(member);
+            REQUIRE(member->size() == loose.size());
+            const auto bytes = member->read(0, loose.size());
+            CHECK(std::string(bytes.begin(), bytes.end()) == loose);
+        }
+        CHECK(members->has(".ini"));
+        CHECK_FALSE(members->has(".cbh"));
+    }
+    // Read a piece at a time at every place, backward: each read before what is kept unpacks the member again.
+    auto members      = chessbase::archiveMembers(file, "", 0);
+    auto moves        = members->open(".2cbg", false);
+    const auto source = slurp(chessbaseData("cbtest2.2cbg"));
+    for (uint64_t at = source.size(); at-- > 0;) {
+        const std::size_t n = std::min<std::size_t>(97, source.size() - at);
+        const auto bytes    = moves->read(at, n);
+        REQUIRE(std::string(bytes.begin(), bytes.end()) == source.substr(at, n));
+    }
+    CHECK_THROWS_AS((void)moves->read(source.size(), 1), chessbase::Damage);
+    // Its games one by one, out of order.
+    ChessBaseDatabase db(file, ChessBaseOptions{"", 0});
+    const auto loose = databaseGames(chessbaseData("cbtest2.2cbh"));
+    for (const uint32_t record : {35u, 1u, 18u, 2u, 34u, 1u}) {
+        INFO(record);
+        const auto game = db.read(record);
+        REQUIRE(game);
+        CHECK(game->tree.main.moves.size() == loose[record - 1].tree.main.moves.size());
+        CHECK(game->tree.main.headers == loose[record - 1].tree.main.headers);
+    }
+}
+
+TEST_CASE("ChessBase 2CBZ archive: the zip enciphered, read with its password, a wrong one refused") {
+    const auto file = chessbaseData("cbtest2.2cbz");
+    CHECK(isChessBase(file));
+    CHECK(isChessBaseArchive(file));
+    CHECK(isEncipheredArchive(file));
+    CHECK(isEncipheredArchive("Base.2CbZ"));
+    ChessBaseOptions options;
+    options.password = TEST_PASSWORD;
+    checkDatabase(file, ChessBaseFormat::TwoCBH, false, options);
+    options.unpack_whole = 0;
+    checkDatabase(file, ChessBaseFormat::TwoCBH, false, options);
+    // The same games as the plain zip's, and as the database's own files.
+    const auto plain = databaseGames(chessbaseData("cbtest2.2cbv"));
+    const auto games = databaseGames(file, nullptr, options);
+    REQUIRE(games.size() == plain.size());
+    for (std::size_t i = 0; i < games.size(); ++i) {
+        CHECK(games[i].tree.main.headers == plain[i].tree.main.headers);
+        CHECK(games[i].tree.main.moves.size() == plain[i].tree.main.moves.size());
+    }
+    // It is the zip, enciphered as a .cbz is, padded with zeros to the cipher's blocks.
+    auto zip = slurp(chessbaseData("cbtest2.2cbv"));
+    zip.resize((zip.size() + 7) / 8 * 8, '\0');
+    std::vector<uint8_t> enciphered(zip.begin(), zip.end());
+    chessbase::desBlocks(TEST_PASSWORD, enciphered, false);
+    CHECK(std::string(enciphered.begin(), enciphered.end()) == slurp(file));
+    CHECK(archivePasswordFits(file, TEST_PASSWORD));
+    CHECK_FALSE(archivePasswordFits(file, "RSTEST20"));
+    CHECK(throwsWith([&] { ChessBaseDatabase(file, ChessBaseOptions{"RSTEST20"}); }, "wrong password"));
+    CHECK(throwsWith([&] { (void)ChessBaseDatabase(file); }, "needs its password"));
+    // The import reads it as a ChessBase database, not as a PGN.
+    ImportProgress progress;
+    std::atomic<bool> cancel{false};
+    uint64_t given    = 0;
+    const auto report = importChessBase(
+        file, ImportOptions{}, progress, cancel, [&](std::vector<ImportedGame>&& batch) { given += batch.size(); },
+        nullptr, options);
+    CHECK(report.error.empty());
+    CHECK(report.games == 35);
+    CHECK(report.damaged == 0);
+    CHECK(given == 35);
+    const auto refused = importChessBase(
+        file, ImportOptions{}, progress, cancel, [&](std::vector<ImportedGame>&&) {}, nullptr,
+        ChessBaseOptions{"nope"});
+    CHECK(refused.games == 0);
+    CHECK(refused.error.find("wrong password") != std::string::npos);
+}
+
+TEST_CASE("ChessBase archive: a zip whose files are stored as they are, or with a compression it does not read") {
+    // A zip of the 2CBH database's files, each stored as it is (method 0); then its moves file in method 12 (bzip2).
+    const auto dir = fs::temp_directory_path() / "chessbase-stored";
+    fs::create_directories(dir);
+    const auto files = [](uint16_t moves_method) {
+        std::vector<ZipFile> out;
+        for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid"})
+            out.push_back({std::string("Stored") + ext, slurp(chessbaseData(std::string("cbtest2") + ext)),
+                           std::string(ext) == ".2cbg" ? moves_method : uint16_t{0}});
+        return out;
+    };
+    spit(dir / "Stored.2cbv", zipOf(files(0)));
+    checkDatabase(dir / "Stored.2cbv", ChessBaseFormat::TwoCBH, false);
+    checkDatabase(dir / "Stored.2cbv", ChessBaseFormat::TwoCBH, false, ChessBaseOptions{"", 0});
+    spit(dir / "Bzip2.2cbv", zipOf(files(12)));
+    CHECK(throwsWith([&] { ChessBaseDatabase(dir / "Bzip2.2cbv"); }, "method 12"));
+    // A zip without a database in it.
+    auto other = zipOf(files(0));
+    for (auto at = other.find("Stored.2cbh"); at != std::string::npos; at = other.find("Stored.2cbh"))
+        other.replace(at, 11, "Stored.txt0");
+    spit(dir / "Other.2cbv", other);
+    CHECK(throwsWith([&] { ChessBaseDatabase(dir / "Other.2cbv"); }, "holds no ChessBase database"));
+}
+
+TEST_CASE("ChessBase archive: a large deflated member read a piece at a time, forward, back, and far ahead") {
+    // Seven megabytes of their own in deflate's stored blocks, beside the database's files: more than the member keeps
+    // behind its reads.
+    std::mt19937 random(69);
+    std::string big(7u << 20, '\0');
+    for (auto& c : big) c = static_cast<char>(random() & 0x7F);
+    auto files = std::vector<ZipFile>{{"Big.dat", big, 8}};
+    for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid"})
+        files.push_back({std::string("Big") + ext, slurp(chessbaseData(std::string("cbtest2") + ext)), 8});
+    const auto dir = fs::temp_directory_path() / "chessbase-big";
+    fs::create_directories(dir);
+    spit(dir / "Big.2cbv", zipOf(files));
+    checkDatabase(dir / "Big.2cbv", ChessBaseFormat::TwoCBH, false, ChessBaseOptions{"", 0});
+    auto members = chessbase::archiveMembers(dir / "Big.2cbv", "", 0);
+    auto member  = members->open(".dat", false);
+    REQUIRE(member);
+    REQUIRE(member->size() == big.size());
+    const auto same = [&](uint64_t at, std::size_t n) {
+        const auto bytes = member->read(at, n);
+        return std::string(bytes.begin(), bytes.end()) == big.substr(at, n);
+    };
+    for (uint64_t at = 0; at < big.size(); at += 100000)
+        REQUIRE(same(at, std::min<std::size_t>(100000, big.size() - at)));
+    CHECK(same(big.size() - 10, 10));
+    CHECK(same(0, 1000));                       // back to the start: unpacked again
+    CHECK(same(6u << 20, 4096));                // far ahead in one read
+    CHECK(same((6u << 20) - (512u << 10), 8));  // a little back: kept
+    CHECK(same(3, 5u << 20));                   // a read of megabytes
+    CHECK_THROWS_AS((void)member->read(big.size() - 1, 2), chessbase::Damage);
+    // Whole, its CRC-32 checked; a member whose bytes are not those its CRC says is damaged.
+    auto whole = chessbase::archiveMembers(dir / "Big.2cbv", "", 16u << 20)->open(".2cbh", false);
+    CHECK(whole->size() == slurp(chessbaseData("cbtest2.2cbh")).size());
+    auto wrong      = zipOf(files);
+    const auto name = wrong.rfind("Big.2lid");  // its directory entry: the CRC 30 bytes before its name
+    REQUIRE(name != std::string::npos);
+    wrong[name - 30] = static_cast<char>(wrong[name - 30] ^ 1);
+    spit(dir / "Wrong.2cbv", wrong);
+    CHECK_THROWS_WITH_AS((void)chessbase::archiveMembers(dir / "Wrong.2cbv", "", 0)->open(".2lid", true),
+                         doctest::Contains("CRC-32"), chessbase::Damage);
+}
+
 TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read as damaged, never past their files") {
     struct Set {
         std::string from;
         std::vector<std::string> extensions;
+        std::string password;
     };
     const std::vector<Set> sets = {
-        {"cbtest1", {".cbh", ".cbg", ".cba", ".cbp", ".cbt", ".cbc", ".cbs", ".cbe", ".cbj"}},
-        {"cbtest2", {".2cbh", ".2cbg", ".2cba", ".2lid"}},
-        {"cbtest1", {".cbv"}},
+        {"cbtest1", {".cbh", ".cbg", ".cba", ".cbp", ".cbt", ".cbc", ".cbs", ".cbe", ".cbj"}, ""},
+        {"cbtest2", {".2cbh", ".2cbg", ".2cba", ".2lid"}, ""},
+        {"cbtest1", {".cbv"}, ""},
+        {"cbtest2", {".2cbv"}, ""},
+        {"cbtest2", {".2cbz"}, TEST_PASSWORD},
     };
     // Reads everything it can: only a readable error at opening may escape; damage is in the report.
-    const auto readAll = [](const fs::path& file, ChessBaseReport& report) {
+    const auto readAll = [](const fs::path& file, const std::string& password, ChessBaseReport& report) {
         try {
-            ChessBaseDatabase db(file);
+            ChessBaseOptions options;
+            options.password = password;
+            ChessBaseDatabase db(file, options);
             db.forEach([](ChessBaseGame&& g) {
                 // What was read of a damaged game is a tree a PGN writer and reader agree on.
                 (void)g;
@@ -692,17 +951,13 @@ TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read
     std::mt19937 random(20261120);
     int opened = 0, refused = 0, damaged = 0;
     for (const auto& set : sets) {
-        const bool archive = set.extensions.front() == ".cbv";
         for (const auto& ext : set.extensions) {
             const auto original = slurp(chessbaseData(set.from + ext));
             const auto dir      = fs::temp_directory_path() / "chessbase-damage";
             const auto reset    = [&] {
                 fs::remove_all(dir);
                 fs::create_directories(dir);
-                if (archive)
-                    fs::copy_file(chessbaseData("cbtest1.cbv"), dir / "Base.cbv");
-                else
-                    for (const auto& e : set.extensions) fs::copy_file(chessbaseData(set.from + e), dir / ("Base" + e));
+                for (const auto& e : set.extensions) fs::copy_file(chessbaseData(set.from + e), dir / ("Base" + e));
             };
             const auto file = dir / ("Base" + set.extensions.front());
             // Cut.
@@ -712,7 +967,7 @@ TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read
                 reset();
                 spit(dir / ("Base" + ext), original.substr(0, cut));
                 ChessBaseReport report;
-                if (readAll(file, report)) {
+                if (readAll(file, set.password, report)) {
                     ++opened;
                     damaged += report.damaged + report.unreadable > 0;
                 } else {
@@ -729,7 +984,7 @@ TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read
                 for (std::size_t i = run; i < std::min(bytes.size(), run + 1 + round); ++i) bytes[i] = '\xff';
                 spit(dir / ("Base" + ext), bytes);
                 ChessBaseReport report;
-                if (readAll(file, report))
+                if (readAll(file, set.password, report))
                     ++opened;
                 else
                     ++refused;

@@ -63,6 +63,8 @@ class DatabaseShelf {
     std::size_t add(const std::filesystem::path& folder);
     // Out of the list; its files stay. Not a linked one's.
     void remove(std::size_t index);
+    // Out of the list, its folder deleted: a database made for an import that brought nothing.
+    void discard(std::size_t index);
 
     // The linked sources, after the user's own databases: the tournaments, the PGN files opened; those already open
     // are kept.

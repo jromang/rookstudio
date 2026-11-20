@@ -191,53 +191,75 @@ bool endsWithPgn(std::string name) {
 // The files of a zip archive that `wanted` takes, by its central directory (zip64 included).
 std::vector<std::unique_ptr<ByteSource>> zipSources(const fs::path& file,
                                                     const std::function<bool(std::string_view)>& wanted) {
-    auto in         = openFile(file);
-    const auto size = fs::file_size(file);
+    auto in                 = openFile(file);
+    const ArchiveBytes read = [&](uint64_t offset, std::size_t size) {
+        std::vector<unsigned char> out(size);
+        in.clear();
+        in.seekg(static_cast<std::streamoff>(offset));
+        in.read(reinterpret_cast<char*>(out.data()), static_cast<std::streamsize>(size));
+        out.resize(static_cast<std::size_t>(std::max<std::streamsize>(0, in.gcount())));
+        return out;
+    };
+    const auto label = file.filename().string();
+    std::vector<std::unique_ptr<ByteSource>> out;
+    for (const auto& entry : zipEntries(fs::file_size(file), read, label)) {
+        if (!wanted(entry.name)) continue;
+        const auto data = zipData(entry, read, label);
+        if (entry.method == 0)
+            out.push_back(std::make_unique<StoredSource>(file, entry.name, data, entry.compressed));
+        else if (entry.method == 8)
+            out.push_back(std::make_unique<InflateSource>(file, entry.name, true, data, entry.compressed));
+        else
+            throw std::runtime_error(entry.name + ": a compression this program does not read (method " +
+                                     std::to_string(entry.method) + ")");
+    }
+    return out;
+}
+
+}  // namespace
+
+std::vector<ZipEntry> zipEntries(uint64_t size, const ArchiveBytes& read, const std::string& label) {
     const auto tail = std::min<uint64_t>(size, 65536 + 22);
-    std::vector<unsigned char> end(static_cast<std::size_t>(tail));
-    in.seekg(static_cast<std::streamoff>(size - tail));
-    in.read(reinterpret_cast<char*>(end.data()), static_cast<std::streamsize>(tail));
-    std::size_t at = std::string::npos;
+    const auto end  = read(size - tail, static_cast<std::size_t>(tail));
+    std::size_t at  = std::string::npos;
     for (std::size_t i = end.size() >= 22 ? end.size() - 22 + 1 : 0; i-- > 0;) {
         if (le(&end[i], 4) == 0x06054b50) {
             at = i;
             break;
         }
     }
-    if (at == std::string::npos) throw std::runtime_error(file.filename().string() + ": not a zip archive");
+    if (at == std::string::npos) throw std::runtime_error(label + ": not a zip archive");
     uint64_t entries   = le(&end[at + 10], 2);
     uint64_t dir_size  = le(&end[at + 12], 4);
     uint64_t dir_start = le(&end[at + 16], 4);
     // zip64: the locator just before, and its record.
     if (at >= 20 && le(&end[at - 20], 4) == 0x07064b50) {
         const auto record = le(&end[at - 20 + 8], 8);
-        std::array<unsigned char, 56> z{};
-        in.seekg(static_cast<std::streamoff>(record));
-        in.read(reinterpret_cast<char*>(z.data()), z.size());
-        if (in && le(z.data(), 4) == 0x06064b50) {
+        const auto z      = read(record, 56);
+        if (z.size() == 56 && le(z.data(), 4) == 0x06064b50) {
             entries   = le(&z[32], 8);
             dir_size  = le(&z[40], 8);
             dir_start = le(&z[48], 8);
         }
     }
-    if (dir_size > (uint64_t{1} << 31)) throw std::runtime_error(file.filename().string() + ": damaged zip directory");
-    std::vector<unsigned char> dir(static_cast<std::size_t>(dir_size));
-    in.seekg(static_cast<std::streamoff>(dir_start));
-    in.read(reinterpret_cast<char*>(dir.data()), static_cast<std::streamsize>(dir_size));
-    if (!in) throw std::runtime_error(file.filename().string() + ": damaged zip directory");
+    if (dir_size > (uint64_t{1} << 31)) throw std::runtime_error(label + ": damaged zip directory");
+    const auto dir = read(dir_start, static_cast<std::size_t>(dir_size));
+    if (dir.size() != dir_size) throw std::runtime_error(label + ": damaged zip directory");
 
-    std::vector<std::unique_ptr<ByteSource>> out;
+    std::vector<ZipEntry> out;
     std::size_t p = 0;
     for (uint64_t e = 0; e < entries && p + 46 <= dir.size(); ++e) {
         if (le(&dir[p], 4) != 0x02014b50) break;
-        const auto method      = le(&dir[p + 10], 2);
-        uint64_t compressed    = le(&dir[p + 20], 4);
-        uint64_t uncompressed  = le(&dir[p + 24], 4);
+        ZipEntry entry;
+        entry.method           = static_cast<uint32_t>(le(&dir[p + 10], 2));
+        entry.crc              = static_cast<uint32_t>(le(&dir[p + 16], 4));
+        entry.compressed       = le(&dir[p + 20], 4);
+        entry.size             = le(&dir[p + 24], 4);
         const auto name_length = le(&dir[p + 28], 2), extra_length = le(&dir[p + 30], 2),
                    note_length = le(&dir[p + 32], 2);
-        uint64_t local         = le(&dir[p + 42], 4);
+        entry.header           = le(&dir[p + 42], 4);
         if (p + 46 + name_length + extra_length > dir.size()) break;
-        const std::string name(reinterpret_cast<const char*>(&dir[p + 46]), static_cast<std::size_t>(name_length));
+        entry.name.assign(reinterpret_cast<const char*>(&dir[p + 46]), static_cast<std::size_t>(name_length));
         // The zip64 extra field holds what did not fit in 32 bits, in this order.
         for (std::size_t x = p + 46 + name_length; x + 4 <= p + 46 + name_length + extra_length;) {
             const auto id = le(&dir[x], 2), length = le(&dir[x + 2], 2);
@@ -248,34 +270,24 @@ std::vector<std::unique_ptr<ByteSource>> zipSources(const fs::path& file,
                     field = le(&dir[v], 8);
                     v += 8;
                 };
-                take(uncompressed);
-                take(compressed);
-                take(local);
+                take(entry.size);
+                take(entry.compressed);
+                take(entry.header);
             }
             x += 4 + length;
         }
         p += 46 + name_length + extra_length + note_length;
-        if (!wanted(name)) continue;
-        // The entry's data: after its local header, whose name and extra field may differ from the directory's.
-        std::array<unsigned char, 30> header{};
-        in.seekg(static_cast<std::streamoff>(local));
-        in.read(reinterpret_cast<char*>(header.data()), header.size());
-        if (!in || le(header.data(), 4) != 0x04034b50)
-            throw std::runtime_error(file.filename().string() + ": damaged zip entry " + name);
-        const auto data = local + 30 + le(&header[26], 2) + le(&header[28], 2);
-        if (method == 0)
-            out.push_back(std::make_unique<StoredSource>(file, name, data, compressed));
-        else if (method == 8)
-            out.push_back(std::make_unique<InflateSource>(file, name, true, data, compressed));
-        else
-            throw std::runtime_error(name + ": a compression this program does not read (method " +
-                                     std::to_string(method) + ")");
-        (void)uncompressed;
+        out.push_back(std::move(entry));
     }
     return out;
 }
 
-}  // namespace
+uint64_t zipData(const ZipEntry& entry, const ArchiveBytes& read, const std::string& label) {
+    const auto header = read(entry.header, 30);
+    if (header.size() != 30 || le(header.data(), 4) != 0x04034b50)
+        throw std::runtime_error(label + ": damaged zip entry " + entry.name);
+    return entry.header + 30 + le(&header[26], 2) + le(&header[28], 2);
+}
 
 std::vector<std::unique_ptr<ByteSource>> zipFiles(const fs::path& file,
                                                   const std::function<bool(std::string_view name)>& wanted) {

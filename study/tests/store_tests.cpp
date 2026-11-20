@@ -272,10 +272,33 @@ TEST_CASE("store: the line of each damaged game an import read, found again by t
     const auto got = importInto(*db, file, ImportOptions{2, 4096}, progress, go_on);
     REQUIRE(got.added == 4);
     REQUIRE(got.read.damaged == 2);
+    CHECK(got.damaged == 2);
     REQUIRE(got.damaged_lines.size() == 2);
     const auto snap = db->snapshot();
     CHECK(got.damaged_lines[0] == std::pair<uint64_t, uint64_t>{snap->key(1), 5});
     CHECK(got.damaged_lines[1] == std::pair<uint64_t, uint64_t>{snap->key(3), 14});
+}
+
+TEST_CASE("store: the damaged games an import adds are those of its games added, the duplicates left out") {
+    // The damaged game twice, then once more in another import: added once, counted once.
+    const auto file = fs::temp_directory_path() / "store-damaged-twice.pgn";
+    std::ofstream(file, std::ios::binary) << "[Event \"Illegal\"]\n\n1. e4 e5 2. Ke3 *\n\n"
+                                          << "[Event \"Illegal\"]\n\n1. e4 e5 2. Ke3 *\n\n"
+                                          << "[Event \"Fine\"]\n\n1. e4 e5 1-0\n\n";
+    auto db = Database::create(freshFolder("store-damaged-twice.fcgdb"));
+    std::atomic<bool> go_on{false};
+    ImportProgress progress;
+    auto got = importInto(*db, file, ImportOptions{2, 4096}, progress, go_on);
+    CHECK(got.read.games == 3);
+    CHECK(got.read.damaged == 2);
+    CHECK(got.added == 2);
+    CHECK(got.duplicates == 1);
+    CHECK(got.damaged == 1);
+    ImportProgress again;
+    got = importInto(*db, file, ImportOptions{2, 4096}, again, go_on);
+    CHECK(got.read.damaged == 2);
+    CHECK(got.added == 0);
+    CHECK(got.damaged == 0);
 }
 
 TEST_CASE("store: a file imported into a database, committed as it goes; cancelled or refused, it keeps what it had") {

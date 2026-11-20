@@ -315,6 +315,7 @@ DatabaseImport importInto(Database& db, const std::filesystem::path& file, const
             const auto appended = db.append(std::move(pending), keep_duplicates);
             out.added += appended.added;
             out.duplicates += appended.duplicates;
+            out.damaged += appended.damaged;
             ++out.commits;
         } catch (const std::exception& e) {
             out.error = e.what();
@@ -949,6 +950,8 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
         keys.resize(kept);
     }
     if (games.empty()) return appended;
+    uint64_t damaged = 0;
+    for (const auto& game : games) damaged += game.damaged;
     commit(games, keys, false, nullptr, nullptr);
     if (keys_indexed_) {
         // Merged in: a sort of the new keys only, however many the database has.
@@ -957,7 +960,8 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
         std::sort(known_keys_.begin() + before, known_keys_.end());
         std::inplace_merge(known_keys_.begin(), known_keys_.begin() + before, known_keys_.end());
     }
-    appended.added = games.size();
+    appended.added   = games.size();
+    appended.damaged = damaged;
     return appended;
 }
 

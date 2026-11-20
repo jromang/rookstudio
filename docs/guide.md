@@ -1121,11 +1121,15 @@ PGN text of the clipboard. The import runs in the background at a low priority (
 time), with its progress, its speed and *Cancel*. The games committed stay if it stops (every 262,144 games, and at
 the end), and importing the file again adds only the missing ones; games already in the database are left out.
 
-At the end, a banner on the database tells what came: the games added, those already there, and the damaged ones (a
-move that cannot be read or is illegal, a text cut short, a start position that is not one), each kept up to that
-move with its text as it was; *See them in the list*, or a click on one, shows the file at its line. A full disk, a
-stop asked for or another error says what is kept and what is needed, with *Resume the import* and *Open the
-database's folder*. Then the database's opening tree is built, in the background.
+At the end, a banner on the database tells what came: the games added, those already there, and the damaged ones
+among the games added (a move that cannot be read or is illegal, a text cut short, a start position that is not one),
+each kept up to that move with its text as it was; *See them in the list*, or a click on one, shows the file at its
+line. A full disk, a stop asked for or another error says what is kept and what is needed, with *Resume the import* and
+*Open the database's folder*; a file that cannot be read on says why, the games read before it kept. Then the
+database's opening tree is built, in the background.
+
+A file whose bytes are not text (a program, a picture, an archive the import does not know) is refused before it is
+read as a PGN: nothing is imported, and a new database made for it is not kept.
 
 A database that another program writes to (another RookStudio importing into it, for instance) opens read-only: the
 list, the tree and the searches work; importing and saving games wait until that program has finished. *Remove from
@@ -1177,10 +1181,12 @@ games a tournament finishes, a file that grew or changed). They are neither impo
 ### ChessBase databases
 
 A ChessBase database dropped on the Databases page, or chosen with *Import a file…*, is copied into a RookStudio
-database: its .cbh or .2cbh (or any of its files), or an archive of one, .cbv or .cbz. A card says first what it holds,
-read in its headers, what comes in and what stays out, where it goes and about how long it takes; *Import* (Enter)
-starts the copy, *Not now* (Esc) leaves it. The ChessBase files are only read, nothing is written beside them; an
-archive is unpacked while it is read, and a .cbz's password is asked on the card and not kept.
+database: its .cbh or .2cbh (or any of its files), or an archive of one, .cbv or .cbz for a .cbh, .2cbv or .2cbz for
+a .2cbh. A card says first what it holds, read in its headers, what comes in and what stays out, where it goes and
+about how long it takes; *Import* (Enter) starts the copy, *Not now* (Esc) leaves it. The ChessBase files are only
+read, nothing is written beside them; an archive is unpacked while it is read. The password of a .cbz or a .2cbz is
+typed on the card (Enter in the field starts the copy) and not kept; a wrong one is said there at once, to be typed
+again, before anything is copied.
 
 The copy keeps the moves and their variations, the comments before and after the moves (a text in several languages:
 English first, the others after it), the symbols, the coloured squares and arrows, the clocks and the time spent, the

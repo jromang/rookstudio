@@ -229,3 +229,34 @@ TEST_CASE("story by the model: a model that gives no answer, or a story cancelle
     CHECK(cancelled.back().passage == templ.back());
     CHECK(cancelled.back().attempts == 0);
 }
+
+TEST_CASE("story by the model: the game ends only in the passage about the end") {
+    const auto r    = queenLost();
+    const auto told = story_detail::told(r.line, "1-0", r.report, r.analyses, nullptr, Lang::Fr, PieceLetters::French);
+    REQUIRE(told.size() >= 3);
+    const StoryBrief opening(told.front(), r.line, r.analyses, nullptr, Lang::Fr, PieceLetters::French, Players{});
+    const auto said = opening.prompt.find("L'ouverture se termine sur ");
+    REQUIRE_MESSAGE(said != std::string::npos, opening.prompt);
+    const auto from = said + std::string_view("L'ouverture se termine sur ").size();
+    const auto last = opening.prompt.substr(from, opening.prompt.find('.', from + 3) - from);
+    // The opening's end told as the game's: « la partie se termine sur 11…Dxe7 ».
+    CHECK(opening.check("Au sortir de l'ouverture, la position est équilibrée, et la partie se termine sur " + last +
+                        ".") == Refusal{Refusal::Kind::Wording, "la partie se termine"});
+    CHECK_FALSE(opening.check("Au sortir de l'ouverture, la position est équilibrée, et l'ouverture se termine sur " +
+                              last + "."));
+    const StoryBrief end(told.back(), r.line, r.analyses, nullptr, Lang::Fr, PieceLetters::French, Players{});
+    CHECK_FALSE(end.check("Les Blancs l'emportent, et la partie se termine sur 13…Fxg4."));
+    CHECK(story_detail::checkEnd("The game ends with 13…Bxg4.", false) ==
+          Refusal{Refusal::Kind::Wording, "the game ends"});
+    CHECK_FALSE(story_detail::checkEnd("The opening ends with 13…Bxg4.", false));
+    // As two passages about the opening said it.
+    const Refusal game_ends{Refusal::Kind::Wording, "la partie se termine"};
+    for (const auto* opening_end :
+         {"Dans la Ruy Lopez, défense Steinitz, les Noirs sont un peu mieux au sortir de l'ouverture, et la partie se "
+          "termine sur 11…Dxe7.",
+          "Dans la défense polonaise, les Noirs ont déjà une position gagnante au sortir de l'ouverture, et la partie "
+          "se termine sur 11…Fxh1."}) {
+        CHECK_MESSAGE(story_detail::checkEnd(opening_end, false) == game_ends, opening_end);
+        CHECK_FALSE(story_detail::checkEnd(opening_end, true));
+    }
+}

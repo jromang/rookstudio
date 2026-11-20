@@ -376,6 +376,20 @@ Allowed collect(const MoveContext& ctx, const MoveFacts& facts, const std::optio
     for (const auto* f : present) {
         for (const auto& p : factPieces(*f)) allowed.pieces.push_back(p);
     }
+    // The lines themselves, with their boards, the move played first: what each sentence is read against (#64).
+    std::vector<Move> played_line{ctx.played};
+    if (ctx.reply) played_line.insert(played_line.end(), ctx.reply->moves.begin(), ctx.reply->moves.end());
+    allowed.lines.push_back(Shown::of(Shown::Kind::Played, *ctx.before, played_line, 1 + reply.size(), letters));
+    if (ctx.best && !best.empty())
+        allowed.lines.push_back(Shown::of(Shown::Kind::Best, *ctx.before, ctx.best->moves, best.size(), letters));
+    if (const auto alt = alternative(ctx); alt && !other.empty()) {
+        std::vector<Move> other_line{alt->alt};
+        other_line.insert(other_line.end(), alt->rest.begin(), alt->rest.end());
+        allowed.lines.push_back(Shown::of(Shown::Kind::Other, *ctx.before, other_line, other.size(), letters));
+    }
+    if (theory.main)
+        allowed.lines.push_back(
+            Shown::of(Shown::Kind::Theory, *ctx.before, std::vector<Move>{*theory.main}, 1, letters));
     const auto board = [&](const Position& pos) {
         for (int i = 0; i < 64; ++i) {
             const auto s = square(i);
@@ -752,6 +766,7 @@ Brief::Brief(const MoveContext& ctx, Lang lang, PieceLetters letters) : lang_(la
     standing_       = standings(ctx);
     if (!back) forward_to_ = name(to);
     theory_ = !theory.lines.empty();
+    lost_   = brief_detail::Lost::of(*ctx.report);
 }
 
 bool Brief::hasSubstance() const {
@@ -767,8 +782,11 @@ std::optional<Refusal> Brief::check(std::string_view text) const {
     if (auto r = checkRetreat(text, forward_to_)) return r;
     if (auto r = checkFiller(text)) return r;
     if (auto r = checkStanding(text, standing_)) return r;
-    if (lang_ == Lang::Fr) return checkElision(text);
-    return std::nullopt;
+    if (lang_ == Lang::Fr)
+        if (auto r = checkElision(text)) return r;
+    if (auto r = checkBoards(text, facts_, allowed_)) return r;
+    if (auto r = checkLost(text, lost_)) return r;
+    return checkWording(text, lang_);
 }
 
 }  // namespace fcg::commentary

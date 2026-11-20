@@ -145,10 +145,12 @@ TEST_CASE("theory: a file changed on the disk is read again by itself; RookStudi
     CHECK(shelf.studies()[0].readings == 2);
     CHECK(shelf.studies()[0].notes->counts().games == 2);
     CHECK(shelf.at(keyAfter(NAJDORF), &NAJDORF).found.size() == 5);
-    // The file as its author left it.
-    std::ifstream in(file, std::ios::binary);
-    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    CHECK(text == std::string(NOTES) + "\n" + PLANS);
+    // The file as its author left it, the stream closed after: Windows renames no file a stream holds open.
+    {
+        std::ifstream in(file, std::ios::binary);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        CHECK(text == std::string(NOTES) + "\n" + PLANS);
+    }
 
     // Moved away: missing, its notes of the last reading kept; back again, read again.
     fs::rename(file, dir / "elsewhere.pgn");

@@ -16,6 +16,7 @@
 #include <tour/files.hpp>
 
 #include "https.hpp"
+#include "zstd_reading.hpp"
 
 namespace fcg {
 
@@ -423,245 +424,108 @@ std::optional<std::string> EvalsReading::finished() {
     return out;
 }
 
-void EvalsReading::run(std::string source, fs::path folder) {
-    const auto finish = [this](std::string why) {
-        std::lock_guard lock(mutex_);
-        finished_ = std::move(why);
-    };
-    std::error_code ec;
-    fs::create_directories(folder, ec);
-    const auto rows_file = folder / "reading.tsv", state_file = folder / "reading.json";
-    const bool remote = source.rfind("http://", 0) == 0 || source.rfind("https://", 0) == 0;
-    EvalScanner scanner(evalCandidates(namedOpenings()));
+namespace {
 
-    // Where the reading is: at a frame's end, the line begun there, the database's lines read before it.
-    struct Mark {
-        uint64_t offset = 0;
-        std::string pending;
-        uint64_t lines = 0;
-    } mark;
-    std::string validator;  // that the file has not changed: the server's ETag or date, a file's size and time
-    uint64_t size = 0;
-    std::string date;
-    if (!remote) {  // a file downloaded before: its date is not the database's
-        size      = fs::file_size(source, ec);
-        validator = fmt::format("{}:{}", size, fs::last_write_time(source, ec).time_since_epoch().count());
-    }
-    // A reading of the same source cut short: on from where it stopped.
-    if (const auto j = readJsonFile(state_file);
-        j && j->value("source", "") == source && (remote || j->value("validator", "") == validator)) {
-        mark.offset  = j->value("offset", uint64_t{0});
-        mark.pending = j->value("pending", "");
-        mark.lines   = j->value("lines", uint64_t{0});
-        if (remote) {
-            validator = j->value("validator", "");
-            size      = j->value("size", uint64_t{0});
-            date      = j->value("date", "");
-        }
-        for (const auto& found : readRows(rows_file)) scanner.restore(found);
-        progress_.resumed = true;
-    } else {
-        fs::remove(rows_file, ec);
-    }
-    std::unique_ptr<std::FILE, int (*)(std::FILE*)> rows(tour::openFile(rows_file, "ab"), &std::fclose);
-    if (!rows) return finish("cannot write " + rows_file.string());
-    const auto saveState = [&] {
-        std::fflush(rows.get());
-        nlohmann::json j{{"source", source},      {"validator", validator},  {"size", size},       {"date", date},
-                         {"offset", mark.offset}, {"pending", mark.pending}, {"lines", mark.lines}};
-        tour::replaceFile(state_file, j.dump());
-    };
-    const auto startAgain = [&] {
-        scanner.forget();
-        rows.reset(tour::openFile(rows_file, "wb"));
-        mark = {};
-    };
+// The evaluations database's lines, each scanned for a candidate position: those found written to a file as they come
+// (reading.tsv), made final at the end (evaluations.tsv and .json).
+class EvalsConsumer final : public ZstdConsumer {
+   public:
+    EvalsConsumer(fs::path folder, std::string source, EvalsReading::Progress& progress)
+        : folder_(std::move(folder)),
+          source_(std::move(source)),
+          rows_file_(folder_ / "reading.tsv"),
+          progress_(progress),
+          scanner_(evalCandidates(namedOpenings())) {}
 
-    study::ZstdStream zstd;
-    std::string pending;
-    uint64_t lines = 0, at = 0;  // at: the compressed bytes read, the next one's offset
-    std::string error;
-    auto last_saved = std::chrono::steady_clock::now();
-    const auto text = [&](std::string_view piece) {
+    bool text(std::string_view piece) override {
         for (std::size_t from = 0;;) {
             const auto end = piece.find('\n', from);
             if (end == std::string_view::npos) {
-                pending.append(piece.substr(from));
+                pending_.append(piece.substr(from));
                 break;
             }
             std::string_view line = piece.substr(from, end - from);
-            if (!pending.empty()) {
-                pending.append(line);
-                line = pending;
+            if (!pending_.empty()) {
+                pending_.append(line);
+                line = pending_;
             }
             if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
             if (!line.empty()) {
-                ++lines;
-                if (const auto* found = scanner.line(line)) {
+                ++lines_;
+                if (const auto* found = scanner_.line(line)) {
                     const auto row = evaluatedRow(*found) + '\n';
-                    if (std::fwrite(row.data(), 1, row.size(), rows.get()) != row.size()) {
-                        error = "cannot write " + rows_file.string() + " (is the disk full?)";
+                    if (!rows_ || std::fwrite(row.data(), 1, row.size(), rows_.get()) != row.size()) {
+                        error_ = "cannot write " + rows_file_.string() + " (is the disk full?)";
                         return false;
                     }
                 }
             }
-            pending.clear();
+            pending_.clear();
             from = end + 1;
         }
-        return !cancel_.load();
-    };
-    uint64_t chunk_start = 0;  // the offset of the piece being decoded
-    const auto frameEnd  = [&](std::size_t read) {
-        mark = {chunk_start + read, pending, lines};
-        if (const auto now = std::chrono::steady_clock::now();
-            std::chrono::duration<double>(now - last_saved).count() >= checkpoint_every_) {
-            saveState();
-            last_saved = now;
-        }
-    };
-    const std::function<bool(std::string_view)> on_text = text;
-    const std::function<void(std::size_t)> on_frame_end = frameEnd;
-    const auto feed                                     = [&](std::string_view data) {
-        chunk_start     = at;
-        const bool more = zstd.feed(data, on_text, on_frame_end);
-        at += data.size();
-        progress_.bytes = at;
-        progress_.lines = lines;
-        progress_.kept  = scanner.kept();
-        return more && error.empty() && !cancel_;
-    };
-    // From the mark: the decoder at a frame's start, the line begun there.
-    const auto fromMark = [&] {
-        zstd.restart();
-        pending = mark.pending;
-        lines   = mark.lines;
-        at      = mark.offset;
-    };
-    // The end: what was found kept, the reading's files removed.
-    const auto done = [&] {
-        if (!pending.empty()) (void)text("\n");
-        if (!error.empty()) return finish(error);
-        nlohmann::json j{{"source", source}, {"date", date}, {"lines", lines}, {"kept", scanner.kept()}};
+        progress_.lines = lines_;
+        progress_.kept  = scanner_.kept();
+        return true;
+    }
+    nlohmann::json mark() override { return {{"pending", pending_}, {"lines", lines_}}; }
+    void commit() override {
+        if (rows_) std::fflush(rows_.get());
+    }
+    void restore(const nlohmann::json& state) override {
+        pending_ = state.value("pending", "");
+        lines_   = state.value("lines", uint64_t{0});
+        scanner_.forget();
+        if (rows_) std::fflush(rows_.get());
+        for (const auto& found : readRows(rows_file_)) scanner_.restore(found);
+        if (!rows_) rows_.reset(tour::openFile(rows_file_, "ab"));
+        if (!rows_) error_ = "cannot write " + rows_file_.string();
+    }
+    void startAgain() override {
+        scanner_.forget();
+        rows_.reset(tour::openFile(rows_file_, "wb"));
+        if (!rows_) error_ = "cannot write " + rows_file_.string();
+        pending_.clear();
+        lines_ = 0;
+    }
+    std::string finish(const std::string& date) override {
+        if (!pending_.empty()) (void)text("\n");
+        if (!error_.empty()) return error_;
+        nlohmann::json j{{"source", source_}, {"date", date}, {"lines", lines_}, {"kept", scanner_.kept()}};
         std::string all;
-        for (const auto& found : scanner.found()) all += evaluatedRow(found) + '\n';
-        tour::replaceFile(folder / "evaluations.tsv", all);
-        tour::replaceFile(folder / "evaluations.json", j.dump());
-        rows.reset();
-        fs::remove(rows_file, ec);
-        fs::remove(state_file, ec);
-        finish("");
-    };
-
-    if (!remote) {
-        progress_.size = size;
-        std::ifstream in(source, std::ios::binary);
-        if (!in) return finish("cannot open " + source);
-        fromMark();
-        in.seekg(static_cast<std::streamoff>(mark.offset));
-        std::vector<char> buffer(1 << 20);
-        bool more = true;
-        while (more) {
-            in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-            const auto n = static_cast<std::size_t>(in.gcount());
-            if (n == 0) break;
-            more = feed(std::string_view(buffer.data(), n));
-        }
-        if (cancel_) {
-            saveState();
-            return finish("cancelled");
-        }
-        if (!error.empty()) return finish(error);
-        if (!zstd.betweenFrames()) {
-            saveState();
-            return finish(source + " is cut short");
-        }
-        return done();
+        for (const auto& found : scanner_.found()) all += evaluatedRow(found) + '\n';
+        tour::replaceFile(folder_ / "evaluations.tsv", all);
+        tour::replaceFile(folder_ / "evaluations.json", j.dump());
+        rows_.reset();
+        std::error_code ec;
+        fs::remove(rows_file_, ec);
+        return {};
     }
+    [[nodiscard]] std::string error() const override { return error_; }
 
-    for (int attempt = 0;; ++attempt) {
-        fromMark();
-        HttpRequest request;
-        request.url       = source;
-        request.method    = "GET";
-        request.timeout_s = 30;
-        if (mark.offset > 0) {
-            request.headers.emplace_back("Range", fmt::format("bytes={}-", mark.offset));
-            if (!validator.empty()) request.headers.emplace_back("If-Range", validator);
-        }
-        std::string refused;
-        HttpStream stream;
-        stream.cancel  = &cancel_;
-        stream.on_head = [&](int status, std::string_view head) {
-            uint64_t from = 0, total = 0;
-            bool ranged = false;
-            if (const auto range = httpHeader(head, "Content-Range"); range && range->rfind("bytes ", 0) == 0) {
-                if (const auto slash = range->find('/'); slash != std::string::npos) {
-                    ranged = true;
-                    if ((*range)[6] != '*') std::from_chars(range->data() + 6, range->data() + slash, from);
-                    std::from_chars(range->data() + slash + 1, range->data() + range->size(), total);
-                }
-            }
-            if (status == 206 && mark.offset > 0 && ranged && from == mark.offset) {
-                size = total;
-            } else if (status == 200) {
-                if (mark.offset > 0) {  // the file has changed, or the server sends it whole: from its start
-                    startAgain();
-                    fromMark();
-                    progress_.resumed = false;
-                }
-                size = 0;
-                if (const auto length = httpHeader(head, "Content-Length")) (void)number(*length, size);
-                validator.clear();  // a strong ETag, or the file's date
-                if (const auto etag = httpHeader(head, "ETag"); etag && etag->rfind("W/", 0) != 0) {
-                    validator = *etag;
-                } else if (const auto modified = httpHeader(head, "Last-Modified")) {
-                    validator = *modified;
-                }
-                if (const auto modified = httpHeader(head, "Last-Modified")) date = httpDate(*modified);
-            } else if (status == 416 || status == 206) {
-                refused = "the server does not send the rest of the file as asked";
-                return false;
-            } else {
-                refused = fmt::format("the server answered {} for {}", status, source);
-                return false;
-            }
-            if (!rows) {
-                error = "cannot write " + rows_file.string();
-                return false;
-            }
-            progress_.size = size;
-            return true;
-        };
-        stream.on_data    = feed;
-        const auto result = politeStream(request, stream);
-        if (cancel_) {
-            saveState();
-            return finish("cancelled");
-        }
-        if (!error.empty()) {
-            saveState();
-            return finish(error);
-        }
-        if (!refused.empty()) {
-            if (mark.offset > 0 && attempt == 0) {  // read again from the start
-                startAgain();
-                saveState();
-                continue;
-            }
-            return finish(refused);
-        }
-        if (result.error.empty() && result.status != 0 && zstd.betweenFrames() && (size == 0 || at == size))
-            return done();
-        // Cut short: on from the last frame's end, a few times, waiting longer each time.
-        saveState();
-        if (attempt >= 5)
-            return finish(result.error.empty() ? std::string("the download was cut short") : result.error);
-        const auto wait = std::chrono::steady_clock::now() + retry_wait_ * (1 << attempt);
-        while (std::chrono::steady_clock::now() < wait) {
-            if (cancel_) return finish("cancelled");
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    }
+   private:
+    fs::path folder_;
+    std::string source_;
+    fs::path rows_file_;
+    EvalsReading::Progress& progress_;
+    EvalScanner scanner_;
+    std::unique_ptr<std::FILE, int (*)(std::FILE*)> rows_{nullptr, &std::fclose};
+    std::string pending_;
+    uint64_t lines_ = 0;
+    std::string error_;
+};
+
+}  // namespace
+
+void EvalsReading::run(std::string source, fs::path folder) {
+    std::error_code ec;
+    fs::create_directories(folder, ec);
+    EvalsConsumer consumer(folder, source, progress_);
+    ZstdReadingOptions options;
+    options.checkpoint_every = checkpoint_every_;
+    options.retry_wait       = retry_wait_;
+    const auto why           = readZstd(source, folder / "reading.json", consumer, progress_, cancel_, options);
+    std::lock_guard lock(mutex_);
+    finished_ = why;
 }
 
 }  // namespace fcg

@@ -18,7 +18,9 @@
 #include "app.hpp"
 #include "chesscom.hpp"
 #include "i18n.hpp"
+#include "lichess_month.hpp"
 #include "lichess_months.hpp"
+#include "machines.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -196,6 +198,7 @@ void App::pollTwic() {
                 lichess_months_error_ = TR("The page lists no month the program can read.");
         }
     }
+    pollMonthReading();
     if (!twic_add_ || !shelf_) return;
     auto& add = *twic_add_;
     // The downloads, then the imports one after the other.
@@ -256,14 +259,17 @@ void App::drawSourcesMenu() {
                             TR("database.lichess.org · CC BY-SA 4.0")};
     const Source chess_com{"chess.com", TR("a player's games"),
                            TR("its public API, without an account, a month at a time")};
+    const Source lichess_games{TR("Lichess games"), TR("a month of rated games, filtered"),
+                               TR("database.lichess.org · CC0 · about 30 GB a month, read as it comes")};
     int i = 0;
-    for (const auto& source : {twic, broadcasts, chess_com}) {
+    for (const auto& source : {twic, broadcasts, chess_com, lichess_games}) {
         ImGui::PushID(i++);
         const auto start = ImGui::GetCursorPos();
         if (ImGui::Selectable("##source", false, 0, ImVec2(px(420), ImGui::GetTextLineHeightWithSpacing() * 2.1f))) {
             twic_sheet_      = i == 1;
             broadcast_sheet_ = i == 2;
             chesscom_sheet_  = i == 3;
+            month_sheet_     = i == 4;
             twic_done_.reset();
         }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(2)));
@@ -792,6 +798,189 @@ void App::drawChesscomSheet() {
     ImGui::PushTextWrapPos();
     ImGui::TextDisabled("%s", TR("What leaves the machine: the player's name and the requests for their months, to "
                                  "api.chess.com, one at a time; no account, nothing of you."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+}
+
+void App::startMonthReading(const std::string& source) {
+    if (monthReading() || !shelf_) return;
+    auto& s = shelf();
+    if (s.import() || twic_add_) {
+        month_stopped_ = TR("An import runs already: one at a time.");
+        return;
+    }
+    const auto& f    = month_filter_;
+    const bool local = source.rfind("http", 0) != 0;
+    // The month, from the URL or the file's name: lichess_db_standard_rated_2026-10.pgn.zst.
+    const auto name  = fs::path(source).filename().string();
+    const auto at    = name.find("rated_");
+    const auto month = at != std::string::npos ? name.substr(at + 6, 7) : fs::path(source).stem().stem().string();
+    const auto new_name =
+        f.min_elo > 0 ? fmt::format("Lichess · {}+ · {}", f.min_elo, month) : fmt::format("Lichess · {}", month);
+    int database = month_target_;
+    if (database < 0 || database >= static_cast<int>(s.entries().size())) {
+        try {
+            database      = static_cast<int>(s.create(new_name));
+            month_target_ = database;
+        } catch (const std::exception& e) {
+            month_stopped_ = e.what();
+            return;
+        }
+    }
+    const auto db = s.open(static_cast<std::size_t>(database));
+    if (!db) {
+        month_stopped_ = s.facts(static_cast<std::size_t>(database)).error;
+        return;
+    }
+    MonthRun run;
+    run.source = source;
+    run.title =
+        f.min_elo > 0 ? trf("Lichess {}, both players at {} and more", month, f.min_elo) : trf("Lichess {}", month);
+    run.index  = static_cast<std::size_t>(database);
+    run.from   = static_cast<study::GameId>(db->snapshot()->games());
+    run.filter = f;
+    // Its place, for this source and filter only: read with others, it starts again.
+    run.state =
+        storage_.root() / "sources" / "lichess" /
+        fmt::format("{}-{}-{}{}.json", month, f.min_elo, f.bullet ? "bullet" : "nobullet", local ? "-file" : "");
+    if (month_run_ && month_run_->source == source && month_run_->filter == f) run.from = month_run_->from;
+    month_reading_ = std::make_unique<lichess::MonthReading>();
+    month_reading_->start(source, db, f, run.state);
+    month_run_ = std::move(run);
+    month_stopped_.clear();
+    twic_done_.reset();
+}
+
+void App::pollMonthReading() {
+    if (!month_reading_ || month_reading_->busy() || !month_run_) return;
+    const auto why = month_reading_->finished();
+    if (!why) return;
+    const auto& run = *month_run_;
+    if (run.index < shelf().entries().size()) shelf().rebuildTree(run.index);  // its opening tree, for what came
+    if (!why->empty()) {
+        month_stopped_ = *why == "cancelled" ? std::string(TR("Cancelled: what was read is in the database.")) : *why;
+        return;
+    }
+    TwicDone done;
+    done.title    = run.title;
+    done.index    = run.index;
+    done.database = run.index < shelf().entries().size() ? shelf().entries()[run.index].name : std::string();
+    done.added    = month_reading_->progress().added.load();
+    if (const auto db = shelf().open(run.index)) {
+        const auto snap = db->snapshot();
+        done.report     = twic::reportOf(*snap, run.from, static_cast<study::GameId>(snap->games()));
+    }
+    twic_done_ = std::move(done);
+    month_run_.reset();
+}
+
+void App::drawMonthSheet() {
+    auto& s = shelf();
+    ui::beginCard("month_sheet");
+    ImGui::TextUnformatted(TR("Lichess games"));
+    ImGui::SameLine(0, px(10));
+    ImGui::TextDisabled("%s", TR("a month of rated games from database.lichess.org, filtered while it is read"));
+    ui::topic(guide::topics::LichessMonths);
+    const bool busy = monthReading();
+    if (lichess_standard_months_.empty()) {
+        if (!lichess_months_job_ && lichess_months_error_.empty()) startLichessMonths();
+        if (lichess_months_job_) {
+            ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its months…"));
+        } else {
+            ImGui::PushTextWrapPos();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+                               trf("database.lichess.org did not answer: {}", lichess_months_error_).c_str());
+            ImGui::PopTextWrapPos();
+            if (ImGui::Button(TR("Try again"))) startLichessMonths();
+        }
+    } else if (!busy) {
+        const int shown = static_cast<int>(std::min<std::size_t>(lichess_standard_months_.size(), 12));
+        month_pick_     = std::clamp(month_pick_, 0, shown - 1);
+        if (ImGui::BeginTable("##lichess_months", 4, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit)) {
+            ImGui::TableSetupColumn("##picked", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFrameHeight());
+            ImGui::TableSetupColumn(TR("Month"));
+            ImGui::TableSetupColumn(TR("Size"));
+            ImGui::TableSetupColumn(TR("Games"));
+            ImGui::TableHeadersRow();
+            for (int i = 0; i < shown; ++i) {
+                const auto& m = lichess_standard_months_[static_cast<std::size_t>(i)];
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::RadioButton(fmt::format("##lmonth{}", i).c_str(), month_pick_ == i)) month_pick_ = i;
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(m.month.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextDisabled("%s", m.size.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(m.games ? ui::exactCount(m.games).c_str() : "");
+            }
+            ImGui::EndTable();
+        }
+        // The filters: by default both players at 2400 and more, no bullet (mockup M10, point 5).
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("Both players rated at least"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(120));
+        if (ImGui::InputInt("##month_elo", &month_filter_.min_elo, 100, 100))
+            month_filter_.min_elo = std::clamp(month_filter_.min_elo, 0, 3500);
+        ImGui::SameLine();
+        bool leave_bullet = !month_filter_.bullet;
+        if (ImGui::Checkbox(TR("Leave out bullet"), &leave_bullet)) month_filter_.bullet = !leave_bullet;
+        const auto& m = lichess_standard_months_[static_cast<std::size_t>(month_pick_)];
+        // Into which database.
+        const auto& entries = s.entries();
+        const auto new_name = month_filter_.min_elo > 0
+                                  ? fmt::format("Lichess · {}+ · {}", month_filter_.min_elo, m.month)
+                                  : fmt::format("Lichess · {}", m.month);
+        if (month_target_ >= static_cast<int>(entries.size())) month_target_ = -2;
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("Into"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(260));
+        const auto offer   = trf("A new database, “{}”", new_name);
+        const auto current = month_target_ >= 0 ? entries[static_cast<std::size_t>(month_target_)].name : offer;
+        if (ImGui::BeginCombo("##month_into", current.c_str())) {
+            if (ImGui::Selectable(offer.c_str(), month_target_ < 0)) month_target_ = -2;
+            for (std::size_t i = 0; i < entries.size(); ++i) {
+                if (entries[i].source) continue;
+                if (ImGui::Selectable(fmt::format("{}##month_db{}", entries[i].name, i).c_str(),
+                                      month_target_ == static_cast<int>(i)))
+                    month_target_ = static_cast<int>(i);
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::BeginDisabled(s.import() != nullptr || twic_add_.has_value());
+        if (ImGui::Button(trf("Download and read {} ({})", m.month, m.size).c_str()))
+            startMonthReading(lichess::monthUrl(m));
+        ImGui::SameLine();
+        if (ImGui::Button(TR("Read a file already downloaded…")))
+            dialogs_.openFile(Dialogs::Purpose::LichessMonthFile, {{TR("A month of Lichess (.pgn.zst)"), "zst"}});
+        ImGui::EndDisabled();
+        if (month_run_ && !month_stopped_.empty() && month_run_->filter == month_filter_) {
+            ImGui::SameLine();
+            if (ImGui::Button(TR("Go on"))) startMonthReading(month_run_->source);
+        }
+    }
+    if (busy) {
+        const auto& p   = month_reading_->progress();
+        const auto size = p.size.load();
+        const auto read = size ? fmt::format("{} %", 100 * p.bytes.load() / size) : formatBytes(p.bytes.load());
+        ImGui::TextUnformatted(trf("{} · {} games read, {} kept, {} added", read, ui::exactCount(p.games.load()),
+                                   ui::exactCount(p.kept.load()), ui::exactCount(p.added.load()))
+                                   .c_str());
+        if (p.resumed) ImGui::TextDisabled("%s", TR("gone on from where it stopped"));
+        ImGui::TextDisabled("%s", TR("The database can be read while it fills."));
+        if (ImGui::SmallButton(TR("Cancel##month"))) month_reading_->cancel();
+    } else if (!month_stopped_.empty()) {
+        ImGui::PushTextWrapPos();
+        ImGui::TextUnformatted(month_stopped_.c_str());
+        ImGui::PopTextWrapPos();
+    }
+    if (ImGui::Button(TR("Close##month"))) month_sheet_ = false;
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("What leaves the machine: the request for database.lichess.org's page, then for the "
+                                 "month's file, read as it comes: only the games kept reach the disk. Cancel, a "
+                                 "network cut or the program closed: it goes on from where it stopped."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }

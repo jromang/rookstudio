@@ -896,6 +896,21 @@ msgstr "按 Alt+A 或“分析”可查看各引擎在此局面的最佳着法�
 msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr "Alt+A：引擎分析所显示的局面，并跟随棋盘。"
 
+msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
+msgstr ""
+
+msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
+msgstr ""
+
+msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
+msgstr ""
+
+msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
+msgstr ""
+
+msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
+msgstr ""
+
 msgid "Alternate"
 msgstr "交替"
 
@@ -983,14 +998,17 @@ msgstr "分析"
 msgid "Analyse the game"
 msgstr "分析对局"
 
+msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
+msgstr ""
+
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr "分析这盘棋（G）以查看复盘：双方的准确率、错误、关键时刻，以及谁先看出来。"
 
-msgid "Analyse the game first (G): its key moments come from the review"
-msgstr "请先分析对局（G）：关键时刻来自复盘"
+msgid "Analyse the game first (Alt+G): its key moments come from the review"
+msgstr ""
 
-msgid "Analyse the game first (G): the annotation is its review written in"
-msgstr "请先分析对局（G）：评注就是把复盘写入棋谱"
+msgid "Analyse the game first (Alt+G): the annotation is its review written in"
+msgstr ""
 
 msgid "Analyse the game followed"
 msgstr "分析正在关注的对局"
@@ -1006,6 +1024,9 @@ msgstr "分析引擎"
 
 msgid "Analysed by {}, {} per position."
 msgstr "由 {} 分析，每个局面 {}。"
+
+msgid "Analysed by {}, {}."
+msgstr ""
 
 msgid "Analysis"
 msgstr "分析"
@@ -2925,6 +2946,9 @@ msgstr "对局中被标记为失衡"
 
 msgid "Flip"
 msgstr "翻转"
+
+msgid "Flip the board (Alt+F)"
+msgstr ""
 
 msgid "Flip the board (F)"
 msgstr "翻转棋盘 (F)"
@@ -5308,6 +5332,15 @@ msgstr "仅当机器重装过或其所有者确认密钥已更改时：否则可
 
 msgid "Only move"
 msgstr "唯一着法"
+
+msgid "Only move, according to the tablebases."
+msgstr ""
+
+msgid "Only move."
+msgstr ""
+
+msgid "Only move. {}: {}, the next {}."
+msgstr ""
 
 msgid "Only the 18 symmetrical ones…"
 msgstr "仅 18 个对称局面…"
@@ -10619,11 +10652,20 @@ msgstr "对局对"
 msgid "pass {} of {} · {} per position · {}/{}"
 msgstr "第 {} 轮，共 {} 轮 · 每个局面 {} · {}/{}"
 
+msgid "pass {} of {} · {} · {}/{}"
+msgstr ""
+
 msgid "pass {} · {} per position · {}/{}"
 msgstr "第 {} 轮 · 每个局面 {} · {}/{}"
 
+msgid "pass {} · {} · {}/{}"
+msgstr ""
+
 msgid "paused while A analyses"
 msgstr "A 分析时暂停"
+
+msgid "paused while Alt+A analyses"
+msgstr ""
 
 msgid "performance {}"
 msgstr "表现分 {}"
@@ -11911,6 +11953,10 @@ msgstr[0] "{} 个新版本"
 msgid "{} node per move"
 msgid_plural "{} nodes per move"
 msgstr[0] "每步 {} 节点"
+
+msgid "{} node per position"
+msgid_plural "{} nodes per position"
+msgstr[0] ""
 
 msgid "{} nodes"
 msgstr "{} 节点"

@@ -905,6 +905,21 @@ msgstr "Alt+A, o Analizar, para ver aquí las mejores jugadas de los motores; + 
 msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr "Alt+A: los motores analizan la posición mostrada y siguen el tablero."
 
+msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
+msgstr ""
+
+msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
+msgstr ""
+
+msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
+msgstr ""
+
+msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
+msgstr ""
+
+msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
+msgstr ""
+
 msgid "Alternate"
 msgstr "Alternados"
 
@@ -992,14 +1007,17 @@ msgstr "Analizar"
 msgid "Analyse the game"
 msgstr "Analizar la partida"
 
+msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
+msgstr ""
+
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr "Analiza la partida (G) para su revisión: la precisión de cada bando, sus errores, los momentos clave y quién los vio venir."
 
-msgid "Analyse the game first (G): its key moments come from the review"
-msgstr "Analiza primero la partida (G): sus momentos clave salen de la revisión"
+msgid "Analyse the game first (Alt+G): its key moments come from the review"
+msgstr ""
 
-msgid "Analyse the game first (G): the annotation is its review written in"
-msgstr "Analiza primero la partida (G): la anotación es su revisión escrita en ella"
+msgid "Analyse the game first (Alt+G): the annotation is its review written in"
+msgstr ""
 
 msgid "Analyse the game followed"
 msgstr "Analizar la partida seguida"
@@ -1015,6 +1033,9 @@ msgstr "Análisis con"
 
 msgid "Analysed by {}, {} per position."
 msgstr "Analizada por {}, {} por posición."
+
+msgid "Analysed by {}, {}."
+msgstr ""
 
 msgid "Analysis"
 msgstr "Análisis"
@@ -2939,6 +2960,9 @@ msgstr "Marcadas como desequilibradas durante las partidas"
 
 msgid "Flip"
 msgstr "Girar"
+
+msgid "Flip the board (Alt+F)"
+msgstr ""
 
 msgid "Flip the board (F)"
 msgstr "Girar el tablero (F)"
@@ -5329,6 +5353,15 @@ msgstr "Solo si la máquina se reinstaló o su propietario confirma que su clave
 
 msgid "Only move"
 msgstr "Jugada única"
+
+msgid "Only move, according to the tablebases."
+msgstr ""
+
+msgid "Only move."
+msgstr ""
+
+msgid "Only move. {}: {}, the next {}."
+msgstr ""
 
 msgid "Only the 18 symmetrical ones…"
 msgstr "Solo las 18 simétricas…"
@@ -10679,11 +10712,20 @@ msgstr "pares"
 msgid "pass {} of {} · {} per position · {}/{}"
 msgstr "pasada {} de {} · {} por posición · {}/{}"
 
+msgid "pass {} of {} · {} · {}/{}"
+msgstr ""
+
 msgid "pass {} · {} per position · {}/{}"
 msgstr "pasada {} · {} por posición · {}/{}"
 
+msgid "pass {} · {} · {}/{}"
+msgstr ""
+
 msgid "paused while A analyses"
 msgstr "en pausa mientras A analiza"
+
+msgid "paused while Alt+A analyses"
+msgstr ""
 
 msgid "performance {}"
 msgstr "rendimiento {}"
@@ -12058,6 +12100,11 @@ msgid "{} node per move"
 msgid_plural "{} nodes per move"
 msgstr[0] "{} nodo por jugada"
 msgstr[1] "{} nodos por jugada"
+
+msgid "{} node per position"
+msgid_plural "{} nodes per position"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} nodes"
 msgstr "{} nodos"

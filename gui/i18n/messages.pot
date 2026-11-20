@@ -905,6 +905,21 @@ msgstr ""
 msgid "Alt+A: the engines analyse the position shown, and follow the board."
 msgstr ""
 
+msgid "Alt+G: stop the analysis of the game. Its passes done are kept, and it goes on from there next time."
+msgstr ""
+
+msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens."
+msgstr ""
+
+msgid "Alt+G: the analysis engine goes through every position of the game, in the background, then again further at each pass: the graph comes at once and sharpens. Its inaccuracies, mistakes and blunders are marked, the same ones each time."
+msgstr ""
+
+msgid "Alt+N: the next move the analysis marked (?!, ?, ??)."
+msgstr ""
+
+msgid "Alt+Shift+N: the previous move the analysis marked (?!, ?, ??)."
+msgstr ""
+
 msgid "Alternate"
 msgstr ""
 
@@ -992,13 +1007,16 @@ msgstr ""
 msgid "Analyse the game"
 msgstr ""
 
+msgid "Analyse the game (Alt+G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
+msgstr ""
+
 msgid "Analyse the game (G) to review it: each side's accuracy, its mistakes, the key moments, and who saw them coming."
 msgstr ""
 
-msgid "Analyse the game first (G): its key moments come from the review"
+msgid "Analyse the game first (Alt+G): its key moments come from the review"
 msgstr ""
 
-msgid "Analyse the game first (G): the annotation is its review written in"
+msgid "Analyse the game first (Alt+G): the annotation is its review written in"
 msgstr ""
 
 msgid "Analyse the game followed"
@@ -1014,6 +1032,9 @@ msgid "Analysed by"
 msgstr ""
 
 msgid "Analysed by {}, {} per position."
+msgstr ""
+
+msgid "Analysed by {}, {}."
 msgstr ""
 
 msgid "Analysis"
@@ -2938,6 +2959,9 @@ msgid "Flagged unbalanced during the games"
 msgstr ""
 
 msgid "Flip"
+msgstr ""
+
+msgid "Flip the board (Alt+F)"
 msgstr ""
 
 msgid "Flip the board (F)"
@@ -5328,6 +5352,15 @@ msgid "Only if the machine was reinstalled, or its owner says its key changed: o
 msgstr ""
 
 msgid "Only move"
+msgstr ""
+
+msgid "Only move, according to the tablebases."
+msgstr ""
+
+msgid "Only move."
+msgstr ""
+
+msgid "Only move. {}: {}, the next {}."
 msgstr ""
 
 msgid "Only the 18 symmetrical ones…"
@@ -10679,10 +10712,19 @@ msgstr ""
 msgid "pass {} of {} · {} per position · {}/{}"
 msgstr ""
 
+msgid "pass {} of {} · {} · {}/{}"
+msgstr ""
+
 msgid "pass {} · {} per position · {}/{}"
 msgstr ""
 
+msgid "pass {} · {} · {}/{}"
+msgstr ""
+
 msgid "paused while A analyses"
+msgstr ""
+
+msgid "paused while Alt+A analyses"
 msgstr ""
 
 msgid "performance {}"
@@ -12056,6 +12098,11 @@ msgstr[1] ""
 
 msgid "{} node per move"
 msgid_plural "{} nodes per move"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} node per position"
+msgid_plural "{} nodes per position"
 msgstr[0] ""
 msgstr[1] ""
 

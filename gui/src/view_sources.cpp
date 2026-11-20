@@ -16,6 +16,7 @@
 #include <tour/files.hpp>
 
 #include "app.hpp"
+#include "chesscom.hpp"
 #include "i18n.hpp"
 #include "lichess_months.hpp"
 #include "ui.hpp"
@@ -95,16 +96,15 @@ void App::startTwicAdd(std::vector<twic::Issue> issues, int database) {
         add.wanted.push_back(storage_.root() / "sources" / "twic" / twic::pgnFile(issue.number));
     }
     add.title = "TWIC " + numbers;
-    startFileAdd(std::move(add), database, "TWIC");
+    startFileAdd(std::move(add), database, "TWIC", &twic_target_);
 }
 
-void App::startFileAdd(TwicAdd add, int database, const std::string& new_name) {
+void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, int* target) {
     auto& s = shelf();
     if (database < 0 || database >= static_cast<int>(s.entries().size())) {
         try {
             database = static_cast<int>(s.create(new_name));
-            // The sheet shows the new database from now on.
-            (add.issues.empty() ? broadcast_target_ : twic_target_) = database;
+            if (target) *target = database;  // the sheet shows the new database from now on
         } catch (const std::exception& e) {
             twic_done_        = TwicDone{};
             twic_done_->error = e.what();
@@ -142,6 +142,11 @@ bool App::twicImportEnded(const fs::path& file, const study::DatabaseImport& rep
     add.duplicates += report.duplicates;
     if (report.error.empty() && !report.read.cancelled) {
         if (add.next < add.issues.size()) twic_.added[add.folder.string()].insert(add.issues[add.next].number);
+        if (!add.player.empty() && add.next < add.months.size()) {  // a followed chess.com player's month
+            for (auto& f : chesscom_followed_)
+                if (f.name == add.player) f.months.insert(add.months[add.next]);
+            saveChesscom();
+        }
         std::error_code ec;
         fs::remove(file, ec);  // its games are in the database now
     } else {
@@ -249,13 +254,16 @@ void App::drawSourcesMenu() {
     const Source twic{"TWIC", TR("the week's games, every Monday"), TR("theweekinchess.com · free for personal use")};
     const Source broadcasts{TR("Lichess broadcasts"), TR("a month of official broadcasts"),
                             TR("database.lichess.org · CC BY-SA 4.0")};
+    const Source chess_com{"chess.com", TR("a player's games"),
+                           TR("its public API, without an account, a month at a time")};
     int i = 0;
-    for (const auto& source : {twic, broadcasts}) {
+    for (const auto& source : {twic, broadcasts, chess_com}) {
         ImGui::PushID(i++);
         const auto start = ImGui::GetCursorPos();
         if (ImGui::Selectable("##source", false, 0, ImVec2(px(420), ImGui::GetTextLineHeightWithSpacing() * 2.1f))) {
             twic_sheet_      = i == 1;
             broadcast_sheet_ = i == 2;
+            chesscom_sheet_  = i == 3;
             twic_done_.reset();
         }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(2)));
@@ -451,10 +459,31 @@ void App::drawTwicReport() {
 }
 
 void App::drawFollowedSources() {
-    if (!twic_.weekly) return;
+    if (!chesscom_loaded_) {
+        loadChesscom();
+        chesscom_loaded_ = true;
+    }
+    if (!twic_.weekly && chesscom_followed_.empty()) return;
     ImGui::Dummy(ImVec2(0, px(6)));
     ImGui::TextDisabled("%s", TR("Followed sources"));
     ImGui::Separator();
+    for (const auto& f : chesscom_followed_) {
+        ImGui::PushID(f.name.c_str());
+        ImGui::TextUnformatted(fmt::format("chess.com · {}", f.name).c_str());
+        ImGui::TextDisabled(
+            "%s", f.months.empty() ? TR("no month added yet") : trf("added up to {}", *f.months.rbegin()).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Look for new games"))) {
+            chesscom_name_.fill(0);
+            std::copy_n(f.name.begin(), std::min(f.name.size(), chesscom_name_.size() - 1), chesscom_name_.begin());
+            chesscom_sheet_ = true;
+            for (std::size_t i = 0; i < shelf().entries().size(); ++i)
+                if (shelf().entries()[i].folder.string() == f.database) chesscom_target_ = static_cast<int>(i);
+            startChesscomLookup(f.name);
+        }
+        ImGui::PopID();
+    }
+    if (!twic_.weekly) return;
     ImGui::TextUnformatted(TR("TWIC, every Monday"));
     if (const auto next = twic::newIssue(twic_, twic_.database)) {
         ImGui::TextDisabled("%s", trf("TWIC {} is out", next->number).c_str());
@@ -603,7 +632,7 @@ void App::drawBroadcastSheet() {
             add.title = trf("Lichess broadcasts of {}", m.month);
             add.urls.push_back(lichess::monthUrl(m));
             add.wanted.push_back(storage_.root() / "sources" / "lichess" / lichess::monthFile(m));
-            startFileAdd(std::move(add), broadcast_target_, new_name);
+            startFileAdd(std::move(add), broadcast_target_, new_name, &broadcast_target_);
         }
         ImGui::EndDisabled();
     }
@@ -613,6 +642,156 @@ void App::drawBroadcastSheet() {
     ImGui::PushTextWrapPos();
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for database.lichess.org's page, then for the "
                                  "month's file, nothing else."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+}
+
+void App::loadChesscom() {
+    std::ifstream in(storage_.root() / "chesscom.json", std::ios::binary);
+    if (!in) return;
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    chesscom_followed_ = chesscom::fromJson(text);
+}
+
+void App::saveChesscom() {
+    try {
+        tour::replaceFile(storage_.root() / "chesscom.json", chesscom::toJson(chesscom_followed_));
+    } catch (const std::exception& e) {
+        Console::instance().add(e.what(), true);
+    }
+}
+
+void App::startChesscomLookup(const std::string& player) {
+    if (chesscom_job_ || player.empty()) return;
+    chesscom_error_.clear();
+    chesscom_months_.clear();
+    chesscom_player_ = player;
+    chesscom_job_    = std::async(std::launch::async, [player] {
+        HttpRequest request;
+        request.url    = chesscom::archivesUrl(player);
+        request.method = "GET";
+        request.headers.emplace_back("Accept", "application/json");
+        const auto answer = politeRequest(request);
+        std::pair<std::vector<std::string>, std::string> out;
+        if (answer.status == 404) {
+            out.second = N_("chess.com knows no player of that name.");
+        } else if (answer.status != 200) {
+            out.second = answer.error.empty() ? fmt::format("HTTP {}", answer.status) : answer.error;
+        } else {
+            out.first = chesscom::parseArchives(answer.body);
+            if (out.first.empty()) out.second = N_("This player has no game on chess.com.");
+        }
+        return out;
+    });
+}
+
+void App::drawChesscomSheet() {
+    auto& s = shelf();
+    if (!chesscom_loaded_) {
+        loadChesscom();
+        chesscom_loaded_ = true;
+    }
+    if (chesscom_job_ && chesscom_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto [months, error] = chesscom_job_->get();
+        chesscom_job_.reset();
+        chesscom_months_ = months;
+        chesscom_error_  = error.empty() ? std::string() : std::string(TR(error.c_str()));
+    }
+    ui::beginCard("chesscom_sheet");
+    ImGui::TextUnformatted("chess.com");
+    ImGui::SameLine(0, px(10));
+    ImGui::TextDisabled("%s", TR("a player's games, from its public API, without an account"));
+    ui::topic(guide::topics::ChessCom);
+    ImGui::SetNextItemWidth(px(260));
+    const bool enter =
+        ImGui::InputTextWithHint("##chesscom_name", TR("The player's name on chess.com"), chesscom_name_.data(),
+                                 chesscom_name_.size(), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::SameLine();
+    const auto key = chesscom::playerKey(chesscom_name_.data());
+    ImGui::BeginDisabled(key.empty() || chesscom_job_.has_value());
+    if (ImGui::Button(TR("Look up")) || (enter && !key.empty())) startChesscomLookup(key);
+    ImGui::EndDisabled();
+    if (chesscom_job_) {
+        ImGui::TextDisabled("%s", TR("Asking chess.com for the player's months…"));
+    } else if (!chesscom_error_.empty()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", chesscom_error_.c_str());
+    } else if (!chesscom_months_.empty()) {
+        const auto followed = std::find_if(chesscom_followed_.begin(), chesscom_followed_.end(),
+                                           [&](const auto& f) { return f.name == chesscom_player_; });
+        const std::set<std::string> added =
+            followed != chesscom_followed_.end() ? followed->months : std::set<std::string>{};
+        const auto wanted = chesscom::monthsToAsk(chesscom_months_, added);
+        ImGui::TextUnformatted(trn("{}: {} month of games, from {} to {}", "{}: {} months of games, from {} to {}",
+                                   static_cast<int>(chesscom_months_.size()), chesscom_player_, chesscom_months_.size(),
+                                   chesscom_months_.front(), chesscom_months_.back())
+                                   .c_str());
+        if (!added.empty())
+            ImGui::TextDisabled("%s", trn("{} month added before; the newest is asked for again, it may have grown.",
+                                          "{} months added before; the newest is asked for again, it may have grown.",
+                                          static_cast<int>(added.size()), added.size())
+                                          .c_str());
+        // Into which database: the followed player's, or one of their name.
+        const auto& entries = s.entries();
+        const auto new_name = fmt::format("chess.com · {}", chesscom_player_);
+        if (chesscom_target_ == -2 || chesscom_target_ >= static_cast<int>(entries.size())) {
+            chesscom_target_ = -1;
+            for (std::size_t i = 0; i < entries.size(); ++i)
+                if (!entries[i].source &&
+                    (entries[i].name == new_name ||
+                     (followed != chesscom_followed_.end() && entries[i].folder.string() == followed->database)))
+                    chesscom_target_ = static_cast<int>(i);
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(TR("Into"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(px(260));
+        const auto offer   = trf("A new database, “{}”", new_name);
+        const auto current = chesscom_target_ >= 0 ? entries[static_cast<std::size_t>(chesscom_target_)].name : offer;
+        if (ImGui::BeginCombo("##chesscom_into", current.c_str())) {
+            if (ImGui::Selectable(offer.c_str(), chesscom_target_ < 0)) chesscom_target_ = -1;
+            for (std::size_t i = 0; i < entries.size(); ++i) {
+                if (entries[i].source) continue;
+                if (ImGui::Selectable(fmt::format("{}##chesscom_db{}", entries[i].name, i).c_str(),
+                                      chesscom_target_ == static_cast<int>(i)))
+                    chesscom_target_ = static_cast<int>(i);
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::Checkbox(
+            trf("Follow {}: under the list of databases, to look for their new games", chesscom_player_).c_str(),
+            &chesscom_follow_);
+        ImGui::BeginDisabled(wanted.empty() || twic_add_.has_value() || s.import() != nullptr);
+        if (ImGui::Button(trn("Download and add {} month", "Download and add {} months",
+                              static_cast<int>(wanted.size()), wanted.size())
+                              .c_str())) {
+            TwicAdd add;
+            add.title = new_name;
+            for (const auto& month : wanted) {
+                add.urls.push_back(chesscom::monthPgnUrl(chesscom_player_, month));
+                auto file = month;
+                std::replace(file.begin(), file.end(), '/', '-');
+                add.wanted.push_back(storage_.root() / "sources" / "chesscom" /
+                                     (chesscom_player_ + "-" + file + ".pgn"));
+                add.months.push_back(month);
+            }
+            if (chesscom_follow_) {
+                add.player = chesscom_player_;
+                if (followed == chesscom_followed_.end()) chesscom_followed_.push_back({chesscom_player_, {}, {}});
+            }
+            startFileAdd(std::move(add), chesscom_target_, new_name, &chesscom_target_);
+            if (chesscom_follow_ && twic_add_)  // the followed player's database, once known
+                for (auto& f : chesscom_followed_)
+                    if (f.name == chesscom_player_) f.database = twic_add_->folder.string();
+            saveChesscom();
+        }
+        ImGui::EndDisabled();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(TR("Close##chesscom"))) chesscom_sheet_ = false;
+    drawFileAddProgress();
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("What leaves the machine: the player's name and the requests for their months, to "
+                                 "api.chess.com, one at a time; no account, nothing of you."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }

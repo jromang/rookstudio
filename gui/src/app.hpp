@@ -34,6 +34,7 @@
 #include "board_view.hpp"
 #include "book_jobs.hpp"
 #include "broadcaster.hpp"
+#include "chesscom.hpp"
 #include "console.hpp"
 #include "databases.hpp"
 #include "dialogs.hpp"
@@ -356,6 +357,8 @@ class App {
         std::vector<twic::Issue> issues;            // TWIC's; empty for another source
         std::vector<std::string> urls;              // the files to download, one after the other
         std::vector<std::filesystem::path> wanted;  // where each goes
+        std::string player;                         // chess.com's: the player followed, when followed
+        std::vector<std::string> months;            // chess.com's: each file's month
         std::size_t index = 0;  // the database
         std::filesystem::path folder;
         std::shared_ptr<std::atomic<bool>> cancel;
@@ -383,13 +386,30 @@ class App {
     void drawBroadcastSheet();
     void drawFileAddProgress();  // the downloads and imports under way, with Cancel
     void startLichessMonths();
-    void startFileAdd(TwicAdd add, int database, const std::string& new_name);  // the downloads, then the imports
+    // The downloads, then the imports; `target`, the sheet's choice of database, set to the new one when it is made.
+    void startFileAdd(TwicAdd add, int database, const std::string& new_name, int* target);
     bool broadcast_sheet_ = false;
     int broadcast_pick_   = 0;
     int broadcast_target_ = -2;                                                           // as twic_target_
     std::optional<std::future<std::pair<std::string, std::string>>> lichess_months_job_;  // the page, or why not
     std::vector<lichess::Month> lichess_broadcast_months_, lichess_standard_months_;
     std::string lichess_months_error_;
+    // A chess.com player's games (#74): their months asked for, then each month's PGN; a followed player under the
+    // list of databases, looked at again when the user asks.
+    void drawChesscomSheet();
+    void startChesscomLookup(const std::string& player);
+    void loadChesscom();
+    void saveChesscom();
+    bool chesscom_sheet_ = false;
+    std::array<char, 64> chesscom_name_{};
+    std::string chesscom_player_;  // the name looked up
+    std::vector<std::string> chesscom_months_;
+    std::optional<std::future<std::pair<std::vector<std::string>, std::string>>> chesscom_job_;
+    std::string chesscom_error_;
+    int chesscom_target_  = -2;
+    bool chesscom_follow_ = true;
+    bool chesscom_loaded_ = false;
+    std::vector<chesscom::Followed> chesscom_followed_;
     // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
     // background, its move shown.
     struct FileLines {

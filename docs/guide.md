@@ -1132,6 +1132,15 @@ resumable, then imported, and a report gives its strongest tournaments and best-
 already has is not added twice. The games keep their source, the broadcast's page in their Site tag: what you share of
 them is shared under the same licence. What leaves the machine: the request for the page, then for the month's file.
 
+### A chess.com player
+
+*From a source… › chess.com* adds a player's games from chess.com's public API, without an account: type their name
+and *Look up* asks for the months they played; *Download and add* asks for each month's games, one month at a time,
+and imports them into the database chosen (*A new database, “chess.com · name”* at first), with the same report. With
+*Follow* ticked, the player shows under the list of databases, in *Followed sources*: *Look for new games* asks again
+for the months not added yet and for the newest one (its games may have grown); a game already there is not added
+twice. What leaves the machine: the player's name and the requests for their months, to api.chess.com.
+
 ## The Openings page
 
 Your repertoires: each a PGN file of the profile (one game and its variations, for White or for Black), which the

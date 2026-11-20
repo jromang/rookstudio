@@ -539,6 +539,10 @@ void App::drawDatabases() {
         drawBroadcastSheet();
         return;
     }
+    if (chesscom_sheet_) {
+        drawChesscomSheet();
+        return;
+    }
     const auto& entries = s.entries();
     if (entries.empty()) {
         ui::beginCard("db_empty");

@@ -548,6 +548,15 @@ void App::frame() {
             const auto from  = std::string_view("lichess-database=").size();
             lichess::setDatabaseServer(w.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
             if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w.rfind("chesscom-server=http://127.0.0.1:", 0) == 0) {
+            // chesscom-server=http://127.0.0.1:PORT[,WORD]: a test's server in place of api.chess.com (#74).
+            const auto comma = w.find(',');
+            const auto from  = std::string_view("chesscom-server=").size();
+            chesscom::setServer(w.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+            if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w == "databases-chesscom") {  // the sheet of a chess.com player's games
+            page_           = Page::Databases;
+            chesscom_sheet_ = true;
         } else if (w == "databases-broadcasts") {  // the sheet of Lichess's broadcasts by month
             page_            = Page::Databases;
             broadcast_sheet_ = true;

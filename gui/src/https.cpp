@@ -448,7 +448,7 @@ HttpResult httpRequest(const HttpRequest& request) {
     if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
     if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
     for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    if (request.method != "GET" || !request.body.empty()) {
+    if ((request.method != "GET" && request.method != "HEAD") || !request.body.empty()) {
         head += fmt::format("Content-Length: {}\r\n", request.body.size());
     }
     head += "Connection: close\r\n\r\n";
@@ -475,7 +475,8 @@ HttpResult httpRequest(const HttpRequest& request) {
         result.error = "not an HTTP answer from " + url->host;
         return result;
     }
-    const auto headers = lower(answer.substr(0, headers_end));
+    result.head        = answer.substr(0, headers_end);
+    const auto headers = lower(result.head);
     result.body        = answer.substr(headers_end + 4);
     if (headers.find("\r\ntransfer-encoding: chunked") != std::string::npos) result.body = unchunk(result.body);
     return result;

@@ -24,6 +24,7 @@
 #include "engine_client.hpp"
 #include "game_analysis.hpp"
 #include "game_graph.hpp"
+#include "lichess_studies.hpp"
 #include "pgn_store.hpp"
 #include "review_runner.hpp"
 
@@ -272,6 +273,10 @@ struct BoardPage {
     };
     std::vector<Snapshot> undo, redo;  // the game before each change, and the changes undone
     GameChanges changes;               // since it was opened or saved: the strip and the recent games say so
+    // The game sent as a chapter of a Lichess study, or a chapter of the user's opened from there (#79): the strip
+    // says so, and how many changes since, with "Send the changes".
+    std::optional<lichess::SentRecord> sent;
+    GameChanges since_sent;
     std::string nag_typed;             // ! and ? typed in a row on a move
     double nag_time = 0;               // when the last of them was
     std::string toast;                 // a change said for a moment over the moves

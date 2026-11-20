@@ -24,6 +24,7 @@ struct HttpResult {
     int status = 0;  // HTTP status, 0 when there was no answer
     std::string body;
     std::string error;  // why there was no answer
+    std::string head = {};  // httpRequest: the status line and headers as they came (httpHeader() reads one)
 };
 
 struct HttpRequest {

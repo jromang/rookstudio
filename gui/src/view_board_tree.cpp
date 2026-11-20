@@ -94,6 +94,8 @@ void App::rememberBoardGame() {
     game.start_notes = b.start_notes;
     game.undo        = std::move(b.undo);  // the board takes another game: its history goes with this one
     game.redo        = std::move(b.redo);
+    game.sent        = b.sent;
+    game.since_sent  = b.since_sent;
     b.undo.clear();
     b.redo.clear();
     // One game of a list at a time, the last shown, unless a game has changes not saved: those stay until saved.
@@ -120,7 +122,8 @@ void App::saveRecentGames() const {
     nlohmann::json all = nlohmann::json::array();
     const auto entry = [&](const std::string& title, const std::string& where, const GameTree& tree, int line, int ply,
                            bool chess960, const GameChanges& changes, const std::optional<BoardOrigin>& origin,
-                           bool current) {
+                           bool current, const std::optional<lichess::SentRecord>& sent,
+                           const GameChanges& since_sent) {
         nlohmann::json j;
         j["title"]    = title;
         j["where"]    = where;
@@ -135,6 +138,10 @@ void App::saveRecentGames() const {
                            {"linked", origin->linked},
                            {"id", origin->id}};
         if (current) j["current"] = true;
+        if (sent) {  // sent to a Lichess study (#79)
+            j["sent"]       = lichess::sentJson(*sent);
+            j["since_sent"] = {{"count", since_sent.count}, {"lost", since_sent.lost}};
+        }
         all.push_back(std::move(j));
     };
     const auto& b = board_;
@@ -143,9 +150,9 @@ void App::saveRecentGames() const {
               board_origin_ ? board_origin_->name
               : b.pgn       ? b.pgn->name
                             : std::string(),
-              b.tree, b.line, b.ply, b.chess960, b.changes, board_origin_, true);
+              b.tree, b.line, b.ply, b.chess960, b.changes, board_origin_, true, b.sent, b.since_sent);
     for (const auto& r : recent_games_)
-        entry(r.title, r.where, r.tree, r.line, r.ply, r.chess960, r.changes, r.origin, false);
+        entry(r.title, r.where, r.tree, r.line, r.ply, r.chess960, r.changes, r.origin, false, r.sent, r.since_sent);
     try {
         tour::replaceFile(storage_.root() / "recent.json", all.dump(1));
     } catch (const std::exception& e) {
@@ -188,6 +195,13 @@ void App::loadRecentGames() {
             origin.id     = o->value("id", study::GameId{0});
             r.origin      = std::move(origin);
         }
+        if (const auto sent = j.find("sent"); sent != j.end()) {
+            r.sent = lichess::sentOf(*sent);
+            if (const auto c = j.find("since_sent"); r.sent && c != j.end() && c->is_object()) {
+                r.since_sent.count = c->value("count", 0);
+                r.since_sent.lost  = c->value("lost", false);
+            }
+        }
         if (j.value("current", false) && !boardHasGame(board_)) {
             // The game the board showed, on it again, the page shown at the start kept.
             const auto page = page_;
@@ -217,6 +231,8 @@ void App::restoreRecentGame(std::size_t index) {
     b.changes     = chosen.changes;
     b.pgn         = std::move(chosen.pgn);
     board_origin_ = std::move(chosen.origin);
+    b.sent        = std::move(chosen.sent);
+    b.since_sent  = chosen.since_sent;
 }
 
 std::optional<std::size_t> App::changedCopyOf(const std::filesystem::path& folder, uint32_t id) const {
@@ -459,6 +475,7 @@ void App::drawBoardStrip() {
 void App::drawChessColumn() {
     drawNewMoveQuestion();  // a move where the game went another way, asked about
     drawBoardStrip();
+    drawSentLine();         // sent to a Lichess study: the changes since (#79)
     drawMoveField();        // while a move is typed, whatever the tab
     drawCommentProgress();  // the key moments being commented, whatever the tab
     // The tabs, in the order of the mockups; Alt+1 to Alt+5.

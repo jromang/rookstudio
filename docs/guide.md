@@ -972,7 +972,8 @@ address, nothing else. *Share the game* imports it on Lichess without an account
 the address sees the game, its players' names too. *Have the position played out*, with a time control (3+2 to 30+20,
 or days a move), makes an open challenge from the position: a link for each side, to send to its player; such a game
 is not rated. *Bookmark the game on Lichess*, for a game that comes from there, puts it in your bookmarks: it sends
-the game's id with your token, and asks Lichess once for the permission to change your preferences.
+the game's id with your token, and asks Lichess once for the permission to change your preferences. *To a Lichess
+study…* sends the game into one of your studies or a new one (see [Your Lichess studies](#your-lichess-studies)).
 
 While you play a game on Lichess, none of them touches its line: a position on the way to its position, or the game
 that passes through it, does not leave the machine (see [Fair play](#fair-play)). The rest stays possible.
@@ -1209,6 +1210,39 @@ oldest first, and what was received stays if you cancel. *What is asked*: the sp
 classical; classical and correspondence), since when (the first game, a year ago, a date), standard chess and Chess960
 only. The games keep their link to lichess.org, their clocks and Lichess's evaluations. *Count the new games when the
 Home page opens* asks Lichess at most once an hour, with the player's name.
+
+### Your Lichess studies
+
+*Your studies*, on the Lichess page, lists the studies of your linked account, the most recently changed first. The
+first time the card is opened, RookStudio asks Lichess for the permission to read your studies (*Allow on
+Lichess…*): with it, your private and unlisted studies are listed too; *Without it*, the public ones only. Lichess's
+list gives each study's name and when it last changed; its chapters show once it has been read, and its visibility for
+the studies made from RookStudio. Another's study comes by its link (see [Lichess links](#lichess-links)).
+
+A click on a study reads it the first time: its chapters show, and stay in your profile, offline too. *Open a chapter
+on the Board* (or a double click on it) opens it, seen from the side Lichess shows it from. *Import into a database*
+puts each chapter into a database as a game: *Lichess studies*, made when missing, or another chosen beside it. Done
+again, or with *Read again* once imported, only the chapters changed since are replaced and the new ones added; a game
+you deleted there stays deleted. *Make it a theory study* is not there yet.
+
+*Follow it*: when the Lichess page opens (every five minutes at most), RookStudio asks Lichess whether each followed
+study changed, one request each, without downloading it. A study that changed says so, in the card and on its line
+when the card is folded, with *Read again*: nothing is downloaded before. After a reading, the chapters changed since
+the reading before are marked.
+
+**From the Board**, *lichess.org…* › *To a Lichess study…* opens a card beside the board that sends the game into one
+of your studies (a full one, at 64 chapters, is not offered) or into a new one, whose name and visibility are chosen
+there: private, unlisted or public, private first. The chapter's name, the side it is seen from and whether the
+assistant's comments go too are chosen in the same card; Enter sends, Escape leaves it. What goes is the game as PGN:
+its headers, moves and variations, your comments and symbols, its arrows and squares, its clocks; the engines' data,
+the evaluations and anything else of yours stay here. The first send asks Lichess for the permission to write in your
+studies. Once sent, *Open it on lichess.org* or *Copy its link*.
+
+Later, the strip over the moves says *Sent to Lichess · 2 changes since*, with *Send the changes*: the chapter's moves,
+variations and notes are replaced on Lichess by the game's, its tags too when they changed. Nothing goes on its own. A
+chapter opened from your studies says *From your Lichess study*, and sends its changes the same way.
+
+Lichess's limits: 64 chapters a study, 30 new studies a day.
 
 ### Official broadcasts
 

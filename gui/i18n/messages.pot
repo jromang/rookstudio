@@ -163,8 +163,8 @@ msgstr ""
 msgid ", {} already there left out"
 msgstr ""
 
-msgid ", {} damaged game among them (kept up to the move that cannot be read)"
-msgid_plural ", {} damaged games among them (kept up to the move that cannot be read)"
+msgid ", {} of them damaged (kept up to the move that cannot be read)"
+msgid_plural ", {} of them damaged (each kept up to the move that cannot be read)"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -5240,6 +5240,11 @@ msgstr ""
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr ""
+
+msgid "Of the games added, {} is damaged: kept up to the move that cannot be read, its text kept as it was."
+msgid_plural "Of the games added, {} are damaged: each kept up to the move that cannot be read, its text kept as it was."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Off this machine's list (the engine stays in the library)."
 msgstr ""
@@ -11478,11 +11483,6 @@ msgstr[1] ""
 
 msgid "{} d {} h left"
 msgstr ""
-
-msgid "{} damaged game among them: kept up to the move that cannot be read, its text kept as it was."
-msgid_plural "{} damaged games among them: kept up to the move that cannot be read, their text kept as it was."
-msgstr[0] ""
-msgstr[1] ""
 
 msgid "{} day a move"
 msgid_plural "{} days a move"

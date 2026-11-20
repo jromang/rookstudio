@@ -167,11 +167,11 @@ msgstr ", остановлено по вашему запросу"
 msgid ", {} already there left out"
 msgstr ", пропущено уже имеющихся: {}"
 
-msgid ", {} damaged game among them (kept up to the move that cannot be read)"
-msgid_plural ", {} damaged games among them (kept up to the move that cannot be read)"
-msgstr[0] ", из добавленных {} повреждённая (сохранена до хода, который не читается)"
-msgstr[1] ", из добавленных {} повреждённые (сохранены до хода, который не читается)"
-msgstr[2] ", из добавленных {} повреждённых (сохранены до хода, который не читается)"
+msgid ", {} of them damaged (kept up to the move that cannot be read)"
+msgid_plural ", {} of them damaged (each kept up to the move that cannot be read)"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "0 = a new random order for every match."
 msgstr "0 = новый случайный порядок для каждого матча."
@@ -5263,6 +5263,12 @@ msgstr "окт."
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "Результата одной партии. Пары: как измерено по парам."
+
+msgid "Of the games added, {} is damaged: kept up to the move that cannot be read, its text kept as it was."
+msgid_plural "Of the games added, {} are damaged: each kept up to the move that cannot be read, its text kept as it was."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Off this machine's list (the engine stays in the library)."
 msgstr "Убрать из списка этой машины (движок остаётся в библиотеке)."
@@ -11566,12 +11572,6 @@ msgstr[2] "{} циклов из 2 партий"
 
 msgid "{} d {} h left"
 msgstr "осталось {} д {} ч"
-
-msgid "{} damaged game among them: kept up to the move that cannot be read, its text kept as it was."
-msgid_plural "{} damaged games among them: kept up to the move that cannot be read, their text kept as it was."
-msgstr[0] "Из добавленных {} повреждённая: сохранена до хода, который не читается, с текстом в исходном виде."
-msgstr[1] "Из добавленных {} повреждённые: сохранены до хода, который не читается, с текстом в исходном виде."
-msgstr[2] "Из добавленных {} повреждённых: сохранены до хода, который не читается, с текстом в исходном виде."
 
 msgid "{} day a move"
 msgid_plural "{} days a move"

@@ -163,10 +163,10 @@ msgstr ", interrotto su tua richiesta"
 msgid ", {} already there left out"
 msgstr ", {} già presenti escluse"
 
-msgid ", {} damaged game among them (kept up to the move that cannot be read)"
-msgid_plural ", {} damaged games among them (kept up to the move that cannot be read)"
-msgstr[0] ", di cui {} danneggiata (conservata fino alla mossa illeggibile)"
-msgstr[1] ", di cui {} danneggiate (conservate fino alla mossa illeggibile)"
+msgid ", {} of them damaged (kept up to the move that cannot be read)"
+msgid_plural ", {} of them damaged (each kept up to the move that cannot be read)"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "0 = a new random order for every match."
 msgstr "0 = un nuovo ordine casuale per ogni match."
@@ -5240,6 +5240,11 @@ msgstr "ott"
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "Del punteggio di una partita. Coppie: come misurato sulle coppie."
+
+msgid "Of the games added, {} is damaged: kept up to the move that cannot be read, its text kept as it was."
+msgid_plural "Of the games added, {} are damaged: each kept up to the move that cannot be read, its text kept as it was."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Off this machine's list (the engine stays in the library)."
 msgstr "Togli dalla lista di questa macchina (il motore resta nella libreria)."
@@ -11478,11 +11483,6 @@ msgstr[1] "{} cicli di 2 partite"
 
 msgid "{} d {} h left"
 msgstr "mancano {} g {} h"
-
-msgid "{} damaged game among them: kept up to the move that cannot be read, its text kept as it was."
-msgid_plural "{} damaged games among them: kept up to the move that cannot be read, their text kept as it was."
-msgstr[0] "Tra queste, {} partita danneggiata: conservata fino alla mossa illeggibile, con il suo testo com'era."
-msgstr[1] "Tra queste, {} partite danneggiate: conservate fino alla mossa illeggibile, con il loro testo com'era."
 
 msgid "{} day a move"
 msgid_plural "{} days a move"

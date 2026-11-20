@@ -258,12 +258,13 @@ void App::pollDatabases() {
         } else {
             db_message_ = trn("Import of {} done: {} game added", "Import of {} done: {} games added", report->added,
                               file, ui::exactCount(report->added));
+            // The damaged games right after the added ones, which they are among.
+            if (report->damaged > 0)
+                db_message_ += trn(", {} of them damaged (kept up to the move that cannot be read)",
+                                   ", {} of them damaged (each kept up to the move that cannot be read)",
+                                   report->damaged, ui::exactCount(report->damaged));
             if (report->duplicates > 0)
                 db_message_ += trf(", {} already there left out", ui::exactCount(report->duplicates));
-            if (report->damaged > 0)
-                db_message_ += trn(", {} damaged game among them (kept up to the move that cannot be read)",
-                                   ", {} damaged games among them (kept up to the move that cannot be read)",
-                                   report->damaged, ui::exactCount(report->damaged));
             db_message_ += ".";
         }
         Console::instance().add(db_message_, !report->error.empty() || !report->read.error.empty());
@@ -448,10 +449,10 @@ void App::drawImportOutcome(std::size_t index) {
                                           o.report.duplicates, ui::exactCount(o.report.duplicates))
                                           .c_str());
         if (damaged > 0) {
-            ImGui::TextDisabled("%s", trn("{} damaged game among them: kept up to the move that cannot be read, its "
-                                          "text kept as it was.",
-                                          "{} damaged games among them: kept up to the move that cannot be read, "
-                                          "their text kept as it was.",
+            ImGui::TextDisabled("%s", trn("Of the games added, {} is damaged: kept up to the move that cannot be read, "
+                                          "its text kept as it was.",
+                                          "Of the games added, {} are damaged: each kept up to the move that cannot be "
+                                          "read, its text kept as it was.",
                                           damaged, ui::exactCount(damaged))
                                           .c_str());
             // A game's line opens the file there, unless its text was pasted: that file is gone.

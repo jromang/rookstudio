@@ -346,7 +346,7 @@ bleiben die Bretter flach, und die *Darstellung* sagt, warum. Die Figuren sind c
 der MIT-Lizenz; die *Darstellung* verlinkt sie.
 
 ## Tastenkürzel
-<!-- en: keyboard-shortcuts 46ce10a3 -->
+<!-- en: keyboard-shortcuts 58e8e12c -->
 
 | Tasten | Wo | Was sie tun |
 |---|---|---|
@@ -386,6 +386,9 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Alt</kbd>+<kbd>C</kbd> | Das Brett fürs Studium | Der Assistent kommentiert den Zug |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | Das Brett fürs Studium | Was F, A, X, G und N auf dem Brett für die Engine-Analyse tun (auf diesem Brett tippen die Buchstaben Züge) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | Der Tab Baum | Einen Zug wählen, ihn spielen, ihn im aktiven Repertoire markieren |
+| <kbd>Enter</kbd> | Die Seite Eröffnungen | Das Training des gezeigten Repertoires starten |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Leertaste</kbd>, <kbd>Esc</kbd> | Eine Trainingssitzung | Ein Hinweis, „Ich weiß es nicht“, anhalten |
+| <kbd>Enter</kbd>, <kbd>Strg</kbd>+<kbd>Z</kbd> | Eine Trainingssitzung | Die nächste Stellung oder noch einmal nach einer falschen Antwort; einen zum Repertoire hinzugefügten Zug zurücknehmen |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | Eine Partieliste | Durch die Liste gehen, die Partie öffnen |
 | <kbd>Strg</kbd>+<kbd>F</kbd> | Die Seite Datenbanken | Der Suchbereich |
 | <kbd>Esc</kbd> | Die Seite Datenbanken | Den Suchbereich schließen, dann die Liste |
@@ -406,7 +409,7 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Strg</kbd>+<kbd>C</kbd> | Der Headless-Modus | Nach den laufenden Partien anhalten |
 
 ## Die Startseite
-<!-- en: the-home-page 1eaa857d -->
+<!-- en: the-home-page fde97c98 -->
 
 Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das Laufende zuerst:
 
@@ -423,8 +426,9 @@ Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das La
   *+ Importieren…* und die ohne Kopie gelesenen Turniere (siehe [Datenbanken](#datenbanken)).
 - **Lichess**: das Konto, die Partien eines Spielers mit *Abgleichen*, die neuen Partien gezählt, wenn du es gewählt
   hast, die laufenden Übertragungen (siehe [Die Seite Lichess](#die-seite-lichess)).
-- **Laufend**: die Analyse der Partie, die der Stellung, ein Import und der Assistent (sein Download, sein geladenes
-  Modell, *Entladen*).
+- **Laufend**: die Analyse der Partie, die der Stellung, ein Import, der Assistent (sein Download, sein geladenes
+  Modell, *Entladen*) und die zu wiederholenden Stellungen deiner Repertoires; ein Klick trainiert sie (siehe
+  [Ein Repertoire trainieren](#ein-repertoire-trainieren)).
 
 Der Suchknopf oben oder Strg+K findet einen Befehl, eine Partie, eine Datenbank.
 
@@ -729,6 +733,62 @@ angehakt, ohne die Stellungen mit vertauschten Farben) und fügt es zur Biblioth
   verlangt, wird dann zur Bibliothek hinzugefügt, seine Optionen in seiner Beschreibung. Die Konsole sagt, wie viele
   Partien eingegangen sind, wie viele die Optionen weggelassen haben und wie viele nicht gelesen werden konnten.
 
+### Bücher aus den benannten Eröffnungen
+<!-- en: books-from-the-named-openings df5656f9 -->
+
+*Aus den benannten Eröffnungen von Lichess…* in **Erstellen…** erstellt ein Buch mit Startstellungen aus der Tabelle der
+benannten Eröffnungen von Lichess, die schon im Programm enthalten ist (chess-openings, CC0): Nichts wird
+heruntergeladen. Sein Formular, das anstelle der Angaben zum Buch erscheint, erfasst die **Familien** (A
+Flankeneröffnungen, B halboffene Spiele, C offene Spiele, D geschlossene Spiele, E indische Verteidigungen), die
+**Längen** der übernommenen Varianten in Halbzügen (anfangs 8 bis 16), *Eine Stellung pro benannter Variante* (mehrere
+Varianten teilen sich einen Namen) und die **Anzahl** der Stellungen, gleichmäßig über die ECO-Codes verteilt, wenn mehr
+in Frage kommen. Es sagt, wie viele Stellungen und Eröffnungen es enthalten würde; *Buch erstellen…* fragt, wohin die
+EPD-Datei geschrieben werden soll, jede Stellung mit ihrer Zugnummer (`hmvc`, `fmvn`) und ihrer Eröffnung als `c0`, und
+fügt sie zur Bibliothek hinzu.
+
+### Bücher aus den bewerteten Stellungen
+<!-- en: books-from-the-evaluated-positions 48770901 -->
+
+*Aus den bewerteten Stellungen von Lichess…* in **Erstellen…** erstellt ein Buch aus den Stellungen, die die Spieler von
+Lichess analysiert hatten: denen der Varianten der benannten Eröffnungen und denen, die einen Zug davon abweichen, jede
+mit ihrer Bewertung und deren Tiefe. Sie stammen aus der Bewertungsdatenbank von Lichess (CC0, etwa 21 GB und 290
+Millionen Stellungen): Ihre Größe wird bei database.lichess.org abgefragt und genannt, bevor irgendetwas heruntergeladen
+wird; *Herunterladen und lesen* liest sie, während sie ankommt, und behält nur die gefundenen Stellungen (ein paar
+Megabyte, im Profil), nicht die Datei. *Eine schon heruntergeladene Datei lesen…* liest stattdessen eine
+`lichess_db_eval.jsonl.zst` von der Festplatte. Außer der Anfrage nach der Datei verlässt nichts den Computer. Das Lesen
+zeigt, wie viel gelesen und behalten ist; *Abbrechen*, eine Netzunterbrechung oder das geschlossene Programm behält, was
+gelesen wurde, und *Fortsetzen* macht dort weiter (eine seither auf dem Server geänderte Datei wird von vorn gelesen).
+
+Einmal gelesen, erfasst das Formular die behaltene **Bewertung**, für Weiß (anfangs +0.30 bis +0.80), die **Tiefe**
+mindestens (30), die **Halbzüge** ab dem Anfang (8 bis 16), *Eine Stellung pro benannter Variante* (zuerst die auf der
+Linie der Variante, dann die mit der tiefsten Bewertung, dann die der Mitte des Fensters nächste) und die **Anzahl** der
+Stellungen, gleichmäßig über die ECO-Codes verteilt, wenn mehr in Frage kommen. Es sagt, wie viele Stellungen und
+Eröffnungen es enthalten würde, und ihre mittlere Bewertung; *Buch erstellen…* schreibt die EPD-Datei, jede Stellung mit
+ihrer Zugnummer, ihrer Bewertung für die Seite am Zug und deren Tiefe (`ce`, `acd`) und ihrer Eröffnung (`c0`), und fügt
+sie zur Bibliothek hinzu. *Neu einlesen* liest die Datenbank erneut, für ihre neueren Bewertungen.
+
+### CTG-Bücher
+<!-- en: ctg-books a908f007 -->
+
+**Hinzufügen…** nimmt auch ein Buch im Format CTG auf, dem der Eröffnungsbücher von ChessBase und Fritz: eine `.ctg` mit
+ihrer `.ctb` und ihrer `.cto` daneben, eine beliebige der drei gewählt. Es wird nur gelesen, nie geschrieben. Seine
+Seite sagt, wie viele Stellungen und Züge es enthält und wie viele Züge sein Autor grün (zu spielen) und rot (zu
+vermeiden) markiert hat. Für jede Stellung hat das Buch seine Züge, jeden mit seinem Symbol (!, ?, !?, einziger Zug…),
+seiner Farbe, der Bewertung der Stellung, zu der er führt, und den Partien dahinter: wie viele, wie sie ausgingen, die
+Wertungen der Spieler.
+
+*Im Baum öffnen* zeigt es im Tab *Baum* der Seite Brett, unter den Quellen: die Züge der gezeigten Stellung mit ihren
+Partien, der Punktzahl, der mittleren Wertung der Spieler, die sie gespielt haben, und der Performance, und eine Spalte
+*Buch* mit ihrer Farbe und ihrem Symbol. Grüne Züge kommen zuerst; rote bleiben in der Liste, ausgegraut. Die Jahre und
+die Referenzpartien stammen aus den Datenbanken, nicht aus dem Buch.
+
+fastchess liest keine CTG-Bücher. *Für Engines: ein Polyglot-Buch erstellen…* schreibt eine Polyglot-Kopie (`.bin`) und
+fügt sie zur Bibliothek hinzu, für die *Eröffnungen* der Einrichtung und die eigenen Bücher der Teilnehmer: Seine roten
+Züge werden ausgelassen, und jeder Zug wird mit den Punkten gewichtet, die seine Partien geholt haben (zwei für einen
+Sieg, einer für ein Remis), doppelt so viel für einen grünen Zug; ein Zug, der nichts gepunktet hat, wird ausgelassen.
+*Buch prüfen* folgt seinen Varianten ab der Ausgangsstellung und sagt, wie viele der Stellungen des Buchs es erreicht
+hat und ob sich ein Zug nicht lesen ließ. Nichts verlässt den Computer.
+
 ## Brett
 <!-- en: board 0bbd00c9 -->
 
@@ -968,7 +1028,7 @@ gespeichert, und nur die Engine zählt im Kernbudget. Zurücknehmen geht nicht, 
 außer ihre Karte stellt eine geringere ein (`UCI_LimitStrength` und `UCI_Elo` oder `Skill Level`, wo sie diese hat).
 
 ### Das Brett fürs Studium
-<!-- en: the-study-board da17bfb4 -->
+<!-- en: the-study-board e70e0006 -->
 
 In einer Ansicht, deren Brett *Fürs Studium* ist (siehe [Ansichten](#ansichten)), ist die Seite Brett der Ort, an dem
 Partien gelesen und geschrieben werden. Das Brett steht links; rechts der Streifen der Partie, dann fünf Tabs, Alt+1
@@ -977,8 +1037,9 @@ bis Alt+5:
 - **Notation**: die Titelzeile der Partie und ihre Kopfdaten (siehe [Kopfdaten](#kopfdaten)), dann die Züge, ihre
   Kommentare, Symbole und Varianten, direkt bearbeitet (siehe [Notation](#notation)); die Tabelle der Züge und die
   Auswertung sind in eigenen Tabs (siehe [Die Auswertung einer Partie](#die-auswertung-einer-partie));
-- **Analyse**: die Varianten der Engine und, wenn du sie gewählt hast, die Cloud und die Endspieldatenbanken von
-  Lichess (siehe [Online für die Analyse](#online-für-die-analyse)), mit der Partiegrafik;
+- **Analyse**: bis zu vier Engines nebeneinander (siehe [Mehrere Engines nebeneinander](#mehrere-engines-nebeneinander))
+  und, wenn du sie gewählt hast, die Cloud und die Endspieldatenbanken von Lichess (siehe
+  [Online für die Analyse](#online-für-die-analyse)), mit der Partiegrafik;
 - **Baum**: die von der Stellung aus gespielten Züge in deinen Datenbanken, deinen Büchern und auf Lichess (siehe
   [Der Tab Baum](#der-tab-baum));
 - **Referenzen**: die stärksten Partien der Stellung (siehe [Referenzpartien](#referenzpartien));
@@ -996,8 +1057,48 @@ Enter spielt ihn. Die Buchstaben des Bretts für die Engine-Analyse liegen dann 
 Alt+A startet oder beendet die Analyse, Alt+X zeigt die Drohung, Alt+G analysiert die Partie, Alt+N geht zum nächsten
 Zug, den die Analyse markiert hat.
 
+### Mehrere Engines nebeneinander
+<!-- en: several-engines-side-by-side 269f6f12 -->
+
+Im Tab Analyse des Bretts fürs Studium analysieren bis zu vier Engines der Bibliothek die Stellung gemeinsam, jede in
+einer Karte: ihre Farbe und ihr Name, ihre Bewertung (aus der Sicht von Weiß), ihre Tiefe und seldepth, ihre
+Geschwindigkeit und ihre Threads, ihre beste Linie und ihre anderen Linien, zu einer zusammengeklappt (ein Klick klappt
+sie auf). Steht die Maus über einem Zug einer Linie, zeigt das Brett die Stellung danach; ein Klick spielt die Linie bis
+zu diesem Zug. **+ Engine** listet die Engines der Bibliothek auf, die der Analyse angehakt (↑ ↓ wählen eine, Enter fügt
+sie hinzu), und *Eine Engine herunterladen…*, die beliebten Engines der Seite Engines; eine hinzugefügte Engine sucht
+sofort. Alt+A oder *Analysieren* startet und beendet sie alle, und die Engines bleiben für das nächste Mal erhalten.
+
+Auf dem Brett ist der beste Zug jeder Engine ein Pfeil in ihrer Farbe: dunkelblau, hellorange, blaugrün und grau, von
+der ersten Engine bis zur vierten, auch in der Helligkeit verschieden. Engines, die denselben Zug spielen, teilen sich
+einen Pfeil, in der Farbe der ersten von ihnen, mit ihrer Anzahl neben seinem Anfang. Die Zeile oben im Tab sagt
+dasselbe in Worten: welche Engines sich einig sind, bei welchem Zug, und wie weit ihre Bewertungen auseinanderliegen
+(*7…Be7 bei Stockfish und Gaia · 7…Qb6 bei Leela · ihre Bewertungen höchstens 0.11 auseinander*), oder das Matt, das
+eine Engine sieht; keine Farbe muss unterschieden werden. Mit einer einzigen Engine sind die Pfeile die ihrer Linien,
+wie auf dem Brett für die Engine-Analyse.
+
+**Threads**: Die Analyse hat eine einzige Zahl von Threads, über den Chip oben eingestellt (*24 / 32 Threads*),
+gleichmäßig auf ihre Engines verteilt. Das Menü einer Engine (`…`) stellt ihre Linien, ihren Hash und, von Hand, ihre
+Threads ein, die der Anteil der anderen dann außen vor lässt. Eine Engine, die auf einer Grafikkarte sucht (*Nutzt eine
+GPU* in der Bibliothek angehakt, oder eine Engine wie Lc0, deren Option *Backend* ein GPU-Backend nennt), behält ihre
+eigenen Threads, und der Anteil zählt sie nicht. Ein auf diesem Computer laufendes Turnier behält seine Kerne: Die
+Analyse nimmt höchstens, was seine Partien übrig lassen, und der Chip sagt, wie viele sie belegen. Diese Einstellungen
+gehören der Analyse allein: Weder die Engine der Bibliothek noch ein Turnier sieht sie.
+
+**Die erste Engine** ist die der Analyse: Die Auswertung der Partie (G), die Drohung (Alt+X oder das Menü der ersten
+Engine), die Fragen und die Kommentare des Assistenten nutzen sie. Eine Engine, die an ihrem Namen auf eine andere
+gezogen wird, nimmt deren Platz ein, ganz nach oben gezogen wird sie die erste; *Zur ersten machen* in ihrem Menü tut
+dasselbe. Hat die Partie eine Analyse der neuen ersten Engine, beurteilt diese Analyse die Züge und zeichnet die Kurve
+der Partiegrafik. Die Bewertungen jeder Engine für die Stellungen der Partie, die sie durchsucht hat, erscheinen auf der
+Grafik als dünne Linie in ihrer Farbe (*Live-Analyse*), die der ersten Engine als Kurve, solange die Partie keine
+Analyse hat.
+
+Während eine deiner Partien auf Lichess gespielt wird, hält jede Engine sofort an, und das Brett fürs Studium zeigt
+keinen ihrer Pfeile (siehe [Fairplay](#fairplay)). *Engines der Analyse entladen*, im Menü einer Engine oder in der
+Befehlspalette, beendet ihre Prozesse. Jede Geste des Tabs steht in der Befehlspalette (Strg+K): eine Engine
+hinzugefügt, zur ersten gemacht oder entfernt, ihre Einstellungen, die Threads der Analyse.
+
 ### Notation
-<!-- en: notation 5e273d24 -->
+<!-- en: notation a447e870 -->
 
 Die Notation wird direkt bearbeitet, ohne Dialog:
 
@@ -1017,8 +1118,10 @@ Die Notation wird direkt bearbeitet, ohne Dialog:
   rückgängig machen lässt.
 
 *Figurinen in der Notation* (*Einstellungen* > *Darstellung*) zeigt die Figuren als Figurinen. Die Kommentare des
-Assistenten erscheinen getrennt von deinen, in Blaugrau und kursiv, nach einer Sprechblase (siehe
-[Kommentare des Assistenten](#kommentare-des-assistenten)).
+Assistenten erscheinen getrennt von deinen, in Blaugrau und kursiv, nach einer Sprechblase, oder in einem Kasten unter
+seinem Namen nach einem Kommentar, der schon da war (siehe [Kommentare des Assistenten](#kommentare-des-assistenten)).
+Wenn deine Theoriestudien die gezeigte Stellung kommentieren, führt *Theorie · 3* über den Zügen zu ihren Notizen im
+Tab Baum (siehe [Theoriestudien](#theoriestudien)).
 
 ### Pfeile und Felder
 <!-- en: arrows-and-squares a46e6347 -->
@@ -1053,6 +1156,23 @@ Kopfdaten.
 Eine Datenbank, in die ein anderes Programm schreibt, ist währenddessen schreibgeschützt: Die Partie bleibt hier
 geändert, bis sie gespeichert werden kann.
 
+### Stellungen und Partien zu Lichess
+<!-- en: positions-and-games-to-lichess 1fc6bb1d -->
+
+**lichess.org…** unter dem Brett schickt die Stellung oder die Partie an Lichess; jede Aktion sagt, was sie sendet. *Die
+Stellung auf lichess.org öffnen* öffnet das Analysebrett von Lichess mit ihr im Browser: Die Stellung steht in der
+Adresse, sonst nichts. *Die Partie teilen* importiert sie ohne Konto auf Lichess und kopiert ihre Adresse: Wer die
+Adresse hat, sieht die Partie, auch die Namen ihrer Spieler. *Die Stellung ausspielen lassen*, mit einer Bedenkzeit (3+2
+bis 30+20 oder Tage pro Zug), erstellt eine offene Herausforderung aus der Stellung: ein Link für jede Seite, an ihren
+Spieler zu senden; eine solche Partie ist nicht gewertet. *Lesezeichen für die Partie auf Lichess setzen*, für eine
+Partie, die von dort stammt, legt sie in deine Lesezeichen: Es sendet die ID der Partie mit deinem Token und bittet
+Lichess einmal um die Berechtigung, deine Einstellungen zu ändern. *An eine Lichess-Studie…* sendet die Partie in eine
+deiner Studien oder in eine neue (siehe [Deine Lichess-Studien](#deine-lichess-studien)).
+
+Während du eine Partie auf Lichess spielst, berührt keine dieser Aktionen ihre Variante: Eine Stellung auf dem Weg zu
+ihrer Stellung oder die Partie, die durch sie geht, verlässt den Computer nicht (siehe [Fairplay](#fairplay)). Der Rest
+bleibt möglich.
+
 ### Letzte Partien und die Liste
 <!-- en: recent-games-and-the-list ba602f73 -->
 
@@ -1066,7 +1186,7 @@ Eine aus der Liste einer Datenbank geöffnete Partie behält ihren Platz darin: 
 die nächste Partie der Liste oder ihres Filters, beim selben Zug, wenn die Partie durch die gezeigte Stellung geht.
 
 ### Der Tab Baum
-<!-- en: the-tree-tab 56161f62 -->
+<!-- en: the-tree-tab 8350941e -->
 
 Der Tab Baum zeigt die von der gezeigten Stellung aus gespielten Züge: ihre Partien, die Anteile der Siege von Weiß,
 der Remis und der Siege von Schwarz, die Punktzahl, die durchschnittliche Elo, die Performance der Seite am Zug (nach
@@ -1084,7 +1204,8 @@ ihn, und `*` oder sein Stern markiert ihn im aktiven Repertoire (siehe [Die Seit
 Verlässt die Variante der Partie die Datenbank, sagt der Tab, bei welchem Zug, und ob dieser Zug eine **Neuerung** ist,
 wie eine Stellungssuche bestätigt (*Letzte bekannte Stellung zeigen*). Der Baum einer Datenbank wird nach jedem Import
 erstellt, und erneut im Hintergrund, nachdem eine Partie in sie gespeichert wurde, mit seinem Fortschritt und
-*Abbrechen*.
+*Abbrechen*. Die Notizen deiner Theoriestudien kommen mit den Zügen, egal aus welcher Quelle: eine Spalte *Theorie*
+und *Was deine Studien sagen* unter den Zügen (siehe [Theoriestudien](#theoriestudien)).
 
 ### Referenzpartien
 <!-- en: reference-games c45f1d18 -->
@@ -1094,8 +1215,21 @@ Der Tab Referenzen sucht im Hintergrund die stärksten Partien der Stellung in d
 viele Partien die Stellung, um nach den stärksten zu suchen: Der Tab Baum sagt mehr. *Alle Partien der Stellung in
 „…“* listet sie in der Datenbank auf.
 
+### Mehr vom Explorer
+<!-- en: the-explorer-more 40c92109 -->
+
+Mit den Quellen von Lichess im Tab Baum erscheinen **die Partien, die der Explorer nennt**, unter den Zügen: die
+Meisterpartien, die die Stellung erreichen (*Meisterpartien*), oder die starken auf Lichess gespielten; ein Klick fragt
+Lichess nach der Partie und öffnet sie auf dem Brett, bei der Stellung, die der Baum zeigte.
+
+Für die Spieler von Lichess fragt *Jeder Zug Monat für Monat* Lichess für jeden aufgelisteten Zug, wie viele Partien ihn
+Monat für Monat gespielt haben: eine Linie seiner letzten zwei Jahre in der Spalte *Pro Monat*, grün, wenn er zuletzt
+häufiger gespielt wird, rot, wenn seltener; unter der Maus seine Partien der letzten sechs Monate gegenüber den sechs
+davor. Die Zusammenfassung sagt dasselbe über die Stellung. Das kostet eine Anfrage pro Zug, deshalb bleibt es aus, bis
+es verlangt wird; der Explorer der Meister hat keine Monate.
+
 ### Die Auswertung einer Partie
-<!-- en: the-review-of-a-game 2d88a6f5 -->
+<!-- en: the-review-of-a-game 7cf820c0 -->
 
 Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (G), wie es ein Trainer
 täte:
@@ -1109,8 +1243,20 @@ täte:
 
 Die Stellungen des Endspiels mit sieben Steinen oder weniger können die Lichess-Tablebases exakt beurteilen, einmal für
 diese Partie oder immer abgefragt. *Schlüsselmomente kommentieren* schreibt im Hintergrund zu jedem einen Kommentar
-des Assistenten (ein vorhandener Kommentar wird nie ersetzt); *Partie annotieren* trägt die Bewertungen, die Symbole und
-die besseren Varianten in die Notation ein. Strg+Z nimmt beides zurück.
+des Assistenten, neben den Kommentar, den ein Zug vielleicht schon hat (die Analyse von Lichess, deinen, den eines
+Kommentators), der nie ersetzt wird; *Partie annotieren* trägt die Bewertungen, die Symbole und die besseren Varianten
+in die Notation ein. Strg+Z nimmt beides zurück.
+
+**Die Geschichte der Partie** schreibt das Modell des Assistenten, wenn es da ist, im Hintergrund, aus den Fakten der
+Auswertung: ihren Urteilen und Bewertungen, den Schlüsselmomenten, der Eröffnung, dem Endspiel und wie die Partie
+endete, mit dem, was die Lichess-Tablebases sagten. Jeder Abschnitt wird vom Prüfer der Kommentare an diese Fakten
+gebunden: Jeder Zug, jede Bewertung und jeder Name, die er zitiert, muss aus der Auswertung stammen. Ein abgelehnter
+Abschnitt wird neu geschrieben; zweimal abgelehnt, weicht er dem der Vorlage. Eine Karte in der Farbe des Assistenten
+sagt, dass das Modell die Geschichte geschrieben hat und dass sie geprüft wurde, und was der Prüfer abgelehnt hat. *Die
+Fassung der Vorlagen* zeigt an ihrer Stelle die Geschichte der Vorlagen, *Neu schreiben* lässt das Modell sie anders
+erzählen (auch in Strg+K), *Kopieren* kopiert die gezeigte Geschichte. Ohne das Modell (nicht heruntergeladen, oder eine
+andere GGUF-Datei, die die Kommentare von RookStudio nicht gelernt hat) oder während ein Turnier auf diesem Computer den
+Prozessor belegt, ist die Geschichte die der Vorlagen, wie sie selbst sagt. Nichts verlässt den Computer.
 
 ## Datenbanken
 <!-- en: databases e5980ed0 -->
@@ -1150,6 +1296,17 @@ Ergebnis (`carlsen 2024 B90`). ↑ ↓ gehen durch die Liste, und die gewählte 
 Brett mit ihren Zügen; Enter oder ein Doppelklick öffnet sie auf der Seite Brett. Millionen Partien scrollen und
 sortieren sich sofort.
 
+### FIDE-Karten
+<!-- en: fide-cards fbfb5b7e -->
+
+Die **FIDE-Karte** eines Spielers (Titel, Föderation, Geburtsjahr, FIDE-ID, Standard-, Schnellschach- und Blitzwertung)
+wird bei Lichess abgefragt, das die Liste der FIDE führt, ohne Konto und nur, wenn du es verlangst: ein Rechtsklick auf
+einen Namen der Partieliste oder *FIDE-Karte von …* in der Vorschau der Partie. Eine Partie, die die FIDE-ID des
+Spielers angibt (*WhiteFideId*, wie die Übertragungen von Lichess), sendet diese ID; sonst wird der Name gesendet, und
+wenn mehrere Spieler der FIDE-Liste so heißen, wählst du, welcher es ist. Die Karte wird für diesen Namen in deinem
+Profil gespeichert: Sie erscheint dann, wenn die Maus über dem Namen steht, und in der Vorschau. *Auf lichess.org*
+öffnet dort die Seite des Spielers.
+
 ### Suchen
 <!-- en: searching 15418482 -->
 
@@ -1183,6 +1340,86 @@ deinen Datenbanken: Ihre Partien werden wie die einer Datenbank aufgelistet und 
 Hintergrund aktualisiert (die Partien, die ein Turnier beendet, eine Datei, die gewachsen ist oder sich geändert hat).
 Sie werden weder importiert noch entfernt.
 
+### ChessBase-Datenbanken
+<!-- en: chessbase-databases 2582d418 -->
+
+Eine ChessBase-Datenbank, auf die Seite Datenbanken gezogen oder mit *Datei importieren…* gewählt, wird in eine
+RookStudio-Datenbank kopiert: ihre .cbh oder .2cbh (oder eine beliebige ihrer Dateien) oder ein Archiv davon, .cbv oder
+.cbz. Eine Karte sagt zuerst, was sie enthält, aus ihren Kopfdaten gelesen, was übernommen und was ausgelassen wird,
+wohin sie kommt und wie lange es ungefähr dauert; *Importieren* (Enter) startet die Kopie, *Nicht jetzt* (Esc) lässt
+sie. Die ChessBase-Dateien werden nur gelesen, nichts wird daneben geschrieben; ein Archiv wird beim Lesen entpackt, und
+das Passwort einer .cbz wird auf der Karte abgefragt und nicht gespeichert.
+
+Die Kopie behält die Züge und ihre Varianten, die Kommentare vor und nach den Zügen (ein Text in mehreren Sprachen:
+Englisch zuerst, die anderen danach), die Symbole, die farbigen Felder und Pfeile, die Uhren und die verbrauchte Zeit,
+die Bewertungen der Engines, die Medaillen (ein Tag *Medals*), die kritischen Stellungen und die Bedenkzeiten.
+Trainingsfragen, Bilder, Töne und Videos, Weblinks, zitierte Partien, Bauernstrukturen und Figurenwege, Variantenfarben
+und die Texte (Artikel) werden ausgelassen: Der Bericht am Ende zählt sie nach Art. Bei einem erneuten Import (seither
+in ChessBase hinzugefügte Partien) kommen nur die neuen Partien hinzu. Die Namen der Spieler werden so geschrieben, wie
+die Datenbank sie schreibt, „Nachname, Vorname“.
+
+### TWIC
+<!-- en: twic fa3a19dd -->
+
+*Aus einer Quelle…* holt Partien von einer Website, nur heruntergeladen, wenn du es verlangst. **TWIC**, The Week in
+Chess, veröffentlicht jeden Montag eine Ausgabe mit den Partien der Woche: Sein Bereich fragt theweekinchess.com nach
+seiner Liste der Ausgaben und zeigt die neuesten, mit ihrem Montag, ihren Partien und ob jede schon in der gewählten
+Datenbank ist. Hake einige an, wähle die Datenbank (anfangs *Eine neue Datenbank, „TWIC“*), dann *Herunterladen und
+hinzufügen*: Das PGN jeder Ausgabe wird heruntergeladen und dann importiert, eine nach der anderen, während die
+Datenbank lesbar bleibt; *Abbrechen* hält nach dem schon Hinzugefügten an. Eine Partie, die die Datenbank schon hat, mit
+gleichen Tags und Zügen, wird nicht doppelt hinzugefügt. Danach nennt ein Bericht die stärksten Turniere der
+hinzugefügten Partien (die mittlere Wertung ihrer Spieler) und die Spieler mit der besten Wertung; ein Name öffnet seine
+Partien in der Liste.
+
+*Jeden Montag nach einer neuen Ausgabe suchen* ist aus, bis du es anhakst. Angehakt fragt RookStudio, solange es offen
+ist, nach der Liste der Ausgaben, höchstens viermal am Tag; eine neue Ausgabe erscheint unter der Liste der Datenbanken
+in *Verfolgte Quellen* und auf der Karte *Meine Datenbanken* der Startseite, mit *Hinzufügen*: Sie wird nie ohne dich
+hinzugefügt. Was den Computer verlässt: die Anfrage nach der Liste der Ausgaben, dann nach den PGN-Dateien der gewählten
+Ausgaben, sonst nichts. TWIC ist für den persönlichen Gebrauch frei; nichts davon wird mit RookStudio ausgeliefert.
+
+### Lichess-Monate
+<!-- en: lichess-months 26060e4f -->
+
+*Aus einer Quelle… › Lichess-Übertragungen* fügt einen Monat der offiziellen Übertragungen von Lichess hinzu
+(database.lichess.org, CC BY-SA 4.0): Sein Bereich fragt nach der Dateiseite der Website und listet die neuesten Monate
+mit ihrer Größe und ihren Partien auf. Wähle einen und die Datenbank (anfangs *Eine neue Datenbank,
+„Lichess-Übertragungen“*), dann *Herunterladen und hinzufügen*: Die Datei des Monats wird heruntergeladen, fortsetzbar,
+dann importiert, und ein Bericht nennt seine stärksten Turniere und die Spieler mit der besten Wertung. Eine Partie, die
+die Datenbank schon hat, wird nicht doppelt hinzugefügt. Die Partien behalten ihre Quelle, die Seite der Übertragung in
+ihrem Tag Site: Was du davon teilst, wird unter derselben Lizenz geteilt. Was den Computer verlässt: die Anfrage nach
+der Seite, dann nach der Datei des Monats.
+
+*Aus einer Quelle… › Lichess-Partien* liest einen Monat gewerteter Partien von Lichess (CC0, etwa 95 Millionen Partien
+und 30 GB komprimiert) beim Herunterladen und behält nur die Partien, die seine Filter passieren: standardmäßig beide
+Spieler mit einer Wertung von 2400 und mehr, ohne Bullet (eine Grundzeit plus 40 Inkremente unter drei Minuten). Nur die
+behaltenen Partien erreichen die Festplatte, stapelweise zur gewählten Datenbank hinzugefügt, während die Datenbank
+lesbar bleibt. *Eine schon heruntergeladene Datei lesen…* liest stattdessen eine `lichess_db_standard_rated_*.pgn.zst`
+von der Festplatte. *Abbrechen*, eine Netzunterbrechung oder das geschlossene Programm behält, was hinzugefügt wurde,
+und *Fortsetzen* macht dort weiter, wo es aufhörte, mit denselben Filtern; die erneut gelesenen Partien werden nicht
+doppelt hinzugefügt.
+
+### Ein Spieler von chess.com
+<!-- en: a-chesscom-player 39157248 -->
+
+*Aus einer Quelle… › chess.com* fügt die Partien eines Spielers über die öffentliche API von chess.com hinzu, ohne
+Konto: Tippe seinen Namen ein, und *Nachschlagen* fragt nach den Monaten, in denen er gespielt hat; *Herunterladen und
+hinzufügen* fragt nach den Partien jedes Monats, ein Monat nach dem anderen, und importiert sie in die gewählte
+Datenbank (anfangs *Eine neue Datenbank, „chess.com · Name“*), mit demselben Bericht. Ist *Folgen* angehakt, erscheint
+der Spieler unter der Liste der Datenbanken in *Verfolgte Quellen*: *Nach neuen Partien suchen* fragt erneut nach den
+noch nicht hinzugefügten Monaten und nach dem neuesten (seine Partien sind vielleicht mehr geworden); eine schon
+vorhandene Partie wird nicht doppelt hinzugefügt. Was den Computer verlässt: der Name des Spielers und die Anfragen nach
+seinen Monaten, an api.chess.com.
+
+### Lumbra's Gigabase
+<!-- en: lumbras-gigabase 19d9d71f -->
+
+*Aus einer Quelle… › Lumbra's Gigabase* erklärt, wie man sie holt: Die Website verlangt, dass du ihre Lizenz akzeptierst
+(CC BY-NC 4.0) und zeigst, dass du kein Roboter bist; das tut RookStudio nicht für dich. *Website öffnen* öffnet sie in
+deinem Browser; sobald die Datei heruntergeladen ist, importiert *Die heruntergeladene Datei importieren…* sie, wie sie
+ist. Ein .7z-Archiv (LZMA oder LZMA2) wird beim Entpacken gelesen: seine PGN-Dateien eine nach der anderen, seine
+anderen Dateien übergangen, nichts außer den Partien wird auf die Festplatte geschrieben. Jedes .7z mit PGN-Dateien
+lässt sich genauso importieren oder auf die Seite ziehen.
+
 ## Die Seite Eröffnungen
 <!-- en: the-openings-page 651bcc49 -->
 
@@ -1196,6 +1433,85 @@ erstellt ist (*Gemessen an*: ein Chip für jede, ein Klick nimmt sie heraus oder
 Partien entlang des Repertoires, die bis zum Ende seiner Varianten eine Antwort finden, oder bis Zug 10 oder 15. Seine
 **Lücken** folgen, die häufigsten zuerst: ein Zug des Gegners, der oft genug ohne deine Antwort gespielt wurde, oder
 eine Variante, die mit einem Zug des Gegners endet. Ein Klick zeigt die Stellung, mit dem Baum daneben.
+
+### Ein Repertoire trainieren
+<!-- en: training-a-repertoire d1994455 -->
+
+Jede Stellung eines Repertoires, in der du am Zug bist und für die das Repertoire deinen Zug hat, ist eine
+Trainingsstellung. RookStudio fragt sie immer wieder ab, in immer größeren Abständen, je öfter du sie weißt, mit FSRS,
+der verteilten Wiederholung, die Anki verwendet: Eine richtig beantwortete Stellung kommt nach ein paar Tagen wieder,
+dann nach Wochen; eine, die du verfehlst, kommt später in der Sitzung wieder, dann am nächsten Tag.
+
+Die Karte **Trainieren** der Seite Eröffnungen zählt die heute fälligen Stellungen, die neuen von heute und die, die du
+weißt und die später fällig sind. *Start* (Enter) fragt die fälligen Stellungen ab, dann die neuen von heute; *Nur die
+neuen* fragt nur die neuen ab. Neue Stellungen kommen in der Reihenfolge, in der deine Datenbanken sie am häufigsten
+antreffen, die meistgespielten zuerst, höchstens 20 pro Tag (der Knopf daneben, *20 pro Tag*, ändert das). Darunter: was
+morgen, innerhalb von drei Tagen und innerhalb einer Woche wiederkommt.
+
+Eine Sitzung nimmt die Seite Brett ein, deren Spalte zu der des Trainings wird; die Partie, die auf dem Brett war,
+wartet unter den letzten Partien und kommt danach zurück. RookStudio spielt die Züge deines Gegners entlang des
+Repertoires bis zu jeder Stellung, wo das Repertoire mehrere hat, zuerst die, die deine Datenbanken am häufigsten
+spielen. Spiele deinen Zug auf dem Brett oder tippe ihn ein (seine Buchstaben, dann Enter). Während der Frage sind der
+Baum, die Engines und deine Notizen ausgeblendet; sie kommen mit der Antwort zurück.
+
+- **Alt+H**: ein Hinweis, das Feld der zu ziehenden Figur in Blau (H allein beginnt einen Zug des h-Bauern).
+- **Leertaste**: „Ich weiß es nicht“, und der Zug wird gezeigt.
+- **Esc**: anhalten. Was beantwortet wurde, bleibt erhalten; die nächste Sitzung macht mit dem weiter, was noch fällig
+  ist.
+
+Jede Antwort wird von selbst bewertet, ohne Knopfdruck: im ersten Versuch richtig, *gut*; richtig nach einem Hinweis
+oder nach mehr als 20 Sekunden, *schwer*; falsch oder „Ich weiß es nicht“, *noch einmal*. Eine richtige Antwort zeigt
+den Kommentar des Repertoires zum Zug und wann die Stellung wiederkommt; die nächste kommt mit Enter oder von selbst
+nach einer Sekunde (das *…* daneben ändert das, und die Maus auf der Antwort hält sie an). Eine falsche zeigt den Zug
+deines Repertoires auf seinen Feldern, in Grün: *Noch einmal* (Enter) fragt sie erneut; *Den Baum hier ansehen* zeigt
+die Stellung mit dem Tab Baum; *… zum Repertoire hinzufügen* macht den gespielten Zug zu einer zweiten dort akzeptierten
+Antwort (Strg+Z nimmt das zurück).
+
+Am Ende: die Zahlen, die verfehlten Züge (ein Klick zeigt die Stellung, mit dem Zug deines Repertoires) und *Die … jetzt
+wiederholen*.
+
+Die Wiederholungen werden im Profil neben dem Repertoire aufbewahrt (`Najdorf.training.json` und
+`Najdorf.reviews.jsonl`, eine Zeile pro Antwort): Sein PGN ändert sich nicht. Ein im Repertoire geänderter Zug macht
+seine Stellung wieder neu. Nichts verlässt den Computer. *Laufend* auf der Startseite sagt, wie viele Stellungen fällig
+sind, ein Klick trainiert sie; ebenso *Das Repertoire … trainieren* in Strg+K. Während eine deiner Partien live auf
+Lichess gespielt wird, wartet das Training; die Stellungen auf der Variante einer deiner Fernpartien werden ausgelassen,
+bis sie endet.
+
+### Theoriestudien
+<!-- en: theory-studies 8ba97ca4 -->
+
+Der Teil **Theorie** der Seite Eröffnungen (neben *Repertoires*, in der Zeile ihres Titels) enthält deine
+Theoriestudien: kommentierte PGN-Dateien, deine Analysen oder ein Buch als PGN, und Lichess-Studien. Ihre Notizen
+erscheinen im Tab Baum der Seite Brett, bei jeder Stellung, die sie kommentieren, egal über welche Zugfolge sie erreicht
+wird.
+
+*Ein PGN hinzufügen…* oder ein auf die Seite gezogenes PGN fügt eine Datei hinzu: RookStudio liest sie dort, wo sie
+liegt, im Hintergrund, und liest sie von selbst neu, wenn sie sich auf der Festplatte ändert. Die Theorie schreibt nie
+hinein, und nichts verlässt den Computer. *Aus einer Lichess-Studie…* fügt eine deiner auf diesem Computer gelesenen
+Lichess-Studien hinzu (siehe [Deine Lichess-Studien](#deine-lichess-studien)): Ihre Kopie in deinem Profil wird gelesen,
+und mit der Studie neu gelesen.
+
+Was zu einer Notiz wird: jede kommentierte Stellung der Datei, Varianten eingeschlossen, mit den Kommentaren vor und
+nach dem Zug, seinen Symbolen (!, ?!, ±…), einer geschriebenen Bewertung (`[%eval]`) und seinen Pfeilen und Feldern; der
+Kommentar einer Partie vor ihrem ersten Zug ist eine Notiz zu ihrem Anfang. Die Kommentare des Assistenten werden es
+nicht (siehe [Kommentare des Assistenten](#kommentare-des-assistenten)): Sie betreffen den Zug einer Partie, und der
+Assistent kommentiert jede Stellung auf Anfrage. Die Kommentare deiner Repertoires erscheinen genauso, unter ihren Namen
+(*Auch die Kommentare deiner Repertoires*, unter der Liste).
+
+Jede Studie zeigt ihre Zahlen: die kommentierten Stellungen, die Kommentare, Symbole und Bewertungen. *Notizen im Baum
+zeigen* (anfangs an) blendet sie aus oder wieder ein. *Auf dem Brett öffnen* (Enter oder ein Doppelklick in der Liste)
+öffnet ihre Partien dort als Kopie: Strg+S speichert eine Partie anderswo, und die Datei bleibt, wie ihr Autor sie
+schreibt. *Aus der Theorie entfernen* (Entf) lässt die Datei, wo sie ist, und *Rückgängig* holt sie zurück. Eine
+verschobene Datei sagt das, mit *Suchen…*.
+
+Im **Tab Baum** markiert die Spalte *Theorie* die Züge, die deine Studien kommentieren: ihre Symbole und wie viele
+Notizen mehr als ein Symbol sagen. Unter den Zügen listet **Was deine Studien sagen** die Notizen der gezeigten Stellung
+auf: die Quelle jeder Notiz, wo sie steht (*nach 7.f4*, *auf 7…Qb6* oder *durch Zugumstellung gefunden* mit ihren
+eigenen Zügen, wenn sie die Stellung in anderer Reihenfolge erreichen), ihren Text und ihre Variante, die ein Klick auf
+dem Brett bei ihrem Zug öffnet. Steht die Maus über einer Notiz zu einem Zug, zeigt sie den Zug als Pfeil des Baums;
+über einer Notiz zur Stellung ihre Pfeile und Felder auf dem Brett. Im Tab **Notation** sagt *Theorie · 3* über den
+Zügen, wie viele Notizen die Stellung hat, und führt zum Tab Baum (Alt+3). Während eine deiner Partien live auf Lichess
+gespielt wird, sind die Notizen mit dem Baum ausgeblendet.
 
 ## Die Seite Lichess
 <!-- en: the-lichess-page ea1e19cc -->
@@ -1229,6 +1545,45 @@ erste Partie, vor einem Jahr, ein Datum), nur Standardschach und Chess960. Die P
 ihre Uhren und die Bewertungen von Lichess. *Neue Partien zählen, wenn sich die Startseite öffnet* fragt Lichess
 höchstens einmal pro Stunde, mit dem Namen des Spielers.
 
+### Deine Lichess-Studien
+<!-- en: your-lichess-studies 11bcbad8 -->
+
+*Deine Studien* auf der Seite Lichess listet die Studien deines verknüpften Kontos auf, die zuletzt geänderten zuerst.
+Beim ersten Öffnen der Karte bittet RookStudio Lichess um die Berechtigung, deine Studien zu lesen (*Auf Lichess
+erlauben…*): Mit ihr werden auch deine privaten und nicht gelisteten Studien aufgelistet; *Ohne sie* nur die
+öffentlichen. Die Liste von Lichess nennt den Namen jeder Studie und wann sie sich zuletzt geändert hat; ihre Kapitel
+erscheinen, sobald sie gelesen wurde, und ihre Sichtbarkeit bei den von RookStudio erstellten Studien. Die Studie eines
+anderen kommt über ihren Link (siehe [Lichess-Links](#lichess-links)).
+
+Ein Klick auf eine Studie liest sie beim ersten Mal: Ihre Kapitel erscheinen und bleiben in deinem Profil, auch offline.
+*Ein Kapitel auf dem Brett öffnen* (oder ein Doppelklick darauf) öffnet es, aus der Sicht der Seite, von der Lichess es
+zeigt. *In eine Datenbank importieren* legt jedes Kapitel als Partie in eine Datenbank: *Lichess-Studien*, angelegt,
+wenn sie fehlt, oder eine andere, daneben gewählt. Beim nächsten Mal, oder mit *Neu einlesen* nach einem Import, werden
+nur die seither geänderten Kapitel ersetzt und die neuen hinzugefügt; eine Partie, die du dort gelöscht hast, bleibt
+gelöscht. *Zur Theoriestudie machen* zeigt ihre Kommentare im Tab Baum, mit der Studie neu gelesen (siehe
+[Theoriestudien](#theoriestudien)); eine nie gelesene Studie wird zuerst gelesen.
+
+*Verfolgen*: Wenn sich die Seite Lichess öffnet (höchstens alle fünf Minuten), fragt RookStudio Lichess, ob sich jede
+verfolgte Studie geändert hat, eine Anfrage pro Studie, ohne sie herunterzuladen. Eine geänderte Studie sagt das, in der
+Karte und auf ihrer Zeile, wenn die Karte zugeklappt ist, mit *Neu einlesen*: Vorher wird nichts heruntergeladen. Nach
+einem Lesen sind die seit dem vorherigen Lesen geänderten Kapitel markiert.
+
+**Vom Brett aus** öffnet *lichess.org…* › *An eine Lichess-Studie…* neben dem Brett eine Karte, die die Partie in eine
+deiner Studien sendet (eine volle, mit 64 Kapiteln, wird nicht angeboten) oder in eine neue, deren Name und Sichtbarkeit
+dort gewählt werden: privat, nicht gelistet oder öffentlich, privat zuerst. Der Name des Kapitels, die Seite, aus deren
+Sicht es gezeigt wird, und ob die Kommentare des Assistenten mitgehen (als einfache Kommentare nach denen des Zugs)
+werden in derselben Karte gewählt; Enter sendet, Esc schließt sie. Gesendet wird die Partie als PGN: ihre Kopfdaten,
+Züge und Varianten, deine Kommentare und Symbole, ihre Pfeile und Felder, ihre Uhren; die Daten der Engines, die
+Bewertungen und alles andere von dir bleiben hier. Das erste Senden bittet Lichess um die Berechtigung, in deine Studien
+zu schreiben. Einmal gesendet: *Auf lichess.org öffnen* oder *Link kopieren*.
+
+Später sagt der Streifen über den Zügen *An Lichess gesendet · 2 Änderungen seitdem*, mit *Änderungen senden*: Die Züge,
+Varianten und Notizen des Kapitels werden auf Lichess durch die der Partie ersetzt, auch ihre Tags, wenn sie sich
+geändert haben. Nichts geht von selbst. Ein aus deinen Studien geöffnetes Kapitel sagt *Aus deiner Lichess-Studie* und
+sendet seine Änderungen genauso.
+
+Die Grenzen von Lichess: 64 Kapitel pro Studie, 30 neue Studien pro Tag.
+
 ### Offizielle Übertragungen
 <!-- en: official-broadcasts a02f4c35 -->
 
@@ -1245,6 +1600,150 @@ Lichess lässt ohne Konto vier Runden gleichzeitig verfolgen, mit Konto acht. Se
 Übertragung stark aus, die ohne ein Konto verfolgt wird, das Übertragungen lesen darf: Beim ersten Mal fragt
 RookStudio nach dieser Berechtigung (*Auf Lichess erlauben…* oder *Ohne sie verfolgen*). Eine Runde, deren Partien alle
 beendet sind, kommt in die Datenbank *Übertragungen*.
+
+### Mehr von einer Übertragung
+<!-- en: more-of-a-broadcast d4233fd7 -->
+
+Rechts vom Mosaik einer Übertragung, unter der Runde, **die Tabelle**: Rang, Titel, Wertung und Punkte jedes Spielers,
+wie die Veranstalter sie angeben (die Föderation, die Mannschaft, die Performance und die Wertungsänderung unter der
+Maus), die ersten zwölf oder alle; bei einem Mannschaftswettbewerb zuerst die Mannschaften, nach Mannschaftspunkten,
+dann nach Brettpunkten. Lichess liefert sie ohne Konto; sie werden alle zwei Minuten neu abgefragt, solange das Mosaik
+zu sehen ist.
+
+*Das ganze Turnier*, neben dem Namen einer Runde, verfolgt alle laufenden Runden des Turniers und jede nächste, sobald
+sie beginnt: Das Mosaik zeigt die Runde live, und **Runden** darüber zeigt eine andere (ein Klick auf die laufende
+verfolgt wieder die nächsten). Jede Runde kommt an ihrem Ende in die Datenbank *Übertragungen*.
+
+**Übertragungen durchsuchen**, oben bei den offiziellen Übertragungen, sucht eine neuere nach ihrem Namen: Lichess
+antwortet nur einem Konto, das Übertragungen lesen darf, beim ersten Mal angefragt. *Zurück zur Liste* zeigt wieder die
+gerade laufenden Übertragungen.
+
+### Lichess-Links
+<!-- en: lichess-links c975cfa4 -->
+
+Eine mit Strg+V auf der Seite Brett oder auf der Seite Datenbanken eingefügte Lichess-Adresse wird erkannt, ohne Lichess
+etwas zu fragen: eine Partie (`lichess.org/abcd1234`, mit `/white`, `/black` oder einem Zug nach `#`), eine Studie oder
+eines ihrer Kapitel, eine Runde oder ein Turnier einer Übertragung, eine Arena, ein Turnier nach Schweizer System, ein
+Spieler (`lichess.org/@/name`) oder deine Lesezeichen. Bei einer Adresse, die RookStudio nicht kennt, wird das gesagt,
+und nichts wird abgefragt.
+
+Eine Karte sagt dann, was es ist, wohin seine Partien gehen und was bei Lichess abgefragt wird; Enter führt es aus, Esc
+schließt sie:
+
+- eine Partie oder ein Kapitel öffnet sich auf dem Brett, mit der Seite und dem Zug, die die Adresse zeigt, oder kommt
+  in eine Datenbank;
+- eine Studie, eine Übertragung, eine Arena, ein Turnier nach Schweizer System oder deine Lesezeichen kommen im
+  Hintergrund in eine Datenbank, ihre Partien gezählt, wie sie kommen, mit *Abbrechen*; dann *Datenbank öffnen*;
+- eine laufende Runde lässt sich stattdessen live verfolgen (siehe [Offizielle
+  Übertragungen](#offizielle-übertragungen));
+- die Partien eines Spielers kommen in seine Datenbank, über [seinen Abgleich](#partien-eines-spielers).
+
+Angeboten wird die auf der Seite Datenbanken gewählte Datenbank, wenn der Link dort eingefügt wurde, sonst
+*Lichess-Partien*, *Lichess-Studien*, *Übertragungen*, *Lichess-Turniere* oder *Lichess-Lesezeichen*, angelegt, wenn sie
+fehlt; eine andere lässt sich wählen. Eine Partie wird über ihre ID abgefragt, ohne Konto; eine private Studie mit
+deinem Token; Übertragungen mit einem Konto, das sie lesen darf, einmal angefragt, wie zum Verfolgen einer Runde; deine
+Lesezeichen brauchen ein verknüpftes Konto.
+
+### Fairplay
+<!-- en: fair-play e42fbcbd -->
+
+Lichess verbietet jede Hilfe während einer Partie. Mit verknüpftem Konto hält sich RookStudio daran, wo immer du
+spielst, im Browser oder auf einem Telefon:
+
+- solange eine deiner Live-Partien dauert, sperrt die Seite Brett ihre Tabs Analyse, Baum, Referenzen und Fragen, und
+  weder die Engine noch die Drohung, die Tablebases, die Cloud oder der Assistent sehen sich irgendeine Stellung an; die
+  Bretter zeigen keinen der Pfeile der Analyse und nicht ihre Bewertung, auch nicht die der Suche, die die Sperre
+  angehalten hat. Eine laufende Auswertung hält an, ihre erledigten Durchgänge bleiben erhalten. Engine-Turniere laufen
+  weiter, ohne Analyse auf ihrem Brett. Alles kommt von selbst zurück, wenn die Partie endet.
+- eine Fernpartie sperrt die Engine, die Cloud, die Tablebases und den Assistenten für die Partie auf dem Brett, die
+  durch ihre Stellung geht, vom ersten Zug bis zu dem, was folgt, eine aus einer Variante gezeigte Stellung dieser
+  Partie eingeschlossen; Lichess erlaubt dort ein Buch und eine Datenbank, also bleiben der Baum deiner Datenbanken und
+  ihre Referenzpartien offen. Bei jeder anderen Partie funktioniert alles.
+
+Ein Banner auf der Seite Brett sagt, welche Partie was sperrt. Die Karte Lichess der Startseite listet deine laufenden
+Partien auf, die, in denen du am Zug bist, zuerst, jede mit ihrer Uhr oder der verbleibenden Zeit für den Zug, und *Auf
+lichess.org öffnen*.
+
+Deine laufenden Partien werden mit dem Token deines Kontos abgefragt, wenn die Startseite erscheint, alle halbe Minute,
+solange eine Live-Partie dauert, und alle zehn Minuten, solange eine Fernpartie läuft. Die Seite Lichess bietet einmal
+an, stattdessen auf ihren Beginn und ihr Ende zu hören, solange RookStudio offen ist: eine weitere Berechtigung, deine
+Herausforderungen lesen. RookStudio liest während einer Partie keinen Zug und spielt keinen. Ohne diese Berechtigung
+greift die Sperre, wenn die Startseite erscheint.
+
+### Deine beendeten Partien
+<!-- en: your-finished-games 2e1cf545 -->
+
+Wenn eine deiner Partien endet, holt RookStudio sie in *Lichess · dein Name*, eine Datenbank, die angelegt wird, wenn
+sie fehlt, mit ihren Uhren, ihrer Eröffnung und, wenn du Lichess um eine Analyse gebeten hast, den Bewertungen von
+Lichess. Ein Banner auf der Seite Brett und eine Zeile auf der Startseite sagen, wie sie endete; *Auswerten* (Enter)
+fragt Lichess noch einmal nach seiner Analyse, die inzwischen angefordert worden sein kann, öffnet die Partie und
+startet ihre Auswertung. *Nicht jetzt* (Esc) legt das Banner beiseite.
+
+Die Analyse von Lichess erscheint dann neben der deiner Engine: ihre Kurve auf der Grafik und die Genauigkeit jeder
+Analyse unter den Zahlen der beiden Seiten im Tab Auswertung, für beide mit derselben Formel. *Meine beendeten Partien
+sofort auswerten* auf der Seite Lichess startet die Auswertung von selbst, außer das Brett hat eine Partie mit
+ungespeicherten Änderungen oder laufende Arbeit; dann bietet das Banner sie an.
+
+### Verfolgte Spieler
+<!-- en: followed-players 72df1253 -->
+
+Die Karte *Verfolgte Spieler* der Seite Lichess listet die Spieler auf, denen dein Konto auf Lichess folgt, und die, die
+du über ihren Namen hinzufügst, jeden mit einem Punkt: rot, solange er spielt, mit der Bedenkzeit der Partie, grün, wenn
+er online ist. Ihr Status wird alle fünfzehn Sekunden abgefragt, solange die Karte oder ihr Mosaik zu sehen ist, ohne
+Konto.
+
+*Ihre Partien im Mosaik* zeigt die Partien, die sie gerade spielen, im Mosaik der Übertragungen, jede von deiner Engine
+analysiert, höchstens acht, wie Lichess es erlaubt; Lichess zeigt ihre Züge drei Züge verzögert, für alle. Eine beendete
+Partie bleibt mit ihrem Ergebnis, bis eine andere ihren Platz einnimmt. Um zu lesen, wem dein Konto folgt, braucht es
+eine weitere Berechtigung, beim ersten Mal angefragt; *Ohne sie* werden die über ihren Namen hinzugefügten Spieler
+verfolgt. Dein eigenes Konto und deine eigenen Partien erscheinen dort nie.
+
+### Eine Partie vorbereiten
+<!-- en: preparing-a-game 5bf402fc -->
+
+Die Karte *Eine Partie vorbereiten gegen* der Seite Lichess nimmt einen Lichess-Namen. Die Partien dieses Spielers aus
+dem letzten Jahr, Blitz, Schnellschach und klassisch, kommen in eine eigene Datenbank, *Lichess · Name*, beim nächsten
+Mal erneut abgeglichen, und sein öffentliches Profil gibt sein Niveau an. Dann, aus dem Baum dieser Datenbank: seine
+Partien und Jahre, deine Partien gegen ihn (mit verknüpftem Konto), was er mit Weiß spielt und mit Schwarz gegen die
+ersten Züge, denen er am häufigsten begegnet, und die Varianten, die er oft spielt und auf die deine Repertoires nicht
+antworten, die häufigsten zuerst. Ein Klick auf eine öffnet sie auf dem Brett, den Tab Baum auf seinen Partien. Nur sein
+Name und diese Filter gehen an Lichess. Während eine deiner Partien gegen ihn auf Lichess gespielt wird, zeigt die Karte
+nichts von ihm.
+
+### Die Bewertungen von Lichess, offline
+<!-- en: lichesss-evaluations-offline e972bc19 -->
+
+Die Karte *Die Bewertungen von Lichess, offline* bewahrt auf deiner Festplatte auf, was die Server von Lichess für 418
+Millionen Stellungen berechnet haben (database.lichess.org, CC0): für jede die Bewertung, die Tiefe und den ersten Zug
+ihrer tiefsten Suche. Danach wird nichts mehr im Netz abgefragt, und eine Bewertung erscheint sofort, wo immer Lichess
+eine hat.
+
+- **Was aufbewahrt wird**: jede Stellung (etwa 3,6 GB) oder nur die Eröffnungen (etwa 1,5 GB), die Stellungen mit 24
+  Steinen oder mehr auf dem Brett. Die Datei von Lichess nennt keine Zugnummer: In den Partien von Lichess sind 24
+  Steine oder mehr 89 % der Stellungen der ersten 20 Züge und 8 % der späteren. Die Varianten von Lichess werden
+  ausgelassen: Sie bräuchten fast fünfmal so viel Platz, für das, was deine Engine in einer Sekunde wiederfindet.
+- **Herunterladen und vorbereiten** (Enter) liest die Datei von Lichess, etwa 21 GB, beim Herunterladen und behält davon
+  nur, was du gewählt hast; *Eine schon heruntergeladene Datei…* liest stattdessen `lichess_db_eval.jsonl.zst` von
+  deiner Festplatte. Während der Vorbereitung braucht es etwas mehr als den doppelten Platz dessen, was es behält; die
+  Karte sagt, wie viel deine Festplatte frei hat.
+- Die gelesenen Stellungen antworten schon, ein paar Millionen auf einmal, ohne auf das Ende zu warten. *Abbrechen*,
+  eine Netzunterbrechung oder das geschlossene Programm: *Fortsetzen* nimmt die Datei dort wieder auf, wo sie aufhörte,
+  *Neu beginnen* vergisst, was gelesen wurde.
+- Fertig nennt die Karte die Stellungen, die Größe und das Datum der Datei. Lichess veröffentlicht die Datei jeden Monat
+  neu: *Aktualisieren* fragt database.lichess.org nach ihrem Datum und liest eine neuere Datei, während die aufbewahrten
+  Bewertungen antworten, bis sie fertig ist. *Entfernen* gibt die Festplatte frei.
+
+Sie erscheinen an drei Stellen:
+
+- im Tab Analyse: eine Zeile über der Engine, *Lichess offline · +0.31 · Tiefe 46 · 6…e6*, die Bewertung aus der Sicht
+  von Weiß (ein Klick zeigt den Zug auf dem Brett);
+- in der Auswertung einer Partie: Eine mit Tiefe 30 oder mehr bekannte Stellung wird übernommen, wie sie ist, ohne
+  Suche, und die Engine durchsucht die anderen (ihr letzter Durchgang, standardmäßig 5 Sekunden pro Stellung, geht
+  selten tiefer);
+- im Tab Baum: eine Spalte *Bew.*, die Bewertung nach jedem Zug.
+
+Was den Computer verlässt: die Anfrage nach der Datei an database.lichess.org, sonst nichts. Während eine deiner Partien
+auf Lichess gespielt wird, verschwinden sie wie die Engine (siehe [Fairplay](#fairplay)).
 
 ### Online für die Analyse
 <!-- en: online-for-the-analysis 991c19c9 -->
@@ -1311,14 +1810,21 @@ Die Engine des Tabs Analyse antwortet für ihn, in einem eigenen Prozess (ein Th
 Fragen brauchen eine Engine in der Bibliothek.
 
 ### Kommentare des Assistenten
-<!-- en: comments-by-the-assistant dea97e86 -->
+<!-- en: comments-by-the-assistant 009c27cb -->
 
 *Diesen Zug kommentieren* (Alt+C oder Strg+K) schreibt den Kommentar des Assistenten zum gezeigten Zug und
-*Schlüsselmomente kommentieren* in der Auswertung einen zu jedem Schlüsselmoment. Seine Kommentare werden im PGN
-markiert (`[%rs assistant]`) und in Blaugrau und kursiv gezeigt, nach einer Sprechblase; unter dem Mauszeiger steht,
-worauf jeder beruht: die Engine, die Fakten der Stellungen, die Datenbank der Theorie, das Modell oder eine Vorlage. Ein
-Doppelklick korrigiert einen, und er wird deiner. Ohne das Modell sind die Kommentare Vorlagen, aus denselben Fakten
-geschrieben.
+*Schlüsselmomente kommentieren* in der Auswertung einen zu jedem Schlüsselmoment. Seine Kommentare werden in Blaugrau
+und kursiv gezeigt, nach einer Sprechblase; unter dem Mauszeiger steht, worauf jeder beruht: die Engine, die Fakten der
+Stellungen, die Datenbank der Theorie, das Modell oder eine Vorlage. Ohne das Modell sind die Kommentare Vorlagen, aus
+denselben Fakten geschrieben.
+
+Ein Zug, der schon einen Kommentar hat (deinen, die Analyse von Lichess zu einer Partie, den des Kommentators einer
+Partie), behält ihn, wie er ist: Der des Assistenten kommt danach, getrennt, in einem Kasten in seiner Farbe unter
+seinem Namen. Im PGN sind es zwei Kommentare hintereinander, der des Assistenten mit `[%rs assistant]` markiert; ein
+anderes Programm liest zwei Kommentare, und RookStudio gibt jedem wieder seinen Platz. Strg+Z nimmt den Kommentar des
+Assistenten zurück. Ein Doppelklick korrigiert ihn, und er wird deiner: Bei einem Zug, der schon einen Kommentar von
+dir hat, wird der korrigierte Text danach angefügt, als ein einziger Kommentar. Eine Antwort des Tabs Fragen, die zur
+Notation hinzugefügt wird, ist ebenfalls ein Kommentar des Assistenten.
 
 ## Testsuiten
 <!-- en: test-suites 42c2b2ba -->
@@ -2215,6 +2721,18 @@ signieren (Google Trust Services), und denen von Let's Encrypt. Sie geht über d
 `ALL_PROXY`) nennt, etwa `http://proxy.example:3128` oder `http://user:password@proxy.example:3128`, außer für die
 Hosts von `NO_PROXY`; auch unter Windows kommt der Proxy aus diesen Variablen, nicht aus den Systemeinstellungen.
 SOCKS-Proxys werden nicht unterstützt.
+
+### Deine eigene Lichess-Übertragung
+<!-- en: your-own-lichess-broadcast 9acdf587 -->
+
+*Auf Lichess übertragen…* in der Kopfzeile eines Turniers, das auf diesem Computer spielt, öffnet einen Bereich: den
+Namen der Übertragung (anfangs den des Turniers), nicht gelistet (für alle, die ihren Link haben), es sei denn,
+*Öffentlich* ist gewählt, und was an Lichess geht: der Name, Format und Bedenkzeit des Turniers und das PGN jeder
+Partie. *Übertragung erstellen* bittet dein verknüpftes Konto beim ersten Mal um eine weitere Berechtigung, Studien und
+Übertragungen zu erstellen (dafür öffnet sich die Seite von Lichess), oder verknüpft das Konto mit ihr; das in der
+lichess-Karte oben eingefügte Token dient, wenn kein Konto verknüpft ist. Danach gehen die Partien wie oben beschrieben
+an die Übertragung, und ein Banner unter der Kopfzeile sagt, wie viele gesendet wurden und wann die letzte, mit *Auf
+lichess.org öffnen* und *Stopp*.
 
 ### Ein Mannschaftskampf auf Sendung
 <!-- en: a-team-match-on-the-air fd32027f -->

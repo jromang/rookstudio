@@ -332,7 +332,7 @@ tabuleiros continuam planos e *Aparência* diz por quê. As peças são as Staun
 MIT; *Aparência* tem o link para elas.
 
 ## Atalhos de teclado
-<!-- en: keyboard-shortcuts 46ce10a3 -->
+<!-- en: keyboard-shortcuts 58e8e12c -->
 
 | Teclas | Onde | O que fazem |
 |---|---|---|
@@ -372,6 +372,9 @@ MIT; *Aparência* tem o link para elas.
 | <kbd>Alt</kbd>+<kbd>C</kbd> | O Tabuleiro de estudo | O assistente comenta o lance |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd> | O Tabuleiro de estudo | O que F, A, X, G e N fazem no Tabuleiro dos engines (aqui, as letras digitam lances) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | A aba Árvore | Escolher um lance, jogá-lo, marcá-lo no repertório ativo |
+| <kbd>Enter</kbd> | A página Aberturas | Iniciar o treino do repertório mostrado |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espaço</kbd>, <kbd>Esc</kbd> | Uma sessão de treino | Uma dica, "Não sei", parar |
+| <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Uma sessão de treino | A próxima posição, ou de novo após uma resposta errada; desfazer um lance adicionado ao repertório |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | Uma lista de partidas | Percorrer a lista, abrir a partida |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | A página Bases | O painel de busca |
 | <kbd>Esc</kbd> | A página Bases | Fechar o painel de busca, depois a lista |
@@ -392,7 +395,7 @@ MIT; *Aparência* tem o link para elas.
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | O modo headless | Parar depois das partidas em andamento |
 
 ## A página Início
-<!-- en: the-home-page 1eaa857d -->
+<!-- en: the-home-page fde97c98 -->
 
 A página **Início** de uma visão reúne em cartões as páginas da visão, com o que está rodando primeiro:
 
@@ -407,8 +410,9 @@ A página **Início** de uma visão reúne em cartões as páginas da visão, co
   *+ Importar…*, e os torneios lidos sem cópia (veja [Bases de dados](#bases-de-dados)).
 - **Lichess**: a conta, as partidas de um jogador com *Sincronizar*, as novas partidas contadas se você escolheu
   isso, as transmissões ao vivo (veja [A página Lichess](#a-página-lichess)).
-- **Em andamento**: a análise da partida, a da posição, uma importação, e o assistente (o download dele, o modelo
-  carregado, *Descarregar*).
+- **Em andamento**: a análise da partida, a da posição, uma importação, o assistente (o download dele, o modelo
+  carregado, *Descarregar*), e as posições dos seus repertórios a revisar, que um clique treina (veja [Treinar um
+  repertório](#treinar-um-repertório)).
 
 O botão de busca no alto, ou Ctrl+K, encontra um comando, uma partida, uma base.
 
@@ -694,6 +698,59 @@ adiciona à biblioteca. *Rodar como suíte de testes…* abre um livro EPD em **
   como o formato exige, é então adicionado à biblioteca, com as opções na descrição. O console diz quantas partidas
   entraram nele, quantas as opções deixaram de fora e quantas não puderam ser lidas.
 
+### Livros a partir das aberturas nomeadas
+<!-- en: books-from-the-named-openings df5656f9 -->
+
+*Das aberturas nomeadas do Lichess…*, em **Criar…**, gera um livro de posições iniciais a partir da tabela de
+aberturas nomeadas do Lichess, que já está no programa (chess-openings, CC0): nada é baixado. O formulário dele, no
+lugar dos detalhes do livro, recebe as **famílias** (A aberturas de flanco, B jogos semiabertos, C jogos abertos, D
+jogos fechados, E defesas índias), os **comprimentos** das linhas mantidas, em meios-lances (de 8 a 16 no início),
+*Uma posição por variante nomeada* (várias linhas têm o mesmo nome) e o **número** de posições, distribuídas por igual
+pelos códigos ECO quando há mais posições que se qualificam. Ele diz quantas posições e aberturas o livro teria;
+*Criar o livro…* pergunta onde gravar o arquivo EPD, cada posição com o número do lance (`hmvc`, `fmvn`) e a abertura
+como `c0`, e o adiciona à biblioteca.
+
+### Livros a partir das posições avaliadas
+<!-- en: books-from-the-evaluated-positions 48770901 -->
+
+*Das posições avaliadas do Lichess…*, em **Criar…**, gera um livro com as posições que os jogadores do Lichess
+analisaram: as das linhas das aberturas nomeadas e a um lance delas, cada uma com a avaliação e a profundidade. Elas
+vêm da base de avaliações do Lichess (CC0, cerca de 21 GB e 290 milhões de posições): o tamanho dela é pedido a
+database.lichess.org e informado antes de qualquer download; *Baixar e ler* a lê enquanto ela chega, e guarda só as
+posições encontradas (alguns megabytes, no perfil), não o arquivo. *Ler um arquivo já baixado…* lê em vez disso um
+`lichess_db_eval.jsonl.zst` do disco. Nada sai da máquina além do pedido do arquivo. A leitura mostra quanto foi lido e
+mantido; *Cancelar*, uma queda da rede ou o programa fechado mantêm o que foi lido, e *Continuar* segue dali (um arquivo
+alterado no servidor desde então é lido de novo desde o início).
+
+Depois da leitura, o formulário recebe a **avaliação** mantida, para as Brancas (de +0,30 a +0,80 no início), a
+**profundidade** mínima (30), os **meios-lances** desde o início (de 8 a 16), *Uma posição por variante nomeada* (a da
+linha da variante primeiro, depois a avaliação mais profunda, depois a mais próxima do meio da janela) e o **número**
+de posições, distribuídas por igual pelos códigos ECO quando há mais posições que se qualificam. Ele diz quantas
+posições e aberturas o livro teria e a avaliação média delas; *Criar o livro…* grava o arquivo EPD, cada posição com o
+número do lance, a avaliação para o lado que joga, a profundidade (`ce`, `acd`) e a abertura (`c0`), e o adiciona à
+biblioteca. *Ler de novo* lê a base outra vez, para as avaliações mais recentes.
+
+### Livros CTG
+<!-- en: ctg-books a908f007 -->
+
+**Adicionar…** também aceita um livro no formato CTG, os livros de aberturas do ChessBase e do Fritz: um `.ctg` com o
+`.ctb` e o `.cto` ao lado, qualquer um dos três escolhido. Ele é apenas lido, nunca gravado. A página dele diz quantas
+posições e lances ele contém, e quantos lances o autor marcou em verde (para jogar) e em vermelho (para evitar). Para
+cada posição, o livro tem os seus lances, cada um com o símbolo (!, ?, !?, lance único…), a cor, a avaliação da posição
+a que ele leva e as partidas por trás dele: quantas, como terminaram, os ratings dos jogadores.
+
+*Abrir na árvore* o mostra na aba *Árvore* da página Tabuleiro, entre as fontes: os lances da posição mostrada com as
+partidas, a pontuação, o rating médio dos jogadores que os jogaram e a performance, e uma coluna *Livro* com a cor e o
+símbolo deles. Os lances verdes vêm primeiro; os vermelhos ficam na lista, em cinza. Os anos e as partidas de
+referência vêm das bases, não do livro.
+
+O fastchess não lê livros CTG. *Para engines: criar um livro Polyglot…* grava uma cópia Polyglot (`.bin`) e a
+adiciona à biblioteca, para as *Aberturas* da configuração e os livros próprios dos participantes: os lances vermelhos
+ficam de fora, e cada lance pesa os pontos que suas partidas fizeram (dois por vitória, um por empate), o dobro para um
+lance verde; um lance que não fez nenhum ponto fica de fora. *Verificar o livro* segue as linhas dele a partir da
+posição inicial e diz quantas posições alcançou das que o livro contém, e se algum lance não pôde ser lido. Nada sai
+da máquina.
+
 ## Tabuleiro
 <!-- en: board 0bbd00c9 -->
 
@@ -922,7 +979,7 @@ Não dá para voltar um lance, e o engine joga com força total, a menos que o c
 (`UCI_LimitStrength` e `UCI_Elo`, ou `Skill Level`, quando ele os tem).
 
 ### O Tabuleiro de estudo
-<!-- en: the-study-board da17bfb4 -->
+<!-- en: the-study-board e70e0006 -->
 
 Numa visão cujo Tabuleiro é *Para estudo* (veja [Visões](#visões)), a página Tabuleiro é onde as partidas são lidas e
 escritas. O tabuleiro fica à esquerda; à direita, a faixa da partida, depois cinco abas, de Alt+1 a Alt+5:
@@ -930,8 +987,9 @@ escritas. O tabuleiro fica à esquerda; à direita, a faixa da partida, depois c
 - **Notação**: a linha de título da partida e os cabeçalhos dela (veja [Cabeçalhos](#cabeçalhos)), depois os
   lances, os comentários, os símbolos e as variantes, escritos no lugar (veja [Notação](#notação)); a tabela dos
   lances e a revisão ficam em abas próprias (veja [A revisão de uma partida](#a-revisão-de-uma-partida));
-- **Análise**: as linhas do engine, e a nuvem e as tablebases do Lichess quando você as escolheu (veja [Online para a
-  análise](#online-para-a-análise)), com o gráfico da partida;
+- **Análise**: até quatro engines lado a lado (veja [Vários engines lado a lado](#vários-engines-lado-a-lado)), e a
+  nuvem e as tablebases do Lichess quando você as escolheu (veja [Online para a análise](#online-para-a-análise)), com
+  o gráfico da partida;
 - **Árvore**: os lances jogados a partir da posição nas suas bases, nos seus livros e no Lichess (veja [A aba
   Árvore](#a-aba-árvore));
 - **Referências**: as partidas mais fortes da posição (veja [Partidas de referência](#partidas-de-referência));
@@ -948,8 +1006,46 @@ legais que começam assim (em letras inglesas, K Q R B N; em francês, R D T F C
 Tabuleiro dos engines passam então para o Alt: Alt+F gira o tabuleiro, Alt+A inicia ou para a análise, Alt+X mostra a
 ameaça, Alt+G analisa a partida, Alt+N vai ao próximo lance marcado pela análise.
 
+### Vários engines lado a lado
+<!-- en: several-engines-side-by-side 269f6f12 -->
+
+Na aba Análise do Tabuleiro de estudo, até quatro engines da biblioteca analisam a posição juntos, cada um num cartão:
+a cor e o nome dele, a avaliação (do ponto de vista das Brancas), a profundidade e a seldepth, a velocidade e as
+threads, a melhor linha, e as outras linhas recolhidas numa só (um clique as expande). Passar o mouse sobre um lance de
+uma linha mostra no tabuleiro a posição depois dele; um clique joga a linha até esse lance. **+ Um engine** lista os
+engines da biblioteca, com os da análise marcados (↑ ↓ escolhem um, Enter o adiciona), e *Baixar um engine…*, os
+engines populares da página Engines; um engine adicionado começa a buscar na hora. Alt+A, ou *Analisar*, inicia e para
+todos eles, e os engines ficam guardados para a próxima vez.
+
+No tabuleiro, o melhor lance de cada engine é uma seta da cor dele: azul-escuro, laranja-claro, verde-azulado e cinza,
+do primeiro engine ao quarto, com luminosidades também diferentes. Engines que jogam o mesmo lance dividem uma seta, na
+cor do primeiro deles, com o número de engines ao lado do início dela. A linha no alto da aba diz o mesmo em palavras:
+quais engines concordam, em que lance, e quanto as avaliações deles diferem (*7…Be7 para Stockfish e Gaia · 7…Qb6 para
+Leela · avaliações com até 0.11 de diferença*), ou o mate que um engine vê; nenhuma cor precisa ser distinguida. Com um
+só engine, as setas são as das linhas dele, como no Tabuleiro dos engines.
+
+**Threads**: a análise tem um só número de threads, definido pelo botão no alto (*24 / 32 threads*), dividido
+igualmente entre os engines dela. O menu de um engine (`…`) define as linhas, o hash e, à mão, as threads dele, que a
+divisão entre os outros passa então a deixar de lado. Um engine que busca numa placa de vídeo (*Usa uma GPU* marcado na
+biblioteca, ou um engine como o Lc0 cuja opção *Backend* indica um backend de GPU) mantém as próprias threads, e a
+divisão não as conta. Um torneio em andamento neste computador mantém os núcleos dele: a análise usa no máximo o que as
+partidas dele deixam, e o botão diz quantas threads elas ocupam. Essas configurações são próprias da análise: nem o
+engine da biblioteca nem um torneio as veem.
+
+**O primeiro engine** é o da análise: a revisão da partida (G), a ameaça (Alt+X, ou o menu do primeiro engine), as
+perguntas e os comentários do assistente o usam. Um engine arrastado pelo nome sobre outro toma o lugar dele; levado ao
+topo, ele passa a ser o primeiro; *Torná-lo o primeiro*, no menu dele, faz o mesmo. Quando a partida tem uma análise do
+novo primeiro engine, essa análise julga os lances e desenha a curva do gráfico da partida. As avaliações que cada
+engine deu às posições da partida que ele buscou aparecem no gráfico como uma linha fina da cor dele (*análise ao
+vivo*), as do primeiro engine como a curva enquanto a partida não tem análise.
+
+Enquanto uma das suas partidas é jogada no Lichess, todos os engines param na hora, e o Tabuleiro de estudo não mostra
+nenhuma das setas deles (veja [Jogo limpo](#jogo-limpo)). *Descarregar os engines da análise*, no menu de um engine ou
+na paleta de comandos, encerra os processos deles. Cada gesto da aba está na paleta de comandos (Ctrl+K): um engine
+adicionado, tornado o primeiro ou removido, as configurações dele, as threads da análise.
+
 ### Notação
-<!-- en: notation 5e273d24 -->
+<!-- en: notation a447e870 -->
 
 A notação é escrita no lugar, sem caixa de diálogo:
 
@@ -967,8 +1063,10 @@ A notação é escrita no lugar, sem caixa de diálogo:
   refaz; uma linha sob a notação diz o que foi feito e como desfazê-lo.
 
 *Figuras na notação* (*Preferências* > *Aparência*) mostra as peças como figuras. Os comentários do assistente
-aparecem separados dos seus, em cinza-azulado e em itálico, depois de um balão (veja [Comentários do
-assistente](#comentários-do-assistente)).
+aparecem separados dos seus, em cinza-azulado e em itálico, depois de um balão, ou numa caixa sob o nome dele depois de
+um comentário que já estava lá (veja [Comentários do assistente](#comentários-do-assistente)). Quando seus estudos de
+teoria comentam a posição mostrada, *Teoria · 3* acima dos lances leva às notas deles na aba Árvore (veja [Estudos de
+teoria](#estudos-de-teoria)).
 
 ### Setas e casas
 <!-- en: arrows-and-squares a46e6347 -->
@@ -1001,6 +1099,23 @@ partida em outro lugar. Uma partida sem jogadores abre primeiro os cabeçalhos d
 Uma base em que outro programa está gravando fica somente leitura nesse meio-tempo: a partida continua alterada aqui
 até poder ser salva.
 
+### Posições e partidas para o Lichess
+<!-- en: positions-and-games-to-lichess 1fc6bb1d -->
+
+**lichess.org…**, sob o tabuleiro, envia a posição ou a partida ao Lichess; cada ação diz o que envia. *Abrir a
+posição em lichess.org* abre nela o tabuleiro de análise do Lichess, no navegador: a posição vai no endereço, nada
+mais. *Compartilhar a partida* a importa no Lichess sem conta e copia o endereço dela: quem tiver o endereço vê a
+partida, inclusive os nomes dos jogadores. *Pôr a posição em jogo*, com um controle de tempo (de 3+2 a 30+20, ou dias
+por lance), cria um desafio aberto a partir da posição: um link para cada lado, para enviar ao seu jogador; uma partida
+assim não é ranqueada. *Favoritar a partida no Lichess*, para uma partida que vem de lá, a coloca nos seus favoritos:
+envia o id da partida com o seu token, e pede uma vez ao Lichess a permissão para alterar suas preferências. *Para um
+estudo do Lichess…* envia a partida para um dos seus estudos ou para um novo (veja [Seus estudos do
+Lichess](#seus-estudos-do-lichess)).
+
+Enquanto você joga uma partida no Lichess, nenhuma dessas ações toca a linha dela: uma posição no caminho até a
+posição dessa partida, ou a partida que passa por essa posição, não sai da máquina (veja [Jogo limpo](#jogo-limpo)). O
+resto continua possível.
+
 ### Partidas recentes e a lista
 <!-- en: recent-games-and-the-list ba602f73 -->
 
@@ -1014,7 +1129,7 @@ Uma partida aberta da lista de uma base guarda o lugar dela na lista: Ctrl+← e
 seguinte da lista, ou do filtro dela, no mesmo lance quando a partida passa pela posição mostrada.
 
 ### A aba Árvore
-<!-- en: the-tree-tab 56161f62 -->
+<!-- en: the-tree-tab 8350941e -->
 
 A aba Árvore dá os lances jogados a partir da posição mostrada: as partidas de cada um, as parcelas de vitórias das
 brancas, empates e vitórias das pretas, a pontuação, o Elo médio, a performance do lado a jogar (pela tabela da FIDE)
@@ -1031,7 +1146,9 @@ O lance sob o mouse, ou escolhido com ↑ ↓, aparece como uma seta azul no tab
 ou a estrela dele o marca no repertório ativo (veja [A página Aberturas](#a-página-aberturas)). Quando a linha da
 partida sai da base, a aba diz em que lance, e se esse lance é uma **novidade**, como confirma uma busca por posição
 (*Ver a última posição conhecida*). A árvore de uma base é construída após cada importação, e de novo em segundo plano
-depois que uma partida é salva nela, com o progresso mostrado e *Cancelar*.
+depois que uma partida é salva nela, com o progresso mostrado e *Cancelar*. As notas dos seus estudos de teoria
+acompanham os lances, seja qual for a fonte: uma coluna *Teoria*, e *O que seus estudos dizem* sob os lances (veja
+[Estudos de teoria](#estudos-de-teoria)).
 
 ### Partidas de referência
 <!-- en: reference-games c45f1d18 -->
@@ -1041,8 +1158,21 @@ A aba Referências procura as partidas mais fortes da posição nas suas bases, 
 chegam à posição para procurar as mais fortes: a aba Árvore diz mais. *Todas as partidas da posição em “…”* as lista
 na base.
 
+### Mais sobre o explorador
+<!-- en: the-explorer-more 40c92109 -->
+
+Com as fontes do Lichess na aba Árvore, **as partidas que o explorador cita** aparecem sob os lances: as partidas de
+mestres que chegam à posição (*Partidas de mestres*), ou as partidas fortes jogadas no Lichess; um clique pede a
+partida ao Lichess e a abre no tabuleiro, na posição que a árvore mostrava.
+
+Para os jogadores do Lichess, *Cada lance mês a mês* pergunta ao Lichess, para cada lance listado, quantas partidas o
+jogaram mês a mês: uma linha dos dois últimos anos dele na coluna *Por mês*, verde quando ele é mais jogado
+ultimamente, vermelha quando é menos; sob o mouse, as partidas dele nos últimos seis meses contra os seis anteriores.
+O resumo diz o mesmo da posição. Isso custa um pedido por lance, então fica desligado até ser pedido; o explorador dos
+mestres não tem meses.
+
 ### A revisão de uma partida
-<!-- en: the-review-of-a-game 2d88a6f5 -->
+<!-- en: the-review-of-a-game 7cf820c0 -->
 
 No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da partida (G) como um treinador leria:
 
@@ -1055,8 +1185,20 @@ No Tabuleiro de estudo, a aba *Revisão* ao lado da notação lê a análise da 
 
 As posições do final com sete peças ou menos podem ser julgadas com exatidão pelas tablebases do Lichess, consultadas
 uma vez para esta partida ou sempre. *Comentar os momentos-chave* escreve um comentário do assistente em cada um, em
-segundo plano (um comentário já existente nunca é substituído); *Anotar a partida* escreve as avaliações, os símbolos
-e as linhas melhores na notação. Ctrl+Z desfaz um ou outro.
+segundo plano, ao lado do comentário que um lance já pode ter (a análise do Lichess, o seu, o de um anotador), que
+nunca é substituído; *Anotar a partida* escreve as avaliações, os símbolos e as linhas melhores na notação. Ctrl+Z
+desfaz um ou outro.
+
+**A história da partida** é escrita pelo modelo do assistente quando ele está presente, em segundo plano, a partir dos
+fatos da revisão: os veredictos e as avaliações dela, os momentos-chave, a abertura, o final e como a partida terminou,
+com o que as tablebases do Lichess disseram. Cada trecho é mantido fiel a esses fatos pelo verificador dos comentários:
+cada lance, avaliação e nome que ele cita deve vir da revisão. Um trecho recusado é escrito de novo; recusado duas
+vezes, ele dá lugar ao texto padronizado. Um cartão na cor do assistente diz que o modelo escreveu a história e que ela
+foi verificada, e o que o verificador recusou. *A versão padronizada* mostra ao lado a história escrita com os textos
+padronizados, *Escrever de novo* faz o modelo contá-la de outro jeito (também no Ctrl+K), *Copiar* copia a história
+mostrada. Sem o modelo (não baixado, ou outro arquivo GGUF que não aprendeu os comentários do RookStudio), ou enquanto
+um torneio nesta máquina está usando o processador, a história é a padronizada, como ela mesma diz. Nada sai da
+máquina.
 
 ## Bases de dados
 <!-- en: databases e5980ed0 -->
@@ -1094,6 +1236,16 @@ código ECO, resultado (`carlsen 2024 B90`). ↑ ↓ percorrem a lista e a parti
 pequeno com os lances; Enter ou um duplo clique a abre na página Tabuleiro. Milhões de partidas rolam e são ordenadas
 na hora.
 
+### Fichas FIDE
+<!-- en: fide-cards fbfb5b7e -->
+
+A **ficha FIDE** de um jogador (título, federação, ano de nascimento, id FIDE, ratings clássico, rápido e blitz) é
+pedida ao Lichess, que mantém a lista da FIDE, sem conta e só quando você pede: um clique direito num nome da lista de
+partidas, ou *Ficha FIDE de …* na prévia da partida. Uma partida que traz o id FIDE do jogador (*WhiteFideId*, como
+fazem as transmissões do Lichess) envia esse id; senão, o nome é enviado, e quando vários jogadores da lista da FIDE se
+chamam assim, você escolhe qual deles é. A ficha fica guardada no seu perfil para esse nome: ela aparece então ao
+passar o mouse sobre o nome, e na prévia. *Em lichess.org* abre lá a página do jogador.
+
 ### Buscar
 <!-- en: searching 15418482 -->
 
@@ -1125,6 +1277,80 @@ Os torneios do perfil, e o arquivo PGN aberto na página Tabuleiro, aparecem em 
 bases: as partidas deles são listadas e buscadas como as de uma base, e atualizadas em segundo plano quando mostradas
 (as partidas que um torneio termina, um arquivo que cresceu ou mudou). Eles não são importados nem removidos.
 
+### Bases ChessBase
+<!-- en: chessbase-databases 2582d418 -->
+
+Uma base ChessBase solta na página Bases, ou escolhida com *Importar um arquivo…*, é copiada para uma base do
+RookStudio: o .cbh ou o .2cbh dela (ou qualquer um dos seus arquivos), ou um arquivo compactado de uma base, .cbv ou
+.cbz. Um cartão diz primeiro o que ela contém, lido nos cabeçalhos dela, o que entra e o que fica de fora, para onde
+ela vai e quanto tempo leva, aproximadamente; *Importar* (Enter) inicia a cópia, *Agora não* (Esc) a deixa de lado. Os
+arquivos ChessBase são apenas lidos, nada é gravado ao lado deles; um arquivo compactado é descompactado enquanto é
+lido, e a senha de um .cbz é pedida no cartão e não é guardada.
+
+A cópia mantém os lances e suas variantes, os comentários antes e depois dos lances (um texto em vários idiomas: o
+inglês primeiro, os outros depois dele), os símbolos, as casas coloridas e as setas, os relógios e o tempo gasto, as
+avaliações dos engines, as medalhas (uma tag *Medals*), as posições críticas e os controles de tempo. Perguntas de
+treino, imagens, sons e vídeos, links da web, partidas citadas, estruturas de peões e trajetos de peças, cores de
+variantes e os textos (artigos) ficam de fora: o relatório no fim os conta por tipo. Importada de novo (com partidas
+novas adicionadas no ChessBase desde então), a base traz só as partidas novas. Os nomes dos jogadores são escritos como
+a base os escreve, "Sobrenome, Nome".
+
+### TWIC
+<!-- en: twic fa3a19dd -->
+
+*De uma fonte…* traz partidas de um site, baixadas só quando você pede. **TWIC**, The Week in Chess, publica toda
+segunda-feira uma edição com as partidas da semana: o painel dele pede a theweekinchess.com a lista de edições e mostra
+as mais recentes, com a segunda-feira, as partidas de cada uma e se ela já está na base escolhida. Marque algumas,
+escolha a base (*Uma nova base, “TWIC”* no início), depois *Baixar e adicionar*: o PGN de cada edição é baixado, depois
+importado, uma edição após a outra, com a base legível o tempo todo; *Cancelar* para depois do que foi adicionado. Uma
+partida que a base já tem, com as mesmas tags e lances, não é adicionada duas vezes. Depois, um relatório dá os
+torneios mais fortes das partidas adicionadas (pelo rating médio dos jogadores deles) e os jogadores com melhor rating;
+um nome abre as partidas dele na lista.
+
+*Toda segunda-feira, procurar uma nova edição* fica desligado até você marcá-lo. Marcado, o RookStudio pede a lista de
+edições enquanto está aberto, no máximo quatro vezes por dia; uma edição nova aparece sob a lista de bases, em *Fontes
+acompanhadas*, e no cartão *Minhas bases* da página Início, com *Adicionar*: ela nunca é adicionada sem você. O que sai
+da máquina: o pedido da lista de edições, depois o dos arquivos PGN das edições escolhidas, nada mais. O TWIC é grátis
+para uso pessoal; nada dele vem com o RookStudio.
+
+### Meses do Lichess
+<!-- en: lichess-months 26060e4f -->
+
+*De uma fonte… › Transmissões do Lichess* adiciona um mês das transmissões oficiais do Lichess (database.lichess.org,
+CC BY-SA 4.0): o painel dele pede a página de arquivos do site e lista os meses mais recentes com o tamanho e as
+partidas. Escolha um e a base (*Uma nova base, “Transmissões do Lichess”* no início), depois *Baixar e adicionar*: o
+arquivo do mês é baixado, com retomada possível, depois importado, e um relatório dá os torneios mais fortes e os
+jogadores com melhor rating. Uma partida que a base já tem não é adicionada duas vezes. As partidas mantêm a fonte, a
+página da transmissão na tag Site: o que você compartilhar delas é compartilhado sob a mesma licença. O que sai da
+máquina: o pedido da página, depois o do arquivo do mês.
+
+*De uma fonte… › Partidas do Lichess* lê um mês de partidas ranqueadas do Lichess (CC0, cerca de 95 milhões de
+partidas e 30 GB compactados) enquanto ele baixa, e mantém só as partidas que passam pelos filtros: por padrão, os dois
+jogadores com rating de 2400 ou mais, sem bullet (um tempo base mais 40 incrementos abaixo de três minutos). Só as
+partidas mantidas chegam ao disco, adicionadas à base escolhida em lotes, com a base legível o tempo todo. *Ler um
+arquivo já baixado…* lê em vez disso um `lichess_db_standard_rated_*.pgn.zst` do disco. *Cancelar*, uma queda da rede
+ou o programa fechado mantêm o que foi adicionado, e *Continuar* segue de onde parou, com os mesmos filtros; as
+partidas lidas de novo não são adicionadas duas vezes.
+
+### Um jogador do chess.com
+<!-- en: a-chesscom-player 39157248 -->
+
+*De uma fonte… › chess.com* adiciona as partidas de um jogador pela API pública do chess.com, sem conta: digite o nome
+dele e *Consultar* pede os meses em que ele jogou; *Baixar e adicionar* pede as partidas de cada mês, um mês de cada
+vez, e as importa para a base escolhida (*Uma nova base, “chess.com · nome”* no início), com o mesmo relatório. Com
+*Acompanhar* marcado, o jogador aparece sob a lista de bases, em *Fontes acompanhadas*: *Procurar partidas novas* pede
+de novo os meses ainda não adicionados e o mais recente (as partidas dele podem ter aumentado); uma partida que já está
+lá não é adicionada duas vezes. O que sai da máquina: o nome do jogador e os pedidos dos meses dele, a api.chess.com.
+
+### Lumbra's Gigabase
+<!-- en: lumbras-gigabase 19d9d71f -->
+
+*De uma fonte… › Lumbra's Gigabase* explica como trazê-la: o site dela pede que você aceite a licença (CC BY-NC 4.0) e
+mostre que não é um robô, o que o RookStudio não faz por você. *Abrir o site* o abre no seu navegador; depois de
+baixado o arquivo, *Importar o arquivo baixado…* o importa como está. Um arquivo .7z (LZMA ou LZMA2) é lido enquanto é
+descompactado: os arquivos PGN dele um após o outro, os outros arquivos ignorados, e nada é gravado no disco além das
+partidas. Qualquer .7z de arquivos PGN pode ser importado, ou solto na página, do mesmo jeito.
+
 ## A página Aberturas
 <!-- en: the-openings-page 651bcc49 -->
 
@@ -1138,6 +1364,78 @@ botão para cada uma, um clique a retira ou a traz de volta), em segundo plano: 
 repertório que encontram resposta até o fim das linhas dele, ou até o lance 10 ou 15. As **lacunas** dele vêm em
 seguida, as mais frequentes primeiro: um lance do adversário jogado com frequência suficiente sem resposta sua, ou uma
 linha que termina num lance do adversário. Um clique mostra a posição, com a árvore ao lado.
+
+### Treinar um repertório
+<!-- en: training-a-repertoire d1994455 -->
+
+Cada posição de um repertório em que é a sua vez, e em que o repertório tem o seu lance, é uma posição a treinar. O
+RookStudio as pergunta de novo e de novo, com intervalos maiores a cada vez que você as sabe, com o FSRS, a repetição
+espaçada que o Anki usa: uma posição respondida certo volta em alguns dias, depois em semanas; uma que você erra volta
+mais tarde na sessão, depois no dia seguinte.
+
+O cartão **Treino** da página Aberturas conta as posições para hoje, as novas de hoje e as que você sabe, para mais
+tarde. *Começar* (Enter) pergunta as posições pendentes, depois as novas de hoje; *Só as novas* pergunta apenas as
+novas. As posições novas vêm na ordem em que suas bases mais as encontram, as mais jogadas primeiro, no máximo 20 por
+dia (o botão ao lado, *20 por dia*, muda isso). Abaixo delas: o que volta amanhã, em até três dias e em até uma semana.
+
+Uma sessão ocupa a página Tabuleiro, cuja coluna passa a ser a do treino; a partida que estava no tabuleiro espera entre
+as partidas recentes e volta depois. O RookStudio joga os lances do seu adversário seguindo o repertório até cada
+posição, primeiro os lances que suas bases mais jogam onde o repertório tem vários. Jogue o seu lance no tabuleiro, ou
+digite-o (as letras dele, depois Enter). Durante a pergunta, a árvore, os engines e suas notas ficam ocultos; eles
+voltam com a resposta.
+
+- **Alt+H**: uma dica, a casa da peça a jogar em azul (H sozinho começa um lance do peão h).
+- **Espaço**: "Não sei", e o lance é mostrado.
+- **Esc**: parar. O que foi respondido é mantido; a próxima sessão continua com o que ainda está pendente.
+
+Cada resposta é avaliada sozinha, sem nenhum botão a apertar: certa na primeira tentativa, *bom*; certa após uma dica
+ou após mais de 20 segundos, *difícil*; errada, ou "Não sei", *de novo*. Uma resposta certa mostra o comentário do
+repertório sobre o lance e quando a posição volta; a próxima vem com Enter, ou automaticamente após um segundo (o *…* ao
+lado muda isso, e o mouse sobre a resposta a segura). Uma errada mostra o lance do seu repertório nas casas dele, em
+verde: *Tentar de novo* (Enter) pergunta a posição outra vez; *Ver a árvore aqui* mostra a posição com a aba Árvore;
+*Adicionar … ao repertório* torna o lance que você jogou uma segunda resposta aceita ali (Ctrl+Z o desfaz).
+
+No fim: as contagens, os lances que você errou (um clique mostra a posição, com o lance do seu repertório) e *Revisar
+os … agora*.
+
+As revisões ficam guardadas no perfil ao lado do repertório (`Najdorf.training.json`, e `Najdorf.reviews.jsonl`, uma
+linha por resposta): o PGN dele não muda. Um lance alterado no repertório torna a posição dele nova de novo. Nada sai da
+máquina. O *Em andamento* da página Início diz quantas posições estão pendentes, e um clique as treina; o Ctrl+K
+*Treinar o repertório* também. Enquanto uma das suas partidas é jogada ao vivo no Lichess, o treino espera; as posições
+na linha de uma das suas partidas por correspondência ficam de fora até ela terminar.
+
+### Estudos de teoria
+<!-- en: theory-studies 8ba97ca4 -->
+
+A parte **Teoria** da página Aberturas (ao lado de *Repertórios*, na linha do título dela) guarda seus estudos de
+teoria: arquivos PGN anotados, suas análises ou um livro em PGN, e estudos do Lichess. As notas deles aparecem na aba
+Árvore da página Tabuleiro, em cada posição que eles comentam, seja qual for a ordem de lances que leva até ela.
+
+*Adicionar um PGN…*, ou um PGN solto na página, adiciona um arquivo: o RookStudio o lê onde está, em segundo plano, e o
+lê de novo sozinho quando ele muda no disco. A teoria nunca grava nele, e nada sai da máquina. *De um estudo do
+Lichess…* adiciona um dos seus estudos do Lichess lidos nesta máquina (veja [Seus estudos do
+Lichess](#seus-estudos-do-lichess)): a cópia dele no seu perfil é lida, e lida de novo junto com o estudo.
+
+O que vira nota: cada posição anotada do arquivo, variantes incluídas, com os comentários antes e depois do lance, os
+símbolos dele (!, ?!, ±…), uma avaliação escrita (`[%eval]`), e as setas e casas dele; o comentário de uma partida antes
+do primeiro lance é uma nota sobre o início dela. Os comentários do assistente não viram notas (veja [Comentários do
+assistente](#comentários-do-assistente)): eles são sobre o lance de uma partida, e o assistente comenta qualquer
+posição a pedido. Os comentários dos seus repertórios aparecem do mesmo jeito, com os nomes deles (*Os comentários dos
+seus repertórios também*, sob a lista).
+
+Cada estudo mostra seus números: as posições anotadas, os comentários, os símbolos e as avaliações. *Mostrar suas
+notas na árvore* (ligado no início) as oculta, ou as mostra de novo. *Abrir no Tabuleiro* (Enter, ou um duplo clique na
+lista) abre as partidas dele lá como uma cópia: Ctrl+S salva uma partida em outro lugar, e o arquivo continua como o
+autor o escreve. *Retirar da teoria* (Delete) deixa o arquivo onde está, e *Desfazer* o traz de volta. Um arquivo
+movido diz isso, com *Encontrar…*.
+
+Na **aba Árvore**, a coluna *Teoria* marca os lances que seus estudos comentam: os símbolos deles, e quantas notas dizem
+mais que um símbolo. Sob os lances, **O que seus estudos dizem** lista as notas da posição mostrada: a fonte de cada
+uma, onde ela está (*após 7.f4*, *em 7…Qb6*, ou *encontrada por transposição* com os próprios lances quando eles chegam
+à posição em outra ordem), o texto e a linha dela, que um clique abre no Tabuleiro no lance dela. O mouse sobre uma nota
+de um lance mostra o lance como a seta da árvore; sobre uma nota sobre a posição, as setas e casas dela no tabuleiro.
+Na aba **Notação**, *Teoria · 3* acima dos lances diz quantas notas a posição tem, e leva à aba Árvore (Alt+3).
+Enquanto uma das suas partidas é jogada ao vivo no Lichess, as notas ficam ocultas junto com a árvore.
 
 ## A página Lichess
 <!-- en: the-lichess-page ea1e19cc -->
@@ -1170,6 +1468,45 @@ ano, uma data), só xadrez padrão e Chess960. As partidas mantêm o link para l
 do Lichess. *Contar as novas partidas quando a página Início abrir* consulta o Lichess no máximo uma vez por hora, com
 o nome do jogador.
 
+### Seus estudos do Lichess
+<!-- en: your-lichess-studies 11bcbad8 -->
+
+*Seus estudos*, na página Lichess, lista os estudos da sua conta vinculada, os alterados mais recentemente primeiro. Na
+primeira vez que o cartão é aberto, o RookStudio pede ao Lichess a permissão para ler seus estudos (*Autorizar no
+Lichess…*): com ela, seus estudos privados e não listados também são listados; *Sem ela*, só os públicos. A lista do
+Lichess dá o nome de cada estudo e quando ele mudou pela última vez; os capítulos dele aparecem depois que ele é lido, e
+a visibilidade dele, para os estudos criados a partir do RookStudio. O estudo de outra pessoa vem pelo link (veja
+[Links do Lichess](#links-do-lichess)).
+
+Um clique num estudo o lê na primeira vez: os capítulos dele aparecem, e ficam no seu perfil, também offline. *Abrir um
+capítulo no Tabuleiro* (ou um duplo clique nele) o abre, visto do lado de onde o Lichess o mostra. *Importar para uma
+base* coloca cada capítulo numa base como uma partida: *Estudos do Lichess*, criada quando falta, ou outra escolhida ao
+lado. Feito de novo, ou com *Ler de novo* depois de importado, só os capítulos alterados desde então são substituídos e
+os novos adicionados; uma partida que você apagou lá continua apagada. *Torná-lo um estudo de teoria* mostra os
+comentários dele na aba Árvore, lidos de novo junto com o estudo (veja [Estudos de teoria](#estudos-de-teoria)); um
+estudo nunca lido é lido primeiro.
+
+*Acompanhar*: quando a página Lichess abre (a cada cinco minutos no máximo), o RookStudio pergunta ao Lichess se cada
+estudo acompanhado mudou, um pedido para cada um, sem baixá-lo. Um estudo que mudou diz isso, no cartão e na linha dele
+quando o cartão está recolhido, com *Ler de novo*: nada é baixado antes. Depois de uma leitura, os capítulos alterados
+desde a leitura anterior ficam marcados.
+
+**A partir do Tabuleiro**, *lichess.org…* › *Para um estudo do Lichess…* abre um cartão ao lado do tabuleiro que envia
+a partida para um dos seus estudos (um estudo cheio, com 64 capítulos, não é oferecido) ou para um novo, cujo nome e
+visibilidade são escolhidos ali: privado, não listado ou público, privado primeiro. O nome do capítulo, o lado de onde
+ele é visto e se os comentários do assistente vão junto (como comentários simples depois dos do próprio lance) são
+escolhidos no mesmo cartão; Enter envia, Esc o fecha. O que vai é a partida em PGN: os cabeçalhos, os lances e as
+variantes, os seus comentários e símbolos, as setas e casas, os relógios; os dados dos engines, as avaliações e
+qualquer outra coisa sua ficam aqui. O primeiro envio pede ao Lichess a permissão para escrever nos seus estudos.
+Depois de enviado, *Abrir em lichess.org* ou *Copiar o link*.
+
+Mais tarde, a faixa acima dos lances diz *Enviada ao Lichess · 2 alterações desde então*, com *Enviar as alterações*:
+os lances, as variantes e as notas do capítulo são substituídos no Lichess pelos da partida, as tags dela também quando
+mudaram. Nada vai automaticamente. Um capítulo aberto a partir dos seus estudos diz *Do seu estudo do Lichess*, e envia
+as alterações do mesmo jeito.
+
+Limites do Lichess: 64 capítulos por estudo, 30 estudos novos por dia.
+
 ### Transmissões oficiais
 <!-- en: official-broadcasts a02f4c35 -->
 
@@ -1185,6 +1522,143 @@ O Lichess deixa acompanhar quatro rodadas ao mesmo tempo sem conta, oito com uma
 muito lenta uma transmissão acompanhada sem uma conta autorizada a ler transmissões: na primeira vez, o RookStudio pede
 essa permissão (*Autorizar no Lichess…*, ou *Acompanhar sem ela*). Uma rodada cujas partidas terminaram todas vai para
 a base *Transmissões*.
+
+### Mais sobre uma transmissão
+<!-- en: more-of-a-broadcast d4233fd7 -->
+
+À direita do mosaico de uma transmissão, sob a rodada, **a classificação**: a posição, o título, o rating e os pontos
+de cada jogador como os organizadores os informam (a federação, a equipe, a performance e a variação de rating ao
+passar o mouse), os doze primeiros ou todos eles; num evento por equipes, primeiro as equipes, por pontos de match e
+depois por pontos de partida. O Lichess os dá sem conta; eles são consultados de novo a cada dois minutos enquanto o
+mosaico está à vista.
+
+*O torneio inteiro*, ao lado do nome de uma rodada, acompanha todas as rodadas em andamento do torneio, e cada rodada
+seguinte assim que ela começa: o mosaico mostra a rodada ao vivo, e **Rodadas** acima dele mostra outra (um clique na
+rodada ao vivo volta a acompanhar as seguintes). Cada rodada vai para a base *Transmissões* quando termina.
+
+**Pesquisar as transmissões**, no alto das transmissões oficiais, procura uma recente pelo nome: o Lichess só responde
+a uma conta autorizada a ler transmissões, pedida na primeira vez. *Voltar à lista* mostra de novo as transmissões em
+andamento.
+
+### Links do Lichess
+<!-- en: lichess-links c975cfa4 -->
+
+Um endereço do Lichess colado com Ctrl+V na página Tabuleiro ou na página Bases é reconhecido sem perguntar nada ao
+Lichess: uma partida (`lichess.org/abcd1234`, com `/white`, `/black` ou um lance depois de `#`), um estudo ou um dos
+capítulos dele, uma rodada ou um torneio de transmissão, uma arena, um torneio suíço, um jogador (`lichess.org/@/name`)
+ou os seus favoritos. Um endereço que o RookStudio não conhece é informado como tal, e nada é pedido.
+
+Um cartão diz então o que ele é, para onde vão as partidas dele e o que é pedido ao Lichess; Enter faz isso, Esc o
+fecha:
+
+- uma partida ou um capítulo abre no tabuleiro, do lado e no lance que o endereço mostra, ou vai para uma base;
+- um estudo, uma transmissão, uma arena, um torneio suíço ou os seus favoritos vão para uma base em segundo plano, as
+  partidas contadas à medida que chegam, com *Cancelar*; depois, *Abrir a base*;
+- uma rodada em andamento pode, em vez disso, ser acompanhada ao vivo (veja [Transmissões
+  oficiais](#transmissões-oficiais));
+- as partidas de um jogador vão para a base dele, por meio da [sincronização dele](#as-partidas-de-um-jogador).
+
+A base oferecida é a escolhida na página Bases quando o link foi colado lá, senão *Partidas do Lichess*, *Estudos do
+Lichess*, *Transmissões*, *Torneios do Lichess* ou *Favoritos do Lichess*, criada quando falta; outra pode ser
+escolhida. Uma partida é pedida pelo id, sem conta; um estudo privado, com o seu token; as transmissões, com uma conta
+autorizada a lê-las, pedida uma vez, como para acompanhar uma rodada; seus favoritos precisam de uma conta vinculada.
+
+### Jogo limpo
+<!-- en: fair-play e42fbcbd -->
+
+O Lichess proíbe qualquer ajuda durante uma partida. Com a sua conta vinculada, o RookStudio respeita isso onde quer
+que você jogue, no navegador ou num celular:
+
+- enquanto uma das suas partidas ao vivo dura, a página Tabuleiro bloqueia as abas Análise, Árvore, Referências e
+  Perguntas, e nem o engine, nem a ameaça, nem as tablebases, nem a nuvem, nem o assistente olham posição alguma; os
+  tabuleiros não mostram nenhuma seta da análise nem a avaliação dela, inclusive as da busca que o bloqueio parou. Uma
+  revisão em andamento para, com as passadas feitas mantidas. Os torneios de engines continuam, sem análise no
+  Tabuleiro deles. Tudo volta sozinho quando a partida termina.
+- uma partida por correspondência bloqueia o engine, a nuvem, as tablebases e o assistente na partida do tabuleiro que
+  passa pela posição dela, do primeiro lance ao que vem depois, inclusive uma posição dessa partida mostrada a partir de
+  uma variante; o Lichess permite ali um livro e uma base de dados, então a árvore das suas bases e as partidas de
+  referência delas continuam abertas. Em qualquer outra partida, tudo funciona.
+
+Um aviso na página Tabuleiro diz qual partida bloqueia o quê. O cartão Lichess da página Início lista suas partidas em
+andamento, primeiro aquelas em que é a sua vez, cada uma com o relógio ou o tempo restante para jogar, e *Abrir em
+lichess.org*.
+
+Suas partidas em andamento são consultadas com o token da sua conta quando a página Início aparece, a cada meio minuto
+enquanto uma partida ao vivo dura e a cada dez minutos enquanto uma partida por correspondência dura. A página Lichess
+oferece uma vez, em vez disso, ouvir o início e o fim delas enquanto o RookStudio está aberto: mais uma permissão, ler
+seus desafios. O RookStudio não lê nenhum lance durante uma partida e não joga nenhum. Sem essa permissão, o bloqueio
+vem quando a página Início aparece.
+
+### Suas partidas terminadas
+<!-- en: your-finished-games 2e1cf545 -->
+
+Quando uma das suas partidas termina, o RookStudio a traz para *Lichess · seu nome*, uma base criada quando falta, com
+os relógios, a abertura e, quando você pediu ao Lichess para analisá-la, as avaliações do Lichess. Um aviso na página
+Tabuleiro, e uma linha na página Início, dizem como ela terminou; *Revisar* (Enter) pede mais uma vez ao Lichess a
+análise dela, que pode ter sido pedida desde então, abre a partida e inicia a revisão dela. *Agora não* (Esc) deixa o
+aviso de lado.
+
+A análise do Lichess aparece então ao lado da do seu engine: a curva dela no gráfico, e a precisão de cada análise sob
+os números dos dois lados na aba Revisão, com a mesma fórmula para ambas. *Revisar na hora minhas partidas terminadas*,
+na página Lichess, inicia a revisão sozinho, a não ser que o Tabuleiro tenha uma partida com alterações não salvas ou
+um trabalho em andamento; nesse caso, o aviso a oferece.
+
+### Jogadores seguidos
+<!-- en: followed-players 72df1253 -->
+
+O cartão *Jogadores seguidos* da página Lichess lista os jogadores que a sua conta segue no Lichess e os que você
+adiciona pelo nome, cada um com um ponto: vermelho enquanto ele joga, com o controle de tempo da partida, verde quando
+ele está online. O estado deles é consultado a cada quinze segundos enquanto o cartão ou o mosaico deles está à vista,
+sem conta.
+
+*As partidas deles no mosaico* mostra as partidas que eles estão jogando no mosaico das transmissões, cada uma
+analisada pelo seu engine, oito no máximo, como o Lichess permite; o Lichess mostra os lances deles com três lances de
+atraso, para qualquer pessoa. Uma partida que termina fica com o resultado até que outra tome o lugar dela. Ler quem a
+sua conta segue precisa de mais uma permissão, pedida na primeira vez; *Sem ela*, os jogadores adicionados pelo nome
+são acompanhados. Sua própria conta e suas próprias partidas nunca aparecem ali.
+
+### Preparar uma partida
+<!-- en: preparing-a-game 5bf402fc -->
+
+O cartão *Preparar uma partida contra* da página Lichess recebe um nome do Lichess. As partidas do último ano desse
+jogador, blitz, rápidas e clássicas, vão para uma base só dele, *Lichess · nome*, sincronizada de novo da próxima vez,
+e o perfil público dele dá o nível dele. Depois, a partir da árvore dessa base: as partidas e os anos dele, suas
+partidas contra ele (com a sua conta vinculada), o que ele joga de Brancas, e de Pretas contra os primeiros lances que
+ele mais encontra, e as linhas que ele joga com frequência e que seus repertórios não respondem, as mais frequentes
+primeiro. Um clique numa delas a abre no Tabuleiro, com a aba Árvore nas partidas dele. Só o nome dele e esses filtros
+vão para o Lichess. Enquanto uma partida sua contra ele é jogada no Lichess, o cartão não mostra nada dele.
+
+### Avaliações do Lichess, offline
+<!-- en: lichesss-evaluations-offline e972bc19 -->
+
+O cartão *Avaliações do Lichess, offline* guarda no seu disco o que os servidores do Lichess calcularam para 418
+milhões de posições (database.lichess.org, CC0): para cada uma, a avaliação, a profundidade e o primeiro lance da busca
+mais profunda. Nada mais é pedido à rede depois, e uma avaliação aparece na hora onde quer que o Lichess tenha uma.
+
+- **O que é guardado**: todas as posições (cerca de 3,6 GB), ou só as aberturas (cerca de 1,5 GB), as posições com 24
+  peças ou mais no tabuleiro. O arquivo do Lichess não dá o número do lance: nas partidas do Lichess, 24 peças ou mais
+  são 89 % das posições dos 20 primeiros lances e 8 % das posteriores. As linhas do Lichess ficam de fora: elas
+  ocupariam quase cinco vezes o espaço, para o que o seu engine encontra de novo em um segundo.
+- **Baixar e preparar** (Enter) lê o arquivo do Lichess, cerca de 21 GB, enquanto ele baixa, e guarda dele só o que
+  você escolheu; *Um arquivo já baixado…* lê em vez disso `lichess_db_eval.jsonl.zst` do seu disco. Durante a
+  preparação, ele precisa de um pouco mais do que o dobro do espaço do que guarda; o cartão diz quanto o seu disco tem
+  livre.
+- As posições lidas passam a responder alguns milhões de cada vez, sem esperar o fim. *Cancelar*, uma queda da rede ou
+  o programa fechado: *Continuar* retoma o arquivo de onde parou, *Recomeçar* esquece o que foi lido.
+- Pronto, o cartão dá as posições, o tamanho e a data do arquivo. O Lichess publica o arquivo de novo a cada mês:
+  *Atualizar* pergunta a database.lichess.org a data dele e lê um arquivo mais novo, enquanto as avaliações guardadas
+  continuam respondendo até ele ficar pronto. *Remover* libera o disco.
+
+Elas aparecem em três lugares:
+
+- a aba Análise: uma linha acima do engine, *Lichess offline · +0.31 · profundidade 46 · 6…e6*, a pontuação do ponto
+  de vista das Brancas (um clique mostra o lance no tabuleiro);
+- a revisão de uma partida: uma posição conhecida com profundidade 30 ou mais é usada como está, sem busca, e o engine
+  busca as outras (a última passada dele, 5 segundos por posição por padrão, raramente vai mais fundo);
+- a aba Árvore: uma coluna *Aval.*, a avaliação depois de cada lance.
+
+O que sai da máquina: o pedido do arquivo a database.lichess.org, e nada mais. Enquanto uma das suas partidas é jogada
+no Lichess, elas se ocultam como o engine (veja [Jogo limpo](#jogo-limpo)).
 
 ### Online para a análise
 <!-- en: online-for-the-analysis 991c19c9 -->
@@ -1246,13 +1720,20 @@ O engine da aba Análise calcula para ele, num processo próprio (uma thread, 30
 precisam de um engine na biblioteca.
 
 ### Comentários do assistente
-<!-- en: comments-by-the-assistant dea97e86 -->
+<!-- en: comments-by-the-assistant 009c27cb -->
 
 *Comentar este lance* (Alt+C, ou Ctrl+K) escreve o comentário do assistente sobre o lance mostrado, e *Comentar os
-momentos-chave*, na revisão, um em cada momento-chave. Os comentários dele são marcados no PGN (`[%rs assistant]`) e
-mostrados em cinza-azulado e em itálico, depois de um balão; ao passar o cursor, aparece em que cada um se baseia: o
-engine, os fatos das posições, a base da teoria, o modelo ou um texto padronizado. Um duplo clique corrige um deles, e
-ele passa a ser seu. Sem o modelo, os comentários são padronizados, escritos a partir dos mesmos fatos.
+momentos-chave*, na revisão, um em cada momento-chave. Os comentários dele são mostrados em cinza-azulado e em
+itálico, depois de um balão; ao passar o cursor, aparece em que cada um se baseia: o engine, os fatos das posições, a
+base da teoria, o modelo ou um texto padronizado. Sem o modelo, os comentários são padronizados, escritos a partir dos
+mesmos fatos.
+
+Um lance que já tem um comentário (o seu, a análise do Lichess de uma partida, o do anotador de uma partida) o mantém
+como está: o do assistente vem depois dele, à parte, numa caixa da cor do assistente, sob o nome dele. No PGN são dois
+comentários seguidos, o do assistente marcado com `[%rs assistant]`; outro programa lê dois comentários, e o
+RookStudio devolve a cada um o seu lugar. Ctrl+Z desfaz o comentário do assistente. Um duplo clique o corrige, e ele
+passa a ser seu: num lance que já tem um comentário seu, o texto corrigido é acrescentado depois dele, como um só
+comentário. Uma resposta da aba Perguntas adicionada à notação também é um comentário do assistente.
 
 ## Suítes de testes
 <!-- en: test-suites 42c2b2ba -->
@@ -2117,6 +2598,17 @@ A conexão usa o Mbed TLS, embutido no programa, e só confia nos certificados r
 Trust Services) e nos do Let's Encrypt. Ela passa pelo proxy HTTP que `HTTPS_PROXY` (ou `ALL_PROXY`) indica, como
 `http://proxy.example:3128` ou `http://user:password@proxy.example:3128`, exceto para os hosts de `NO_PROXY`; também
 no Windows o proxy vem dessas variáveis, não das configurações do sistema. Proxies SOCKS não são suportados.
+
+### Sua própria transmissão no Lichess
+<!-- en: your-own-lichess-broadcast 9acdf587 -->
+
+*Transmitir no Lichess…*, no cabeçalho de um torneio que é jogado nesta máquina, abre um painel: o nome da transmissão
+(o do torneio no início), não listada (para quem tem o link) a menos que *Público* seja escolhido, e o que vai para o
+Lichess: o nome, o formato e o controle de tempo do torneio, e o PGN de cada partida. *Criar a transmissão* pede à sua
+conta vinculada mais uma permissão na primeira vez, a de criar estudos e transmissões (a página do Lichess se abre para
+isso), ou vincula a conta com ela; o token colado no cartão do lichess acima serve quando nenhuma conta está vinculada.
+Depois as partidas vão para a transmissão como descrito acima, e um aviso sob o cabeçalho diz quantas foram enviadas e
+quando foi a última, com *Abrir em lichess.org* e *Parar*.
 
 ### Um match por equipes no ar
 <!-- en: a-team-match-on-the-air fd32027f -->

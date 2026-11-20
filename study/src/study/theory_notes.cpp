@@ -126,6 +126,13 @@ void TheoryNotes::add(const GameTree& tree, bool chess960, const TheoryOptions& 
                 else
                     n.after = notes.after;
             }
+            // The assistant's comment, in its own slot: a comment of its mark, left out with it, else a note like any.
+            if (!notes.assistant.empty()) {
+                if (options.left_out == ASSISTANT_MARK)
+                    ++counts_.left_out;
+                else
+                    n.after += (n.after.empty() ? "" : " ") + notes.assistant;
+            }
             n.nags    = notes.nags;
             n.arrows  = notes.arrows;
             n.squares = notes.squares;

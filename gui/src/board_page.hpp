@@ -291,7 +291,8 @@ struct BoardPage {
     MoveNotes start_notes;                    // the marks of the start position
     struct CommentEdit {
         int line = -1, ply = 0;  // the move leading to position `ply` of `line`
-        bool before = false;     // the comment before the move, else after it
+        bool before    = false;  // the comment before the move, else after it
+        bool assistant = false;  // the assistant's after it (#60): corrected, it becomes the user's
         std::array<char, 2048> text{};
         bool focus = true;  // the field takes the keys on its first frame
     };
@@ -316,5 +317,17 @@ struct BoardPage {
     bool move_focus = false;  // the field takes the keys on its next frame
     std::string move_error;
 };
+
+// The board's game before a change, which Ctrl+Z brings back.
+[[nodiscard]] BoardPage::Snapshot boardSnapshot(const BoardPage& b);
+// A change made to the board's game: `before` kept for Ctrl+Z (200 at most), what was undone forgotten, the change
+// counted (since the game was opened or saved, and since it was sent to Lichess).
+void boardChanged(BoardPage& b, BoardPage::Snapshot before);
+// Ctrl+Z, or Ctrl+Y with `redo`: the game as it was before the last change, or after the last one undone; false when
+// there is none.
+bool boardUndo(BoardPage& b, bool redo);
+// The comment field left with `text`, its spaces at either end taken off: the comment before the move, after it, or the
+// assistant's, which becomes the user's when it is corrected (#60). False when nothing changed.
+bool editComment(GameTree& tree, const BoardPage::CommentEdit& edit, std::string text);
 
 }  // namespace fcg

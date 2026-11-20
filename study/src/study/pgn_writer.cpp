@@ -133,7 +133,20 @@ class Lines {
 
 }  // namespace
 
-std::string noteComment(const ReplayMove& m) {
+namespace {
+
+std::string joined(const std::vector<std::string>& parts) {
+    std::string out;
+    for (const auto& p : parts) {
+        if (!out.empty()) out += ' ';
+        out += p;
+    }
+    return out;
+}
+
+}  // namespace
+
+std::string noteComment(const ReplayMove& m, bool assistant_mark) {
     std::vector<std::string> parts;
     if (m.clock_ms) parts.push_back("[%clk " + duration(*m.clock_ms) + "]");
     if (m.notes.eval_tag && m.score) parts.push_back("[%eval " + evalValue(m) + "]");
@@ -141,13 +154,19 @@ std::string noteComment(const ReplayMove& m) {
     if (!m.notes.arrows.empty()) parts.push_back("[%cal " + marks(m.notes.arrows, true) + "]");
     if (!m.notes.squares.empty()) parts.push_back("[%csl " + marks(m.notes.squares, false) + "]");
     for (const auto& c : m.notes.commands) parts.push_back(c);
-    if (!m.notes.after.empty()) parts.push_back(m.notes.after);
-    std::string out;
-    for (const auto& p : parts) {
-        if (!out.empty()) out += ' ';
-        out += p;
+    if (!m.notes.after.empty()) {
+        parts.push_back(m.notes.after);
+    } else if (!m.notes.assistant.empty()) {
+        // The assistant's comment alone: one comment, as the assistant's were always written.
+        if (assistant_mark) parts.emplace_back(ASSISTANT_MARK);
+        parts.push_back(m.notes.assistant);
     }
-    return out;
+    return joined(parts);
+}
+
+std::string assistantComment(const ReplayMove& m, bool assistant_mark) {
+    if (m.notes.after.empty() || m.notes.assistant.empty()) return {};
+    return assistant_mark ? joined({std::string(ASSISTANT_MARK), m.notes.assistant}) : m.notes.assistant;
 }
 
 std::string writePgnGame(const GameTree& tree, const PgnWriteOptions& options) {
@@ -237,10 +256,12 @@ std::string writePgnGame(const GameTree& tree, const PgnWriteOptions& options) {
             }
             lines.put(std::move(word));
             for (const int nag : nags) lines.put(fmt::format("${}", nag));
-            if (const auto note = noteComment(m); !note.empty()) {
+            if (const auto note = noteComment(m, options.assistant_mark); !note.empty()) {
                 lines.comment(note);
                 number = true;
             }
+            // The assistant's beside it, a comment of its own (#60).
+            if (const auto said = assistantComment(m, options.assistant_mark); !said.empty()) lines.comment(said);
             for (std::size_t v = 0; v < tree.variations.size(); ++v) {
                 const auto& var = tree.variations[v];
                 if (var.parent != which || var.from != ply || var.moves.empty()) continue;

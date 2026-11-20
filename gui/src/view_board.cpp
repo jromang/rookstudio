@@ -451,6 +451,7 @@ void App::pollBoard() {
         (liveGameOn() || correspondencePly(board_.review_game, board_.review_chess960, INT32_MAX) >= 0))
         cancelGameReview();
     if (liveGameOn() && comment_job_ && comment_job_->cancel) *comment_job_->cancel = true;
+    if (liveGameOn() && story_job_) *story_job_->cancel = true;  // fair play (#48): the story waits too
     if (board_.threat_on && board_.threat.state() == Analyser::State::Failed) board_.threat_on = false;
     if (board_.threat_on && page_ == Page::Board && !board_.editor && !trainingHidesAids()) {
         board_.threat.update(threatSettings());
@@ -906,37 +907,12 @@ ImU32 nagColour(uint8_t nag) {
     }
 }
 
-BoardPage::Snapshot App::boardSnapshot() const {
-    const auto& b = board_;
-    return {b.tree, b.start_notes, b.line, b.ply};
-}
+BoardPage::Snapshot App::boardSnapshot() const { return fcg::boardSnapshot(board_); }
 
-void App::boardChanged(BoardPage::Snapshot before) {
-    auto& b = board_;
-    b.undo.push_back(std::move(before));
-    if (b.undo.size() > 200) b.undo.erase(b.undo.begin());
-    b.redo.clear();
-    b.changes.change();
-    if (b.sent) b.since_sent.change();  // the chapter on Lichess no longer has it (#79)
-}
+void App::boardChanged(BoardPage::Snapshot before) { fcg::boardChanged(board_, std::move(before)); }
 
 void App::boardUndo(bool redo) {
-    auto& b    = board_;
-    auto& from = redo ? b.redo : b.undo;
-    if (from.empty()) return;
-    (redo ? b.undo : b.redo).push_back(boardSnapshot());
-    auto s = std::move(from.back());
-    from.pop_back();
-    b.changes.undone(redo);
-    if (b.sent) b.since_sent.undone(redo);
-    b.tree        = std::move(s.tree);
-    b.start_notes = std::move(s.start_notes);
-    b.comment_edit.reset();
-    b.line = s.line >= -1 && s.line < static_cast<int>(b.tree.variations.size()) ? s.line : -1;
-    b.game = lineOf(b.tree, b.line);
-    b.ply  = std::clamp(s.ply, 0, static_cast<int>(b.game.moves.size()));
-    b.selected.reset();
-    b.preview.reset();
+    if (!fcg::boardUndo(board_, redo)) return;
     boardToast(redo ? TR("Change made again") : TR("Change undone · Ctrl+Y makes it again"));
 }
 
@@ -972,16 +948,18 @@ void App::boardToast(std::string text) {
     board_.toast_time = ImGui::GetTime();
 }
 
-void App::boardComment(bool before) {
+void App::boardComment(bool before, bool assistant) {
     auto& b = board_;
     if (b.ply <= 0) return;
     const MoveNotes* notes = notesAt(b.tree, b.line, b.ply);
     if (!notes) return;
     BoardPage::CommentEdit e;
-    e.line   = ownerOf(b.tree, b.line, b.ply - 1);
-    e.ply    = b.ply;
-    e.before = before;
-    std::snprintf(e.text.data(), e.text.size(), "%s", (before ? notes->before : notes->after).c_str());
+    e.line           = ownerOf(b.tree, b.line, b.ply - 1);
+    e.ply            = b.ply;
+    e.before         = before;
+    e.assistant      = assistant && !before;
+    const auto& text = e.before ? notes->before : e.assistant ? notes->assistant : notes->after;
+    std::snprintf(e.text.data(), e.text.size(), "%s", text.c_str());
     b.comment_edit = e;
 }
 
@@ -990,16 +968,8 @@ void App::boardCommentDone() {
     if (!b.comment_edit) return;
     const auto e = *b.comment_edit;
     b.comment_edit.reset();
-    std::string text = e.text.data();
-    const auto first = text.find_first_not_of(" \t");
-    text             = first == std::string::npos ? "" : text.substr(first, text.find_last_not_of(" \t") - first + 1);
-    auto before      = boardSnapshot();
-    MoveNotes* notes = notesAt(b.tree, e.line, e.ply);
-    if (!notes) return;
-    auto& slot = e.before ? notes->before : notes->after;
-    if (slot == text) return;
-    slot = text;
-    if (!e.before) markByAssistant(*notes, false);  // corrected by the user, the comment becomes theirs
+    auto before = boardSnapshot();
+    if (!editComment(b.tree, e, e.text.data())) return;
     boardChanged(std::move(before));
     b.game = lineOf(b.tree, b.line);
 }
@@ -2688,8 +2658,7 @@ void App::drawBoardMoves(float height) {
         const bool proto        = chessBoard();
         const ImU32 comment_col = IM_COL32(52, 146, 92, 255);
         // The assistant's: blue grey, in italics, after a bubble (M5, board 3).
-        const ImU32 assistant_col =
-            ui::currentTheme() == ui::Theme::Light ? IM_COL32(84, 104, 138, 255) : IM_COL32(150, 168, 198, 255);
+        const ImU32 assistant_col = ui::assistantColour();
         // A comment's words give back an id of their own: a click goes to its move, a double click corrects it.
         struct CommentAt {
             int line, ply;
@@ -2721,6 +2690,23 @@ void App::drawBoardMoves(float height) {
                 items.push_back(std::move(w));
             }
         };
+        // The assistant's comment beside another (#60, mockup M11, board 5): apart, in a box of its colour, under its
+        // name; what can be done with it said in the box of the move shown.
+        const auto block = [&](const std::string& text, float indent, int line, int ply) {
+            const int id = kCommentIds + static_cast<int>(comments.size());
+            comments.push_back({line, ply, false, true});
+            NotationItem box;
+            box.kind   = NotationItem::Kind::Block;
+            box.icon   = ui::Icon::Comment;
+            box.colour = assistant_col;
+            box.title  = TR("Assistant");
+            box.text   = text;
+            box.indent = indent;
+            box.id     = id;
+            if (line == owner && ply == b.ply)
+                box.hint = TR("Ctrl+Z takes it back · a double click corrects it, and it then becomes yours");
+            items.push_back(std::move(box));
+        };
         const auto field = [&](float indent) {
             auto& e = *b.comment_edit;
             NotationItem f;
@@ -2728,9 +2714,11 @@ void App::drawBoardMoves(float height) {
             f.field       = e.text.data();
             f.field_size  = e.text.size();
             f.field_focus = e.focus;
-            f.text        = e.before ? TR("A comment before the move · Enter keeps it, Esc leaves it")
-                                     : TR("A comment after the move · Enter keeps it, Esc leaves it");
-            f.colour      = comment_col;
+            f.text        = e.before      ? TR("A comment before the move · Enter keeps it, Esc leaves it")
+                            : e.assistant ? TR("The assistant's comment · Enter keeps it, and it becomes yours; Esc "
+                                               "leaves it")
+                                          : TR("A comment after the move · Enter keeps it, Esc leaves it");
+            f.colour      = e.assistant ? assistant_col : comment_col;
             f.indent      = indent;
             items.push_back(std::move(f));
         };
@@ -2791,12 +2779,24 @@ void App::drawBoardMoves(float height) {
                         sign.text = nagText(nag);
                         items.push_back(std::move(sign));
                     }
-                    if (editing && !b.comment_edit->before) {
-                        field(px(10) * static_cast<float>(depth));
+                    const float indent = px(10) * static_cast<float>(depth);
+                    if (editing && !b.comment_edit->before && !b.comment_edit->assistant) {
+                        field(indent);
                         number = true;
                     } else if (!m.notes.after.empty()) {
-                        words(m.notes.after, px(10) * static_cast<float>(depth), line, ply + 1, false,
-                              byAssistant(m.notes));
+                        words(m.notes.after, indent, line, ply + 1, false, false);
+                        number = true;
+                    }
+                    // The assistant's: inline after a bubble when the move has no other (M5, board 3), apart beside
+                    // another (M11, board 5).
+                    if (editing && b.comment_edit->assistant) {
+                        field(indent);
+                        number = true;
+                    } else if (!m.notes.assistant.empty()) {
+                        if (m.notes.after.empty())
+                            words(m.notes.assistant, indent, line, ply + 1, false, true);
+                        else
+                            block(m.notes.assistant, indent, line, ply + 1);
                         number = true;
                     }
                 }
@@ -2854,7 +2854,7 @@ void App::drawBoardMoves(float height) {
         };
         if (const auto* c = comment(ev.double_clicked)) {
             showBoardLine(c->line, c->ply);
-            boardComment(c->before);
+            boardComment(c->before, c->assistant);
         } else if (const auto* at = comment(ev.clicked)) {
             showBoardLine(at->line, at->ply);
             b.preview.reset();
@@ -2868,8 +2868,7 @@ void App::drawBoardMoves(float height) {
                                            : TR("A double click corrects the comment");
             // What it rests on, when it was written in this session (R9).
             if (const MoveNotes* notes = c->assistant ? notesAt(b.tree, c->line, c->ply) : nullptr) {
-                if (const auto it = assistant_basis_.find(c->before ? notes->before : notes->after);
-                    it != assistant_basis_.end()) {
+                if (const auto it = assistant_basis_.find(notes->assistant); it != assistant_basis_.end()) {
                     tip += "\n\n" + std::string(TR("What it rests on:"));
                     for (const auto& s : it->second) tip += "\n· " + s;
                 }

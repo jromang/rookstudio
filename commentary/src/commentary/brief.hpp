@@ -44,9 +44,12 @@ struct Refusal {
         Elision,       // French that forgets an elision: « du habituel », « le échec »
         Grammar,       // something the grammar does not allow: digits, other punctuation, a fourth sentence
         Empty,
+        // The story's (story_model.hpp):
+        Name,    // a name the facts do not give: a player, an opening, a place
+        Number,  // a number in words that the facts do not give: "on move thirty-four"
     };
     Kind kind = Kind::Empty;
-    // The words refused: the move, the motif, the piece; empty for TooManyMoves, Grammar and Empty.
+    // The words refused: the move, the motif, the piece, the name; empty for TooManyMoves, Grammar and Empty.
     std::string what;
     bool operator==(const Refusal&) const = default;
 };
@@ -145,6 +148,8 @@ class Brief {
     [[nodiscard]] std::optional<Refusal> check(std::string_view text) const;
 
    private:
+    friend class StoryBrief;  // a passage of the story about a move is held to the move's facts (story_model.hpp)
+
     MoveFacts facts_;
     brief_detail::Allowed allowed_;
     Color mover_ = Color::White;

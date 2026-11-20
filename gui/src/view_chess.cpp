@@ -87,7 +87,9 @@ void App::drawChessHome() {
         if (b.ply > 0) parts.push_back(trf("at {}", boardMoveLabel(b.ply)));
         std::size_t comments = 0;
         const auto count     = [&](const std::vector<ReplayMove>& moves) {
-            for (const auto& m : moves) comments += (m.notes.before.empty() ? 0 : 1) + (m.notes.after.empty() ? 0 : 1);
+            for (const auto& m : moves)
+                comments += (m.notes.before.empty() ? 0 : 1) + (m.notes.after.empty() ? 0 : 1) +
+                            (m.notes.assistant.empty() ? 0 : 1);
         };
         count(b.tree.main.moves);
         for (const auto& v : b.tree.variations) count(v.moves);

@@ -8,6 +8,7 @@
 #include <matchmaking/syzygy.hpp>
 #include <tour/pgn_file.hpp>
 
+#include "assistant_notes.hpp"
 #include "tablebases.hpp"
 
 namespace fcg {
@@ -280,6 +281,53 @@ std::vector<int8_t> tablebaseResults(const ReplayGame& game, bool chess960, cons
         if (p < game.moves.size()) board.makeMove<true>(game.moves[p].move);
     }
     return out;
+}
+
+BoardPage::Snapshot boardSnapshot(const BoardPage& b) { return {b.tree, b.start_notes, b.line, b.ply}; }
+
+void boardChanged(BoardPage& b, BoardPage::Snapshot before) {
+    b.undo.push_back(std::move(before));
+    if (b.undo.size() > 200) b.undo.erase(b.undo.begin());
+    b.redo.clear();
+    b.changes.change();
+    if (b.sent) b.since_sent.change();  // the chapter on Lichess no longer has it (#79)
+}
+
+bool boardUndo(BoardPage& b, bool redo) {
+    auto& from = redo ? b.redo : b.undo;
+    if (from.empty()) return false;
+    (redo ? b.undo : b.redo).push_back(boardSnapshot(b));
+    auto s = std::move(from.back());
+    from.pop_back();
+    b.changes.undone(redo);
+    if (b.sent) b.since_sent.undone(redo);
+    b.tree        = std::move(s.tree);
+    b.start_notes = std::move(s.start_notes);
+    b.comment_edit.reset();
+    b.line = s.line >= -1 && s.line < static_cast<int>(b.tree.variations.size()) ? s.line : -1;
+    b.game = lineOf(b.tree, b.line);
+    b.ply  = std::clamp(s.ply, 0, static_cast<int>(b.game.moves.size()));
+    b.selected.reset();
+    b.preview.reset();
+    return true;
+}
+
+bool editComment(GameTree& tree, const BoardPage::CommentEdit& edit, std::string text) {
+    const auto first = text.find_first_not_of(" \t");
+    text             = first == std::string::npos ? "" : text.substr(first, text.find_last_not_of(" \t") - first + 1);
+    MoveNotes* notes = notesAt(tree, edit.line, edit.ply);
+    if (!notes) return false;
+    if (edit.assistant) {
+        // Corrected by the user, the assistant's comment becomes theirs: after the move's other comment, which stays as
+        // it was (#60).
+        if (notes->assistant == text) return false;
+        correctAssistant(*notes, text);
+        return true;
+    }
+    auto& slot = edit.before ? notes->before : notes->after;
+    if (slot == text) return false;
+    slot = std::move(text);
+    return true;
 }
 
 }  // namespace fcg

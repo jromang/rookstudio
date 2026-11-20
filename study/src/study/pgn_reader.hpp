@@ -30,7 +30,8 @@ struct PgnRead {
 
 // A comment's commands taken out into the move ([%clk], [%eval], [%emt], [%cal], [%csl]; any other kept verbatim in
 // its notes), what is left of the text then going to its notes' comment after it, or, when it is a tournament's
-// comment ("+0.35/18 1.234s, ..."), to its engine fields. Returns that tournament comment's text, empty for another.
+// comment ("+0.35/18 1.234s, ..."), to its engine fields. A comment with the assistant's mark (ASSISTANT_MARK) goes
+// to its own slot instead, beside the other. Returns that tournament comment's text, empty for another.
 std::string applyMoveComment(std::string_view comment, ReplayMove& move);
 
 }  // namespace fcg::study

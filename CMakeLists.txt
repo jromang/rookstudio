@@ -235,6 +235,11 @@ add_library(fcg_lzma STATIC
     ${lzma_SOURCE_DIR}/C/Bcj2.c ${lzma_SOURCE_DIR}/C/Bra.c ${lzma_SOURCE_DIR}/C/Bra86.c ${lzma_SOURCE_DIR}/C/BraIA64.c
     ${lzma_SOURCE_DIR}/C/Delta.c)
 target_include_directories(fcg_lzma SYSTEM PUBLIC ${lzma_SOURCE_DIR}/C)
+# The SDK reads an archive's numbers where they lie, unaligned (7zArcIn.c), as it means to on x86-64 and ARM64: like
+# pyrrhic's, its sources are left out of UBSan's alignment check.
+if(CMAKE_C_FLAGS MATCHES "sanitize=[^ ]*undefined" OR FCG_FUZZ)
+    target_compile_options(fcg_lzma PRIVATE -fno-sanitize=alignment)
+endif()
 
 # ---------------------------------------------------------------------------
 # Study layer: games and their PGN, databases (no UI)

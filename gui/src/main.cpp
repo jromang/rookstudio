@@ -465,6 +465,7 @@ bool runFirstStart(SDL_Window* window, const fs::path& own, const Args& args, bo
         chosen.push_back(offered[static_cast<std::size_t>(i)]);
     }
     profile.setViews(fcg::views::toJson(chosen), shown);
+    profile.setPagesOffered({"training"});  // the views offered hold the Training page already (#80)
     return true;
 }
 

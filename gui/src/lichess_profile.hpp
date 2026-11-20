@@ -57,6 +57,8 @@ struct Profile {
     int64_t read_at = 0;                // seconds since the epoch: when Lichess was asked
     std::vector<SpeedRating> speeds;    // the five of SPEEDS, in its order
     std::vector<ActivityDay> activity;  // the last days, newest first
+    // The puzzle rating (#80): where the RookStudio rating of the offline puzzles starts; 0 when Lichess gave none.
+    int puzzle_rating = 0, puzzle_deviation = 0, puzzle_games = 0;
     bool operator==(const Profile&) const = default;
 };
 

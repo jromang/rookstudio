@@ -103,7 +103,8 @@ void to_json(nlohmann::json& j, const Profile& p) {
          {"username", p.username},
          {"read_at", p.read_at},
          {"speeds", std::move(speeds)},
-         {"activity", std::move(activity)}};
+         {"activity", std::move(activity)},
+         {"puzzle", {{"rating", p.puzzle_rating}, {"rd", p.puzzle_deviation}, {"games", p.puzzle_games}}}};
 }
 
 }  // namespace
@@ -125,6 +126,13 @@ void readAccount(const nlohmann::json& j, Profile& out) {
             }
         }
         out.speeds.push_back(std::move(s));
+    }
+    if (perfs) {
+        if (const auto* p = objectAt(*perfs, "puzzle")) {
+            out.puzzle_rating    = intOf(*p, "rating");
+            out.puzzle_deviation = intOf(*p, "rd");
+            out.puzzle_games     = intOf(*p, "games");
+        }
     }
 }
 
@@ -324,6 +332,11 @@ std::optional<Profile> keptProfile(const std::filesystem::path& root) {
             a.puzzles_loss = d.value("puzzles_loss", 0);
             a.studies      = d.value("studies", 0);
             p.activity.push_back(std::move(a));
+        }
+        if (const auto it = j.find("puzzle"); it != j.end() && it->is_object()) {
+            p.puzzle_rating    = it->value("rating", 0);
+            p.puzzle_deviation = it->value("rd", 0);
+            p.puzzle_games     = it->value("games", 0);
         }
         return p;
     } catch (const std::exception&) {

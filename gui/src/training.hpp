@@ -56,7 +56,8 @@ void writeTrainingSettings(const std::filesystem::path& profile, const TrainingS
 
 // A session on the Board page.
 struct TrainingRun {
-    enum class Kind { Due, New, Missed };
+    // Due: the positions due, then today's new ones; Review: the positions due alone (the day's review, #80).
+    enum class Kind { Due, New, Missed, Review };
     enum class Phase { Preparing, Asking, Right, Wrong, End };
     Kind kind = Kind::Due;
     std::filesystem::path file;  // the repertoire's PGN

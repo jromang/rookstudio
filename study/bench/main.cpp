@@ -23,6 +23,12 @@
 //                                                 program makes it, its size, the lookups' speed cold and warm on the
 //                                                 runs and on the index; a sample kept in <folder>/sample.tsv)
 //   fcg-study-bench evals-lookup <folder>          (the lookups again, on the folder's index and its sample)
+//   fcg-study-bench puzzles <lichess_db_puzzle.csv.zst> <folder>
+//                                                 (Lichess's puzzle database read whole and kept as the program keeps
+//                                                 it: the store's size, the time to make it, a puzzle in a thousand
+//                                                 compared with its line, the picks and the reading of a puzzle, cold
+//                                                 and warm)
+//   fcg-study-bench puzzles-pick <folder>          (the picks and reads again, on the folder's store)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -48,6 +54,7 @@
 #include <study/import.hpp>
 #include <study/mapped_file.hpp>
 #include <study/pgn_reader.hpp>
+#include <study/puzzles.hpp>
 #include <study/query.hpp>
 #include <study/repertoire.hpp>
 #include <study/scan_board.hpp>
@@ -1669,6 +1676,153 @@ int runEvalsLookup(const Args& a) {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Lichess's puzzles kept offline (#80)
+
+// Picks of twenty, cold then warm: a theme at random, a rating at random; then the puzzles picked read.
+void measurePicks(const fs::path& store) {
+    std::mt19937_64 rng(80);
+    for (const bool cold : {true, false}) {
+        if (cold && !dropFromCache(store)) std::printf("(the store's pages could not be dropped from the cache)\n");
+        PuzzleStore s(store);
+        std::vector<double> times, reads;
+        for (int i = 0; i < 200; ++i) {
+            const int list   = static_cast<int>(rng() % (s.themes().size() + 1)) - 1;
+            const int rating = 800 + static_cast<int>(rng() % 1800);
+            const auto t0    = Clock::now();
+            const auto got   = s.pick(list, rating, 20, {}, rng());
+            times.push_back(ms(t0));
+            const auto t1 = Clock::now();
+            for (const auto k : got) (void)s.puzzle(k);
+            if (!got.empty()) reads.push_back(ms(t1) / static_cast<double>(got.size()));
+        }
+        std::sort(times.begin(), times.end());
+        std::sort(reads.begin(), reads.end());
+        std::printf(
+            "%s: a pick of 20 median %.2f ms, 90 %% within %.2f ms, the slowest %.2f ms; a puzzle read median %.3f "
+            "ms\n",
+            cold ? "cold" : "warm", times[times.size() / 2], times[times.size() * 9 / 10], times.back(),
+            reads.empty() ? 0.0 : reads[reads.size() / 2]);
+    }
+}
+
+int runPuzzles(const Args& a) {
+    if (a.words.size() < 3) return 2;
+    const fs::path file = a.words[1], folder = a.words[2];
+    fs::create_directories(folder);
+    const auto build = folder / "build";
+    fs::remove_all(build);
+    // The database read as the program reads it: its frames decoded, its lines given to the builder; a puzzle in a
+    // thousand kept aside to compare with the store.
+    PuzzleBuilder builder(build);
+    std::vector<std::string> sample;
+    uint64_t text = 0, lines = 0;
+    const auto start = Clock::now();
+    {
+        std::FILE* in = std::fopen(file.string().c_str(), "rb");
+        if (!in) throw std::runtime_error("cannot open " + file.string());
+        ZstdStream zstd;
+        std::string pending;
+        std::vector<char> buffer(1 << 20);
+        const auto line = [&](std::string_view l) {
+            builder.line(l);
+            if (++lines % 1000 == 500) sample.emplace_back(l);
+        };
+        const std::function<bool(std::string_view)> out = [&](std::string_view piece) {
+            text += piece.size();
+            for (std::size_t from = 0;;) {
+                const auto end = piece.find('\n', from);
+                if (end == std::string_view::npos) {
+                    pending.append(piece.substr(from));
+                    break;
+                }
+                if (pending.empty()) {
+                    line(piece.substr(from, end - from));
+                } else {
+                    pending.append(piece.substr(from, end - from));
+                    line(pending);
+                    pending.clear();
+                }
+                from = end + 1;
+            }
+            return true;
+        };
+        std::size_t n = 0;
+        while ((n = std::fread(buffer.data(), 1, buffer.size(), in)) > 0)
+            zstd.feed(std::string_view(buffer.data(), n), out);
+        std::fclose(in);
+        if (!pending.empty()) line(pending);
+    }
+    const double read_s = seconds(start);
+    const auto store    = nextPuzzleStore(folder);
+    const auto finish   = Clock::now();
+    const auto why      = builder.finish(store, "");
+    if (!why.empty()) throw std::runtime_error(why);
+    const double finish_s = seconds(finish);
+    std::printf(
+        "read: %.1f s (%.2f GB of text, %llu lines, %llu puzzles kept), sorted and written: %.1f s, peak %.0f MB\n",
+        read_s, text / 1e9, static_cast<unsigned long long>(builder.lines()),
+        static_cast<unsigned long long>(builder.kept()), finish_s, peakMb());
+    PuzzleStore opened(store);
+    std::printf("store: %s, %u puzzles, %.1f MB, %.2f bytes a puzzle; %zu themes, %zu openings\n",
+                store.filename().string().c_str(), opened.size(), opened.bytes() / 1e6,
+                static_cast<double>(opened.bytes()) / opened.size(), opened.themes().size(), opened.openings().size());
+    uint64_t list_bytes = 0, postings = 0;
+    for (const auto* tags : {&opened.themes(), &opened.openings()})
+        for (const auto& t : *tags) postings += t.puzzles;
+    (void)list_bytes;
+    std::printf("lists: %llu puzzles listed in all\n", static_cast<unsigned long long>(postings));
+
+    // A puzzle in a thousand, as its line has it.
+    std::map<std::string, uint32_t> numbers;
+    for (uint32_t k = 0; k < opened.size(); ++k) numbers[opened.idOf(k)] = k;
+    std::size_t same = 0, differ = 0;
+    for (const auto& l : sample) {
+        PuzzleLine line;
+        if (!readPuzzleLine(l, line)) continue;
+        const auto it = numbers.find(std::string(line.id));
+        if (it == numbers.end()) {
+            ++differ;
+            continue;
+        }
+        const auto p = opened.puzzle(it->second);
+        std::string moves, themes, openings;
+        for (const auto& m : p.moves) moves += (moves.empty() ? "" : " ") + m;
+        std::vector<std::string> want_themes, got_themes = p.themes;
+        std::size_t from = 0;
+        while (from <= line.themes.size()) {
+            const auto space = line.themes.find(' ', from);
+            want_themes.emplace_back(
+                line.themes.substr(from, space == std::string_view::npos ? std::string_view::npos : space - from));
+            if (space == std::string_view::npos) break;
+            from = space + 1;
+        }
+        std::sort(want_themes.begin(), want_themes.end());
+        std::sort(got_themes.begin(), got_themes.end());
+        for (const auto& o : p.openings) openings += (openings.empty() ? "" : " ") + o;
+        const bool ok = p.fen == line.fen && moves == line.moves && p.rating == line.rating &&
+                        p.deviation == std::min(line.deviation, 255) && p.popularity == line.popularity &&
+                        got_themes == want_themes && openings == line.openings && p.gameUrl() == line.url;
+        if (ok) {
+            ++same;
+        } else {
+            if (++differ <= 5) std::printf("differs: %s\n  kept: %s %s\n", l.c_str(), p.fen.c_str(), moves.c_str());
+        }
+    }
+    std::printf("compared with their lines: %zu the same, %zu differ\n", same, differ);
+
+    measurePicks(store);
+    return 0;
+}
+
+int runPuzzlePicks(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    const auto store = newestPuzzleStore(a.words[1]);
+    if (store.empty()) throw std::runtime_error("no store of puzzles in " + a.words[1]);
+    measurePicks(store);
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1691,6 +1845,8 @@ int main(int argc, char** argv) {
         if (a.words[0] == "chessbase-item") rc = runChessBaseItem(a);
         if (a.words[0] == "evals") rc = runEvals(a);
         if (a.words[0] == "evals-lookup") rc = runEvalsLookup(a);
+        if (a.words[0] == "puzzles") rc = runPuzzles(a);
+        if (a.words[0] == "puzzles-pick") rc = runPuzzlePicks(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

@@ -265,6 +265,9 @@ void App::drawShell() {
             ui::pageTitle("Lichess");
             drawLichessPage();
             break;
+        case Page::Training:
+            drawTraining();
+            break;
         case Page::Count:
             break;
     }
@@ -298,11 +301,9 @@ void App::drawRail(float width) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, px(14)));
     ImGui::BeginChild("##rail", ImVec2(width, 0), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar);
     // The view's pages and Quit under the logo and the switch of views: lower buttons in a low window, rather than a
-    // scroll bar.
+    // scroll bar (fourteen pages and Quit fit in 800 pixels, #80).
     const float spacing = ImGui::GetStyle().ItemSpacing.y;
     const float n       = static_cast<float>(view().pages.size() + 1);
-    const float button  = std::clamp((ImGui::GetContentRegionAvail().y - px(48) - viewSwitchHeight() - n * spacing) / n,
-                                     ImGui::GetFontSize() * 2.0f, ui::railButtonHeight());
 
     // The logo, on the accent colour.
     {
@@ -313,6 +314,9 @@ void App::drawRail(float width) {
         ImGui::Dummy(ImVec2(width, size + px(12)));
     }
     drawViewSwitch(width);
+    // What is left under them, measured rather than foreseen.
+    const float button = std::clamp((ImGui::GetContentRegionAvail().y - n * spacing - px(6)) / n,
+                                    ImGui::GetFontSize() * 1.9f, ui::railButtonHeight());
     drawViewRail(width, button);
 
     // Quit, at the bottom: the window's own close button is not always in reach.

@@ -121,6 +121,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     loadKeptSearches();
     loadLichess();
     offline_evals_ = std::make_unique<OfflineEvals>(storage_.root() / "lichess-evals");  // #58
+    offline_puzzles_ = std::make_unique<OfflinePuzzles>(storage_.root() / "lichess-puzzles");  // #80
     // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
     assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
@@ -303,6 +304,7 @@ void App::frame() {
     pollStudies();          // the user's Lichess studies: read, imported, followed, a game sent (#79)
     pollTheory();           // the theory studies: read, read again when their files change (#77)
     pollTraining();         // a repertoire's training: its cards prepared, its first question (#76)
+    pollPuzzles();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -375,6 +377,22 @@ void App::frame() {
             if (repertoires().active() >= 0)
                 startTraining(static_cast<std::size_t>(repertoires().active()),
                               w == "training" ? TrainingRun::Kind::Due : TrainingRun::Kind::New);
+        } else if (w == "training-page" || w == "training-puzzles" || w == "puzzles-online") {
+            // The Training page (#80): its Today part, its Puzzles part, the puzzles online chosen.
+            page_           = Page::Training;
+            training_tab_   = w == "training-page" ? 0 : 1;
+            puzzles_online_ = w == "puzzles-online";
+        } else if (w.rfind("puzzles-file=", 0) == 0) {  // puzzles-file=FILE: Lichess's puzzle database read from it
+            page_         = Page::Training;
+            training_tab_ = 1;
+            startOfflinePuzzles(w.substr(13));
+        } else if (w == "puzzles-series" || w.rfind("puzzles-series=", 0) == 0) {
+            // puzzles-series[=THEME]: a series of the offline puzzles at once, of THEME (a Lichess key) or any.
+            puzzles_online_ = false;
+            puzzles_theme_  = w.size() > 15 ? w.substr(15) : std::string();
+            startPuzzles();
+        } else if (w == "review-all") {  // the day's review, every kind one after the other (#80)
+            startReview();
         } else if (w.rfind("engines-remote-picker", 0) == 0) {
             // The first machine's files, as Add, A program on <machine>, shows them; engines-remote-picker=PATH: from
             // the folder of PATH there.
@@ -1671,6 +1689,9 @@ void App::handleDialogs() {
                 break;
             case Dialogs::Purpose::OfflineEvalsFile:
                 startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
+                break;
+            case Dialogs::Purpose::OfflinePuzzlesFile:
+                startOfflinePuzzles(path);
                 break;
             case Dialogs::Purpose::LichessMonthFile:
                 startMonthReading(path);

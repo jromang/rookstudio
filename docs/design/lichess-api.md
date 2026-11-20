@@ -728,7 +728,7 @@ P2. Monthly database dumps import. PLANNED.
 - Section 4 has the files, sizes, fields and known issues.
 - Extensions: the broadcast dumps (1.3 M OTB games, almost all with evals; CC BY-SA 4.0, so keep attribution and licence on anything redistributed); filters on `[%eval]` presence, `BOT` titles, Glicko-2 ratings, time control; flags for the known-issue months; stop a download early (partial files decompress).
 
-P3. Puzzles with results sent back. PLANNED.
+P3. Puzzles with results sent back. DONE (#80, 2026-11-20): batches of 50 at most (`GET /api/puzzle/batch/{angle}?nb=50&difficulty=`, `puzzle:read`), solved here, kept in the profile until their results are taken (`POST`, `puzzle:write`, `nb=50` bringing the next batch in the same answer; `difficulty` is sent with the POST too, which the spec documents for the GET only: when the user chose another theme or difficulty since, the POST asks for no batch and a GET follows); a 429 or a cut sent again a minute later, a refused token said; `GET /api/puzzle/dashboard/30` read once a session for the last 30 days by theme. Not used: `replay`, `activity`, `daily`, `next`. Offline, the dump (`docs/design/puzzles.md`). As planned:
 - Endpoints: `GET /api/puzzle/batch/{angle}?nb=50&difficulty=` (none; `puzzle:read` for unseen puzzles at the user's rating); solve offline; `POST /api/puzzle/batch/{angle}` (`puzzle:write`) with `{"solutions":[{"id","win","rated"}]}` and `nb` to get the next batch in the same call; `GET /api/puzzle/dashboard/{days}`, `GET /api/puzzle/replay/{days}/{theme}`, `GET /api/puzzle/activity?since=` (`puzzle:read`); `GET /api/puzzle/daily`, `GET /api/puzzle/{id}`, `GET /api/storm/dashboard/{username}` (none).
 - Extensions: train the weakest dashboard themes, and tie them to the key moments of the local review (for instance, forks missed in the user's own games shown next to their success rate on the `fork` theme); a daily-puzzle tile on the home page; the dump's `GameUrl` shows which of the user's synced games became Lichess puzzles.
 - Never use `next` or `batch` to download the collection (the dump exists). Value high. Effort M.
@@ -768,7 +768,7 @@ A new authorization replaces the token: ask for the union of the granted scopes 
 | `study:read` | broadcasts (DONE, now required), private and unlisted studies (P1, N5), whole-event streams and search (N15), resuming an own broadcast (N9) | first time a broadcast is followed |
 | `study:write` | pushing to studies (P1), own broadcast (N9) | first push |
 | `challenge:read` | event stream for the fair-play guard (N6) and the finished-game pipeline (N7) | when the user turns either on |
-| `puzzle:read`, `puzzle:write` | puzzles (P3) | first puzzle session, first result upload |
+| `puzzle:read`, `puzzle:write` | puzzles (P3, DONE) | both at once, at the first use of the puzzles online |
 | `follow:read` | seeding the Live follow list with friends (N8) | when "follow my friends" is chosen |
 | `preference:read` | preferences and kid mode (N20) | first online game setup |
 | `preference:write` | bookmark toggle (N14) | first star |

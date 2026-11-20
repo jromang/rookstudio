@@ -147,8 +147,8 @@ void App::saveRecentGames() const {
     const auto& b = board_;
     // During a training session the board shows its position, not a game: the game put aside for it is the one shown
     // (#76).
-    const bool aside = training_ && training_->aside && !recent_games_.empty();
-    if (boardHasGame(b) && !training_)
+    const bool aside = ((training_ && training_->aside) || (puzzle_ && puzzle_->aside)) && !recent_games_.empty();
+    if (boardHasGame(b) && !training_ && !puzzle_)
         entry(b.title,
               board_origin_ ? board_origin_->name
               : b.pgn       ? b.pgn->name

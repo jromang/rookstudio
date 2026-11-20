@@ -85,6 +85,10 @@ class Storage {
     [[nodiscard]] nlohmann::json viewsJson() const;
     [[nodiscard]] int shownView() const;
     void setViews(const nlohmann::json& views, int shown) const;
+    // The pages a view made before them was offered once (settings.json "pages_offered"): "training" (#80), whatever
+    // the answer.
+    [[nodiscard]] std::vector<std::string> pagesOffered() const;
+    void setPagesOffered(const std::vector<std::string>& pages) const;
 
     // How the boards look and sound (settings.json): colours, pieces, move sounds.
     [[nodiscard]] appearance::Settings appearance() const;

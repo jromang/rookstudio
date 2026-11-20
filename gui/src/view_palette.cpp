@@ -14,6 +14,7 @@
 #include "board_text.hpp"
 #include "i18n.hpp"
 #include "layout.hpp"
+#include "lichess_months.hpp"
 #include "palette.hpp"
 #include "participants.hpp"
 #include "review_stats.hpp"
@@ -70,6 +71,7 @@ const char* App::guideSection() const {
             return Books;
         case Page::Board:
             if (training_) return Training;  // a session of the repertoire's training (#76)
+            if (puzzle_) return Puzzles;     // a series of puzzles (#80)
             if (!chessBoard()) return Board;
             switch (board_side_tab_) {
                 case 0:
@@ -91,6 +93,8 @@ const char* App::guideSection() const {
             return openings_theory_ ? TheoryStudies : OpeningsPage;
         case Page::Lichess:
             return LichessPage;
+        case Page::Training:
+            return training_tab_ == 1 ? Puzzles : TrainingPage;
         case Page::Count:  // the views' sheet
             return Views;
         case Page::Suites:
@@ -660,6 +664,64 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     add(TR("Training: new positions a day…"), TR("Openings"), [this] {
         page_                = Page::Openings;
         training_limit_menu_ = true;
+    });
+    // The Training page (#80): the page, the day's review, each theme's puzzles, Lichess's database, the batch online.
+    add(TR("Training"), where(Page::Training), [this, go = page(Page::Training)] {
+        go();
+        training_tab_ = 0;
+    });
+    if (const auto day = reviewDay(); day.due() > 0 && trainingLock().empty())
+        add(trn("Review all · {} to review today", "Review all · {} to review today", day.due(),
+                ui::exactCount(day.due())),
+            TR("Training"), [this] { startReview(); });
+    add(TR("Puzzles"), where(Page::Training), [this, go = page(Page::Training)] {
+        go();
+        training_tab_ = 1;
+    });
+    if (offline_puzzles_) {
+        const auto store = offline_puzzles_->store();
+        if (store && puzzleLock().empty()) {
+            add(TR("Puzzles: random"), TR("Training"), [this] {
+                puzzles_online_ = false;
+                puzzles_theme_.clear();
+                startPuzzles();
+            });
+            for (const auto key : puzzleThemesShown()) {
+                if (!store->themeList(key)) continue;
+                add(trf("Puzzles: {}", puzzleThemeName(key)), TR("Training"), [this, key = std::string(key)] {
+                    puzzles_online_ = false;
+                    puzzles_theme_  = key;
+                    startPuzzles();
+                });
+            }
+        }
+        if (offline_puzzles_->busy()) {
+            add(TR("Cancel the download of Lichess's puzzles"), TR("Training"), [this] { offline_puzzles_->cancel(); });
+        } else if (store) {
+            add(TR("Update Lichess's puzzles"), TR("Training"), [this, go = page(Page::Training)] {
+                go();
+                training_tab_ = 1;
+                offline_puzzles_note_.clear();
+                offline_puzzles_update_ =
+                    std::async(std::launch::async, [] { return evalsSize(lichess::puzzlesUrl()); });
+            });
+            add(TR("Remove Lichess's puzzles…"), TR("Training"), [this, go = page(Page::Training)] {
+                go();
+                training_tab_           = 1;
+                offline_puzzles_remove_ = true;
+            });
+        } else {
+            add(TR("Download Lichess's puzzles"), TR("Training"), [this, go = page(Page::Training)] {
+                go();
+                training_tab_ = 1;
+                startOfflinePuzzles(lichess::puzzlesUrl());
+            });
+        }
+    }
+    add(TR("Puzzles online, from my Lichess account"), "Lichess", [this, go = page(Page::Training)] {
+        go();
+        training_tab_   = 1;
+        puzzles_online_ = true;
     });
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The assistant (M5): a question about the board's position, its model unloaded.

@@ -23,6 +23,7 @@ enum class PageId {
     Board,
     Databases,
     Openings,
+    Training,  // #80
     Lichess,
     Play,
     Engines,

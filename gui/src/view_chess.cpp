@@ -58,6 +58,9 @@ void App::drawChessHome() {
     const bool lichess     = v.holds(views::PageId::Lichess);
     const bool tournaments = v.holds(views::PageId::Tournaments);
 
+    // The Training page offered once to a view made before it (#80).
+    drawTrainingOffer();
+
     // Where the user was (mockup M0): the Board page's game at its move, where it comes from, what it holds.
     const bool has_game = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
     if (has_game && board) {
@@ -250,8 +253,8 @@ void App::drawChessHome() {
         drawLichessHomeCard();
     }
 
-    // What runs: the game's analysis, the position's, an import, the assistant (M5, board 1); the positions of the
-    // repertoires to review (#76).
+    // What runs: the game's analysis, the position's, an import, the assistant (M5, board 1); the day's review, every
+    // kind in one count (#76, #80).
     const bool importing = job != nullptr;
     const auto assistant = assistantStatus();
     const bool training  = trainingDue();

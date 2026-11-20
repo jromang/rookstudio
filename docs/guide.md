@@ -91,7 +91,9 @@ a click on a badge, or Ctrl+1 to Ctrl+3, shows that view, at the page it was on.
 disappears.
 
 The first start offers three: *Tests* (Tournaments, Engines, Books, Board, Suites, Ratings, Log), *Study* (Home,
-Board, Databases, Openings, Lichess, Engines) and *Everything* (every page). Settings is in every view.
+Board, Databases, Openings, Training, Lichess, Engines) and *Everything* (every page). Settings is in every view. A
+page that comes with a new version is not added to a view you have by itself: the Home page offers it once (see [The
+Training page](#the-training-page)).
 
 *Edit the views* opens the views' sheet in place of the page: *Settings* > *Views*, ⋯ under the switch, a right click
 on a badge (the sheet opens at its view), or *Edit the views…* in Ctrl+K. It holds:
@@ -342,6 +344,9 @@ them.
 | <kbd>Enter</kbd> | The Openings page | Start the training of the repertoire shown |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | A training session | A hint, "I don't know", stop |
 | <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | A training session | The next position, or again after a wrong answer; take back a move added to the repertoire |
+| <kbd>Enter</kbd> | The Training page | Review all; or start the puzzles once one of their choices was clicked |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | A series of puzzles | A hint, "I don't know", stop |
+| <kbd>Enter</kbd>, <kbd>→</kbd> | A series of puzzles | The next puzzle, or again after a wrong answer; the solution a move at a time |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A game list | Go through the list, open the game |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | The Databases page | The search panel |
 | <kbd>Escape</kbd> | The Databases page | Close the search panel, then the list |
@@ -377,8 +382,8 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
 - **In progress**: the game's analysis, the position's, an import, the assistant (its download, its model loaded,
-  *Unload*), and the positions of your repertoires to review, a click training them (see
-  [Training a repertoire](#training-a-repertoire)).
+  *Unload*), a series of puzzles under way, and what the day's review has due, in one count, a click reviewing it all
+  (see [The day's review](#the-days-review)).
 
 The search button at the top, or Ctrl+K, finds a command, a game, a database.
 
@@ -1313,8 +1318,8 @@ the … missed positions now*.
 
 The reviews are kept in the profile beside the repertoire (`Najdorf.training.json`, and `Najdorf.reviews.jsonl`, a line
 per answer): its PGN does not change. A move changed in the repertoire makes its position new again. Nothing leaves
-the machine. The Home page's *In progress* says how many positions are due, a click training them; Ctrl+K *Train the
-repertoire* too. While one of your games is played live on Lichess, the training waits; the positions on the line of
+the machine. The positions due count in the day's review with the other kinds (see [The day's
+review](#the-days-review)); Ctrl+K *Train the repertoire* too. While one of your games is played live on Lichess, the training waits; the positions on the line of
 one of your correspondence games are left out until it ends.
 
 ### Theory studies
@@ -1347,6 +1352,97 @@ another order), its text, and its line, which a click opens on the Board at its 
 shows the move as the tree's arrow; over a note about the position, its arrows and squares on the board. In the
 **Notation** tab, *Theory · 3* above the moves says how many notes the position has, and leads to the Tree tab (Alt+3).
 While one of your games is played live on Lichess, the notes are hidden with the tree.
+
+## The Training page
+
+The **Training** page gathers what comes back today, then the exercises by kind. It is in the rail between the
+Openings and Lichess, in the views *Study* and *Everything*. A view you made before it does not change by itself: the
+Home page offers once to add the page to the view shown (*Add it to …*, or *Not now*), and Ctrl+K *Training* leads
+there meanwhile.
+
+Its title has two parts: **Today** (the day's review, the kinds of exercises, the puzzles to start) and **Puzzles**
+(the same choice of puzzles, Lichess's database kept on your disk, your results by theme). Everything works offline;
+what goes to Lichess is said where you choose it.
+
+### The day's review
+
+*To review today* counts what each kind of training has due today, each with its spaced repetition (FSRS), in one
+queue: the positions of your repertoires (their training stays on the Openings page, see [Training a
+repertoire](#training-a-repertoire)) and the puzzles you missed. *Review all* (Enter) takes them one after the other on
+the Board page: the positions due of each repertoire, then the puzzles to review. At the end of each, *Next: …*
+(Enter) goes on, *Back to the Training page* (Escape) stops there; what was answered is kept. Beside the button, the
+time it should take, from the pace of your answers; under it, what comes back tomorrow and within three days. When
+puzzles are due with other kinds, *Only the puzzles* reviews them alone.
+
+The Home page's *In progress* has the same count (*35 to review today · Review all*), a click reviewing it all; so
+does Ctrl+K *Review all*.
+
+### Puzzles
+
+Lichess publishes its puzzles every month as a database (database.lichess.org, CC0): 6,193,530 puzzles in November
+2026, each with its rating, its themes and, before move 20, its opening. RookStudio keeps it on your disk and gives
+you puzzles from it without a network.
+
+**The database.** *Download* fetches the file (about 295 MB) and reads it while it arrives into a store of about 293
+MB in the profile; the file itself is not kept. A download cut short (*Cancel*, the network, the program closed) goes
+on from where it stopped: *Go on*, or *Start again*. *A file already downloaded…* reads `lichess_db_puzzle.csv.zst`
+from your disk instead. Once there: *Update* asks database.lichess.org for its file's date and reads a newer one while
+the puzzles kept answer; *Remove them* frees the disk (your rating, your results and your puzzles to review stay, kept
+apart). Nothing leaves the machine but the request for the file.
+
+**The choice.** *Offline* (the database) or *Online* (your Lichess account, see [Lichess puzzles
+online](#lichess-puzzles-online)); a theme among the first ones offered, each with how often you solve it at the first
+try, or among *All themes…*, which lists every theme and every opening with its puzzles (type a few letters to find
+one); and a difficulty: *Easier* (300 points under your rating), *Your rating*, *Harder* (300 over). *Start · 20
+puzzles* (Enter) begins a series near your rating, never a puzzle you saw before; Ctrl+K has *Puzzles: Fork* and the
+other themes, which start a series at once.
+
+**A series** takes the Board page, its column becoming the puzzle's, as the repertoires' training does; the game on the
+board waits among the recent games and comes back after it. The board shows the position from your side, the
+opponent's move just played in pale green. Play your move on the board, or type it (its letters, then Enter); RookStudio
+plays the opponent's replies, the rest of the solution. During the question the engine, the tree and your notes are
+hidden, and so are the puzzle's themes.
+
+- **Alt+H**: a hint, the square of the piece to play in blue; the puzzle then counts as missed.
+- **Space**: "I don't know"; the solution is shown and the puzzle counts as missed.
+- **Escape**: stop; what was answered is kept.
+
+Right: the solution in moves, your rating's change and the puzzle's themes; *Next* comes on Enter, or on its own after a
+second (the repertoires' training's setting); *Analyse here* (Alt+A) starts the engine on the position; *The game on
+lichess.org* opens the game the puzzle comes from. Any move that mates is right, as on Lichess. Wrong: your move in
+orange and the solution's first move as a green arrow; *Retry* (Enter) plays it again, without counting again; *The
+solution move by move* (→) plays it a move at a time; *Next* goes on.
+
+At the end: the puzzles solved at the first try, those missed, your rating's change, and the missed ones (a click shows
+the position with the solution); *Review them now* asks them again without counting, *Back to the Training page*
+leaves.
+
+**Your rating** is RookStudio's own, computed with Glicko-2 as Lichess computes its puzzle ratings: a puzzle solved at
+the first try, without a hint, is won against the puzzle's rating. It starts from your Lichess puzzle rating when your
+account is linked, else at 1500, and moves fast while it is new; results of offline puzzles cannot go back to Lichess.
+*Your results by theme* (the Puzzles part) counts each theme's puzzles and how often you solved them at the first try.
+
+A puzzle you miss becomes a card of the day's review: it comes back tomorrow, then further apart each time you solve
+it; missed again, later in the same series, then the next day. All of it is kept in the profile's `puzzles` folder
+(`rating.json`, `results.jsonl` a line per puzzle, `review.json`), the database in `lichess-puzzles`.
+
+### Lichess puzzles online
+
+*Online* gives puzzles from your Lichess account: puzzles you never saw, at your Lichess rating, whose results go back
+to Lichess. It needs your account linked (see [Linking your account](#linking-your-account)); the first time, Lichess
+asks for two more permissions, *puzzle:read* and *puzzle:write*: *Allow on Lichess…* opens its page, your account stays
+linked meanwhile, and the token it replaces is revoked.
+
+*Get a batch · 50 puzzles* asks Lichess for fifty puzzles of the theme and the difficulty chosen. The batch is kept on
+your disk: it is solved offline too, over as many series as you like (*Resume · N left*). *Rated* or *Unrated, to
+try* is sent with each answer. At the batch's end, its answers go to Lichess in one request, which brings the next
+batch; your Lichess rating moves then, and the page says when the last answers were taken. Lichess asks programs not
+to download its collection through these requests: the database is there for that.
+
+When Lichess cannot take the answers they stay on the disk, said with what to do: too many requests (429), sent again
+by themselves a minute later, even if RookStudio was closed meanwhile; the network down, sent again a minute later;
+the token refused, sent once the account is linked again. *Try again now* does not wait. What leaves the machine: the
+batch asked for (its theme or opening, its difficulty), then each puzzle's id with right or wrong, rated or not.
 
 ## The Lichess page
 

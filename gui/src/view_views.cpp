@@ -79,6 +79,8 @@ const char* pageName(PageId page) {
             return TR("Databases");
         case PageId::Openings:
             return TR("Openings");
+        case PageId::Training:
+            return TR("Training");
         case PageId::Lichess:
             return "Lichess";
         case PageId::Play:
@@ -111,6 +113,8 @@ ui::Icon pageIcon(PageId page) {
             return ui::Icon::Database;
         case PageId::Openings:
             return ui::Icon::Openings;
+        case PageId::Training:
+            return ui::Icon::Cap;
         case PageId::Lichess:
             return ui::Icon::Globe;
         case PageId::Play:
@@ -156,6 +160,8 @@ std::optional<PageId> App::rootOf(Page page) {
             return PageId::Databases;
         case Page::Openings:
             return PageId::Openings;
+        case Page::Training:
+            return PageId::Training;
         case Page::Lichess:
             return PageId::Lichess;
         case Page::Engines:
@@ -189,6 +195,8 @@ App::Page App::pageFor(PageId id) {
             return Page::Databases;
         case PageId::Openings:
             return Page::Openings;
+        case PageId::Training:
+            return Page::Training;
         case PageId::Lichess:
             return Page::Lichess;
         case PageId::Engines:
@@ -258,12 +266,6 @@ void App::toStudyBoard() {
         }
     }
     page_ = Page::Board;
-}
-
-float App::viewSwitchHeight() const {
-    if (views_.size() <= 1) return 0.0f;
-    const float token = px(34), gap = px(6);
-    return static_cast<float>(views_.size()) * (token + gap) + ImGui::GetFontSize() * 0.8f + px(12) + px(20) + px(10);
 }
 
 void App::drawViewSwitch(float width) {

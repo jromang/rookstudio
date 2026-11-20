@@ -318,6 +318,21 @@ void Storage::setViews(const nlohmann::json& views, int shown) const {
     save(root_ / "settings.json", settings);
 }
 
+std::vector<std::string> Storage::pagesOffered() const {
+    std::vector<std::string> out;
+    const auto s = settings();
+    if (const auto it = s.find("pages_offered"); it != s.end() && it->is_array())
+        for (const auto& p : *it)
+            if (p.is_string()) out.push_back(p.get<std::string>());
+    return out;
+}
+
+void Storage::setPagesOffered(const std::vector<std::string>& pages) const {
+    auto settings             = this->settings();
+    settings["pages_offered"] = pages;
+    save(root_ / "settings.json", settings);
+}
+
 void Storage::setUpdateSettings(const update::Settings& updates) const {
     auto settings                     = this->settings();
     settings["check_new_version"]     = updates.enabled;

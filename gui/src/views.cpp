@@ -11,13 +11,13 @@ namespace fcg::views {
 
 namespace {
 
-constexpr std::array<PageId, 13> ALL = {PageId::Home,     PageId::Tournaments, PageId::Board,   PageId::Databases,
-                                        PageId::Openings, PageId::Lichess,     PageId::Play,    PageId::Engines,
-                                        PageId::Books,    PageId::Suites,      PageId::Ratings, PageId::Log,
-                                        PageId::Settings};
-constexpr std::array<std::string_view, 13> IDS   = {"home",    "tournaments", "board",   "databases", "openings",
-                                                    "lichess", "play",        "engines", "books",     "suites",
-                                                    "ratings", "log",         "settings"};
+constexpr std::array<PageId, 14> ALL = {PageId::Home,     PageId::Tournaments, PageId::Board,   PageId::Databases,
+                                        PageId::Openings, PageId::Training,    PageId::Lichess, PageId::Play,
+                                        PageId::Engines,  PageId::Books,       PageId::Suites,  PageId::Ratings,
+                                        PageId::Log,      PageId::Settings};
+constexpr std::array<std::string_view, 14> IDS   = {"home",     "tournaments", "board", "databases", "openings",
+                                                    "training", "lichess",     "play",  "engines",   "books",
+                                                    "suites",   "ratings",     "log",   "settings"};
 constexpr std::array<std::string_view, 12> ICONS = {"flask", "cap",   "layers", "trophy", "crown", "swords",
                                                     "book",  "globe", "cpu",    "chart",  "board", "rook"};
 constexpr std::array<Colour, 6> COLOURS          = {{
@@ -68,16 +68,17 @@ std::vector<View> proposed() {
                    0,
                    {P::Tournaments, P::Engines, P::Books, P::Board, P::Suites, P::Ratings, P::Log, P::Settings},
                    false});
+    // The Training page (#80) between the Openings and Lichess, in Study and Everything.
     out.push_back({TR("Study"),
                    "cap",
                    1,
-                   {P::Home, P::Board, P::Databases, P::Openings, P::Lichess, P::Engines, P::Settings},
+                   {P::Home, P::Board, P::Databases, P::Openings, P::Training, P::Lichess, P::Engines, P::Settings},
                    true});
     out.push_back({TR("Everything"),
                    "layers",
                    2,
-                   {P::Home, P::Tournaments, P::Board, P::Databases, P::Openings, P::Lichess, P::Play, P::Engines,
-                    P::Books, P::Suites, P::Ratings, P::Log, P::Settings},
+                   {P::Home, P::Tournaments, P::Board, P::Databases, P::Openings, P::Training, P::Lichess, P::Play,
+                    P::Engines, P::Books, P::Suites, P::Ratings, P::Log, P::Settings},
                    true});
     return out;
 }

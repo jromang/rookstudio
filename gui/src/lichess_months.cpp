@@ -38,6 +38,8 @@ std::string monthUrl(const Month& month) { return databaseServer() + "/" + month
 
 std::string evalsUrl() { return databaseServer() + "/lichess_db_eval.jsonl.zst"; }
 
+std::string puzzlesUrl() { return databaseServer() + "/lichess_db_puzzle.csv.zst"; }
+
 std::string monthFile(const Month& month) {
     const auto slash = month.path.rfind('/');
     return slash == std::string::npos ? month.path : month.path.substr(slash + 1);

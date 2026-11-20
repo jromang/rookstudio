@@ -409,6 +409,10 @@ const char* glyph(Icon icon) {
             return "\uE10B";  // lock
         case Icon::Check:
             return "\uE06C";  // check
+        case Icon::Puzzle:
+            return "\uE29C";  // puzzle
+        case Icon::Alert:
+            return "\uE193";  // triangle-alert
     }
     return "";
 }

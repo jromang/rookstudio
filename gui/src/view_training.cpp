@@ -251,6 +251,8 @@ std::string App::trainingLock() const {
 }
 
 bool App::trainingHidesAids() const {
+    if (puzzle_ && (puzzle_->phase == PuzzleRun::Phase::Asking || puzzle_->phase == PuzzleRun::Phase::Reply))
+        return true;  // a puzzle's question (#80)
     return training_ && (training_->phase == Ask::Asking || training_->phase == Ask::Preparing);
 }
 
@@ -406,6 +408,7 @@ void App::drawTrainingCard(std::size_t index) {
 void App::startTraining(std::size_t index, TrainingRun::Kind kind) {
     if (!trainingLock().empty() || index >= repertoires().entries().size()) return;
     if (training_) closeTraining(false);
+    if (puzzle_) closePuzzles(false);  // a series of puzzles left where it is, its answers kept (#80)
     const auto& e  = repertoires().entries()[index];
     auto run       = std::make_unique<TrainingRun>();
     run->kind      = kind;
@@ -441,7 +444,7 @@ void App::pollTraining() {
     const auto day    = trainingDay(epochNow());
     const auto limit  = static_cast<std::size_t>(std::max(0, t.settings.new_per_day));
     const auto counts = study::trainingCounts(*cards, t.kept.memories, day, limit);
-    std::size_t fresh = counts.today;
+    std::size_t fresh = t.kind == TrainingRun::Kind::Review ? 0 : counts.today;
     // Only the new ones once today's are learnt: as many again, asked for.
     if (t.kind == TrainingRun::Kind::New && fresh == 0) fresh = std::min(counts.fresh, std::max<std::size_t>(1, limit));
     // Fair play (#48): a position on the line of one of the user's correspondence games on Lichess is not asked while
@@ -452,7 +455,8 @@ void App::pollTraining() {
             if (correspondencePly(gameOf(t.start_fen, card.line), false, INT32_MAX) >= 0) left_out.insert(card.key);
     }
     t.left_out = left_out.size();
-    auto order = study::sessionOrder(*cards, t.kept.memories, day, fresh, t.kind == TrainingRun::Kind::Due, left_out);
+    auto order = study::sessionOrder(*cards, t.kept.memories, day, fresh,
+                                     t.kind == TrainingRun::Kind::Due || t.kind == TrainingRun::Kind::Review, left_out);
     t.session.emplace(*cards, std::move(order), t.kept.memories, trainingScheduler());
     t.started = Clock::now();
     if (!t.session->current()) return finishTraining(false);
@@ -647,6 +651,12 @@ void App::reviewMissed() {
 
 void App::closeTraining(bool to_openings) {
     if (!training_) return;
+    // Left during the day's review (#80): back to the Training page, what the review had left forgotten.
+    const bool to_training = to_openings && review_running_;
+    if (to_openings) {
+        review_running_ = false;
+        review_chain_.clear();
+    }
     const bool aside = training_->aside, flip = training_->flip;
     board_side_tab_ = training_->tab;
     training_.reset();
@@ -658,7 +668,7 @@ void App::closeTraining(bool to_openings) {
     forget_board_game_ = false;
     board_.flip        = flip;
     board_back_.reset();
-    page_ = to_openings ? Page::Openings : Page::Board;
+    page_ = to_training ? Page::Training : to_openings ? Page::Openings : Page::Board;
 }
 
 void App::dropTraining() {
@@ -718,10 +728,16 @@ void App::trainingKeys() {
         case Ask::End: {
             const bool missed = t.session && std::any_of(t.session->outcomes().begin(), t.session->outcomes().end(),
                                                          [](const auto& o) { return o.rating == Rating::Again; });
-            if (escape)
+            if (review_running_) {  // the day's review (#80): Enter goes on, Escape back to the Training page
+                if (escape)
+                    closeTraining(true);
+                else if (enter && !nextReview())
+                    closeTraining(true);
+            } else if (escape) {
                 closeTraining(true);
-            else if (enter)
+            } else if (enter) {
                 missed ? reviewMissed() : closeTraining(true);
+            }
             break;
         }
     }
@@ -1166,7 +1182,17 @@ void App::drawTrainingEnd() {
         ui::endCard();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
-    if (!missed.empty()) {
+    if (review_running_) {  // the day's review (#80): the next kind, or back to the Training page
+        drawReviewNext(false);
+        if (!training_) return;
+        if (!missed.empty()) {
+            ImGui::SameLine();
+            if (ImGui::Button(trn("Review the {} missed position now", "Review the {} missed positions now",
+                                  missed.size(), missed.size())
+                                  .c_str()))
+                return reviewMissed();
+        }
+    } else if (!missed.empty()) {
         if (primaryButton(trn("Review the {} missed position now", "Review the {} missed positions now", missed.size(),
                               missed.size())
                               .c_str()))
@@ -1176,8 +1202,10 @@ void App::drawTrainingEnd() {
     } else if (primaryButton(TR("Back to the Openings"))) {
         return closeTraining(true);
     }
-    ImGui::SameLine(0, px(8));
-    ImGui::TextDisabled("%s", missed.empty() ? TR("Enter") : TR("Enter: review them · Esc: back"));
+    if (!review_running_) {
+        ImGui::SameLine(0, px(8));
+        ImGui::TextDisabled("%s", missed.empty() ? TR("Enter") : TR("Enter: review them · Esc: back"));
+    }
     ImGui::Dummy(ImVec2(0, px(4)));
     wrapped(TR("A session stopped midway keeps what was answered; the next one goes on with what is still due."), true);
 }
@@ -1186,10 +1214,8 @@ void App::drawTrainingEnd() {
 // The Home page
 
 bool App::trainingDue() {
-    if (training_) return true;
-    for (std::size_t i = 0; i < repertoires().entries().size(); ++i)
-        if (trainingSummary(i).counts.due > 0) return true;
-    return false;
+    if (training_ || puzzle_) return true;
+    return reviewDay().due() > 0;  // the day's review, every kind (#80)
 }
 
 void App::drawTrainingHome() {
@@ -1202,21 +1228,8 @@ void App::drawTrainingHome() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
     }
-    const ui::TopicRegion topic(guide::topics::Training);
-    for (std::size_t i = 0; i < repertoires().entries().size(); ++i) {
-        const auto& s = trainingSummary(i);
-        if (s.counts.due == 0 || (training_ && training_->file == repertoires().entries()[i].file)) continue;
-        ImGui::PushID(static_cast<int>(i));
-        const auto label =
-            trn("{} position to review", "{} positions to review", s.counts.due, ui::exactCount(s.counts.due)) + " · " +
-            repertoires().entries()[i].name;
-        if (ImGui::Selectable(label.c_str(), false, 0, ImVec2(ImGui::CalcTextSize(label.c_str()).x, 0)))
-            startTraining(i, TrainingRun::Kind::Due);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(
-                "%s", trainingLock().empty() ? TR("Train them now, on the Board page") : trainingLock().c_str());
-        ImGui::PopID();
-    }
+    // The day's review (#80): one count for every kind, a click reviewing them all.
+    drawReviewHome();
 }
 
 }  // namespace fcg

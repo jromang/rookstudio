@@ -170,6 +170,7 @@ struct GraphDraw {
     std::string progress;        // in the header, right: the continuous analysis's state
     bool can_add       = false;  // "+" in the legend
     bool analyses_menu = false;  // the analyses' legend items have a menu (judge, remove)
+    int menu_analyses  = -1;     // only the first ones have it (the others are no analyses of the game); -1: all
     // Why a chart has no values, for the charts menu (the PGN options that write them); none: such charts are left out.
     std::function<std::string(GraphChart)> missing;
     bool pgn_options = false;  // with them, a button to the setup's PGN options

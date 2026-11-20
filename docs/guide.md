@@ -899,8 +899,9 @@ board is on the left; on the right, the game's strip, then five tabs, Alt+1 to A
 - **Notation**: the game's title line and its headers (see [Headers](#headers)), then the moves, their comments,
   symbols and variations, written in place (see [Notation](#notation)); the table of the moves and the review are
   in tabs of their own (see [The review of a game](#the-review-of-a-game));
-- **Analysis**: the engine's lines, and Lichess's cloud and endgame tables when you chose them (see [Online for the
-  analysis](#online-for-the-analysis)), with the game graph;
+- **Analysis**: up to four engines side by side (see [Several engines side by side](#several-engines-side-by-side)),
+  and Lichess's cloud and endgame tables when you chose them (see [Online for the analysis](#online-for-the-analysis)),
+  with the game graph;
 - **Tree**: the moves played from the position in your databases, your books and on Lichess (see [The Tree
   tab](#the-tree-tab));
 - **References**: the strongest games of the position (see [Reference games](#reference-games));
@@ -915,6 +916,41 @@ A move is typed as well as played: its first letter opens a field above the tabs
 begin so (in English letters, K Q R B N; in French, R D T F C), and Enter plays it. The letters of the engines' Board
 are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis, Alt+X shows the threat, Alt+G
 analyses the game, Alt+N goes to the next move the analysis marked.
+
+### Several engines side by side
+
+In the study Board's Analysis tab, up to four engines of the library analyse the position together, each in a card: its
+colour and name, its evaluation (White's), its depth and seldepth, its speed and its threads, its best line, and its
+other lines folded into one (a click unfolds them). Hovering a move of a line shows the position after it on the board;
+a click plays the line up to that move. **+ An engine** lists the library's engines, those of the analysis ticked (↑ ↓
+pick one, Enter adds it), and *Download an engine…*, the popular engines of the Engines page; an engine added searches
+at once. Alt+A, or *Analyse*, starts and stops them all, and the engines are kept for the next time.
+
+On the board, each engine's best move is an arrow of its colour: dark blue, light orange, teal and grey, from the first
+engine to the fourth, their lightness apart too. Engines that play the same move share one arrow, in the colour of the
+first of them, with their number beside its start. The line at the top of the tab says the same in words: which engines
+agree, on which move, and how far apart their evaluations are (*7…Be7 for Stockfish and Gaia · 7…Qb6 for Leela · their
+evaluations within 0.11*), or the mate an engine sees; no colour has to be told apart. With one engine, the arrows are
+its lines', as on the engines' Board.
+
+**Threads**: the analysis has one number of threads, set from the chip at the top (*24 / 32 threads*), shared equally
+between its engines. An engine's menu (`…`) sets its lines, its hash and, by hand, its threads, which the others' share
+then leaves aside. An engine that searches on a graphics card (*Uses a GPU* ticked in the library, or an engine like Lc0
+whose *Backend* option names a GPU backend) keeps its own threads, and the share does not count them. A tournament
+running on this computer keeps its cores: the analysis takes at most what its games leave, and the chip says how many
+they take. These settings are the analysis's own: neither the library's engine nor a tournament sees them.
+
+**The first engine** is the analysis's: the game's review (G), the threat (Alt+X, or the first engine's menu), the
+questions and the assistant's comments use it. An engine dragged by its name onto another takes its place, to the top it
+becomes the first; *Make it first* in its menu does the same. When the game has an analysis by the new first engine,
+that analysis judges the moves and draws the curve of the game graph. Each engine's evaluations of the positions of the
+game it searched show on the graph as a thin line of its colour (*live analysis*), the first engine's as the curve while
+the game has no analysis.
+
+While one of your games is played on Lichess, every engine stops at once, and the study Board shows none of their arrows
+(see [Fair play](#fair-play)). *Unload the analysis's engines*, in an engine's menu or the command palette, ends their
+processes. Every gesture of the tab is in the command palette (Ctrl+K): an engine added, made first or removed, its
+settings, the analysis's threads.
 
 ### Notation
 

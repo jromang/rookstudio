@@ -73,6 +73,8 @@ const char* App::guideSection() const {
             switch (board_side_tab_) {
                 case 0:
                     return Notation;
+                case 1:
+                    return SideBySide;
                 case 2:
                     return TreeTab;
                 case 3:
@@ -453,8 +455,63 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         page_ = Page::Board;
         setBoardAnalysis(!board_.analysing);
     });
-    if (board_.analyser.active() || board_.threat.active())
-        add(TR("Unload the engine"), TR("Board"), [this] { unloadBoardEngines(); });
+    if (board_.analyser->active() || board_.threat.active() ||
+        std::any_of(board_.side.begin(), board_.side.end(), [](const auto& a) { return a && a->active(); }))
+        add(chessBoard() && analysisEngines(board_.settings).size() > 1 ? TR("Unload the analysis's engines")
+                                                                        : TR("Unload the engine"),
+            TR("Board"), [this] { unloadBoardEngines(); });
+    // Several engines side by side in the study Board's analysis (#78): each gesture of its tab.
+    if (chessBoard()) {
+        loadBoardSettings();
+        const auto list   = analysisEngines(board_.settings);
+        const auto at_tab = [this] {
+            toStudyBoard();
+            board_side_tab_ = 1;
+        };
+        const auto index = [this](const std::string& name) -> std::optional<std::size_t> {
+            const auto now = analysisEngines(board_.settings);
+            for (std::size_t i = 0; i < now.size(); ++i)
+                if (now[i].engine == name) return i;
+            return std::nullopt;
+        };
+        if (list.size() < MAX_SIDE_ENGINES) {
+            add(TR("Add an engine to the analysis…"), TR("Board"), [this, at_tab] {
+                at_tab();
+                side_menu_open_ = true;
+            });
+            for (const auto& e : engines_) {
+                if (e.inactive ||
+                    std::any_of(list.begin(), list.end(), [&](const auto& s) { return s.engine == e.name; }))
+                    continue;
+                add(trf("Analyse with {} too", e.name), TR("Board"), [this, at_tab, name = e.name] {
+                    at_tab();
+                    (void)addSideEngine(name);
+                });
+            }
+        }
+        for (std::size_t k = 0; k < list.size(); ++k) {
+            const auto& name = list[k].engine;
+            if (k > 0) {
+                add(trf("Make {} first in the analysis", name), TR("Board"), [this, at_tab, index, name] {
+                    at_tab();
+                    if (const auto i = index(name)) moveSideEngine(*i, 0);
+                });
+            }
+            if (list.size() > 1) {
+                add(trf("Remove {} from the analysis", name), TR("Board"), [this, index, name] {
+                    if (const auto i = index(name)) removeSideEngine(*i);
+                });
+            }
+            add(trf("{} in the analysis: lines, threads, hash…", name), TR("Board"), [this, at_tab, index, name] {
+                at_tab();
+                if (const auto i = index(name)) side_engine_menu_ = static_cast<int>(*i);
+            });
+        }
+        add(TR("The analysis's threads…"), TR("Board"), [this, at_tab] {
+            at_tab();
+            side_threads_open_ = true;
+        });
+    }
     add(TR("Copy FEN"), TR("Board"), [this] { ImGui::SetClipboardText(boardFen().c_str()); });
     add(TR("Open a PGN…"), TR("Board"), [this] {
         page_ = Page::Board;

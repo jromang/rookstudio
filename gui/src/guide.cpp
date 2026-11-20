@@ -112,6 +112,7 @@ const std::vector<const char*>& allTopics() {
                                               Views,
                                               FirstStart,
                                               StudyBoard,
+                                              SideBySide,
                                               Notation,
                                               Marks,
                                               Headers,

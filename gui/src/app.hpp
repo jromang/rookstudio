@@ -841,10 +841,51 @@ class App {
     void openPositionOnBoard(const std::string& fen, bool chess960, std::string title, bool analyse);
     void setBoardAnalysis(bool on);
     void setBoardThreat(bool on);  // X: the opponent's best move were it to move again
-    // Ends the analysis engine and the threat engine, the analysis and the threat off: stopped, an engine stays
+    // Ends the analysis engines and the threat engine, the analysis and the threat off: stopped, an engine stays
     // started, its hash table (a GPU's memory) held, for the next search.
     void unloadBoardEngines();
     [[nodiscard]] std::optional<AnalysisPosition> threatPosition() const;  // the board's, the turn passed
+    // The analysis's engine's settings as its process gets them: in the study Board, its share of the threads; the
+    // threat's, one line.
+    [[nodiscard]] AnalysisSettings firstEngineSettings() const;
+    [[nodiscard]] AnalysisSettings threatSettings() const;
+    // Several engines side by side in the study Board's Analysis tab (#78, mockup M11, board 3;
+    // view_board_engines.cpp): each a card with its colour, its arrow on the board, the threads shared between them.
+    void drawSideBySide();
+    struct SideGesture {  // asked of an engine's card, done once the cards are drawn
+        std::optional<std::pair<std::size_t, std::size_t>> move;  // from, to (made first: to 0)
+        std::optional<std::size_t> remove;
+    };
+    void drawSideEngineCard(std::size_t index, const std::vector<SideEngine>& list, const std::vector<int>& threads,
+                            const chess::Board& board, const AnalysisPosition& position, SideGesture& gesture);
+    // Its menu: lines, threads, hash, made first, removed. False when it closes.
+    bool drawSideEngineMenu(std::size_t index, const std::vector<int>& threads, SideGesture& gesture);
+    void drawAddEngineMenu();                     // "+ An engine": the library's engines, and the engine picker
+    void drawAnalysisThreadsPopup();              // the analysis's threads, from its chip
+    bool addSideEngine(const std::string& name);  // false when it cannot be (four already, locked, not there)
+    void removeSideEngine(std::size_t index);
+    void moveSideEngine(std::size_t from, std::size_t to);    // dragged, or made first
+    void firstEngineChanged(const std::string& before);       // the threat, the review's curve follow the new first
+    [[nodiscard]] Analyser* sideAnalyser(std::size_t index);  // the process of the engine at that place, 0 the first
+    [[nodiscard]] std::vector<int> sideThreads() const;       // each engine's threads now, in the list's order
+    // The analysis's threads, without the cores of the tournaments running on this computer (they keep them).
+    [[nodiscard]] int analysisTotal() const;
+    [[nodiscard]] int tournamentCores() const;  // what the tournaments running here keep: their games at once
+    [[nodiscard]] const EngineEntry* engineNamed(const std::string& name) const;  // the library's, null when none
+    // The engines' arrows on the board (one per move, its engines counted), their verdicts in words: the engines
+    // whose search is of `position`.
+    [[nodiscard]] std::vector<BoardArrow> sideBySideArrows(const chess::Board& board, const AnalysisPosition& position);
+    [[nodiscard]] std::vector<EngineVerdict> sideVerdicts(const chess::Board& board, const AnalysisPosition& position);
+    void keepSideTrails(const AnalysisPosition& position);  // each engine's evaluation of the game's position shown
+    // The colour of an analysis of the game (the graph's curves, its arrows): in the study Board, an engine of the
+    // analysis's own; else analysisColour's.
+    [[nodiscard]] ImU32 reviewColour(std::size_t index, const std::string& engine) const;
+    bool side_menu_open_    = false;                     // "+ An engine" opens at the next frame (Ctrl+K)
+    int side_menu_pick_     = 0;                         // the engine Enter adds, among those the menu offers
+    int side_engine_menu_   = -1;                        // that engine's menu opens at the next frame (Ctrl+K)
+    bool side_threads_open_ = false;                     // the analysis's threads open at the next frame (Ctrl+K)
+    std::set<std::string> side_unfolded_;                // the engines whose other lines are shown
+    std::map<std::string, std::string> side_installed_;  // "installed …" by engine, read when the menu opens
     // Key A, pressed for a board now: once a frame, not while a text field or a popup has the keys.
     [[nodiscard]] bool boardKey();
     [[nodiscard]] std::string boardFen();  // the position of the Board page
@@ -2267,6 +2308,7 @@ class App {
     bool board_key_taken_  = false;  // key A served a board this frame
     bool review_when_read_ = false;  // --focus board-review: the game analysed once its file is read
     int review_ply_        = -1;     // --focus board-review-PLY: the board at that ply then
+    int ply_when_read_     = -1;     // --focus board-analysis=FILE@PLY: the board at that ply once FILE is read
 
     // Console view.
     std::vector<Console::Line> console_lines_;

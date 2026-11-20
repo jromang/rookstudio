@@ -328,7 +328,7 @@ void App::setBoardAnalysis(bool on) {
     loadBoardSettings();
     if (!on) {
         board_.analysing = false;
-        board_.analyser.halt();
+        board_.analyser->halt();
         return;
     }
     if (aidsLocked()) {  // fair play (#48)
@@ -360,10 +360,13 @@ void App::setBoardAnalysis(bool on) {
         s.engine = engine->name;
         saveBoardSettings();
     }
-    if (!board_.analyser.active() || board_.analyser.engine() != engine->name) {
-        board_.analyser.start(*engine, s);
+    if (!board_.analyser->active() || board_.analyser->engine() != engine->name) {
+        board_.analyser->start(*engine, firstEngineSettings());
         board_.new_game = true;
     }
+    // The engines beside it that failed try again (#78).
+    for (auto& a : board_.side)
+        if (a && a->state() == Analyser::State::Failed) a->stop();
     board_.analysing = true;
 }
 
@@ -393,24 +396,44 @@ void App::setBoardThreat(bool on) {
         b.message_error = false;
         return;
     }
-    auto one    = b.settings.analysis;
-    one.multipv = 1;
-    if (!b.threat.active() || b.threat.engine() != engine->name) b.threat.start(*engine, one);
+    if (!b.threat.active() || b.threat.engine() != engine->name) b.threat.start(*engine, threatSettings());
     b.threat_on = true;
+}
+
+AnalysisSettings App::firstEngineSettings() const {
+    auto s = board_.settings.analysis;
+    if (!chessBoard()) {
+        s.threads = std::max(1, s.threads);
+        return s;
+    }
+    // In the study Board, its share of the analysis's threads, beside the others (#78).
+    if (const auto threads = sideThreads(); !threads.empty()) s.threads = threads.front();
+    return s;
+}
+
+AnalysisSettings App::threatSettings() const {
+    auto one    = firstEngineSettings();
+    one.multipv = 1;
+    return one;
 }
 
 void App::unloadBoardEngines() {
     auto& b     = board_;
     b.analysing = false;
     b.threat_on = false;
-    b.analyser.stop();
+    b.analyser->stop();
+    for (auto& a : b.side)
+        if (a) a->stop();
     b.threat.stop();
 }
 
 void App::pollBoard() {
     board_key_taken_ = false;
-    board_.analyser.poll();
+    board_.analyser->poll();
+    for (auto& a : board_.side)
+        if (a) a->poll();
     board_.threat.poll();
+    if (board_.new_game) board_.side_new_game = true;
     // Fair play (#48): no engine on a locked position; while a live game lasts, none on any, the assistant's work
     // stopped too (a review's passes done are kept, for later).
     if (aidsLocked()) {
@@ -427,6 +450,7 @@ void App::pollBoard() {
     if (liveGameOn() && comment_job_ && comment_job_->cancel) *comment_job_->cancel = true;
     if (board_.threat_on && board_.threat.state() == Analyser::State::Failed) board_.threat_on = false;
     if (board_.threat_on && page_ == Page::Board && !board_.editor) {
+        board_.threat.update(threatSettings());
         if (const auto position = threatPosition())
             board_.threat.analyse(*position);
         else
@@ -436,41 +460,62 @@ void App::pollBoard() {
     }
     pollBoardPgn();
     pollBoardGames();
-    if (board_.analysing && board_.analyser.state() == Analyser::State::Failed) board_.analysing = false;
+    // The first engine failing ends the analysis, unless others search beside it (#78): its card says why.
+    if (board_.analysing && board_.analyser->state() == Analyser::State::Failed &&
+        !(chessBoard() && analysisEngines(board_.settings).size() > 1))
+        board_.analysing = false;
     // A game analysed in passes runs on its own thread; the board's analysis (A) pauses it.
     auto& b = board_;
     pollGameReview();
     // The analysis follows the board while the page is shown, and waits meanwhile.
-    if (b.analysing && page_ == Page::Board && !b.editor) {
-        const auto position = analysisPosition(b.game, b.chess960, b.ply);
-        if (!(b.analyser.position() == position)) b.review_offered = 0;
-        b.analyser.analyse(position, {}, b.new_game);
+    const bool shown    = b.analysing && page_ == Page::Board && !b.editor;
+    const auto position = analysisPosition(b.game, b.chess960, b.ply);
+    if (shown) {
+        if (!(b.analyser->position() == position)) b.review_offered = 0;
+        // Its threads as the Board has them: the analysis's, or its share beside the others (#78).
+        if (b.analyser->active() && b.analyser->engine() == b.settings.analysis.engine)
+            b.analyser->update(firstEngineSettings());
+        b.analyser->analyse(position, {}, b.new_game);
         b.new_game = false;
-        // A position of the game analysed in passes, searched for longer than its pass did: its value offered.
-        BoardPage::ReviewTask* same = nullptr;
-        for (auto& t : b.review_tasks)
-            if (t.engine == b.analyser.engine()) same = &t;
-        if (same && b.line < 0 && b.review_game_key == b.review_key && b.analyser.position() == position &&
-            !b.analyser.lines().empty() && b.analyser.lines().front().score && !b.analyser.lines().front().pv.empty()) {
-            const auto& line = b.analyser.lines().front();
-            const auto ply   = static_cast<std::size_t>(b.ply);
-            // Once a second at most, and when it went further than what the analysis has.
-            if (ply < same->state.live.positions.size() &&
-                static_cast<int64_t>(line.time_ms) > same->state.live.positions[ply].time_ms &&
-                static_cast<int64_t>(line.time_ms) >= b.review_offered + 1000) {
-                b.review_offered = static_cast<int64_t>(line.time_ms);
-                PositionEval value;
-                value.score   = line.score;
-                value.best    = line.pv.front();
-                value.depth   = static_cast<int>(line.depth);
-                value.time_ms = static_cast<int64_t>(line.time_ms);
-                value.wdl     = line.wdl;
-                for (const auto& m : line.pv) value.pv += (value.pv.empty() ? "" : " ") + m;
-                same->runner->offer(b.ply, std::move(value));
-            }
+    } else if (b.analyser->state() == Analyser::State::Searching) {
+        b.analyser->halt();
+    }
+    // The study Board's other engines search beside it (#78); elsewhere they wait, or end once out of the list.
+    {
+        const auto list    = analysisEngines(b.settings);
+        const auto threads = sideThreads();
+        std::vector<SideRun> runs;
+        for (std::size_t i = 1; i < list.size(); ++i)
+            runs.push_back({engineNamed(list[i].engine), {list[i].engine, threads[i], list[i].hash, list[i].multipv}});
+        const bool search = shown && chessBoard() && !aidsLocked();
+        runSideBySide(b.side, runs, search, position, search && b.side_new_game);
+        if (search) b.side_new_game = false;
+    }
+    if (!shown) return;
+    if (chessBoard()) keepSideTrails(position);
+    // A position of the game analysed in passes, searched for longer than its pass did: its value offered.
+    const auto& a               = *b.analyser;
+    BoardPage::ReviewTask* same = nullptr;
+    for (auto& t : b.review_tasks)
+        if (t.engine == a.engine()) same = &t;
+    if (same && b.line < 0 && b.review_game_key == b.review_key && a.position() == position && !a.lines().empty() &&
+        a.lines().front().score && !a.lines().front().pv.empty()) {
+        const auto& line = a.lines().front();
+        const auto ply   = static_cast<std::size_t>(b.ply);
+        // Once a second at most, and when it went further than what the analysis has.
+        if (ply < same->state.live.positions.size() &&
+            static_cast<int64_t>(line.time_ms) > same->state.live.positions[ply].time_ms &&
+            static_cast<int64_t>(line.time_ms) >= b.review_offered + 1000) {
+            b.review_offered = static_cast<int64_t>(line.time_ms);
+            PositionEval value;
+            value.score   = line.score;
+            value.best    = line.pv.front();
+            value.depth   = static_cast<int>(line.depth);
+            value.time_ms = static_cast<int64_t>(line.time_ms);
+            value.wdl     = line.wdl;
+            for (const auto& m : line.pv) value.pv += (value.pv.empty() ? "" : " ") + m;
+            same->runner->offer(b.ply, std::move(value));
         }
-    } else if (b.analyser.state() == Analyser::State::Searching) {
-        b.analyser.halt();
     }
 }
 
@@ -496,6 +541,16 @@ const EngineEntry* App::analysisEngine() {
         return &engines_.front();
     }
     return nullptr;
+}
+
+ImU32 App::reviewColour(std::size_t index, const std::string& engine) const {
+    // The study Board: an engine of the analysis side by side keeps its colour there (#78); the judge is the area.
+    if (chessBoard() && index > 0) {
+        const auto list = analysisEngines(board_.settings);
+        for (std::size_t k = 0; k < list.size(); ++k)
+            if (list[k].engine == engine) return sideColour(k);
+    }
+    return analysisColour(index);
 }
 
 void App::startReviewTask(const EngineEntry& engine, const std::vector<GameReview>& kept) {
@@ -1475,6 +1530,8 @@ void App::pollBoardPgn() {
     source.file  = file;
     source.index = std::make_shared<const tour::PgnIndex>(std::move(index));
     showPgnSource(std::move(source));
+    if (ply_when_read_ >= 0)
+        board_.ply = std::clamp(std::exchange(ply_when_read_, -1), 0, static_cast<int>(board_.game.moves.size()));
     if (review_when_read_) {
         review_when_read_ = false;
         board_.open_tab   = 0;
@@ -1885,9 +1942,17 @@ void App::drawBoardColumn(float size) {
     decor.flipped = b.flip;
     if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
     // The bar: the analysis of this position, else the score of the move that led to it.
-    decor.eval_white  = 0.5f;
-    const auto& lines = b.analyser.lines();
-    const bool fresh  = b.analyser.active() && b.analyser.position() == analysisPosition(b.game, b.chess960, b.ply);
+    decor.eval_white    = 0.5f;
+    const auto& lines   = b.analyser->lines();
+    const auto position = analysisPosition(b.game, b.chess960, b.ply);
+    // Fair play (#48): while the aids are locked, the study Board shows no engine's arrow nor evaluation, those of the
+    // last search before the lock included, every engine alike (#78).
+    const bool aids  = !(chessBoard() && aidsLocked());
+    const bool fresh = aids && b.analyser->active() && b.analyser->position() == position;
+    // The study Board's engines side by side (#78): one arrow per move, in the colour of the first engine that plays
+    // it, how many play it beside its start.
+    const bool side_by_side = aids && chessBoard() && analysisEngines(b.settings).size() > 1;
+    const auto side_arrows  = side_by_side ? sideBySideArrows(board, position) : std::vector<BoardArrow>{};
     if (fresh && !lines.empty() && lines.front().score) {
         decor.eval_white = barFraction(*lines.front().score, stm);
     } else {
@@ -1900,7 +1965,7 @@ void App::drawBoardColumn(float size) {
     }
     // Without the board's analysis, each analysis of the game's best move here, in its colour.
     const bool on_main = b.line < 0 || boardMainPly() == b.ply;
-    if (!fresh && b.settings.arrows && on_main) {
+    if (!fresh && side_arrows.empty() && b.settings.arrows && on_main) {
         const auto reviews = shownReviews();
         for (std::size_t i = reviews.size(); i-- > 0;) {
             const auto& positions = reviews[i]->positions;
@@ -1909,14 +1974,16 @@ void App::drawBoardColumn(float size) {
                 continue;
             const auto moves = legalPrefix(board, {positions[static_cast<std::size_t>(b.ply)].best}, 1);
             if (!moves.empty()) {
-                auto colour = analysisColour(i);
+                auto colour = reviewColour(i, reviews[i]->engine);
                 colour      = (colour & ~IM_COL32_A_MASK) | (IM_COL32(0, 0, 0, 170) & IM_COL32_A_MASK);
                 decor.arrows.push_back({moves.front(), colour});
             }
         }
     }
-    // The first move of each line, the best on top.
-    if (fresh && b.settings.arrows) {
+    if (side_by_side && b.settings.arrows) {
+        decor.arrows.insert(decor.arrows.end(), side_arrows.begin(), side_arrows.end());
+    } else if (fresh && b.settings.arrows) {
+        // The first move of each line, the best on top.
         for (int i = static_cast<int>(lines.size()) - 1; i >= 0; --i) {
             const auto moves = legalPrefix(board, lines[static_cast<std::size_t>(i)].pv, 1);
             if (!moves.empty()) decor.arrows.push_back({moves.front(), arrowColour(i)});
@@ -2158,7 +2225,7 @@ void App::drawBoardAnalysis() {
     }
     auto& b          = board_;
     auto& s          = b.settings.analysis;
-    auto& a          = b.analyser;
+    auto& a          = *b.analyser;
     bool changed     = false;
     const auto board = boardAt(b.game, b.chess960, b.ply);
 
@@ -3108,7 +3175,20 @@ void App::drawBoardGraph(float height) {
     std::vector<GraphAnalysis> analyses;
     for (std::size_t i = 0; i < reviews.size(); ++i) {
         analyses.push_back({reviews[i]->engine, i == 0 && reviews.size() > 1 ? TR("judge") : TR("analysis"),
-                            analysisColour(i), reviews[i]});
+                            reviewColour(i, reviews[i]->engine), reviews[i]});
+    }
+    // The study Board's engines side by side (#78): what each one's search said of the game's positions it reached,
+    // a thin line of its colour, unless it has an analysis of the game; the first's is the curve when none has.
+    const auto with_menu = analyses.size();
+    if (chessBoard() && !b.trails.empty() && b.trails_key == reviewKey(b.tree.main)) {
+        const auto list = analysisEngines(b.settings);
+        for (std::size_t k = 0; k < list.size(); ++k) {
+            if (std::any_of(reviews.begin(), reviews.end(), [&](const auto* r) { return r->engine == list[k].engine; }))
+                continue;
+            const auto it = b.trails.find(list[k].engine);
+            if (it != b.trails.end())
+                analyses.push_back({list[k].engine, TR("live analysis"), sideColour(k), &it->second});
+        }
     }
     auto graph      = buildGameGraph(b.tree.main, b.chess960, b.settings.graph.chart, analyses, b.judged);
     graph.tablebase = boardTablebasePly();
@@ -3131,6 +3211,7 @@ void App::drawBoardGraph(float height) {
     draw.tip           = [this](int ply) { return boardGraphTip(ply); };
     draw.can_add       = !b.tree.main.moves.empty() && !(b.watching && b.match && b.match_state.running);
     draw.analyses_menu = true;
+    draw.menu_analyses = static_cast<int>(with_menu);  // not the live analysis's lines
     // The analyses in passes: where they are, what each position got.
     const bool running = b.reviewing() && b.review_game_key == b.review_key;
     if (running) {

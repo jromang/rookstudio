@@ -621,7 +621,8 @@ GraphEvents drawGameGraph(const char* id, const GameGraph& g, GraphView& view, c
         }
         if (eval_like) {
             for (std::size_t i = 0; i < g.analyses.size(); ++i)
-                item(fmt::format("##analysis{}", i), g.analyses[i], i == 0 ? 1 : 0, d.analyses_menu,
+                item(fmt::format("##analysis{}", i), g.analyses[i], i == 0 ? 1 : 0,
+                     d.analyses_menu && (d.menu_analyses < 0 || static_cast<int>(i) < d.menu_analyses),
                      static_cast<int>(i));
             if (d.can_add) {
                 ImGui::SameLine(0, px(4));

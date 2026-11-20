@@ -335,6 +335,25 @@ Board3d::Input Board3d::draw(const std::array<chess::Piece, 64>& pieces, float s
                 radius, *decor.badge);
         }
     }
+    // The engines that agree on an arrow's move, counted beside its start (#78), as the 2D board puts it.
+    if (r.width() > 0) {
+        const auto view   = board3d::viewOf(r.camera(), 1.0f);
+        const auto screen = [&](const std::array<float, 2>& q) {
+            return ImVec2(p0.x + (q[0] + 1) / 2 * size, p0.y + (1 - q[1]) / 2 * size);
+        };
+        const float radius = size / 8.0f * 0.16f;
+        for (const auto& arrow : decor.arrows) {
+            if (arrow.count.empty()) continue;
+            const auto a = board3d::project(view, board3d::squareCentre(arrow.move.from().index()));
+            const auto b = board3d::project(view, board3d::squareCentre(displayedTarget(arrow.move).index()));
+            if (!a || !b) continue;
+            const ImVec2 c = arrowCountCentre(screen(*a), screen(*b), size / 8.0f);
+            drawArrowCount(
+                dl,
+                ImVec2(std::clamp(c.x, p0.x + radius, p1.x - radius), std::clamp(c.y, p0.y + radius, p1.y - radius)),
+                radius, arrow);
+        }
+    }
     if (decor.frame) dl->AddRect(ImVec2(p0.x - 2, p0.y - 2), ImVec2(p1.x + 2, p1.y + 2), *decor.frame, 0, 0, 3.0f);
 
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && m.x >= p0.x && m.x < p1.x && m.y >= p0.y && m.y < p1.y) {

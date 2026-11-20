@@ -514,6 +514,8 @@ class App {
         std::optional<PgnSource> pgn;  // the file it was read from, its list of games
         MoveNotes start_notes;
         std::vector<BoardPage::Snapshot> undo, redo;  // its changes, still undone and redone
+        std::optional<lichess::SentRecord> sent;      // sent to a Lichess study (#79)
+        GameChanges since_sent;
     };
     std::deque<RecentGame> recent_games_;       // the newest first
     int recent_pick_ = -1;                      // the one chosen while Ctrl+Tab is held; -1 when the list is closed
@@ -1021,6 +1023,86 @@ class App {
     void drawToLichessMenu();               // its button under the board, and its menu
     void drawToLichessActions();            // the menu's actions
     void drawToLichessResult(float width);  // what came, under the board, as wide as it
+    // The user's Lichess studies (#79, mockup M11, board 4): the Lichess page's card (the account's studies, a study's
+    // chapters, imported into a database, opened on the Board, followed); the followed ones asked whether they
+    // changed when the page opens (a HEAD each, nothing downloaded); a game of the Board sent into one of them or a
+    // new one (lichess.org… › To a Lichess study…), and later its changes, on request.
+    lichess::StudiesState studies_;
+    bool studies_loaded_ = false;
+    std::optional<std::vector<lichess::StudyInfo>> studies_list_;  // the account's, asked once the card opens
+    std::string studies_list_error_;
+    std::string studies_list_of_;  // the account and the permission the list was asked with
+    std::future<lichess::Answer<std::vector<lichess::StudyInfo>>> studies_list_job_;
+    std::string study_shown_;                                                   // the study whose chapters show
+    int study_chapter_ = 0;                                                     // its chapter chosen
+    std::map<std::string, std::vector<lichess::StudyChapter>> study_chapters_;  // as last read, by study
+    struct StudyRead {
+        lichess::Answer<lichess::StudyText> text;
+        std::vector<lichess::StudyChapter> chapters;
+        std::optional<lichess::StudyImport> import;  // when it went into a database too
+    };
+    struct StudyJob {
+        std::string id;
+        std::size_t base = SIZE_MAX;  // into this database too
+        std::string base_name;
+        std::filesystem::path folder;  // that database's
+        bool open_after = false;       // its chosen chapter opened on the Board once read
+        std::future<StudyRead> done;
+    };
+    std::optional<StudyJob> study_job_;
+    std::string study_said_;     // the outcome of the last reading or import
+    std::string study_said_of_;  // the study it is about
+    bool study_said_bad_ = false;
+    int study_base_      = -1;  // the database an import goes into; -1: the one it went into before, else the default
+    std::future<std::vector<std::pair<std::string, lichess::Answer<std::string>>>> study_checks_job_;
+    std::chrono::steady_clock::time_point study_checked_{};
+    int lichess_page_frame_  = -10;    // the frame that drew the Lichess page last: one more after a gap opens it again
+    bool studies_after_link_ = false;  // the permission to read studies asked from the card: the list again after
+    // The card on the Board that sends the game.
+    struct StudySend {
+        int where = 0;  // 0 one of the user's studies, 1 a new study
+        std::string study;
+        std::array<char, 104> name{};  // the new study's
+        int visibility = 0;            // private, unlisted, public
+        std::array<char, 104> chapter{};
+        bool black      = false;
+        bool assistant  = false;
+        bool after_link = false;  // sent once Lichess gave the permission
+        bool busy       = false;
+        std::string error;
+        lichess::SentRecord going;                // what goes, while it goes
+        uint64_t serial = 0;                      // the board's game then (board_game_serial_)
+        int count       = 0;                      // and its changes
+        std::optional<lichess::SentRecord> sent;  // what went, once it went
+        int chapters = -1;                        // the study's then
+        bool focus   = true;
+    };
+    std::optional<StudySend> study_send_;
+    std::future<lichess::Answer<lichess::SendResult>> study_send_job_;
+    std::future<lichess::Answer<bool>> study_update_job_;  // the changes sent
+    lichess::SentRecord study_update_;                     // what they send
+    uint64_t study_update_serial_ = 0;
+    int study_update_count_       = 0;
+    std::string study_update_error_;
+    bool study_update_after_link_ = false;
+    std::string study_origin_seen_;  // the database game last looked for among the games sent
+    int study_popup_frame_ = -10;    // the last frame a list was open over the send card: its Escape not the card's
+    void loadStudiesState();
+    void saveStudiesState();
+    void pollStudies();
+    void drawLichessStudies();  // the Lichess page's card
+    void drawStudyDetail(const lichess::StudyInfo& study);
+    void readStudy(const std::string& id, std::optional<std::size_t> base, bool open_after = false);
+    void checkFollowedStudies();
+    void openStudyChapter(const std::string& id, std::size_t chapter);
+    [[nodiscard]] std::string studyToken(bool write) const;  // the account's when it may, else none
+    void askStudyPermission(bool write);                     // Lichess's page, the permission added
+    void openStudySend();                                    // lichess.org… › To a Lichess study…
+    void drawStudySendCard();                                // in the Board's column
+    void startStudySend();
+    void sendStudyChanges();  // the strip's "Send the changes"
+    void drawSentLine();      // under the strip
+    [[nodiscard]] bool studySendTakesKeys() const { return study_send_ && !study_send_->sent && page_ == Page::Board; }
     void drawPlayingGames();   // the Home page's list
     void drawListenOffer();    // the Lichess page's offer of the right to read challenges
     // A game of the user's that ended (#49, mockup M8, board "Fairplay"): brought into "Lichess · account", made when
@@ -1058,7 +1140,8 @@ class App {
     void actOnLink();
     void drawLinkCard();
     [[nodiscard]] bool linkCardTakesKeys() const {
-        return link_card_.has_value() || link_key_frame_ == ImGui::GetFrameCount() || finishedCardTakesKeys();
+        return link_card_.has_value() || link_key_frame_ == ImGui::GetFrameCount() || finishedCardTakesKeys() ||
+               studySendTakesKeys();
     }
     struct LichessSync {
         std::size_t index = 0;  // the database's

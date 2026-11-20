@@ -594,6 +594,20 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         if (lichess_account_ && !boardLichessGameId().empty())
             add(TR("Bookmark the game on Lichess"), "Lichess", [this] { bookmarkGameOnLichess(); });
     }
+    // The user's studies (#79): their card, the game sent into one, its changes sent again.
+    add(TR("Lichess studies"), "Lichess", [this, go = page(Page::Lichess)] {
+        go();
+        loadStudiesState();
+        studies_.shown = studies_.opened = true;
+        saveStudiesState();
+    });
+    if (chessBoard() && !toLichessLock(true) && !board_.tree.main.moves.empty())
+        add(TR("Send the game to a Lichess study…"), "Lichess", [this] {
+            toStudyBoard();
+            openStudySend();
+        });
+    if (board_.sent && board_.since_sent.any() && !toLichessLock(true))
+        add(TR("Send the changes to the Lichess study"), "Lichess", [this] { sendStudyChanges(); });
     // The books from Lichess's open data (#53).
     add(TR("From Lichess's named openings…"), TR("Books"), [this] {
         page_                  = Page::Books;

@@ -263,6 +263,8 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     board_.start_notes = {};
     board_.comment_edit.reset();
     board_.changes = {};
+    board_.sent.reset();  // another game's chapter, if it was sent (#79)
+    board_.since_sent = {};
     board_.toast.clear();  // what it said was about the game left
     board_.toast_time = -100;
     if (page_ != Page::Board) {
@@ -854,6 +856,7 @@ void App::boardChanged(BoardPage::Snapshot before) {
     if (b.undo.size() > 200) b.undo.erase(b.undo.begin());
     b.redo.clear();
     b.changes.change();
+    if (b.sent) b.since_sent.change();  // the chapter on Lichess no longer has it (#79)
 }
 
 void App::boardUndo(bool redo) {
@@ -864,6 +867,7 @@ void App::boardUndo(bool redo) {
     auto s = std::move(from.back());
     from.pop_back();
     b.changes.undone(redo);
+    if (b.sent) b.since_sent.undone(redo);
     b.tree        = std::move(s.tree);
     b.start_notes = std::move(s.start_notes);
     b.comment_edit.reset();
@@ -1413,6 +1417,7 @@ void App::drawBoardPage() {
     ImGui::SameLine();
     ImGui::BeginChild("##board_side", ImVec2(0, 0));
     drawLinkCard();             // a Lichess link pasted (#47)
+    drawStudySendCard();        // the game sent to a Lichess study (#79)
     drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
     if (b.play_open || (b.match && b.match_state.running)) drawBoardPlay();
     if (chessBoard()) {

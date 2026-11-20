@@ -44,6 +44,13 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
       topology_(topology),
       options_(std::move(options)),
       dialogs_(window) {
+    // A test's Lichess (--focus lichess-api=http://127.0.0.1:PORT), in place before anything asks lichess.org: the
+    // games in progress are asked at the first frame, before the focus words are read.
+    if (const auto& w = options_.focus_window; w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
+        const auto comma   = w.find(',');
+        const auto base    = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
+        lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};
+    }
     software_at_launch_  = storage_.softwareRendering();
     engines_             = storage_.loadEngines();
     books_               = storage_.loadBooks();
@@ -290,6 +297,7 @@ void App::frame() {
     pollPrep();             // a game prepared against an opponent: their games, then the report (#52)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
+    pollStudies();          // the user's Lichess studies: read, imported, followed, a game sent (#79)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -427,6 +435,18 @@ void App::frame() {
                         ? boardAt(board_.game, board_.chess960, std::min<int>(ply, board_.game.moves.size())).getFen()
                         : boardFen();
             lichess_playing_.push_back(g);
+        } else if (w == "lichess" || w == "lichess-studies") {  // the Lichess page; its Studies card open (#79)
+            page_ = Page::Lichess;
+            if (w == "lichess-studies") {
+                loadStudiesState();
+                studies_.shown = studies_.opened = true;
+            }
+        } else if (w.rfind("board-to-study=", 0) == 0) {  // board-to-study=FILE: on the Board, sent to a study (#79)
+            std::ifstream in(w.substr(15), std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            toStudyBoard();
+            readOnBoard(text, std::filesystem::path(w.substr(15)).filename().string());
+            openStudySend();
         } else if (w.rfind("link=", 0) == 0) {  // link=URL: a Lichess link, as pasted on the Board page (#47)
             page_ = Page::Board;
             (void)offerLichessLink(w.substr(5));

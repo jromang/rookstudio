@@ -153,7 +153,8 @@ const std::vector<const char*>& allTopics() {
                                               LichessMonths,
                                               ChessCom,
                                               ChessBaseImport,
-                                              Lumbra};
+                                              Lumbra,
+                                              LichessStudies};
     return all;
 }
 

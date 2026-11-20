@@ -184,6 +184,19 @@ void App::drawToLichessActions() {
         ImGui::CloseCurrentPopup();
     }
     ImGui::Spacing();
+    // Into one of the user's studies, or a new one (#79): its card in the column, where what goes is chosen.
+    if (chessBoard()) {
+        if (action("study", TR("To a Lichess study…"),
+                   TR("A chapter of one of your studies, or of a new one; its link to open or copy."),
+                   TR("the game as PGN, with your token (one more permission, asked the first time)."),
+                   on_game ? locked
+                   : empty ? TR("A game with moves.")
+                           : nullptr)) {
+            openStudySend();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::Spacing();
+    }
     // Played out: the time control chosen in the line under it.
     ImGui::PushID("play");
     ImGui::BeginDisabled(on_position != nullptr || lichess_challenge_job_.valid());

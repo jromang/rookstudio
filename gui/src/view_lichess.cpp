@@ -862,6 +862,14 @@ void App::drawLichessPage() {
         drawBroadcastMosaic();
         return;
     }
+    // The page opens: the followed studies asked whether they changed (#79, M11 point 10), a HEAD each, at most every
+    // five minutes.
+    const int frame = ImGui::GetFrameCount();
+    if (frame - lichess_page_frame_ > 1 &&
+        (study_checked_.time_since_epoch().count() == 0 ||
+         std::chrono::steady_clock::now() - study_checked_ > std::chrono::minutes(5)))
+        checkFollowedStudies();
+    lichess_page_frame_ = frame;
     ImGui::PushTextWrapPos();
     ImGui::TextDisabled("%s", TR("Everything here is optional: RookStudio works without an account and without the "
                                  "Internet. What goes to Lichess is said where you decide it."));
@@ -884,6 +892,11 @@ void App::drawLichessPage() {
     {
         ui::TopicRegion topic(guide::topics::LichessGames);
         drawLichessGames();
+    }
+    ImGui::Dummy(ImVec2(0, px(8)));
+    {
+        ui::TopicRegion topic(guide::topics::LichessStudies);
+        drawLichessStudies();  // the user's studies (#79)
     }
     ImGui::Dummy(ImVec2(0, px(8)));
     drawPrepCard();  // a game prepared against an opponent (#52)

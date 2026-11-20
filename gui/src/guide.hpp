@@ -92,6 +92,7 @@ inline constexpr const char* CtgBooks           = "ctg-books";
 inline constexpr const char* Twic               = "twic";
 inline constexpr const char* LichessMonths      = "lichess-months";
 inline constexpr const char* ChessCom           = "a-chesscom-player";
+inline constexpr const char* ChessBaseImport    = "chessbase-databases";
 inline constexpr const char* Assistant          = "the-assistant";
 inline constexpr const char* AssistantModel     = "its-model";
 inline constexpr const char* Questions          = "questions";

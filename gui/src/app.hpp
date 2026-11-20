@@ -327,6 +327,21 @@ class App {
     };
     std::optional<ImportOutcome> db_outcome_;
     void drawImportOutcome(std::size_t index);
+    // A ChessBase database dropped or chosen (#69, mockup M10, board 1): what it brings and leaves, asked before its
+    // copy into a RookStudio database; a .cbz's password asked there, not kept.
+    struct ChessBaseAsk {
+        int index = -1;  // the database it goes into; -1, a new one named after it
+        std::filesystem::path file;
+        std::string format;  // "CBH" or "2CBH", empty for an archive (counted as it is read)
+        uint32_t records = 0;
+        bool archive = false, enciphered = false;
+        std::string error;
+        std::array<char, 128> password{};
+    };
+    std::optional<ChessBaseAsk> db_chessbase_;
+    bool db_chessbase_go_ = false;
+    std::string db_chessbase_password_;
+    void drawChessBaseAsk();
     // Sources of games (#70, #71, mockup M10): the Databases page's "From a source…"; TWIC's sheet, its issues
     // downloaded then imported one after the other, its report; the weekly look for a new issue, off until ticked;
     // the followed sources under the list of databases, and a new issue on the Home page.

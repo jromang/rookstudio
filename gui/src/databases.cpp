@@ -338,7 +338,7 @@ std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t i
     return TreeSource{entries_[index].name, snapshot, cached.tree};
 }
 
-bool DatabaseShelf::startImport(std::size_t index, const fs::path& file) {
+bool DatabaseShelf::startImport(std::size_t index, const fs::path& file, const std::string& password) {
     if (import_ || index >= entries_.size() || entries_[index].source) return false;
     const auto db = open(index);
     if (!db || db->readOnly()) return false;
@@ -347,9 +347,12 @@ bool DatabaseShelf::startImport(std::size_t index, const fs::path& file) {
     import_->file    = file;
     import_->started = std::chrono::steady_clock::now();
     Import* job      = import_.get();
-    job->done        = std::async(std::launch::async, [db, job] {
+    job->done        = std::async(std::launch::async, [db, job, password] {
         study::enterBackground();
-        const auto report = study::importInto(*db, job->file, study::ImportOptions{}, job->progress, job->cancel);
+        study::ChessBaseOptions chessbase;
+        chessbase.password = password;
+        const auto report = study::importInto(*db, job->file, study::ImportOptions{}, job->progress, job->cancel, false,
+                                              std::size_t{1} << 18, chessbase);
         // The opening tree of every game committed, a cancelled import's too, unless the import was cancelled.
         if (!job->cancel && report.added > 0) {
             job->building = true;

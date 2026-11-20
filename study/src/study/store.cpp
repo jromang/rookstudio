@@ -306,7 +306,7 @@ void setCommitFaultHook(std::function<void(std::string_view)> hook) { g_fault_ho
 
 DatabaseImport importInto(Database& db, const std::filesystem::path& file, const ImportOptions& options,
                           ImportProgress& progress, std::atomic<bool>& cancel, bool keep_duplicates,
-                          std::size_t commit_games) {
+                          std::size_t commit_games, const ChessBaseOptions& chessbase) {
     DatabaseImport out;
     std::vector<ImportedGame> pending;
     const auto commit = [&] {
@@ -322,7 +322,7 @@ DatabaseImport importInto(Database& db, const std::filesystem::path& file, const
         }
         pending.clear();
     };
-    out.read = importGames(file, options, progress, cancel, [&](std::vector<ImportedGame>&& batch) {
+    const auto take = [&](std::vector<ImportedGame>&& batch) {
         if (!out.error.empty()) return;
         for (const auto& game : batch)
             if (game.damaged && out.damaged_lines.size() < 64)
@@ -333,7 +333,14 @@ DatabaseImport importInto(Database& db, const std::filesystem::path& file, const
             pending.insert(pending.end(), std::make_move_iterator(batch.begin()), std::make_move_iterator(batch.end()));
         }
         if (pending.size() >= commit_games) commit();
-    });
+    };
+    if (isChessBase(file)) {
+        ChessBaseReport left_out;
+        out.read      = importChessBase(file, options, progress, cancel, take, &left_out, chessbase);
+        out.chessbase = std::move(left_out);
+    } else {
+        out.read = importGames(file, options, progress, cancel, take);
+    }
     commit();
     return out;
 }

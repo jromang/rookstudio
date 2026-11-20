@@ -695,3 +695,31 @@ TEST_CASE("ChessBase databases: the time to read a game") {
         CHECK(games == 35 * ROUNDS);
     }
 }
+
+TEST_CASE("ChessBase databases: copied into a database, then again: only new games come in") {
+    CHECK(isChessBase("Games.2cbh"));
+    CHECK(isChessBase("old.CBH"));
+    CHECK(isChessBase("archive.cbv"));
+    CHECK_FALSE(isChessBase("games.pgn"));
+    const auto dir = std::filesystem::temp_directory_path() / "chessbase-into";
+    std::filesystem::remove_all(dir);
+    auto db = Database::create(dir / "Copy.fcgdb");
+    for (const char* name : {"cbtest2.2cbh", "cbtest1.cbh"}) {
+        CAPTURE(name);
+        ImportProgress progress;
+        std::atomic<bool> cancel{false};
+        const auto done = importInto(*db, data(std::string("chessbase/") + name), {}, progress, cancel);
+        CHECK(done.error.empty());
+        REQUIRE(done.chessbase.has_value());
+        CHECK(done.chessbase->games == 35);
+        // The first copy brings every game; the second, the same games in the other format, brings none but the one
+        // whose name the older format wrote otherwise ("Dvořák" in a Windows code page).
+        if (std::string(name) == "cbtest2.2cbh") {
+            CHECK(done.added == 35);
+        } else {
+            CHECK(done.added + done.duplicates == 35);
+            CHECK(done.added <= 1);
+        }
+    }
+    CHECK(db->snapshot()->games() >= 35);
+}

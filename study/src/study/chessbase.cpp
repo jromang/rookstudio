@@ -9,6 +9,7 @@
 // reader keeps written into the tree and the others counted.
 
 #include "chessbase.hpp"
+#include <cctype>
 
 #include <algorithm>
 #include <map>
@@ -22,6 +23,15 @@
 #include "signature.hpp"
 
 namespace fcg::study {
+
+bool isChessBase(const std::filesystem::path& file) {
+    auto ext = file.extension().string();
+    for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (const char* known : {".cbh", ".cbg", ".cba", ".cbp", ".cbt", ".cbc", ".cbs", ".cbe", ".cbj", ".2cbh", ".2cbg",
+                              ".2cba", ".2lid", ".cbv", ".cbz"})
+        if (ext == known) return true;
+    return false;
+}
 
 namespace chessbase {
 

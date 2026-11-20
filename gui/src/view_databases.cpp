@@ -56,7 +56,10 @@ std::string folderText(const std::filesystem::path& folder) {
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 const std::vector<std::pair<std::string, std::string>>& gameFiles() {
-    static const std::vector<std::pair<std::string, std::string>> filters = {{"PGN", "pgn;zst;gz;zip"}};
+    static const std::vector<std::pair<std::string, std::string>> filters = {
+        {"PGN, ChessBase", "pgn;zst;gz;zip;cbh;2cbh;cbv;cbz"},
+        {"PGN", "pgn;zst;gz;zip"},
+        {"ChessBase", "cbh;2cbh;cbv;cbz"}};
     return filters;
 }
 
@@ -69,6 +72,28 @@ DatabaseShelf& App::shelf() {
 
 void App::importIntoDatabase(int index, const std::filesystem::path& file, bool pasted) {
     auto& s = shelf();
+    // A ChessBase database: what it brings, asked first (M10, board 1).
+    if (study::isChessBase(file) && !db_chessbase_go_) {
+        ChessBaseAsk ask;
+        ask.index = index;
+        ask.file  = file;
+        auto ext  = file.extension().string();
+        for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        ask.archive    = ext == ".cbv" || ext == ".cbz";
+        ask.enciphered = ext == ".cbz";
+        if (!ask.archive) {  // its headers only: the moves are read by the copy
+            try {
+                const study::ChessBaseDatabase cb(file);
+                ask.format  = cb.format() == study::ChessBaseFormat::CBH ? "CBH" : "2CBH";
+                ask.records = cb.records();
+            } catch (const std::exception& e) {
+                ask.error = e.what();
+            }
+        }
+        db_chessbase_ = std::move(ask);
+        page_         = Page::Databases;
+        return;
+    }
     if (monthReading()) {  // it writes to a database too: one at a time
         db_message_ = TR("A month of Lichess is being read into a database: import once it has finished.");
         return;
@@ -88,7 +113,7 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
     start.pasted = pasted;
     if (const auto db = s.open(static_cast<std::size_t>(index))) start.games = db->snapshot()->games();
     start.bytes = s.facts(static_cast<std::size_t>(index)).bytes;
-    if (!s.startImport(static_cast<std::size_t>(index), file)) {
+    if (!s.startImport(static_cast<std::size_t>(index), file, db_chessbase_password_)) {
         const auto facts = s.facts(index);
         db_message_      = s.import() ? TR("An import runs already: one at a time.")
                            : facts.read_only
@@ -332,7 +357,7 @@ void App::drawFileLines() {
 void App::drawEmptyDatabase(std::size_t index) {
     ui::beginCard("db_empty");
     ImGui::TextUnformatted(trf("“{}” has no game yet", shelf().entries()[index].name).c_str());
-    ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz or .zip file here, or:"));
+    ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz or .zip file, or a ChessBase database, here, or:"));
     if (ui::iconButton("db_empty_import", ui::Icon::Folder, TR("Import a file…"))) {
         db_selected_ = static_cast<int>(index);
         dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
@@ -424,6 +449,28 @@ void App::drawImportOutcome(std::size_t index) {
             }
         }
     }
+    // A ChessBase database: what its games left out, by kind (M10, board 2).
+    if (o.report.chessbase) {
+        const auto& c   = *o.report.chessbase;
+        const auto many = [](uint64_t n) { return static_cast<int>(std::min<uint64_t>(n, 1000000000)); };
+        std::vector<std::string> left;
+        const auto add = [&](uint64_t n, const char* one, const char* more) {
+            if (n) left.push_back(trn(one, more, many(n), ui::exactCount(n)));
+        };
+        add(c.texts, N_("{} text"), N_("{} texts"));
+        add(c.training, N_("{} training question"), N_("{} training questions"));
+        add(c.pictures + c.sounds + c.videos, N_("{} picture, sound or video"), N_("{} pictures, sounds or videos"));
+        add(c.web_links, N_("{} web link"), N_("{} web links"));
+        add(c.quotations, N_("{} game quoted"), N_("{} games quoted"));
+        add(c.pawn_structures + c.piece_paths, N_("{} pawn structure or piece path"),
+            N_("{} pawn structures or piece paths"));
+        add(c.variation_colours, N_("{} variation colour"), N_("{} variation colours"));
+        add(c.correspondence + c.undecoded + c.other, N_("{} other annotation"), N_("{} other annotations"));
+        std::string said;
+        for (const auto& l : left) said += (said.empty() ? "" : ", ") + l;
+        ImGui::TextDisabled(
+            "%s", said.empty() ? TR("Nothing of its games stayed out.") : trf("Stayed out: {}.", said).c_str());
+    }
     if (ImGui::SmallButton(TR("Close"))) {
         db_outcome_.reset();
         closeFileLines();
@@ -488,8 +535,8 @@ void App::drawDatabases() {
             ImGui::SetTooltip("%s", TR("A database folder (Name.fcgdb) made elsewhere: listed here, its files left "
                                        "where they are."));
     }
-    ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz or .zip file here: it goes into the chosen database, or into a "
-                                 "new one named after it."));
+    ImGui::TextDisabled("%s", TR("Drop a PGN (.pgn, .zst, .gz, .zip) or a ChessBase database (.cbh, .2cbh, .cbv, .cbz) "
+                                 "here: it goes into the chosen database, or into a new one named after it."));
 
     // A new database's name, typed in place.
     if (db_naming_) {
@@ -534,6 +581,7 @@ void App::drawDatabases() {
             db_linked_key_ = key;
         }
     }
+    drawChessBaseAsk();
     drawTwicReport();
     if (twic_sheet_) {
         drawTwicSheet();
@@ -1641,6 +1689,84 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("Its criteria, not its games: on any database, its new games found next time."));
         ImGui::PopTextWrapPos();
+    }
+}
+
+void App::drawChessBaseAsk() {
+    if (!db_chessbase_) return;
+    auto& a    = *db_chessbase_;
+    auto& s    = shelf();
+    bool go    = false;
+    bool later = false;
+    ui::beginCard("db_chessbase");
+    ImGui::PushTextWrapPos();
+    ImGui::TextUnformatted(a.file.stem().string().c_str());
+    ImGui::SameLine(0, px(10));
+    ImGui::TextDisabled("%s", (a.archive ? (a.enciphered ? TR("ChessBase archive · CBZ · only read")
+                                                         : TR("ChessBase archive · CBV · only read"))
+                                         : trf("ChessBase database · {} · only read", a.format))
+                                  .c_str());
+    ui::topic(guide::topics::ChessBaseImport);
+    if (!a.error.empty()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", a.error.c_str());
+    } else {
+        if (!a.archive)
+            ImGui::TextUnformatted(trn("Read in its headers, without opening its moves: {} record (a game, or a text)",
+                                       "Read in its headers, without opening its moves: {} records (games, and texts "
+                                       "if it has some)",
+                                       static_cast<int>(std::min<uint32_t>(a.records, 1000000000)),
+                                       ui::exactCount(a.records))
+                                       .c_str());
+        else
+            ImGui::TextUnformatted(TR("An archive: unpacked while it is read, its games counted as they come."));
+        ImGui::Spacing();
+        ImGui::TextUnformatted(TR("Comes in"));
+        ImGui::TextDisabled("%s", TR("The moves and their variations, the comments before and after the moves, the "
+                                     "symbols, the coloured squares and arrows, the clocks and the time spent, the "
+                                     "engines' evaluations, the medals, the critical positions, the time controls."));
+        ImGui::TextUnformatted(TR("Stays out, counted at the end"));
+        ImGui::TextDisabled("%s", TR("Training (questions and solutions), pictures, sounds and videos, web links, "
+                                     "games quoted, pawn structures and piece paths, variation colours, the texts "
+                                     "(articles)."));
+        ImGui::Spacing();
+        const bool new_one = a.index < 0 || a.index >= static_cast<int>(s.entries().size());
+        const auto into    = new_one ? trf("Into a new database, “{}”", a.file.stem().string())
+                                     : trf("Into “{}”", s.entries()[static_cast<std::size_t>(a.index)].name);
+        std::string estimate;
+        if (a.records > 0) {  // about 350 bytes and 25 µs a game, as measured on large databases
+            estimate = trf(
+                " · about {} · about {} on this machine", formatBytes(static_cast<uint64_t>(a.records) * 350),
+                a.records < 2'400'000 ? std::string(TR("a minute or less")) : trf("{} min", a.records / 2'400'000 + 1));
+        }
+        ImGui::TextUnformatted((into + estimate).c_str());
+        if (a.enciphered) {
+            ImGui::SetNextItemWidth(px(260));
+            ImGui::InputTextWithHint("##cbz_password", TR("The archive's password"), a.password.data(),
+                                     a.password.size(), ImGuiInputTextFlags_Password);
+        }
+        go = ImGui::Button(TR("Import")) ||
+             (!ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Enter, false));
+        ImGui::SameLine(0, px(4));
+        ImGui::TextDisabled("%s", TR("Enter"));
+        ImGui::SameLine();
+    }
+    later = ImGui::Button(TR("Not now")) || ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    ImGui::SameLine(0, px(4));
+    ImGui::TextDisabled("%s", TR("Esc"));
+    ImGui::TextDisabled("%s", TR("The ChessBase files are only read: nothing is written beside them. Imported again, "
+                                 "only its new games come in. A .cbz's password is asked here and not kept."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+    if (go && a.error.empty() && !s.import()) {
+        const auto ask = std::move(*db_chessbase_);
+        db_chessbase_.reset();
+        db_chessbase_go_       = true;
+        db_chessbase_password_ = ask.password.data();
+        importIntoDatabase(ask.index, ask.file, false);
+        db_chessbase_go_ = false;
+        db_chessbase_password_.clear();
+    } else if (later) {
+        db_chessbase_.reset();
     }
 }
 

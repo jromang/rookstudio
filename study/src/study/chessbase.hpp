@@ -36,6 +36,10 @@ namespace fcg::study {
 
 enum class ChessBaseFormat : uint8_t { CBH, TwoCBH };
 
+// The file is one of a ChessBase database's (.cbh, .2cbh and their companions) or an archive of one (.cbv, .cbz),
+// whatever the case of its name.
+[[nodiscard]] bool isChessBase(const std::filesystem::path& file);
+
 struct ChessBaseOptions {
     std::string password;  // a .cbz's
     // An archive's member of at most this many bytes is unpacked whole when the database is opened; a larger one a

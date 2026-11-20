@@ -97,7 +97,7 @@ class DatabaseShelf {
         std::future<study::DatabaseImport> done;
     };
     // False when one runs already, or the database cannot be opened.
-    bool startImport(std::size_t index, const std::filesystem::path& file);
+    bool startImport(std::size_t index, const std::filesystem::path& file, const std::string& password = {});
     [[nodiscard]] Import* import() noexcept { return import_.get(); }
     // The import's report once it is over (its tree built), taken once; none while it runs.
     [[nodiscard]] std::optional<study::DatabaseImport> finishedImport();

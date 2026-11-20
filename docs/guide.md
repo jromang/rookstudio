@@ -1107,6 +1107,21 @@ The tournaments of the profile, and the PGN file open on the Board page, show un
 databases: their games listed and searched like a database's, brought up to date in the background when shown (the
 games a tournament finishes, a file that grew or changed). They are neither imported nor removed.
 
+### ChessBase databases
+
+A ChessBase database dropped on the Databases page, or chosen with *Import a file…*, is copied into a RookStudio
+database: its .cbh or .2cbh (or any of its files), or an archive of one, .cbv or .cbz. A card says first what it holds,
+read in its headers, what comes in and what stays out, where it goes and about how long it takes; *Import* (Enter)
+starts the copy, *Not now* (Esc) leaves it. The ChessBase files are only read, nothing is written beside them; an
+archive is unpacked while it is read, and a .cbz's password is asked on the card and not kept.
+
+The copy keeps the moves and their variations, the comments before and after the moves (a text in several languages:
+English first, the others after it), the symbols, the coloured squares and arrows, the clocks and the time spent, the
+engines' evaluations, the medals (a *Medals* tag), the critical positions and the time controls. Training questions,
+pictures, sounds and videos, web links, games quoted, pawn structures and piece paths, variation colours and the
+texts (articles) stay out: the report at the end counts them by kind. Imported again (new games added in ChessBase
+since), only the new games come in. Players' names are written as the database writes them, "Last, First".
+
 ### TWIC
 
 *From a source…* brings games from a site, downloaded only when you ask. **TWIC**, The Week in Chess, publishes an

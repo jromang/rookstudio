@@ -26,6 +26,7 @@
 
 #include <tour/files.hpp>
 
+#include "chessbase.hpp"
 #include "import.hpp"
 
 namespace fcg::study {
@@ -198,6 +199,7 @@ class Database {
 
 struct DatabaseImport {
     ImportReport read;  // what reading the file gave
+    std::optional<ChessBaseReport> chessbase;  // a ChessBase database's: what its games left out
     uint64_t added      = 0;
     uint64_t duplicates = 0;
     uint64_t commits    = 0;
@@ -211,9 +213,11 @@ struct DatabaseImport {
 // crash or a cancel keeps what was committed, and importing the file again adds the rest only (the duplicates are
 // left out, unless `keep_duplicates`). `cancel` stops the reading within a tenth of a second, what was read being
 // committed; importInto sets it itself when the disk refuses (`error` then says why).
+// A ChessBase database or archive (isChessBase()) is read as importChessBase() reads it, `chessbase` its options (a
+// .cbz's password).
 DatabaseImport importInto(Database& db, const std::filesystem::path& file, const ImportOptions& options,
                           ImportProgress& progress, std::atomic<bool>& cancel, bool keep_duplicates = false,
-                          std::size_t commit_games = std::size_t{1} << 18);
+                          std::size_t commit_games = std::size_t{1} << 18, const ChessBaseOptions& chessbase = {});
 
 // For the tests: called at each step of a commit with its name; an exception thrown from it stops the commit there,
 // as a crash would. Empty: none.

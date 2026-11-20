@@ -268,6 +268,19 @@ TEST_CASE("analysis: an engine that cannot start, or stops, says so") {
     CHECK(a.error().find("mover") != std::string::npos);
 }
 
+TEST_CASE("board: the analysis's search hidden under the fair-play lock, in both spaces") {
+    // Nothing locked: shown on both boards.
+    CHECK(searchShown(true, false, false));
+    CHECK(searchShown(false, false, false));
+    // A game played live: hidden on both.
+    CHECK_FALSE(searchShown(true, true, true));
+    CHECK_FALSE(searchShown(false, true, true));
+    // A correspondence game's position on the line shown: hidden on the study Board, the engines' Board as before.
+    CHECK_FALSE(searchShown(true, true, false));
+    CHECK(searchShown(false, true, false));
+    static_assert(searchShown(false, false, false));
+}
+
 TEST_CASE("board: moves played over a game, the position for the analysis, scores from White's side") {
     ReplayGame game;
     game.start_fen = std::string(chess::constants::STARTPOS);

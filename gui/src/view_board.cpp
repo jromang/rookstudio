@@ -1945,9 +1945,9 @@ void App::drawBoardColumn(float size) {
     decor.eval_white    = 0.5f;
     const auto& lines   = b.analyser->lines();
     const auto position = analysisPosition(b.game, b.chess960, b.ply);
-    // Fair play (#48): while the aids are locked, the study Board shows no engine's arrow nor evaluation, those of the
-    // last search before the lock included, every engine alike (#78).
-    const bool aids  = !(chessBoard() && aidsLocked());
+    // Fair play (#48): no engine's arrow nor evaluation under the lock, those of the search it stopped included: every
+    // engine of the study Board while the aids are locked (#78), the engines' Board's while a game is played live.
+    const bool aids  = searchShown(chessBoard(), aidsLocked(), liveGameOn() != nullptr);
     const bool fresh = aids && b.analyser->active() && b.analyser->position() == position;
     // The study Board's engines side by side (#78): one arrow per move, in the colour of the first engine that plays
     // it, how many play it beside its start.
@@ -2001,7 +2001,7 @@ void App::drawBoardColumn(float size) {
             decor.drop = b.drag_over;
     }
     // The threat, in red.
-    if (b.threat_on && !b.threat.lines().empty() && !b.threat.lines().front().pv.empty()) {
+    if (aids && b.threat_on && !b.threat.lines().empty() && !b.threat.lines().front().pv.empty()) {
         if (const auto position = threatPosition(); position && b.threat.position() == *position) {
             auto passed = board;
             passed.makeNullMove();

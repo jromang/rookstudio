@@ -86,6 +86,13 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BoardSettings, analysis, first_t
 // into side_engines.
 void setAnalysisEngines(BoardSettings& settings, std::vector<SideEngine> engines);
 
+// Fair play (#48): whether a board shows what the analysis's search says (its arrows, its evaluation, the threat), the
+// search the lock stopped included. The study Board hides it while the aids are locked (a game played live, or a
+// correspondence game's position on its line, #78); the engines' Board while a game is played live.
+[[nodiscard]] constexpr bool searchShown(bool study_board, bool aids_locked, bool live_game) noexcept {
+    return study_board ? !aids_locked : !live_game;
+}
+
 // The same, for the analysis engine: the start position and the moves to it.
 [[nodiscard]] AnalysisPosition analysisPosition(const ReplayGame& game, bool chess960, int ply);
 

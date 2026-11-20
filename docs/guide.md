@@ -1302,7 +1302,8 @@ Lichess forbids any help during a game. With your account linked, RookStudio kee
 browser or on a phone:
 
 - while one of your live games lasts, the Board page locks its Analysis, Tree, References and Questions tabs, and
-  neither the engine, the threat, the tables, the cloud nor the assistant look at any position; a review under way
+  neither the engine, the threat, the tables, the cloud nor the assistant look at any position; the boards show none
+  of the analysis's arrows nor its evaluation, those of the search the lock stopped included. A review under way
   stops, the passes it has done kept. Engine tournaments go on, without analysis on their Board. Everything comes back
   by itself when the game ends.
 - a correspondence game locks the engine, the cloud, the tables and the assistant on the game on the board that

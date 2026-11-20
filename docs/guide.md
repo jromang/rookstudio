@@ -1163,6 +1163,14 @@ and imports them into the database chosen (*A new database, “chess.com · name
 for the months not added yet and for the newest one (its games may have grown); a game already there is not added
 twice. What leaves the machine: the player's name and the requests for their months, to api.chess.com.
 
+### Lumbra's Gigabase
+
+*From a source… › Lumbra's Gigabase* explains how to bring it: its site asks you to accept its licence (CC BY-NC
+4.0) and to show you are not a robot, which RookStudio does not do for you. *Open its site* opens it in your browser;
+once the file is downloaded, *Import the downloaded file…* imports it as it is. A .7z archive (LZMA or LZMA2) is
+read as it is unpacked: its PGN files one after the other, its other files passed over, nothing written onto the disk
+but the games. Any .7z of PGN files can be imported, or dropped on the page, the same way.
+
 ## The Openings page
 
 Your repertoires: each a PGN file of the profile (one game and its variations, for White or for Black), which the

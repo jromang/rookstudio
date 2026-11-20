@@ -1,7 +1,7 @@
 #pragma once
 
 // Where games come from: a PGN file as it is, compressed with zstd (.zst) or gzip (.gz), or the PGN files of a zip
-// archive (.zip, zip64 included). Each is read as a stream of text, whatever its size: a month of Lichess games is
+// archive (.zip, zip64 included) or of a 7z archive (.7z). Each is read as a stream of text, whatever its size: a month of Lichess games is
 // 30 GB compressed.
 
 #include <cstddef>

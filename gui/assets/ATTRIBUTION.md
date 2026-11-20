@@ -53,6 +53,11 @@ license:
     All values used to derive this implementation are sourced from Troy's initial AgX implementation/OCIO config
     file available here: https://github.com/sobotka/AgX
 
+## The LZMA SDK (`fcg_lzma`, from 7-Zip's sources)
+
+The reading of .7z archives uses the LZMA SDK's 7z reader and LZMA/LZMA2 decoders by Igor Pavlov, from 7-Zip 24.09
+(https://github.com/ip7z/7zip), placed in the public domain.
+
 ## The reader of ChessBase databases (`study/src/study/chessbase*.cpp`)
 
 Its reading of CBH databases, of CBV and CBZ archives and of the framing of 2CBH's records is ported from cbvault 0.1.6

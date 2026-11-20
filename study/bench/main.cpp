@@ -8,6 +8,7 @@
 //   fcg-study-bench tree <database> [--threads N] [--plies N] [--memory MB]
 //   fcg-study-bench search <database> [--threads N]
 //   fcg-study-bench repertoire <database> <repertoire.pgn> white|black   (the database's tree built before)
+//   fcg-study-bench chessbase <file> [--quiet]   (a ChessBase database or archive, every game read, nothing written)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -25,6 +26,7 @@
 
 #include <chess.hpp>
 
+#include <study/chessbase.hpp>
 #include <study/import.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/query.hpp>
@@ -326,6 +328,58 @@ std::pair<uint64_t, uint64_t> replayAll(const Snapshot& snap, int threads) {
     }
     for (auto& t : pool) t.join();
     return {plies, bad};
+}
+
+// A ChessBase database read through, each game as a GameTree: how many, how fast, what they left out, the first
+// problems met.
+int runChessBase(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    const auto start = std::chrono::steady_clock::now();
+    ChessBaseDatabase db{fs::path(std::string(a.words[1]))};
+    std::printf("%s: %s, %u records\n", std::string(a.words[1]).c_str(),
+                db.format() == ChessBaseFormat::CBH ? "CBH" : "2CBH", db.records());
+    uint64_t games = 0, damaged = 0, plies = 0, variations = 0;
+    std::vector<std::string> problems;
+    auto last = start;
+    db.forEach([&](ChessBaseGame&& g) {
+        ++games;
+        plies += g.tree.main.moves.size();
+        variations += g.tree.variations.size();
+        if (g.damaged) {
+            ++damaged;
+            if (problems.size() < 20) problems.push_back(std::to_string(g.record) + ": " + g.problem);
+        }
+        const auto now = std::chrono::steady_clock::now();
+        if (!a.quiet && now - last > std::chrono::seconds(10)) {
+            std::printf("  %llu games\n", static_cast<unsigned long long>(games));
+            std::fflush(stdout);
+            last = now;
+        }
+        return true;
+    });
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    const auto& r        = db.report();
+    std::printf("games %llu, damaged %llu, plies %llu, variations %llu, %.1f s (%.1f us a game)\n",
+                static_cast<unsigned long long>(games), static_cast<unsigned long long>(damaged),
+                static_cast<unsigned long long>(plies), static_cast<unsigned long long>(variations), seconds,
+                games ? 1e6 * seconds / static_cast<double>(games) : 0.0);
+    std::printf("report: records %llu games %llu texts %llu deleted %llu unknown %llu damaged %llu unreadable %llu\n",
+                static_cast<unsigned long long>(r.records), static_cast<unsigned long long>(r.games),
+                static_cast<unsigned long long>(r.texts), static_cast<unsigned long long>(r.deleted),
+                static_cast<unsigned long long>(r.unknown), static_cast<unsigned long long>(r.damaged),
+                static_cast<unsigned long long>(r.unreadable));
+    std::printf(
+        "left out: training %llu pictures %llu sounds %llu videos %llu links %llu quotations %llu pawns %llu "
+        "paths %llu colours %llu correspondence %llu undecoded %llu other %llu\n",
+        static_cast<unsigned long long>(r.training), static_cast<unsigned long long>(r.pictures),
+        static_cast<unsigned long long>(r.sounds), static_cast<unsigned long long>(r.videos),
+        static_cast<unsigned long long>(r.web_links), static_cast<unsigned long long>(r.quotations),
+        static_cast<unsigned long long>(r.pawn_structures), static_cast<unsigned long long>(r.piece_paths),
+        static_cast<unsigned long long>(r.variation_colours), static_cast<unsigned long long>(r.correspondence),
+        static_cast<unsigned long long>(r.undecoded), static_cast<unsigned long long>(r.other));
+    for (const auto& p : problems) std::printf("  problem %s\n", p.c_str());
+    for (std::size_t i = 0; i < r.problems.size() && i < 20; ++i) std::printf("  report %s\n", r.problems[i].c_str());
+    return 0;
 }
 
 int runDecode(const Args& a) {
@@ -739,6 +793,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "tree") rc = runTree(a);
         if (a.words[0] == "search") rc = runSearch(a);
         if (a.words[0] == "repertoire") rc = runRepertoire(a);
+        if (a.words[0] == "chessbase") rc = runChessBase(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

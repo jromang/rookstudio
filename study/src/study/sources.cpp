@@ -1,5 +1,7 @@
 #include "sources.hpp"
 
+#include "sevenzip.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -335,6 +337,8 @@ std::vector<std::unique_ptr<ByteSource>> openSources(const fs::path& file) {
         out.push_back(std::make_unique<InflateSource>(file, file.filename().string(), false, 0, ~uint64_t{0}));
     } else if (le(magic.data(), 4) == 0x04034b50 || le(magic.data(), 4) == 0x06054b50) {
         out = zipSources(file, [](std::string_view name) { return endsWithPgn(std::string(name)); });
+    } else if (magic[0] == '7' && magic[1] == 'z' && magic[2] == 0xBC && magic[3] == 0xAF) {
+        out.push_back(sevenZipSource(file));  // Lumbra's Gigabase: its PGN files decoded as they are read
     } else {
         out.push_back(std::make_unique<PlainSource>(file));
     }

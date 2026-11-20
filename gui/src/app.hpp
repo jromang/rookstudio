@@ -432,6 +432,8 @@ class App {
     void pollMonthReading();
     [[nodiscard]] bool monthReading() const { return month_reading_ && month_reading_->busy(); }
     bool month_sheet_ = false;
+    bool lumbra_sheet_ = false;  // Lumbra's Gigabase (#75): downloaded on its site by the user, then imported
+    void drawLumbraSheet();
     int month_pick_   = 0;
     int month_target_ = -2;
     lichess::MonthFilter month_filter_;

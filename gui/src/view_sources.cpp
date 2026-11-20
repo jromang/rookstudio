@@ -10,6 +10,7 @@
 #include <future>
 #include <iterator>
 
+#include <SDL3/SDL.h>
 #include <imgui.h>
 
 #include <fmt/include/fmt/format.h>
@@ -261,8 +262,10 @@ void App::drawSourcesMenu() {
                            TR("its public API, without an account, a month at a time")};
     const Source lichess_games{TR("Lichess games"), TR("a month of rated games, filtered"),
                                TR("database.lichess.org · CC0 · about 30 GB a month, read as it comes")};
+    const Source lumbra{"Lumbra's Gigabase", TR("a file downloaded on its site"),
+                        TR("CC BY-NC 4.0 · its site asks you to accept its licence")};
     int i = 0;
-    for (const auto& source : {twic, broadcasts, chess_com, lichess_games}) {
+    for (const auto& source : {twic, broadcasts, chess_com, lichess_games, lumbra}) {
         ImGui::PushID(i++);
         const auto start = ImGui::GetCursorPos();
         if (ImGui::Selectable("##source", false, 0, ImVec2(px(420), ImGui::GetTextLineHeightWithSpacing() * 2.1f))) {
@@ -270,6 +273,7 @@ void App::drawSourcesMenu() {
             broadcast_sheet_ = i == 2;
             chesscom_sheet_  = i == 3;
             month_sheet_     = i == 4;
+            lumbra_sheet_    = i == 5;
             twic_done_.reset();
         }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(2)));
@@ -981,6 +985,33 @@ void App::drawMonthSheet() {
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for database.lichess.org's page, then for the "
                                  "month's file, read as it comes: only the games kept reach the disk. Cancel, a "
                                  "network cut or the program closed: it goes on from where it stopped."));
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+}
+
+void App::drawLumbraSheet() {
+    ui::beginCard("lumbra_sheet");
+    ImGui::TextUnformatted("Lumbra's Gigabase");
+    ImGui::SameLine(0, px(10));
+    ImGui::TextDisabled("%s", TR("millions of games, over-the-board and online, CC BY-NC 4.0"));
+    ui::topic(guide::topics::Lumbra);
+    ImGui::PushTextWrapPos();
+    ImGui::TextUnformatted(
+        TR("Its site asks you to accept its licence and to show you are not a robot: RookStudio does "
+           "not do it for you. Download the file on its site, then import it here as it is, .7z "
+           "or .pgn: a .7z is read as it is unpacked, nothing written onto the disk but the games."));
+    ImGui::PopTextWrapPos();
+    if (ImGui::Button(TR("Open its site"))) SDL_OpenURL("https://lumbrasgigabase.com/");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(shelf().import() != nullptr || monthReading());
+    if (ImGui::Button(TR("Import the downloaded file…")))
+        dialogs_.openFile(Dialogs::Purpose::ImportGames, {{TR("Lumbra's Gigabase (.7z, .pgn)"), "7z;pgn"}});
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button(TR("Close##lumbra"))) lumbra_sheet_ = false;
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", TR("Its games are under CC BY-NC 4.0: for a use that is not commercial, their source "
+                                 "named. What leaves the machine: nothing, the site opened in your browser."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }

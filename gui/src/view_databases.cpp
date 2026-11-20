@@ -57,8 +57,8 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 const std::vector<std::pair<std::string, std::string>>& gameFiles() {
     static const std::vector<std::pair<std::string, std::string>> filters = {
-        {"PGN, ChessBase", "pgn;zst;gz;zip;cbh;2cbh;cbv;cbz"},
-        {"PGN", "pgn;zst;gz;zip"},
+        {"PGN, ChessBase", "pgn;zst;gz;zip;7z;cbh;2cbh;cbv;cbz"},
+        {"PGN", "pgn;zst;gz;zip;7z"},
         {"ChessBase", "cbh;2cbh;cbv;cbz"}};
     return filters;
 }
@@ -357,7 +357,7 @@ void App::drawFileLines() {
 void App::drawEmptyDatabase(std::size_t index) {
     ui::beginCard("db_empty");
     ImGui::TextUnformatted(trf("“{}” has no game yet", shelf().entries()[index].name).c_str());
-    ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz or .zip file, or a ChessBase database, here, or:"));
+    ImGui::TextDisabled("%s", TR("Drop a PGN, .zst, .gz, .zip or .7z file, or a ChessBase database, here, or:"));
     if (ui::iconButton("db_empty_import", ui::Icon::Folder, TR("Import a file…"))) {
         db_selected_ = static_cast<int>(index);
         dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
@@ -535,8 +535,9 @@ void App::drawDatabases() {
             ImGui::SetTooltip("%s", TR("A database folder (Name.fcgdb) made elsewhere: listed here, its files left "
                                        "where they are."));
     }
-    ImGui::TextDisabled("%s", TR("Drop a PGN (.pgn, .zst, .gz, .zip) or a ChessBase database (.cbh, .2cbh, .cbv, .cbz) "
-                                 "here: it goes into the chosen database, or into a new one named after it."));
+    ImGui::TextDisabled("%s",
+                        TR("Drop a PGN (.pgn, .zst, .gz, .zip, .7z) or a ChessBase database (.cbh, .2cbh, .cbv, .cbz) "
+                           "here: it goes into the chosen database, or into a new one named after it."));
 
     // A new database's name, typed in place.
     if (db_naming_) {
@@ -597,6 +598,10 @@ void App::drawDatabases() {
     }
     if (month_sheet_) {
         drawMonthSheet();
+        return;
+    }
+    if (lumbra_sheet_) {
+        drawLumbraSheet();
         return;
     }
     const auto& entries = s.entries();

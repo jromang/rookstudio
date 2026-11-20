@@ -209,7 +209,13 @@ FetchContent_Declare(zlib
     GIT_TAG v1.3.2
     SOURCE_SUBDIR fcg-no-cmake
     GIT_SHALLOW TRUE)
-FetchContent_MakeAvailable(zstd zlib)
+# The LZMA SDK's decoders and 7z reader (public domain), from 7-Zip's sources: .7z archives, Lumbra's Gigabase.
+FetchContent_Declare(lzma
+    GIT_REPOSITORY https://github.com/ip7z/7zip.git
+    GIT_TAG 24.09
+    SOURCE_SUBDIR fcg-no-cmake
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(zstd zlib lzma)
 
 # The decoder alone, in C, without its assembly (one source set on every system) or threads.
 file(GLOB FCG_ZSTD_SOURCES ${zstd_SOURCE_DIR}/lib/common/*.c ${zstd_SOURCE_DIR}/lib/decompress/*.c)
@@ -222,6 +228,13 @@ add_library(fcg_zlib STATIC
 target_include_directories(fcg_zlib SYSTEM PUBLIC ${zlib_SOURCE_DIR})
 target_compile_definitions(fcg_zlib PRIVATE Z_PREFIX)
 target_compile_definitions(fcg_zlib INTERFACE Z_PREFIX)
+add_library(fcg_lzma STATIC
+    ${lzma_SOURCE_DIR}/C/7zArcIn.c ${lzma_SOURCE_DIR}/C/7zBuf.c ${lzma_SOURCE_DIR}/C/7zCrc.c
+    ${lzma_SOURCE_DIR}/C/7zCrcOpt.c ${lzma_SOURCE_DIR}/C/7zStream.c ${lzma_SOURCE_DIR}/C/CpuArch.c
+    ${lzma_SOURCE_DIR}/C/LzmaDec.c ${lzma_SOURCE_DIR}/C/Lzma2Dec.c ${lzma_SOURCE_DIR}/C/7zDec.c
+    ${lzma_SOURCE_DIR}/C/Bcj2.c ${lzma_SOURCE_DIR}/C/Bra.c ${lzma_SOURCE_DIR}/C/Bra86.c ${lzma_SOURCE_DIR}/C/BraIA64.c
+    ${lzma_SOURCE_DIR}/C/Delta.c)
+target_include_directories(fcg_lzma SYSTEM PUBLIC ${lzma_SOURCE_DIR}/C)
 
 # ---------------------------------------------------------------------------
 # Study layer: games and their PGN, databases (no UI)
@@ -232,7 +245,7 @@ add_library(fcg_study STATIC ${FCG_STUDY_SOURCES})
 target_compile_features(fcg_study PUBLIC cxx_std_20)
 target_include_directories(fcg_study PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/study/src)
 target_compile_options(fcg_study PRIVATE -Wall -Wextra)
-target_link_libraries(fcg_study PUBLIC fcg_tournament PRIVATE fcg_zstd fcg_zlib)
+target_link_libraries(fcg_study PUBLIC fcg_tournament PRIVATE fcg_zstd fcg_zlib fcg_lzma)
 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_STUDY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/tests/*.cpp)

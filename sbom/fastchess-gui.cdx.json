@@ -130,6 +130,20 @@
     },
     {
       "type": "library",
+      "bom-ref": "fetchcontent:lzma",
+      "name": "lzma-sdk",
+      "version": "24.09",
+      "description": "Reading of .7z game archives (Lumbra's Gigabase): the LZMA SDK's 7z reader and LZMA/LZMA2 decoders, in C, from 7-Zip's sources.",
+      "purl": "pkg:github/ip7z/7zip@24.09",
+      "licenses": [{ "license": { "name": "Public domain (LZMA SDK)" } }],
+      "externalReferences": [{ "type": "vcs", "url": "https://github.com/ip7z/7zip.git" }],
+      "properties": [
+        { "name": "fastchess-gui:pin", "value": "24.09" },
+        { "name": "fastchess-gui:commit", "value": "e5431fa6f5505e385c6f9367260717e9c47dc2ee" }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "fetchcontent:llama",
       "name": "llama.cpp",
       "version": "0.6.0",

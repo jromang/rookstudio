@@ -4,8 +4,10 @@
 #include <doctest/doctest.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <map>
 #include <thread>
 
 #include "../../tournament/tests/self_path.hpp"
@@ -268,4 +270,76 @@ TEST_CASE("continuous analysis: an analysis waits at a pass for the others, then
         std::this_thread::sleep_for(10ms);
     }
     CHECK(st.settled.passes == 2);
+}
+
+TEST_CASE("continuous analysis: positions known deep enough already are taken as they are, the others searched") {
+    if (!fs::is_regular_file(randomMover())) return;
+    ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
+    // The start and the positions after the first two moves known, as Lichess's evaluations kept offline give them.
+    const auto game = shortGame();
+    std::map<uint64_t, PositionEval> known;
+    {
+        chess::Board board;
+        for (int ply = 0; ply <= 2; ++ply) {
+            PositionEval e;
+            e.score = cp(20 + ply);
+            e.best  = chess::uci::moveToUci(game.moves[static_cast<std::size_t>(ply)].move);
+            e.pv    = e.best;
+            e.depth = 40;
+            e.known = true;
+            known.emplace(board.hash(), e);
+            board.makeMove(game.moves[static_cast<std::size_t>(ply)].move);
+        }
+    }
+    std::atomic<int> asked{0};
+    ReviewRunner runner;
+    ReviewRunner::Setup setup;
+    setup.engine.name     = "mover";
+    setup.engine.cmd      = randomMover();
+    setup.engine.protocol = "uci";
+    setup.game            = game;
+    setup.ceiling_ms      = passTime(1);  // two passes
+    setup.known           = [&](const chess::Board& board) -> std::optional<PositionEval> {
+        ++asked;
+        const auto it = known.find(board.hash());
+        if (it == known.end()) return std::nullopt;
+        return it->second;
+    };
+    runner.start(setup);
+    ReviewRunner::State st;
+    uint64_t version = 0;
+    const auto until = std::chrono::steady_clock::now() + 60s;
+    while (std::chrono::steady_clock::now() < until) {
+        (void)runner.state(st, version);
+        if (!st.running) break;
+        std::this_thread::sleep_for(10ms);
+    }
+    CHECK(st.error.empty());
+    REQUIRE_FALSE(st.running);
+    CHECK(st.settled.passes == 2);
+    CHECK(asked == 5);  // once per position, not at each pass
+    REQUIRE(st.settled.positions.size() == 5);
+    for (std::size_t ply = 0; ply < 5; ++ply) {
+        CAPTURE(ply);
+        const auto& p = st.settled.positions[ply];
+        CHECK(p.time_ms == passTime(1));
+        if (ply <= 2) {
+            CHECK(p.known);
+            CHECK(p.depth == 40);
+            CHECK(p.best == chess::uci::moveToUci(game.moves[ply].move));
+            REQUIRE(p.score.has_value());
+            CHECK(p.score->value == static_cast<int64_t>(20 + ply));
+        } else {
+            CHECK_FALSE(p.known);  // searched by the engine
+            CHECK_FALSE(p.best.empty());
+        }
+    }
+    // Kept with the game as it was found: known, not searched.
+    const auto dir = fs::temp_directory_path() / "known-reviews";
+    fs::remove_all(dir);
+    REQUIRE(saveReview(dir, game, st.settled));
+    const auto back = loadReview(dir, game);
+    REQUIRE(back);
+    CHECK(back->positions[0].known);
+    CHECK_FALSE(back->positions[4].known);
 }

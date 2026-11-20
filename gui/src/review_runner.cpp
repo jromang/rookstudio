@@ -269,6 +269,12 @@ void ReviewRunner::run(Setup setup, std::vector<AnalysisPosition> positions) {
     std::vector<bool> over(static_cast<std::size_t>(n));
     for (int i = 0; i < n; ++i)
         over[static_cast<std::size_t>(i)] = endScore(boardOf(positions[static_cast<std::size_t>(i)])).has_value();
+    // The positions known already, deep enough: taken as they are at each pass.
+    std::vector<std::optional<PositionEval>> known(static_cast<std::size_t>(n));
+    if (setup.known)
+        for (int i = 0; i < n && !stop_; ++i)
+            if (!over[static_cast<std::size_t>(i)])
+                known[static_cast<std::size_t>(i)] = setup.known(boardOf(positions[static_cast<std::size_t>(i)]));
 
     while (!stop_) {
         // What the board's analysis searched for longer, taken also while it pauses the analysis.
@@ -283,6 +289,8 @@ void ReviewRunner::run(Setup setup, std::vector<AnalysisPosition> positions) {
                 if (ply < 0 || ply >= n) continue;
                 auto& live = state_.live.positions[static_cast<std::size_t>(ply)];
                 if (value.time_ms <= live.time_ms) continue;
+                // A position known already: replaced only by a deeper search.
+                if (const auto& k = known[static_cast<std::size_t>(ply)]; k && value.depth <= k->depth) continue;
                 int level = 0;
                 while (level < 12 && passTime(level + 1) <= value.time_ms) ++level;
                 live = std::move(value);
@@ -300,13 +308,19 @@ void ReviewRunner::run(Setup setup, std::vector<AnalysisPosition> positions) {
         }
         {
             std::lock_guard lock(mutex_);
-            // The positions the game ended in need no engine.
+            // The positions the game ended in need no engine, nor those known already.
             for (int i = 0; i < n; ++i) {
-                if (!over[static_cast<std::size_t>(i)] || state_.done[static_cast<std::size_t>(i)]) continue;
-                state_.live.positions[static_cast<std::size_t>(i)] = {
-                    endScore(boardOf(positions[static_cast<std::size_t>(i)])), "", 0, passTime(pass), "", std::nullopt};
-                state_.level[static_cast<std::size_t>(i)] = pass;
-                state_.done[static_cast<std::size_t>(i)]  = true;
+                const auto at = static_cast<std::size_t>(i);
+                if ((!over[at] && !known[at]) || state_.done[at]) continue;
+                if (over[at]) {
+                    state_.live.positions[at] = {
+                        endScore(boardOf(positions[at])), "", 0, passTime(pass), "", std::nullopt};
+                } else {
+                    state_.live.positions[at]         = *known[at];
+                    state_.live.positions[at].time_ms = passTime(pass);
+                }
+                state_.level[at] = pass;
+                state_.done[at]  = true;
             }
             // The board's position first, then the review's order.
             const int first = first_;

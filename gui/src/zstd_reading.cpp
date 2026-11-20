@@ -86,6 +86,7 @@ std::string readZstd(const std::string& source, const fs::path& state_file, Zstd
         nlohmann::json j{{"source", source}, {"validator", validator}, {"size", size},
                          {"date", date},     {"offset", offset},       {"state", kept}};
         tour::replaceFile(state_file, j.dump());
+        if (options.on_saved) options.on_saved();
     };
     const auto startAgain = [&] {
         consumer.startAgain();

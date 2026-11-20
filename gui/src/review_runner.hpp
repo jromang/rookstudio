@@ -2,7 +2,8 @@
 
 // The continuous analysis of a game (Board page): every position searched by an engine of the library at each pass,
 // passTime(pass) each, four times longer at each pass, on a thread of its own with its own engine process, so that
-// its pace does not depend on the window's frames. The positions go from the last to the first (the engine's hash
+// its pace does not depend on the window's frames. A position whose value is known deep enough already (Lichess's
+// evaluations kept offline) is taken as it is. The positions go from the last to the first (the engine's hash
 // then holds what comes after a position), the board's position first. Its threads count in the core budget while it
 // searches.
 //
@@ -15,6 +16,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -50,6 +52,9 @@ class ReviewRunner {
         bool chess960      = false;
         int64_t ceiling_ms = 0;  // the time per position of the last pass; 0: until stopped
         GameReview resume;       // the passes done before, kept; passes 0: from the start
+        // A position's value known already (Lichess's evaluations kept offline, deep enough: #58), taken as it is at
+        // every pass instead of a search; asked once per position, on the analysis's thread.
+        std::function<std::optional<PositionEval>(const chess::Board&)> known;
     };
     struct State {
         uint64_t version = 0;

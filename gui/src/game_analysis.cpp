@@ -108,6 +108,7 @@ GameReview reviewFromJson(const nlohmann::json& j) {
         e.depth   = p.value("depth", 0);
         e.time_ms = p.value("time_ms", int64_t{0});
         e.pv      = p.value("pv", "");
+        e.known   = p.value("known", false);
         if (p.contains("wdl") && p["wdl"].is_array() && p["wdl"].size() == 3)
             e.wdl = std::array<int64_t, 3>{p["wdl"][0].get<int64_t>(), p["wdl"][1].get<int64_t>(),
                                            p["wdl"][2].get<int64_t>()};
@@ -136,6 +137,7 @@ nlohmann::json reviewToJson(const GameReview& review) {
         if (p.time_ms > 0) e["time_ms"] = p.time_ms;
         if (!p.pv.empty()) e["pv"] = p.pv;
         if (p.wdl) e["wdl"] = *p.wdl;
+        if (p.known) e["known"] = true;
         j["positions"].push_back(std::move(e));
     }
     if (!review.previous.empty()) {

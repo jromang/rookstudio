@@ -23,6 +23,9 @@ class MappedFile {
 
     [[nodiscard]] const uint8_t* data() const noexcept { return data_; }
     [[nodiscard]] std::size_t size() const noexcept { return size_; }
+    // Read here and there rather than from its start: the system then reads the pages asked for, not their
+    // neighbours too (POSIX; nothing elsewhere).
+    void adviseRandom() const noexcept;
 
    private:
     void close() noexcept;

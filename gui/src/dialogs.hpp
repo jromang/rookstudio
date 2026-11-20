@@ -43,6 +43,7 @@ class Dialogs {
         OpeningSuiteBook,    // a book from Lichess's named openings (#53)
         EvaluatedSuiteBook,  // a book from Lichess's evaluated positions (#53)
         EvalsFile,           // Lichess's evaluations database downloaded before (#53)
+        OfflineEvalsFile,    // the same, read for the evaluations kept offline (#58)
         LichessMonthFile,    // a month of Lichess's games downloaded before (#72)
         BuildBookPgn,
         BuildBookBin,

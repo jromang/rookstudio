@@ -132,6 +132,7 @@ const std::vector<const char*>& allTopics() {
                                               LichessGames,
                                               LichessBroadcasts,
                                               LichessOnline,
+                                              OfflineEvals,
                                               Assistant,
                                               AssistantModel,
                                               Questions,

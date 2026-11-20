@@ -26,6 +26,8 @@ void setDatabaseServer(std::string base);
 [[nodiscard]] std::string databaseUrl();  // its page
 [[nodiscard]] std::string monthUrl(const Month& month);
 [[nodiscard]] std::string monthFile(const Month& month);  // the file's name
+// Lichess's evaluations database (lichess_db_eval.jsonl.zst, CC0), on the same site (#53, #58).
+[[nodiscard]] std::string evalsUrl();
 
 // The months of one kind its page lists, the newest first; empty when it lists none (the page changed).
 [[nodiscard]] std::vector<Month> parseMonths(std::string_view html, MonthKind kind);

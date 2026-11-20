@@ -65,6 +65,7 @@
 #include "machine_run.hpp"
 #include "model.hpp"
 #include "notice.hpp"
+#include "offline_evals.hpp"
 #include "opening_suite.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
@@ -1324,6 +1325,33 @@ class App {
     void drawLichessBroadcasts();
     void drawLichessFollowed();
     void drawLichessOnline();
+    // Lichess's evaluations kept offline (#58, mockup M11, board 6): the index in the profile; its card on the Lichess
+    // page (what is kept, the preparation, Update, Remove them); the Analysis tab's line, the review's known positions
+    // and the Tree tab's column.
+    std::unique_ptr<OfflineEvals> offline_evals_;
+    int offline_evals_choice_  = 0;      // what is kept: 0 every position, 1 the openings
+    bool offline_evals_remove_ = false;  // Remove them asked: what it frees said, then the answer
+    bool offline_evals_focus_  = false;  // the card to bring into view (Ctrl+K, --focus)
+    bool offline_evals_keys_   = false;  // Enter is the card's: it was brought into view, not clicked away from
+    float offline_evals_y_     = -1;     // where the card starts on the screen, for the page to scroll there
+    std::string offline_evals_error_;    // why the last preparation stopped
+    std::future<EvalsSize> offline_evals_update_;                  // Update: the server's file asked for its date first
+    std::string offline_evals_note_;                               // what Update found
+    std::chrono::steady_clock::time_point offline_evals_since_{};  // the rate: since when, from how many bytes
+    uint64_t offline_evals_from_ = 0;
+    std::map<std::string, std::optional<study::OfflineEval>> offline_evals_seen_;  // looked up, by position
+    uint64_t offline_evals_generation_ = 0;                                        // of what answered when they were
+    int offline_evals_frame_           = -1;  // the frame whose lookups' time is counted, and that time
+    double offline_evals_spent_        = 0;
+    void pollOfflineEvals();
+    void drawLichessOfflineEvals();
+    void startOfflineEvals(std::string source, int min_men);
+    // A position's offline evaluation when it may show (standard chess, nothing locked by fair play), kept for the
+    // frames that ask again.
+    [[nodiscard]] std::optional<study::OfflineEval> offlineEval(const chess::Board& board);
+    void drawOfflineEvalLine(const chess::Board& board);  // the Analysis tab's line, above the engine
+    // The review's known positions: those the evaluations have deep enough; empty without them.
+    [[nodiscard]] std::function<std::optional<PositionEval>(const chess::Board&)> reviewKnown() const;
     // The game's headers, unfolded in place above the notation (M2, board 7): Alt+H.
     bool headers_open_ = false;
     std::map<std::string, std::array<char, 256>> header_edit_;  // a field's text while it is written

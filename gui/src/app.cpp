@@ -120,6 +120,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     loadRecentGames();  // the board's game and the recent ones of the session before
     loadKeptSearches();
     loadLichess();
+    offline_evals_ = std::make_unique<OfflineEvals>(storage_.root() / "lichess-evals");  // #58
     // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
     assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
@@ -296,6 +297,7 @@ void App::frame() {
     pollCast();             // a tournament on the user's own Lichess broadcast, once allowed (#51)
     pollPrep();             // a game prepared against an opponent: their games, then the report (#52)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
+    pollOfflineEvals();     // Lichess's evaluations kept offline: a preparation's runs, its end (#58)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
     pollStudies();          // the user's Lichess studies: read, imported, followed, a game sent (#79)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
@@ -589,6 +591,19 @@ void App::frame() {
             const auto from  = std::string_view("chesscom-server=").size();
             chesscom::setServer(w.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
             if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w == "lichess-evals") {  // the card of Lichess's evaluations kept offline (#58)
+            page_                = Page::Lichess;
+            offline_evals_focus_ = true;
+        } else if (w.rfind("lichess-evals=", 0) == 0) {
+            // lichess-evals=FILE[@openings]: their preparation from that file (a .jsonl.zst), every position or the
+            // openings only.
+            page_                = Page::Lichess;
+            offline_evals_focus_ = true;
+            auto file            = w.substr(14);
+            const bool openings  = file.size() > 9 && file.substr(file.size() - 9) == "@openings";
+            if (openings) file.resize(file.size() - 9);
+            offline_evals_choice_ = openings ? 1 : 0;
+            startOfflineEvals(file, openings ? study::EVALS_OPENING_MEN : 0);
         } else if (w == "databases-chesscom") {  // the sheet of a chess.com player's games
             page_           = Page::Databases;
             chesscom_sheet_ = true;
@@ -1620,6 +1635,9 @@ void App::handleDialogs() {
                 break;
             case Dialogs::Purpose::EvalsFile:
                 startEvalsReading(path);
+                break;
+            case Dialogs::Purpose::OfflineEvalsFile:
+                startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
                 break;
             case Dialogs::Purpose::LichessMonthFile:
                 startMonthReading(path);

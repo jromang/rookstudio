@@ -346,6 +346,9 @@ void App::drawBoardOnline() {
                     lichess_.cloud, online_cloud_not_now_);
         }
     }
+
+    // Lichess's evaluations kept offline (#58): a line above the engine, nothing asked of the network.
+    drawOfflineEvalLine(board);
 }
 
 void App::drawOnlineTablebase(const chess::Board& board, int pieces) {

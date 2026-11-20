@@ -81,6 +81,7 @@
 #include "suite_run.hpp"
 #include "tablebases.hpp"
 #include "topology.hpp"
+#include "training.hpp"
 #include "twic.hpp"
 #include "ui.hpp"
 #include "views.hpp"
@@ -642,6 +643,69 @@ class App {
     // A line of moves from the start (SAN) shown on the board, at its end, the tree beside it.
     void showLineOnBoard(const std::vector<std::string>& line, const std::string& title);
 
+    // The repertoires' training (#76, mockup M11, board 1; training.hpp, view_training.cpp): the training card of the
+    // Openings page, a session on the Board page whose column becomes the training's, "In progress" on the Home page
+    // and Ctrl+K. Each repertoire's cards and memories, counted for the day.
+    struct TrainingSummary {
+        uint64_t revision = UINT64_MAX;  // the repertoire's when its cards were made
+        std::vector<study::TrainingCard> cards;
+        TrainingFile kept;
+        study::TrainingCounts counts;
+        int64_t counted = 0;   // when (seconds), counted again each minute
+        int new_per_day = -1;  // the limit it was counted with
+    };
+    std::map<std::filesystem::path, TrainingSummary> training_summaries_;  // by the repertoire's file
+    [[nodiscard]] const TrainingSummary& trainingSummary(std::size_t index);
+    // The cards ordered by what the databases play (the walk, the games of each), made in the background, one
+    // repertoire at a time: nullptr until they are ready.
+    struct TrainingPlanned {
+        std::string of;  // the repertoire's file and revision, the databases
+        std::vector<study::TrainingCard> cards;
+    };
+    std::map<std::filesystem::path, TrainingPlanned> training_planned_;
+    struct TrainingPlanning {
+        std::filesystem::path file;
+        std::string of;
+        std::future<std::vector<study::TrainingCard>> cards;
+    };
+    std::optional<TrainingPlanning> training_planning_;
+    [[nodiscard]] const std::vector<study::TrainingCard>* plannedCards(std::size_t index);
+    // The databases whose tree is built and that the Openings page measures on; `key` names them and their state.
+    [[nodiscard]] std::vector<study::TreeBase> trainingBases(std::string* key, std::vector<std::string>* names);
+    [[nodiscard]] std::optional<std::size_t> repertoireOf(const std::filesystem::path& file);
+    std::optional<TrainingSettings> training_settings_;
+    TrainingSettings& trainingSettings();
+    void saveTrainingSettings();
+    bool training_limit_menu_ = false;  // the menu of the new positions a day, asked from Ctrl+K
+    std::unique_ptr<TrainingRun> training_;
+    void drawTrainingCard(std::size_t index);                       // on the Openings page
+    [[nodiscard]] std::string trainingListLine(std::size_t index);  // "23 to review", for the list of repertoires
+    // Why a session cannot start now, empty when it can.
+    [[nodiscard]] std::string trainingLock() const;
+    void startTraining(std::size_t index, TrainingRun::Kind kind);
+    void pollTraining();      // each frame: the cards prepared, the session's first question
+    void drawTrainingPage();  // the Board page during a session
+    void drawTrainingBoard(float size);
+    void drawTrainingColumn();
+    void drawTrainingEnd();
+    void trainingKeys();
+    void trainingAnswer(chess::Move move);  // a move played on the board or typed
+    void trainingGrade(bool right);         // the first answer to the card asked, kept
+    void trainingDontKnow();
+    void trainingRetry();
+    void trainingNext();
+    void trainingAdd();  // the move played added to the repertoire (Ctrl+Z takes it back)
+    void trainingTakeBack();
+    void finishTraining(bool stopped);
+    void askTrainingCard();  // the board on the card asked, the opponent's move just played
+    void showTrainingCard(const study::TrainingCard& card);  // its line on the board, the question's position
+    void reviewMissed();                           // "Review them now": the missed moves in a session of their own
+    void closeTraining(bool to_openings);          // the session left, the board given back
+    void dropTraining();                           // another game came on the board: the session left where it is
+    [[nodiscard]] bool trainingHidesAids() const;  // a question: the tree, the engines, the notes hidden
+    void drawTrainingHome();                       // the Home page's "In progress": the positions to review
+    [[nodiscard]] bool trainingDue();
+
     // shell
     void drawShell();
     void drawRail(float width);
@@ -815,6 +879,7 @@ class App {
     // The Board page (view_board.cpp): a game or a position, and its analysis.
     void drawBoardPage();
     void drawBoardColumn(float size);  // the board, the buttons under it
+    void drawPromotionPopup(const chess::Board& board);  // the piece a pawn becomes, once its move is chosen
     void drawBoardAnalysis();
     void drawBoardMoves(float height);
     void drawBoardTable();   // the Table tab: each move with its engine's score, depth and time
@@ -1391,6 +1456,7 @@ class App {
     void boardMark(chess::Square from, chess::Square to);
     void boardClearMarks();
     void boardEditKeys();
+    void boardMoveKeys();  // a letter that begins a move opens the move field
     void boardTypeNag(char sign);
     void boardSetNag(uint8_t nag);
     void boardComment(bool before);  // the field opened on the move shown
@@ -1401,6 +1467,7 @@ class App {
     // The Chess space's column beside the board (mockups M2 and M3, view_board_tree.cpp): its tabs (Alt+1 to Alt+4),
     // the opening tree of the databases and books, the reference games of the position.
     void drawChessColumn();
+    void drawChessTabs();  // the tabs and the one chosen
     void drawBoardTree();
     // The Questions tab (Alt+5, mockup M5, board 2; view_board_questions.cpp): questions about the position, answered
     // by the assistant from what the engine, the databases and the tables establish; the first time, the card that

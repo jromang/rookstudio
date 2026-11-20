@@ -69,6 +69,7 @@ const char* App::guideSection() const {
         case Page::Books:
             return Books;
         case Page::Board:
+            if (training_) return Training;  // a session of the repertoire's training (#76)
             if (!chessBoard()) return Board;
             switch (board_side_tab_) {
                 case 0:
@@ -601,6 +602,32 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     add(TR("Home"), where(Page::ChessHome), page(Page::ChessHome));
     add(TR("Databases"), where(Page::Databases), page(Page::Databases));
     add(TR("Openings: repertoires"), where(Page::Openings), page(Page::Openings));
+    // The repertoires' training (#76): a session of each, its new positions alone, its settings.
+    for (std::size_t i = 0; i < repertoires().entries().size(); ++i) {
+        const auto& counts = trainingSummary(i).counts;
+        if (counts.cards == 0) continue;
+        const auto& name = repertoires().entries()[i].name;
+        add(trf("Train the repertoire “{}”", name),
+            counts.due > 0
+                ? trn("{} position to review", "{} positions to review", counts.due, ui::exactCount(counts.due))
+                : std::string(TR("Openings")),
+            [this, i] { startTraining(i, TrainingRun::Kind::Due); });
+        if (counts.fresh > 0)
+            add(trf("Train only the new positions of “{}”", name), TR("Openings"),
+                [this, i] { startTraining(i, TrainingRun::Kind::New); });
+    }
+    add(trainingSettings().advance_ms > 0 ? TR("Training: the next position on Enter only")
+                                          : TR("Training: the next position on its own after a right answer"),
+        TR("Openings"), [this] {
+            auto& s      = trainingSettings();
+            s.advance_ms = s.advance_ms > 0 ? 0 : 1000;
+            if (training_) training_->settings.advance_ms = s.advance_ms;
+            saveTrainingSettings();
+        });
+    add(TR("Training: new positions a day…"), TR("Openings"), [this] {
+        page_                = Page::Openings;
+        training_limit_menu_ = true;
+    });
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {

@@ -4,6 +4,7 @@
 // variations each, the colour they prepare in their [RepertoireSide] tag. One of them is active: the star of the
 // Board page's opening tree adds a move to it or takes it out.
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -21,6 +22,7 @@ struct RepertoireFile {
     std::filesystem::path file;
     chess::Color side = chess::Color::WHITE;
     GameTree lines;
+    uint64_t revision = 0;  // changed with its lines: what is made of them (the training's cards) is made again
 };
 
 class RepertoireShelf {
@@ -48,11 +50,13 @@ class RepertoireShelf {
 
    private:
     void save(std::size_t index) const;
+    void changed(std::size_t index);  // its map made again, its revision new, its file written
 
     std::filesystem::path dir_;
     std::vector<RepertoireFile> entries_;
     std::vector<std::optional<study::Repertoire>> maps_;
     int active_ = -1;
+    uint64_t revisions_ = 0;
 };
 
 }  // namespace fcg

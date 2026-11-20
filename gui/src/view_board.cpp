@@ -248,7 +248,8 @@ int App::tournamentThreads() const {
 }
 
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
-    rememberBoardGame();  // its changes and undo history go with it
+    if (training_) dropTraining();  // another game on the board: the session ends there, its answers kept (#76)
+    rememberBoardGame();            // its changes and undo history go with it
     // The questions were about the game left: those still being answered end on their own, out of sight; so do the
     // comments being written, which go nowhere.
     for (auto& q : questions_)
@@ -451,7 +452,7 @@ void App::pollBoard() {
         cancelGameReview();
     if (liveGameOn() && comment_job_ && comment_job_->cancel) *comment_job_->cancel = true;
     if (board_.threat_on && board_.threat.state() == Analyser::State::Failed) board_.threat_on = false;
-    if (board_.threat_on && page_ == Page::Board && !board_.editor) {
+    if (board_.threat_on && page_ == Page::Board && !board_.editor && !trainingHidesAids()) {
         board_.threat.update(threatSettings());
         if (const auto position = threatPosition())
             board_.threat.analyse(*position);
@@ -470,7 +471,8 @@ void App::pollBoard() {
     auto& b = board_;
     pollGameReview();
     // The analysis follows the board while the page is shown, and waits meanwhile.
-    const bool shown    = b.analysing && page_ == Page::Board && !b.editor;
+    // A question of the repertoire's training hides the engines: they wait for the answer (#76).
+    const bool shown    = b.analysing && page_ == Page::Board && !b.editor && !trainingHidesAids();
     const auto position = analysisPosition(b.game, b.chess960, b.ply);
     if (shown) {
         if (!(b.analyser->position() == position)) b.review_offered = 0;
@@ -736,6 +738,7 @@ void App::boardPlay(chess::Move move) {
 }
 
 void App::boardPlayAsked(chess::Move move) {
+    if (training_) return trainingAnswer(move);  // the answer to the training's question (#76)
     auto& b = board_;
     if (!chessBoard()) return boardPlay(move);
     // Only a move that would start a variation is asked about: the line's next move, or one a variation starts with,
@@ -1073,10 +1076,17 @@ void App::boardEditKeys() {
         b.ply  = std::clamp(b.ply, 0, static_cast<int>(b.game.moves.size()));
         boardToast(line < 0 ? TR("The main line now · Ctrl+Z undoes it") : TR("Variation moved up · Ctrl+Z undoes it"));
     }
+    for (const ImWchar c : io.InputQueueCharacters)
+        if (c == '!' || c == '?') boardTypeNag(static_cast<char>(c));
+    boardMoveKeys();
+}
+
+void App::boardMoveKeys() {
+    auto& b        = board_;
+    const auto& io = ImGui::GetIO();
+    if (io.WantTextInput) return;
     for (const ImWchar c : io.InputQueueCharacters) {
-        if (c == '!' || c == '?') {
-            boardTypeNag(static_cast<char>(c));
-        } else if (!b.move_typed && !io.KeyCtrl && !io.KeyAlt && moveStart(c)) {
+        if (!b.move_typed && !io.KeyCtrl && !io.KeyAlt && moveStart(c)) {
             b.move_typed.emplace();
             (*b.move_typed)[0] = static_cast<char>(c);
             b.move_focus       = true;
@@ -1288,6 +1298,7 @@ void App::boardPointer(const chess::Board& board, std::optional<chess::Square> p
 
 void App::drawBoardPage() {
     loadBoardSettings();
+    if (training_) return drawTrainingPage();  // a session of the repertoire's training: the column is its (#76)
     auto& b = board_;
 
     ui::pageTitle(TR("Board"), guideSection());
@@ -2130,33 +2141,7 @@ void App::drawBoardColumn(float size) {
         dl->AddText(ImVec2(p0.x + px(8), p0.y + px(4)), IM_COL32(240, 243, 248, 255), label.c_str());
     }
 
-    // The piece a pawn becomes.
-    if (ImGui::BeginPopup("##promotion")) {
-        static constexpr chess::PieceType types[] = {chess::PieceType::QUEEN, chess::PieceType::ROOK,
-                                                     chess::PieceType::BISHOP, chess::PieceType::KNIGHT};
-        for (const auto type : types) {
-            ImVec2 uv0, uv1;
-            atlas_.uv(chess::Piece(type, stm), uv0, uv1);
-            ImGui::PushID(static_cast<int>(type));
-            if (ImGui::ImageButton("##piece", atlas_.texture(px(44)), ImVec2(px(44), px(44)), uv0, uv1) &&
-                b.promotion) {
-                for (const auto& m : movesFrom(board, b.promotion->from())) {
-                    if (shownTarget(m) == shownTarget(*b.promotion) && m.typeOf() == chess::Move::PROMOTION &&
-                        m.promotionType() == type) {
-                        boardMove(m);
-                    }
-                }
-                b.promotion.reset();
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::PopID();
-            ImGui::SameLine();
-        }
-        ImGui::NewLine();
-        ImGui::EndPopup();
-    } else {
-        b.promotion.reset();
-    }
+    drawPromotionPopup(board);  // the piece a pawn becomes
 
     if (strips)
         drawPlayerStrip(b.flip ? chess::Color::BLACK : chess::Color::WHITE, size, clocks);
@@ -2217,6 +2202,35 @@ void App::drawBoardColumn(float size) {
         }
     }
     drawToLichessResult(size);  // a game shared, a position played out (#54)
+}
+
+void App::drawPromotionPopup(const chess::Board& board) {
+    auto& b = board_;
+    if (!ImGui::BeginPopup("##promotion")) {
+        b.promotion.reset();
+        return;
+    }
+    static constexpr chess::PieceType types[] = {chess::PieceType::QUEEN, chess::PieceType::ROOK,
+                                                 chess::PieceType::BISHOP, chess::PieceType::KNIGHT};
+    for (const auto type : types) {
+        ImVec2 uv0, uv1;
+        atlas_.uv(chess::Piece(type, board.sideToMove()), uv0, uv1);
+        ImGui::PushID(static_cast<int>(type));
+        if (ImGui::ImageButton("##piece", atlas_.texture(px(44)), ImVec2(px(44), px(44)), uv0, uv1) && b.promotion) {
+            for (const auto& m : movesFrom(board, b.promotion->from())) {
+                if (shownTarget(m) == shownTarget(*b.promotion) && m.typeOf() == chess::Move::PROMOTION &&
+                    m.promotionType() == type) {
+                    boardMove(m);
+                }
+            }
+            b.promotion.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopID();
+        ImGui::SameLine();
+    }
+    ImGui::NewLine();
+    ImGui::EndPopup();
 }
 
 void App::drawBoardAnalysis() {

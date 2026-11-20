@@ -133,15 +133,19 @@ bool RepertoireShelf::toggle(std::size_t index, std::span<const chess::Move> pat
             if (!removed) break;
         }
     }
-    maps_[index].reset();
-    save(index);
+    changed(index);
     return has(index, path, move);
 }
 
 void RepertoireShelf::restore(std::size_t index, GameTree lines) {
     if (index >= entries_.size()) return;
     entries_[index].lines = std::move(lines);
+    changed(index);
+}
+
+void RepertoireShelf::changed(std::size_t index) {
     maps_[index].reset();
+    entries_[index].revision = ++revisions_;
     save(index);
 }
 

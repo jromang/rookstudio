@@ -1088,9 +1088,11 @@ The same game always gets the same review: the same scores, symbols, key moments
 machine is doing. The study Board's analysis of the game counts nodes rather than time: each position is searched for
 20,000 nodes at the first pass, four times more at each pass, up to the choice beside the button (320,000, 1,280,000,
 5,120,000 or 20,480,000 nodes per position, or *until stopped*), on one thread and from an empty hash, so that a
-position's result depends on the engine and the position alone. As many positions are searched at once as the
-analysis has threads, an engine process each. Where the move played was the engine's choice and the position is not
-one-sided, a second search of the position with two lines gives the next best move: an only move is told with it.
+position's result depends on the engine and the position alone. Several positions are searched at once, an engine
+process each: as many as the analysis has threads, and at least half the processor's cores, up to four; fewer while a
+tournament plays on this machine, which keeps its cores. Where the move played was the engine's choice and the
+position is not one-sided, a second search of the position with two lines gives the next best move: an only move is
+told with it.
 
 The endgame's positions of seven pieces or fewer can be judged exactly by Lichess's tables, asked once for this game
 or always. *Comment the key moments* writes a comment by the assistant on each, in the background, beside the comment a

@@ -572,13 +572,15 @@ void App::startReviewTask(const EngineEntry& engine, const std::vector<GameRevie
     setup.chess960   = b.review_chess960;
     setup.ceiling_ms = b.settings.review_ceiling_ms;
     // The Chess space: Lichess's evaluations kept offline, deep enough, taken as they are (#58); each position searched
-    // for a number of nodes from an empty hash, so that the same game gets the same review, as many engine processes
-    // side by side as the analysis has threads (#61); the engine's second line where a move can be the only one (#63).
-    // The Engines space's review does not change.
+    // for a number of nodes from an empty hash, so that the same game gets the same review, by several engine
+    // processes side by side (#61): as many as the analysis has threads, at least half the cores up to four, fewer
+    // beside tournaments; the engine's second line where a move can be the only one (#63). The Engines space's review
+    // does not change.
     if (chessBoard()) {
         setup.known        = reviewKnown();
         setup.reproducible = true;
-        setup.processes    = analysisTotal();
+        setup.processes    = reviewProcesses(std::max(1, b.settings.analysis.threads), topology_.physical,
+                                             topology_.logical, tournamentCores());
         setup.second_line  = secondLines(b.review_game, b.review_chess960);
     }
     // Resumed after the passes this engine completed the same way, unless it went as far as asked: then again from the

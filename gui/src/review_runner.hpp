@@ -47,6 +47,13 @@ inline constexpr int REVIEW_HASH_MB = 64;
 // there are times).
 [[nodiscard]] int reviewPasses(int64_t ceiling_ms);
 
+// The engine processes the Chess space's review searches with side by side (Setup::processes): as many as the
+// analysis has threads, and at least half the machine's physical cores up to four, so that a long game takes minutes
+// rather than a quarter of an hour on one process (So–Shankland: 16 min 36 s on one, 2 min 56 s on six); fewer while
+// tournaments play on this machine, which keep their cores (`tournament_cores` of the `logical` ones): the review takes
+// what they leave, as the board's analysis does. At least one.
+[[nodiscard]] int reviewProcesses(int analysis_threads, int physical, int logical, int tournament_cores);
+
 // The positions a principal variation of `position` goes through, its last move left out (nothing comes after it):
 // at most `max` of them, each legal, none after the game would end. From the first move to the last.
 [[nodiscard]] std::vector<AnalysisPosition> pvPositions(const AnalysisPosition& position, const std::string& pv,

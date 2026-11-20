@@ -33,6 +33,12 @@ int reviewPasses(int64_t ceiling_ms) {
     return std::max(1, n);
 }
 
+int reviewProcesses(int analysis_threads, int physical, int logical, int tournament_cores) {
+    int processes = std::max(analysis_threads, std::min(4, physical / 2));
+    if (tournament_cores > 0) processes = std::min(processes, logical - tournament_cores);
+    return std::max(1, processes);
+}
+
 std::vector<AnalysisPosition> pvPositions(const AnalysisPosition& position, const std::string& pv, std::size_t max) {
     std::vector<AnalysisPosition> out;
     std::vector<std::string> moves;

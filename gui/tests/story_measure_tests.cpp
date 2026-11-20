@@ -46,6 +46,7 @@
 #include "game_analysis.hpp"
 #include "review_bridge.hpp"
 #include "review_runner.hpp"
+#include "topology.hpp"
 
 using namespace fcg;
 using namespace std::chrono_literals;
@@ -55,6 +56,14 @@ namespace {
 std::string env(const char* name) {
     const char* v = std::getenv(name);
     return v ? std::string(v) : std::string();
+}
+
+// The review's engine processes: FCG_REVIEW_PROCESSES, else the Chess space's default on this machine, the analysis
+// on one thread and no tournament playing.
+int processesOf() {
+    if (!env("FCG_REVIEW_PROCESSES").empty()) return std::stoi(env("FCG_REVIEW_PROCESSES"));
+    const auto cpu = detectTopology();
+    return reviewProcesses(1, cpu.physical, cpu.logical, 0);
 }
 
 // The game's analysis: the one kept in `dir` when there is one, else the study Board's run here, then kept there.
@@ -70,7 +79,7 @@ GameReview analysed(const ReplayGame& game, const std::string& engine, int64_t c
     setup.game            = game;
     setup.ceiling_ms      = ceiling;
     setup.reproducible    = true;
-    setup.processes       = env("FCG_REVIEW_PROCESSES").empty() ? 1 : std::stoi(env("FCG_REVIEW_PROCESSES"));
+    setup.processes       = processesOf();
     setup.second_line     = secondLines(game, false);
     runner.start(setup);
     ReviewRunner::State st;
@@ -463,8 +472,9 @@ TEST_CASE("comments by the model: the key moments of FCG_STORY_GAMES, by hand") 
 //
 // time: the Engines space's review, passTime() up to the ceiling, FCG_REVIEW_THREADS threads, the hash kept from one
 // position to the next; nodes: the Chess space's, passNodes() up to the ceiling, one thread, an empty hash for each
-// position, FCG_REVIEW_PROCESSES processes; depth:D and nodes:N, one pass so, as nodes otherwise. FCG_REVIEW_SECOND:
-// the second line where the Chess space asks for it (matters), everywhere (all), or nowhere.
+// position, FCG_REVIEW_PROCESSES processes (the Chess space's default on this machine without it, reviewProcesses());
+// depth:D and nodes:N, one pass so, as nodes otherwise. FCG_REVIEW_SECOND: the second line where the Chess space asks
+// for it (matters), everywhere (all), or nowhere.
 //
 //     FCG_STORY_GAMES=games.pgn FCG_REVIEW_REFERENCE=dir FCG_REVIEW_COMPARE="dir/pass2 other/pass2 ..."
 //     build/fastchess-gui-tests -tc='review: compared*'
@@ -496,7 +506,7 @@ struct Method {
             m.value = std::stoull(method.substr(6));
         }
         if (!env("FCG_REVIEW_THREADS").empty()) m.threads = std::stoi(env("FCG_REVIEW_THREADS"));
-        if (!env("FCG_REVIEW_PROCESSES").empty()) m.processes = std::stoi(env("FCG_REVIEW_PROCESSES"));
+        m.processes = processesOf();
         m.second = env("FCG_REVIEW_SECOND").empty() ? "none" : env("FCG_REVIEW_SECOND");
         if (!env("FCG_STORY_CEILING_MS").empty()) m.ceiling = std::stoll(env("FCG_STORY_CEILING_MS"));
         if (m.kind == Kind::Depth || m.kind == Kind::OnePass) m.ceiling = FIRST_PASS_MS;  // one pass

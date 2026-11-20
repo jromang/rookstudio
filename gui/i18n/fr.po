@@ -10266,6 +10266,9 @@ msgstr "il a nommé une idée que les faits du bilan n'appuient pas"
 msgid "it named “{}”, a name the review does not give"
 msgstr "il a nommé « {} », un nom que le bilan ne donne pas"
 
+msgid "it praised the better move for “{}”, which the move played does too"
+msgstr "il a loué le meilleur coup pour « {} », ce que fait aussi le coup joué"
+
 msgid "it put “{}” where the board has no such piece"
 msgstr "il a mis « {} » là où l'échiquier n'a pas cette pièce"
 
@@ -10274,6 +10277,12 @@ msgstr "il a cité trop de coups : une histoire n'est pas une variante"
 
 msgid "it quoted “{}”, a move the review does not give"
 msgstr "il a cité « {} », un coup que le bilan ne donne pas"
+
+msgid "it said “{}” changes hands, which the line it speaks of does not count"
+msgstr "il a dit que « {} » change de mains, ce que la ligne dont il parle ne donne pas"
+
+msgid "it said “{}” of a position that does not have it"
+msgstr "il a dit « {} », ce que la position dont il parle ne montre pas"
 
 msgid "it said “{}”, a number the review does not give"
 msgstr "il a dit « {} », un nombre que le bilan ne donne pas"
@@ -10351,6 +10360,9 @@ msgstr "son texte s'arrête là ; gardée jusqu'au coup {}"
 
 msgid "its value"
 msgstr "sa valeur"
+
+msgid "its words say something else: “{}”"
+msgstr "ses mots disent autre chose : « {} »"
 
 msgid "itself"
 msgstr "lui-même"

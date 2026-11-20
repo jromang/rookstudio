@@ -10322,6 +10322,9 @@ msgstr "она назвала идею, которую не подтвержда
 msgid "it named “{}”, a name the review does not give"
 msgstr "она назвала «{}» — имя, которого нет в разборе"
 
+msgid "it praised the better move for “{}”, which the move played does too"
+msgstr "она похвалила лучший ход за «{}», но сыгранный ход делает то же самое"
+
 msgid "it put “{}” where the board has no such piece"
 msgstr "она поставила «{}» туда, где на доске нет такой фигуры"
 
@@ -10330,6 +10333,12 @@ msgstr "она привела слишком много ходов: расска
 
 msgid "it quoted “{}”, a move the review does not give"
 msgstr "она привела «{}» — ход, которого нет в разборе"
+
+msgid "it said “{}” changes hands, which the line it speaks of does not count"
+msgstr "она написала, что «{}» меняет владельца, но вариант, о котором идёт речь, этого не даёт"
+
+msgid "it said “{}” of a position that does not have it"
+msgstr "она написала «{}» — этого нет в позиции, о которой идёт речь"
 
 msgid "it said “{}”, a number the review does not give"
 msgstr "она написала «{}» — число, которого нет в разборе"
@@ -10408,6 +10417,9 @@ msgstr "её текст обрывается здесь; сохранена до
 
 msgid "its value"
 msgstr "его значение"
+
+msgid "its words say something else: “{}”"
+msgstr "её слова означают другое: «{}»"
 
 msgid "itself"
 msgstr "самого себя"

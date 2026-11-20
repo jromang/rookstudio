@@ -10266,6 +10266,9 @@ msgstr "es nannte eine Idee, die die Fakten der Auswertung nicht stützen"
 msgid "it named “{}”, a name the review does not give"
 msgstr "es nannte „{}“, einen Namen, den die Auswertung nicht nennt"
 
+msgid "it praised the better move for “{}”, which the move played does too"
+msgstr "es lobte den besseren Zug für „{}“, was der gespielte Zug ebenso tut"
+
 msgid "it put “{}” where the board has no such piece"
 msgstr "es stellte „{}“ dorthin, wo das Brett keine solche Figur hat"
 
@@ -10274,6 +10277,12 @@ msgstr "es zitierte zu viele Züge: Eine Geschichte ist keine Variante"
 
 msgid "it quoted “{}”, a move the review does not give"
 msgstr "es zitierte „{}“, einen Zug, den die Auswertung nicht nennt"
+
+msgid "it said “{}” changes hands, which the line it speaks of does not count"
+msgstr "es schrieb, dass „{}“ den Besitzer wechselt, was die Variante, von der es spricht, nicht ergibt"
+
+msgid "it said “{}” of a position that does not have it"
+msgstr "es schrieb „{}“, was die Stellung, von der es spricht, nicht zeigt"
 
 msgid "it said “{}”, a number the review does not give"
 msgstr "es schrieb „{}“, eine Zahl, die die Auswertung nicht nennt"
@@ -10351,6 +10360,9 @@ msgstr "ihr Text endet dort; bis Zug {} behalten"
 
 msgid "its value"
 msgstr "sein Wert"
+
+msgid "its words say something else: “{}”"
+msgstr "seine Worte sagen etwas anderes: „{}“"
 
 msgid "itself"
 msgstr "sich selbst"

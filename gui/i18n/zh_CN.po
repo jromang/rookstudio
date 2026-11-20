@@ -10210,6 +10210,9 @@ msgstr "它提到了复盘的事实不支持的想法"
 msgid "it named “{}”, a name the review does not give"
 msgstr "它提到了“{}”，而复盘中没有这个名称"
 
+msgid "it praised the better move for “{}”, which the move played does too"
+msgstr "它以“{}”称赞更好的着法，而实战着法同样做到了"
+
 msgid "it put “{}” where the board has no such piece"
 msgstr "它把“{}”放在了棋盘上没有这种棋子的地方"
 
@@ -10218,6 +10221,12 @@ msgstr "它引用了太多着法：讲述对局经过不是罗列变化"
 
 msgid "it quoted “{}”, a move the review does not give"
 msgstr "它引用了“{}”，而复盘中并没有这步棋"
+
+msgid "it said “{}” changes hands, which the line it speaks of does not count"
+msgstr "它说“{}”易手，而它所说的变化里并没有这样的得失"
+
+msgid "it said “{}” of a position that does not have it"
+msgstr "它说了“{}”，而它所说的局面并非如此"
 
 msgid "it said “{}”, a number the review does not give"
 msgstr "它说了“{}”，而复盘中没有这个数字"
@@ -10294,6 +10303,9 @@ msgstr "其文本在此中断；保留到第 {} 回合"
 
 msgid "its value"
 msgstr "值"
+
+msgid "its words say something else: “{}”"
+msgstr "它的措辞表达了别的意思：“{}”"
 
 msgid "itself"
 msgstr "自己"

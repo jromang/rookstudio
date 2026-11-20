@@ -10266,6 +10266,9 @@ msgstr ""
 msgid "it named “{}”, a name the review does not give"
 msgstr ""
 
+msgid "it praised the better move for “{}”, which the move played does too"
+msgstr ""
+
 msgid "it put “{}” where the board has no such piece"
 msgstr ""
 
@@ -10273,6 +10276,12 @@ msgid "it quoted too many moves: a story is not a variation"
 msgstr ""
 
 msgid "it quoted “{}”, a move the review does not give"
+msgstr ""
+
+msgid "it said “{}” changes hands, which the line it speaks of does not count"
+msgstr ""
+
+msgid "it said “{}” of a position that does not have it"
 msgstr ""
 
 msgid "it said “{}”, a number the review does not give"
@@ -10350,6 +10359,9 @@ msgid "its text stops there; kept up to move {}"
 msgstr ""
 
 msgid "its value"
+msgstr ""
+
+msgid "its words say something else: “{}”"
 msgstr ""
 
 msgid "itself"

@@ -10266,6 +10266,9 @@ msgstr "nombró una idea que los hechos de la revisión no respaldan"
 msgid "it named “{}”, a name the review does not give"
 msgstr "nombró «{}», un nombre que la revisión no da"
 
+msgid "it praised the better move for “{}”, which the move played does too"
+msgstr "elogió la mejor jugada por «{}», algo que también hace la jugada de la partida"
+
 msgid "it put “{}” where the board has no such piece"
 msgstr "puso «{}» donde el tablero no tiene esa pieza"
 
@@ -10274,6 +10277,12 @@ msgstr "citó demasiadas jugadas: una historia no es una variante"
 
 msgid "it quoted “{}”, a move the review does not give"
 msgstr "citó «{}», una jugada que la revisión no da"
+
+msgid "it said “{}” changes hands, which the line it speaks of does not count"
+msgstr "dijo que «{}» cambia de manos, algo que la línea de la que habla no da"
+
+msgid "it said “{}” of a position that does not have it"
+msgstr "dijo «{}», algo que la posición de la que habla no muestra"
 
 msgid "it said “{}”, a number the review does not give"
 msgstr "dijo «{}», un número que la revisión no da"
@@ -10351,6 +10360,9 @@ msgstr "su texto se acaba ahí; se conserva hasta la jugada {}"
 
 msgid "its value"
 msgstr "su valor"
+
+msgid "its words say something else: “{}”"
+msgstr "sus palabras dicen otra cosa: «{}»"
 
 msgid "itself"
 msgstr "sí mismo"

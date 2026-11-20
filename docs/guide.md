@@ -979,6 +979,18 @@ there already (see [Comments by the assistant](#comments-by-the-assistant)). Whe
 position shown, *Theory · 3* above the moves leads to their notes in the Tree tab (see [Theory
 studies](#theory-studies)).
 
+**A tournament's game**, in either style of its PGN (fastchess's `{+0.35/18 1.234s, n=…}` or the ChessBase style's
+`[%eval]`, `[%clk]` and `[%emt]`), whether opened from its file, from a database that imported it or from a tournament
+read as a database, shows its engines' comments condensed: beside each move, in small grey, the evaluation its
+engine gave (for White, as the bar and the curve) and its depth, *+1.44/22*, the book's end marked. Hovering a move
+tells the rest: its engine and side, the evaluation from its side too, the depth and the selective depth, the time
+and when it settled on the move, the nodes and the speed, the tablebase hits, its chances of a win, a draw and a loss,
+and the line it expected after it, written in moves. The right button on the move shows that line on the board, makes
+it a variation from where the game left it (Ctrl+Z takes it away), or copies the engine's comment as it is. The line
+under the moves chooses what shows beside them: the evaluation and the depth, the time too, or nothing (Ctrl+K as
+well). The PGN does not change: Ctrl+S and *Copy PGN* write each engine's comment back as it was read, every field
+kept, as long as the move's data is the same.
+
 ### Arrows and squares
 
 The right button draws on the study Board: a click colours a square, a drag from one square to another draws an arrow,
@@ -1070,6 +1082,15 @@ under the mouse, its games in the last six months against the six before. The su
 It costs a request a move, so it stays off until asked for; the masters' explorer has no months.
 
 ### The review of a game
+
+On the study Board, a tournament's game shows at the top of the *Review* tab what its two engines thought, as soon
+as it is opened and without any analysis: White's chances along the game according to each engine at its own moves
+(from the share of wins, draws and losses it gave, turned around for Black, else from its evaluation converted as the
+review does), the book shaded, the stretches where the two engines saw different games tinted; under it, the time of
+each move, White's above the line and Black's below; each engine's time, average depth and speed. Then its moments,
+each a click away: how each engine saw the game out of the book, where they disagreed, where the tablebases entered
+a search, where a mate was seen, and how the game ended. Once the game is analysed, the review's curve is drawn over
+theirs, thicker.
 
 On the study Board, the *Review* tab beside the notation reads the game's analysis (Alt+G) as a coach would:
 

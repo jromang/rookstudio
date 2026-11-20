@@ -43,6 +43,7 @@
 #include "engine_changes.hpp"
 #include "engine_downloads.hpp"
 #include "engine_import.hpp"
+#include "engine_notes.hpp"
 #include "engines.hpp"
 #include "fide_cards.hpp"
 #include "game_graph.hpp"
@@ -1640,6 +1641,15 @@ class App {
     void drawCommentProgress();  // the key moments being commented: how many, Cancel
     void drawReviewAssistant();  // the review tab's story of the game and the assistant's gestures
     void drawReviewCurve();      // the review tab's head: White's chances, the key moments as dots (M5, board 4)
+    // A tournament's game on the study Board (#87, mockup M12, board 8): the review tab's head is the curve of the two
+    // engines that played it, from the game alone, the review's over it once done; their moves' times under it, their
+    // figures and the moments that stand out. Drawn by drawGameCurve(), the review's alone when it is null.
+    void drawEnginesCurve();
+    void drawGameCurve(const EngineCurves* engines);
+    void drawEngineMoveTip(int ply, const MoveReview& judged);  // a move's fields in full, under the mouse
+    void drawEngineTagChips();             // what the notation shows beside the moves of engines: the setting
+    void boardExpectedVariation(int ply);  // the line the engine of move `ply` expected after it, a variation
+    [[nodiscard]] EngineTags engineTags() const;
     // The commentary's review of the board's game, from its judging analysis; made again when that changes.
     [[nodiscard]] std::shared_ptr<const CommentaryReview> boardCommentaryReview();
     struct CommentJob {
@@ -1655,6 +1665,8 @@ class App {
     std::optional<CommentJob> comment_job_;
     std::shared_ptr<const CommentaryReview> board_commentary_;
     std::string board_commentary_of_;
+    EngineCurves engine_curves_;    // the board's tournament game as its engines saw it (#87)
+    std::string engine_curves_of_;  // the game it is of, and the language of its sentences
     // How far the board's game followed theory, against a database of the user's (the Tree tab's, else the first with
     // a tree): its book moves are not judged, its novelty is told. Looked for in the background.
     struct TheoryJob {
@@ -1728,6 +1740,7 @@ class App {
     uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
     int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions
+    int engine_menu_ply_ = -1;  // the tournament engine's move whose menu is open in the notation (#87)
     struct TreeRow {
         std::string shares;  // My databases: each database's games, said over the Games column
         std::string san;

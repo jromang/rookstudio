@@ -417,7 +417,8 @@ TEST_CASE("board text: lichess evaluations, a FEN that cannot be played, a game 
     CHECK(pgn.find("[SetUp \"1\"]") != std::string::npos);
     CHECK(pgn.find("[FEN \"4k3/8/8/8/8/8/4P3/4K3 w - - 0 1\"]") != std::string::npos);
     CHECK(pgn.find("[PlyCount \"2\"]") != std::string::npos);
-    CHECK(pgn.find("1. e4 {+1.50/20 1.250s} Kd7 {-M4/18 0.500s} 1-0") != std::string::npos);
+    // The engines' comments as they were read (#87).
+    CHECK(pgn.find("1. e4 {+1.50/20 1.250s} Kd7 {-M4/18 0.5s} 1-0") != std::string::npos);
     const auto again = readPgnGame(pgn, error);
     REQUIRE(again);
     CHECK(again->header("White") == "A");

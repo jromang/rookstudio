@@ -570,6 +570,19 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         page_           = Page::Board;
         board_.open_tab = 3;
     });
+    // What the study Board's notation shows beside a tournament engine's moves (#87, mockup M12, board 8).
+    if (chessBoard() && hasPlayerEvaluations(board_.tree.main)) {
+        const char* beside[] = {TR("Beside the moves: the engines' evaluation and depth"),
+                                TR("Beside the moves: their evaluation, depth and time"),
+                                TR("Beside the moves: nothing")};
+        for (int i = 0; i < 3; ++i) {
+            if (static_cast<int>(engineTags()) == i) continue;
+            add(beside[i], TR("Notation"), [this, i] {
+                board_.settings.engine_tags = i;
+                saveBoardSettings();
+            });
+        }
+    }
     add(appearance::current().figurines ? TR("Letters in the notation") : TR("Figurines in the notation"), TR("Board"),
         [this] {
             auto s      = appearance::current();

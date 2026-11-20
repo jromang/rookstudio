@@ -84,9 +84,10 @@ std::vector<int> annotate(GameTree& game, const MainLine& line, const GameReport
     for (const auto& m : report.moves) {
         if (m.ply == 0 || m.ply > moves.size()) continue;
         auto& move = moves[m.ply - 1];
-        // The evaluation after the move, unless the game has another one of its own (a tournament engine's).
+        // The evaluation after the move, unless the game has another one of its own: a tournament engine's, in either
+        // style of its comments (its ChessBase style's [%eval] kept with them, #87).
         const auto* after = m.ply < analyses.size() && analyses[m.ply] ? analyses[m.ply]->best() : nullptr;
-        if (after && (!move.score || move.notes.eval_tag)) {
+        if (after && (!move.score || (move.notes.eval_tag && move.engine_comment.empty()))) {
             move.score          = forMover(after->score, move.mover);
             move.depth          = static_cast<int>(after->depth);
             move.notes.eval_tag = true;

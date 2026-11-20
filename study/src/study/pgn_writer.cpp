@@ -12,6 +12,7 @@
 #include <tour/pgn_file.hpp>
 
 #include "pgn_lexer.hpp"
+#include "pgn_reader.hpp"
 
 namespace fcg::study {
 
@@ -87,25 +88,13 @@ class Lines {
         cur_.push_back(Word{std::move(word), open, close});
     }
     void comment(const std::string& text) {
-        // Its words, a [%...] command kept whole: other programs may not read one cut by a line end.
-        std::vector<std::string> words;
-        std::size_t at = 0;
-        while (at < text.size()) {
-            if (text[at] == ' ') {
-                ++at;
-                continue;
-            }
-            auto end = text.compare(at, 2, "[%") == 0 ? text.find(']', at) : std::string::npos;
-            end      = end == std::string::npos ? text.find(' ', at) : end + 1;
-            if (end == std::string::npos) end = text.size();
-            words.push_back(text.substr(at, end - at));
-            at = end;
-        }
-        if (words.empty()) words.emplace_back();
-        // A brace comment cannot hold a "}" (a ";" comment can): written as ")".
-        for (auto& w : words) std::replace(w.begin(), w.end(), '}', ')');
-        words.front().insert(0, "{");
-        words.back() += '}';
+        for (auto& w : commentWords(text)) put(std::move(w));
+    }
+    // A comment glued to the word before it ("Nf3 {+0.35/18"): a move and its engine's comment start on the same
+    // line, as other readers expect them; the comment's other words wrap as any.
+    void commentAfter(std::string word, const std::string& text) {
+        auto words    = commentWords(text);
+        words.front() = std::move(word) + " " + words.front();
         for (auto& w : words) put(std::move(w));
     }
     void finish() {
@@ -120,6 +109,32 @@ class Lines {
     }
 
    private:
+    // A comment's words in its braces, a [%...] command kept whole: other programs may not read one cut by a line end.
+    // What touches a command stays with it ("[%emt 0:00:01.234]," as a tournament writes it).
+    static std::vector<std::string> commentWords(const std::string& text) {
+        std::vector<std::string> words;
+        std::size_t at = 0;
+        while (at < text.size()) {
+            if (text[at] == ' ') {
+                ++at;
+                continue;
+            }
+            auto end = at;
+            while (end < text.size() && text[end] != ' ') {
+                const auto close = text.compare(end, 2, "[%") == 0 ? text.find(']', end) : std::string::npos;
+                end              = close == std::string::npos ? end + 1 : close + 1;
+            }
+            words.push_back(text.substr(at, end - at));
+            at = end;
+        }
+        if (words.empty()) words.emplace_back();
+        // A brace comment cannot hold a "}" (a ";" comment can): written as ")".
+        for (auto& w : words) std::replace(w.begin(), w.end(), '}', ')');
+        words.front().insert(0, "{");
+        words.back() += '}';
+        return words;
+    }
+
     struct Word {
         std::string text;
         bool open  = false;  // a variation's "("
@@ -146,11 +161,63 @@ std::string joined(const std::vector<std::string>& parts) {
 
 }  // namespace
 
-std::string noteComment(const ReplayMove& m, bool assistant_mark) {
+namespace {
+
+bool sameScore(const std::optional<fastchess::Score>& a, const std::optional<fastchess::Score>& b) {
+    return a.has_value() == b.has_value() && (!a || (a->type == b->type && a->value == b->value));
+}
+
+// What the tournament's comment read on a move gives back, when it still says what the move holds: read again, the
+// same data (a score changed since, an annotation's evaluation in its place, and it is written anew). Its commands
+// are then its own, not the notes'.
+struct HeldComment {
+    bool clk = false, eval = false, emt = false;
+};
+std::optional<HeldComment> heldComment(const ReplayMove& m) {
+    if (m.engine_comment.empty()) return std::nullopt;
+    ReplayMove probe;
+    probe.mover = m.mover;
+    (void)applyMoveComment(m.engine_comment, probe);
+    if (probe.engine_comment != m.engine_comment) return std::nullopt;
+    if ((probe.clock_ms && probe.clock_ms != m.clock_ms) ||
+        (probe.notes.emt_ms && probe.notes.emt_ms != m.notes.emt_ms))
+        return std::nullopt;
+    if (probe.book != m.book || !sameScore(probe.score, m.score) || probe.depth != m.depth ||
+        probe.time_ms != m.time_ms || probe.notes.eval_tag != m.notes.eval_tag || probe.nodes != m.nodes ||
+        probe.seldepth != m.seldepth || probe.nps != m.nps || probe.tbhits != m.tbhits || probe.pv != m.pv ||
+        probe.decision_ms != m.decision_ms || probe.wdl != m.wdl || probe.fields != m.fields)
+        return std::nullopt;
+    return HeldComment{probe.clock_ms.has_value(), probe.notes.eval_tag, probe.notes.emt_ms.has_value()};
+}
+
+// The fields after a tournament's score and time, those it wrote ("…, n=1234, pv=\"e2e4 e7e5\""), from the move's data.
+std::string engineFields(const ReplayMove& m) {
+    std::string out;
+    if (m.fields & PGN_NODES) out += fmt::format(", n={}", m.nodes);
+    if (m.fields & PGN_SELDEPTH) out += fmt::format(", sd={}", m.seldepth);
+    if (m.fields & PGN_NPS) out += fmt::format(", nps={}", m.nps);
+    if (m.fields & PGN_TBHITS) out += fmt::format(", tbhits={}", m.tbhits);
+    if (m.fields & PGN_PV) out += fmt::format(", pv=\"{}\"", m.pv);
+    if ((m.fields & PGN_WDL) && m.wdl) out += fmt::format(", wdl={}/{}/{}", (*m.wdl)[0], (*m.wdl)[1], (*m.wdl)[2]);
+    if ((m.fields & PGN_DECISION) && m.decision_ms)
+        out += fmt::format(", dt={:.3f}s", static_cast<double>(*m.decision_ms) / 1000.0);
+    return out;
+}
+
+std::string engineText(const ReplayMove& m, bool held) {
+    if (held) return m.engine_comment;
+    if (m.book) return "book";
+    if (!m.score || m.notes.eval_tag) return {};
+    auto out = commentScore(*m.score) + "/" + std::to_string(m.depth);
+    if (m.time_ms >= 0) out += fmt::format(" {:.3f}s", static_cast<double>(m.time_ms) / 1000.0);
+    return out + engineFields(m);
+}
+
+std::string noteText(const ReplayMove& m, bool assistant_mark, const std::optional<HeldComment>& held) {
     std::vector<std::string> parts;
-    if (m.clock_ms) parts.push_back("[%clk " + duration(*m.clock_ms) + "]");
-    if (m.notes.eval_tag && m.score) parts.push_back("[%eval " + evalValue(m) + "]");
-    if (m.notes.emt_ms) parts.push_back("[%emt " + duration(*m.notes.emt_ms) + "]");
+    if (m.clock_ms && !(held && held->clk)) parts.push_back("[%clk " + duration(*m.clock_ms) + "]");
+    if (m.notes.eval_tag && m.score && !(held && held->eval)) parts.push_back("[%eval " + evalValue(m) + "]");
+    if (m.notes.emt_ms && !(held && held->emt)) parts.push_back("[%emt " + duration(*m.notes.emt_ms) + "]");
     if (!m.notes.arrows.empty()) parts.push_back("[%cal " + marks(m.notes.arrows, true) + "]");
     if (!m.notes.squares.empty()) parts.push_back("[%csl " + marks(m.notes.squares, false) + "]");
     for (const auto& c : m.notes.commands) parts.push_back(c);
@@ -163,6 +230,14 @@ std::string noteComment(const ReplayMove& m, bool assistant_mark) {
     }
     return joined(parts);
 }
+
+}  // namespace
+
+std::string noteComment(const ReplayMove& m, bool assistant_mark) {
+    return noteText(m, assistant_mark, heldComment(m));
+}
+
+std::string engineComment(const ReplayMove& m) { return engineText(m, heldComment(m).has_value()); }
 
 std::string assistantComment(const ReplayMove& m, bool assistant_mark) {
     if (m.notes.after.empty() || m.notes.assistant.empty()) return {};
@@ -242,21 +317,30 @@ std::string writePgnGame(const GameTree& tree, const PgnWriteOptions& options) {
                     nags.push_back(nag);
                 }
             }
-            // A move and its engine comment on the same line, as other readers expect them.
-            std::string word = san;
-            if (m.book) {
-                word += " {book}";
-            } else if (m.score && !m.notes.eval_tag) {
-                word += " {" + commentScore(*m.score) + "/" + std::to_string(m.depth);
-                if (m.time_ms >= 0) word += fmt::format(" {:.3f}s", static_cast<double>(m.time_ms) / 1000.0);
-                word += "}";
+            // The engine's comment right after the move, its first word on the move's line: the tournament's as it was
+            // read, else made from the move's data (#87).
+            const auto held  = heldComment(m);
+            std::string lead = engineText(m, held.has_value());
+            std::string note = noteText(m, options.assistant_mark, held);
+            // Notes that will read back as a tournament's comment ([%eval], [%clk] and [%emt] alone) take its place, so
+            // that what is written reads back and is written again the same.
+            if (lead.empty() && nags.empty() && !note.empty()) {
+                ReplayMove probe;
+                probe.mover = m.mover;
+                (void)applyMoveComment(note, probe);
+                if (!probe.engine_comment.empty()) lead = std::exchange(note, {});
             }
-            if (which < 0 && options.annotate) {
-                if (const auto extra = options.annotate(ply + 1); !extra.empty()) word += " " + extra;
+            // What the caller adds after the move (the analysis's evaluation and symbol), glued to it when it has no
+            // engine's comment.
+            std::string extra = which < 0 && options.annotate ? options.annotate(ply + 1) : std::string();
+            if (lead.empty()) {
+                lines.put(extra.empty() ? std::move(san) : san + " " + extra);
+            } else {
+                lines.commentAfter(std::move(san), lead);
+                if (!extra.empty()) lines.put(std::move(extra));
             }
-            lines.put(std::move(word));
             for (const int nag : nags) lines.put(fmt::format("${}", nag));
-            if (const auto note = noteComment(m, options.assistant_mark); !note.empty()) {
+            if (!note.empty()) {
                 lines.comment(note);
                 number = true;
             }

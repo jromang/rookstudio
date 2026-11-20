@@ -1132,6 +1132,13 @@ resumable, then imported, and a report gives its strongest tournaments and best-
 already has is not added twice. The games keep their source, the broadcast's page in their Site tag: what you share of
 them is shared under the same licence. What leaves the machine: the request for the page, then for the month's file.
 
+*From a source… › Lichess games* reads a month of Lichess's rated games (CC0, about 95 million games and 30 GB
+compressed) as it downloads, and keeps only the games that pass its filters: by default both players rated 2400 and
+more, without bullet (a base time and 40 increments under three minutes). Only the games kept reach the disk, added to
+the database chosen by batches, the database read all along. *Read a file already downloaded…* reads a
+`lichess_db_standard_rated_*.pgn.zst` from the disk instead. *Cancel*, a network cut or the program closed keeps what was
+added, and *Go on* goes on from where it stopped, with the same filters; the games read again are not added twice.
+
 ### A chess.com player
 
 *From a source… › chess.com* adds a player's games from chess.com's public API, without an account: type their name

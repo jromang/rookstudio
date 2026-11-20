@@ -1586,6 +1586,9 @@ void App::handleDialogs() {
             case Dialogs::Purpose::EvalsFile:
                 startEvalsReading(path);
                 break;
+            case Dialogs::Purpose::LichessMonthFile:
+                startMonthReading(path);
+                break;
             case Dialogs::Purpose::BuildBookPgn:
                 book_build_form_.pgn = path;
                 book_build_shown_    = true;

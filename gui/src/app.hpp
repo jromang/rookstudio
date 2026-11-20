@@ -53,6 +53,7 @@
 #include "lichess_evals.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
+#include "lichess_month.hpp"
 #include "lichess_months.hpp"
 #include "lichess_players.hpp"
 #include "lichess_playing.hpp"
@@ -410,6 +411,25 @@ class App {
     bool chesscom_follow_ = true;
     bool chesscom_loaded_ = false;
     std::vector<chesscom::Followed> chesscom_followed_;
+    // A month of Lichess's rated games (#72): read as it downloads, or from a file, filtered, into a database.
+    void drawMonthSheet();
+    void startMonthReading(const std::string& source);  // a URL, or a .pgn.zst on the disk
+    void pollMonthReading();
+    [[nodiscard]] bool monthReading() const { return month_reading_ && month_reading_->busy(); }
+    bool month_sheet_ = false;
+    int month_pick_   = 0;
+    int month_target_ = -2;
+    lichess::MonthFilter month_filter_;
+    std::unique_ptr<lichess::MonthReading> month_reading_;
+    struct MonthRun {
+        std::string source, title;
+        std::size_t index  = 0;
+        study::GameId from = 0;
+        std::filesystem::path state;
+        lichess::MonthFilter filter;
+    };
+    std::optional<MonthRun> month_run_;
+    std::string month_stopped_;  // why the last reading stopped, before its end
     // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
     // background, its move shown.
     struct FileLines {

@@ -69,6 +69,10 @@ DatabaseShelf& App::shelf() {
 
 void App::importIntoDatabase(int index, const std::filesystem::path& file, bool pasted) {
     auto& s = shelf();
+    if (monthReading()) {  // it writes to a database too: one at a time
+        db_message_ = TR("A month of Lichess is being read into a database: import once it has finished.");
+        return;
+    }
     if (index < 0 || index >= static_cast<int>(s.entries().size())) {
         try {
             index = static_cast<int>(s.create(file.stem().stem().string()));  // games.pgn.zst: games
@@ -541,6 +545,10 @@ void App::drawDatabases() {
     }
     if (chesscom_sheet_) {
         drawChesscomSheet();
+        return;
+    }
+    if (month_sheet_) {
+        drawMonthSheet();
         return;
     }
     const auto& entries = s.entries();

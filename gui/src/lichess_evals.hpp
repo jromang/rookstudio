@@ -21,6 +21,8 @@
 
 #include "opening_suite.hpp"
 
+#include "zstd_reading.hpp"
+
 namespace fcg {
 
 inline constexpr const char* LICHESS_EVALS_URL = "https://database.lichess.org/lichess_db_eval.jsonl.zst";
@@ -123,12 +125,9 @@ struct EvalsFolder {
 // program closed, Cancel) goes on from there. A server whose file has changed since is read again from its start.
 class EvalsReading {
    public:
-    struct Progress {
-        std::atomic<uint64_t> bytes{0};  // of the compressed file, read so far
-        std::atomic<uint64_t> size{0};   // of the whole file, 0 while not known
+    struct Progress : ZstdProgress {     // the compressed bytes read, the file's size, a reading gone on
         std::atomic<uint64_t> lines{0};  // positions of the database read
         std::atomic<uint64_t> kept{0};   // candidates found
-        std::atomic<bool> resumed{false};
     };
     EvalsReading() = default;
     ~EvalsReading();  // cancels and waits

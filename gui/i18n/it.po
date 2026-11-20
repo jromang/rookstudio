@@ -7578,6 +7578,9 @@ msgstr "Le mosse, le varianti e le note del capitolo sostituite su Lichess da qu
 msgid "The charts appear with the first results."
 msgstr "I grafici compaiono con i primi risultati."
 
+msgid "The charts are left out: the window is too low for them."
+msgstr "I grafici sono omessi: la finestra è troppo bassa."
+
 msgid "The check of {} is interrupted for the start: it is done again later."
 msgstr "La verifica di {} è interrotta per l'avvio: sarà rifatta più tardi."
 
@@ -7720,6 +7723,9 @@ msgstr "I libri propri dei motori sono disattivati"
 
 msgid "The engines' scores in this tab: from the side to move's point of view, as fastchess writes them in the PGN, or from White's. The evaluation bar and the big screen are always from White's side."
 msgstr "Le valutazioni dei motori in questa scheda: dal punto di vista del lato al tratto, come fastchess le scrive nel PGN, o da quello del Bianco. La barra di valutazione e lo schermo grande mostrano sempre quello del Bianco."
+
+msgid "The evaluation curve is left out: the window is too low for it."
+msgstr "La curva di valutazione è omessa: la finestra è troppo bassa."
 
 msgid "The evaluations, the symbols and the better lines written into the notation; Ctrl+Z takes them back"
 msgstr "Le valutazioni, i simboli e le linee migliori scritti nella notazione; Ctrl+Z li toglie"

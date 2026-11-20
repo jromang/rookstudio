@@ -501,7 +501,7 @@ void App::annotateBoardGame() {
     auto& b           = board_;
     const auto review = boardCommentaryReview();
     if (!review || !review->report.complete) {
-        boardToast(TR("Analyse the game first (Alt+G): the annotation is its review written in"));
+        boardToast(TR("Analyse the game first (Alt+G): the annotation is its review written into the game"));
         return;
     }
     auto before      = boardSnapshot();

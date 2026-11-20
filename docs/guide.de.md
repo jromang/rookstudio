@@ -43,7 +43,7 @@ eintreffen. Die Einrichtung bleibt erhalten: Wähle beim nächsten Mal die näch
 klicke beim beendeten Match auf *Neu starten mit…*.
 
 ### Deine Partien studieren
-<!-- en: studying-your-games a1bb7f7a -->
+<!-- en: studying-your-games 9a78e41c -->
 
 1. **Eine Datenbank.** In der Leiste *Datenbanken*, dann *Neue Datenbank*, direkt benannt, und *Datei importieren…*:
    eine PGN-Datei oder eine Datei `.zst`, `.gz` oder `.zip`, die eine enthält (eine auf die Seite gezogene Datei tut
@@ -51,8 +51,8 @@ klicke beim beendeten Match auf *Neu starten mit…*.
 2. **Eine Partie.** Ein Klick auf eine Partie der Liste zeigt sie daneben; Enter oder ein Doppelklick öffnet sie auf dem
    *Brett*. Strg+O öffnet dort eine PGN-Datei, Strg+V fügt eine Partie oder eine FEN ein.
 3. **Eine Engine.** Die Analyse braucht eine Engine: Bei leerer Bibliothek bietet der Tab *Analyse* an, Gaia mit einem
-   Klick herunterzuladen (siehe [Beliebte Engines](#beliebte-engines)). A startet und beendet die Analyse der Stellung
-   (Alt+A auf dem Brett fürs Studium), G analysiert die ganze Partie.
+   Klick herunterzuladen (siehe [Beliebte Engines](#beliebte-engines)). A startet und beendet die Analyse der Stellung,
+   G analysiert die ganze Partie (Alt+A und Alt+G auf dem Brett fürs Studium).
 4. **Deine Notizen.** Enter schreibt einen Kommentar nach dem Zug, `!` und `?` setzen Symbole, ein anderer Zug als der
    der Partie beginnt eine Variante, die rechte Maustaste zeichnet Pfeile und Felder; Strg+S speichert die Partie in
    ihre Datenbank.
@@ -1058,7 +1058,7 @@ Alt+A startet oder beendet die Analyse, Alt+X zeigt die Drohung, Alt+G analysier
 Zug, den die Analyse markiert hat.
 
 ### Mehrere Engines nebeneinander
-<!-- en: several-engines-side-by-side 269f6f12 -->
+<!-- en: several-engines-side-by-side 43f5e1fe -->
 
 Im Tab Analyse des Bretts fürs Studium analysieren bis zu vier Engines der Bibliothek die Stellung gemeinsam, jede in
 einer Karte: ihre Farbe und ihr Name, ihre Bewertung (aus der Sicht von Weiß), ihre Tiefe und seldepth, ihre
@@ -1084,7 +1084,7 @@ eigenen Threads, und der Anteil zählt sie nicht. Ein auf diesem Computer laufen
 Analyse nimmt höchstens, was seine Partien übrig lassen, und der Chip sagt, wie viele sie belegen. Diese Einstellungen
 gehören der Analyse allein: Weder die Engine der Bibliothek noch ein Turnier sieht sie.
 
-**Die erste Engine** ist die der Analyse: Die Auswertung der Partie (G), die Drohung (Alt+X oder das Menü der ersten
+**Die erste Engine** ist die der Analyse: Die Auswertung der Partie (Alt+G), die Drohung (Alt+X oder das Menü der ersten
 Engine), die Fragen und die Kommentare des Assistenten nutzen sie. Eine Engine, die an ihrem Namen auf eine andere
 gezogen wird, nimmt deren Platz ein, ganz nach oben gezogen wird sie die erste; *Zur ersten machen* in ihrem Menü tut
 dasselbe. Hat die Partie eine Analyse der neuen ersten Engine, beurteilt diese Analyse die Züge und zeichnet die Kurve
@@ -1229,17 +1229,30 @@ gegenüber den sechs davor. Die Zusammenfassung sagt dasselbe über die Stellung
 bleibt es aus, bis es verlangt wird; der Explorer der Meister hat keine Monate.
 
 ### Die Auswertung einer Partie
-<!-- en: the-review-of-a-game 4c333a51 -->
+<!-- en: the-review-of-a-game b1237d38 -->
 
-Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (G), wie es ein Trainer
-täte:
+Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (Alt+G), wie es ein
+Trainer täte:
 
 - oben die Chancen von Weiß im Verlauf der Partie, mit den Schlüsselmomenten als Punkten (dunkel für einen guten Zug,
   orange für einen Fehler); ein Klick springt zum Zug;
 - die Theorie der Partie in einer deiner Datenbanken (der des Tabs Baum, sonst der ersten): Ihre Buchzüge werden nicht
-  beurteilt, und ihre Neuerung wird genannt; das Buch endet vor dem ersten Fehler, den die Engine sieht;
+  beurteilt, und ihre Neuerung wird genannt; das Buch endet vor dem ersten Fehler, den die Engine sieht. Die Züge, die
+  das Eröffnungsbuch eines Turniers gespielt hat (`{book}` im PGN), werden ebenfalls nicht beurteilt;
+- **Schlüsselmomente**: die Züge der Punkte, jeder mit seinem Urteil (ein Fehler mit den Chancen, die er verloren hat,
+  und dem besseren Zug, ein einziger Zug mit dem nächstbesten der Engine: *Einziger Zug. Gaia: +0.62, der nächstbeste
+  +0.31.*), und wo das Endspiel beginnt;
 - **Die Schlüsselmomente in Worten**, **Die Geschichte der Partie** und **Woran zu arbeiten ist**, für jede Seite, mit
   den Zügen, die es zeigen; ein Klick springt zum Zug.
+
+Dieselbe Partie bekommt immer dieselbe Auswertung: dieselben Bewertungen, Symbole, Schlüsselmomente und Kommentare,
+egal was der Computer gerade tut. Die Analyse der Partie auf dem Brett fürs Studium zählt Knoten statt Zeit: Jede
+Stellung wird beim ersten Durchgang mit 20.000 Knoten durchsucht, bei jedem weiteren Durchgang mit viermal so vielen,
+bis zu der Wahl neben dem Knopf (320.000, 1.280.000, 5.120.000 oder 20.480.000 Knoten pro Stellung oder *bis zum
+Stoppen*), mit einem einzigen Thread und leerem Hash, sodass das Ergebnis einer Stellung nur von der Engine und der
+Stellung abhängt. Es werden so viele Stellungen gleichzeitig durchsucht, wie die Analyse Threads hat, jede von einem
+eigenen Engine-Prozess. Wo der gespielte Zug die Wahl der Engine war und die Stellung nicht einseitig ist, liefert eine
+zweite Suche der Stellung mit zwei Linien den nächstbesten Zug: Ein einziger Zug wird mit ihm genannt.
 
 Die Stellungen des Endspiels mit sieben Steinen oder weniger können die Lichess-Tablebases exakt beurteilen, einmal für
 diese Partie oder immer abgefragt. *Schlüsselmomente kommentieren* schreibt im Hintergrund zu jedem einen Kommentar

@@ -41,7 +41,7 @@ conserva: la próxima vez, elige la siguiente versión como A y pulsa **Iniciar*
 match terminado.
 
 ### Estudiar tus partidas
-<!-- en: studying-your-games a1bb7f7a -->
+<!-- en: studying-your-games 9a78e41c -->
 
 1. **Una base de datos.** En la barra lateral, *Bases de datos*, luego *Nueva base de datos*, con su nombre escrito en
    el sitio, e *Importar un archivo…*: un archivo PGN, o un archivo `.zst`, `.gz` o `.zip` que contenga uno (soltar un
@@ -50,8 +50,8 @@ match terminado.
 2. **Una partida.** Un clic en una partida de la lista la muestra al lado; Intro o un doble clic la abre en el
    *Tablero*. Ctrl+O abre allí un archivo PGN, Ctrl+V pega una partida o una FEN.
 3. **Un motor.** El análisis necesita un motor: con la biblioteca vacía, la pestaña *Análisis* ofrece descargar Gaia con
-   un clic (consulta [Motores populares](#motores-populares)). A inicia y detiene el análisis de la posición (Alt+A en
-   el Tablero de estudio), G analiza la partida entera.
+   un clic (consulta [Motores populares](#motores-populares)). A inicia y detiene el análisis de la posición, G analiza
+   la partida entera (Alt+A y Alt+G en el Tablero de estudio).
 4. **Tus notas.** Intro escribe un comentario tras la jugada, `!` y `?` ponen símbolos, una jugada distinta de la de la
    partida abre una variante, el botón derecho dibuja flechas y casillas; Ctrl+S guarda la partida en su base de datos.
 
@@ -1030,7 +1030,7 @@ del Tablero de los motores pasan entonces a Alt: Alt+F gira el tablero, Alt+A in
 muestra la amenaza, Alt+G analiza la partida, Alt+N va a la siguiente jugada que marcó el análisis.
 
 ### Varios motores uno junto a otro
-<!-- en: several-engines-side-by-side 269f6f12 -->
+<!-- en: several-engines-side-by-side 43f5e1fe -->
 
 En la pestaña Análisis del Tablero de estudio, hasta cuatro motores de la biblioteca analizan juntos la posición, cada
 uno en una tarjeta: su color y su nombre, su evaluación (del lado de las blancas), su profundidad y su profundidad
@@ -1055,10 +1055,10 @@ no los cuenta. Un torneo que se juega en este ordenador conserva sus núcleos: e
 sus partidas, y el botón dice cuántos ocupan estas. Estos ajustes son propios del análisis: ni el motor de la biblioteca
 ni un torneo los ven.
 
-**El primer motor** es el del análisis: lo usan la revisión de la partida (G), la amenaza (Alt+X, o el menú del primer
-motor), las preguntas y los comentarios del asistente. Un motor arrastrado por su nombre sobre otro ocupa su lugar, y
-arriba del todo pasa a ser el primero; *Hacerlo el primero*, en su menú, hace lo mismo. Cuando la partida tiene un
-análisis del nuevo primer motor, ese análisis juzga las jugadas y dibuja la curva del gráfico de la partida. Las
+**El primer motor** es el del análisis: lo usan la revisión de la partida (Alt+G), la amenaza (Alt+X, o el menú del
+primer motor), las preguntas y los comentarios del asistente. Un motor arrastrado por su nombre sobre otro ocupa su
+lugar, y arriba del todo pasa a ser el primero; *Hacerlo el primero*, en su menú, hace lo mismo. Cuando la partida tiene
+un análisis del nuevo primer motor, ese análisis juzga las jugadas y dibuja la curva del gráfico de la partida. Las
 evaluaciones de cada motor en las posiciones de la partida que buscó se muestran en el gráfico como una línea fina de su
 color (*análisis en directo*), y las del primer motor como la curva mientras la partida no tiene análisis.
 
@@ -1196,17 +1196,30 @@ anteriores. El resumen dice lo mismo de la posición. Cuesta una petición por j
 lo pides; el explorador de los maestros no tiene meses.
 
 ### La revisión de una partida
-<!-- en: the-review-of-a-game 4c333a51 -->
+<!-- en: the-review-of-a-game b1237d38 -->
 
-En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (G) como lo haría un
-entrenador:
+En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (Alt+G) como lo
+haría un entrenador:
 
 - arriba, las posibilidades de las blancas a lo largo de la partida, con los momentos clave como puntos (oscuros para
   una buena jugada, naranjas para un error); un clic lleva a la jugada;
 - la teoría de la partida en una de tus bases de datos (la de la pestaña Árbol, si no la primera): sus jugadas de libro
-  no se juzgan, y se nombra su novedad; el libro se detiene antes del primer error que ve el motor;
+  no se juzgan, y se nombra su novedad; el libro se detiene antes del primer error que ve el motor. Las jugadas que jugó
+  el libro de aperturas de un torneo (`{book}` en el PGN) tampoco se juzgan;
+- **Momentos clave**: las jugadas de los puntos, cada una con su veredicto (un error con las posibilidades que perdió y
+  la mejor jugada, una jugada única con la siguiente mejor del motor: *Jugada única. Gaia: +0.62, la siguiente
+  +0.31.*), y dónde empieza el final;
 - **Los momentos clave, en palabras**, **La historia de la partida** y **En qué trabajar**, para cada bando, con las
   jugadas que lo muestran; un clic lleva a la jugada.
+
+La misma partida recibe siempre la misma revisión: las mismas evaluaciones, símbolos, momentos clave y comentarios, haga
+lo que haga la máquina. El análisis de la partida del Tablero de estudio cuenta nodos en lugar de tiempo: cada posición
+se busca durante 20.000 nodos en la primera pasada, cuatro veces más en cada pasada, hasta lo elegido junto al botón
+(320.000, 1.280.000, 5.120.000 o 20.480.000 nodos por posición, o *hasta que lo detengas*), con un solo hilo y con la
+tabla hash vacía, para que el resultado de una posición dependa solo del motor y de la posición. Se buscan a la vez
+tantas posiciones como hilos tiene el análisis, con un proceso del motor para cada una. Donde la jugada hecha era la
+elegida por el motor y la posición no está decidida, una segunda búsqueda de la posición con dos líneas da la siguiente
+mejor jugada: una jugada única se indica con ella.
 
 Las posiciones del final con siete piezas o menos pueden juzgarse con exactitud con las tablas de Lichess, consultadas
 una vez para esta partida o siempre. *Comentar los momentos clave* escribe un comentario del asistente en cada uno, en

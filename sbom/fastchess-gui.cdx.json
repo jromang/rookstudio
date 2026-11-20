@@ -377,6 +377,16 @@
       "externalReferences": [{ "type": "website", "url": "https://iolite-engine.com/blog_posts/minimal_agx_implementation" }]
     },
     {
+      "type": "library",
+      "bom-ref": "study:cbvault",
+      "name": "cbvault",
+      "version": "0.1.6",
+      "description": "The crates cbvault, cbvault-format and cbvault-chess 0.1.6, ported to C++ in study/src/study/chessbase*.cpp (the reader of ChessBase databases); their readers of the CBH format are themselves ported from cbformat of oschess-cb-bridge (MIT).",
+      "purl": "pkg:cargo/cbvault@0.1.6",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "externalReferences": [{ "type": "vcs", "url": "https://github.com/itshak/cbvault" }]
+    },
+    {
       "type": "data",
       "bom-ref": "gui:staunton-pieces",
       "name": "Staunton-Pieces",

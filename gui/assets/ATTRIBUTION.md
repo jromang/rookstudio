@@ -53,6 +53,30 @@ license:
     All values used to derive this implementation are sourced from Troy's initial AgX implementation/OCIO config
     file available here: https://github.com/sobotka/AgX
 
+## The reader of ChessBase databases (`study/src/study/chessbase*.cpp`)
+
+Its reading of CBH databases, of CBV and CBZ archives and of the framing of 2CBH's records is ported from cbvault 0.1.6
+(https://github.com/itshak/cbvault: the crates cbvault, cbvault-format and cbvault-chess), whose readers of the CBH
+format are themselves ported from cbformat of oschess-cb-bridge. MIT license:
+
+    MIT License
+
+    Copyright (c) 2026 cbvault Contributors
+    Copyright (c) 2026 the oschess-cb-bridge contributors
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+    rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+    the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+    WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+    COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## Chess pieces (`pieces/<set>/*.svg`)
 
 Four sets, embedded in the program and chosen in **Settings** > Appearance. Each is the version the lichess project

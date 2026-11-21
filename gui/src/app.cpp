@@ -123,6 +123,10 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     offline_evals_ = std::make_unique<OfflineEvals>(storage_.root() / "lichess-evals");  // #58
     offline_puzzles_ = std::make_unique<OfflinePuzzles>(storage_.root() / "lichess-puzzles");  // #80
     player_names_    = storage_.playerNames();                                                 // #81
+    // The Syzygy tables of 3 to 5 pieces, downloaded on the user's click from Lichess's mirror (a test's server when
+    // one stands in for Lichess) into the profile (#82).
+    syzygy_download_ = std::make_unique<SyzygyDownload>(storage_.root() / "syzygy",
+                                                        lichess::servers().tablebase + "/tables/standard/3-4-5/");
     // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
     assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
@@ -308,6 +312,7 @@ void App::frame() {
     pollTraining();         // a repertoire's training: its cards prepared, its first question (#76)
     pollPuzzles();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
     pollMistakes();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
+    pollEndgames();         // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -406,6 +411,30 @@ void App::frame() {
                 page_         = Page::Training;
                 training_tab_ = 2;
             }
+        } else if (w == "training-endgames" || w == "training-vision") {
+            // The Training page's parts of #82: the endgames against the tables and the mates, board vision.
+            page_         = Page::Training;
+            training_tab_ = w == "training-endgames" ? 4 : 5;
+        } else if (w.rfind("endgame=", 0) == 0) {  // endgame=ID: that endgame of the catalogue against the tables
+            if (const auto* e = endgameEntry(w.substr(8))) {
+                if (!endgameNeed(e->fen).empty() || !startEndgame(*e)) {
+                    page_         = Page::Training;
+                    training_tab_ = 4;
+                    endgame_need_ = e->id;
+                }
+            }
+        } else if (w == "endgames-review") {  // the endgames missed, due today (#82)
+            if (!startEndgameReview()) {
+                page_         = Page::Training;
+                training_tab_ = 4;
+            }
+        } else if (w == "vision-coordinates" || w == "vision-blindfold" || w == "vision-lines") {
+            if (w == "vision-coordinates")
+                startCoordinates();
+            else if (w == "vision-blindfold")
+                startBlindfold();
+            else
+                startHeadLines();
         } else if (w == "guess-board" || w == "guess-random") {
             // Guessing the moves of the Board page's game from the position shown, or of a random game (#81).
             if (w == "guess-board")

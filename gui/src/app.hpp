@@ -41,6 +41,7 @@
 #include "console.hpp"
 #include "databases.hpp"
 #include "dialogs.hpp"
+#include "endgames.hpp"
 #include "engine_changes.hpp"
 #include "engine_downloads.hpp"
 #include "engine_import.hpp"
@@ -87,6 +88,7 @@
 #include "stats.hpp"
 #include "storage.hpp"
 #include "suite_run.hpp"
+#include "syzygy_download.hpp"
 #include "tablebases.hpp"
 #include "theory_shelf.hpp"
 #include "topology.hpp"
@@ -94,6 +96,7 @@
 #include "twic.hpp"
 #include "ui.hpp"
 #include "views.hpp"
+#include "vision.hpp"
 
 #include <tour/book_scan.hpp>
 #include <tour/by_opening.hpp>
@@ -946,6 +949,108 @@ class App {
     void drawGuessBoard(float size);
     void drawGuessColumn();
     void drawGuessEnd();
+
+    // Endgames against the tablebases, mates, board vision (#82, mockup M12, board 3; endgames.hpp, vision.hpp,
+    // syzygy_download.hpp; view_endgames.cpp, view_vision.cpp): the Training page's Endgames and Vision parts, a
+    // session of each on the Board page, the endgames missed in the day's review.
+    std::optional<EndgameRecord> endgame_record_;
+    EndgameRecord& endgameRecord();
+    [[nodiscard]] std::filesystem::path endgamesFolder() const { return storage_.root() / "endgames"; }
+    void saveEndgameRecord();
+    // The tables of the disk: the setup's folders (Settings, the tournaments'), with the profile's own once it holds
+    // tables (the download); the most pieces they cover, read off the interface's thread.
+    [[nodiscard]] std::string endgameTablesPaths();
+    [[nodiscard]] int diskTablesPieces();
+    std::string disk_tables_of_;  // the paths diskTablesPieces() checked itself, before the checks in the background
+    int disk_tables_pieces_ = 0;
+    [[nodiscard]] bool diskTablesLocked() const;  // a tournament plays in this process: its tables, not to be probed
+    // Why the position cannot be played against the tables now, empty when it can: the tables it needs.
+    [[nodiscard]] std::string endgameNeed(const std::string& fen);
+    std::unique_ptr<SyzygyDownload> syzygy_download_;
+    std::optional<SyzygyDownload::State> syzygy_state_;
+    std::chrono::steady_clock::time_point syzygy_state_at_{};
+    std::chrono::steady_clock::time_point syzygy_since_{};
+    uint64_t syzygy_from_       = 0;
+    uint64_t syzygy_generation_ = 0;
+    std::string syzygy_error_;
+    const SyzygyDownload::State& syzygyState();
+    void startSyzygyDownload();
+    void pollEndgames();        // each frame: the download, the tables' answers, the tables' move, a blindfold game
+    std::string endgame_need_;  // the endgame whose tables are missing: the card says what it needs
+    int endgame_tables_choice_ = 0;      // 0 download the tables, 1 a folder already there, 2 Lichess's online
+    int endgame_selected_      = 0;      // the catalogue's endgame the arrows move over
+    bool endgame_keys_         = false;  // the arrows and Enter go to the catalogue: one of its endgames was clicked
+    bool endgame_scroll_mates_ = false;  // the page brought to its mates (the Today part's card)
+    std::string endgame_error_;
+    void drawTrainingEndgames();
+    void drawEndgameCatalogue(bool& enter);
+    void drawEndgameTablesCard(bool& enter);  // the tables missing: download them, a folder, Lichess's online
+    void drawSyzygyDownloadCard();
+    void drawEndgamesFromGames();
+    void drawMatesCard();
+    [[nodiscard]] std::vector<EndgameTask> gameEndgames();  // the user's mistakes in positions of 7 pieces or fewer
+    [[nodiscard]] std::string endgameState(const EndgameEntry& entry);  // "done in 9 (the tables: 7)", "5 pieces"…
+    std::unique_ptr<EndgameRun> endgame_;
+    // The questions to Lichess of a session left, cancelled, ending out of sight (a future of std::async waits for its
+    // task when it goes).
+    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_left_;
+    std::vector<std::future<lichess::Answer<std::vector<std::string>>>> endgame_lines_left_;
+    void leaveEndgameQuestions();
+    [[nodiscard]] std::string endgameLock() const;  // why a session cannot start, empty when it can
+    bool startEndgame(const EndgameEntry& entry);
+    bool startEndgameReview();
+    bool startGameEndgames();
+    void startEndgameRun(std::unique_ptr<EndgameRun> run);
+    void beginEndgameTask();
+    void showEndgamePosition();  // the task's start and its moves on the board
+    void askEndgameTables();     // the tables' answer for the board's position: the disk's at once, Lichess's coming
+    void endgameAnswered();      // an answer came: a move kept judged, the tables' move
+    void endgameAnswer(chess::Move move);
+    void endgameJudge(chess::Move move);
+    void endgameTablesMove();
+    void endgameTakeBack();
+    void endgameRestart();
+    void endgameContinue();
+    void endgameSeeWin();
+    void endgameNext();
+    void endgameEnded(EndgameOutcome outcome);
+    void finishEndgames(bool stopped);
+    void closeEndgame(bool to_training);
+    void dropEndgame();
+    void endgameKeys();
+    void drawEndgamePage();
+    void drawEndgameBoard(float size);
+    void drawEndgameColumn();
+    void drawEndgameEnd();
+    // Board vision.
+    std::optional<VisionRecord> vision_record_;
+    VisionRecord& visionRecord();
+    void saveVisionRecord();
+    CoordMode vision_mode_ = CoordMode::Find;
+    CoordSide vision_side_ = CoordSide::White;
+    Hidden vision_hidden_  = Hidden::All;
+    int vision_colour_     = 0;     // blindfold: 0 White, 1 Black, 2 at random
+    int vision_elo_        = 1500;  // 0: the engine's own strength
+    std::string vision_engine_;     // "" the analysis's
+    int vision_enter_ = 0;          // what Enter starts on the page: 0 the coordinates, 1 blindfold, 2 the lines
+    std::string vision_error_;
+    std::unique_ptr<VisionRun> vision_;
+    void drawTrainingVision();
+    void startCoordinates();
+    void startBlindfold();
+    void startHeadLines();
+    void startVisionRun(std::unique_ptr<VisionRun> run);
+    void visionAnswer(chess::Move move);
+    void visionSquare(chess::Square square);  // a square clicked: the coordinates, "Where is…?"
+    void visionNextSquare();
+    void finishVision(bool stopped);
+    void closeVision(bool to_training);
+    void dropVision();
+    void pollVision();
+    void visionKeys();
+    void drawVisionPage();
+    void drawVisionBoard(float size);
+    void drawVisionColumn();
 
     // Theory studies (#77, mockup M11, board 2; theory_shelf.hpp, view_theory.cpp): annotated PGN files read where they
     // are, Lichess studies' PGN, the repertoires' comments. The Openings page's Theory part, the Tree tab's Theory

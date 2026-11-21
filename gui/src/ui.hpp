@@ -130,7 +130,9 @@ enum class Icon {
     Puzzle,  // the puzzles (#80)
     Alert,   // a warning: what went wrong, and what is kept
     Target,  // your mistakes as exercises (#81)
-    Eye      // guessing the moves of a game (#81)
+    Eye,     // guessing the moves of a game (#81)
+    Zap,     // the mates (#82)
+    Grid     // board vision (#82)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

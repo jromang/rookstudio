@@ -220,11 +220,11 @@ void drawBoard(const PieceAtlas& atlas, const std::array<chess::Piece, 64>& piec
 
             // Coordinates along the bottom and left edges, in the opposite square colour.
             const ImU32 coord = light ? colours.dark : colours.light;
-            if (row == 7) {
+            if (row == 7 && decor.coordinates) {
                 const char label[2] = {static_cast<char>('a' + file), 0};
                 dl->AddText(font, font_size, ImVec2(p1.x - font_size * 0.6f, p1.y - font_size * 1.05f), coord, label);
             }
-            if (col == 0) {
+            if (col == 0 && decor.coordinates) {
                 const char label[2] = {static_cast<char>('1' + rank), 0};
                 dl->AddText(font, font_size, ImVec2(p0.x + 2.0f, p0.y + 1.0f), coord, label);
             }

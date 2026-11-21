@@ -350,6 +350,13 @@ them.
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | An exercise of your mistakes | A hint, "I don't know", stop |
 | <kbd>Enter</kbd> | An exercise of your mistakes | The next exercise, or again after a wrong answer |
 | <kbd>Enter</kbd>, <kbd>Escape</kbd> | Guessing the moves | The game goes on at once after a score; stop |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | The Training page's endgames | Choose an endgame once one was clicked; play it |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Escape</kbd> | An endgame against the tables | Take back a move, the right move, stop |
+| <kbd>Enter</kbd> | An endgame against the tables | After a fault: take it back; at the end: again, or the next |
+| <kbd>Enter</kbd>, <kbd>Escape</kbd> | Board vision | Start, go on; stop |
+| A letter, then a figure | The coordinates, *Where is…?* | Name a square |
+| <kbd>Shift</kbd> held, <kbd>F2</kbd> | Blindfold | The pieces shown 2 seconds, three times a game; *Where is…?* |
+| <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | A line read in your head | The piece as FEN writes it (a white knight, a black one), or none |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A game list | Go through the list, open the game |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | The Databases page | The search panel |
 | <kbd>Escape</kbd> | The Databases page | Close the search panel, then the list |
@@ -385,7 +392,8 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
 - **In progress**: the game's analysis, the position's, an import, the assistant (its download, its model loaded,
-  *Unload*), a series of puzzles, a session of exercises or a game guessed under way, and what the day's review has
+  *Unload*), a series of puzzles, a session of exercises, a game guessed, an endgame or a vision exercise under way, and
+  what the day's review has
   due, in one count, a click reviewing it all (see [The day's review](#the-days-review)).
 
 The search button at the top, or Ctrl+K, finds a command, a game, a database.
@@ -1363,19 +1371,20 @@ Openings and Lichess, in the views *Study* and *Everything*. A view you made bef
 Home page offers once to add the page to the view shown (*Add it to …*, or *Not now*), and Ctrl+K *Training* leads
 there meanwhile.
 
-Its title has four parts: **Today** (the day's review, the kinds of exercises, the puzzles to start), **Puzzles** (the
+Its title has six parts: **Today** (the day's review, the kinds of exercises, the puzzles to start), **Puzzles** (the
 same choice of puzzles, Lichess's database kept on your disk, your results by theme), **My mistakes** (see [Your
-mistakes as exercises](#your-mistakes-as-exercises)) and **Guess the moves** (see [Guessing the
-moves](#guessing-the-moves)). A card for each kind of exercise leads to its part. Everything works offline; what goes to
-Lichess is said where you choose it.
+mistakes as exercises](#your-mistakes-as-exercises)), **Guess the moves** (see [Guessing the
+moves](#guessing-the-moves)), **Endgames** (see [Endgames against the tables](#endgames-against-the-tables) and
+[Mates](#mates)) and **Vision** (see [Board vision](#board-vision)). A card for each kind of exercise leads to its part.
+Everything works offline; what goes to Lichess is said where you choose it.
 
 ### The day's review
 
 *To review today* counts what each kind of training has due today, each with its spaced repetition (FSRS), in one
 queue: the mistakes of your games (see [Your mistakes as exercises](#your-mistakes-as-exercises)), the positions of your
-repertoires (their training stays on the Openings page, see [Training a repertoire](#training-a-repertoire)) and the
-puzzles you missed. *Review all* (Enter) takes them one after the other on the Board page: your mistakes due, the
-positions due of each repertoire, then the puzzles to review. At the end of each, *Next: …* (Enter) goes on, *Back to
+repertoires (their training stays on the Openings page, see [Training a repertoire](#training-a-repertoire)), the
+puzzles and the endgames you missed. *Review all* (Enter) takes them one after the other on the Board page: your
+mistakes due, the positions due of each repertoire, the puzzles to review, then the endgames. At the end of each, *Next: …* (Enter) goes on, *Back to
 the Training page* (Escape) stops there; what was answered is kept. Beside the button, the time it should take, from the
 pace of your answers; under it, what comes back tomorrow and within three days. When mistakes or puzzles are due with
 other kinds, *Only my mistakes* and *Only the puzzles* review them alone.
@@ -1522,6 +1531,101 @@ each guess and its points, and the score so far. At the end: your points, how ma
 pawns lost a move on average, and the moves that cost you most (a click shows their position); the whole game is on the
 board, ← and → go through it. Each game guessed is kept in the profile's `guess` folder; the Training page shows the
 last one's points.
+
+### Endgames against the tables
+
+The **Endgames** part is a catalogue of endgames to win or to hold, played against the tablebases: eighteen of them in
+four groups. *Elementary mates*: the queen, the rook, the two bishops, bishop and knight. *Pawns*: the opposition, the
+rule of the square, the outside passed pawn, Réti's manoeuvre. *Rooks*: Lucena, Philidor, Vancura, rook against pawn,
+rook and two pawns against rook. *Pieces and queen*: queen against rook, queen against pawn, the wrong bishop, rook
+against bishop, bishop against knight. Each says what it asks (*mate*, *win* or *hold the draw*) and where you stand:
+*to do*, *done*, *done in 9 (the tables: 7)* for a mate, *to do again* after a fault. One the tables at hand cannot
+answer is greyed, its pieces said (see [Tables for the endgames](#tables-for-the-endgames)); hover one for the idea that
+wins or holds it. A click plays it; then ↑ and ↓ choose another and Enter plays it. Ctrl+K has *Endgame: Lucena* and the
+others.
+
+**An endgame** takes the Board page, its column becoming the endgame's, as the puzzles do; the game on the board waits
+among the recent games. You play from your side; the tables answer each move with the one that resists the longest
+(with Syzygy's tables, the longest to the next capture or pawn move, and among moves as long the one that leaves you the
+fewest good answers). Above the question: the tables' verdict now (*The tables: White wins*), and how far, the moves to
+mate when Lichess knows them, else the moves at most before a capture or a pawn move.
+
+- **Ctrl+Z**: take back your last move and the tables' answer.
+- **Alt+H**: the right move, as a green arrow; the endgame then counts as done with help.
+- **Start again**: back to the start. **Escape**: stop.
+
+Each move is judged at once. One that turns a win into a draw, or a draw into a loss, is a fault: the tables answer,
+then the column says it (*1.Kd5? Ke7: a draw, now*) with the moves that kept the result (*Kept the win: 1.Kd6!,
+1.Kf6!*, their squares in green, your move in orange) and the endgame's idea. *Take back* (Enter, or Ctrl+Z) plays it
+again; *See the win* takes it back and writes the tables' line from there; *Continue anyway* plays on in the new
+verdict. Under it, the verdict at the start and each move that changed it.
+
+A win counts at the mate, or once a pawn of yours becomes a queen or the other king stands alone, the win kept; in the
+elementary mates the mate itself is the goal, your moves set against the tables' own mate from the start. A draw counts
+when a rule draws the game (stalemate, too little material, the threefold repetition, the fifty moves), or after 15
+moves held. At the end: *Again* (Enter), *Next:* the next endgame not done yet, *Back to the Training page*.
+
+The position before a fault becomes a card of the day's review (see [The day's review](#the-days-review)): it comes back
+tomorrow, the endgame played again from it, then further apart each time you win or hold it without a fault (with
+help, it counts as hard; a fault, as missed). Ctrl+K *Review the missed endgames*.
+
+**From your games** takes the positions of 7 pieces or fewer among your mistakes (see [Your mistakes as
+exercises](#your-mistakes-as-exercises)), where the review of your game saw the win, or the draw, slip away. *Start*
+plays them one after the other against the tables, each from the position before your move; one the tables say was lost
+anyway is left out. The results and the cards are kept in the profile's `endgames` folder (`record.json`).
+
+### Tables for the endgames
+
+The tables are those of your disk, the Syzygy folders of the tournaments (*Adjudication* > tablebases, see [Tablebases
+on the Board page](#tablebases-on-the-board-page)), with the profile's own once downloaded; for more pieces than they
+hold, Lichess's online, up to 7 pieces, with your consent to the online tables (the Board page's, see [Online for the
+analysis](#online-for-the-analysis)). While a tournament plays in the program's process, the tables of the disk are its
+own: Lichess's answer meanwhile, or the endgame waits.
+
+When an endgame needs tables you do not have, the part says so (*No tables for "Lucena"*) and offers three ways:
+
+- **Download the tables of 3 to 5 pieces** (290 files, 938 MB) from Lichess's mirror, one file at a time, the smallest
+  first: the endgames of 3 and 4 pieces are ready within seconds, the others as their files arrive. A download cut
+  short goes on from where it stopped (*Go on*); each file is checked (its size and Syzygy's mark). The tables go to the
+  profile's `syzygy` folder and, once all there, to the tournaments' folders.
+- **A folder of tables already on the disk…**: chosen for the tournaments too.
+- **Lichess's, online**: up to 7 pieces, a request a position played; choosing it gives the consent.
+
+Without tables, the endgames that need them are greyed, each with what it needs; the other exercises work. Online, a
+cut makes the endgame wait: your move is kept, and judged when the network comes back (*Try again now* does not wait); a
+429 waits the minute Lichess asks for. What leaves the machine: with the tables of the disk, nothing; with Lichess's,
+each position played, as its FEN; for the download, the request of each file.
+
+### Mates
+
+The **Mates** card (on the Endgames part, which the Today part's card leads to) starts 20 of Lichess's mate puzzles
+(see [Puzzles](#puzzles)): in 1 to 5 moves, or by pattern (back rank, smothered, Anastasia's, Arabian, Boden's, double
+bishop, hook), each chip with how often you solve it at the first try. They come from the database on your disk, else
+from a batch of your Lichess account; without either, the click leads to the Puzzles part. The elementary mates against
+the tables are in the catalogue above, your moves counted against the tables' mate.
+
+### Board vision
+
+The **Vision** part trains seeing the board in your head. Nothing leaves the machine; the records are kept in the
+profile's `vision.json`.
+
+**Coordinates**: thirty seconds of squares. *Find the square*: a square is named, click it on a board without its
+letters and figures; *Name the square*: a square is marked in blue, type its name (a letter, then a figure). Seen from
+White, from Black, or *At random*, the board turning square by square. A fault shows the square asked in green and
+yours in orange. At the end, your count and your record for that way and side. Enter starts, Escape stops.
+
+**Blindfold**: a game against an engine of your library (the analysis's, or another), at an Elo of 1000, 1500 or 2000
+when it has the setting (*UCI_Elo*), else at its own strength. You play White, Black or either at random; the board
+hides every piece, every piece after the 10th move, or all but the pawns, the last move marked. Type your moves, or play
+them on the board; the moves so far are written in the column. Hold Shift a moment to see the pieces for 2 seconds,
+three times a game; F2 asks *Where is…?* about a piece its words name alone (*the black dark-squared bishop*): click its
+square, or type it. Your clock is long, the engine's short; each game is appended to the profile's
+`games/blindfold.pgn`.
+
+**A line read in your head**: a position of a well-known opening, the six moves that follow written beside it without
+the pieces moving, then a question: which piece is on a square they changed? Click the answer, or type the piece as FEN
+writes it (*N* a white knight, *n* a black one, *-* an empty square); the board then shows the position after the moves.
+Ten lines a series.
 
 ## The Lichess page
 

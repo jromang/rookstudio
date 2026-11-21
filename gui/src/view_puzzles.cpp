@@ -226,6 +226,8 @@ void App::startPuzzleRun(std::unique_ptr<PuzzleRun> run) {
     if (puzzle_) closePuzzles(false);
     if (mistake_) closeMistakes(false);  // a session of exercises, a game guessed (#81)
     if (guess_) closeGuess(false);
+    if (endgame_) closeEndgame(false);  // an endgame against the tables, a vision exercise (#82)
+    if (vision_) closeVision(false);
     review_running_ = chained;
     for (std::size_t i = 0; i < run->puzzles.size(); ++i) run->queue.push_back(i);
     run->total        = run->puzzles.size();

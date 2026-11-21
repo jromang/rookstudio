@@ -258,6 +258,8 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     if (puzzle_) dropPuzzles();     // so does a series of puzzles (#80)
     if (mistake_) dropMistakes();   // a session of exercises, a game guessed (#81)
     if (guess_) dropGuess();
+    if (endgame_) dropEndgame();  // an endgame against the tables, a vision exercise (#82)
+    if (vision_) dropVision();
     rememberBoardGame();            // its changes and undo history go with it
     // The questions were about the game left: those still being answered end on their own, out of sight; so do the
     // comments being written, which go nowhere.
@@ -763,6 +765,8 @@ void App::boardPlayAsked(chess::Move move) {
     if (puzzle_) return puzzleAnswer(move);      // to the puzzle's (#80)
     if (mistake_) return mistakeAnswer(move);    // to the exercise's, the guess (#81)
     if (guess_) return guessAnswer(move);
+    if (endgame_) return endgameAnswer(move);  // to the endgame's, the vision's (#82)
+    if (vision_) return visionAnswer(move);
     auto& b = board_;
     if (!chessBoard()) return boardPlay(move);
     // Only a move that would start a variation is asked about: the line's next move, or one a variation starts with,
@@ -1296,6 +1300,8 @@ void App::drawBoardPage() {
     if (puzzle_) return drawPuzzlePage();      // a series of puzzles: the column is the puzzle's (#80)
     if (mistake_) return drawMistakePage();    // a session of exercises, a game guessed (#81)
     if (guess_) return drawGuessPage();
+    if (endgame_) return drawEndgamePage();  // an endgame against the tables, a vision exercise (#82)
+    if (vision_) return drawVisionPage();
     auto& b = board_;
 
     ui::pageTitle(TR("Board"), guideSection());

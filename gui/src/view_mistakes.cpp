@@ -800,6 +800,8 @@ void App::startMistakeRun(std::unique_ptr<MistakeRun> run) {
     if (puzzle_) closePuzzles(false);
     if (guess_) closeGuess(false);
     if (mistake_) closeMistakes(false);
+    if (endgame_) closeEndgame(false);  // an endgame against the tables, a vision exercise (#82)
+    if (vision_) closeVision(false);
     review_running_ = chained;
     for (std::size_t i = 0; i < run->exercises.size(); ++i) run->queue.push_back(i);
     run->total = run->exercises.size();

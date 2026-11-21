@@ -165,18 +165,26 @@ std::unique_lock<std::mutex> lockSyzygy() {
     return std::unique_lock<std::mutex>(mutex);
 }
 
+namespace {
+
+// The tables loaded in this process: their folders, the most pieces they cover.
+std::string g_loaded;
+int g_largest = 0;
+
+}  // namespace
+
 int loadSyzygy(const std::string& paths) {
-    static std::string loaded;
-    static int largest = 0;
     // A tournament of this process frees the tables when it ends: loaded again then.
     static const chess::Board kqk("8/8/8/8/8/8/8/KQ5k w - - 0 1");
     if (paths.empty()) return 0;
-    if (loaded != paths || (largest > 0 && !fastchess::canProbeSyzgyWdl(kqk))) {
-        largest = fastchess::initSyzygy(paths);
-        loaded  = paths;
+    if (g_loaded != paths || (g_largest > 0 && !fastchess::canProbeSyzgyWdl(kqk))) {
+        g_largest = fastchess::initSyzygy(paths);
+        g_loaded  = paths;
     }
-    return largest;
+    return g_largest;
 }
+
+void forgetSyzygy() { g_loaded.clear(); }
 
 std::optional<TableVerdict> probeTables(const chess::Board& board, const std::string& paths, bool ignore50) {
     const int largest = loadSyzygy(paths);

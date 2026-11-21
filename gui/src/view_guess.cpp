@@ -356,6 +356,8 @@ void App::startGuess(ReplayGame game, bool chess960, std::string title, chess::C
     if (puzzle_) closePuzzles(false);
     if (mistake_) closeMistakes(false);
     if (guess_) closeGuess(false);
+    if (endgame_) closeEndgame(false);  // an endgame against the tables, a vision exercise (#82)
+    if (vision_) closeVision(false);
     auto run      = std::make_unique<GuessRun>();
     run->game     = std::move(game);
     run->chess960 = chess960;

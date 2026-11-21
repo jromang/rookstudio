@@ -148,8 +148,8 @@ std::string kindDue(ReviewKind kind, std::size_t n) {
             return trn("repertoire position", "repertoire positions", n);
         case ReviewKind::Puzzles:
             return trn("missed puzzle", "missed puzzles", n);
-        default:
-            break;
+        case ReviewKind::Endgames:
+            return trn("missed endgame", "missed endgames", n);
     }
     return {};
 }
@@ -205,8 +205,14 @@ ReviewCount App::reviewCount(ReviewKind kind) {
             out.answer_ms  = mistakeRecord().answer_ms;
             break;
         }
-        default:  // the endgames (#82) plug in here
+        case ReviewKind::Endgames: {  // #82
+            const auto& r  = endgameRecord();
+            out.due        = endgameCardsDue(r, day.end);
+            out.tomorrow   = endgameCardsDue(r, day.end + study::fsrs::DAY) - out.due;
+            out.three_days = endgameCardsDue(r, day.end + 3 * study::fsrs::DAY) - out.due;
+            out.answer_ms  = r.answer_ms;
             break;
+        }
     }
     return out;
 }
@@ -231,8 +237,8 @@ bool App::startReviewOf(ReviewKind kind, std::size_t repertoire) {
             return startPuzzleReview();
         case ReviewKind::Mistakes:
             return startMistakes(true);
-        default:
-            break;
+        case ReviewKind::Endgames:
+            return startEndgameReview();
     }
     return false;
 }
@@ -283,8 +289,10 @@ std::string App::reviewNextLabel() {
             const auto n = reviewCount(ReviewKind::Mistakes).due;
             return trn("Next: {} mistake of your games", "Next: {} mistakes of your games", n, ui::exactCount(n));
         }
-        default:
-            break;
+        case ReviewKind::Endgames: {
+            const auto n = reviewCount(ReviewKind::Endgames).due;
+            return trn("Next: {} missed endgame", "Next: {} missed endgames", n, ui::exactCount(n));
+        }
     }
     return TR("Next");
 }
@@ -294,6 +302,7 @@ void App::drawReviewNext(bool enter) {
         if (training_) closeTraining(true);
         if (puzzle_) closePuzzles(true);
         if (mistake_) closeMistakes(true);
+        if (endgame_) closeEndgame(true);
         review_running_ = false;
         review_chain_.clear();
         page_ = Page::Training;
@@ -604,6 +613,14 @@ void App::drawTraining() {
     ImGui::TextDisabled("·");
     ImGui::SameLine(0, px(8));
     if (partLink(TR("Guess the moves"), training_tab_ == 3)) training_tab_ = 3;
+    ImGui::SameLine(0, px(8));
+    ImGui::TextDisabled("·");
+    ImGui::SameLine(0, px(8));
+    if (partLink(TR("Endgames"), training_tab_ == 4)) training_tab_ = 4;
+    ImGui::SameLine(0, px(8));
+    ImGui::TextDisabled("·");
+    ImGui::SameLine(0, px(8));
+    if (partLink(TR("Vision"), training_tab_ == 5)) training_tab_ = 5;
     ImGui::BeginChild("##training_page", ImVec2(0, 0), ImGuiChildFlags_None);
     if (training_tab_ == 1)
         drawTrainingPuzzles();
@@ -611,6 +628,10 @@ void App::drawTraining() {
         drawTrainingMistakes();
     else if (training_tab_ == 3)
         drawTrainingGuess();
+    else if (training_tab_ == 4)
+        drawTrainingEndgames();
+    else if (training_tab_ == 5)
+        drawTrainingVision();
     else
         drawTrainingToday();
     ImGui::EndChild();
@@ -686,6 +707,40 @@ void App::drawTrainingToday() {
              guess_last_ ? trf("the last: {} points of {}", guess_last_->points, guess_last_->max)
                          : std::string(TR("not tried yet")),
              3);
+        // The second row (#82): the endgames against the tables, the mates, board vision.
+        ImGui::Dummy(ImVec2(0, gap - ImGui::GetStyle().ItemSpacing.y));
+        {
+            const auto& all  = endgameCatalogue();
+            std::size_t done = 0;
+            for (const auto& e : all)
+                if (const auto it = endgameRecord().results.find(e.id);
+                    it != endgameRecord().results.end() && it->second.done > 0)
+                    ++done;
+            card("##training_kind_endgames", ui::Icon::Crown, TR("Endgames"),
+                 TR("Against the tables: win, or hold the draw."), trf("{} endgames · {} done", all.size(), done), 4);
+        }
+        ImGui::SameLine(0, gap);
+        {
+            const auto it    = puzzleRecord().themes.find("mateIn2");
+            const auto stat  = it != puzzleRecord().themes.end() && it->second.tried >= 5
+                                   ? trf("mate in 2: {} % right", 100 * it->second.won / it->second.tried)
+                                   : std::string(TR("mates in 1 to 5, by pattern"));
+            const int before = training_tab_;
+            card("##training_kind_mates", ui::Icon::Zap, TR("Mates"),
+                 TR("Mates in 1 to 5 of the puzzles; Q, R, 2B, B+N against the tables."), stat, 4);
+            if (before != 4 && training_tab_ == 4) endgame_scroll_mates_ = true;  // to the part's mates
+        }
+        ImGui::SameLine(0, gap);
+        {
+            const auto& v = visionRecord();
+            int best      = 0;
+            for (const auto& [key, n] : v.coordinates) best = std::max(best, n);
+            card("##training_kind_vision", ui::Icon::Grid, TR("Vision"),
+                 TR("The coordinates, blindfold, a line read in your head."),
+                 best > 0 ? trn("record: {} square in 30 s", "record: {} squares in 30 s", best, best)
+                          : std::string(TR("not tried yet")),
+                 5);
+        }
     }
     ImGui::Dummy(ImVec2(0, px(4)));
     bool puzzles_enter = enter && training_enter_puzzles_;
@@ -727,7 +782,7 @@ void App::drawReviewCard(bool& enter) {
     if (day.due() == 0) {
         wrapped(day.kinds.empty()
                     ? TR("Nothing yet: the positions of your repertoires (the Openings page), the mistakes of your "
-                         "games and the puzzles you miss come back here, each on its day.")
+                         "games and the puzzles and endgames you miss come back here, each on its day.")
                     : TR("Nothing more today."),
                 true);
     } else {

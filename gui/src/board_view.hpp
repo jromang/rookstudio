@@ -101,6 +101,7 @@ struct BoardDecor {
     std::optional<chess::Square> drop;  // the square under the piece dragged, where it would land: tinted
     // The squares' colours; by default those of the theme in use (appearance::boardColours()), as on every board.
     std::optional<appearance::BoardColours> colours;
+    bool coordinates = true;  // the letters and figures along the edges (board vision hides them, #82)
 };
 
 // A move's judgement as a disc with its mark, centred on `centre`, `radius` wide; the 2D board puts it on the corner

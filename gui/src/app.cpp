@@ -122,6 +122,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     loadLichess();
     offline_evals_ = std::make_unique<OfflineEvals>(storage_.root() / "lichess-evals");  // #58
     offline_puzzles_ = std::make_unique<OfflinePuzzles>(storage_.root() / "lichess-puzzles");  // #80
+    player_names_    = storage_.playerNames();                                                 // #81
     // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
     assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
@@ -140,6 +141,7 @@ App::~App() {
     *lichess_count_cancel_ = true;
     if (review_tables_job_) *review_tables_job_->cancel = true;  // the tables of a review, within a quarter of a second
     if (story_job_) *story_job_->cancel = true;                  // the story by the model, at its next passage (#62)
+    if (mistake_scan_job_) *mistake_scan_job_->cancel = true;    // the user's games looked for, at the next game (#81)
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once, and the window goes away first rather than freeze while it does.
     if (probe_.valid() || check_.valid()) {
@@ -305,6 +307,7 @@ void App::frame() {
     pollTheory();           // the theory studies: read, read again when their files change (#77)
     pollTraining();         // a repertoire's training: its cards prepared, its first question (#76)
     pollPuzzles();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
+    pollMistakes();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -393,6 +396,22 @@ void App::frame() {
             startPuzzles();
         } else if (w == "review-all") {  // the day's review, every kind one after the other (#80)
             startReview();
+        } else if (w == "training-mistakes" || w == "training-guess") {
+            // The Training page's parts of #81: the mistakes as exercises, guessing the moves.
+            page_         = Page::Training;
+            training_tab_ = w == "training-mistakes" ? 2 : 3;
+        } else if (w == "mistakes-session" || w == "mistakes-review") {
+            // A session of the exercises of the user's mistakes: today's, or the day's review of them alone (#81).
+            if (!startMistakes(w == "mistakes-review")) {
+                page_         = Page::Training;
+                training_tab_ = 2;
+            }
+        } else if (w == "guess-board" || w == "guess-random") {
+            // Guessing the moves of the Board page's game from the position shown, or of a random game (#81).
+            if (w == "guess-board")
+                startGuessBoard();
+            else
+                (void)startGuessRandom();
         } else if (w.rfind("engines-remote-picker", 0) == 0) {
             // The first machine's files, as Add, A program on <machine>, shows them; engines-remote-picker=PATH: from
             // the folder of PATH there.

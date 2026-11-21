@@ -138,6 +138,7 @@ class Teller {
             for (const auto& [lesson, moves] : found) {
                 WorkOn::Topic t;
                 t.name = topic(lesson);
+                t.key  = topicKey(lesson);
                 for (const auto* m : moves) t.plies.push_back(m->ply);
                 w.topics.push_back(std::move(t));
             }
@@ -653,6 +654,48 @@ class Teller {
                 return f ? "les finales" : "endgames";
             default:
                 return f ? "l'ouverture" : "the opening";
+        }
+    }
+
+    // A lesson's kind, the same in every language (WorkOn::Topic::key).
+    static const char* topicKey(const Lesson& lesson) {
+        switch (lesson.kind) {
+            case Lesson::Kind::EnPrise:
+                return "en_prise";
+            case Lesson::Kind::Motif:
+                switch (*lesson.motif) {
+                    case Motif::Fork:
+                        return "fork";
+                    case Motif::Pin:
+                        return "pin";
+                    case Motif::Skewer:
+                        return "skewer";
+                    case Motif::Discovery:
+                        return "discovery";
+                    case Motif::Guard:
+                        return "guard";
+                    case Motif::Trapped:
+                        return "trapped";
+                    default:
+                        return "back_rank";
+                }
+            case Lesson::Kind::Tactics:
+                return "tactics";
+            case Lesson::Kind::King:
+                return "king";
+            case Lesson::Kind::Missed:
+                return "missed";
+            case Lesson::Kind::Conversion:
+                return "conversion";
+            case Lesson::Kind::Endgame:
+                if (lesson.ending == Ending::Pawn) return "pawn_endgame";
+                if (lesson.ending == Ending::Rook) return "rook_endgame";
+                if (lesson.ending == Ending::Queen) return "queen_endgame";
+                if (lesson.ending == Ending::Minor) return "minor_endgame";
+                if (lesson.ending == Ending::OppositeBishops) return "bishops_endgame";
+                return "endgame";
+            default:
+                return "opening";
         }
     }
 

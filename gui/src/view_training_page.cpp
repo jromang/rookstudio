@@ -142,6 +142,8 @@ uint64_t freeSpace(const fs::path& folder) {
 // What a kind of the day's review calls its cards due.
 std::string kindDue(ReviewKind kind, std::size_t n) {
     switch (kind) {
+        case ReviewKind::Mistakes:
+            return trn("mistake of your games", "mistakes of your games", n);
         case ReviewKind::Repertoire:
             return trn("repertoire position", "repertoire positions", n);
         case ReviewKind::Puzzles:
@@ -195,7 +197,15 @@ ReviewCount App::reviewCount(ReviewKind kind) {
             out.answer_ms = n > 0 ? ms / n : 0;
             break;
         }
-        default:  // the mistakes (#81) and the endgames (#82) plug in here
+        case ReviewKind::Mistakes: {  // #81
+            const auto c   = mistakeDayCounts();
+            out.due        = c.due;
+            out.tomorrow   = c.tomorrow;
+            out.three_days = c.three_days;
+            out.answer_ms  = mistakeRecord().answer_ms;
+            break;
+        }
+        default:  // the endgames (#82) plug in here
             break;
     }
     return out;
@@ -219,6 +229,8 @@ bool App::startReviewOf(ReviewKind kind, std::size_t repertoire) {
             return training_ != nullptr;
         case ReviewKind::Puzzles:
             return startPuzzleReview();
+        case ReviewKind::Mistakes:
+            return startMistakes(true);
         default:
             break;
     }
@@ -267,6 +279,10 @@ std::string App::reviewNextLabel() {
             const auto n = reviewCount(ReviewKind::Puzzles).due;
             return trn("Next: {} missed puzzle", "Next: {} missed puzzles", n, ui::exactCount(n));
         }
+        case ReviewKind::Mistakes: {
+            const auto n = reviewCount(ReviewKind::Mistakes).due;
+            return trn("Next: {} mistake of your games", "Next: {} mistakes of your games", n, ui::exactCount(n));
+        }
         default:
             break;
     }
@@ -277,6 +293,7 @@ void App::drawReviewNext(bool enter) {
     const auto back = [this] {
         if (training_) closeTraining(true);
         if (puzzle_) closePuzzles(true);
+        if (mistake_) closeMistakes(true);
         review_running_ = false;
         review_chain_.clear();
         page_ = Page::Training;
@@ -579,9 +596,21 @@ void App::drawTraining() {
     ImGui::TextDisabled("·");
     ImGui::SameLine(0, px(8));
     if (partLink(TR("Puzzles"), training_tab_ == 1)) training_tab_ = 1;
+    ImGui::SameLine(0, px(8));
+    ImGui::TextDisabled("·");
+    ImGui::SameLine(0, px(8));
+    if (partLink(TR("My mistakes"), training_tab_ == 2)) training_tab_ = 2;
+    ImGui::SameLine(0, px(8));
+    ImGui::TextDisabled("·");
+    ImGui::SameLine(0, px(8));
+    if (partLink(TR("Guess the moves"), training_tab_ == 3)) training_tab_ = 3;
     ImGui::BeginChild("##training_page", ImVec2(0, 0), ImGuiChildFlags_None);
     if (training_tab_ == 1)
         drawTrainingPuzzles();
+    else if (training_tab_ == 2)
+        drawTrainingMistakes();
+    else if (training_tab_ == 3)
+        drawTrainingGuess();
     else
         drawTrainingToday();
     ImGui::EndChild();
@@ -604,30 +633,59 @@ void App::drawTrainingToday() {
     drawReviewCard(review_enter);
     ImGui::Dummy(ImVec2(0, px(4)));
 
-    // The kinds of exercises, a card each.
+    // The kinds of exercises, a card each: a click on one leads to its part.
     {
         const float gap   = px(10);
         const float width = (ImGui::GetContentRegionAvail().x - 2 * gap) / 3.0f;
-        ui::beginCard("##training_kind_puzzles", ImVec2(width, 0));
-        const auto start = ImGui::GetCursorScreenPos();
-        ui::inlineIcon(ui::Icon::Puzzle, ui::ACCENT);
-        ImGui::SameLine();
-        ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
-        ImGui::TextUnformatted(TR("Puzzles"));
-        ImGui::PopFont();
-        wrapped(TR("Lichess's, by theme and at your rating, offline or online."), true);
+        const auto card   = [&](const char* id, ui::Icon icon, const char* name, const char* line,
+                                const std::string& stat, int tab) {
+            ui::beginCard(id, ImVec2(width, 0));
+            const auto start = ImGui::GetCursorScreenPos();
+            ui::inlineIcon(icon, ui::ACCENT);
+            ImGui::SameLine();
+            ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
+            ImGui::TextUnformatted(name);
+            ImGui::PopFont();
+            wrapped(line, true);
+            ImGui::TextDisabled("%s", stat.c_str());
+            const auto end = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos(start);
+            if (ImGui::InvisibleButton(fmt::format("{}_go", id).c_str(),
+                                       ImVec2(std::max(1.0f, width - px(32)), std::max(1.0f, end.y - start.y))))
+                training_tab_ = tab;
+            if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ui::endCard();
+        };
         const auto state = offline_puzzles_ ? offline_puzzles_->state() : OfflinePuzzles::State{};
-        const auto stat  = state.ready ? trf("{} on the disk · your rating {}", ui::exactCount(state.puzzles),
-                                             static_cast<int>(std::lround(puzzleRating().glicko.rating)))
-                                       : std::string(TR("not on this disk yet"));
-        ImGui::TextDisabled("%s", stat.c_str());
-        const auto end = ImGui::GetCursorScreenPos();
-        ImGui::SetCursorScreenPos(start);
-        if (ImGui::InvisibleButton("##to_puzzles",
-                                   ImVec2(std::max(1.0f, width - px(32)), std::max(1.0f, end.y - start.y))))
-            training_tab_ = 1;
-        if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-        ui::endCard();
+        card("##training_kind_puzzles", ui::Icon::Puzzle, TR("Puzzles"),
+             TR("Lichess's, by theme and at your rating, offline or online."),
+             state.ready ? trf("{} on the disk · your rating {}", ui::exactCount(state.puzzles),
+                               static_cast<int>(std::lround(puzzleRating().glicko.rating)))
+                         : std::string(TR("not on this disk yet")),
+             1);
+        ImGui::SameLine(0, gap);
+        {
+            const auto all = mistakeExercises();
+            const auto c   = mistakeCounts(all, trainingDay(epochNow()), 0);
+            card("##training_kind_mistakes", ui::Icon::Target, TR("My mistakes"),
+                 TR("Your reviewed games' mistakes, turned into exercises."),
+                 userNames().empty() ? std::string(TR("your names first"))
+                 : c.exercises == 0  ? std::string(TR("none yet"))
+                                     : trn("{} exercise", "{} exercises", c.exercises, ui::exactCount(c.exercises)) +
+                                           " " + trn("from {} game", "from {} games", c.games, c.games) +
+                                           (c.fresh > 0 ? " · " + trf("{} new", c.fresh) : std::string()),
+                 2);
+        }
+        ImGui::SameLine(0, gap);
+        if (!guess_last_read_) {
+            guess_last_read_ = true;
+            guess_last_      = lastGuessRecord(guessFolder());
+        }
+        card("##training_kind_guess", ui::Icon::Eye, TR("Guess the moves"),
+             TR("A game of a database, a side, move by move; the engine scores."),
+             guess_last_ ? trf("the last: {} points of {}", guess_last_->points, guess_last_->max)
+                         : std::string(TR("not tried yet")),
+             3);
     }
     ImGui::Dummy(ImVec2(0, px(4)));
     bool puzzles_enter = enter && training_enter_puzzles_;
@@ -668,8 +726,8 @@ void App::drawReviewCard(bool& enter) {
     ImGui::PopFont();
     if (day.due() == 0) {
         wrapped(day.kinds.empty()
-                    ? TR("Nothing yet: the positions of your repertoires (the Openings page) and the puzzles you miss "
-                         "come back here, each on its day.")
+                    ? TR("Nothing yet: the positions of your repertoires (the Openings page), the mistakes of your "
+                         "games and the puzzles you miss come back here, each on its day.")
                     : TR("Nothing more today."),
                 true);
     } else {
@@ -691,6 +749,13 @@ void App::drawReviewCard(bool& enter) {
                          : lock);
         ImGui::SameLine(0, px(8));
         ImGui::TextDisabled("%s", trf("Enter · about {} min", day.minutes()).c_str());
+        if (const auto* mistakes = day.find(ReviewKind::Mistakes);
+            mistakes && mistakes->due > 0 && day.dueKinds().size() > 1) {
+            ImGui::SameLine(0, px(14));
+            ImGui::BeginDisabled(!lock.empty());
+            if (ImGui::Button(TR("Only my mistakes"))) startReview(ReviewKind::Mistakes);
+            ImGui::EndDisabled();
+        }
         if (const auto* puzzles = day.find(ReviewKind::Puzzles);
             puzzles && puzzles->due > 0 && day.dueKinds().size() > 1) {
             ImGui::SameLine(0, px(14));
@@ -781,8 +846,25 @@ void App::drawPuzzleChooser(bool& enter) {
     };
     const bool batch_under_way = puzzles_online_ && onlineBatch() && onlineBatch()->left() > 0 &&
                                  onlineBatch()->left() < onlineBatch()->puzzles.size();
+    // What the user's games say (#81): the kinds of their mistakes of the last month ("To work on" of their reviews),
+    // as puzzle themes, come first.
+    std::vector<std::pair<std::string, std::size_t>> said;
+    {
+        const auto month = packedDaysBefore(epochNow(), 30);
+        std::map<std::string, std::size_t> kinds;
+        for (const auto* e : mistakeExercises())
+            if (e->packed_date >= month && !mistakeKindTheme(e->kind).empty()) ++kinds[e->kind];
+        said.assign(kinds.begin(), kinds.end());
+        std::stable_sort(said.begin(), said.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+        if (said.size() > 3) said.resize(3);
+    }
     if (chip(TR("Random"), puzzles_theme_.empty(), "theme_mix")) choose({});
     std::vector<std::string_view> chips(std::begin(FIRST_THEMES), std::end(FIRST_THEMES));
+    for (auto it = said.rbegin(); it != said.rend(); ++it) {
+        const auto theme = mistakeKindTheme(it->first);
+        std::erase(chips, theme);
+        chips.insert(chips.begin(), theme);
+    }
     if (!puzzles_theme_.empty() && std::find(chips.begin(), chips.end(), puzzles_theme_) == chips.end())
         chips.insert(chips.begin(), puzzles_theme_);
     for (const auto key : chips) {
@@ -846,6 +928,16 @@ void App::drawPuzzleChooser(bool& enter) {
         }
         ImGui::EndChild();
         ImGui::EndPopup();
+    }
+    if (!said.empty()) {
+        std::string list;
+        for (const auto& [kind, n] : said)
+            list += (list.empty() ? "" : ", ") + fmt::format("{} {}", std::string(TR(mistakeKindName(kind))), n);
+        ImGui::TextDisabled("%s",
+                            trf("Your games say: {} this month (“To work on” of their reviews). These themes come "
+                                "first.",
+                                list)
+                                .c_str());
     }
     if (batch_under_way)
         ImGui::TextDisabled(

@@ -41,6 +41,10 @@ struct WorkOn {
     struct Topic {
         std::string name;  // « les fourchettes », "rook endgames"
         std::vector<std::size_t> plies;
+        // The kind of lesson, the same in every language: "en_prise", "fork", "pin", "skewer", "discovery", "guard",
+        // "trapped", "back_rank", "tactics", "king", "missed", "conversion", "pawn_endgame", "rook_endgame",
+        // "queen_endgame", "minor_endgame", "bishops_endgame", "endgame", "opening" (the exercises of #81).
+        std::string key;
         bool operator==(const Topic&) const = default;
     };
     std::vector<Topic> topics;

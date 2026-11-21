@@ -347,6 +347,9 @@ them.
 | <kbd>Enter</kbd> | The Training page | Review all; or start the puzzles once one of their choices was clicked |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | A series of puzzles | A hint, "I don't know", stop |
 | <kbd>Enter</kbd>, <kbd>→</kbd> | A series of puzzles | The next puzzle, or again after a wrong answer; the solution a move at a time |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Space</kbd>, <kbd>Escape</kbd> | An exercise of your mistakes | A hint, "I don't know", stop |
+| <kbd>Enter</kbd> | An exercise of your mistakes | The next exercise, or again after a wrong answer |
+| <kbd>Enter</kbd>, <kbd>Escape</kbd> | Guessing the moves | The game goes on at once after a score; stop |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A game list | Go through the list, open the game |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | The Databases page | The search panel |
 | <kbd>Escape</kbd> | The Databases page | Close the search panel, then the list |
@@ -382,8 +385,8 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
 - **In progress**: the game's analysis, the position's, an import, the assistant (its download, its model loaded,
-  *Unload*), a series of puzzles under way, and what the day's review has due, in one count, a click reviewing it all
-  (see [The day's review](#the-days-review)).
+  *Unload*), a series of puzzles, a session of exercises or a game guessed under way, and what the day's review has
+  due, in one count, a click reviewing it all (see [The day's review](#the-days-review)).
 
 The search button at the top, or Ctrl+K, finds a command, a game, a database.
 
@@ -1360,19 +1363,22 @@ Openings and Lichess, in the views *Study* and *Everything*. A view you made bef
 Home page offers once to add the page to the view shown (*Add it to …*, or *Not now*), and Ctrl+K *Training* leads
 there meanwhile.
 
-Its title has two parts: **Today** (the day's review, the kinds of exercises, the puzzles to start) and **Puzzles**
-(the same choice of puzzles, Lichess's database kept on your disk, your results by theme). Everything works offline;
-what goes to Lichess is said where you choose it.
+Its title has four parts: **Today** (the day's review, the kinds of exercises, the puzzles to start), **Puzzles** (the
+same choice of puzzles, Lichess's database kept on your disk, your results by theme), **My mistakes** (see [Your
+mistakes as exercises](#your-mistakes-as-exercises)) and **Guess the moves** (see [Guessing the
+moves](#guessing-the-moves)). A card for each kind of exercise leads to its part. Everything works offline; what goes to
+Lichess is said where you choose it.
 
 ### The day's review
 
 *To review today* counts what each kind of training has due today, each with its spaced repetition (FSRS), in one
-queue: the positions of your repertoires (their training stays on the Openings page, see [Training a
-repertoire](#training-a-repertoire)) and the puzzles you missed. *Review all* (Enter) takes them one after the other on
-the Board page: the positions due of each repertoire, then the puzzles to review. At the end of each, *Next: …*
-(Enter) goes on, *Back to the Training page* (Escape) stops there; what was answered is kept. Beside the button, the
-time it should take, from the pace of your answers; under it, what comes back tomorrow and within three days. When
-puzzles are due with other kinds, *Only the puzzles* reviews them alone.
+queue: the mistakes of your games (see [Your mistakes as exercises](#your-mistakes-as-exercises)), the positions of your
+repertoires (their training stays on the Openings page, see [Training a repertoire](#training-a-repertoire)) and the
+puzzles you missed. *Review all* (Enter) takes them one after the other on the Board page: your mistakes due, the
+positions due of each repertoire, then the puzzles to review. At the end of each, *Next: …* (Enter) goes on, *Back to
+the Training page* (Escape) stops there; what was answered is kept. Beside the button, the time it should take, from the
+pace of your answers; under it, what comes back tomorrow and within three days. When mistakes or puzzles are due with
+other kinds, *Only my mistakes* and *Only the puzzles* review them alone.
 
 The Home page's *In progress* has the same count (*35 to review today · Review all*), a click reviewing it all; so
 does Ctrl+K *Review all*.
@@ -1443,6 +1449,78 @@ When Lichess cannot take the answers they stay on the disk, said with what to do
 by themselves a minute later, even if RookStudio was closed meanwhile; the network down, sent again a minute later;
 the token refused, sent once the account is linked again. *Try again now* does not wait. What leaves the machine: the
 batch asked for (its theme or opening, its difficulty), then each puzzle's id with right or wrong, rated or not.
+
+### Your mistakes as exercises
+
+The mistakes of your own games come back as exercises: the position before your move, to find better. Your games are
+those where you play under one of your names (see [Your names](#your-names)), in your databases. Each of them that has
+a review (see [The review of a game](#the-review-of-a-game)) gives the moves the review marked **?** and **??** on your
+side, where a better move is clear: the review searched the position deep enough to name its best move (its third pass
+at least), and the game was not decided anyway (the review's best move keeps you in the game; your move did not keep a
+win). Inaccuracies (?!) are left out: they seldom have one good answer.
+
+The **My mistakes** part counts the exercises and the games they come from, those due today, the new ones and those you
+know, due later. Their kinds come from *What to work on* of each review: forks, pieces left en prise, rook endgames…;
+a chip for each keeps the list and the session to that kind, *Every kind* takes them all. The list gives each
+exercise's game, where and when it was played, your move and the review's, and when it comes back. *Start · N
+exercises* (Enter) asks those due, then today's new ones (as many a day as the repertoires' new positions).
+
+Your latest games without a review are said under the list: *Review them · in the background* reviews them one after
+the other, as the Board page reviews a game (its engine, its settings, the processes left beside a tournament), each
+review kept with its game; their exercises come game by game. The progress, the time left and *Cancel* show
+meanwhile; the reviews wait while the Board page analyses.
+
+**An exercise** takes the Board page, its column becoming the exercise's, as the repertoires' training does: the game
+up to the position, from your side, the opponent's last move in pale green; under the board, when it was played and
+what you played then. Play your move on the board, or type it. The review's best move is right at once; any other move
+is searched by the review's engine at the review's settings (one thread, its number of nodes, from an empty table), and
+it is right when it loses 0.3 pawn at most against the review's best, or keeps a win the review would not mark. The
+engine, the tree and your notes are hidden during the question.
+
+- **Alt+H**: a hint, the square of the piece to play in blue.
+- **Space**: "I don't know"; the review's move is shown.
+- **Escape**: stop; what was answered is kept.
+
+Each answer is graded by itself, as a repertoire's position is: right at the first try, *good*; right after a hint or
+after more than 20 seconds, *hard*; wrong, *again*. Right: the review's line and your game's, what the review said of
+your move, and when the exercise comes back; *Open the game at this move* opens it on the Board page. Wrong: your move
+in orange, the review's move as a green arrow, and what the engine found after yours; *Retry* (Enter) plays it again
+without counting again; a missed exercise comes back a few exercises later, then the next day.
+
+The exercises due count in the day's review (see [The day's review](#the-days-review)), *Only my mistakes* reviews them
+alone; Ctrl+K has *Review my mistakes* and *Exercises from my mistakes*. A position your repertoire trains is not taken
+here: it is trained on the Openings page. A game removed from its database takes its exercises with it. The exercises
+and their cards are kept in the profile's `mistakes` folder (`exercises.json`, and `answers.jsonl`, a line per answer);
+your games do not change, and nothing leaves the machine. What your games say also orders the puzzles' themes: the
+kinds of your mistakes of the last month come first among them, said under the chips.
+
+### Your names
+
+*Settings › Your names* (or the *My mistakes* part, before any name) lists the names you play under, as your databases
+write them: a game where one of them plays is yours. A name matches by its whole words, letter case and accents left
+out: *Tester* is *Tester, Sam* and *TESTER, S.*, *Sam Tester* is *Tester, Sam*, but *Test* is no one. The name of your
+linked Lichess account counts by itself. Click a name to take it away.
+
+### Guessing the moves
+
+**Guess the moves** replays a game of your databases from one side: at each of its moves, you guess the one played.
+The engine scores each guess against the game's move: *as the game* 3 points; *as good* by the engine (0.2 pawn worse
+at most, or better) 2; *playable* (0.5 pawn worse at most) 1; else none. It is the analysis engine, on one thread, a
+second a move; the game's move is searched while you think.
+
+*A game at random* draws one from the database chosen, through a filter: the game list's quick filter (players, event,
+an ECO code, a year) and the players' Elo. Choose your side, then *Start · a random game* (Enter). With *The moves of
+theory pass by themselves*, the guessing starts where the game leaves the moves many games of your databases played
+(their opening tree). *The Board page's game* guesses the game shown from its position, for the side to move: Ctrl+K
+*Guess the moves* on the Board page.
+
+The game takes the Board page, its column becoming the guessing's; the game is not changed, and its later moves are not
+shown. After each guess: your move as a blue arrow, the game's as a green one, the points and both evaluations; the game
+goes on by itself after a moment (Enter at once), the opponent's answer played, and the next move is yours. Under it:
+each guess and its points, and the score so far. At the end: your points, how many guesses were the game's move, the
+pawns lost a move on average, and the moves that cost you most (a click shows their position); the whole game is on the
+board, ← and → go through it. Each game guessed is kept in the profile's `guess` folder; the Training page shows the
+last one's points.
 
 ## The Lichess page
 

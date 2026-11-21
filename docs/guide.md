@@ -1499,7 +1499,8 @@ kinds of your mistakes of the last month come first among them, said under the c
 *Settings › Your names* (or the *My mistakes* part, before any name) lists the names you play under, as your databases
 write them: a game where one of them plays is yours. A name matches by its whole words, letter case and accents left
 out: *Tester* is *Tester, Sam* and *TESTER, S.*, *Sam Tester* is *Tester, Sam*, but *Test* is no one. The name of your
-linked Lichess account counts by itself. Click a name to take it away.
+linked Lichess account counts by itself. Click a name to take it away: the exercises of its games go, but their cards
+are kept, and come back with them if you add the name again.
 
 ### Guessing the moves
 
@@ -1510,9 +1511,9 @@ second a move; the game's move is searched while you think.
 
 *A game at random* draws one from the database chosen, through a filter: the game list's quick filter (players, event,
 an ECO code, a year) and the players' Elo. Choose your side, then *Start · a random game* (Enter). With *The moves of
-theory pass by themselves*, the guessing starts where the game leaves the moves many games of your databases played
-(their opening tree). *The Board page's game* guesses the game shown from its position, for the side to move: Ctrl+K
-*Guess the moves* on the Board page.
+theory pass by themselves* (kept for the next time), the guessing starts where the game leaves the moves many games of
+your databases played (their opening tree). *The Board page's game* guesses the game shown from its position, for the
+side to move: Ctrl+K *Guess the moves* on the Board page.
 
 The game takes the Board page, its column becoming the guessing's; the game is not changed, and its later moves are not
 shown. After each guess: your move as a blue arrow, the game's as a green one, the points and both evaluations; the game

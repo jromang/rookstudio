@@ -227,13 +227,16 @@ void App::drawTrainingGuess() {
         ImGui::SameLine(0, px(4));
         if (chip(TR("Black"), guess_side_ == 1, "guess_black")) guess_side_ = 1;
         ImGui::SameLine(0, px(16));
-        ImGui::Checkbox(TR("The moves of theory pass by themselves"), &guess_theory_);
+        if (ImGui::Checkbox(TR("The moves of theory pass by themselves"), &trainingSettings().guess_theory))
+            saveTrainingSettings();
         tip(
             TR("Those many games of your databases played (their opening tree): the guessing starts where the game "
                "leaves them."));
         if (!guess_error_.empty())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", guess_error_.c_str());
-        if (primaryButton(TR("Start · a random game"), lock.empty()) || (enter && lock.empty())) {
+        const bool drawing = guess_pick_.valid();
+        if (primaryButton(TR("Start · a random game"), lock.empty() && !drawing) ||
+            (enter && lock.empty() && !drawing)) {
             enter = false;
             (void)startGuessRandom();
         }
@@ -241,7 +244,7 @@ void App::drawTrainingGuess() {
                                           "changed."))
                          : lock);
         ImGui::SameLine(0, px(8));
-        ImGui::TextDisabled("%s", TR("Enter"));
+        ImGui::TextDisabled("%s", drawing ? TR("Drawing a game…") : TR("Enter"));
     }
     ImGui::PopTextWrapPos();
     ui::endCard();
@@ -281,7 +284,7 @@ void App::drawTrainingGuess() {
 
 bool App::startGuessRandom() {
     guess_error_.clear();
-    if (!trainingLock().empty()) return false;
+    if (!trainingLock().empty() || guess_pick_.valid()) return false;
     auto& s = shelf();
     if (guess_source_ < 0 || guess_source_ >= static_cast<int>(s.entries().size())) return false;
     const auto index = static_cast<std::size_t>(guess_source_);
@@ -290,33 +293,40 @@ bool App::startGuessRandom() {
         guess_error_ = trf("“{}” cannot be opened: {}", s.entries()[index].name, s.facts(index).error);
         return false;
     }
-    const auto snapshot = db->snapshot();
-    auto filter         = quickFilter(guess_words_.data());
-    filter.elo_min      = static_cast<uint16_t>(std::clamp(guess_elo_, 0, 3500));
-    const auto view     = study::makeView(snapshot, filter, study::SortBy::Number);
-    if (view.ids.empty()) {
-        guess_error_ = TR("No game of this database passes the filter.");
-        return false;
-    }
-    std::mt19937_64 random(static_cast<uint64_t>(Clock::now().time_since_epoch().count()));
-    for (int attempt = 0; attempt < 40; ++attempt) {
-        const auto id = view.ids[random() % view.ids.size()];
-        if (snapshot->deleted(id)) continue;
-        const auto row = snapshot->row(id);
-        if (row.plies < GUESS_SHORTEST) continue;
-        std::string error;
-        auto game = readPgnGame(study::importedPgn(snapshot->game(id)), error);
-        if (!game || game->moves.size() < GUESS_SHORTEST) continue;
-        const bool chess960 = gameIsChess960(*game);
-        auto title          = fmt::format("{} – {}", game->header("White"), game->header("Black"));
-        if (const auto event = game->header("Event"); !event.empty() && event != "?") title += " · " + event;
-        startGuess(std::move(*game), chess960, std::move(title),
-                   guess_side_ == 0 ? chess::Color::WHITE : chess::Color::BLACK, 0,
-                   std::make_pair(s.entries()[index].folder, id));
-        return guess_ != nullptr;
-    }
-    guess_error_ = TR("No game long enough passes the filter.");
-    return false;
+    auto filter      = quickFilter(guess_words_.data());
+    filter.elo_min   = static_cast<uint16_t>(std::clamp(guess_elo_, 0, 3500));
+    guess_pick_side_ = guess_side_ == 0 ? chess::Color::WHITE : chess::Color::BLACK;
+    // The filter and the draw in the background: a large database's filter takes a moment.
+    guess_pick_ =
+        std::async(std::launch::async, [snapshot = db->snapshot(), filter, folder = s.entries()[index].folder,
+                                        seed = static_cast<uint64_t>(Clock::now().time_since_epoch().count())] {
+            study::enterBackground();
+            GuessPick pick;
+            const auto view = study::makeView(snapshot, filter, study::SortBy::Number);
+            if (view.ids.empty()) {
+                pick.error = "none";  // said in the interface's words on its thread
+                return pick;
+            }
+            std::mt19937_64 random(seed);
+            for (int attempt = 0; attempt < 40; ++attempt) {
+                const auto id = view.ids[random() % view.ids.size()];
+                if (snapshot->deleted(id) || snapshot->row(id).plies < GUESS_SHORTEST) continue;
+                std::string error;
+                auto game = readPgnGame(study::importedPgn(snapshot->game(id)), error);
+                if (!game || game->moves.size() < GUESS_SHORTEST) continue;
+                pick.chess960 = gameIsChess960(*game);
+                pick.title    = fmt::format("{} – {}", game->header("White"), game->header("Black"));
+                if (const auto event = game->header("Event"); !event.empty() && event != "?")
+                    pick.title += " · " + event;
+                pick.game   = std::move(*game);
+                pick.folder = folder;
+                pick.id     = id;
+                return pick;
+            }
+            pick.error = "short";
+            return pick;
+        });
+    return true;
 }
 
 void App::startGuessBoard() {
@@ -366,7 +376,7 @@ void App::startGuess(ReplayGame game, bool chess960, std::string title, chess::C
     run->engine_name = engine->name;
     // The moves of theory of the user's databases, from the start of a game that starts at the usual position.
     const bool usual = run->game.start_fen.empty() || run->game.start_fen == std::string(chess::constants::STARTPOS);
-    if (guess_theory_ && run->from == 0 && usual && !chess960) {
+    if (trainingSettings().guess_theory && run->from == 0 && usual && !chess960) {
         auto& s = shelf();
         std::optional<std::size_t> base;
         if (tree_db_ >= 0 && static_cast<std::size_t>(tree_db_) < s.entries().size() && !s.entries()[tree_db_].source)

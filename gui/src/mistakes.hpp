@@ -149,10 +149,22 @@ struct ScannedGame {
     std::vector<uint64_t> keys;
 };
 
+// The card of an exercise no game gives any longer (a name taken away, a database removed, a review changed): kept, so
+// that the exercise comes back with it when a game gives it again (nothing is lost by a gesture undone).
+struct KeptCard {
+    study::fsrs::Card card;
+    int64_t since = 0;
+};
+
 struct MistakeRecord {
     std::map<uint64_t, MistakeExercise> exercises;  // by position
     std::map<std::string, ScannedGame> games;       // by review key
+    std::map<uint64_t, KeptCard> kept;              // by position: the cards answered of exercises gone
     int64_t answer_ms = 0;                          // how long an answer takes, on average; 0 before any
+    // An exercise gone: its card kept when it was ever answered.
+    void keep(const MistakeExercise& exercise);
+    // A card kept given back to an exercise that comes back; false when none is kept for it.
+    bool giveBack(MistakeExercise& exercise);
 };
 [[nodiscard]] MistakeRecord readMistakeRecord(const std::filesystem::path& folder);
 bool writeMistakeRecord(const std::filesystem::path& folder, const MistakeRecord& record);
@@ -210,7 +222,8 @@ struct MistakeScan {
                                        std::size_t recent, commentary::Lang lang,
                                        const std::atomic<bool>* cancel = nullptr);
 // A game's exercises put in a record in place of those it gave before (a game reviewed in the background), their
-// cards kept: `game` its review key, `exercises` as exercisesOf() gives them, with their place.
+// cards kept, those of the exercises gone kept apart: `game` its review key, `exercises` as exercisesOf() gives them,
+// with their place.
 void putExercises(MistakeRecord& record, const std::string& game, const std::string& signature,
                   std::vector<MistakeExercise> exercises);
 

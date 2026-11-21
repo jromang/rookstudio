@@ -70,7 +70,9 @@ each database's snapshot generation and the analyses folder's time. When it chan
 (`study::enterBackground()`) finds the user's games (the names' words as the game list's player filter, then each game
 told by its players' whole words), their review keys (the game read as the Board page reads it), and the exercises of
 those reviewed; a game whose review did not change since keeps the exercises found before. The cards of the record live
-on the screen side: answers given while the thread looked are kept. A game no longer found takes its exercises with it.
+on the screen side: answers given while the thread looked are kept. A game no longer found takes its exercises with it,
+but not their cards: the card of an exercise no game gives any longer is kept apart (`kept`), and given back when a game
+gives the position again, so that a name taken away or a database removed by mistake loses nothing.
 
 The latest 20 games of the user's (by date) without a review are offered: *Review them · in the background* reviews
 them one after the other as the Board page reviews a game in the Chess space (its analysis engine, its ceiling, nodes on
@@ -83,8 +85,9 @@ Board page analyses or reviews, and while one of the user's games is played live
 
 `mistakes/exercises.json`: the exercises by position, each with its game (start, moves up to the position, tags, its
 database and number), the move played and its judgement and kind, the review's engine, limit and date, its best line and
-the line after the move played with their scores, the review's comment, and the card (FSRS) with its first answer; and
-the reviewed games by review key, each with its review's signature and the positions it gave. `mistakes/answers.jsonl`:
+the line after the move played with their scores, the review's comment, and the card (FSRS) with its first answer; the
+reviewed games by review key, each with its review's signature and the positions it gave; and the cards kept of the
+exercises gone. `mistakes/answers.jsonl`:
 a line per answer (the position, when, its grade, its time, the move played). `guess/games.jsonl`: a line per game
 guessed (its title and side, the points of the maximum, the guesses that were the game's move, the average pawns lost).
 Nothing leaves the machine.
@@ -92,16 +95,17 @@ Nothing leaves the machine.
 ## Guessing the moves
 
 A game drawn at random from a database through the game list's quick filter and a minimum Elo (a game of 16 plies at
-least), or the Board page's game from the position shown, for the side to move there. The moves of theory of the user's
-databases pass by themselves (`commentary::theoryOf()` on the first database of theirs with an opening tree, the game
-itself left out), for a game from its usual start. The game's later moves are never on the board before they are
-guessed.
+least; the filter and the draw on a thread of their own), or the Board page's game from the position shown, for the side
+to move there. The moves of theory of the user's databases pass by themselves (`commentary::theoryOf()` on the first
+database of theirs with an opening tree, the game itself left out), for a game from its usual start; the choice is kept
+in `training.json` (`guess_theory`). The game's later moves are never on the board before they are guessed.
 
 The analysis engine, one thread, a second a move: the position after the game's move is searched while the user thinks,
 the position after the guess once it is played. The guess scores 3 when it is the game's move; else, both evaluations
-for the side that played: 2 when the guess is 0.2 pawn worse at most (or better), 1 when 0.5 pawn worse at most, else
-0 (mates as 100 pawns less a tenth a move: a mate in more moves is as good, a mate given up for a few pawns is not). The
-game goes on by itself after a moment (the repertoires' training's setting, and 1.5 s more), the opponent's reply played.
+for the side that played: 2 when the guess is 0.2 pawn worse at most (or better), 1 when 0.5 pawn worse at most, else 0
+(mates as 100 pawns less a tenth a move: a mate in more moves is as good, a mate given up for a few pawns is not). The
+game goes on by itself after a moment (the repertoires' training's setting, and 1.5 s more), the opponent's reply
+played.
 
 ## Checked on the screen
 

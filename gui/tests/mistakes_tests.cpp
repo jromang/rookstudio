@@ -317,8 +317,17 @@ TEST_CASE("mistakes: a game's exercises replaced by its new review's, their card
     putExercises(record, "game-a", "two", {});
     CHECK(record.exercises.size() == 1);
     CHECK(record.games.at("game-a").keys.empty());
+    // Answered once, then given by no game: its card is kept apart, and comes back with it.
+    record.exercises.begin()->second.card.reps = 2;
+    record.exercises.begin()->second.card.last = 1000;
     putExercises(record, "game-b", "two", {});
     CHECK(record.exercises.empty());
+    REQUIRE(record.kept.size() == 1);
+    putExercises(record, "game-b", "three", older);
+    REQUIRE(record.exercises.size() == 1);
+    CHECK(record.exercises.begin()->second.card.reps == 2);
+    CHECK(record.exercises.begin()->second.since == 42);
+    CHECK(record.kept.empty());
 }
 
 TEST_CASE("mistakes: the user's games looked for in their databases, the reviewed ones giving their exercises") {
@@ -372,13 +381,27 @@ TEST_CASE("mistakes: the user's games looked for in their databases, the reviewe
     // Scanned again with its card: kept, the review unchanged.
     auto before                                = scan.record;
     before.exercises.begin()->second.card.reps = 3;
+    before.exercises.begin()->second.card.last = 1000;
     before.exercises.begin()->second.since     = 77;
     auto again = scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En);
     REQUIRE(again.record.exercises.size() == 1);
     CHECK(again.record.exercises.begin()->second.card.reps == 3);
     CHECK(again.record.exercises.begin()->second.since == 77);
-    // Under no name of theirs: nothing.
-    CHECK(scanMistakes(sources, {"Nobody"}, analyses, before, 20, commentary::Lang::En).record.exercises.empty());
+    // Under no name of theirs: nothing, the card answered kept apart; the name back, the exercise comes back with it.
+    const auto nobody = scanMistakes(sources, {"Nobody"}, analyses, before, 20, commentary::Lang::En);
+    CHECK(nobody.record.exercises.empty());
+    REQUIRE(nobody.record.kept.size() == 1);
+    const auto back = scanMistakes(sources, names, analyses, nobody.record, 20, commentary::Lang::En);
+    REQUIRE(back.record.exercises.size() == 1);
+    CHECK(back.record.exercises.begin()->second.card.reps == 3);
+    CHECK(back.record.exercises.begin()->second.since == 77);
+    CHECK(back.record.kept.empty());
+    // Kept in the profile too.
+    REQUIRE(writeMistakeRecord(dir / "kept", nobody.record));
+    const auto read = readMistakeRecord(dir / "kept");
+    REQUIRE(read.kept.size() == 1);
+    CHECK(read.kept.begin()->second.card.reps == 3);
+    CHECK(read.kept.begin()->second.since == 77);
     // The review gone: its exercise goes.
     REQUIRE(saveReviews(analyses, *first, {}));
     CHECK(scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En).record.exercises.empty());

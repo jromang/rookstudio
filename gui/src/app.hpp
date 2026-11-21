@@ -911,15 +911,26 @@ class App {
     int guess_source_  = -1;    // the database a game is drawn from (the shelf's index); -1 the first of the user's
     int guess_side_    = 0;     // 0 White, 1 Black
     int guess_elo_     = 0;     // both players at least
-    bool guess_theory_ = true;  // the moves of theory of the user's databases passed by themselves
     std::array<char, 96> guess_words_{};  // the quick filter's words: players, event, an ECO code, a year
+    // A game drawn at random from the database and the filter chosen, in the background (a large database's filter
+    // takes a moment).
+    struct GuessPick {
+        std::optional<ReplayGame> game;
+        bool chess960 = false;
+        std::string title;
+        std::filesystem::path folder;
+        uint64_t id = 0;
+        std::string error;  // "none": no game passes the filter; "short": none long enough
+    };
+    std::future<GuessPick> guess_pick_;
+    chess::Color guess_pick_side_ = chess::Color::WHITE;
     std::optional<GuessRecord> guess_last_;
     bool guess_last_read_ = false;
     std::string guess_error_;
     std::unique_ptr<GuessRun> guess_;
     void drawTrainingGuess();
     void pollGuess();         // each frame: the theory looked for, the searches after the game's move and the guess
-    bool startGuessRandom();  // a game of the chosen database and filter
+    bool startGuessRandom();  // a game of the chosen database and filter, drawn in the background
     void startGuessBoard();   // the Board page's game, from the position shown, for the side to move
     void startGuess(ReplayGame game, bool chess960, std::string title, chess::Color side, int from,
                     std::optional<std::pair<std::filesystem::path, uint64_t>> origin);

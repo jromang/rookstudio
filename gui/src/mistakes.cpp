@@ -472,6 +472,19 @@ std::optional<PositionEval> endedAfter(const MistakeExercise& exercise, const ch
 // ---------------------------------------------------------------------------
 // What the profile keeps
 
+void MistakeRecord::keep(const MistakeExercise& exercise) {
+    if (!exercise.card.fresh()) kept[exercise.key] = {exercise.card, exercise.since};
+}
+
+bool MistakeRecord::giveBack(MistakeExercise& exercise) {
+    const auto it = kept.find(exercise.key);
+    if (it == kept.end()) return false;
+    exercise.card  = it->second.card;
+    exercise.since = it->second.since;
+    kept.erase(it);
+    return true;
+}
+
 MistakeRecord readMistakeRecord(const fs::path& folder) {
     MistakeRecord out;
     const auto json = readJson<nlohmann::json>(folder / "exercises.json");
@@ -493,6 +506,10 @@ MistakeRecord readMistakeRecord(const fs::path& folder) {
             out.games.emplace(game, std::move(g));
         }
     }
+    if (const auto it = json->find("kept"); it != json->end() && it->is_object())
+        for (const auto& [hex, j] : it->items())
+            if (const auto key = keyOfHex(hex); key && j.is_object())
+                out.kept[*key] = {cardOf(j.value("card", nlohmann::json::object())), j.value("since", int64_t{0})};
     return out;
 }
 
@@ -507,10 +524,13 @@ bool writeMistakeRecord(const fs::path& folder, const MistakeRecord& record) {
         for (const auto k : g.keys) keys.push_back(hexKey(k));
         games[game] = {{"review", g.review}, {"keys", std::move(keys)}};
     }
+    nlohmann::json kept = nlohmann::json::object();
+    for (const auto& [key, k] : record.kept) kept[hexKey(key)] = {{"card", cardJson(k.card)}, {"since", k.since}};
     return writeJson(folder / "exercises.json", {{"version", 1},
                                                  {"answer_ms", record.answer_ms},
                                                  {"exercises", std::move(exercises)},
-                                                 {"games", std::move(games)}});
+                                                 {"games", std::move(games)},
+                                                 {"kept", std::move(kept)}});
 }
 
 void appendMistakeAnswer(const fs::path& folder, uint64_t key, int64_t at, study::fsrs::Rating rating, int64_t ms,
@@ -586,7 +606,11 @@ void putExercises(MistakeRecord& record, const std::string& game, const std::str
                 return g.first != game &&
                        std::find(g.second.keys.begin(), g.second.keys.end(), k) != g.second.keys.end();
             });
-            if (!elsewhere) record.exercises.erase(k);
+            if (elsewhere) continue;
+            if (const auto e = record.exercises.find(k); e != record.exercises.end()) {
+                record.keep(e->second);
+                record.exercises.erase(e);
+            }
         }
     }
     ScannedGame scanned;
@@ -601,6 +625,7 @@ void putExercises(MistakeRecord& record, const std::string& game, const std::str
             if (it->second.game_key != game && it->second.packed_date > e.packed_date) continue;
             it->second = std::move(e);
         } else {
+            (void)record.giveBack(e);  // an exercise gone that comes back, with its card
             record.exercises.emplace(e.key, std::move(e));
         }
     }
@@ -612,6 +637,7 @@ MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::v
                          commentary::Lang lang, const std::atomic<bool>* cancel) {
     MistakeScan out;
     out.record.answer_ms = before.answer_ms;
+    out.record.kept      = before.kept;
     const auto stopped   = [&] { return cancel && cancel->load(); };
     // The games reviewed, by their review's key.
     std::unordered_set<std::string> reviewed;
@@ -697,13 +723,16 @@ MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::v
         }
         putExercises(out.record, f.key, signature, std::move(exercises));
     }
-    // The cards of the exercises found before.
+    // The cards of the exercises found before; those no longer found kept apart.
     for (auto& [key, e] : out.record.exercises) {
         if (const auto it = before.exercises.find(key); it != before.exercises.end()) {
             e.card  = it->second.card;
             e.since = it->second.since;
+            out.record.kept.erase(key);
         }
     }
+    for (const auto& [key, e] : before.exercises)
+        if (!out.record.exercises.contains(key)) out.record.keep(e);
     // The latest games without a review.
     std::vector<const Found*> latest;
     for (const auto& f : found) latest.push_back(&f);

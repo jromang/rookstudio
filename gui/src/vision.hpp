@@ -122,7 +122,7 @@ struct VisionRun {
     Hidden hidden    = Hidden::All;
     chess::Color you = chess::Color::WHITE;
     std::string engine;
-    int elo      = 0;  // the engine's strength asked, 0 its own
+    std::string strength;  // as the Play page chose it (#83): "Elo 1,500", "1,000 nodes a move", "full strength"
     int peeks    = PEEKS;
     bool peeking = false;
     std::chrono::steady_clock::time_point peek_until{};

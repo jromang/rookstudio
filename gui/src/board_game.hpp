@@ -11,10 +11,12 @@
 #include <condition_variable>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <json.hpp>
@@ -44,7 +46,29 @@ struct BoardMatchSetup {
     // The user plays one side: 0 the first (White in the first game), 1 the second; -1 two engines. Its entry is only
     // the name its games give it.
     int human = -1;
+
+    // A game against an engine of the Play page (#83, mockup M12, board 4):
+    // - the nodes a move of the first and the second engine, its search stopped there too; 0 none;
+    std::array<uint64_t, 2> nodes{};
+    // - the engine's openings: its move for a position (UCI), asked from the game's thread until it has none, the
+    //   engine playing from there; null, the engine from the first move;
+    std::function<std::optional<std::string>(const chess::Board&)> book;
+    // - the game's Event, and tags after the usual ones;
+    std::string event;
+    std::vector<std::pair<std::string, std::string>> tags;
+    // - a game resumed (one game): its moves so far from `fen`, White's and Black's clocks before each and now, the
+    //   moves taken back, where its openings ended.
+    std::optional<ReplayGame> resume;
+    std::vector<std::array<int64_t, 2>> resume_clocks_before;
+    std::array<int64_t, 2> resume_clock_ms{};
+    int resume_takebacks = 0;
+    int resume_last_book = -1;
+    bool resume_book_out = false;
 };
+
+// Whether the engine takes a draw the user offers (#83): it is being mated or stands clearly worse (1.5 pawns), or it
+// is not better (by 0.1 pawn) once 20 moves have been played. `score` is its own, from its last search.
+[[nodiscard]] bool engineAcceptsDraw(const std::optional<fastchess::Score>& score, int plies);
 
 // The user's name in the games they play: their login name, or "Human".
 [[nodiscard]] std::string humanName();
@@ -80,6 +104,16 @@ class BoardMatch {
         bool running = false;
         std::string error;  // why it could not start or go on
         std::filesystem::path pgn;
+        // A game against an engine of the Play page (#83): White's and Black's clocks before each move of `current`
+        // (what a move taken back gives back), the moves taken back, the ply of the engine's last move from its
+        // openings and whether they ended, a draw offered waiting for the engine's answer, and the ply of the move it
+        // declined one with.
+        std::vector<std::array<int64_t, 2>> clocks_before;
+        int takebacks     = 0;
+        int last_book     = -1;
+        bool book_out     = false;
+        bool draw_offered = false;
+        int draw_declined = -1;
     };
 
     BoardMatch() = default;
@@ -87,8 +121,8 @@ class BoardMatch {
     BoardMatch(const BoardMatch&)            = delete;
     BoardMatch& operator=(const BoardMatch&) = delete;
 
-    // Starts the games on a thread of its own, appended to `pgn` as each ends. False, with the reason, when an
-    // engine has no program.
+    // Starts the games on a thread of its own, appended to `pgn` as each ends (none when it is empty). False, with
+    // the reason, when an engine has no program.
     bool start(const EngineEntry& first, const EngineEntry& second, const BoardMatchSetup& setup,
                const std::filesystem::path& pgn, std::string& error);
     // Ends the games: the one being played ends without a result ("*"), its engines are told to quit.
@@ -98,6 +132,12 @@ class BoardMatch {
     void play(const std::string& uci);
     // The user resigns the game being played, whoever is to move; the second game of a pair follows.
     void resign();
+    // The user takes back their last move, and the engine's answer when it came (#83): at their turn, or while the
+    // engine thinks, its search stopped; the clocks as they were before it. Nothing before their first move.
+    void takeBack();
+    // The user offers a draw (#83): the engine answers when it next searches, by engineAcceptsDraw(); a move from its
+    // openings declines it.
+    void offerDraw();
     // Once the games are over: their thread joined, their threads no longer counted. From the thread that started
     // them, now and then.
     void reap();
@@ -117,6 +157,8 @@ class BoardMatch {
     std::thread thread_;
     std::atomic<bool> stop_{false};
     std::atomic<bool> resign_{false};
+    std::atomic<bool> takeback_{false};
+    std::atomic<bool> draw_offer_{false};
     BoardSeat seat_;
     mutable std::mutex mutex_;
     State state_;

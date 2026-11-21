@@ -29,7 +29,7 @@ TEST_CASE("views: the three offered, and the spaces as two of them") {
     CHECK_FALSE(offered[0].study_board);
     // Study: the Chess space's, the study's Board.
     CHECK(offered[1].pages == std::vector<PageId>{PageId::Home, PageId::Board, PageId::Databases, PageId::Openings,
-                                                  PageId::Training, PageId::Lichess, PageId::Engines,
+                                                  PageId::Training, PageId::Play, PageId::Lichess, PageId::Engines,
                                                   PageId::Settings});
     CHECK(offered[1].study_board);
     // Everything: every page.

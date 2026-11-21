@@ -141,7 +141,8 @@ void App::drawGameHeaders() {
     auto& b          = board_;
     const auto& main = b.tree.main;
     const auto& io   = ImGui::GetIO();
-    if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_H)) headers_open_ = !headers_open_;
+    // Alt+H is a hint while a game against an engine lasts (#83).
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_H) && !engineGameRunning()) headers_open_ = !headers_open_;
 
     // The title line: a click unfolds the headers, or folds them.
     const auto value = [&](const char* key) {

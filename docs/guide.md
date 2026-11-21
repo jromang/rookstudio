@@ -75,7 +75,7 @@ A navigation rail on the left leads to the pages of the [view](#views) shown, in
 | Databases | Your game databases: import, the game list, the searches |
 | Openings | Your repertoires, their coverage and their gaps |
 | Lichess | Your Lichess account, a player's games, the official broadcasts, what the analysis may ask Lichess |
-| Play | A game against an engine, on the Board page |
+| Play | A game against an engine of the library at the strength you choose, with its openings and a handicap, played on the Board page (see [The Play page](#the-play-page)) |
 | Engines | The engine library: options, checks, groups, reference Elo, import of other programs' lists, the popular engines |
 | Books | The opening book library, and the openings of each book with what is wrong with them |
 | Suites | Test suites (STS, WAC, ERET…): engines against the positions of an EPD file |
@@ -91,9 +91,9 @@ a click on a badge, or Ctrl+1 to Ctrl+3, shows that view, at the page it was on.
 disappears.
 
 The first start offers three: *Tests* (Tournaments, Engines, Books, Board, Suites, Ratings, Log), *Study* (Home,
-Board, Databases, Openings, Training, Lichess, Engines) and *Everything* (every page). Settings is in every view. A
-page that comes with a new version is not added to a view you have by itself: the Home page offers it once (see [The
-Training page](#the-training-page)).
+Board, Databases, Openings, Training, Play, Lichess, Engines) and *Everything* (every page). Settings is in every view.
+A page that comes with a new version is not added to a view you have by itself: the Home page offers it once (see [The
+Training page](#the-training-page) and [The Play page](#the-play-page)).
 
 *Edit the views* opens the views' sheet in place of the page: *Settings* > *Views*, ⋯ under the switch, a right click
 on a badge (the sheet opens at its view), or *Edit the views…* in Ctrl+K. It holds:
@@ -336,7 +336,7 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | The study Board | Undo, redo |
 | <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> | The study Board | Save the game; save a copy elsewhere |
 | <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | The study Board | The previous, the next game of the list it came from |
-| <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers |
+| <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers (a hint during a game against an engine) |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | The study Board | The Notation, Analysis, Tree, References and Questions tabs |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G, N and Shift+N do on the engines' Board (on the study Board, the letters type moves) |
@@ -354,6 +354,9 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Escape</kbd> | An endgame against the tables | Take back a move, the right move, stop |
 | <kbd>Enter</kbd> | An endgame against the tables | After a fault: take it back; at the end: again, or the next |
 | <kbd>Enter</kbd>, <kbd>Escape</kbd> | Board vision | Start, go on; stop |
+| <kbd>Enter</kbd> | The Play page | Play a game against the engine chosen |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> | A game against an engine | Take back your last move; a hint |
+| <kbd>Enter</kbd> | A game against an engine | Confirm *Resign…*; resume a game kept when RookStudio closed; once it is over, review it |
 | A letter, then a figure | The coordinates, *Where is…?* | Name a square |
 | <kbd>Shift</kbd> held, <kbd>F2</kbd> | Blindfold | The pieces shown 2 seconds, three times a game; *Where is…?* |
 | <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | A line read in your head | The piece as FEN writes it (a white knight, a black one), or none |
@@ -384,7 +387,7 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
   it comes from (its database and number, its place in a filter, or its file), its comments, and whether it has
   changes not saved yet. *Resume* (Enter) goes back to it; Ctrl+Tab lists the recent games.
 - What to start, each with its key: *Open a PGN…* (Ctrl+O), *Paste a game or a FEN* (Ctrl+V), *New game* (Ctrl+N),
-  *Import into a database…*, *Play against an engine*, *New tournament*: those of the view's pages.
+  *Import into a database…*, *Play against an engine* (the Play page), *New tournament*: those of the view's pages.
 - The tournaments running, as on the Tournaments page, when the view holds Tournaments.
 - **Recently**: the games opened on the board, a click reopening one with its changes.
 - **My databases**: each with its games and the state of its opening tree, the import running, *+ Import…*, and the
@@ -910,6 +913,9 @@ too); the finished game has it, ready for *Analyse the game*. *Resign the game* 
 engine; with a second game, it follows, your colour reversed. Your games are saved under your login name, and only the
 engine counts in the core budget. There is no takeback, and the engine plays at its full strength unless its card sets a
 lower one (`UCI_LimitStrength` and `UCI_Elo`, or `Skill Level`, where it has them).
+
+In a view for study, the card leads to the Play page too: a game of yours against an engine at the strength you choose,
+with its openings, a handicap, takebacks and hints, its aids hidden until the end (see [The Play page](#the-play-page)).
 
 ### The study Board
 
@@ -1614,8 +1620,8 @@ letters and figures; *Name the square*: a square is marked in blue, type its nam
 White, from Black, or *At random*, the board turning square by square. A fault shows the square asked in green and
 yours in orange. At the end, your count and your record for that way and side. Enter starts, Escape stops.
 
-**Blindfold**: a game against an engine of your library (the analysis's, or another), at an Elo of 1000, 1500 or 2000
-when it has the setting (*UCI_Elo*), else at its own strength. You play White, Black or either at random; the board
+**Blindfold**: a game against the engine of the Play page, at the strength and with the openings chosen there (*Change
+on the Play page*, see [Against an engine](#against-an-engine)). You play White, Black or either at random; the board
 hides every piece, every piece after the 10th move, or all but the pawns, the last move marked. Type your moves, or play
 them on the board; the moves so far are written in the column. Hold Shift a moment to see the pieces for 2 seconds,
 three times a game; F2 asks *Where is…?* about a piece its words name alone (*the black dark-squared bishop*): click its
@@ -1626,6 +1632,87 @@ square, or type it. Your clock is long, the engine's short; each game is appende
 the pieces moving, then a question: which piece is on a square they changed? Click the answer, or type the piece as FEN
 writes it (*N* a white knight, *n* a black one, *-* an empty square); the board then shows the position after the moves.
 Ten lines a series.
+
+## The Play page
+
+The **Play** page sets up a game against an engine of your library, played on the Board page. It is in the rail after
+the Training page, in the views *Study* and *Everything*. A view you made before it does not change by itself: the
+Home page offers once to add it to the view shown (*Add it to …*, or *Not now*), and Ctrl+K *Play against an engine*
+leads there meanwhile, as do *Play against an engine* on the Home page and *The Play page* in the Board page's card
+*Play a game…*. Nothing leaves the machine: the engine runs on it. While one of your games is played live on Lichess,
+the page says so and starts no game (see [Fair play](#fair-play)).
+
+### Against an engine
+
+The choice is kept for the next game: once made, *Play* (Enter) is all it takes.
+
+- **The opponent**: an engine of your library, with the strengths it can take.
+- **Its strength**: the Elo it aims at (`UCI_Elo`, with `UCI_LimitStrength`), on its own scale: an indication, not a
+  FIDE rating. An engine without that setting plays a number of nodes a move instead, from 1 to a million, fewer for a
+  weaker game. *Full strength* leaves it at its best, whatever its card limits.
+- **Its style: its openings**, what it plays before its own moves: *Its own* (no book); *Your databases* (the moves
+  played most there, in all your databases with an opening tree or in one of them); *Your repertoire* (the moves you
+  prepared against, then the engine; you play the repertoire's colour, which choosing it sets); *A player's games*
+  (the moves a player played with the engine's colour, from a database named *Lichess · name*, such as preparing a game
+  against them makes, see [Preparing a game](#preparing-a-game)); *A book of the library* (a Polyglot or CTG book of the
+  Books page, its moves to avoid left out). *Vary* picks at random among the moves played at least 5 times, as often as
+  they were played (a book's moves as its weights say, a repertoire's alike); unticked, the move played most, a book's
+  main move first. Once its openings have no move for the position, the engine plays to the end. Its style is its openings: the engine's own settings stay on its card. With
+  a man given, the openings meet positions they do not have, and the engine plays from the first move.
+- **You**: White, Black or at random; the clock, minutes and an increment, *The same for both* or, unticked, the
+  engine's own (unequal time); from the start position, or from the Board page's.
+- **The handicap**: what the engine gives at the start: nothing, its f-pawn, its b-knight, its a-rook (castling on that
+  side with it) or its queen; a man it does not have where it starts is greyed, and Chess960 has none. *Taking a move
+  back* (allowed unless unticked) and *Hints* (3 a game) are handicaps too, counted.
+
+The game counts in the core budget (the engine's threads, as for a game played from the board); the page says when the
+machine is full.
+
+### The game against an engine
+
+*Play* takes the game to the Board page, in a view for study: the board turned to your side, the clocks running in the
+players' strips (the engine's with its strength), and over the column the game's card: whose move it is, *Offer a
+draw*, *Resign…*, *Take back · Ctrl+Z*, *Hint · Alt+H*, *Stop*.
+
+- Play your moves on the board, or type them: a move's first letter opens the field, Enter plays it.
+- **The aids are hidden until the end**: the Analysis, Tree, References and Questions tabs, the analysis (Alt+A), the
+  threat, the game's analysis (Alt+G), the tablebases and the assistant. The engine shows nothing of its search either:
+  its evaluations come with the finished game. *Show them*, in the card or in place of a tab, gives them back during
+  the game, which is then marked *with aids*.
+- *Take back* (Ctrl+Z) takes back your last move and the engine's answer, or your move while the engine thinks, the
+  clocks as they were before it: counted, and written in the game.
+- *Hint* (Alt+H): at your move, the analysis engine's move after a second's search, as a green arrow; three a game,
+  counted and written in the game.
+- *Offer a draw*: the engine answers with its next move. It takes the draw when it is being mated or stands clearly
+  worse, or when it stands no better once 20 moves are played; a move from its openings declines it.
+- *Resign…* asks for Enter, or a second click, within a few seconds; *Stop* ends the game without a result, saved as it
+  is.
+- Where the engine's openings ended, the notation says so (*end of your repertoire · then the engine*).
+
+Closing RookStudio during the game keeps it: at the next launch it is back on the Board page, its clocks waiting until
+you resume it (*Resume*, Enter) or stop it (*Stop it*). Another game opened on the board meanwhile leaves yours going,
+your clock running when it is your move: *Back to the game* brings it back.
+
+### After the game
+
+At the end, the aids come back, and the card says how the game ended (*Draw: threefold repetition at move 34*),
+against what and how: the strength, your colour, the clock, the takebacks, the hints, with or without aids. The game
+is saved into the database **My games against engines**, made at the first game, with its settings in its tags:
+`Strength` (`UCI_Elo 1800`, `nodes 1000`, `full`), `Openings` (`repertoire Najdorf`, `database Mine`, `databases`,
+`player Somebody`, `book Human`, `engine`), `Handicap` (`knight b8`, with the start position), `Takebacks`, `Hints`,
+`Aids`. Ctrl+S puts it back there after a change.
+
+- *Review it* (Enter): the game's analysis, as Alt+G does (see [The review of a game](#the-review-of-a-game)); once it
+  is reviewed, your mistakes in it become exercises (see [Your mistakes as exercises](#your-mistakes-as-exercises))
+  when your names say the game is yours (see [Your names](#your-names)).
+- *Rematch, colours reversed*: the same choice, the other colour.
+- *Change the settings*: the Play page.
+- *Close*: the game stays on the board as any game.
+
+Under it, **your games against that engine at that level**: won, drawn and lost, those with aids apart and not
+counted, and where you lost the last one (*a rook endgame*), with whether it is among your exercises. The next level
+is chosen there or on the Play page: nothing goes up by itself. Each game is also a line of the profile's
+`play/games.jsonl`.
 
 ## The Lichess page
 

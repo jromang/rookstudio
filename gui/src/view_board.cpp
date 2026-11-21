@@ -350,6 +350,10 @@ void App::setBoardAnalysis(bool on) {
         board_.message_error = false;
         return;
     }
+    if (engineGameHidesAids()) {  // a game against an engine (#83)
+        boardToast(TR("Hidden until the end of your game: Show them first, and the game is marked “with aids”"));
+        return;
+    }
     auto& s = board_.settings.analysis;
     // The engine chosen, or the first that works.
     const EngineEntry* engine = nullptr;
@@ -410,6 +414,10 @@ void App::setBoardThreat(bool on) {
         b.message_error = false;
         return;
     }
+    if (engineGameHidesAids()) {  // a game against an engine (#83)
+        boardToast(TR("Hidden until the end of your game: Show them first, and the game is marked “with aids”"));
+        return;
+    }
     if (!b.threat.active() || b.threat.engine() != engine->name) b.threat.start(*engine, threatSettings());
     b.threat_on = true;
 }
@@ -455,6 +463,10 @@ void App::pollBoard() {
             board_.message       = TR("Locked while one of your games is played on Lichess.");
             board_.message_error = false;
         }
+        if (board_.analysing) setBoardAnalysis(false);
+        board_.threat_on = false;
+    }
+    if (engineGameHidesAids()) {  // a game against an engine, its aids hidden until its end (#83)
         if (board_.analysing) setBoardAnalysis(false);
         board_.threat_on = false;
     }
@@ -614,6 +626,10 @@ void App::startGameReview() {
         b.message_error = false;
         return;
     }
+    if (engineGameHidesAids()) {  // a game against an engine, kept waiting for Resume (#83)
+        boardToast(TR("Hidden until the end of your game: Show them first, and the game is marked “with aids”"));
+        return;
+    }
     // Every analysis the game has goes on; without one, the analysis engine's.
     const auto kept = loadReviews(storage_.root() / "analyses", b.tree.main);
     std::vector<const EngineEntry*> engines;
@@ -768,6 +784,15 @@ void App::boardPlayAsked(chess::Move move) {
     if (endgame_) return endgameAnswer(move);  // to the endgame's, the vision's (#82)
     if (vision_) return visionAnswer(move);
     auto& b = board_;
+    // In a game the user plays, a move typed is theirs, at their turn only (#83); a game kept waits for Resume.
+    if (b.humanGame()) {
+        if (b.humanTurn()) boardMove(move);
+        return;
+    }
+    if (engine_game_ && engine_game_->waiting) {
+        boardToast(TR("The game waits: Resume it first (Enter)"));
+        return;
+    }
     if (!chessBoard()) return boardPlay(move);
     // Only a move that would start a variation is asked about: the line's next move, or one a variation starts with,
     // is played as it is.
@@ -1043,6 +1068,9 @@ void App::boardEditKeys() {
     auto& b        = board_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput) return;  // a field has the keys: the move typed, a comment
+    // A game against an engine (#83): its keys while it lasts (Ctrl+Z takes back, Alt+H a hint, the moves typed);
+    // Enter reviews it once it is over.
+    if (engineGameKeys()) return;
     // Enter writes a comment, unless a move of the tree is chosen (Up, Down): it plays it then.
     const bool tree_chosen = board_side_tab_ == 2 && tree_row_ >= 0;
     if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen && !linkCardTakesKeys() &&
@@ -1355,7 +1383,7 @@ void App::drawBoardPage() {
         ImGui::EndDisabled();
         ImGui::SameLine();
         // The game analysed in passes, up to the time per position chosen beside.
-        const bool live_game = b.watching && b.match && b.match_state.running;
+        const bool live_game = (b.watching && b.match && b.match_state.running) || engineGameHidesAids();
         ImGui::BeginDisabled(b.editor.has_value() || (!b.reviewing() && (b.game.moves.empty() || live_game)));
         if (ui::iconButton("board_review", b.reviewing() ? ui::Icon::Stop : ui::Icon::Chart, review))
             b.reviewing() ? cancelGameReview() : startGameReview();
@@ -1505,7 +1533,12 @@ void App::drawBoardPage() {
     drawLinkCard();             // a Lichess link pasted (#47)
     drawStudySendCard();        // the game sent to a Lichess study (#79)
     drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
-    if (b.play_open || (b.match && b.match_state.running)) drawBoardPlay();
+    // A game against an engine of the Play page (#83); once it is over, the card of the games from here closes it.
+    if (engine_game_ && engine_game_->over && b.play_open) closeEngineGame();
+    if (engine_game_)
+        drawEngineGameCard();
+    else if (b.play_open || (b.match && b.match_state.running))
+        drawBoardPlay();
     if (chessBoard()) {
         drawChessColumn();
     } else {
@@ -1988,7 +2021,8 @@ void App::drawBoardColumn(float size) {
     const auto position = analysisPosition(b.game, b.chess960, b.ply);
     // Fair play (#48): no engine's arrow nor evaluation under the lock, those of the search it stopped included: every
     // engine of the study Board while the aids are locked (#78), the engines' Board's while a game is played live.
-    const bool aids  = searchShown(chessBoard(), aidsLocked(), liveGameOn() != nullptr);
+    const bool hidden = engineGameHidesAids();  // a game against an engine (#83)
+    const bool aids   = searchShown(chessBoard(), aidsLocked() || hidden, liveGameOn() != nullptr || hidden);
     const bool fresh = aids && b.analyser->active() && b.analyser->position() == position;
     // The study Board's engines side by side (#78): one arrow per move, in the colour of the first engine that plays
     // it, how many play it beside its start.
@@ -2050,6 +2084,9 @@ void App::drawBoardColumn(float size) {
                 decor.arrows.push_back({moves.front(), IM_COL32(205, 40, 40, 200)});
         }
     }
+    // A hint in a game against an engine (#83), in green, on the position it is for.
+    if (engine_game_ && engine_game_->hint_move && b.line < 0 && b.ply == engine_game_->hint_ply)
+        decor.arrows.push_back({*engine_game_->hint_move, IM_COL32(40, 160, 80, 210)});
     // The tree's move under the mouse or chosen (the Chess space's Tree tab), in the accent's blue.
     if (chessBoard() && tree_arrow_ && tree_arrow_->position == board.hash())
         decor.arrows.push_back({tree_arrow_->move, IM_COL32(47, 111, 222, 190)});
@@ -2537,7 +2574,8 @@ void App::updateBoardTablebase() {
     auto& b = board_;
     // Fair play (#48): no tables while a live game lasts, nor on a game that passes through a correspondence game's
     // position.
-    const bool hidden = liveGameOn() || correspondencePly(b.tree.main, b.chess960, INT32_MAX) >= 0;
+    const bool hidden = liveGameOn() || correspondencePly(b.tree.main, b.chess960, INT32_MAX) >= 0 ||
+                        engineGameHidesAids();  // a game against an engine (#83)
     const auto key    = fmt::format("{}|{}|{}", b.review_key, setup_.tb_paths, hidden);
     if (key == b.tb_key) return;
     if (hidden) b.tb.clear();  // at once, a tournament playing or not
@@ -2585,6 +2623,13 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
     const float ty = p.y + (h - ImGui::GetTextLineHeight()) / 2;
     auto name      = g.header(side == chess::Color::WHITE ? "White" : "Black");
     if (name.empty() || name == "?") name = side == chess::Color::WHITE ? TR("White") : TR("Black");
+    // A game against an engine on the board (#83): its strength, and the clocks as they run, or wait for Resume.
+    const bool engine_game = engine_game_ && !engine_game_->over && (b.watching || engine_game_->waiting) &&
+                             g.header(engine_game_->kept.white ? "Black" : "White") == engine_game_->kept.engine;
+    const bool at_end      = b.line < 0 && b.ply == static_cast<int>(g.moves.size());
+    const bool playing     = engine_game && b.match && b.match_state.running && at_end;
+    if (engine_game && (side == chess::Color::WHITE) != engine_game_->kept.white)
+        name += " · " + strengthText(engine_game_->kept.strength);
     dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     dl->AddText(ImVec2(x + 0.6f, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     x += ImGui::CalcTextSize(name.c_str()).x + px(10);
@@ -2609,9 +2654,22 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
         }
     }
     if (to_move) dl->AddText(ImVec2(x, ty), ui::MUTED, TR("to move"));
-    // Its clock after its last move, at the right, framed while it has the move.
-    if (last >= 0 && static_cast<std::size_t>(last) < clocks.size() && clocks[static_cast<std::size_t>(last)]) {
-        const auto text = ui::formatClock(*clocks[static_cast<std::size_t>(last)]);
+    // Its clock after its last move, at the right, framed while it has the move; running in a game being played.
+    std::optional<int64_t> clock;
+    if (last >= 0 && static_cast<std::size_t>(last) < clocks.size()) clock = clocks[static_cast<std::size_t>(last)];
+    if (playing) {
+        const auto& st = b.match_state;
+        auto ms        = st.clock_ms[side == chess::Color::WHITE ? 0 : 1];
+        if (st.thinking == side)
+            ms -=
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - st.think_start)
+                    .count();
+        clock = std::max<int64_t>(0, ms);
+    } else if (engine_game && engine_game_->waiting && at_end) {
+        clock = engine_game_->kept.clock_ms[side == chess::Color::WHITE ? 0 : 1];  // as they wait for Resume
+    }
+    if (clock) {
+        const auto text = ui::formatClock(*clock);
         ImGui::PushFont(ui::titleFont(), ImGui::GetFontSize() * 1.1f);
         const ImVec2 ts = ImGui::CalcTextSize(text.c_str());
         const float x1 = p.x + bar + size, x0 = x1 - ts.x - px(20);
@@ -2780,6 +2838,15 @@ void App::drawBoardMoves(float height) {
         int last_book = -1;
         for (int i = 0; i < static_cast<int>(main.moves.size()) && main.moves[static_cast<std::size_t>(i)].book; ++i)
             last_book = i;
+        // A game against an engine (#83): where its openings ended, the engine playing from there.
+        std::string book_text = proto ? TR("end of book") : TR("· end of book ·");
+        if (engine_game_ && b.match && b.watching && b.match_state.book_out && b.match_state.last_book >= 0 &&
+            last_book < 0) {
+            last_book = b.match_state.last_book;
+            book_text = engine_game_->kept.settings.openings == Openings::Repertoire
+                            ? TR("end of your repertoire · then the engine")
+                            : TR("end of its openings · then the engine");
+        }
         const auto tags = engineTags();  // what shows beside a tournament engine's moves (#87)
 
         const std::function<void(int, int, chess::Board, int)> emit = [&](int line, int base, chess::Board at,
@@ -2871,7 +2938,7 @@ void App::drawBoardMoves(float height) {
                 if (line < 0 && ply == last_book && last_book + 1 < static_cast<int>(main.moves.size())) {
                     NotationItem book;
                     book.kind   = NotationItem::Kind::Text;
-                    book.text   = proto ? TR("end of book") : TR("· end of book ·");
+                    book.text   = book_text;
                     book.chip   = proto;  // a pill in the Chess space (M12, board 8)
                     book.colour = ImGui::GetColorU32(ImGuiCol_TextDisabled);
                     items.push_back(std::move(book));
@@ -3837,6 +3904,7 @@ int App::engineThreads(const std::string& name) const {
 }
 
 void App::startBoardGames() {
+    if (engine_game_ && engine_game_->over) closeEngineGame();  // a game against an engine ended: it gives way (#83)
     auto& b                  = board_;
     auto& s                  = b.settings;
     const EngineEntry *first = nullptr, *second = nullptr;
@@ -3876,22 +3944,7 @@ void App::startBoardGames() {
         b.message_error = true;
         return;
     }
-    // The game shown gives way to the one played: among the recent games, with its list and its changes.
-    rememberBoardGame();
-    board_origin_.reset();
-    b.undo.clear();
-    b.redo.clear();
-    b.start_notes = {};
-    b.comment_edit.reset();
-    b.changes       = {};
-    b.match_version = 0;
-    b.match_state   = {};
-    b.watching      = true;
-    b.play_anyway   = false;
-    b.flipped_game  = -1;
-    b.chess960      = setup.chess960;
-    b.title         = fmt::format("{} – {} · {}", first->name, second->name, clockText(setup.first_clock));
-    b.message.clear();
+    takeBoardFor(setup);
 }
 
 void App::pollBoardGames() {
@@ -4022,6 +4075,20 @@ void App::drawBoardPlay() {
         return;
     }
 
+    // In the study Board, a game of the user's against an engine is the Play page's (#83, mockup M12, board 4).
+    if (chessBoard()) {
+        ImGui::PushTextWrapPos();
+        ImGui::TextDisabled("%s", TR("Against an engine, at a strength, with its openings and a handicap:"));
+        ImGui::PopTextWrapPos();
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("The Play page"))) {
+            page_                     = Page::Play;
+            playSettings().from_board = true;
+            savePlaySettings();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("The game from this position, chosen there; its aids hidden until the end."));
+    }
     // The engines: the first has White in the first game. Human, first in each list, is the user, in place of its
     // engine, its moves made on the board.
     const auto engineCombo = [&](const char* id, std::string& name, int side) {

@@ -235,42 +235,24 @@ void App::drawTrainingVision() {
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(TR("Blindfold"));
     ImGui::PopFont();
-    const EngineEntry* engine = nullptr;
-    for (const auto& e : engines_)
-        if (e.name == vision_engine_ && !e.inactive) engine = &e;
+    // The engine, its strength and its openings are the Play page's (#83): one place to choose the opponent.
+    const auto& play          = playSettings();
+    const EngineEntry* engine = engineNamed(play.engine);
+    if (engine && engine->inactive) engine = nullptr;
     if (!engine) engine = analysisEngine();
     if (!engine) {
         wrapped(TR("A game against an engine of your library: add one on the Engines page first."), true);
     } else {
+        std::string text, tag, note;
+        uint64_t least = 1;
+        (void)openingSource(play, vision_colour_ == 1 ? chess::Color::WHITE : chess::Color::BLACK, text, tag, note,
+                            least, false);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(TR("Against"));
+        ImGui::TextUnformatted(
+            trf("Against {} · {} · its openings: {}", engine->name, strengthText(strengthFor(play, *engine)), text)
+                .c_str());
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(px(220));
-        if (ImGui::BeginCombo("##vision_engine", engine->name.c_str())) {
-            for (const auto& e : engines_) {
-                if (e.inactive) continue;
-                if (ImGui::Selectable(e.name.c_str(), &e == engine)) {
-                    vision_engine_ = e.name;
-                    vision_enter_  = 1;
-                }
-            }
-            ImGui::EndCombo();
-        }
-        const bool elo = std::any_of(engine->uci_options.begin(), engine->uci_options.end(),
-                                     [](const auto& o) { return o.name == "UCI_Elo"; });
-        ImGui::SameLine(0, px(12));
-        if (elo) {
-            for (const int level : {1000, 1500, 2000, 0}) {
-                const auto label = level > 0 ? trf("Elo {}", level) : std::string(TR("its full strength"));
-                ImGui::SameLine();
-                if (chip(label.c_str(), vision_elo_ == level, fmt::format("elo{}", level).c_str())) {
-                    vision_elo_   = level;
-                    vision_enter_ = 1;
-                }
-            }
-        } else {
-            ImGui::TextDisabled("%s", TR("at its own strength: this engine has no setting of it"));
-        }
+        if (ImGui::SmallButton(TR("Change on the Play page"))) page_ = Page::Play;
         for (int c = 0; c < 3; ++c) {
             const char* label = c == 0 ? TR("You: White") : c == 1 ? TR("You: Black") : TR("You: either, at random");
             if (c > 0) ui::sameLineOrWrap(label);
@@ -364,35 +346,41 @@ void App::startCoordinates() {
 
 void App::startBlindfold() {
     if (!trainingLock().empty()) return;
-    const EngineEntry* found = nullptr;
-    for (const auto& e : engines_)
-        if (e.name == vision_engine_ && !e.inactive) found = &e;
+    // The engine, its strength and its openings as the Play page chose them (#83).
+    auto play                = playSettings();
+    const EngineEntry* found = engineNamed(play.engine);
+    if (found && found->inactive) found = nullptr;
     if (!found) found = analysisEngine();
     if (!found) {
         vision_error_ = TR("A game against an engine of your library: add one on the Engines page first.");
         return;
     }
-    // Its strength: UCI_Elo when it has the option, else its own.
-    EngineEntry engine = *found;
-    const bool elo     = std::any_of(engine.uci_options.begin(), engine.uci_options.end(),
-                                     [](const auto& o) { return o.name == "UCI_Elo"; });
-    auto run           = std::make_unique<VisionRun>();
-    run->kind          = VKind::Blindfold;
-    run->hidden        = vision_hidden_;
-    run->engine        = engine.name;
-    if (elo && vision_elo_ > 0) {
-        engine.setOption("UCI_LimitStrength", "true");
-        engine.setOption("UCI_Elo", std::to_string(vision_elo_));
-        run->elo = vision_elo_;
-    }
-    run->you = vision_colour_ == 0     ? chess::Color::WHITE
-               : vision_colour_ == 1   ? chess::Color::BLACK
-               : (run->rng() % 2 == 0) ? chess::Color::WHITE
-                                       : chess::Color::BLACK;
+    EngineEntry engine  = *found;
+    const auto strength = strengthFor(play, engine);
+    applyStrength(engine, strength);
+    auto run      = std::make_unique<VisionRun>();
+    run->kind     = VKind::Blindfold;
+    run->hidden   = vision_hidden_;
+    run->engine   = engine.name;
+    run->strength = strengthText(strength);
+    run->you      = vision_colour_ == 0     ? chess::Color::WHITE
+                    : vision_colour_ == 1   ? chess::Color::BLACK
+                    : (run->rng() % 2 == 0) ? chess::Color::WHITE
+                                            : chess::Color::BLACK;
     EngineEntry you;
     you.name = humanName();
     BoardMatchSetup setup;
     const bool white = run->you == chess::Color::WHITE;
+    setup.nodes      = white ? std::array<uint64_t, 2>{0, strength.nodes} : std::array<uint64_t, 2>{strength.nodes, 0};
+    {
+        std::string text, tag, note;
+        uint64_t least = 1;
+        if (auto source =
+                openingSource(play, white ? chess::Color::BLACK : chess::Color::WHITE, text, tag, note, least)) {
+            auto book  = std::make_shared<OpeningBook>(std::move(source), play.vary, least, run->rng());
+            setup.book = [book](const chess::Board& board) { return book->move(board); };
+        }
+    }
     setup.first      = white ? you.name : engine.name;
     setup.second     = white ? engine.name : you.name;
     // The user's clock is long, the engine's short: a game seen in the head is not a race.
@@ -702,7 +690,8 @@ void App::drawVisionPage() {
                 where = v.flipped ? TR("seen from Black") : TR("seen from White");
                 break;
             case VKind::Blindfold:
-                what  = v.elo > 0 ? trf("Blindfold · {} · Elo {}", v.engine, v.elo) : trf("Blindfold · {}", v.engine);
+                what  = v.strength.empty() ? trf("Blindfold · {}", v.engine)
+                                           : trf("Blindfold · {} · {}", v.engine, v.strength);
                 where = v.state.current.moves.empty() ? std::string()
                                                       : trf("move {}", (v.state.current.moves.size() + 2) / 2);
                 break;

@@ -504,7 +504,11 @@ void App::drawChessTabs() {
     const bool live     = liveGameOn() != nullptr;
     const bool position = aidsLocked();
     const bool game     = position || gameLocked();
-    const auto locked   = [&](int tab) { return (live && tab != 0) || (position && tab == 1) || (game && tab == 4); };
+    // A game against an engine (#83): every tab but the notation hidden until its end, unless shown.
+    const bool playing = engineGameHidesAids();
+    const auto locked  = [&](int tab) {
+        return ((live || playing) && tab != 0) || (position && tab == 1) || (game && tab == 4);
+    };
     if (ImGui::BeginTabBar("##chess_column")) {
         for (int i = 0; i < TABS; ++i) {
             const auto label = fmt::format("{}###chess_tab{}", names[i], i);
@@ -516,16 +520,22 @@ void App::drawChessTabs() {
             if (locked(i)) ImGui::PopStyleColor();
             if (ImGui::IsItemClicked()) board_side_tab_ = i;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", locked(i)
-                                            ? fmt::format("Alt+{} · {}", i + 1,
-                                                          TR("Locked while one of your games is played on Lichess."))
-                                                  .c_str()
-                                            : fmt::format("Alt+{}", i + 1).c_str());
+                ImGui::SetTooltip(
+                    "%s", locked(i) ? fmt::format("Alt+{} · {}", i + 1,
+                                                  playing && !live ? TR("Hidden until the end of your game against the "
+                                                                        "engine.")
+                                                                   : TR("Locked while one of your games is played on "
+                                                                        "Lichess."))
+                                          .c_str()
+                                    : fmt::format("Alt+{}", i + 1).c_str());
         }
         ImGui::EndTabBar();
     }
     if (locked(board_side_tab_)) {
-        drawFairPlayBanner(board_side_tab_ == 4);
+        if (playing && !live && !position && !(game && board_side_tab_ == 4))
+            drawEngineGameBanner();
+        else
+            drawFairPlayBanner(board_side_tab_ == 4);
         return;
     }
     if (position) drawFairPlayBanner();

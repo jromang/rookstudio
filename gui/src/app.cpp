@@ -166,7 +166,8 @@ App::~App() {
     for (auto& f : abandoned_scans_) f.wait();
     storage_.saveSetup(setup_);
     storage_.saveEngines(engines_);
-    saveRecentGames();   // the board's game and the recent ones, for the next session
+    keepEngineGame(true);  // a game against an engine being played, for the next launch (#83)
+    saveRecentGames();     // the board's game and the recent ones, for the next session
     saveLichessToken();  // a token still being typed when the program quits
     if (appearance_save_due_) storage_.setAppearance(appearance::current());
     for (const auto& [file, logo] : logo_textures_) {
@@ -255,6 +256,7 @@ void App::frame() {
     if (!launch_checked_) {
         launch_checked_ = true;
         resumeAtLaunch();
+        loadKeptEngineGame();  // a game against an engine RookStudio closed during, its clocks waiting (#83)
     }
     // Other pieces, logos dropped: before anything is drawn, the last frame drawn with the old ones.
     if (pieces_dirty_) rebuildPieces();
@@ -313,6 +315,7 @@ void App::frame() {
     pollPuzzles();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
     pollMistakes();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
     pollEndgames();         // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
+    pollEngineGame();       // a game against an engine: kept at each move, its end, a hint (#83)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -596,6 +599,9 @@ void App::frame() {
         } else if (w == "board-edit") {  // the position editor
             page_ = Page::Board;
             openPositionEditor();
+        } else if (w == "play" || w == "play-start") {  // the Play page (#83); a game against an engine started
+            page_ = Page::Play;
+            if (w == "play-start") startEngineGame();
         } else if (w == "board-play" || w == "board-play-start") {  // a game from the board: its settings; started
             page_             = Page::Board;
             board_.play_open  = true;

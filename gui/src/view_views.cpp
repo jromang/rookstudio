@@ -162,6 +162,8 @@ std::optional<PageId> App::rootOf(Page page) {
             return PageId::Openings;
         case Page::Training:
             return PageId::Training;
+        case Page::Play:
+            return PageId::Play;
         case Page::Lichess:
             return PageId::Lichess;
         case Page::Engines:
@@ -189,8 +191,9 @@ App::Page App::pageFor(PageId id) {
         case PageId::Tournaments:
             return Page::Home;
         case PageId::Board:
-        case PageId::Play:
             return Page::Board;
+        case PageId::Play:  // #83: a page of its own, its games on the Board
+            return Page::Play;
         case PageId::Databases:
             return Page::Databases;
         case PageId::Openings:
@@ -332,13 +335,12 @@ void App::drawViewRail(float width, float button) {
         bool selected = false;
         if (id == PageId::Tournaments)
             selected = page_ == Page::Home || page_ == Page::NewMatch || page_ == Page::Tournament;
-        else if (id != PageId::Play)
+        else
             selected = page_ == pageFor(id);
         if (ui::railButton(key.c_str(), pageIcon(id), pageName(id), selected, width, button)) {
             page_ = pageFor(id);
             if (id == PageId::Tournaments) tournaments_dirty_ = true;
             if (id == PageId::Ratings) game_db_dirty_ = true;
-            if (id == PageId::Play) board_.play_open = true;
         }
         if (id == PageId::Tournaments) {
             // The games being played, at the icon's top right.

@@ -71,6 +71,8 @@ const char* App::guideSection() const {
         case Page::Books:
             return Books;
         case Page::Board:
+            // A game against an engine (#83).
+            if (engine_game_) return guide::topics::EngineGame;
             if (training_) return Training;  // a session of the repertoire's training (#76)
             if (puzzle_) return Puzzles;     // a series of puzzles (#80)
             if (mistake_) return Mistakes;   // a session of exercises, a game guessed (#81)
@@ -105,6 +107,8 @@ const char* App::guideSection() const {
                    : training_tab_ == 4 ? Endgames
                    : training_tab_ == 5 ? Vision
                                         : TrainingPage;
+        case Page::Play:
+            return PlayEngine;
         case Page::Count:  // the views' sheet
             return Views;
         case Page::Suites:
@@ -675,6 +679,28 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         page_                = Page::Openings;
         training_limit_menu_ = true;
     });
+    // Playing against an engine (#83): the Play page; a game's commands while it lasts, a rematch after it.
+    add(TR("Play against an engine"), where(Page::Play), page(Page::Play));
+    if (engine_game_ && !engine_game_->over && !engine_game_->waiting && board_.match && board_.match_state.running) {
+        add(TR("Offer a draw"), TR("Play"), [this] { board_.match->offerDraw(); });
+        add(TR("Resign the game…"), TR("Play"), [this] {
+            toStudyBoard();
+            engineGameResign();  // armed: Enter, or a second click, resigns
+        });
+        if (engine_game_->kept.settings.takebacks)
+            add(TR("Take a move back"), "Ctrl+Z", [this] { engineGameTakeBack(); });
+        if (engine_game_->kept.settings.hints) add(TR("A hint"), "Alt+H", [this] { engineGameHint(); });
+        if (!engine_game_->aids)
+            add(TR("Show the aids, the game marked “with aids”"), TR("Play"), [this] { showEngineGameAids(); });
+    }
+    if (engine_game_ && engine_game_->waiting)
+        add(TR("Resume the game against the engine"), TR("Play"), [this] { resumeEngineGame(); });
+    if (engine_game_ && engine_game_->over)
+        add(TR("Rematch, colours reversed"), TR("Play"), [this] {
+            const bool white = engine_game_->kept.white;
+            closeEngineGame();
+            startEngineGame(white ? chess::Color::BLACK : chess::Color::WHITE);
+        });
     // The Training page (#80): the page, the day's review, each theme's puzzles, Lichess's database, the batch online.
     add(TR("Training"), where(Page::Training), [this, go = page(Page::Training)] {
         go();

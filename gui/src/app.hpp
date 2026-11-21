@@ -46,6 +46,7 @@
 #include "engine_downloads.hpp"
 #include "engine_import.hpp"
 #include "engine_notes.hpp"
+#include "engine_play.hpp"
 #include "engines.hpp"
 #include "fide_cards.hpp"
 #include "game_graph.hpp"
@@ -278,6 +279,7 @@ class App {
         Openings,
         Lichess,
         Training,  // #80
+        Play,      // #83
         Count      // none: the sheet of the views is shown in place of the page
     };
     enum class Tab { Overview, Standings, Bracket, Schedule, Live, Games, Openings, Broadcast };
@@ -1029,10 +1031,8 @@ class App {
     CoordMode vision_mode_ = CoordMode::Find;
     CoordSide vision_side_ = CoordSide::White;
     Hidden vision_hidden_  = Hidden::All;
-    int vision_colour_     = 0;     // blindfold: 0 White, 1 Black, 2 at random
-    int vision_elo_        = 1500;  // 0: the engine's own strength
-    std::string vision_engine_;     // "" the analysis's
-    int vision_enter_ = 0;          // what Enter starts on the page: 0 the coordinates, 1 blindfold, 2 the lines
+    int vision_colour_     = 0;  // blindfold: 0 White, 1 Black, 2 at random; its engine is the Play page's (#83)
+    int vision_enter_      = 0;  // what Enter starts on the page: 0 the coordinates, 1 blindfold, 2 the lines
     std::string vision_error_;
     std::unique_ptr<VisionRun> vision_;
     void drawTrainingVision();
@@ -1051,6 +1051,88 @@ class App {
     void drawVisionPage();
     void drawVisionBoard(float size);
     void drawVisionColumn();
+
+    // Playing against an engine (#83, mockup M12, board 4; engine_play.hpp, view_play.cpp): the Play page's choice
+    // (play.json: the engine, its strength, its openings, the user's colour and clock, a handicap); the game on the
+    // Board page through board_.match, its aids hidden until its end ("Show them" marks it), its takebacks and hints
+    // counted; at its end, the game saved into "My games against engines" with its settings in its tags, its review,
+    // a rematch, the user's games against that engine at that level (play/games.jsonl). A game RookStudio closed
+    // during is kept (play/current.json) and comes back at the next launch, its clocks waiting for Resume.
+    std::optional<PlaySettings> play_settings_;
+    PlaySettings& playSettings();
+    void savePlaySettings();
+    [[nodiscard]] std::filesystem::path playFolder() const { return storage_.root() / "play"; }
+    std::optional<std::vector<PlayedGame>> played_games_;
+    const std::vector<PlayedGame>& playedGames();
+    struct EngineGame {
+        KeptGame kept;              // as it was started: its settings, engine, strength, colour, start and clocks
+        std::string openings_text;  // "your repertoire “Najdorf”"
+        bool waiting   = false;     // kept when RookStudio closed: on the board, its clocks waiting for Resume
+        int hints_used = 0;
+        std::unique_ptr<Analyser> hint;  // a hint's search, by the analysis engine
+        AnalysisPosition hint_position;
+        std::optional<chess::Move> hint_move;  // shown until the game moves on
+        int hint_ply     = -1;
+        bool aids        = false;  // shown during the game: the game is marked "with aids"
+        double resign_at = -100;   // "Resign…" clicked: confirmed by Enter, or a second click, a few seconds long
+        uint64_t kept_at = 0;      // the match state's version last written to play/current.json
+        bool over        = false;
+        std::string result, reason;  // as it ended
+        std::string saved_in;        // the database it went into
+        std::string save_error;      // why it did not, and where it went instead
+        bool reviewed = false;       // Review it clicked
+        PlayedGame record;
+        ReplayGame final_game;              // as it ended, its tags written
+        std::optional<BoardOrigin> origin;  // where it was saved
+        std::string me;                     // the user's name in it
+    };
+    std::unique_ptr<EngineGame> engine_game_;
+    std::string play_error_;  // why the last game could not start
+    int play_offer_ = -1;     // the Play page offered to a view made before it: -1 not known yet, 0 to offer, 1 done
+    void drawPlay();
+    void drawPlayEngine();
+    void drawPlayOpponent(PlaySettings& s, bool& changed);
+    void drawPlayStrength(PlaySettings& s, const EngineEntry& engine, bool& changed);
+    void drawPlayOpenings(PlaySettings& s, bool& changed);
+    void drawPlayYou(PlaySettings& s, bool& changed);
+    void drawPlayHandicap(PlaySettings& s, bool& changed);
+    [[nodiscard]] std::string playLock() const;  // why a game cannot start now, empty when it can
+    [[nodiscard]] std::string playStartFen(const PlaySettings& s, chess::Color engine_side, std::string* why);
+    // The engine's openings as the choice says: their source, what the game says of them, their tag; none for the
+    // engine's own, or when the source is not there (`note` says so).
+    OpeningBook::Source openingSource(const PlaySettings& s, chess::Color engine_side, std::string& text,
+                                      std::string& tag, std::string& note, uint64_t& least, bool build = true);
+    bool startEngineGame(std::optional<chess::Color> colour = std::nullopt);  // a rematch's colour, else the choice's
+    // The game's setup: its players, clocks, start, the engine's nodes and openings, its tags; what the game says of
+    // the openings and their tag, when asked.
+    BoardMatchSetup engineGameSetup(const KeptGame& kept, const EngineEntry& engine, const std::string& me,
+                                    std::string* openings_text = nullptr, std::string* openings_tag = nullptr);
+    void takeBoardFor(const BoardMatchSetup& setup, bool remember = true);  // the board follows the game started
+    void pollEngineGame();
+    void finishEngineGame();
+    void saveEngineGame(ReplayGame& game);               // into "My games against engines"
+    void endEngineGame(ReplayGame game, int takebacks);  // over: its tags, saved, recorded
+    void stopKeptEngineGame();                           // a game kept, ended without a result
+    void showEngineGameOnBoard();                        // the game ended, on the board again
+    [[nodiscard]] bool engineGameRunning() const;        // being played, or kept waiting for Resume
+    [[nodiscard]] bool engineGameHidesAids() const;      // its aids hidden: until its end, or Show them
+    void showEngineGameAids();
+    void engineGameTakeBack();
+    void engineGameHint();
+    void engineGameResign();
+    bool engineGameKeys();    // true when the keys were the game's
+    void backToEngineGame();  // the board on the game again, after another was opened there
+    void keepEngineGame(bool closing);
+    void loadKeptEngineGame();  // at launch
+    void resumeEngineGame();
+    void closeEngineGame();  // the end's card closed: the game stays on the board as any game
+    void drawEngineGameCard();
+    void drawEngineGameEnd();
+    void drawEngineGameBanner();  // in place of a tab hidden during the game
+    [[nodiscard]] std::string engineGameTitle() const;
+    [[nodiscard]] bool playOffered() const;
+    void answerPlayOffer(bool add);
+    void drawPlayOffer();
 
     // Theory studies (#77, mockup M11, board 2; theory_shelf.hpp, view_theory.cpp): annotated PGN files read where they
     // are, Lichess studies' PGN, the repertoires' comments. The Openings page's Theory part, the Tree tab's Theory

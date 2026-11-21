@@ -27,8 +27,8 @@ using Clock = std::chrono::steady_clock;
 class Player {
    public:
     Player(const EngineEntry& entry, const std::atomic<bool>& stop, const std::atomic<bool>& resign,
-           BoardSeat* seat = nullptr)
-        : entry_(entry), stop_(stop), resign_(resign), seat_(seat) {}
+           const std::atomic<bool>& takeback, BoardSeat* seat = nullptr)
+        : entry_(entry), stop_(stop), resign_(resign), takeback_(takeback), seat_(seat) {}
 
     // Started, given the library's option values (and Chess960 when asked), and ready. False with the reason.
     bool start(bool chess960, std::string& error) {
@@ -71,7 +71,7 @@ class Player {
     }
 
     // Its move for the position, within `budget` (its clock and the margin): the move in UCI, or nullopt (out of
-    // time, stopped, resigned, or the engine ended). `info` gets each info line with a score.
+    // time, stopped, resigned, a move taken back, or the engine ended). `info` gets each info line with a score.
     std::optional<std::string> go(const std::string& position, const std::string& go, std::chrono::milliseconds budget,
                                   const std::function<void(const std::string&)>& info) {
         if (seat_) return userMove(budget);
@@ -85,8 +85,9 @@ class Player {
             },
             &move, true);
         if (!got) {
-            // The user resigned while it searched: stopped and its bestmove read, ready for the next game.
-            if (resign_ && !stop_ && process_.running()) {
+            // The user resigned, or took their move back, while it searched: stopped and its bestmove read, ready for
+            // the next search.
+            if ((resign_ || takeback_) && !stop_ && process_.running()) {
                 (void)process_.send("stop");
                 (void)waitFor("bestmove", Clock::now() + std::chrono::seconds(2), [](const std::string&) {});
             }
@@ -102,12 +103,12 @@ class Player {
 
    private:
     // The user's move, given by the window while their turn lasts: nullopt when their clock ran out, the games were
-    // stopped or they resigned. A move given before their turn is not taken.
+    // stopped, they resigned or took a move back. A move given before their turn is not taken.
     std::optional<std::string> userMove(std::chrono::milliseconds budget) {
         std::unique_lock lock(seat_->mutex);
         seat_->move.reset();
         seat_->turn = true;
-        seat_->cv.wait_until(lock, Clock::now() + budget, [&] { return seat_->move || stop_ || resign_; });
+        seat_->cv.wait_until(lock, Clock::now() + budget, [&] { return seat_->move || stop_ || resign_ || takeback_; });
         seat_->turn = false;
         return std::exchange(seat_->move, std::nullopt);
     }
@@ -136,7 +137,8 @@ class Player {
                 }
                 each(text);
             }
-            if (stop_ || (interruptible && resign_) || !process_.running() || Clock::now() >= deadline) return false;
+            if (stop_ || (interruptible && (resign_ || takeback_)) || !process_.running() || Clock::now() >= deadline)
+                return false;
             const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
             process_.wait(std::clamp(left, std::chrono::milliseconds(1), std::chrono::milliseconds(50)));
         }
@@ -145,6 +147,7 @@ class Player {
     const EngineEntry& entry_;
     const std::atomic<bool>& stop_;
     const std::atomic<bool>& resign_;
+    const std::atomic<bool>& takeback_;
     BoardSeat* seat_ = nullptr;
     EngineProcess process_;
 };
@@ -181,6 +184,13 @@ std::string today() {
 std::string pgnTimeControl(const GameClock& c) { return fmt::format("{:g}+{:g}", c.base_s, c.inc_s); }
 
 }  // namespace
+
+bool engineAcceptsDraw(const std::optional<fastchess::Score>& score, int plies) {
+    if (!score) return false;
+    if (score->type == fastchess::ScoreType::MATE) return score->value < 0;
+    if (score->value <= -150) return true;
+    return plies >= 40 && score->value <= 10;
+}
 
 std::string humanName() {
     for (const char* var : {"USER", "USERNAME", "LOGNAME"}) {
@@ -223,8 +233,10 @@ bool BoardMatch::start(const EngineEntry& first, const EngineEntry& second, cons
         state_.running     = true;
         state_.pgn         = pgn;
     }
-    stop_   = false;
-    resign_ = false;
+    stop_       = false;
+    resign_     = false;
+    takeback_   = false;
+    draw_offer_ = false;
     claim_.set(std::max(setup.human == 0 ? 0 : first.threads(), setup.human == 1 ? 0 : second.threads()));
     thread_ = std::thread([this, first, second, setup, pgn] { run(first, second, setup, pgn); });
     return true;
@@ -262,6 +274,30 @@ void BoardMatch::resign() {
     seat_.cv.notify_all();
 }
 
+void BoardMatch::takeBack() {
+    {
+        std::lock_guard lock(mutex_);
+        if (!state_.running || !state_.you) return;
+        const auto you = *state_.you;
+        if (std::none_of(state_.current.moves.begin(), state_.current.moves.end(),
+                         [&](const ReplayMove& m) { return m.mover == you; }))
+            return;
+    }
+    {
+        std::lock_guard lock(seat_.mutex);
+        takeback_ = true;
+    }
+    seat_.cv.notify_all();
+}
+
+void BoardMatch::offerDraw() {
+    std::lock_guard lock(mutex_);
+    if (!state_.running || !state_.you || state_.draw_offered) return;
+    draw_offer_         = true;
+    state_.draw_offered = true;
+    ++state_.version;
+}
+
 bool BoardMatch::state(State& out, uint64_t& version) const {
     std::lock_guard lock(mutex_);
     if (state_.version == version) return false;
@@ -276,8 +312,8 @@ bool BoardMatch::running() const {
 }
 
 void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setup, std::filesystem::path pgn) {
-    Player one(first, stop_, resign_, setup.human == 0 ? &seat_ : nullptr);
-    Player two(second, stop_, resign_, setup.human == 1 ? &seat_ : nullptr);
+    Player one(first, stop_, resign_, takeback_, setup.human == 0 ? &seat_ : nullptr);
+    Player two(second, stop_, resign_, takeback_, setup.human == 1 ? &seat_ : nullptr);
     // While the user plays, what the engine thinks is not shown: its scores come with the finished game.
     const bool hide = setup.human >= 0;
     std::string error;
@@ -300,17 +336,24 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
         const auto& black_name    = g == 0 ? second.name : first.name;
         const GameClock clocks[2] = {g == 0 ? setup.first_clock : setup.second_clock,
                                      g == 0 ? setup.second_clock : setup.first_clock};
+        const std::array<uint64_t, 2> nodes = {g == 0 ? setup.nodes[0] : setup.nodes[1],
+                                               g == 0 ? setup.nodes[1] : setup.nodes[0]};
 
         ReplayGame game;
         game.start_fen = setup.fen;
-        game.headers   = {{"Event", "RookStudio board game"}, {"Site", "?"},         {"Date", today()},
-                          {"Round", std::to_string(g + 1)},   {"White", white_name}, {"Black", black_name}};
+        game.headers   = {{"Event", setup.event.empty() ? std::string("RookStudio board game") : setup.event},
+                          {"Site", "?"},
+                          {"Date", today()},
+                          {"Round", std::to_string(g + 1)},
+                          {"White", white_name},
+                          {"Black", black_name}};
         if (pgnTimeControl(clocks[0]) == pgnTimeControl(clocks[1])) {
             game.headers.emplace_back("TimeControl", pgnTimeControl(clocks[0]));
         } else {
             game.headers.emplace_back("WhiteTimeControl", pgnTimeControl(clocks[0]));
             game.headers.emplace_back("BlackTimeControl", pgnTimeControl(clocks[1]));
         }
+        for (const auto& tag : setup.tags) game.headers.push_back(tag);
         std::array<int64_t, 2> clock_ms     = {static_cast<int64_t>(clocks[0].base_s * 1000),
                                                static_cast<int64_t>(clocks[1].base_s * 1000)};
         const std::array<int64_t, 2> inc_ms = {static_cast<int64_t>(clocks[0].inc_s * 1000),
@@ -318,11 +361,48 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
         // The user's side: the first has White in the first game.
         std::optional<chess::Color> you;
         if (setup.human >= 0) you = (setup.human == 0) == (g == 0) ? chess::Color::WHITE : chess::Color::BLACK;
-        resign_ = false;
+        // The engine's openings, until they have no move (#83); what a move taken back takes back with it.
+        bool book_on    = static_cast<bool>(setup.book) && you.has_value();
+        int last_book   = -1;
+        int book_out_at = -1;  // the ply they had no move at
+        std::vector<std::array<int64_t, 2>> clocks_before;
+        int takebacks = 0;
+
+        chess::Board board;
+        board.set960(setup.chess960);
+        board.setFen(setup.fen);
+        std::vector<std::string> moves;
+        // A game resumed (#83): its moves so far, its clocks and what it had taken back.
+        if (setup.resume && g == 0) {
+            game = *setup.resume;
+            if (game.start_fen.empty()) game.start_fen = setup.fen;
+            for (const auto& m : game.moves) {
+                moves.push_back(chess::uci::moveToUci(m.move, setup.chess960));
+                board.makeMove<true>(m.move);
+            }
+            clock_ms      = setup.resume_clock_ms;
+            clocks_before = setup.resume_clocks_before;
+            clocks_before.resize(game.moves.size(), clock_ms);
+            takebacks = setup.resume_takebacks;
+            last_book = setup.resume_last_book;
+            if (setup.resume_book_out && book_on) {
+                book_on     = false;
+                book_out_at = last_book >= 0 ? last_book + 2 : 0;
+            }
+        }
+        resign_     = false;
+        takeback_   = false;
+        draw_offer_ = false;
         update([&](State& s) {
-            s.game     = g;
-            s.current  = game;
-            s.clock_ms = clock_ms;
+            s.game          = g;
+            s.current       = hide ? withoutEvaluations(game) : game;
+            s.clock_ms      = clock_ms;
+            s.clocks_before = clocks_before;
+            s.takebacks     = takebacks;
+            s.last_book     = last_book;
+            s.book_out      = !book_on;
+            s.draw_offered  = false;
+            s.draw_declined = -1;
             s.thinking.reset();
             s.info.clear();
             s.you = you;
@@ -334,10 +414,6 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
             stop_  = true;
         }
 
-        chess::Board board;
-        board.set960(setup.chess960);
-        board.setFen(setup.fen);
-        std::vector<std::string> moves;
         while (!stop_) {
             const auto [why, outcome] = board.isGameOver();
             if (outcome != chess::GameResult::NONE) {
@@ -359,32 +435,87 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
             const int side       = stm == chess::Color::WHITE ? 0 : 1;
             Player& player       = side == 0 ? white : black;
             const auto& name     = side == 0 ? white_name : black_name;
+            const bool engine_up = you && stm != *you;
+
+            // The engine's openings first: their move played at once, taking no time (#83).
+            std::optional<std::string> book_move;
+            if (engine_up && book_on) {
+                book_move = setup.book(board);
+                if (!book_move) {
+                    book_on     = false;
+                    book_out_at = static_cast<int>(game.moves.size());
+                }
+            }
             std::string position = "position fen " + setup.fen;
             if (!moves.empty()) {
                 position += " moves";
                 for (const auto& m : moves) position += " " + m;
             }
-            const auto go    = fmt::format("go wtime {} btime {} winc {} binc {}", std::max<int64_t>(1, clock_ms[0]),
-                                           std::max<int64_t>(1, clock_ms[1]), inc_ms[0], inc_ms[1]);
+            auto go = fmt::format("go wtime {} btime {} winc {} binc {}", std::max<int64_t>(1, clock_ms[0]),
+                                  std::max<int64_t>(1, clock_ms[1]), inc_ms[0], inc_ms[1]);
+            if (nodes[static_cast<std::size_t>(side)] > 0)
+                go += fmt::format(" nodes {}", nodes[static_cast<std::size_t>(side)]);
             const auto start = Clock::now();
             update([&](State& s) {
                 s.thinking    = stm;
                 s.think_start = start;
                 s.info.clear();
+                s.book_out = !book_on;
             });
             std::string last_info;
-            const auto move  = player.go(position, go, std::chrono::milliseconds(clock_ms[side]) + CLOCK_MARGIN,
-                                         [&](const std::string& line) {
-                                            last_info = line;
-                                            if (!hide) update([&](State& s) { s.info = line; });
-                                         });
-            const auto spent = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
+            const auto move = book_move
+                                  ? book_move
+                                  : player.go(position, go, std::chrono::milliseconds(clock_ms[side]) + CLOCK_MARGIN,
+                                              [&](const std::string& line) {
+                                                  last_info = line;
+                                                  if (!hide) update([&](State& s) { s.info = line; });
+                                              });
+            const auto spent =
+                book_move ? int64_t{0}
+                          : std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
             if (stop_) break;
             if (you && resign_) {
                 result  = *you == chess::Color::WHITE ? "0-1" : "1-0";
                 reason  = trf("{} resigns", *you == chess::Color::WHITE ? white_name : black_name);
                 resign_ = false;
                 break;
+            }
+            // A move taken back (#83): the user's last one, and what followed it, the clocks as they were before it.
+            if (you && takeback_) {
+                takeback_ = false;
+                int last  = -1;
+                for (int i = static_cast<int>(game.moves.size()) - 1; i >= 0; --i)
+                    if (game.moves[static_cast<std::size_t>(i)].mover == *you) {
+                        last = i;
+                        break;
+                    }
+                if (last >= 0) {
+                    const auto keep = static_cast<std::size_t>(last);
+                    clock_ms        = keep < clocks_before.size() ? clocks_before[keep] : clock_ms;
+                    game.moves.resize(keep);
+                    moves.resize(keep);
+                    clocks_before.resize(std::min(clocks_before.size(), keep));
+                    board.setFen(setup.fen);
+                    for (const auto& m : game.moves) board.makeMove<true>(m.move);
+                    ++takebacks;
+                    // Back before its openings had no move: they are asked again.
+                    while (last_book >= last) last_book -= 2;
+                    if (last_book < 0) last_book = -1;
+                    if (book_out_at >= 0 && last <= book_out_at) {
+                        book_on     = true;
+                        book_out_at = -1;
+                    }
+                }
+                update([&](State& s) {
+                    s.current       = hide ? withoutEvaluations(game) : game;
+                    s.clock_ms      = clock_ms;
+                    s.clocks_before = clocks_before;
+                    s.takebacks     = takebacks;
+                    s.last_book     = last_book;
+                    s.book_out      = !book_on;
+                    s.thinking.reset();
+                });
+                continue;
             }
             const char* winner = side == 0 ? "0-1" : "1-0";
             if (!move) {
@@ -405,7 +536,24 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
                 reason = trf("illegal move {} by {}", *move, name);
                 break;
             }
-            clock_ms[side] = clock_ms[side] - spent + inc_ms[side];
+            std::optional<fastchess::Score> score;
+            if (!last_info.empty())
+                if (const auto info = fastchess::engine::UciEngine::parseInfo(last_info); info.score)
+                    score = *info.score;
+            // A draw offered (#83): the engine answers with its search, its move otherwise.
+            int declined = -1;
+            if (engine_up && draw_offer_) {
+                draw_offer_ = false;
+                if (!book_move && engineAcceptsDraw(score, static_cast<int>(game.moves.size()))) {
+                    result = "1/2-1/2";
+                    reason = TR("draw by agreement");
+                    update([&](State& s) { s.draw_offered = false; });
+                    break;
+                }
+                declined = static_cast<int>(game.moves.size());
+            }
+            clocks_before.push_back(clock_ms);
+            if (!book_move) clock_ms[side] = clock_ms[side] - spent + inc_ms[side];
 
             ReplayMove played;
             played.move    = parsed;
@@ -419,12 +567,20 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
                 if (info.nodes) played.nodes = *info.nodes;
                 if (info.wdl) played.wdl = *info.wdl;
             }
+            if (book_move) last_book = static_cast<int>(game.moves.size());
             moves.push_back(chess::uci::moveToUci(parsed, setup.chess960));
             board.makeMove<true>(parsed);
             game.moves.push_back(played);
             update([&](State& s) {
-                s.current  = hide ? withoutEvaluations(game) : game;
-                s.clock_ms = clock_ms;
+                s.current       = hide ? withoutEvaluations(game) : game;
+                s.clock_ms      = clock_ms;
+                s.clocks_before = clocks_before;
+                s.last_book     = last_book;
+                s.book_out      = !book_on;
+                if (declined >= 0) {
+                    s.draw_offered  = false;
+                    s.draw_declined = declined;
+                }
                 s.thinking.reset();
             });
         }
@@ -433,15 +589,20 @@ void BoardMatch::run(EngineEntry first, EngineEntry second, BoardMatchSetup setu
         game.final_comment = stop_ && reason.empty() ? std::string(TR("stopped")) : reason;
         if (!game.final_comment.empty()) game.headers.emplace_back("Termination", game.final_comment);
         std::string written;
-        try {
-            tour::appendShared(pgn, gamePgn(game, setup.chess960));
-        } catch (const std::exception& e) {
-            written = trf("Cannot write {}: {}", pgn.string(), e.what());
+        if (!pgn.empty()) {
+            try {
+                tour::appendShared(pgn, gamePgn(game, setup.chess960));
+            } catch (const std::exception& e) {
+                written = trf("Cannot write {}: {}", pgn.string(), e.what());
+            }
         }
         update([&](State& s) {
             s.current = game;
             s.finished.push_back(game);
             s.thinking.reset();
+            s.clock_ms      = clock_ms;
+            s.clocks_before = clocks_before;
+            s.takebacks     = takebacks;
             if (!written.empty()) s.error = written;
         });
     }

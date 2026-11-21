@@ -72,6 +72,8 @@ const char* App::guideSection() const {
         case Page::Board:
             if (training_) return Training;  // a session of the repertoire's training (#76)
             if (puzzle_) return Puzzles;     // a series of puzzles (#80)
+            if (mistake_) return Mistakes;   // a session of exercises, a game guessed (#81)
+            if (guess_) return GuessMoves;
             if (!chessBoard()) return Board;
             switch (board_side_tab_) {
                 case 0:
@@ -94,7 +96,10 @@ const char* App::guideSection() const {
         case Page::Lichess:
             return LichessPage;
         case Page::Training:
-            return training_tab_ == 1 ? Puzzles : TrainingPage;
+            return training_tab_ == 1   ? Puzzles
+                   : training_tab_ == 2 ? Mistakes
+                   : training_tab_ == 3 ? GuessMoves
+                                        : TrainingPage;
         case Page::Count:  // the views' sheet
             return Views;
         case Page::Suites:
@@ -723,6 +728,42 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         training_tab_   = 1;
         puzzles_online_ = true;
     });
+    // Your mistakes as exercises, guessing the moves (#81).
+    add(TR("My mistakes"), where(Page::Training), [this, go = page(Page::Training)] {
+        go();
+        training_tab_ = 2;
+    });
+    if (mistakeLock().empty()) {
+        const auto c = mistakeDayCounts();
+        if (c.due > 0)
+            add(trn("Review my mistakes · {} due", "Review my mistakes · {} due", c.due, ui::exactCount(c.due)),
+                TR("Training"), [this] { startReview(ReviewKind::Mistakes); });
+        if (c.due + c.today > 0)
+            add(trn("Exercises from my mistakes · {}", "Exercises from my mistakes · {}", c.due + c.today,
+                    ui::exactCount(c.due + c.today)),
+                TR("Training"), [this] {
+                    mistake_kind_.clear();
+                    startMistakes(false);
+                });
+    }
+    if (!mistake_unreviewed_.empty() && !mistake_reviews_)
+        add(trn("Review my latest game in the background", "Review my {} latest games in the background",
+                mistake_unreviewed_.size(), mistake_unreviewed_.size()),
+            TR("Training"), [this] { startMistakeReviews(); });
+    if (mistake_reviews_) add(TR("Cancel the reviews of my games"), TR("Training"), [this] { cancelMistakeReviews(); });
+    add(TR("Your names…"), TR("Settings"), page(Page::Settings));
+    add(TR("Guess the moves"), where(Page::Training), [this, go = page(Page::Training)] {
+        // The Board page's game, from the position shown; else the Training page's part.
+        if (page_ == Page::Board && !training_ && !puzzle_ && !mistake_ && !guess_ &&
+            board_.ply < static_cast<int>(board_.game.moves.size()) && trainingLock().empty()) {
+            startGuessBoard();
+            return;
+        }
+        go();
+        training_tab_ = 3;
+    });
+    if (trainingLock().empty())
+        add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {

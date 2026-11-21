@@ -253,6 +253,9 @@ std::string App::trainingLock() const {
 bool App::trainingHidesAids() const {
     if (puzzle_ && (puzzle_->phase == PuzzleRun::Phase::Asking || puzzle_->phase == PuzzleRun::Phase::Reply))
         return true;  // a puzzle's question (#80)
+    if (mistake_ && (mistake_->phase == MistakeRun::Phase::Asking || mistake_->phase == MistakeRun::Phase::Checking))
+        return true;  // an exercise's question, a guess (#81)
+    if (guess_ && guess_->phase != GuessRun::Phase::Shown && guess_->phase != GuessRun::Phase::End) return true;
     return training_ && (training_->phase == Ask::Asking || training_->phase == Ask::Preparing);
 }
 
@@ -409,6 +412,8 @@ void App::startTraining(std::size_t index, TrainingRun::Kind kind) {
     if (!trainingLock().empty() || index >= repertoires().entries().size()) return;
     if (training_) closeTraining(false);
     if (puzzle_) closePuzzles(false);  // a series of puzzles left where it is, its answers kept (#80)
+    if (mistake_) closeMistakes(false);  // a session of exercises, a game guessed (#81)
+    if (guess_) closeGuess(false);
     const auto& e  = repertoires().entries()[index];
     auto run       = std::make_unique<TrainingRun>();
     run->kind      = kind;
@@ -1214,7 +1219,7 @@ void App::drawTrainingEnd() {
 // The Home page
 
 bool App::trainingDue() {
-    if (training_ || puzzle_) return true;
+    if (training_ || puzzle_ || mistake_ || guess_) return true;
     return reviewDay().due() > 0;  // the day's review, every kind (#80)
 }
 
@@ -1227,6 +1232,22 @@ void App::drawTrainingHome() {
         ImGui::TextUnformatted(label.c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
+    }
+    // A session of exercises, a game guessed (#81).
+    if (mistake_) {
+        const auto& m    = *mistake_;
+        const auto label = m.phase != MistakeRun::Phase::End
+                               ? trf("Your mistakes: {} of {}", std::min(m.done + 1, m.total), m.total)
+                               : std::string(TR("Your mistakes"));
+        ImGui::TextUnformatted(label.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
+    }
+    if (guess_) {
+        ImGui::TextUnformatted(
+            trf("Guessing “{}”: {} points of {}", guess_->title, guess_->points, 3 * guess_->guesses.size()).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Back to the game guessed"))) page_ = Page::Board;
     }
     // The day's review (#80): one count for every kind, a click reviewing them all.
     drawReviewHome();

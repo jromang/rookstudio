@@ -333,6 +333,21 @@ void Storage::setPagesOffered(const std::vector<std::string>& pages) const {
     save(root_ / "settings.json", settings);
 }
 
+std::vector<std::string> Storage::playerNames() const {
+    std::vector<std::string> out;
+    const auto s = settings();
+    if (const auto it = s.find("player_names"); it != s.end() && it->is_array())
+        for (const auto& p : *it)
+            if (p.is_string() && !p.get<std::string>().empty()) out.push_back(p.get<std::string>());
+    return out;
+}
+
+void Storage::setPlayerNames(const std::vector<std::string>& names) const {
+    auto settings            = this->settings();
+    settings["player_names"] = names;
+    save(root_ / "settings.json", settings);
+}
+
 void Storage::setUpdateSettings(const update::Settings& updates) const {
     auto settings                     = this->settings();
     settings["check_new_version"]     = updates.enabled;

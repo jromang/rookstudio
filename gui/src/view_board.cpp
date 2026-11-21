@@ -256,6 +256,8 @@ int App::tournamentThreads() const {
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
     if (training_) dropTraining();  // another game on the board: the session ends there, its answers kept (#76)
     if (puzzle_) dropPuzzles();     // so does a series of puzzles (#80)
+    if (mistake_) dropMistakes();   // a session of exercises, a game guessed (#81)
+    if (guess_) dropGuess();
     rememberBoardGame();            // its changes and undo history go with it
     // The questions were about the game left: those still being answered end on their own, out of sight; so do the
     // comments being written, which go nowhere.
@@ -759,6 +761,8 @@ void App::boardPlay(chess::Move move) {
 void App::boardPlayAsked(chess::Move move) {
     if (training_) return trainingAnswer(move);  // the answer to the training's question (#76)
     if (puzzle_) return puzzleAnswer(move);      // to the puzzle's (#80)
+    if (mistake_) return mistakeAnswer(move);    // to the exercise's, the guess (#81)
+    if (guess_) return guessAnswer(move);
     auto& b = board_;
     if (!chessBoard()) return boardPlay(move);
     // Only a move that would start a variation is asked about: the line's next move, or one a variation starts with,
@@ -1290,6 +1294,8 @@ void App::drawBoardPage() {
     loadBoardSettings();
     if (training_) return drawTrainingPage();  // a session of the repertoire's training: the column is its (#76)
     if (puzzle_) return drawPuzzlePage();      // a series of puzzles: the column is the puzzle's (#80)
+    if (mistake_) return drawMistakePage();    // a session of exercises, a game guessed (#81)
+    if (guess_) return drawGuessPage();
     auto& b = board_;
 
     ui::pageTitle(TR("Board"), guideSection());

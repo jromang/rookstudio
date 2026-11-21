@@ -94,14 +94,16 @@ TrainingSettings readTrainingSettings(const fs::path& profile) {
     TrainingSettings out;
     if (const auto json = readJson<nlohmann::json>(profile / "training.json"); json && json->is_object()) {
         out.advance_ms  = std::clamp(json->value("advance_ms", out.advance_ms), 0, 10000);
-        out.new_per_day = std::clamp(json->value("new_per_day", out.new_per_day), 0, 1000);
+        out.new_per_day  = std::clamp(json->value("new_per_day", out.new_per_day), 0, 1000);
+        out.guess_theory = json->value("guess_theory", out.guess_theory);
     }
     return out;
 }
 
 void writeTrainingSettings(const fs::path& profile, const TrainingSettings& settings) {
-    (void)writeJson(profile / "training.json",
-                    {{"advance_ms", settings.advance_ms}, {"new_per_day", settings.new_per_day}});
+    (void)writeJson(profile / "training.json", {{"advance_ms", settings.advance_ms},
+                                                {"new_per_day", settings.new_per_day},
+                                                {"guess_theory", settings.guess_theory}});
 }
 
 int64_t trainingDayEnd(int64_t now) {

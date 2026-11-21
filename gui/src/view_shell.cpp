@@ -950,6 +950,20 @@ void App::drawSettings() {
     // The boards' colours, the pieces, the move sounds.
     section(board, [&] { drawAppearanceSettings(label); });
 
+    // The names the user plays under: their games, whose mistakes become exercises (#81).
+    section(v.holds(views::PageId::Training) || v.holds(views::PageId::Databases), [&] {
+        ui::label(TR("Your names"), label);
+        ui::topic(guide::topics::YourNames);
+        ImGui::BeginGroup();
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + px(560));
+        ImGui::TextDisabled("%s", TR("The names you play under, as your databases write them: a game where one of them "
+                                     "plays is yours, and the mistakes of your reviewed games become exercises (the "
+                                     "Training page)."));
+        ImGui::PopTextWrapPos();
+        drawPlayerNames("settings_names");
+        ImGui::EndGroup();
+    });
+
     // Where the program keeps its files, and whether that is beside the program (the portable mode).
     ImGui::Spacing();
     ImGui::Separator();

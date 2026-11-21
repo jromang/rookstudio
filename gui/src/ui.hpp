@@ -128,7 +128,9 @@ enum class Icon {
     Lock,    // fair play: the aids locked (#48)
     Check,   // done: a game of the user's that ended (#49)
     Puzzle,  // the puzzles (#80)
-    Alert    // a warning: what went wrong, and what is kept
+    Alert,   // a warning: what went wrong, and what is kept
+    Target,  // your mistakes as exercises (#81)
+    Eye      // guessing the moves of a game (#81)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

@@ -232,8 +232,12 @@ void Analyser::beginSearch() {
     (void)process_.send(goCommand(limit_));
     state_        = State::Searching;
     search_start_ = Clock::now();
-    // A limited search gets its time and some more; a depth, a while.
-    if (limit_.movetime_ms > 0)
+    // A limited search gets its time and some more; a depth, a while; a number of nodes, the time of an engine of
+    // 20,000 nodes a second at least, as the review gives it (an answer judged at the review's settings, #81).
+    if (limit_.nodes > 0)
+        deadline_ = search_start_ + std::chrono::seconds(30) +
+                    std::chrono::milliseconds(static_cast<int64_t>(limit_.nodes / 20));
+    else if (limit_.movetime_ms > 0)
         deadline_ = search_start_ + std::chrono::milliseconds(limit_.movetime_ms) + std::chrono::seconds(3);
     else if (limit_.depth > 0)
         deadline_ = search_start_ + std::chrono::minutes(5);

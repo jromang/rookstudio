@@ -13,6 +13,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <matchmaking/sprt/sprt.hpp>
@@ -67,6 +68,7 @@
 #include "live.hpp"
 #include "machine_jobs.hpp"
 #include "machine_run.hpp"
+#include "mistakes.hpp"
 #include "model.hpp"
 #include "notice.hpp"
 #include "offline_evals.hpp"
@@ -825,6 +827,125 @@ class App {
     bool online_dashboard_asked_ = false;
     void askOnlineBatch();
     void sendOnlineResults();
+
+    // Your mistakes as exercises and guessing the moves (#81, mockup M12, board 2; mistakes.hpp, view_mistakes.cpp,
+    // view_guess.cpp). The user's names (Settings › Your names, and the linked Lichess account's); the exercises their
+    // reviewed games give, looked for in the background when the databases, the names or the reviews change; the latest
+    // of their games without a review reviewed in the background; a session of exercises, or a game guessed, on the
+    // Board page.
+    std::vector<std::string> player_names_;  // settings.json "player_names"
+    std::array<char, 96> player_name_input_{};
+    [[nodiscard]] std::vector<std::string> userNames() const;  // the user's, with the linked Lichess account's
+    void setPlayerNames(std::vector<std::string> names);
+    void drawPlayerNames(const char* id);  // the names as chips, a field that adds one (Settings, the Training page)
+    std::optional<MistakeRecord> mistake_record_;
+    MistakeRecord& mistakeRecord();
+    [[nodiscard]] std::filesystem::path mistakesFolder() const { return storage_.root() / "mistakes"; }
+    [[nodiscard]] std::filesystem::path guessFolder() const { return storage_.root() / "guess"; }
+    void saveMistakeRecord();
+    struct MistakeScanJob {
+        std::string of;
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        std::future<MistakeScan> done;
+    };
+    std::optional<MistakeScanJob> mistake_scan_job_;
+    std::string mistake_scan_of_;  // what the last scan looked at: the names, the databases, the reviews
+    std::chrono::steady_clock::time_point mistake_scan_checked_{};
+    bool mistake_scanned_       = false;  // a scan came back this session
+    std::size_t mistake_games_  = 0;      // the user's games it found
+    std::size_t mistake_judged_ = 0;      // of them, with a review
+    std::vector<UnreviewedGame> mistake_unreviewed_;
+    [[nodiscard]] std::string mistakeScanKey();
+    void pollMistakes();  // each frame: the scan, the background reviews, a session's judge and engine
+    // The exercises asked: those of the record but a position of a repertoire of the same side (trained on the
+    // Openings page); of `kind` when it is given.
+    [[nodiscard]] std::vector<const MistakeExercise*> mistakeExercises(const std::string* kind = nullptr);
+    [[nodiscard]] MistakeCounts mistakeDayCounts(const std::string* kind = nullptr);
+    std::string mistake_kind_;     // the kind chosen on the page ("" every kind)
+    int mistake_keys_frame_ = -1;  // the frame the repertoires' positions were gathered in, by side
+    std::unordered_set<uint64_t> mistake_repertoire_keys_[2];
+    // The user's latest games without a review, reviewed one after the other in the background as the Board page
+    // reviews a game: its engine, its processes beside the tournaments, its passes; their exercises come game by game.
+    struct MistakeReviews {
+        std::vector<UnreviewedGame> games;
+        std::size_t done = 0;
+        std::unique_ptr<ReviewRunner> runner;
+        ReviewRunner::State state;
+        uint64_t version = 0;
+        std::chrono::steady_clock::time_point started, game_started;
+        double plies_done = 0, seconds = 0;  // what the games done took, for the time left
+        int processes = 1;
+        std::string engine;
+        std::string error;
+    };
+    std::optional<MistakeReviews> mistake_reviews_;
+    void startMistakeReviews();
+    void cancelMistakeReviews();
+    void startMistakeReview();  // the next game's
+    // A session on the Board page.
+    std::unique_ptr<MistakeRun> mistake_;
+    [[nodiscard]] std::string mistakeLock() const;           // why a session cannot start, empty when it can
+    bool startMistakes(bool review, bool new_only = false);  // the page's choice; false when nothing is to be asked
+    void startMistakeRun(std::unique_ptr<MistakeRun> run);
+    void askMistake();
+    void showMistakePosition(const MistakeExercise& e, std::optional<chess::Move> then = std::nullopt);
+    void mistakeAnswer(chess::Move move);
+    void mistakeJudged();  // the search after the answer is back: right or wrong
+    void mistakeGrade(bool right);
+    void mistakeDontKnow();
+    void mistakeRetry();
+    void mistakeNext();
+    void finishMistakes(bool stopped);
+    void reviewMissedMistakes();  // "Review them now": the missed ones again, nothing graded
+    void closeMistakes(bool to_training);
+    void dropMistakes();                             // another game came on the board: the session left where it is
+    void openMistakeGame(const MistakeExercise& e);  // the game it comes from, at the mistake
+    void mistakeKeys();
+    void drawMistakePage();
+    void drawMistakeBoard(float size);
+    void drawMistakeColumn();
+    void drawMistakeEnd();
+    void drawTrainingMistakes();    // the Training page's part
+    void drawMistakeReviewsCard();  // the games without a review, reviewed in the background
+    // Guessing the moves: the Training page's part, a game on the Board page.
+    int guess_source_  = -1;    // the database a game is drawn from (the shelf's index); -1 the first of the user's
+    int guess_side_    = 0;     // 0 White, 1 Black
+    int guess_elo_     = 0;     // both players at least
+    std::array<char, 96> guess_words_{};  // the quick filter's words: players, event, an ECO code, a year
+    // A game drawn at random from the database and the filter chosen, in the background (a large database's filter
+    // takes a moment).
+    struct GuessPick {
+        std::optional<ReplayGame> game;
+        bool chess960 = false;
+        std::string title;
+        std::filesystem::path folder;
+        uint64_t id = 0;
+        std::string error;  // "none": no game passes the filter; "short": none long enough
+    };
+    std::future<GuessPick> guess_pick_;
+    chess::Color guess_pick_side_ = chess::Color::WHITE;
+    std::optional<GuessRecord> guess_last_;
+    bool guess_last_read_ = false;
+    std::string guess_error_;
+    std::unique_ptr<GuessRun> guess_;
+    void drawTrainingGuess();
+    void pollGuess();         // each frame: the theory looked for, the searches after the game's move and the guess
+    bool startGuessRandom();  // a game of the chosen database and filter, drawn in the background
+    void startGuessBoard();   // the Board page's game, from the position shown, for the side to move
+    void startGuess(ReplayGame game, bool chess960, std::string title, chess::Color side, int from,
+                    std::optional<std::pair<std::filesystem::path, uint64_t>> origin);
+    void askGuess();  // the next question, or the end
+    void guessAnswer(chess::Move move);
+    void guessScored();   // both searches back: the points
+    void guessAdvance();  // the game's move and the reply played, the next question
+    void finishGuess(bool stopped);
+    void closeGuess(bool to_training);
+    void dropGuess();
+    void guessKeys();
+    void drawGuessPage();
+    void drawGuessBoard(float size);
+    void drawGuessColumn();
+    void drawGuessEnd();
 
     // Theory studies (#77, mockup M11, board 2; theory_shelf.hpp, view_theory.cpp): annotated PGN files read where they
     // are, Lichess studies' PGN, the repertoires' comments. The Openings page's Theory part, the Tree tab's Theory

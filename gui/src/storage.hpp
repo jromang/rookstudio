@@ -90,6 +90,10 @@ class Storage {
     [[nodiscard]] std::vector<std::string> pagesOffered() const;
     void setPagesOffered(const std::vector<std::string>& pages) const;
 
+    // The names the user plays under, as their databases write them (settings.json "player_names"): their games are
+    // those where one of them plays (#81).
+    [[nodiscard]] std::vector<std::string> playerNames() const;
+    void setPlayerNames(const std::vector<std::string>& names) const;
     // How the boards look and sound (settings.json): colours, pieces, move sounds.
     [[nodiscard]] appearance::Settings appearance() const;
     void setAppearance(const appearance::Settings& settings) const;

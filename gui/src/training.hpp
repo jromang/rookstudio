@@ -40,6 +40,7 @@ void appendReview(const std::filesystem::path& repertoire, uint64_t key, int64_t
 struct TrainingSettings {
     int advance_ms  = 1000;  // after a right answer, the next position on its own after this; 0: on Enter only
     int new_per_day = 20;    // new positions a day at most
+    bool guess_theory = true;  // guessing the moves (#81): the moves of theory pass by themselves
 };
 [[nodiscard]] TrainingSettings readTrainingSettings(const std::filesystem::path& profile);
 void writeTrainingSettings(const std::filesystem::path& profile, const TrainingSettings& settings);

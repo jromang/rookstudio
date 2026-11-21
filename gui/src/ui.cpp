@@ -417,6 +417,10 @@ const char* glyph(Icon icon) {
             return "\uE180";  // target
         case Icon::Eye:
             return "\uE0BA";  // eye
+        case Icon::Zap:
+            return "\uE1B4";  // zap
+        case Icon::Grid:
+            return "\uE0E9";  // grid-3x3
     }
     return "";
 }

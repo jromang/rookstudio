@@ -15,6 +15,7 @@
 #include "i18n.hpp"
 #include "layout.hpp"
 #include "lichess_months.hpp"
+#include "machines.hpp"
 #include "palette.hpp"
 #include "participants.hpp"
 #include "review_stats.hpp"
@@ -74,6 +75,8 @@ const char* App::guideSection() const {
             if (puzzle_) return Puzzles;     // a series of puzzles (#80)
             if (mistake_) return Mistakes;   // a session of exercises, a game guessed (#81)
             if (guess_) return GuessMoves;
+            if (endgame_) return Endgames;  // an endgame against the tables, a vision exercise (#82)
+            if (vision_) return Vision;
             if (!chessBoard()) return Board;
             switch (board_side_tab_) {
                 case 0:
@@ -99,6 +102,8 @@ const char* App::guideSection() const {
             return training_tab_ == 1   ? Puzzles
                    : training_tab_ == 2 ? Mistakes
                    : training_tab_ == 3 ? GuessMoves
+                   : training_tab_ == 4 ? Endgames
+                   : training_tab_ == 5 ? Vision
                                         : TrainingPage;
         case Page::Count:  // the views' sheet
             return Views;
@@ -764,6 +769,57 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     });
     if (trainingLock().empty())
         add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
+    // The endgames against the tables, the mates, board vision (#82).
+    add(TR("Endgames"), where(Page::Training), [this, go = page(Page::Training)] {
+        go();
+        training_tab_ = 4;
+    });
+    add(TR("Mates"), where(Page::Training), [this, go = page(Page::Training)] {
+        go();
+        training_tab_         = 4;
+        endgame_scroll_mates_ = true;
+    });
+    if (endgameLock().empty()) {
+        for (const auto& e : endgameCatalogue())
+            add(trf("Endgame: {}", TR(e.name)), TR("Training"), [this, &e, go = page(Page::Training)] {
+                if (endgameNeed(e.fen).empty() && startEndgame(e)) return;
+                go();
+                training_tab_ = 4;
+                endgame_need_ = e.id;
+            });
+        if (const auto n = reviewCount(ReviewKind::Endgames).due; n > 0)
+            add(trn("Review the missed endgames · {} due", "Review the missed endgames · {} due", n, ui::exactCount(n)),
+                TR("Training"), [this] { startReview(ReviewKind::Endgames); });
+        if (!gameEndgames().empty())
+            add(TR("Endgames of my games"), TR("Training"), [this] { (void)startGameEndgames(); });
+    }
+    if (syzygy_download_) {
+        if (syzygy_download_->busy())
+            add(TR("Cancel the download of the Syzygy tables"), TR("Training"), [this] { syzygy_download_->cancel(); });
+        else if (!syzygyState().complete)
+            add(trf("Download the Syzygy tables of 3 to 5 pieces · {}", formatBytes(syzygy345Bytes())), TR("Training"),
+                [this, go = page(Page::Training)] {
+                    go();
+                    training_tab_ = 4;
+                    startSyzygyDownload();
+                });
+    }
+    add(TR("Vision"), where(Page::Training), [this, go = page(Page::Training)] {
+        go();
+        training_tab_ = 5;
+    });
+    if (trainingLock().empty()) {
+        add(TR("Coordinates: find the square"), TR("Training"), [this] {
+            vision_mode_ = CoordMode::Find;
+            startCoordinates();
+        });
+        add(TR("Coordinates: name the square"), TR("Training"), [this] {
+            vision_mode_ = CoordMode::Name;
+            startCoordinates();
+        });
+        add(TR("Blindfold against an engine"), TR("Training"), [this] { startBlindfold(); });
+        add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
+    }
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {

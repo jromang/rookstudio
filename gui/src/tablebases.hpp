@@ -70,6 +70,9 @@ class TablebaseChecks {
 // With lockSyzygy() held: the tables of `paths` loaded, unless they are the ones loaded. The most pieces they cover,
 // 0 when none could be loaded.
 int loadSyzygy(const std::string& paths);
+// With lockSyzygy() held: the next loadSyzygy() loads its tables again, the same folders now holding more files (a
+// download that brought them, #82).
+void forgetSyzygy();
 
 // What the tables say of a position, for the side to move.
 struct TableVerdict {

@@ -58,8 +58,9 @@ void App::drawChessHome() {
     const bool lichess     = v.holds(views::PageId::Lichess);
     const bool tournaments = v.holds(views::PageId::Tournaments);
 
-    // The Training page offered once to a view made before it (#80).
+    // The Training page offered once to a view made before it (#80); then the Play page (#83).
     drawTrainingOffer();
+    drawPlayOffer();
 
     // Where the user was (mockup M0): the Board page's game at its move, where it comes from, what it holds.
     const bool has_game = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
@@ -139,8 +140,7 @@ void App::drawChessHome() {
         ImGui::SameLine(0, px(14));
     }
     if (board && ui::iconButton("chess_play", ui::Icon::Play, TR("Play against an engine"))) {
-        page_            = Page::Board;
-        board_.play_open = true;
+        page_ = Page::Play;  // its strength, its openings, a handicap (#83)
     }
     if (tournaments) {
         if (board) ImGui::SameLine(0, px(14));

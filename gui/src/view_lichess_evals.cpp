@@ -68,7 +68,8 @@ uint64_t freeSpace(const fs::path& folder) {
 }  // namespace
 
 std::optional<study::OfflineEval> App::offlineEval(const chess::Board& board) {
-    if (!offline_evals_ || board.chess960() || aidsLocked() || liveGameOn()) return std::nullopt;
+    if (!offline_evals_ || board.chess960() || aidsLocked() || liveGameOn() || engineGameHidesAids())
+        return std::nullopt;
     // Kept by the position itself, its en passant square too (a best move's legality may depend on it): not by a
     // hash two positions can share.
     const auto position = study::evalsPosition(board);

@@ -268,6 +268,9 @@ void App::drawShell() {
         case Page::Training:
             drawTraining();
             break;
+        case Page::Play:
+            drawPlay();
+            break;
         case Page::Count:
             break;
     }

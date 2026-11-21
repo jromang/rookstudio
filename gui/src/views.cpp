@@ -68,16 +68,17 @@ std::vector<View> proposed() {
                    0,
                    {P::Tournaments, P::Engines, P::Books, P::Board, P::Suites, P::Ratings, P::Log, P::Settings},
                    false});
-    // The Training page (#80) between the Openings and Lichess, in Study and Everything.
-    out.push_back({TR("Study"),
-                   "cap",
-                   1,
-                   {P::Home, P::Board, P::Databases, P::Openings, P::Training, P::Lichess, P::Engines, P::Settings},
-                   true});
+    // The Training page (#80) between the Openings and Lichess, in Study and Everything; the Play page (#83) after it.
+    out.push_back(
+        {TR("Study"),
+         "cap",
+         1,
+         {P::Home, P::Board, P::Databases, P::Openings, P::Training, P::Play, P::Lichess, P::Engines, P::Settings},
+         true});
     out.push_back({TR("Everything"),
                    "layers",
                    2,
-                   {P::Home, P::Tournaments, P::Board, P::Databases, P::Openings, P::Training, P::Lichess, P::Play,
+                   {P::Home, P::Tournaments, P::Board, P::Databases, P::Openings, P::Training, P::Play, P::Lichess,
                     P::Engines, P::Books, P::Suites, P::Ratings, P::Log, P::Settings},
                    true});
     return out;

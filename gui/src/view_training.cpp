@@ -246,7 +246,8 @@ const std::vector<study::TrainingCard>* App::plannedCards(std::size_t index) {
 
 std::string App::trainingLock() const {
     if (liveGameOn()) return TR("Locked while one of your games is played on Lichess.");
-    if (board_.match && board_.match_state.running) return TR("Once the game played on the board is over.");
+    if ((board_.match && board_.match_state.running) || engineGameRunning())
+        return TR("Once the game played on the board is over.");
     return {};
 }
 

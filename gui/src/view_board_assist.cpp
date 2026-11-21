@@ -333,6 +333,10 @@ void App::commentBoardMove() {
         boardToast(TR("Locked while one of your games is played on Lichess."));
         return;
     }
+    if (engineGameHidesAids()) {  // a game against an engine (#83)
+        boardToast(TR("Hidden until the end of your game: Show them first, and the game is marked “with aids”"));
+        return;
+    }
     auto& b = board_;
     if (b.ply <= 0 || !assistant_) return;
     if (!assistant_->installed()) {

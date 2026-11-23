@@ -2337,7 +2337,7 @@ beim ersten Mal angefragt; *Ohne sie* werden die über ihren Namen hinzugefügte
 deine eigenen Partien erscheinen dort nie.
 
 ### Lichess TV
-<!-- en: lichess-tv 07af67f5 -->
+<!-- en: lichess-tv f41a341a -->
 
 Die Karte *Lichess TV* der Seite Lichess listet die Kanäle des Standardschachs auf: *Höchste Wertung*, *Bullet*,
 *Blitz*, *Schnellschach*, *Klassisch*, *UltraBullet*, *Bots* und *Computer* (Spieler gegen die KI von Lichess); die
@@ -2367,8 +2367,8 @@ Deine eigenen Partien erscheinen nie, auch nicht hervorgehoben: die deines verkn
 Lichess-Bots (siehe [Ein Lichess-Bot](#ein-lichess-bot)). Solange eine deiner Live-Partien dauert, pausieren die Engines
 des Mosaiks (siehe [Fairplay](#fairplay)). Was den Computer verlässt: der abgefragte Kanal und die verfolgten Partien,
 ohne Konto; nichts wird von selbst gespeichert. Strg+K hat *Lichess TV*, jeden Kanal im Mosaik (und auf dem Brett,
-sobald die Karte abgerufen wurde) und für die Partie des Bretts *Bei dieser Partie bleiben*, *Diese Partie behalten…*
-und *Zurück zum Mosaik*.
+sobald die Karte abgerufen wurde) und für die Partie des Bretts Befehle, um bei ihr zu bleiben oder zur nächsten Partie
+des Kanals überzugehen, sie zu behalten und zum Mosaik zurückzukehren.
 
 ### Eine Partie vorbereiten
 <!-- en: preparing-a-game 5bf402fc -->

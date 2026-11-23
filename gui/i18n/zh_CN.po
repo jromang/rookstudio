@@ -2907,7 +2907,7 @@ msgid "Dismiss what changed: {}"
 msgstr "关闭更改提示：{}"
 
 msgid "Don't keep it"
-msgstr ""
+msgstr "不保存"
 
 msgid "Done"
 msgstr "完成"
@@ -4097,7 +4097,7 @@ msgid "Go to the engines"
 msgstr "前往引擎页"
 
 msgid "Goes into “{}” at its end"
-msgstr ""
+msgstr "结束时存入“{}”"
 
 msgid "Golden hour"
 msgstr "黄金时刻"
@@ -4958,7 +4958,7 @@ msgid "Keep the engine log of every game"
 msgstr "保存每局对局的引擎日志"
 
 msgid "Keep the game in"
-msgstr ""
+msgstr "将对局保存到"
 
 msgid "Keep the game, at its end, in"
 msgstr "对局结束时保存到"
@@ -5397,7 +5397,7 @@ msgid "Lichess's analysis"
 msgstr "Lichess 的分析"
 
 msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
-msgstr ""
+msgstr "Lichess 上最强的机器人，或棋手对阵其 AI 的对局，由这个引擎分析每局对局"
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Lichess 的直播采用 CC BY-SA 4.0 许可：其对局保留来源，即 Site 标签中的直播页面；你分享其中的内容时须以相同方式共享。"
@@ -11236,7 +11236,7 @@ msgid "The variance of a game when the games are counted in pairs, over the vari
 msgstr "按对局对计算时单局的方差与单独计算时单局方差之比：低于 1 时，成对对局只需相应更少的对局即可达到同样精度。"
 
 msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
-msgstr ""
+msgstr "变体频道（疯狂屋、原子棋……）不显示。卡片显示时会重新读取列表，最多每 30 秒一次。"
 
 msgid "The version and the system, for a bug report."
 msgstr "版本和系统信息，用于错误报告。"

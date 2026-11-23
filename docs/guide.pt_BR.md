@@ -2218,12 +2218,12 @@ sua conta segue precisa de mais uma permissão, pedida na primeira vez; *Sem ela
 são acompanhados. Sua própria conta e suas próprias partidas nunca aparecem ali.
 
 ### Lichess TV
-<!-- en: lichess-tv 07af67f5 -->
+<!-- en: lichess-tv f41a341a -->
 
 O cartão *Lichess TV* da página Lichess lista os canais de xadrez padrão: *Melhores ratings*, *Bullet*, *Blitz*,
 *Rápida*, *Clássica*, *UltraBullet*, *Bots* e *Computador* (jogadores contra a IA do Lichess); os canais das variantes
 não são mostrados. Cada um dá a partida que o Lichess destaca nele, os dois jogadores com os ratings deles, e o
-relógio. A lista é lida de novo quando o cartão aparece, no máximo a cada 30 segundos.
+relógio. A lista é lida de novo quando o cartão aparece, no máximo uma vez a cada 30 segundos.
 
 *O mosaico* mostra as partidas em andamento do canal no mosaico das transmissões, a terceira fonte dele: a linha no alto
 dele passa de uma a outra (*Transmissões*, *Jogadores seguidos*, *Lichess TV*), e os canais são botões abaixo dela. Os
@@ -2247,7 +2247,7 @@ As suas próprias partidas nunca aparecem, nem em destaque: as da sua conta vinc
 [Um bot do Lichess](#um-bot-do-lichess)). Enquanto uma das suas partidas ao vivo dura, os engines do mosaico descansam
 (veja [Jogo limpo](#jogo-limpo)). O que sai da máquina: o canal pedido e as partidas acompanhadas, sem conta; nada é
 guardado sozinho. O Ctrl+K tem *Lichess TV*, cada canal no mosaico (e no Tabuleiro depois que o cartão foi lido), e,
-para a partida do Tabuleiro, *Ficar nesta partida*, *Guardar esta partida…* e *Voltar ao mosaico*.
+para a partida do Tabuleiro, ficar nela ou passar à próxima partida do canal, guardá-la, e voltar ao mosaico.
 
 ### Preparar uma partida
 <!-- en: preparing-a-game 5bf402fc -->

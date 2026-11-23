@@ -2922,7 +2922,7 @@ msgid "Dismiss what changed: {}"
 msgstr "Hinweis zu den Änderungen schließen: {}"
 
 msgid "Don't keep it"
-msgstr ""
+msgstr "Nicht behalten"
 
 msgid "Done"
 msgstr "Fertig"
@@ -4120,7 +4120,7 @@ msgid "Go to the engines"
 msgstr "Zu den Engines"
 
 msgid "Goes into “{}” at its end"
-msgstr ""
+msgstr "Kommt an ihrem Ende in „{}“"
 
 msgid "Golden hour"
 msgstr "Goldene Stunde"
@@ -4987,7 +4987,7 @@ msgid "Keep the engine log of every game"
 msgstr "Das Engine-Log jeder Partie behalten"
 
 msgid "Keep the game in"
-msgstr ""
+msgstr "Die Partie speichern in"
 
 msgid "Keep the game, at its end, in"
 msgstr "Die Partie an ihrem Ende speichern in"
@@ -5427,7 +5427,7 @@ msgid "Lichess's analysis"
 msgstr "Analyse von Lichess"
 
 msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
-msgstr ""
+msgstr "Die besten Bots von Lichess oder Spieler gegen seine KI, jede Partie von dieser Engine analysiert"
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Die Übertragungen von Lichess stehen unter CC BY-SA 4.0: Ihre Partien behalten ihre Quelle, die Seite der Übertragung in ihrem Tag Site; was du davon teilst, wird unter gleichen Bedingungen geteilt."
@@ -11312,7 +11312,7 @@ msgid "The variance of a game when the games are counted in pairs, over the vari
 msgstr "Die Varianz einer Partie, wenn die Partien paarweise gezählt werden, geteilt durch die Varianz einzelner Partien: unter 1 brauchen die Paare entsprechend weniger Partien für dieselbe Genauigkeit."
 
 msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
-msgstr ""
+msgstr "Die Kanäle der Varianten (Crazyhouse, Atomic…) werden nicht gezeigt. Die Liste wird neu abgerufen, wenn die Karte erscheint, höchstens einmal alle 30 s."
 
 msgid "The version and the system, for a bug report."
 msgstr "Die Version und das System, für einen Fehlerbericht."

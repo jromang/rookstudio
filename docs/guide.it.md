@@ -2274,12 +2274,12 @@ più, chiesto la prima volta; *Senza permesso*, vengono seguiti i giocatori aggi
 partite non compaiono mai lì.
 
 ### Lichess TV
-<!-- en: lichess-tv 07af67f5 -->
+<!-- en: lichess-tv f41a341a -->
 
 La scheda *Lichess TV* della pagina Lichess elenca i canali degli scacchi standard: *I più forti*, *Bullet*, *Blitz*,
 *Rapida*, *Classica*, *UltraBullet*, *Bot* e *Computer* (giocatori contro l'IA di Lichess); i canali delle varianti non
 vengono mostrati. Ognuno dà la partita che Lichess vi mette in evidenza, i suoi due giocatori con i loro rating, e la
-sua cadenza. L'elenco viene riletto quando compare la scheda, al massimo ogni 30 secondi.
+sua cadenza. L'elenco viene riletto quando compare la scheda, al massimo una volta ogni 30 secondi.
 
 *Il mosaico* mostra le partite in corso del canale nel mosaico delle trasmissioni, la sua terza fonte: la riga in alto
 passa dall'una all'altra (*Trasmissioni*, *Giocatori seguiti*, *Lichess TV*), e i canali sono dei chip sotto di essa.
@@ -2303,7 +2303,8 @@ Le tue partite non compaiono mai, nemmeno in evidenza: quelle del tuo account co
 bot Lichess](#un-bot-lichess)). Finché dura una delle tue partite in diretta, i motori del mosaico restano a riposo
 (vedi [Fair play](#fair-play)). Cosa esce dalla macchina: il canale chiesto e le partite seguite, senza account; niente
 viene conservato da solo. Ctrl+K ha *Lichess TV*, ogni canale nel mosaico (e sulla Scacchiera una volta letta la
-scheda), e, per la partita della Scacchiera, *Resta su questa partita*, *Conserva questa partita…* e *Torna al mosaico*.
+scheda), e, per la partita della Scacchiera, restarci o passare alla prossima partita del canale, conservarla, e tornare
+al mosaico.
 
 ### Preparare una partita
 <!-- en: preparing-a-game 5bf402fc -->

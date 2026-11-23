@@ -2922,7 +2922,7 @@ msgid "Dismiss what changed: {}"
 msgstr "Fermer l'avis des changements : {}"
 
 msgid "Don't keep it"
-msgstr ""
+msgstr "Ne pas la garder"
 
 msgid "Done"
 msgstr "Terminé"
@@ -4120,7 +4120,7 @@ msgid "Go to the engines"
 msgstr "Aller aux moteurs"
 
 msgid "Goes into “{}” at its end"
-msgstr ""
+msgstr "Va dans « {} » à sa fin"
 
 msgid "Golden hour"
 msgstr "Heure dorée"
@@ -4987,7 +4987,7 @@ msgid "Keep the engine log of every game"
 msgstr "Garder le journal moteur de chaque partie"
 
 msgid "Keep the game in"
-msgstr ""
+msgstr "Garder la partie dans"
 
 msgid "Keep the game, at its end, in"
 msgstr "Garder la partie, à sa fin, dans"
@@ -5427,7 +5427,7 @@ msgid "Lichess's analysis"
 msgstr "L'analyse de Lichess"
 
 msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
-msgstr ""
+msgstr "Les meilleurs bots de Lichess, ou des joueurs contre son IA, ce moteur analysant chaque partie"
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Les diffusions de Lichess sont sous CC BY-SA 4.0 : leurs parties gardent leur source, la page de la diffusion dans leur balise Site ; ce que tu en partages est partagé dans les mêmes conditions."
@@ -11312,7 +11312,7 @@ msgid "The variance of a game when the games are counted in pairs, over the vari
 msgstr "La variance d'une partie quand les parties sont comptées par paires, rapportée à celle des parties seules : sous 1, les paires demandent d'autant moins de parties pour la même précision."
 
 msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
-msgstr ""
+msgstr "Les chaînes des variantes (Crazyhouse, Atomic…) ne sont pas montrées. La liste est relue quand la carte s'affiche, au plus une fois toutes les 30 s."
 
 msgid "The version and the system, for a bug report."
 msgstr "La version et le système, pour un rapport de bug."

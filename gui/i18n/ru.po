@@ -4130,9 +4130,6 @@ msgstr "Перейти к движкам"
 msgid "Golden hour"
 msgstr "Золотой час"
 
-msgid "Good game!"
-msgstr "Хорошей игры!"
-
 msgid "Good move"
 msgstr "Хороший ход"
 
@@ -4231,6 +4228,9 @@ msgstr[2] "Хеш-таблицы: до {} в {} процессах движко�
 
 msgid "Hash {} MB"
 msgstr "Хеш {} МБ"
+
+msgid "Have a good game!"
+msgstr ""
 
 msgid "Have the position played out"
 msgstr "Разыграть позицию"
@@ -5471,8 +5471,8 @@ msgstr "Откроется страница Lichess: войдите под уч�
 msgid "Lichess's page opens; your account stays linked meanwhile, and the token it replaces is revoked. The same permission serves the lock and the challenges received."
 msgstr "Открывается страница Lichess; учётная запись тем временем остаётся привязанной, а заменяемый токен отзывается. Это же разрешение служит для блокировки и для полученных вызовов."
 
-msgid "Lichess's page, logged in with the bot's account, the permission “Play bot moves” ticked."
-msgstr "Страница Lichess, вход под учётной записью бота, отмечено разрешение «Играть партии с API ботов»."
+msgid "Lichess's page, logged in with the bot's account, the permission to play as a bot (bot:play) ticked."
+msgstr ""
 
 msgid "Lichess's players' games; the right button chooses their speeds and ratings"
 msgstr "Партии игроков Lichess; правая кнопка выбирает контроль времени и рейтинги"
@@ -5786,8 +5786,8 @@ msgstr "Добавить в теорию"
 msgid "Make it first"
 msgstr "Сделать первым"
 
-msgid "Make one with the permission “Play bot moves” (bot:play), logged in with the bot's account, then paste it."
-msgstr "Создайте токен с разрешением «Играть партии с API ботов» (bot:play), войдя под учётной записью бота, затем вставьте его."
+msgid "Make one with the permission to play as a bot (bot:play), logged in with the bot's account, then paste it."
+msgstr ""
 
 msgid "Make one, or import a PGN file: a new database takes its name."
 msgstr "Создайте базу или импортируйте файл PGN: новая база получит его имя."
@@ -12929,6 +12929,9 @@ msgstr "бот"
 msgid "a bot already ✓"
 msgstr "уже бот ✓"
 
+msgid "a bot since today, {}"
+msgstr ""
+
 msgid "a bot since {}"
 msgstr "стала ботом: {}"
 
@@ -13936,9 +13939,6 @@ msgstr "nElo A (ДИ 95%)"
 
 msgid "names: players, events, sites, rounds"
 msgstr "имена: игроки, соревнования, места, туры"
-
-msgid "never"
-msgstr "никогда"
 
 msgid "never tested: test its connection in Settings > Machines"
 msgstr "ни разу не проверялась: проверьте её подключение в разделе Параметры > Машины"
@@ -15463,6 +15463,9 @@ msgstr "свободно: {}"
 
 msgid "{} free where its folder {} is."
 msgstr "{} свободно там, где находится его папка {}."
+
+msgid "{} from the start"
+msgstr ""
 
 msgid "{} game"
 msgid_plural "{} games"
@@ -17180,6 +17183,9 @@ msgstr "{}: его линии, потоки и хеш; сделать первы
 msgid "{}: kept, judged when the tables answer."
 msgstr "{}: сохранён, будет оценён, когда ответят таблицы."
 
+msgid "{}: never"
+msgstr ""
+
 msgid "{}: no Syzygy file in {}: the adjudication does without them; push them from Settings > Machines > Books and tablebases."
 msgstr "{}: нет файлов Syzygy в {}: присуждение обойдётся без них; отправьте их в разделе Параметры > Машины > Книги и эндшпильные таблицы."
 
@@ -17378,9 +17384,6 @@ msgstr "· учётная запись не привязана"
 msgid "· no thinking on the opponent's time"
 msgstr "· без обдумывания во время хода соперника"
 
-msgid "· no, while testing (Lichess asks it) · to open afterwards"
-msgstr "· нет, пока идёт проверка (так просит Lichess) · открыть позже"
-
 msgid "· not sent yet"
 msgstr "· ещё не отправлен"
 
@@ -17389,6 +17392,9 @@ msgstr "· пары [0-2]: %d  %d  %d  %d  %d"
 
 msgid "· the token lasts until {}"
 msgstr "· токен действует до {}"
+
+msgid "· unrated while you test it, as Lichess asks; tick it afterwards"
+msgstr ""
 
 msgid "· waiting for challenges"
 msgstr "· ожидание вызовов"

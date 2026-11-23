@@ -4107,9 +4107,6 @@ msgstr ""
 msgid "Golden hour"
 msgstr ""
 
-msgid "Good game!"
-msgstr ""
-
 msgid "Good move"
 msgstr ""
 
@@ -4206,6 +4203,9 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Hash {} MB"
+msgstr ""
+
+msgid "Have a good game!"
 msgstr ""
 
 msgid "Have the position played out"
@@ -5441,7 +5441,7 @@ msgstr ""
 msgid "Lichess's page opens; your account stays linked meanwhile, and the token it replaces is revoked. The same permission serves the lock and the challenges received."
 msgstr ""
 
-msgid "Lichess's page, logged in with the bot's account, the permission “Play bot moves” ticked."
+msgid "Lichess's page, logged in with the bot's account, the permission to play as a bot (bot:play) ticked."
 msgstr ""
 
 msgid "Lichess's players' games; the right button chooses their speeds and ratings"
@@ -5754,7 +5754,7 @@ msgstr ""
 msgid "Make it first"
 msgstr ""
 
-msgid "Make one with the permission “Play bot moves” (bot:play), logged in with the bot's account, then paste it."
+msgid "Make one with the permission to play as a bot (bot:play), logged in with the bot's account, then paste it."
 msgstr ""
 
 msgid "Make one, or import a PGN file: a new database takes its name."
@@ -12842,6 +12842,9 @@ msgstr ""
 msgid "a bot already ✓"
 msgstr ""
 
+msgid "a bot since today, {}"
+msgstr ""
+
 msgid "a bot since {}"
 msgstr ""
 
@@ -13832,9 +13835,6 @@ msgid "nElo of A (95% CI)"
 msgstr ""
 
 msgid "names: players, events, sites, rounds"
-msgstr ""
-
-msgid "never"
 msgstr ""
 
 msgid "never tested: test its connection in Settings > Machines"
@@ -15312,6 +15312,9 @@ msgid "{} free"
 msgstr ""
 
 msgid "{} free where its folder {} is."
+msgstr ""
+
+msgid "{} from the start"
 msgstr ""
 
 msgid "{} game"
@@ -16890,6 +16893,9 @@ msgstr ""
 msgid "{}: kept, judged when the tables answer."
 msgstr ""
 
+msgid "{}: never"
+msgstr ""
+
 msgid "{}: no Syzygy file in {}: the adjudication does without them; push them from Settings > Machines > Books and tablebases."
 msgstr ""
 
@@ -17083,9 +17089,6 @@ msgstr ""
 msgid "· no thinking on the opponent's time"
 msgstr ""
 
-msgid "· no, while testing (Lichess asks it) · to open afterwards"
-msgstr ""
-
 msgid "· not sent yet"
 msgstr ""
 
@@ -17093,6 +17096,9 @@ msgid "· pairs [0-2]: %d  %d  %d  %d  %d"
 msgstr ""
 
 msgid "· the token lasts until {}"
+msgstr ""
+
+msgid "· unrated while you test it, as Lichess asks; tick it afterwards"
 msgstr ""
 
 msgid "· waiting for challenges"

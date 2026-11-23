@@ -4107,9 +4107,6 @@ msgstr "Aller aux moteurs"
 msgid "Golden hour"
 msgstr "Heure dorée"
 
-msgid "Good game!"
-msgstr "Bonne partie !"
-
 msgid "Good move"
 msgstr "Bon coup"
 
@@ -4207,6 +4204,9 @@ msgstr[1] "Tables de hachage : jusqu'à {} dans {} processus de moteur"
 
 msgid "Hash {} MB"
 msgstr "Hash {} Mo"
+
+msgid "Have a good game!"
+msgstr ""
 
 msgid "Have the position played out"
 msgstr "Faire jouer la position"
@@ -5441,8 +5441,8 @@ msgstr "La page de Lichess s'ouvre : connecte-toi avec le compte du bot, pas le 
 msgid "Lichess's page opens; your account stays linked meanwhile, and the token it replaces is revoked. The same permission serves the lock and the challenges received."
 msgstr "La page de Lichess s'ouvre ; ton compte reste associé pendant ce temps, et le jeton qu'elle remplace est révoqué. La même permission sert au verrouillage et aux défis reçus."
 
-msgid "Lichess's page, logged in with the bot's account, the permission “Play bot moves” ticked."
-msgstr "La page de Lichess, connecté avec le compte du bot, la permission « Play bot moves » cochée."
+msgid "Lichess's page, logged in with the bot's account, the permission to play as a bot (bot:play) ticked."
+msgstr ""
 
 msgid "Lichess's players' games; the right button chooses their speeds and ratings"
 msgstr "Les parties des joueurs de Lichess ; le bouton droit choisit leurs cadences et leurs classements"
@@ -5754,8 +5754,8 @@ msgstr "En faire une étude de théorie"
 msgid "Make it first"
 msgstr "En faire le premier"
 
-msgid "Make one with the permission “Play bot moves” (bot:play), logged in with the bot's account, then paste it."
-msgstr "Crées-en un avec la permission « Play bot moves » (bot:play), connecté avec le compte du bot, puis colle-le."
+msgid "Make one with the permission to play as a bot (bot:play), logged in with the bot's account, then paste it."
+msgstr ""
 
 msgid "Make one, or import a PGN file: a new database takes its name."
 msgstr "Crées-en une, ou importe un fichier PGN : une nouvelle base prend son nom."
@@ -12842,6 +12842,9 @@ msgstr "un bot"
 msgid "a bot already ✓"
 msgstr "déjà un bot ✓"
 
+msgid "a bot since today, {}"
+msgstr ""
+
 msgid "a bot since {}"
 msgstr "un bot depuis {}"
 
@@ -13833,9 +13836,6 @@ msgstr "nElo de A (IC 95 %)"
 
 msgid "names: players, events, sites, rounds"
 msgstr "noms : joueurs, événements, lieux, rondes"
-
-msgid "never"
-msgstr "jamais"
 
 msgid "never tested: test its connection in Settings > Machines"
 msgstr "jamais testée : teste sa connexion dans Réglages > Machines"
@@ -15313,6 +15313,9 @@ msgstr "{} libres"
 
 msgid "{} free where its folder {} is."
 msgstr "{} libres là où se trouve son dossier {}."
+
+msgid "{} from the start"
+msgstr ""
 
 msgid "{} game"
 msgid_plural "{} games"
@@ -16890,6 +16893,9 @@ msgstr "{} : ses lignes, ses threads et son hash ; en faire le premier, le retir
 msgid "{}: kept, judged when the tables answer."
 msgstr "{} : gardé, jugé quand les tables répondront."
 
+msgid "{}: never"
+msgstr ""
+
 msgid "{}: no Syzygy file in {}: the adjudication does without them; push them from Settings > Machines > Books and tablebases."
 msgstr "{} : aucun fichier Syzygy dans {} : l'arbitrage s'en passe ; envoie-les depuis Réglages > Machines > Livres et tables de finales."
 
@@ -17083,9 +17089,6 @@ msgstr "· aucun compte associé"
 msgid "· no thinking on the opponent's time"
 msgstr "· pas de réflexion pendant le temps de l'adversaire"
 
-msgid "· no, while testing (Lichess asks it) · to open afterwards"
-msgstr "· non, pendant les essais (Lichess le demande) · à ouvrir ensuite"
-
 msgid "· not sent yet"
 msgstr "· pas encore envoyé"
 
@@ -17094,6 +17097,9 @@ msgstr "· paires [0-2] : %d  %d  %d  %d  %d"
 
 msgid "· the token lasts until {}"
 msgstr "· le jeton est valable jusqu'au {}"
+
+msgid "· unrated while you test it, as Lichess asks; tick it afterwards"
+msgstr ""
 
 msgid "· waiting for challenges"
 msgstr "· en attente de défis"

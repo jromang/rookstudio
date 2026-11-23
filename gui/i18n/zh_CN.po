@@ -4084,9 +4084,6 @@ msgstr "前往引擎页"
 msgid "Golden hour"
 msgstr "黄金时刻"
 
-msgid "Good game!"
-msgstr "祝对局愉快！"
-
 msgid "Good move"
 msgstr "好着"
 
@@ -4183,6 +4180,9 @@ msgstr[0] "哈希表：最多 {}，分布在 {} 个引擎进程中"
 
 msgid "Hash {} MB"
 msgstr "哈希 {} MB"
+
+msgid "Have a good game!"
+msgstr ""
 
 msgid "Have the position played out"
 msgstr "从此局面对弈"
@@ -5411,8 +5411,8 @@ msgstr "会打开 Lichess 的页面：请用机器人的账户登录，而不是
 msgid "Lichess's page opens; your account stays linked meanwhile, and the token it replaces is revoked. The same permission serves the lock and the challenges received."
 msgstr "会打开 Lichess 的页面；在此期间你的账户保持关联，被替换的令牌会被吊销。同一项权限也用于锁定和接收挑战。"
 
-msgid "Lichess's page, logged in with the bot's account, the permission “Play bot moves” ticked."
-msgstr "Lichess 的页面，需用机器人的账户登录，并已勾选“Play bot moves”（作为机器人走棋）权限。"
+msgid "Lichess's page, logged in with the bot's account, the permission to play as a bot (bot:play) ticked."
+msgstr ""
 
 msgid "Lichess's players' games; the right button chooses their speeds and ratings"
 msgstr "Lichess 棋手的对局；右键可选择棋速和等级分"
@@ -5722,8 +5722,8 @@ msgstr "设为理论研究"
 msgid "Make it first"
 msgstr "设为第一个"
 
-msgid "Make one with the permission “Play bot moves” (bot:play), logged in with the bot's account, then paste it."
-msgstr "请用机器人的账户登录，创建一个带有“Play bot moves”（bot:play）权限的令牌，然后粘贴。"
+msgid "Make one with the permission to play as a bot (bot:play), logged in with the bot's account, then paste it."
+msgstr ""
 
 msgid "Make one, or import a PGN file: a new database takes its name."
 msgstr "创建一个，或导入 PGN 文件：新数据库会以该文件命名。"
@@ -12755,6 +12755,9 @@ msgstr "机器人"
 msgid "a bot already ✓"
 msgstr "已经是机器人 ✓"
 
+msgid "a bot since today, {}"
+msgstr ""
+
 msgid "a bot since {}"
 msgstr "{}起成为机器人"
 
@@ -13730,9 +13733,6 @@ msgstr "A 的 nElo（95% 置信区间）"
 
 msgid "names: players, events, sites, rounds"
 msgstr "名称：棋手、赛事、地点、轮次"
-
-msgid "never"
-msgstr "从未"
 
 msgid "never tested: test its connection in Settings > Machines"
 msgstr "从未测试：请在 设置 > 机器 中测试其连接"
@@ -15163,6 +15163,9 @@ msgstr "{} 空闲"
 
 msgid "{} free where its folder {} is."
 msgstr "其文件夹所在处可用空间：{}（文件夹 {}）。"
+
+msgid "{} from the start"
+msgstr ""
 
 msgid "{} game"
 msgid_plural "{} games"
@@ -16600,6 +16603,9 @@ msgstr "{}：其变化数、线程和哈希；设为第一个、移除"
 msgid "{}: kept, judged when the tables answer."
 msgstr "{}：已保留，残局库作答后再评判。"
 
+msgid "{}: never"
+msgstr ""
+
 msgid "{}: no Syzygy file in {}: the adjudication does without them; push them from Settings > Machines > Books and tablebases."
 msgstr "{}：{} 中没有 Syzygy 文件：判定将不使用它们；请在 设置 > 机器 > 开局库与残局库 中推送。"
 
@@ -16788,9 +16794,6 @@ msgstr "· 未关联账户"
 msgid "· no thinking on the opponent's time"
 msgstr "· 不在对手的时间内思考"
 
-msgid "· no, while testing (Lichess asks it) · to open afterwards"
-msgstr "· 测试期间不接受（Lichess 的要求）· 之后再开放"
-
 msgid "· not sent yet"
 msgstr "· 尚未发出"
 
@@ -16799,6 +16802,9 @@ msgstr "· 对局对 [0-2]：%d  %d  %d  %d  %d"
 
 msgid "· the token lasts until {}"
 msgstr "· 令牌有效期至 {}"
+
+msgid "· unrated while you test it, as Lichess asks; tick it afterwards"
+msgstr ""
 
 msgid "· waiting for challenges"
 msgstr "· 等待挑战"

@@ -122,7 +122,10 @@ Report reportOf(const study::Snapshot& snapshot, study::GameId from, study::Game
             e.first = e.first ? std::min(e.first, row.date) : row.date;
             e.last  = std::max(e.last, row.date);
         }
-        for (const auto& [name, elo] : {std::pair{row.white, row.white_elo}, std::pair{row.black, row.black_elo}}) {
+        // The players as the table of names gives them (#88): a player's spellings counted as one.
+        const auto ids = snapshot.rowIds(id);
+        for (const auto& [name, elo] : {std::pair{snapshot.shownName(ids.white), row.white_elo},
+                                        std::pair{snapshot.shownName(ids.black), row.black_elo}}) {
             if (name.empty()) continue;
             auto& p = players[std::string(name)];
             p.name  = name;

@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -28,6 +29,7 @@
 
 #include "chessbase.hpp"
 #include "import.hpp"
+#include "players.hpp"
 
 namespace fcg::study {
 
@@ -84,6 +86,14 @@ struct GameMoves {
 
 class Segment;
 
+// A game's place as the edits leave it: its version (none: as it was added) and whether it is deleted. What undoing an
+// edit puts back (Database::restore()).
+struct GameState {
+    GameId id = 0;
+    std::optional<std::pair<uint32_t, uint32_t>> version;  // a segment of versions and its place there
+    bool deleted = false;
+};
+
 class Snapshot {
    public:
     [[nodiscard]] uint64_t games() const noexcept { return games_; }
@@ -122,10 +132,35 @@ class Snapshot {
     [[nodiscard]] ImportedGame game(GameId id) const;
     [[nodiscard]] uint32_t names() const noexcept { return names_; }
     [[nodiscard]] std::string_view name(uint32_t id) const;
+    // A tag of a game kept with its other tags (not one of the columns): "WhiteFideId", "GameURL"; empty when none.
+    [[nodiscard]] std::string tag(GameId id, std::string_view name) const;
+    // The file the game was imported from (its segment's), empty when not known: a game added before the sources
+    // were kept, or saved from the board. A game replaced keeps its first source.
+    [[nodiscard]] const std::string& source(GameId id) const;
+
+    // The table of names (players.hpp): never null, empty when none was made.
+    [[nodiscard]] const std::shared_ptr<const PlayerTable>& players() const noexcept { return players_; }
+    // A player's name as everything shows it: the name of the player of the table it belongs to, else as written.
+    [[nodiscard]] std::string_view shownName(uint32_t name_id) const;
+    // The game's state as its edits leave it, for undoing them.
+    [[nodiscard]] GameState state(GameId id) const;
+    // The bytes its moves and annex take: none for a deleted game a compaction emptied.
+    [[nodiscard]] uint64_t storedBytes(GameId id) const;
+
+    // The segments, those of versions included, in the manifest's order.
+    struct SegmentInfo {
+        std::string name;
+        GameId first   = 0;  // its first game's number; for a segment of versions, 0
+        uint32_t games = 0;
+        bool versions  = false;
+        std::string source;
+    };
+    [[nodiscard]] std::vector<SegmentInfo> segmentInfos() const;
 
    private:
     friend class Database;
     [[nodiscard]] std::pair<const Segment*, std::size_t> locate(GameId id) const;
+    [[nodiscard]] std::size_t segmentOf(GameId id) const;  // the segment that added it (an index in segments_)
 
     std::vector<std::shared_ptr<const Segment>> segments_;  // all of them, those of versions included
     std::vector<std::size_t> logical_;                      // the segments that add games, in order
@@ -138,6 +173,63 @@ class Snapshot {
     uint64_t games_      = 0;
     uint32_t names_      = 0;
     uint64_t generation_ = 0;
+    std::vector<std::string> segment_names_;  // of each segment
+    std::vector<std::string> sources_;        // of each segment
+    std::vector<bool> versions_;              // whether each segment holds versions
+    std::shared_ptr<const PlayerTable> players_ = std::make_shared<const PlayerTable>();
+    std::string players_file_;
+};
+
+struct CheckProgress {
+    std::atomic<uint64_t> done{0};  // of the games read
+    std::atomic<uint64_t> total{0};
+};
+
+// What checking a database found (Database::check()): every segment read again from the disk, every game's moves
+// replayed, its signature and its key (a hash of its headers and moves) made again and compared with the stored ones.
+struct CheckReport {
+    uint64_t games = 0;  // the games checked: those the database reads (not deleted), in their last versions
+    // A segment that cannot be read again: its games' number, why, the file it was imported from.
+    struct BadSegment {
+        std::string name;
+        GameId first   = 0;
+        uint64_t games = 0;
+        bool versions  = false;
+        std::string error;
+        std::string source;
+    };
+    std::vector<BadSegment> segments;
+    // The games read differently from how they were written, by number (those of the segments above included),
+    // sorted, with the file each was imported from.
+    std::vector<GameId> damaged;
+    std::map<std::string, uint64_t> damaged_sources;  // their sources, and how many each
+    bool tree       = false;                          // an opening tree covers the games
+    bool signatures = true;  // every segment has its signatures (a database of the first format has none)
+    bool cancelled  = false;
+    double seconds  = 0;
+};
+
+// What compacting would give back: the games deleted, the versions replaced, and the bytes they hold.
+struct CompactPlan {
+    uint64_t deleted  = 0;  // games deleted
+    uint64_t replaced = 0;  // games replaced: their first versions, and the versions after them but the last
+    uint64_t bytes    = 0;  // what goes
+    uint64_t needed   = 0;  // what the new files take while the old ones are kept
+    std::vector<std::string> segments;  // those written again
+};
+
+struct CompactProgress {
+    std::atomic<uint64_t> segment{0};  // being written, from 1
+    std::atomic<uint64_t> segments{0};
+    std::atomic<uint64_t> games{0};  // of the segment written
+};
+
+struct Compacted {
+    bool done      = false;
+    bool cancelled = false;
+    std::string error;
+    uint64_t bytes = 0;      // given back once the old files go
+    bool undoable  = false;  // the old files kept: undoCompaction() until the database is closed
 };
 
 class Database {
@@ -164,8 +256,10 @@ class Database {
     };
     // The games added, in segments of at most SEGMENT_GAMES, committed together: after a crash the database has all
     // of them or none. A game the database already has, or the batch had before it, is left out unless
-    // `keep_duplicates`. Throws std::runtime_error when the disk refuses; the database is then as before.
-    Appended append(std::vector<ImportedGame> games, bool keep_duplicates = false);
+    // `keep_duplicates`; a key of `forget` (sorted) does not count as one it has. `source`, the file they come from,
+    // is kept with their segments. Throws std::runtime_error when the disk refuses; the database is then as before.
+    Appended append(std::vector<ImportedGame> games, bool keep_duplicates = false, const std::string& source = {},
+                    const std::vector<uint64_t>& forget = {});
 
     // Replaces game `id` with `game`: it keeps its number, its new version written in a segment of versions; the
     // old one stays where it was until the database is tidied. Committed as append() is. Throws std::out_of_range
@@ -176,19 +270,60 @@ class Database {
     void setDeleted(std::span<const GameId> ids, bool deleted);
     [[nodiscard]] const std::filesystem::path& folder() const noexcept { return dir_; }
 
+    // Duplicates merged (mockup M13, board 1): each `keep` replaced by its merged `game`, the `drop` games marked
+    // deleted, all in one commit. Gives the games' states before, which restore() puts back. Throws as replace().
+    struct Merge {
+        GameId keep = 0;
+        ImportedGame game;
+        std::vector<GameId> drop;
+    };
+    std::vector<GameState> merge(std::vector<Merge> merges);
+    // The games put back in the states given (their versions, deleted or not), in one commit: an edit undone.
+    void restore(std::span<const GameState> states);
+    // The table of names replaced, in one commit.
+    void setPlayers(PlayerTable table);
+
+    // Every segment read again and every game replayed, in the background on `threads` threads (0: the machine's),
+    // the database read and written meanwhile; what is checked is the snapshot of when it starts.
+    [[nodiscard]] CheckReport check(CheckProgress& progress, const std::atomic<bool>& cancel, int threads = 0) const;
+    // What compact() would give back; nothing to do when it finds no game deleted nor replaced.
+    [[nodiscard]] CompactPlan compactPlan() const;
+    // The segments that hold games deleted or replaced written again without them, each game keeping its number (a
+    // game deleted keeps its headers, an empty game): the segments of versions go. The opening tree stays valid.
+    // Unless `one_at_a_time`, the old files are kept until the database is closed, undoCompaction() putting them
+    // back while nothing else was committed; one at a time, each segment is committed and its old files removed at
+    // once, needing the room of one segment only. The segments are written from the snapshot of when it starts, the
+    // other changes going on: games added meanwhile are kept; a game replaced or deleted meanwhile stops it before its
+    // commit (its error says so), nothing changed.
+    Compacted compact(CompactProgress& progress, const std::atomic<bool>& cancel, bool one_at_a_time = false);
+    // Whether undoCompaction() can put the files before the compaction back: nothing committed since.
+    [[nodiscard]] bool compactionUndoable() const;
+    bool undoCompaction();
+    // The files a compaction left (those it replaced): removed when the database is closed.
+    ~Database();
+    Database(const Database&)            = delete;
+    Database& operator=(const Database&) = delete;
+
     explicit Database(const std::filesystem::path& dir);  // use create() or open()
     Database(const std::filesystem::path& dir, bool read_only);  // use openReadOnly()
 
    private:
-    void load();
+    void load(bool clean = true);  // `clean`: what a commit cut short left removed (and what a compaction left)
     uint32_t nameId(const std::string& name, std::vector<std::string>& added);
     // Writes `games` in new segments (of versions when `versions`) and commits them with the edits `replaced` and
-    // `deleted` (the snapshot's own when null), in one manifest. Under the lock.
+    // `deleted` (the snapshot's own when null) and the table of names `players` (the snapshot's when null), in one
+    // manifest. Under the lock.
     void commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
-                const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted);
+                const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
+                const PlayerTable* players = nullptr, const std::string& source = {});
+    void dropCompactionLeftovers();
 
     std::filesystem::path dir_;
     std::optional<tour::FolderLock> lock_;  // none when read-only
+    // Held by every change for its whole length, a compaction's included, before mutex_: a long compaction keeps the
+    // other changes waiting, not the readers.
+    std::mutex write_mutex_;
+    std::mutex compact_mutex_;  // one compaction at a time, and its undoing
     mutable std::mutex mutex_;
     std::shared_ptr<const Snapshot> current_;
     std::unordered_map<std::string, uint32_t> name_ids_;  // filled at the first append
@@ -196,6 +331,14 @@ class Database {
     std::vector<uint64_t> known_keys_;  // the games' keys, sorted, filled at the first append that skips duplicates
     bool keys_indexed_     = false;
     uint64_t next_segment_ = 1;
+    // The last compaction's: the manifest before it, the generation it committed, the files it left.
+    struct Leftovers {
+        std::string manifest;
+        uint64_t generation = 0;
+        std::vector<std::string> files;      // the segments and files it replaced, kept for undoCompaction()
+        std::vector<std::string> new_files;  // those it wrote, removed when it is undone
+    };
+    std::optional<Leftovers> leftovers_;
 };
 
 struct DatabaseImport {
@@ -217,9 +360,12 @@ struct DatabaseImport {
 // committed; importInto sets it itself when the disk refuses (`error` then says why).
 // A ChessBase database or archive (isChessBase()) is read as importChessBase() reads it, `chessbase` its options (a
 // .cbz's password).
+// The file is kept as its games' source (Snapshot::source()). The keys of `forget` (sorted) do not count as games the
+// database has: a damaged game's, imported again from its file.
 DatabaseImport importInto(Database& db, const std::filesystem::path& file, const ImportOptions& options,
                           ImportProgress& progress, std::atomic<bool>& cancel, bool keep_duplicates = false,
-                          std::size_t commit_games = std::size_t{1} << 18, const ChessBaseOptions& chessbase = {});
+                          std::size_t commit_games = std::size_t{1} << 18, const ChessBaseOptions& chessbase = {},
+                          const std::vector<uint64_t>& forget = {});
 
 // For the tests: called at each step of a commit with its name; an exception thrown from it stops the commit there,
 // as a crash would. Empty: none.

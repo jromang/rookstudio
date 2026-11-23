@@ -1243,7 +1243,8 @@ the end), and importing the file again adds only the missing ones; games already
 At the end, a banner on the database tells what came: the games added, those already there, and the damaged ones
 among the games added (a move that cannot be read or is illegal, a text cut short, a start position that is not one),
 each kept up to that move with its text as it was; *See them in the list*, or a click on one, shows the file at its
-line. A full disk, a stop asked for or another error says what is kept and what is needed, with *Resume the import* and
+line. The games already there from another source, the same game with its headers written otherwise, are told with
+*Merge them* and *See them first* (see [Duplicate games](#duplicate-games)). A full disk, a stop asked for or another error says what is kept and what is needed, with *Resume the import* and
 *Open the database's folder*; a file that cannot be read on says why, the games read before it kept. Then the
 database's opening tree is built, in the background.
 
@@ -1257,7 +1258,8 @@ the list* leaves a database's files where they are.
 ### The game list
 
 The list gives each game's number, players, Elo, result, event, date, ECO code and length; a click on a heading sorts
-it. The quick filter above takes free words: players, event, year, ECO code, result (`carlsen 2024 B90`). ↑ ↓ go
+it. A player's spellings brought together in the database's table of names (see [Players' names](#players-names)) show
+under the player's name, and under the mouse the name says how the game writes it. The quick filter above takes free words: players, event, year, ECO code, result (`carlsen 2024 B90`). ↑ ↓ go
 through the list and the game chosen shows beside, on a small board with its moves; Enter or a double click opens it
 on the Board page. Millions of games scroll and sort at once.
 
@@ -1268,7 +1270,8 @@ Lichess, which keeps FIDE's list, without an account and only when you ask: a ri
 or *FIDE card of …* in the game's preview. A game that gives the player's FIDE id (*WhiteFideId*, as Lichess's
 broadcasts do) sends that id; otherwise the name is sent, and when several players of FIDE's list are called that way,
 you choose which one it is. The card is kept in your profile for that name: it then shows under the mouse over the
-name, and in the preview. *On lichess.org* opens the player's page there.
+name, and in the preview. *On lichess.org* opens the player's page there. A player matched with FIDE's rating list in
+the database's table of names shows the list's card instead, without asking Lichess.
 
 ### Searching
 
@@ -1322,7 +1325,8 @@ ones, with their Monday, their games and whether each is already in the database
 database (*A new database, “TWIC”* at first), then *Download and add*: each issue's PGN is downloaded, then imported,
 one after the other, the database read all along; *Cancel* stops after what was added. A game the database already
 has, the same tags and moves, is not added twice. Then a report gives the strongest tournaments of the games added (the
-average rating of their players) and the best-rated players; a name opens its games in the list.
+average rating of their players) and the best-rated players; a name opens its games in the list. The games already there
+from another source, a broadcast followed before for instance, are told there with *Merge them*.
 
 *Every Monday, look for a new issue* is off until you tick it. Ticked, RookStudio asks for the list of issues while it
 is open, four times a day at most; a new issue shows under the list of databases, in *Followed sources*, and on the
@@ -1362,6 +1366,85 @@ twice. What leaves the machine: the player's name and the requests for their mon
 once the file is downloaded, *Import the downloaded file…* imports it as it is. A .7z archive (LZMA or LZMA2) is
 read as it is unpacked: its PGN files one after the other, its other files passed over, nothing written onto the disk
 but the games. Any .7z of PGN files can be imported, or dropped on the page, the same way.
+
+### Maintenance
+
+A database's ⋯, beside its buttons on the Databases page, or a right click on it in the list, opens its maintenance in
+place of the page, in three parts: *Duplicate games*, *Players' names*, *Check and compact*; Esc comes back. Ctrl+K has
+*Duplicate games*, *Players' names*, *FIDE's rating list*, *Check the database* and *Compact the database*. Each long
+task runs in the background at a low priority, with its progress and *Cancel*, the database read all along: a
+tournament beside it loses no time. Ctrl+Z undoes the last merge, the last players brought together, or the damaged
+games set aside. A database another program writes to is open read-only: its maintenance waits until that program
+lets it go. The Home page speaks of the maintenance only when it finds something: duplicates after an import, damaged
+games found by a check.
+
+### Duplicate games
+
+The same game can come twice from two sources, its headers written otherwise: a round followed on Lichess, then
+TWIC's issue of the Monday. The import leaves out a game the database has exactly (the same tags and moves), not these.
+*Duplicate games* finds them: the same players (read in the table of names; else their surnames and first initials),
+the same year, rounds and dates that do not differ, and the same moves, or the moves of one the start of the other's,
+unfinished (a broadcast cut short). A game needs ten moves at least to be told (twenty when its day is not known); two
+games with an address of their own (Lichess's) are two games.
+
+It counts them by kind: the same moves with other headers; one shorter, a broadcast cut short; results that differ,
+left to you. *Merge all* (Enter) merges the first two kinds: each group becomes one game with the fullest of each field
+(a name in full over an initial, the longer event, the round that says more, "9.2" over "9", a date that knows more,
+the ratings, the ECO code, the FIDE ids, the longer moves with their comments, the clocks and evaluations, a result over
+none), the other games marked deleted. A click on a group compares it field by field, each source in a column and the
+merged game beside: a click on a cell takes that field from that source; then *Merge* (Enter), *Keep both* (two games,
+never offered again) or *Next group* (↓). The merged game keeps the number of the oldest; its *MergedFrom* tag says
+where each field came from, and a broadcast's address left for a place stays as its *GameURL*. Ctrl+Z brings the other
+games back. *See in the list* shows the duplicates in the game list, where *Show all* shows every game again.
+
+At the end of an import, the games already there from another source are told in its report, with *Merge them*: they
+are never merged without your click. The reports of the sources (*From a source…*) tell them too.
+
+### Players' names
+
+One player is often written several ways: "Lindqvist, Erik", "Lindqvist,E", "Erik Lindqvist". *Players' names* brings
+a player's spellings together in the database's table of names. The games are not changed, but the game list shows the
+player's name, and its quick filter, its search and its sorts, the opening tree's reference games and the reports of
+the sources read it. Three counts say what can be done:
+
+- brought together at once: the games give the player's FIDE id (Lichess's broadcasts do), or FIDE's rating list has a
+  single player of that name, or of that name as another alphabet writes it ("Kowalenko" for "Kovalenko") with ratings
+  near the games'; *Bring together the …* (Enter) does it;
+- to confirm: several players of the list have that name. The one whose rating is the nearest to the games' is proposed
+  first; ↑ ↓ choose among them or *None of them*, and Enter keeps the choice and goes to the next one;
+- kept as they are: a player not on the list, a name of one word (an account's), or no list taken; two spellings of
+  one surname and given name are brought together by hand, with a right click and *Bring together*.
+
+A player matched with the list keeps its FIDE id, federation, title, birth year and ratings in the table, also once the
+list is removed. Ctrl+Z undoes. The table is part of the database: it goes with its folder. The games of a later import
+join their players by themselves when they give a player's FIDE id or write its name in full; another spelling waits
+for this page.
+
+### FIDE's rating list
+
+FIDE publishes its rating list each month, about two million players: their FIDE ids, names, federations, titles,
+ratings and birth years. RookStudio does not ship it, since FIDE gives it no licence. *Download*, on the *Players'
+names* part, asks ratings.fide.com for its combined list (a zip of about 43 MB) and reads it into your profile (about 90
+MB), where it stays, never sent anywhere; *A file already downloaded…* reads one you have. A download cut short resumes
+where it stopped (*Resume*). Each month after, the Home page says that a new list is out, with *Take it*: it is never
+taken without your click. *Look for a newer list* asks again; *Remove it* takes the list out of your profile, the
+players brought together staying as they are. A list whose columns changed is refused, the list before staying in
+service, with *Report it*. What leaves the machine: the request for the file, when you download it.
+
+### Checking and compacting
+
+*Check* (Enter, or Ctrl+K *Check the database*) reads every segment of the database again from the disk and replays
+every game: its signature and its key (a hash of its headers and moves) are made again and compared with those stored,
+and a game that reads otherwise than it was written is damaged. It says *Sound*, or the damaged games and the files they
+were imported from: *Keep what can be read* sets them aside (deleted; Ctrl+Z brings them back), and *Import their file
+again* brings them back from their file when it is still there. The opening tree is compared with the games too.
+
+Games deleted or replaced, merges included, keep their room in the files. *Compact* writes the segments that hold them
+again without them: each game keeps its number (a deleted game its headers only), and the opening tree stays valid. The
+old files are kept until RookStudio closes: *Undo the compaction* puts them back until then, and the room is given back
+at closing. Imports and saves into the database wait while it compacts; the list, the tree and the searches work. When
+the disk has not room enough for the copy, *Compact segment by segment* needs the room of one segment only, but cannot
+be undone.
 
 ## The Openings page
 

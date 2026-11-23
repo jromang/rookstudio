@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
+#include <set>
 #include <string>
 
 #include <SDL3/SDL.h>
@@ -70,7 +71,7 @@ DatabaseShelf& App::shelf() {
     return *shelf_;
 }
 
-void App::importIntoDatabase(int index, const std::filesystem::path& file, bool pasted) {
+void App::importIntoDatabase(int index, const std::filesystem::path& file, bool pasted, std::vector<uint64_t> forget) {
     auto& s = shelf();
     // A ChessBase database: what it brings, asked first (M10, board 1).
     if (study::isChessBase(file) && !db_chessbase_go_) {
@@ -115,7 +116,12 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
     start.created = created;
     if (const auto db = s.open(static_cast<std::size_t>(index))) start.games = db->snapshot()->games();
     start.bytes = s.facts(static_cast<std::size_t>(index)).bytes;
-    if (!s.startImport(static_cast<std::size_t>(index), file, db_chessbase_password_)) {
+    if (careBusy(s.entries()[static_cast<std::size_t>(index)].folder)) {
+        db_message_ = trf("“{}” is being compacted: import once it has finished.",
+                          s.entries()[static_cast<std::size_t>(index)].name);
+        return;
+    }
+    if (!s.startImport(static_cast<std::size_t>(index), file, db_chessbase_password_, std::move(forget))) {
         const auto facts = s.facts(index);
         db_message_      = s.import() ? TR("An import runs already: one at a time.")
                            : facts.read_only
@@ -153,6 +159,7 @@ void App::pasteGamesInto(int index) {
 }
 
 void App::pollDatabases() {
+    pollCare();  // the maintenance's tasks (M13, board 1), FIDE's list
     if (!shelf_) return;
     shelf_->pollTreeJob();
     shelf_->keepReadOnlyCurrent();
@@ -163,7 +170,9 @@ void App::pollDatabases() {
     const auto index = job->index;
     const auto read = job->progress.bytes.load(), total = job->progress.total_bytes;
     if (const auto report = shelf_->finishedImport()) {
-        if (twicImportEnded(path, *report)) return;  // an issue of TWIC: its own report, once they are all in
+        // The games already there from another source, the same game with other headers (M13, board 1).
+        auto found = shelf_->takeImportDuplicates();
+        if (twicImportEnded(path, *report, found.groups)) return;  // an issue of TWIC: its own report, once all in
         const auto start = db_import_start_.value_or(ImportStart{});
         // A file refused at once (not text, an archive that cannot be read) into a database made for it: no empty
         // database stays, and the page says why.
@@ -186,9 +195,11 @@ void App::pollDatabases() {
         }
         // The outcome, said on the database: the disk full and what the rest would take, the damaged games and why.
         ImportOutcome o;
-        o.file   = path;
-        o.report = *report;
-        o.pasted = start.pasted;
+        o.file         = path;
+        o.report       = *report;
+        o.pasted       = start.pasted;
+        o.duplicates   = std::move(found.groups);
+        o.games_before = start.games;
         if (index < shelf_->entries().size()) {
             o.folder = shelf_->entries()[index].folder;
             if (!report->error.empty()) {
@@ -448,6 +459,48 @@ void App::drawImportOutcome(std::size_t index) {
             ImGui::TextDisabled("%s", trn("{} game already there left out.", "{} games already there left out.",
                                           o.report.duplicates, ui::exactCount(o.report.duplicates))
                                           .c_str());
+        // The same games from another source, their headers written differently (M13, board 1): told, and merged
+        // on a click, never without it.
+        if (!o.duplicates.empty()) {
+            std::set<std::string> sources;
+            if (const auto db = shelf().open(index)) {
+                const auto snap = db->snapshot();
+                for (const auto& g : o.duplicates)
+                    for (const auto id : g.games)
+                        if (id < o.games_before && id < snap->games()) {
+                            const auto label = study::sourceLabel(snap->source(id), snap->game(id));
+                            if (!label.empty()) sources.insert(label);
+                        }
+            }
+            std::string from;
+            for (const auto& s : sources) from += (from.empty() ? "" : ", ") + s;
+            ImGui::TextUnformatted((from.empty()
+                                        ? trn("{} game already there, from another source.",
+                                              "{} games already there, from another source.", o.duplicates.size(),
+                                              ui::exactCount(o.duplicates.size()))
+                                        : trn("{} game already there, from {}.", "{} games already there, from {}.",
+                                              o.duplicates.size(), ui::exactCount(o.duplicates.size()), from))
+                                       .c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Merge them"))) {
+                std::vector<study::DuplicateGroup> merge;
+                for (const auto& g : o.duplicates)
+                    if (g.kind != study::DuplicateKind::Results) merge.push_back(g);
+                const auto since = o.games_before;
+                openCare(static_cast<int>(index), CarePart::Duplicates);
+                if (care_) care_->since = since;
+                startCareMerges(index, std::move(merge), {});
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("Each kept once, with the fullest of each field; the other marked deleted. "
+                                           "Ctrl+Z undoes, on the maintenance page that opens."));
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("See them first"))) {
+                const auto since = o.games_before;
+                openCare(static_cast<int>(index), CarePart::Duplicates);
+                if (care_) care_->since = since;
+            }
+        }
         if (damaged > 0) {
             ImGui::TextDisabled("%s", trn("Of the games added, {} is damaged: kept up to the move that cannot be read, "
                                           "its text kept as it was.",
@@ -541,6 +594,10 @@ void App::drawDatabases() {
             pasteGamesInto(db_selected_);
     }
     drawLinkCard();
+    if (care_) {  // a database's maintenance (M13, board 1)
+        drawCare();
+        return;
+    }
     if (db_list_ && db_selected_ >= 0 && db_selected_ < static_cast<int>(s.entries().size())) {
         drawGameList();
         return;
@@ -680,6 +737,13 @@ void App::drawDatabases() {
         const auto start = ImGui::GetCursorPos();
         if (ImGui::Selectable("##db", on, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.2f)))
             db_selected_ = static_cast<int>(i);
+        if (!entries[i].source && ImGui::BeginPopupContextItem("##db_menu")) {
+            ImGui::TextDisabled("%s", TR("Maintenance"));
+            if (ImGui::MenuItem(TR("Duplicate games"))) openCare(static_cast<int>(i), CarePart::Duplicates);
+            if (ImGui::MenuItem(TR("Players' names"))) openCare(static_cast<int>(i), CarePart::Names);
+            if (ImGui::MenuItem(TR("Check and compact"))) openCare(static_cast<int>(i), CarePart::Checks);
+            ImGui::EndPopup();
+        }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(3)));
         ImGui::TextUnformatted(entries[i].name.c_str());
         ImGui::SetCursorPosX(start.x + px(6));
@@ -853,6 +917,17 @@ void App::drawDatabases() {
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", TR("Its files stay where they are: Add a database… lists it again."));
+    // ⋯: its maintenance (M13, board 1).
+    ImGui::SameLine();
+    if (ui::iconOnlyButton("##db_more", ui::Icon::More, TR("More: the database's maintenance")))
+        ImGui::OpenPopup("##db_more_menu");
+    if (ImGui::BeginPopup("##db_more_menu")) {
+        ImGui::TextDisabled("%s", TR("Maintenance"));
+        if (ImGui::MenuItem(TR("Duplicate games"))) openCare(static_cast<int>(index), CarePart::Duplicates);
+        if (ImGui::MenuItem(TR("Players' names"))) openCare(static_cast<int>(index), CarePart::Names);
+        if (ImGui::MenuItem(TR("Check and compact"))) openCare(static_cast<int>(index), CarePart::Checks);
+        ImGui::EndPopup();
+    }
     ImGui::EndChild();
 }
 
@@ -913,6 +988,11 @@ bool App::saveBoardToDatabase() {
                            board_origin_->name));
             return true;
         }
+        if (careBusy(s.entries()[i].folder)) {
+            boardToast(trf("“{}” is being compacted: Ctrl+S once it has finished; the game stays changed here.",
+                           board_origin_->name));
+            return true;
+        }
         fillBoardEco();
         study::ImportedGame game;
         if (!study::readImportedGame(gamePgn(board_.tree, board_.chess960), game)) return false;
@@ -947,6 +1027,7 @@ void App::drawGameList() {
         db_search_open_ = false;  // the panel first, then the list
     } else if (ui::iconButton("db_back", ui::Icon::Back, TR("Databases")) || escape) {
         db_list_ = false;
+        db_only_.reset();
         return;
     }
     ImGui::SameLine();
@@ -991,11 +1072,12 @@ void App::drawGameList() {
     if (!db_pattern_job_.of.empty()) narrowing_jobs.push_back(&db_pattern_job_);
     std::string narrowing;
     for (const auto* job : narrowing_jobs) narrowing += job->of + (job->ready ? "+" : "-");
-    const auto of = fmt::format("{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(),
-                                snapshot->generation(), db_filter_.data(), static_cast<int>(db_sort_), db_descending_,
-                                p.player.data(), p.opponent.data(), p.event.data(), p.side, p.year_from.data(),
-                                p.year_to.data(), p.eco_from.data(), p.eco_to.data(), p.elo_min.data(),
-                                static_cast<int>(p.result), narrowing + (p.damaged ? "|damaged" : ""));
+    const auto of = fmt::format(
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(), snapshot->generation(),
+        db_filter_.data(), static_cast<int>(db_sort_), db_descending_, p.player.data(), p.opponent.data(),
+        p.event.data(), p.side, p.year_from.data(), p.year_to.data(), p.eco_from.data(), p.eco_to.data(),
+        p.elo_min.data(), static_cast<int>(p.result),
+        narrowing + (p.damaged ? "|damaged" : "") + (db_only_ ? "|only" + std::to_string(db_only_->size()) : ""));
     if (db_view_of_ != of && (!db_view_job_ || db_view_job_->of != of)) {
         if (db_view_job_) *db_view_job_->cancel = true;
         ViewJob job;
@@ -1003,14 +1085,16 @@ void App::drawGameList() {
         job.cancel        = std::make_shared<std::atomic<bool>>(false);
         job.started       = std::chrono::steady_clock::now();
         const auto filter = listFilter();
-        // The games the searches found, those of all of them: the others left out of the view.
-        std::optional<std::vector<study::GameId>> through;
+        // The games the searches found, those of all of them: the others left out of the view; and those the
+        // maintenance shows, when it shows some.
+        std::optional<std::vector<study::GameId>> through = db_only_;
         for (const auto* job : narrowing_jobs) {
             if (!job->ready) continue;
             if (!through) {
                 through = job->ids;
                 continue;
             }
+            // (db_only_ and the searches' ids are sorted alike.)
             std::vector<study::GameId> both;
             std::set_intersection(through->begin(), through->end(), job->ids.begin(), job->ids.end(),
                                   std::back_inserter(both));
@@ -1040,6 +1124,12 @@ void App::drawGameList() {
             db_view_of_ = db_view_job_->of;
         }
         db_view_job_.reset();
+    }
+    if (db_only_) {
+        ImGui::SameLine(0, px(16));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", trf("Only {}", db_only_said_).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Show all"))) db_only_.reset();
     }
     ImGui::SameLine(0, px(16));
     if (db_view_job_)
@@ -1128,8 +1218,13 @@ void App::drawGameList() {
                     ImGui::TableNextColumn();
                     ImGui::TextUnformatted(v.data(), v.data() + v.size());
                 };
-                // A player's name: their FIDE card under the mouse once known, asked by a right click (#57).
+                // A player's name as the table of names gives it (M13, board 1): their FIDE card under the mouse once
+                // known, asked by a right click (#57); the spelling of the game said when it differs.
+                const auto ids    = snap->rowIds(id);
                 const auto player = [&](std::string_view name, bool white) {
+                    const auto shown_id = white ? ids.white : ids.black;
+                    const auto* known   = snap->players()->of(shown_id);
+                    if (known && !known->name.empty()) name = known->name;
                     text(name);
                     if (name.empty()) return;
                     // Over the row's selectable, which spans the columns: its hover allowed.
@@ -1141,6 +1236,25 @@ void App::drawGameList() {
                         askFideCard(std::string(name), fide);
                     }
                     if (!ImGui::IsItemHovered(over | ImGuiHoveredFlags_DelayNormal)) return;
+                    if (known && (known->fide || snap->name(shown_id) != known->name)) {
+                        ImGui::BeginTooltip();
+                        ImGui::TextUnformatted(known->name.c_str());
+                        if (known->fide) {
+                            std::string line = known->federation;
+                            if (!known->title.empty()) line += " · " + known->title;
+                            if (known->born) line += " · " + trf("born {}", known->born);
+                            if (known->standard) line += " · " + trf("standard {}", known->standard);
+                            if (known->rapid) line += " · " + trf("rapid {}", known->rapid);
+                            if (known->blitz) line += " · " + trf("blitz {}", known->blitz);
+                            ImGui::TextDisabled("%s", line.c_str());
+                            ImGui::TextDisabled("%s", trf("FIDE id {}", known->fide).c_str());
+                        }
+                        const auto written = snap->name(shown_id);
+                        if (written != known->name)
+                            ImGui::TextDisabled("%s", trf("Written “{}” in this game.", written).c_str());
+                        ImGui::EndTooltip();
+                        return;  // the table's card: no need of Lichess's
+                    }
                     if (const auto* card = fideCards().byName(name)) {
                         ImGui::BeginTooltip();
                         drawFideCard(*card);
@@ -1180,16 +1294,28 @@ void App::drawGameList() {
         ui::TopicRegion topic(guide::topics::Searching);
         drawSearchPanel(snapshot);
     } else if (!ids.empty()) {
-        const auto id  = ids[db_row_];
-        const auto row = snap->row(id);
+        const auto id    = ids[db_row_];
+        const auto row   = snap->row(id);
+        const auto names = snap->rowIds(id);
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(fmt::format("{} – {}", row.white, row.black).c_str());
-        // Their FIDE cards, known or asked for by a click (#57).
+        ImGui::TextUnformatted(
+            fmt::format("{} – {}", snap->shownName(names.white), snap->shownName(names.black)).c_str());
+        // Their FIDE cards: the table of names' (M13, board 1), else known or asked for by a click (#57).
         for (const bool white : {true, false}) {
-            const std::string name(white ? row.white : row.black);
+            const std::string name(snap->shownName(white ? names.white : names.black));
             if (name.empty() || name == "?") continue;
             ImGui::PushID(white ? "fide_white" : "fide_black");
-            if (const auto* card = fideCards().byName(name)) {
+            if (const auto* known = snap->players()->of(white ? names.white : names.black); known && known->fide) {
+                std::string line =
+                    (known->title.empty() ? "" : known->title + " ") + known->name + " · " + known->federation;
+                if (known->standard) line += " · " + std::to_string(known->standard);
+                ImGui::TextDisabled("%s", line.c_str());
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s",
+                                      trf("From FIDE's list of {} (FIDE id {}), kept in the database's table of names.",
+                                          fide::monthText(known->list), known->fide)
+                                          .c_str());
+            } else if (const auto* card = fideCards().byName(name)) {
                 const auto line =
                     fmt::format("{}{} · {} · {}", card->title.empty() ? "" : card->title + " ", card->name,
                                 card->federation, card->standard > 0 ? std::to_string(card->standard) : "–");

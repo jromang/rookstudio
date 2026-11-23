@@ -4,18 +4,23 @@
 #include <array>
 #include <bit>
 #include <charconv>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 
 #include <chess.hpp>
 #include <json.hpp>
 
+#include "background.hpp"
 #include "mapped_file.hpp"
 #include "scan_board.hpp"
+#include "tree.hpp"
 
 #ifndef _WIN32
 #    include <fcntl.h>
@@ -183,6 +188,12 @@ std::string editsBytes(const std::vector<Snapshot::Version>& replaced, const std
     return out;
 }
 
+std::string playersName(uint64_t generation) {
+    char name[32];
+    std::snprintf(name, sizeof name, "players-%06llu.bin", static_cast<unsigned long long>(generation));
+    return name;
+}
+
 std::string segmentName(uint64_t number) {
     char name[32];
     std::snprintf(name, sizeof name, "seg-%06llu", static_cast<unsigned long long>(number));
@@ -242,6 +253,26 @@ class Segment {
     [[nodiscard]] std::span<const uint8_t> annex(std::size_t i) const {
         const auto from = value<uint64_t>(ANNEX, i), to = value<uint64_t>(ANNEX, i + 1);
         return {annex_.data() + from, static_cast<std::size_t>(to - from)};
+    }
+    [[nodiscard]] uint32_t version() const noexcept { return version_; }
+    // The files' bytes, for a check and a compaction.
+    [[nodiscard]] std::size_t movesBytes() const noexcept { return moves_.size(); }
+    [[nodiscard]] std::size_t annexBytes() const noexcept { return annex_.size(); }
+    [[nodiscard]] std::size_t bytes() const noexcept {
+        return cols_.size() + moves_.size() + annex_.size() + names_.size() + sig_.size();
+    }
+    [[nodiscard]] std::string_view namesText() const noexcept {
+        return {reinterpret_cast<const char*>(names_.data()), names_.size()};
+    }
+    // A record's offsets within its files: false when they are not (a damaged file).
+    [[nodiscard]] bool offsetsSound(std::size_t i) const {
+        const auto mf = value<uint64_t>(MOVES, i), mt = value<uint64_t>(MOVES, i + 1);
+        const auto af = value<uint64_t>(ANNEX, i), at = value<uint64_t>(ANNEX, i + 1);
+        return mf <= mt && mt <= moves_.size() && af <= at && at <= annex_.size();
+    }
+    // The signature's bytes as stored, null in a segment of the first format.
+    [[nodiscard]] const uint8_t* signatureBytes(std::size_t i) const {
+        return sig_.data() ? sig_.data() + i * SIG_BYTES : nullptr;
     }
     [[nodiscard]] std::optional<GameSignature> signature(std::size_t i) const {
         if (!sig_.data()) return std::nullopt;  // a segment of the first format
@@ -306,13 +337,16 @@ void setCommitFaultHook(std::function<void(std::string_view)> hook) { g_fault_ho
 
 DatabaseImport importInto(Database& db, const std::filesystem::path& file, const ImportOptions& options,
                           ImportProgress& progress, std::atomic<bool>& cancel, bool keep_duplicates,
-                          std::size_t commit_games, const ChessBaseOptions& chessbase) {
+                          std::size_t commit_games, const ChessBaseOptions& chessbase,
+                          const std::vector<uint64_t>& forget) {
     DatabaseImport out;
     std::vector<ImportedGame> pending;
+    const auto u8 = file.u8string();
+    const std::string source(u8.begin(), u8.end());
     const auto commit = [&] {
         if (pending.empty() || !out.error.empty()) return;
         try {
-            const auto appended = db.append(std::move(pending), keep_duplicates);
+            const auto appended = db.append(std::move(pending), keep_duplicates, source, forget);
             out.added += appended.added;
             out.duplicates += appended.duplicates;
             out.damaged += appended.damaged;
@@ -397,25 +431,100 @@ std::string_view Snapshot::name(uint32_t id) const {
     return {};
 }
 
+namespace {
+
+// A segment's record i as its columns give it, its names read in `snap`.
+HeaderRow recordRow(const Snapshot& snap, const Segment& segment, std::size_t i) {
+    HeaderRow row;
+    row.white        = snap.name(segment.value<uint32_t>(WHITE, i));
+    row.black        = snap.name(segment.value<uint32_t>(BLACK, i));
+    row.event        = snap.name(segment.value<uint32_t>(EVENT, i));
+    row.site         = snap.name(segment.value<uint32_t>(SITE, i));
+    row.round        = snap.name(segment.value<uint32_t>(ROUND, i));
+    row.annotator    = snap.name(segment.value<uint32_t>(ANNOTATOR, i));
+    row.time_control = snap.name(segment.value<uint32_t>(TIME_CONTROL, i));
+    row.date         = segment.value<uint32_t>(DATE, i);
+    row.plies        = segment.value<uint32_t>(PLIES, i);
+    row.white_elo    = segment.value<uint16_t>(WHITE_ELO, i);
+    row.black_elo    = segment.value<uint16_t>(BLACK_ELO, i);
+    row.eco          = segment.value<uint16_t>(ECO, i);
+    row.flags        = segment.value<uint16_t>(FLAGS, i);
+    row.result       = static_cast<char>(segment.value<uint8_t>(RESULT, i));
+    return row;
+}
+
+// Everything kept of a segment's record i (Snapshot::game()). Throws std::runtime_error on a damaged annex record.
+ImportedGame recordGame(const Snapshot& snap, const Segment& segment, std::size_t i) {
+    const auto r = recordRow(snap, segment, i);
+    ImportedGame g;
+    const auto tag = [&](std::string_view name, std::string_view value) {
+        if (!value.empty()) g.tags.emplace_back(std::string(name), std::string(value));
+    };
+    tag("Event", r.event);
+    tag("Site", r.site);
+    if (r.date) tag("Date", dateText(r.date));
+    tag("Round", r.round);
+    tag("White", r.white);
+    tag("Black", r.black);
+    g.result = r.result;
+    tag("Result", r.result == '1' ? "1-0" : r.result == '0' ? "0-1" : r.result == '=' ? "1/2-1/2" : "*");
+    if (r.white_elo) tag("WhiteElo", std::to_string(r.white_elo));
+    if (r.black_elo) tag("BlackElo", std::to_string(r.black_elo));
+    if (r.eco) tag("ECO", ecoText(r.eco));
+    tag("TimeControl", r.time_control);
+    tag("Annotator", r.annotator);
+    g.plies          = r.plies;
+    g.chess960       = r.flags & GAME_CHESS960;
+    g.annotated      = r.flags & GAME_ANNOTATED;
+    g.damaged        = r.flags & GAME_DAMAGED;
+    const auto moves = segment.moves(i);
+    g.moves.assign(moves.begin(), moves.end());
+
+    const auto annex   = segment.annex(i);
+    const uint8_t* p   = annex.data();
+    const uint8_t* end = p + annex.size();
+    if (p == end) return g;
+    const uint8_t parts = *p++;
+    if (parts & ANNEX_FEN) {
+        g.start_fen = getText(p, end);
+        tag("FEN", g.start_fen);
+    }
+    if (parts & ANNEX_TAGS) {
+        const auto count = getVarint(p, end);
+        for (uint64_t t = 0; t < count; ++t) {
+            auto name  = getText(p, end);
+            auto value = getText(p, end);
+            g.tags.emplace_back(std::move(name), std::move(value));
+        }
+        // A site kept in the annex (an address) back in its place, after the event.
+        if (r.site.empty()) {
+            const auto site =
+                std::find_if(g.tags.begin(), g.tags.end(), [](const auto& t) { return t.first == "Site"; });
+            if (site != g.tags.end()) std::rotate(g.tags.begin() + (r.event.empty() ? 0 : 1), site, site + 1);
+        }
+    }
+    if (parts & ANNEX_TEXT) g.text = getText(p, end);
+    if (parts & ANNEX_CLOCKS) {
+        const auto count = getVarint(p, end);
+        g.clocks.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
+        for (std::size_t k = 0; k < g.clocks.size(); ++k) {
+            const int64_t before = k >= 2 ? g.clocks[k - 2] : 0;
+            g.clocks[k]          = static_cast<int32_t>(before + unzigzag(getVarint(p, end)));
+        }
+    }
+    if (parts & ANNEX_EVALS) {
+        const auto count = getVarint(p, end);
+        g.evals.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
+        for (auto& e : g.evals) e = static_cast<int16_t>(unzigzag(getVarint(p, end)));
+    }
+    return g;
+}
+
+}  // namespace
+
 HeaderRow Snapshot::row(GameId id) const {
     const auto [segment, i] = locate(id);
-    HeaderRow row;
-    row.white        = name(segment->value<uint32_t>(WHITE, i));
-    row.black        = name(segment->value<uint32_t>(BLACK, i));
-    row.event        = name(segment->value<uint32_t>(EVENT, i));
-    row.site         = name(segment->value<uint32_t>(SITE, i));
-    row.round        = name(segment->value<uint32_t>(ROUND, i));
-    row.annotator    = name(segment->value<uint32_t>(ANNOTATOR, i));
-    row.time_control = name(segment->value<uint32_t>(TIME_CONTROL, i));
-    const auto n     = numbers(id);
-    row.date         = n.date;
-    row.plies        = n.plies;
-    row.white_elo    = n.white_elo;
-    row.black_elo    = n.black_elo;
-    row.eco          = n.eco;
-    row.flags        = n.flags;
-    row.result       = n.result;
-    return row;
+    return recordRow(*this, *segment, i);
 }
 
 HeaderNumbers Snapshot::numbers(GameId id) const {
@@ -459,69 +568,79 @@ std::optional<GameSignature> Snapshot::signature(GameId id) const {
 
 ImportedGame Snapshot::game(GameId id) const {
     const auto [segment, i] = locate(id);
-    const auto r            = row(id);
-    ImportedGame g;
-    const auto tag = [&](std::string_view name, std::string_view value) {
-        if (!value.empty()) g.tags.emplace_back(std::string(name), std::string(value));
-    };
-    tag("Event", r.event);
-    tag("Site", r.site);
-    if (r.date) tag("Date", dateText(r.date));
-    tag("Round", r.round);
-    tag("White", r.white);
-    tag("Black", r.black);
-    g.result = r.result;
-    tag("Result", r.result == '1' ? "1-0" : r.result == '0' ? "0-1" : r.result == '=' ? "1/2-1/2" : "*");
-    if (r.white_elo) tag("WhiteElo", std::to_string(r.white_elo));
-    if (r.black_elo) tag("BlackElo", std::to_string(r.black_elo));
-    if (r.eco) tag("ECO", ecoText(r.eco));
-    tag("TimeControl", r.time_control);
-    tag("Annotator", r.annotator);
-    g.plies          = r.plies;
-    g.chess960       = r.flags & GAME_CHESS960;
-    g.annotated      = r.flags & GAME_ANNOTATED;
-    g.damaged        = r.flags & GAME_DAMAGED;
-    const auto moves = segment->moves(i);
-    g.moves.assign(moves.begin(), moves.end());
+    return recordGame(*this, *segment, i);
+}
 
-    const auto annex   = segment->annex(i);
-    const uint8_t* p   = annex.data();
-    const uint8_t* end = p + annex.size();
-    if (p == end) return g;
+std::string Snapshot::tag(GameId id, std::string_view wanted) const {
+    const auto [segment, i] = locate(id);
+    const auto annex        = segment->annex(i);
+    const uint8_t* p        = annex.data();
+    const uint8_t* end      = p + annex.size();
+    if (p == end) return {};
     const uint8_t parts = *p++;
-    if (parts & ANNEX_FEN) {
-        g.start_fen = getText(p, end);
-        tag("FEN", g.start_fen);
-    }
-    if (parts & ANNEX_TAGS) {
+    try {
+        if (parts & ANNEX_FEN) (void)getText(p, end);
+        if (!(parts & ANNEX_TAGS)) return {};
         const auto count = getVarint(p, end);
         for (uint64_t t = 0; t < count; ++t) {
-            auto name  = getText(p, end);
+            const auto size = getVarint(p, end);
+            if (size > static_cast<uint64_t>(end - p)) return {};
+            const std::string_view name(reinterpret_cast<const char*>(p), static_cast<std::size_t>(size));
+            p += size;
             auto value = getText(p, end);
-            g.tags.emplace_back(std::move(name), std::move(value));
+            if (name == wanted) return value;
         }
-        // A site kept in the annex (an address) back in its place, after the event.
-        if (r.site.empty()) {
-            const auto site =
-                std::find_if(g.tags.begin(), g.tags.end(), [](const auto& t) { return t.first == "Site"; });
-            if (site != g.tags.end()) std::rotate(g.tags.begin() + (r.event.empty() ? 0 : 1), site, site + 1);
-        }
+    } catch (const std::exception&) {
     }
-    if (parts & ANNEX_TEXT) g.text = getText(p, end);
-    if (parts & ANNEX_CLOCKS) {
-        const auto count = getVarint(p, end);
-        g.clocks.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
-        for (std::size_t k = 0; k < g.clocks.size(); ++k) {
-            const int64_t before = k >= 2 ? g.clocks[k - 2] : 0;
-            g.clocks[k]          = static_cast<int32_t>(before + unzigzag(getVarint(p, end)));
-        }
+    return {};
+}
+
+uint64_t Snapshot::storedBytes(GameId id) const {
+    const auto [segment, i] = locate(id);
+    return segment->moves(i).size() + segment->annex(i).size();
+}
+
+std::size_t Snapshot::segmentOf(GameId id) const {
+    if (id >= games_) throw std::out_of_range("no such game");
+    const auto it = std::upper_bound(first_game_.begin(), first_game_.end(), id);
+    return logical_[static_cast<std::size_t>(it - first_game_.begin()) - 1];
+}
+
+const std::string& Snapshot::source(GameId id) const {
+    static const std::string none;
+    const auto s = segmentOf(id);
+    return s < sources_.size() ? sources_[s] : none;
+}
+
+std::string_view Snapshot::shownName(uint32_t name_id) const {
+    if (const auto* p = players_->of(name_id); p && !p->name.empty()) return p->name;
+    return name(name_id);
+}
+
+GameState Snapshot::state(GameId id) const {
+    GameState out;
+    out.id = id;
+    if (id >= games_) return out;
+    const auto v =
+        std::lower_bound(replaced_.begin(), replaced_.end(), id, [](const Version& r, GameId x) { return r.id < x; });
+    if (v != replaced_.end() && v->id == id) out.version = std::pair{v->segment, v->local};
+    out.deleted = deleted(id);
+    return out;
+}
+
+std::vector<Snapshot::SegmentInfo> Snapshot::segmentInfos() const {
+    std::vector<SegmentInfo> out;
+    std::size_t logical = 0;
+    for (std::size_t s = 0; s < segments_.size(); ++s) {
+        SegmentInfo info;
+        info.name     = s < segment_names_.size() ? segment_names_[s] : std::string();
+        info.games    = segments_[s]->games();
+        info.versions = s < versions_.size() && versions_[s];
+        info.source   = s < sources_.size() ? sources_[s] : std::string();
+        if (!info.versions && logical < logical_.size() && logical_[logical] == s) info.first = first_game_[logical++];
+        out.push_back(std::move(info));
     }
-    if (parts & ANNEX_EVALS) {
-        const auto count = getVarint(p, end);
-        g.evals.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
-        for (auto& e : g.evals) e = static_cast<int16_t>(unzigzag(getVarint(p, end)));
-    }
-    return g;
+    return out;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -590,7 +709,7 @@ bool Database::refresh() {
     return true;
 }
 
-void Database::load() {
+void Database::load(bool clean) {
     nlohmann::json manifest;
     try {
         std::ifstream in(dir_ / MANIFEST, std::ios::binary);
@@ -620,6 +739,9 @@ void Database::load() {
         snap->first_name_.push_back(snap->names_);
         snap->names_ += names;
         snap->segments_.push_back(std::move(segment));
+        snap->segment_names_.push_back(name);
+        snap->sources_.push_back(s.value("source", std::string()));
+        snap->versions_.push_back(versions);
         named.push_back(name);
         unsigned long long number = 0;
         std::sscanf(name.c_str(), "seg-%llu", &number);
@@ -655,12 +777,21 @@ void Database::load() {
         }
         snap->deleted_count_ = deleted;
     }
+    // The table of names it names.
+    const auto players = manifest.value("players", std::string());
+    if (!players.empty()) {
+        std::ifstream in(dir_ / players, std::ios::binary);
+        if (!in) throw std::runtime_error((dir_ / players).string() + ": missing");
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        snap->players_      = std::make_shared<const PlayerTable>(PlayerTable::fromBytes(text));
+        snap->players_file_ = players;
+    }
     // What a commit cut short left: segments the manifest does not name, and the new manifest not yet renamed over
     // the old one (a killed program leaves it); edits it does not name. A number such a leftover segment holds is not
     // used again, should it not go.
     // Read-only, they are left alone: they may be the other program's commit under way.
     std::error_code ec;
-    if (lock_) {
+    if (lock_ && clean) {
         for (const auto& entry : fs::directory_iterator(dir_, ec)) {
             const auto name      = entry.path().filename().string();
             const bool temporary = name.size() > 4 && name.compare(name.size() - 4, 4, ".tmp") == 0;
@@ -670,7 +801,8 @@ void Database::load() {
                     next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
                 if (temporary || std::find(named.begin(), named.end(), name) == named.end())
                     fs::remove_all(entry.path(), ec);
-            } else if (temporary || (name.rfind("edits-", 0) == 0 && name != edits)) {
+            } else if (temporary || (name.rfind("edits-", 0) == 0 && name != edits) ||
+                       (name.rfind("players-", 0) == 0 && name != players)) {
                 fs::remove_all(entry.path(), ec);
             }
         }
@@ -693,7 +825,8 @@ uint32_t Database::nameId(const std::string& name, std::vector<std::string>& add
 }
 
 void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
-                      const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted) {
+                      const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
+                      const PlayerTable* players, const std::string& source) {
     if (!names_indexed_) {
         for (uint32_t id = 0; id < current_->names_; ++id) name_ids_.emplace(std::string(current_->name(id)), id);
         names_indexed_ = true;
@@ -707,8 +840,9 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         std::ifstream in(dir_ / MANIFEST, std::ios::binary);
         manifest = nlohmann::json::parse(in);
     }
-    const auto edits_before = manifest.value("edits", std::string());
-    std::string edits_written;
+    const auto edits_before   = manifest.value("edits", std::string());
+    const auto players_before = manifest.value("players", std::string());
+    std::string edits_written, players_written;
     bool committed = false;
     try {
         for (std::size_t from = 0; from < games.size(); from += SEGMENT_GAMES) {
@@ -855,7 +989,13 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         for (std::size_t s = 0; s < made.size(); ++s) {
             nlohmann::json entry{{"name", made[s]}, {"games", counts[s].first}, {"names", counts[s].second}};
             if (versions) entry["versions"] = true;
+            if (!source.empty()) entry["source"] = source;
             manifest["segments"].push_back(std::move(entry));
+        }
+        if (players) {
+            players_written = playersName(current_->generation_ + 1);
+            writeFile(dir_ / players_written, players->bytes());
+            manifest["players"] = players_written;
         }
         if (replaced || deleted) {
             edits_written = editsName(current_->generation_ + 1);
@@ -879,6 +1019,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             fs::remove_all(dir_ / (name + ".tmp"), ec);
         }
         if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
+        if (!players_written.empty()) fs::remove(dir_ / players_written, ec);
         throw;
     }
 
@@ -892,7 +1033,14 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         }
         snap->first_name_.push_back(snap->names_);
         snap->segments_.push_back(std::make_shared<const Segment>(dir_ / made[s], counts[s].first, counts[s].second));
+        snap->segment_names_.push_back(made[s]);
+        snap->sources_.push_back(source);
+        snap->versions_.push_back(versions);
         snap->names_ += counts[s].second;
+    }
+    if (players) {
+        snap->players_      = std::make_shared<const PlayerTable>(*players);
+        snap->players_file_ = players_written;
     }
     if (replaced || deleted) snap->edits_generation_ = snap->generation_;
     if (replaced) snap->replaced_ = *replaced;
@@ -901,17 +1049,29 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         snap->deleted_count_ = 0;
         for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
     }
-    if (!edits_written.empty() && !edits_before.empty() && edits_before != edits_written) {
+    // The files before, unless a compaction keeps them for its undoing: read by nobody, they are in memory.
+    const auto kept = [&](const std::string& name) {
+        return leftovers_ &&
+               std::find(leftovers_->files.begin(), leftovers_->files.end(), name) != leftovers_->files.end();
+    };
+    if (!edits_written.empty() && !edits_before.empty() && edits_before != edits_written && !kept(edits_before)) {
         std::error_code gone;
-        fs::remove(dir_ / edits_before, gone);  // still read on Windows by nobody: the edits are in memory
+        fs::remove(dir_ / edits_before, gone);
+    }
+    if (!players_written.empty() && !players_before.empty() && players_before != players_written &&
+        !kept(players_before)) {
+        std::error_code gone;
+        fs::remove(dir_ / players_before, gone);
     }
     next_segment_ += made.size();
     current_ = std::move(snap);
 }
 
-Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates) {
+Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates, const std::string& source,
+                                    const std::vector<uint64_t>& forget) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     Appended appended;
+    std::lock_guard writing(write_mutex_);
     std::lock_guard lock(mutex_);
     // Each game's key, made once: for the duplicates, the key column and the keys known after.
     std::vector<uint64_t> keys(games.size());
@@ -931,7 +1091,9 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
         std::vector<char> left_out(games.size(), 0);
         for (std::size_t j = 0; j < order.size(); ++j) {
             const auto [key, i] = order[j];
-            if ((j > 0 && order[j - 1].first == key) || std::binary_search(known_keys_.begin(), known_keys_.end(), key))
+            if ((j > 0 && order[j - 1].first == key) ||
+                (std::binary_search(known_keys_.begin(), known_keys_.end(), key) &&
+                 !std::binary_search(forget.begin(), forget.end(), key)))
                 left_out[i] = 1;
         }
         std::size_t kept = 0;
@@ -952,7 +1114,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
     if (games.empty()) return appended;
     uint64_t damaged = 0;
     for (const auto& game : games) damaged += game.damaged;
-    commit(games, keys, false, nullptr, nullptr);
+    commit(games, keys, false, nullptr, nullptr, nullptr, source);
     if (keys_indexed_) {
         // Merged in: a sort of the new keys only, however many the database has.
         const auto before = static_cast<std::ptrdiff_t>(known_keys_.size());
@@ -967,6 +1129,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
 
 void Database::replace(GameId id, ImportedGame game) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard writing(write_mutex_);
     std::lock_guard lock(mutex_);
     if (id >= current_->games_) throw std::out_of_range("no game " + std::to_string(id) + " to replace");
     const uint64_t old_key = current_->key(id);
@@ -993,6 +1156,7 @@ void Database::replace(GameId id, ImportedGame game) {
 
 void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard writing(write_mutex_);
     std::lock_guard lock(mutex_);
     auto bits = current_->deleted_;
     for (const auto id : ids) {
@@ -1007,6 +1171,642 @@ void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
     if (bits == current_->deleted_) return;
     std::vector<ImportedGame> none;
     commit(none, {}, false, nullptr, &bits);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Merges and their undoing.
+
+namespace {
+
+void setBit(std::vector<uint64_t>& bits, GameId id, bool on) {
+    if (bits.size() <= id / 64) {
+        if (!on) return;
+        bits.resize(id / 64 + 1, 0);
+    }
+    if (on)
+        bits[id / 64] |= uint64_t{1} << (id % 64);
+    else
+        bits[id / 64] &= ~(uint64_t{1} << (id % 64));
+}
+
+void trim(std::vector<uint64_t>& bits) {
+    while (!bits.empty() && bits.back() == 0) bits.pop_back();
+}
+
+}  // namespace
+
+std::vector<GameState> Database::merge(std::vector<Merge> merges) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard writing(write_mutex_);
+    std::lock_guard lock(mutex_);
+    std::vector<GameState> before;
+    for (const auto& m : merges) {
+        if (m.keep >= current_->games_) throw std::out_of_range("no game " + std::to_string(m.keep) + " to merge");
+        before.push_back(current_->state(m.keep));
+        for (const auto d : m.drop) {
+            if (d >= current_->games_) throw std::out_of_range("no game " + std::to_string(d) + " to merge");
+            before.push_back(current_->state(d));
+        }
+    }
+    if (merges.empty()) return before;
+    std::map<GameId, Snapshot::Version> versions;
+    for (const auto& v : current_->replaced_) versions[v.id] = v;
+    auto deleted = current_->deleted_;
+    std::vector<ImportedGame> games;
+    std::vector<uint64_t> keys;
+    const auto first = current_->segments_.size();
+    for (std::size_t k = 0; k < merges.size(); ++k) {
+        auto& m          = merges[k];
+        versions[m.keep] = {m.keep, static_cast<uint32_t>(first + k / SEGMENT_GAMES),
+                            static_cast<uint32_t>(k % SEGMENT_GAMES)};
+        setBit(deleted, m.keep, false);
+        for (const auto d : m.drop)
+            if (d != m.keep) setBit(deleted, d, true);
+        keys.push_back(duplicateKey(m.game));
+        games.push_back(std::move(m.game));
+    }
+    trim(deleted);
+    std::vector<Snapshot::Version> replaced;
+    replaced.reserve(versions.size());
+    for (const auto& [id, v] : versions) replaced.push_back(v);
+    commit(games, keys, true, &replaced, &deleted);
+    keys_indexed_ = false;  // made again from the keys at the next append that looks for duplicates
+    return before;
+}
+
+void Database::restore(std::span<const GameState> states) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard writing(write_mutex_);
+    std::lock_guard lock(mutex_);
+    std::map<GameId, Snapshot::Version> versions;
+    for (const auto& v : current_->replaced_) versions[v.id] = v;
+    auto deleted = current_->deleted_;
+    // The states given in their order: the last of a game holds.
+    for (const auto& state : states) {
+        if (state.id >= current_->games_) continue;
+        if (state.version) {
+            const auto [segment, local] = *state.version;
+            if (segment >= current_->segments_.size() || local >= current_->segments_[segment]->games() ||
+                segment >= current_->versions_.size() || !current_->versions_[segment])
+                throw std::runtime_error("the game's version is no longer in the database (compacted since)");
+            versions[state.id] = {state.id, segment, local};
+        } else {
+            versions.erase(state.id);
+        }
+        setBit(deleted, state.id, state.deleted);
+    }
+    trim(deleted);
+    std::vector<Snapshot::Version> replaced;
+    for (const auto& [id, v] : versions) replaced.push_back(v);
+    const bool same_versions = replaced.size() == current_->replaced_.size() &&
+                               std::equal(replaced.begin(), replaced.end(), current_->replaced_.begin(),
+                                          [](const Snapshot::Version& a, const Snapshot::Version& b) {
+                                              return a.id == b.id && a.segment == b.segment && a.local == b.local;
+                                          });
+    if (same_versions && deleted == current_->deleted_) return;
+    std::vector<ImportedGame> none;
+    commit(none, {}, false, &replaced, &deleted);
+    keys_indexed_ = false;
+}
+
+void Database::setPlayers(PlayerTable table) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard writing(write_mutex_);
+    std::lock_guard lock(mutex_);
+    std::vector<ImportedGame> none;
+    commit(none, {}, false, nullptr, nullptr, &table);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The check.
+
+namespace {
+
+// Whether segment record i reads as it was written: its names within the database's, its offsets within its files,
+// its annex whole, its moves replayed to their end, its signature and its key made again the same.
+bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
+    try {
+        for (int c = 0; c < NAME_COLUMNS; ++c)
+            if (segment.value<uint32_t>(static_cast<Column>(c), i) >= snap.names()) return false;
+        if (!segment.offsetsSound(i)) return false;
+        const auto game  = recordGame(snap, segment, i);  // throws on a damaged annex
+        const auto flags = segment.value<uint16_t>(FLAGS, i);
+        ScanBoard board;
+        const bool start = board.setFen(
+            game.start_fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(game.start_fen),
+            game.chess960);
+        if (!start) {
+            if (!(flags & GAME_DAMAGED) || game.plies != 0 || !game.moves.empty()) return false;
+        } else {
+            SignatureMaker signature(board);
+            const auto& codes = game.moves;
+            std::size_t at    = 0;
+            for (uint32_t ply = 0; ply < game.plies; ++ply) {
+                const int count = board.codeCount();
+                if (at >= codes.size()) return false;
+                int code = codes[at++];
+                if (count > 256) {
+                    if (at >= codes.size()) return false;
+                    code = code << 8 | codes[at++];
+                }
+                if (code >= count) return false;
+                const auto move = board.decode(code);
+                if (move.from >= 64 || move.to >= 64) return false;
+                signature.before(board, move, ply);
+                board.play(move);
+            }
+            if (at != codes.size()) return false;
+            if (const auto* stored = segment.signatureBytes(i); stored && (stored[21] & SIG_KNOWN)) {
+                const auto again = signature.finish(board);
+                if (std::memcmp(stored, again.home.data(), 16) != 0) return false;
+                for (int j = 0; j < 5; ++j)
+                    if (stored[16 + j] != static_cast<uint8_t>((again.material[2 * j] & 0x0F) |
+                                                               (std::min<uint8_t>(again.material[2 * j + 1], 15) << 4)))
+                        return false;
+                if (((stored[21] & SIG_PROMOTED) != 0) != again.promoted) return false;
+            }
+        }
+        return duplicateKey(game) == segment.value<uint64_t>(KEY, i);
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+}  // namespace
+
+CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& cancel, int threads) const {
+    const auto started = std::chrono::steady_clock::now();
+    const auto snap    = snapshot();
+    CheckReport report;
+    const auto infos = snap->segmentInfos();
+    uint64_t total   = 0;
+    for (const auto& info : infos) total += info.games;
+    progress.total = total;
+    progress.done  = 0;
+    if (threads <= 0) threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    // The game a record is the current version of, if any.
+    std::map<std::pair<uint32_t, uint32_t>, GameId> current_version;
+    for (const auto& v : snap->replaced_) current_version[{v.segment, v.local}] = v.id;
+    const auto replaced = [&](GameId id) {
+        const auto v = std::lower_bound(snap->replaced_.begin(), snap->replaced_.end(), id,
+                                        [](const Snapshot::Version& r, GameId x) { return r.id < x; });
+        return v != snap->replaced_.end() && v->id == id;
+    };
+    std::vector<GameId> damaged;
+    std::mutex found;
+    std::atomic<uint64_t> checked{0};
+    const Inherited inherited;
+    for (std::size_t s = 0; s < infos.size() && !cancel; ++s) {
+        const auto& info = infos[s];
+        // The game record i is, when it is one as the database reads it; none for an old version.
+        const auto gameOf = [&](std::size_t i) -> std::optional<GameId> {
+            if (info.versions) {
+                const auto it = current_version.find({static_cast<uint32_t>(s), static_cast<uint32_t>(i)});
+                if (it == current_version.end()) return std::nullopt;
+                return it->second;
+            }
+            const GameId id = info.first + i;
+            if (replaced(id)) return std::nullopt;
+            return id;
+        };
+        std::shared_ptr<const Segment> segment;
+        try {
+            segment = std::make_shared<const Segment>(dir_ / info.name, info.games, snap->segments_[s]->nameCount());
+        } catch (const std::exception& e) {
+            report.segments.push_back({info.name, info.first, info.games, info.versions, e.what(), info.source});
+            for (std::size_t i = 0; i < info.games; ++i)
+                if (const auto id = gameOf(i); id && !snap->deleted(*id)) damaged.push_back(*id);
+            progress.done += info.games;
+            continue;
+        }
+        if (segment->version() < 2 && info.games > 0) report.signatures = false;
+        std::atomic<std::size_t> next{0};
+        std::vector<std::thread> pool;
+        const auto parts = std::min<std::size_t>(static_cast<std::size_t>(threads), info.games / 4096 + 1);
+        for (std::size_t t = 0; t < parts; ++t)
+            pool.emplace_back([&] {
+                inherited.apply();
+                std::vector<GameId> mine;
+                for (;;) {
+                    const auto from = next.fetch_add(4096);
+                    if (from >= info.games || cancel.load(std::memory_order_relaxed)) break;
+                    const auto to = std::min<std::size_t>(from + 4096, info.games);
+                    for (std::size_t i = from; i < to; ++i) {
+                        const auto id = gameOf(i);
+                        if (!id || snap->deleted(*id)) continue;  // an old version, or a game no one reads
+                        ++checked;
+                        if (!recordSound(*snap, *segment, i)) mine.push_back(*id);
+                    }
+                    progress.done += to - from;
+                }
+                std::lock_guard lock(found);
+                damaged.insert(damaged.end(), mine.begin(), mine.end());
+            });
+        for (auto& t : pool) t.join();
+    }
+    report.games     = checked.load();
+    report.cancelled = cancel.load();
+    std::sort(damaged.begin(), damaged.end());
+    damaged.erase(std::unique(damaged.begin(), damaged.end()), damaged.end());
+    for (const auto id : damaged) ++report.damaged_sources[snap->source(id)];
+    report.damaged = std::move(damaged);
+    try {
+        const auto tree = Tree::open(dir_);
+        report.tree     = tree && !tree->stale(*snap) && tree->games() == snap->games();
+    } catch (const std::exception&) {
+        report.tree = false;
+    }
+    report.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+    return report;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The compaction.
+
+namespace {
+
+// Whether a deleted game's record still holds its moves or its annex: what a compaction takes away.
+bool heldDeleted(const Snapshot& snap, GameId id) { return snap.deleted(id) && snap.storedBytes(id) > 0; }
+
+// Whether a logical segment holds a game replaced, or a deleted game not emptied yet.
+bool staleSegment(const Snapshot& snap, const Snapshot::SegmentInfo& info) {
+    if (info.versions) return false;
+    for (GameId id = info.first; id < info.first + info.games; ++id)
+        if (snap.state(id).version || heldDeleted(snap, id)) return true;
+    return false;
+}
+
+}  // namespace
+
+CompactPlan Database::compactPlan() const {
+    const auto snap = snapshot();
+    CompactPlan plan;
+    const auto infos = snap->segmentInfos();
+    // What the segments written again take now, and what their new files will take.
+    uint64_t before = 0, after = 0;
+    for (std::size_t s = 0; s < infos.size(); ++s) {
+        const auto& info = infos[s];
+        const auto& seg  = *snap->segments_[s];
+        if (info.versions) {
+            if (info.games == 0) continue;  // its names only: compacted already
+            plan.segments.push_back(info.name);
+            before += seg.bytes();
+            after += layout(0)[COLUMNS] + seg.namesText().size();
+            continue;
+        }
+        if (!staleSegment(*snap, info)) continue;
+        plan.segments.push_back(info.name);
+        uint64_t kept = layout(info.games)[COLUMNS] + seg.namesText().size() + uint64_t{info.games} * SIG_BYTES;
+        for (GameId id = info.first; id < info.first + info.games; ++id) {
+            if (snap->deleted(id)) {
+                if (snap->storedBytes(id) > 0) ++plan.deleted;
+                continue;
+            }
+            if (snap->state(id).version) ++plan.replaced;
+            kept += snap->storedBytes(id);
+        }
+        before += seg.bytes();
+        after += kept;
+    }
+    if (plan.segments.empty()) return CompactPlan{};
+    plan.needed = after;
+    plan.bytes  = before > after ? before - after : 0;
+    return plan;
+}
+
+namespace {
+
+// A segment's files written in folder `tmp`: `n` records, each copied from (segment, record) or emptied when deleted,
+// its names those of `names`.
+struct RecordSource {
+    const Segment* segment = nullptr;
+    std::size_t index      = 0;
+    bool emptied           = false;  // a deleted game: its headers only
+};
+
+void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records, std::string_view names,
+                  uint32_t name_count, const std::atomic<bool>& cancel, std::atomic<uint64_t>& done) {
+    const auto n  = records.size();
+    const auto at = layout(n);
+    std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
+    std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
+    const auto put32 = [&](std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, 4); };
+    const auto put   = [&](Column column, std::size_t i, auto v) {
+        std::memcpy(cols.data() + at[column] + i * sizeof(v), &v, sizeof(v));
+    };
+    put32(8, VERSION);
+    put32(12, static_cast<uint32_t>(n));
+    put32(16, name_count);
+    for (std::size_t k = 0; k < n; ++k) {
+        if ((k & 0xFFF) == 0 && cancel.load(std::memory_order_relaxed)) throw std::runtime_error("cancelled");
+        const auto& r   = records[k];
+        const auto& seg = *r.segment;
+        for (int c = 0; c < NAME_COLUMNS; ++c)
+            put(static_cast<Column>(c), k, seg.value<uint32_t>(static_cast<Column>(c), r.index));
+        put(DATE, k, seg.value<uint32_t>(DATE, r.index));
+        put(WHITE_ELO, k, seg.value<uint16_t>(WHITE_ELO, r.index));
+        put(BLACK_ELO, k, seg.value<uint16_t>(BLACK_ELO, r.index));
+        put(ECO, k, seg.value<uint16_t>(ECO, r.index));
+        put(RESULT, k, seg.value<uint8_t>(RESULT, r.index));
+        put(KEY, k, seg.value<uint64_t>(KEY, r.index));
+        put(MOVES, k, static_cast<uint64_t>(moves.size()));
+        put(ANNEX, k, static_cast<uint64_t>(annex.size()));
+        if (r.emptied) {
+            put(PLIES, k, uint32_t{0});
+            put(FLAGS, k, uint16_t{0});
+        } else {
+            put(PLIES, k, seg.value<uint32_t>(PLIES, r.index));
+            put(FLAGS, k, seg.value<uint16_t>(FLAGS, r.index));
+            const auto m = seg.moves(r.index), a = seg.annex(r.index);
+            moves.append(reinterpret_cast<const char*>(m.data()), m.size());
+            annex.append(reinterpret_cast<const char*>(a.data()), a.size());
+            if (const auto* bytes = seg.signatureBytes(r.index)) {
+                std::memcpy(sig.data() + k * SIG_BYTES, bytes, SIG_BYTES);
+            } else {
+                // A segment of the first format: the signature made from the moves.
+                ScanBoard start;
+                const auto flags = seg.value<uint16_t>(FLAGS, r.index);
+                std::string fen;
+                if (flags & GAME_FEN) {
+                    const uint8_t* p   = a.data();
+                    const uint8_t* end = p + a.size();
+                    if (p < end && (*p++ & ANNEX_FEN)) fen = getText(p, end);
+                }
+                if (start.setFen(fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(fen),
+                                 flags & GAME_CHESS960))
+                    if (const auto signature = signatureOf(start, m, seg.value<uint32_t>(PLIES, r.index))) {
+                        char* out = sig.data() + k * SIG_BYTES;
+                        std::memcpy(out, signature->home.data(), 16);
+                        for (int j = 0; j < 5; ++j)
+                            out[16 + j] =
+                                static_cast<char>((signature->material[2 * j] & 0x0F) |
+                                                  (std::min<uint8_t>(signature->material[2 * j + 1], 15) << 4));
+                        out[21] = static_cast<char>(SIG_KNOWN | (signature->promoted ? SIG_PROMOTED : 0));
+                    }
+            }
+        }
+        ++done;
+    }
+    put(MOVES, n, static_cast<uint64_t>(moves.size()));
+    put(ANNEX, n, static_cast<uint64_t>(annex.size()));
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+    fs::create_directories(tmp, ec);
+    if (ec) throw std::runtime_error("cannot create " + tmp.string());
+    writeFile(tmp / "cols.bin", cols);
+    writeFile(tmp / "moves.bin", moves);
+    writeFile(tmp / "annex.bin", annex);
+    writeFile(tmp / "names.bin", names);
+    writeFile(tmp / "sig.bin", sig);
+    syncFolder(tmp);
+}
+
+}  // namespace
+
+Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& cancel, bool one_at_a_time) {
+    Compacted out;
+    if (!lock_) {
+        out.error = dir_.string() + ": read-only, another program writes to it";
+        return out;
+    }
+    // One compaction at a time. The segments are written without the writers' lock, from the snapshot of when it
+    // starts: games added meanwhile are kept; a game replaced or deleted meanwhile stops it (compact again).
+    std::lock_guard compacting(compact_mutex_);
+    auto snap        = snapshot();
+    const auto infos = snap->segmentInfos();
+    const auto plan  = compactPlan();
+    std::vector<std::string> unremoved;  // one segment at a time: old files still mapped, removed at the end
+    if (plan.segments.empty()) {
+        out.done = true;
+        return out;
+    }
+    if (!one_at_a_time) {
+        std::error_code ec;
+        const auto space = fs::space(dir_, ec);
+        if (!ec && space.available < plan.needed + (uint64_t{64} << 20)) {
+            out.error = "disk full";
+            return out;
+        }
+    }
+    std::string manifest_text;
+    {
+        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
+        manifest_text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const auto old_edits = nlohmann::json::parse(manifest_text).value("edits", std::string());
+    // The steps: all the segments at once; or each logical segment, then the segments of versions.
+    std::vector<std::size_t> logical_stale, versions;
+    for (std::size_t s = 0; s < infos.size(); ++s) {
+        if (infos[s].versions) {
+            if (infos[s].games > 0) versions.push_back(s);
+        } else if (staleSegment(*snap, infos[s])) {
+            logical_stale.push_back(s);
+        }
+    }
+    std::vector<std::vector<std::size_t>> steps;
+    if (one_at_a_time) {
+        for (const auto s : logical_stale) steps.push_back({s});
+        if (!versions.empty()) steps.push_back(versions);
+    } else {
+        auto all = logical_stale;
+        all.insert(all.end(), versions.begin(), versions.end());
+        steps.push_back(all);
+    }
+    progress.segments = logical_stale.size() + versions.size();
+    progress.segment  = 0;
+    auto replaced     = snap->replaced_;  // what stays replaced, the segments folded so far taken out
+    std::vector<std::string> old_files, new_files;
+    uint64_t old_bytes    = 0;
+    std::string edits_now = old_edits;  // the edits file the manifest names
+    std::string manifest_after;
+    for (const auto& batch : steps) {
+        std::vector<std::pair<std::size_t, std::string>> written;  // a segment's index, its new folder
+        std::string edits_written;
+        std::string tmp_now;
+        const auto clean = [&] {
+            std::error_code ec;
+            for (const auto& [s, name] : written) fs::remove_all(dir_ / name, ec);
+            if (!tmp_now.empty()) fs::remove_all(dir_ / tmp_now, ec);
+            if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
+        };
+        try {
+            for (const auto s : batch) {
+                ++progress.segment;
+                progress.games   = 0;
+                const auto& info = infos[s];
+                const auto& seg  = *snap->segments_[s];
+                std::vector<RecordSource> records;
+                if (!info.versions) {
+                    records.reserve(info.games);
+                    for (GameId id = info.first; id < info.first + info.games; ++id) {
+                        const auto [where, i] = snap->locate(id);
+                        records.push_back({where, i, snap->deleted(id)});
+                    }
+                }
+                std::string name;
+                {
+                    std::lock_guard lock(mutex_);  // the numbers the appends take too
+                    name = segmentName(next_segment_++);
+                }
+                tmp_now = name + ".tmp";
+                writeSegment(dir_ / tmp_now, records, seg.namesText(), seg.nameCount(), cancel, progress.games);
+                step("rename segment");
+                std::error_code ec;
+                fs::rename(dir_ / tmp_now, dir_ / name, ec);
+                if (ec) throw std::runtime_error("cannot rename " + (dir_ / tmp_now).string());
+                tmp_now.clear();
+                written.emplace_back(s, name);
+            }
+            syncFolder(dir_);
+            if (cancel) throw std::runtime_error("cancelled");
+        } catch (const std::exception& e) {
+            // Nothing of this step committed: its files go. Those of the steps before stay committed.
+            clean();
+            out.cancelled = cancel.load();
+            out.error     = out.cancelled ? std::string() : std::string(e.what());
+            return out;
+        }
+        {
+            // The commit, under the writers' lock: the manifest as it is now (the segments added meanwhile kept)
+            // naming the new segments, the edits without the versions folded in, the edits generation kept: the
+            // games read the same, and the opening tree holds.
+            std::lock_guard writing(write_mutex_);
+            try {
+                if (snapshot()->editsGeneration() != snap->editsGeneration())
+                    throw std::runtime_error("a game was replaced or deleted meanwhile");
+                nlohmann::json next;
+                {
+                    std::ifstream in(dir_ / MANIFEST, std::ios::binary);
+                    next = nlohmann::json::parse(in);
+                }
+                for (const auto& [s, name] : written) {
+                    auto& entry   = next["segments"][s];
+                    entry["name"] = name;
+                    if (infos[s].versions) {
+                        entry["games"] = 0;
+                    } else {
+                        const auto first = infos[s].first, last = first + infos[s].games;
+                        std::erase_if(replaced,
+                                      [&](const Snapshot::Version& v) { return v.id >= first && v.id < last; });
+                    }
+                }
+                const auto generation = next.value("generation", uint64_t{0}) + 1;
+                if (!replaced.empty() || !snap->deleted_.empty()) {
+                    edits_written = editsName(generation);
+                    writeFile(dir_ / edits_written, editsBytes(replaced, snap->deleted_));
+                    next["edits"] = edits_written;
+                } else {
+                    next.erase("edits");
+                }
+                next["generation"] = generation;
+                step("write manifest");
+                tour::replaceFile(dir_ / MANIFEST, next.dump(1));
+                manifest_after = next.dump(1);
+            } catch (const std::exception& e) {
+                clean();
+                out.error = e.what();
+                return out;
+            }
+            // Committed: read again, the old files kept for now.
+            step("manifest written");
+            load(false);
+            keys_indexed_ = false;
+        }
+        std::vector<std::string> step_old;
+        for (const auto& [s, name] : written) {
+            step_old.push_back(infos[s].name);
+            new_files.push_back(name);
+            old_bytes += snap->segments_[s]->bytes();
+        }
+        if (!edits_written.empty()) new_files.push_back(edits_written);
+        if (edits_now != edits_written && !edits_now.empty()) step_old.push_back(edits_now);
+        edits_now = edits_written;
+        if (one_at_a_time) {
+            for (const auto& name : step_old) {
+                std::error_code ec;
+                fs::remove_all(dir_ / name, ec);
+                if (ec) unremoved.push_back(name);  // Windows: mapped by the snapshot of the start
+            }
+        } else {
+            old_files.insert(old_files.end(), step_old.begin(), step_old.end());
+        }
+    }
+    // What was given back: the old segments' bytes less the new ones'.
+    const auto now     = snapshot();
+    uint64_t new_bytes = 0;
+    for (const auto& name : new_files)
+        for (std::size_t s = 0; s < now->segment_names_.size(); ++s)
+            if (now->segment_names_[s] == name) new_bytes += now->segments_[s]->bytes();
+    out.bytes = old_bytes > new_bytes ? old_bytes - new_bytes : 0;
+    out.done  = true;
+    if (one_at_a_time) {
+        // The start's snapshot let go: what Windows kept mapped can go now (what a reader still maps, at the next open).
+        snap.reset();
+        for (const auto& name : unremoved) {
+            std::error_code ec;
+            fs::remove_all(dir_ / name, ec);
+        }
+        return out;
+    }
+    // Undoing it puts the manifest before back, unless something was committed since: the segments added meanwhile
+    // would go with it.
+    Leftovers left;
+    left.manifest   = now->generation() == snap->generation() + 1 ? manifest_text : std::string();
+    left.generation = now->generation();
+    left.files      = old_files;
+    left.new_files  = new_files;
+    std::lock_guard lock(mutex_);
+    leftovers_   = std::move(left);
+    out.undoable = !leftovers_->manifest.empty();
+    return out;
+}
+
+bool Database::compactionUndoable() const {
+    std::lock_guard lock(mutex_);
+    return leftovers_ && !leftovers_->manifest.empty() && current_->generation_ == leftovers_->generation;
+}
+
+bool Database::undoCompaction() {
+    std::lock_guard compacting(compact_mutex_);
+    std::lock_guard writing(write_mutex_);
+    nlohmann::json manifest;
+    {
+        std::lock_guard lock(mutex_);
+        if (!leftovers_ || leftovers_->manifest.empty() || current_->generation_ != leftovers_->generation)
+            return false;
+        manifest               = nlohmann::json::parse(leftovers_->manifest);
+        manifest["generation"] = current_->generation_ + 1;  // readers see a commit
+    }
+    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    std::vector<std::string> made;
+    {
+        std::lock_guard lock(mutex_);
+        made = leftovers_->new_files;
+        leftovers_.reset();
+    }
+    load(true);  // the compaction's files, no longer named, go
+    // Again, once the snapshot that mapped them is let go (Windows removes no mapped file); a reader holding it
+    // still leaves them to the next open.
+    for (const auto& name : made) {
+        std::error_code ec;
+        fs::remove_all(dir_ / name, ec);
+    }
+    keys_indexed_ = false;
+    return true;
+}
+
+void Database::dropCompactionLeftovers() {
+    if (!leftovers_ || !lock_) return;
+    std::error_code ec;
+    for (const auto& name : leftovers_->files) fs::remove_all(dir_ / name, ec);
+    leftovers_.reset();
+}
+
+Database::~Database() {
+    try {
+        dropCompactionLeftovers();
+    } catch (...) {
+    }
 }
 
 }  // namespace fcg::study

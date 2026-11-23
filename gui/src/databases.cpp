@@ -10,6 +10,7 @@
 #include <json.hpp>
 
 #include <study/background.hpp>
+#include <study/names.hpp>
 #include <tour/files.hpp>
 
 #include "portable.hpp"
@@ -347,21 +348,35 @@ std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t i
     return TreeSource{entries_[index].name, snapshot, cached.tree};
 }
 
-bool DatabaseShelf::startImport(std::size_t index, const fs::path& file, const std::string& password) {
+bool DatabaseShelf::startImport(std::size_t index, const fs::path& file, const std::string& password,
+                                std::vector<uint64_t> forget) {
     if (import_ || index >= entries_.size() || entries_[index].source) return false;
     const auto db = open(index);
     if (!db || db->readOnly()) return false;
-    import_          = std::make_unique<Import>();
-    import_->index   = index;
-    import_->file    = file;
-    import_->started = std::chrono::steady_clock::now();
-    Import* job      = import_.get();
-    job->done        = std::async(std::launch::async, [db, job, password] {
+    import_               = std::make_unique<Import>();
+    import_->index        = index;
+    import_->file         = file;
+    import_->started      = std::chrono::steady_clock::now();
+    import_->games_before = db->snapshot()->games();
+    Import* job           = import_.get();
+    job->done             = std::async(std::launch::async, [db, job, password, forget = std::move(forget)] {
         study::enterBackground();
         study::ChessBaseOptions chessbase;
         chessbase.password = password;
         const auto report = study::importInto(*db, job->file, study::ImportOptions{}, job->progress, job->cancel, false,
-                                              std::size_t{1} << 18, chessbase);
+                                              std::size_t{1} << 18, chessbase, forget);
+        // The new spellings of the players of the table of names join them by themselves (M13, board 1); then the
+        // same games come from another source: told in the report, merged on a click.
+        if (!job->cancel && report.added > 0) {
+            try {
+                if (auto table = study::joinNewSpellings(*db->snapshot(), job->games_before))
+                    db->setPlayers(std::move(*table));
+            } catch (const std::exception&) {
+            }
+            job->looking = true;
+            job->duplicates =
+                study::findDuplicates(db->snapshot(), job->games_before, job->duplicates_progress, job->cancel);
+        }
         // The opening tree of every game committed, a cancelled import's too, unless the import was cancelled.
         if (!job->cancel && report.added > 0) {
             job->building = true;
@@ -377,6 +392,7 @@ std::optional<study::DatabaseImport> DatabaseShelf::finishedImport() {
     if (import_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return std::nullopt;
     auto report = import_->done.get();
     if (import_->index < facts_.size()) facts_[import_->index].generation = ~uint64_t{0};  // its tree now
+    import_duplicates_ = std::move(import_->duplicates);
     import_.reset();
     return report;
 }

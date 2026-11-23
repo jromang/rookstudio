@@ -176,6 +176,11 @@ const std::vector<const char*>& allTopics() {
                                               ChessCom,
                                               ChessBaseImport,
                                               Lumbra,
+                                              Maintenance,
+                                              DuplicateGames,
+                                              PlayersNames,
+                                              FideList,
+                                              CheckCompact,
                                               LichessStudies,
                                               Training};
     return all;

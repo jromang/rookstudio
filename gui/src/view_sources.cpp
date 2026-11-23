@@ -137,13 +137,15 @@ void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, i
     twic_add_ = std::move(add);
 }
 
-bool App::twicImportEnded(const fs::path& file, const study::DatabaseImport& report) {
+bool App::twicImportEnded(const fs::path& file, const study::DatabaseImport& report,
+                          const std::vector<study::DuplicateGroup>& others) {
     if (!twic_add_ || !twic_add_->importing || twic_add_->next >= twic_add_->files.size() ||
         twic_add_->files[twic_add_->next] != file)
         return false;
     auto& add = *twic_add_;
     add.added += report.added;
     add.duplicates += report.duplicates;
+    add.others.insert(add.others.end(), others.begin(), others.end());
     if (report.error.empty() && !report.read.cancelled) {
         if (add.next < add.issues.size()) twic_.added[add.folder.string()].insert(add.issues[add.next].number);
         if (!add.player.empty() && add.next < add.months.size()) {  // a followed chess.com player's month
@@ -234,6 +236,8 @@ void App::pollTwic() {
         done.database   = add.index < shelf_->entries().size() ? shelf_->entries()[add.index].name : std::string();
         done.added      = add.added;
         done.duplicates = add.duplicates;
+        done.others     = add.others;
+        done.from       = add.from;
         for (std::size_t i = 0; i < add.next && i < add.issues.size(); ++i)
             done.numbers.push_back(add.issues[i].number);
         if (const auto db = shelf_->open(add.index)) {
@@ -431,6 +435,27 @@ void App::drawTwicReport() {
                                    trn("{} game", "{} games", many(d.added), ui::exactCount(d.added)),
                                    ui::exactCount(d.duplicates))
                                    .c_str());
+        // The same games from another source, headers written differently (M13, board 1): merged on a click.
+        if (!d.others.empty()) {
+            ImGui::TextDisabled("%s", trn("{} game already there from another source, its headers written differently.",
+                                          "{} games already there from another source, their headers written "
+                                          "differently.",
+                                          d.others.size(), ui::exactCount(d.others.size()))
+                                          .c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton(TR("Merge them"))) {
+                std::vector<study::DuplicateGroup> merge;
+                for (const auto& g : d.others)
+                    if (g.kind != study::DuplicateKind::Results) merge.push_back(g);
+                openCare(static_cast<int>(d.index), CarePart::Duplicates);
+                if (care_) care_->since = d.from;
+                startCareMerges(d.index, std::move(merge), {});
+                twic_done_->others.clear();
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("Each kept once, with the fullest of each field; the other marked deleted. "
+                                           "Ctrl+Z undoes, on the maintenance page that opens."));
+        }
         if (!d.report.events.empty()) {
             ImGui::Spacing();
             ImGui::TextUnformatted(TR("The strongest tournaments"));

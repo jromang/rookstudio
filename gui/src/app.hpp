@@ -27,6 +27,9 @@
 #include <commentary/story_model.hpp>
 #include <commentary/tablebase.hpp>
 #include <study/ctg.hpp>
+#include <study/duplicates.hpp>
+#include <study/fide_list.hpp>
+#include <study/names.hpp>
 #include <study/query.hpp>
 #include <study/search.hpp>
 #include <tour/polyglot.hpp>
@@ -49,6 +52,7 @@
 #include "engine_play.hpp"
 #include "engines.hpp"
 #include "fide_cards.hpp"
+#include "fide_rating_list.hpp"
 #include "game_graph.hpp"
 #include "guide_view.hpp"
 #include "home.hpp"
@@ -325,7 +329,9 @@ class App {
     DatabaseShelf& shelf();  // made at its first use
     // `file` imported into database `index`, or into a new database named after it for -1.
     // `pasted`: games of the clipboard written to a file of the program's, removed once imported.
-    void importIntoDatabase(int index, const std::filesystem::path& file, bool pasted = false);
+    // `forget`: keys of damaged games, imported again from their file (the maintenance's check).
+    void importIntoDatabase(int index, const std::filesystem::path& file, bool pasted = false,
+                            std::vector<uint64_t> forget = {});
     void pasteGamesInto(int index);  // the clipboard's games imported into a database
     // The last import's outcome (mockup M1, board 4), said on its database until another starts or it is closed: what
     // happened, what was kept, and the gesture that mends it.
@@ -349,6 +355,10 @@ class App {
             std::string move;   // the move its moves stop at, as written; empty when none
         };
         std::vector<Damaged> damaged;  // the first few
+        // The games already there from another source, the same game with its headers written differently (M13,
+        // board 1): told here, merged on a click.
+        std::vector<study::DuplicateGroup> duplicates;
+        uint64_t games_before = 0;
     };
     std::optional<ImportOutcome> db_outcome_;
     void drawImportOutcome(std::size_t index);
@@ -380,7 +390,8 @@ class App {
     void drawTwicHomeNotice();
     void startTwicIndex(bool weekly);
     void startTwicAdd(std::vector<twic::Issue> issues, int database);  // database: the shelf's index, -1 a new one
-    bool twicImportEnded(const std::filesystem::path& file, const study::DatabaseImport& report);
+    bool twicImportEnded(const std::filesystem::path& file, const study::DatabaseImport& report,
+                         const std::vector<study::DuplicateGroup>& others);
     void pollTwic();
     void loadTwic();
     void saveTwic();
@@ -414,6 +425,7 @@ class App {
         bool importing   = false;
         uint64_t added = 0, duplicates = 0;
         study::GameId from = 0;  // the database's games before
+        std::vector<study::DuplicateGroup> others;  // the games already there from another source (M13, board 1)
     };
     std::optional<TwicAdd> twic_add_;
     struct TwicDone {
@@ -424,6 +436,8 @@ class App {
         uint64_t added = 0, duplicates = 0;
         twic::Report report;
         std::string error;
+        std::vector<study::DuplicateGroup> others;  // the games already there from another source
+        study::GameId from = 0;
     };
     std::optional<TwicDone> twic_done_;
     // A month of Lichess's broadcasts (#73): its page of files asked for once, read for both kinds of months.
@@ -501,6 +515,104 @@ class App {
     std::array<char, 128> db_name_{};
     std::string db_message_;     // the last import's outcome
     std::string db_linked_key_;  // the linked sources listed: the tournaments, the PGN file opened
+    // The maintenance of a database (mockup M13, board 1; view_maintenance.cpp), in place of the Databases page while
+    // open, from a database's ⋯, an import's report or Ctrl+K: its duplicate games, its players' names and FIDE's
+    // rating list, its check and its compaction. Each long task runs in the background, one at a time; Ctrl+Z undoes
+    // the merges and the names brought together; "Undo the compaction" puts its old files back until RookStudio closes.
+    enum class CarePart { Duplicates, Names, Checks };
+    void openCare(int database, CarePart part);
+    void drawCare();
+    void drawCareDuplicates(std::size_t index);
+    void drawCarePair(std::size_t index);
+    void drawCareNames(std::size_t index);
+    void drawFideListCard();
+    void drawCareChecks(std::size_t index);
+    void pollCare();  // each frame: a task that ended taken, a database whose snapshot changed looked at again
+    void careUndo();
+    struct Care {
+        std::filesystem::path folder;  // the database's
+        CarePart part = CarePart::Duplicates;
+        int tab_shown = -1;  // the part its tab bar shows: another one asked for selects its tab
+        // The duplicates found, of the snapshot `duplicates_of`; `since`: an import's games only.
+        std::optional<study::Duplicates> duplicates;
+        uint64_t duplicates_of = ~uint64_t{0};
+        study::GameId since    = 0;
+        int pair               = -1;  // the group compared, field by field
+        std::vector<study::ImportedGame> pair_games;
+        std::vector<std::string> pair_sources;
+        study::MergeChoice choice{};
+        std::string where, where_of;  // where the duplicates come from, counted for the result `where_of`
+        // The players' names analysed, of the snapshot `names_of`, with the FIDE list of `names_list`.
+        std::optional<study::NamesAnalysis> names;
+        uint64_t names_of = ~uint64_t{0};
+        std::string names_list;
+        int names_shown     = 0;           // 0 to confirm, 1 brought together at once, 2 kept as they are, 3 done
+        bool names_chosen   = false;       // the user chose which: kept even when there is nothing to confirm
+        std::size_t confirm = 0;           // the proposal answered with ↑ ↓ Enter
+        std::map<std::size_t, int> picks;  // a proposal's candidate chosen; -1: none of them, another player
+        std::set<std::size_t> answered;    // the proposals confirmed or set aside this time
+        // The check and the compaction.
+        std::optional<study::CheckReport> check;
+        std::time_t checked = 0;
+        std::optional<study::Compacted> compacted;
+        bool disk_full = false;
+        std::optional<study::CompactPlan> plan;  // what compacting gives back, for the snapshot `plan_of`
+        uint64_t plan_of = ~uint64_t{0};
+        std::shared_ptr<std::future<study::CompactPlan>> plan_job;
+        std::string said;              // what was just done, and Ctrl+Z
+        std::string error;             // why it could not be done
+        bool start_check     = false;  // Ctrl+K "Check the database": started once the page shows
+        bool open_first_pair = false;  // the first group compared once found (a capture's)
+        struct Undo {
+            std::string what;
+            std::vector<study::GameState> states;       // the games put back
+            std::optional<study::PlayerTable> players;  // the table of names put back
+        };
+        std::vector<Undo> undo;
+    };
+    std::optional<Care> care_;
+    struct CareJob {
+        enum class Kind { Duplicates, Names, Check, Compact, Merge, Players, Restore };
+        Kind kind = Kind::Duplicates;
+        std::filesystem::path folder;
+        std::atomic<bool> cancel{false};
+        study::DuplicateProgress duplicates_progress;
+        study::NamesProgress names_progress;
+        study::CheckProgress check_progress;
+        study::CompactProgress compact_progress;
+        std::chrono::steady_clock::time_point started;
+        std::future<void> done;
+        study::GameId since = 0;
+        uint64_t generation = 0;  // the snapshot's it read
+        bool one_at_a_time  = false;
+        // What it gives.
+        study::Duplicates duplicates;
+        study::NamesAnalysis names;
+        std::string names_list;
+        study::CheckReport check;
+        study::Compacted compacted;
+        std::optional<Care::Undo> undo;  // a change's, pushed when it is done
+        std::string said, error;
+        std::size_t merged = 0;
+    };
+    std::unique_ptr<CareJob> care_job_;
+    [[nodiscard]] bool careBusy(const std::filesystem::path& folder) const;  // a compaction of that database runs
+    // A change of the database in the background: merges, a table of names, an undoing.
+    void startCareMerges(std::size_t index, std::vector<study::DuplicateGroup> groups,
+                         std::vector<study::MergeChoice> choices);
+    void startCarePlayers(std::size_t index, study::PlayerTable table, std::string what, std::string said);
+    // FIDE's rating list (fide_rating_list.hpp): kept in the profile, read when needed, offered each month.
+    [[nodiscard]] const fide::Kept* fideKept();
+    [[nodiscard]] std::shared_ptr<const study::FideList> fideList();
+    void startFideList(const std::filesystem::path& file = {});
+    void pollFideList();
+    void drawFideHomeNotice();
+    void drawCareHomeNotice();
+    std::optional<fide::Kept> fide_kept_;
+    bool fide_kept_read_ = false;
+    std::shared_ptr<const study::FideList> fide_list_;
+    std::unique_ptr<fide::Job> fide_job_;
+    std::optional<fide::Job::Outcome> fide_outcome_;  // the last one's, said on the list's card
     // The chosen database's games (mockup M1, board 2), in place of the list of databases: a quick filter, a sort, the
     // view made in the background, the game chosen.
     void drawGameList();
@@ -586,6 +698,9 @@ class App {
     void drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot);
     [[nodiscard]] study::Filter listFilter() const;  // the quick filter's words with the panel's fields
     bool db_search_open_ = false;
+    // The games the maintenance shows in the list ("See in the list"): the others left out while it is set.
+    std::optional<std::vector<study::GameId>> db_only_;
+    std::string db_only_said_;
     struct SearchFields {
         std::array<char, 64> player{}, opponent{}, event{};
         int side = 0;  // the player: 0 either colour, 1 White, 2 Black

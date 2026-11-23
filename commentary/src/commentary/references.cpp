@@ -170,12 +170,15 @@ References references(const Position& pos, std::span<const ReferenceBase> bases,
                       });
     for (std::size_t i = 0; i < kept; ++i) {
         const auto& r  = ranked[i];
-        const auto row = bases[r.base].snapshot->row(r.id);
+        const auto& snapshot = *bases[r.base].snapshot;
+        const auto row       = snapshot.row(r.id);
+        const auto names     = snapshot.rowIds(r.id);
         ReferenceGame g;
         g.base      = r.base;
         g.id        = r.id;
-        g.white     = std::string(row.white);
-        g.black     = std::string(row.black);
+        // The players as the database's table of names gives them (#88): one name for a player's spellings.
+        g.white     = std::string(snapshot.shownName(names.white));
+        g.black     = std::string(snapshot.shownName(names.black));
         g.event     = std::string(row.event);
         g.year      = static_cast<int>(row.date >> 9);
         g.white_elo = row.white_elo;

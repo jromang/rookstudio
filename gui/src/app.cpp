@@ -384,6 +384,28 @@ void App::frame() {
             db_search_open_     = true;
             db_search_.position = w == "databases-search-position";
             std::snprintf(db_search_.year_from.data(), db_search_.year_from.size(), "2020");
+        } else if (w == "databases-care" || w.rfind("databases-care=", 0) == 0) {
+            // databases-care[=names|checks|check|pair]: the first database's maintenance (#88), at that part; check:
+            // its check started; pair: its first group of duplicates compared.
+            const auto part = w.size() > 15 ? w.substr(15) : std::string("duplicates");
+            openCare(0, part == "names"                       ? CarePart::Names
+                        : part == "checks" || part == "check" ? CarePart::Checks
+                                                              : CarePart::Duplicates);
+            if (care_) {
+                care_->start_check     = part == "check";
+                care_->open_first_pair = part == "pair";
+            }
+        } else if (w.rfind("fide-server=http://127.0.0.1:", 0) == 0) {
+            // fide-server=http://127.0.0.1:PORT[,WORD]: a test's server in place of ratings.fide.com (#88), on this
+            // machine only; then WORD, another of these.
+            const auto comma = w.find(',');
+            const auto from  = std::string_view("fide-server=").size();
+            fide::setServer(w.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+            if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+        } else if (w.rfind("databases-import-into=", 0) == 0) {  // databases-import-into=FILE: into the first database
+            page_        = Page::Databases;
+            db_selected_ = 0;
+            importIntoDatabase(0, std::filesystem::path(w.substr(22)));
         } else if (w.rfind("databases-import=", 0) == 0) {  // databases-import=FILE: into a new database named after it
             page_ = Page::Databases;
             importIntoDatabase(-1, std::filesystem::path(w.substr(17)));
@@ -1978,6 +2000,9 @@ void App::handleDialogs() {
                 } catch (const std::exception& e) {
                     db_message_ = e.what();
                 }
+                break;
+            case Dialogs::Purpose::FideList:
+                startFideList(std::filesystem::path(path));
                 break;
         }
     }

@@ -246,6 +246,8 @@ void App::drawChessHome() {
             ImGui::PopTextWrapPos();
         }
         drawTwicHomeNotice();  // a new issue of TWIC, when the weekly look found one (#71)
+        drawFideHomeNotice();  // FIDE's list of a new month (#88)
+        drawCareHomeNotice();  // what the maintenance found: duplicates after an import, damaged games
         ui::endCard();
     }
     if (reopen) restoreRecentGame(*reopen);

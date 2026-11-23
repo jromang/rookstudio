@@ -54,10 +54,12 @@ void parallel(std::size_t n, int threads, F&& f) {
     for (auto& t : pool) t.join();
 }
 
-// The names of a snapshot folded and ranked in alphabetical order, kept while the names do not change: a later
-// snapshot with the same names reuses them.
+// The names of a snapshot folded and ranked in alphabetical order, kept while the names and the table of names do not
+// change: a later snapshot with the same names reuses them. A name of a player of the table of names is also found by
+// the words of the player's name, and ranked as it: the spellings of one player share a rank.
 struct NameIndex {
     uint32_t count = 0;
+    std::shared_ptr<const PlayerTable> table;
     std::vector<std::string> folded;
     std::vector<uint32_t> rank;
 };
@@ -66,19 +68,41 @@ std::shared_ptr<const NameIndex> nameIndex(const Snapshot& snapshot) {
     static std::mutex mutex;
     static std::shared_ptr<const NameIndex> cached;
     std::lock_guard lock(mutex);
-    if (cached && cached->count == snapshot.names()) return cached;
+    if (cached && cached->count == snapshot.names() && cached->table == snapshot.players()) return cached;
     auto index   = std::make_shared<NameIndex>();
     index->count = snapshot.names();
+    index->table      = snapshot.players();
+    const auto& table = *index->table;
     index->folded.resize(index->count);
     for (uint32_t id = 0; id < index->count; ++id) index->folded[id] = foldText(snapshot.name(id));
+    std::vector<std::string> player_folded;
+    for (const auto& p : table.players()) player_folded.push_back(foldText(p.name));
+    std::vector<int64_t> player(index->count, -1);
+    if (!table.players().empty())
+        for (uint32_t id = 0; id < index->count; ++id)
+            if (const auto p = table.playerOf(id)) player[id] = static_cast<int64_t>(*p);
+    const auto key = [&](uint32_t id) -> const std::string& {
+        return player[id] >= 0 ? player_folded[static_cast<std::size_t>(player[id])] : index->folded[id];
+    };
     std::vector<uint32_t> order(index->count);
     std::iota(order.begin(), order.end(), 0u);
     std::sort(order.begin(), order.end(), [&](uint32_t a, uint32_t b) {
-        if (index->folded[a] != index->folded[b]) return index->folded[a] < index->folded[b];
+        if (key(a) != key(b)) return key(a) < key(b);
+        if (player[a] != player[b]) return player[a] < player[b];
         return snapshot.name(a) < snapshot.name(b);
     });
     index->rank.resize(index->count);
-    for (uint32_t r = 0; r < index->count; ++r) index->rank[order[r]] = r;
+    uint32_t rank = 0;
+    for (uint32_t r = 0; r < index->count; ++r) {
+        const auto id = order[r];
+        // One rank for a player's spellings, which follow one another.
+        if (r > 0 && player[id] >= 0 && player[order[r - 1]] == player[id])
+            index->rank[id] = index->rank[order[r - 1]];
+        else
+            index->rank[id] = rank++;
+    }
+    for (uint32_t id = 0; id < index->count; ++id)
+        if (player[id] >= 0) index->folded[id] += "\n" + player_folded[static_cast<std::size_t>(player[id])];
     cached = index;
     return index;
 }

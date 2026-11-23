@@ -15,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -76,6 +77,48 @@ struct BoardMatchSetup {
 // How long a move may take beyond what the clock had before it counts as a loss on time: the time the move takes to
 // come through the pipe and the GUI.
 inline constexpr std::chrono::milliseconds CLOCK_MARGIN{100};
+
+// An engine of the library playing a game, spoken to in UCI (a WinBoard engine through the adapter), from the thread
+// that plays it: the games of the Board page and the Play page (#83), and a Lichess bot's games (#85).
+class EnginePlayer {
+   public:
+    // `stop` ends any wait; `interrupt`, when given, ends a search early, the engine stopped and its bestmove read so
+    // that it is ready for the next one.
+    EnginePlayer(EngineEntry entry, const std::atomic<bool>& stop, std::function<bool()> interrupt = {});
+    ~EnginePlayer();
+    EnginePlayer(const EnginePlayer&)            = delete;
+    EnginePlayer& operator=(const EnginePlayer&) = delete;
+
+    // Started, given the library's option values, Chess960 when asked, then the options of `more` it has (name,
+    // value), and ready. False with the reason.
+    bool start(bool chess960, std::string& error, const std::vector<std::pair<std::string, std::string>>& more = {});
+    bool newGame();
+    // Its move for the position, within `budget`: the move in UCI, or nullopt (out of time, stopped, interrupted, or
+    // the engine ended). `info` gets each info line with a score. With `stop_late`, a search still going at the end of
+    // its budget is stopped, and the move it then gives within a second is taken.
+    std::optional<std::string> go(const std::string& position, const std::string& go, std::chrono::milliseconds budget,
+                                  const std::function<void(const std::string&)>& info, bool stop_late = false);
+    [[nodiscard]] bool alive() const;
+    // An option the engine named at its start.
+    [[nodiscard]] bool has(const std::string& option) const;
+    [[nodiscard]] const EngineEntry& entry() const noexcept { return entry_; }
+    void quit();
+
+   private:
+    bool ready(std::chrono::milliseconds timeout);
+    // Reads its lines until one starting with `word`, passing the others to `each`; `move` gets the word's first
+    // argument (bestmove e2e4). False on the deadline, a stop or the engine's end, and, `interruptible`, when the
+    // search is interrupted.
+    bool waitFor(std::string_view word, std::chrono::steady_clock::time_point deadline,
+                 const std::function<void(const std::string&)>& each, std::optional<std::string>* move = nullptr,
+                 bool interruptible = false);
+
+    EngineEntry entry_;
+    const std::atomic<bool>& stop_;
+    std::function<bool()> interrupt_;
+    std::vector<std::string> options_;  // as the engine named them
+    EngineProcess process_;
+};
 
 // The user's side of a game, between the window and the game's thread: whether their move is awaited, and the move
 // given.

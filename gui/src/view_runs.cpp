@@ -394,7 +394,7 @@ int App::localThreads() const {
         if (r.run->remote() || !r.run->running() || !t) continue;
         threads += r.run->runningGames() * tour::largestGame(t->spec()).threads;
     }
-    return threads + analysisThreads();
+    return threads + analysisThreads() + botThreads();  // the Lichess bot's game too (#85)
 }
 
 namespace {

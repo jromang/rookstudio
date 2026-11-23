@@ -56,6 +56,7 @@
 #include "layout.hpp"
 #include "lichess_account.hpp"
 #include "lichess_board.hpp"
+#include "lichess_bot.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_evals.hpp"
 #include "lichess_games.hpp"
@@ -1675,6 +1676,113 @@ class App {
     [[nodiscard]] bool aidsLocked() const { return fairPlayLock(false) != nullptr; }  // on the board's position
     [[nodiscard]] bool gameLocked() const { return fairPlayLock(true) != nullptr; }   // on the whole game
     void drawFairPlayBanner(bool whole_game = false);
+    // A Lichess bot for one of the user's engines (#85, mockup M12, board 6; lichess_bot.hpp, view_bot.cpp). On the
+    // Engines page, an engine's card gets "On Lichess, as a bot": the bot's account (a second Lichess account, new and
+    // game-less, linked with bot:play only, or by a token pasted), its checks before any request, the upgrade once its
+    // name is typed; its rules; online and offline. Online, its own event stream (one per token) brings the challenges,
+    // accepted or declined with Lichess's reason; its game is played by the engine, followed on the Board, and brought
+    // into "Lichess · <bot>" at its end. The user's own account and games stay apart: the bot's are not in the games in
+    // progress the fair play's lock reads; during the user's own live game, the bot's search is not shown.
+    std::optional<lichess::Account> bot_account_;
+    bool bot_loaded_ = false;
+    void loadBot();  // its account and settings, read once
+    std::optional<lichess::BotSettings> bot_settings_;
+    lichess::BotSettings& botSettings();
+    void saveBotSettings();
+    [[nodiscard]] std::filesystem::path botFolder() const { return storage_.root() / "bot"; }
+    // The account as last checked, the check under way, the refusal said.
+    std::optional<lichess::BotAccountFacts> bot_facts_;
+    std::future<lichess::BotTokenCheck> bot_check_;  // a token pasted, checked
+    std::string bot_error_;                          // why the last link, check or upgrade gave nothing
+    bool bot_unanswered_ = false;                    // Lichess did not answer: nothing changed, to try again
+    // An account refused before it was kept (the user's own, closed, a token that may not play), and why.
+    std::optional<lichess::BotAccountFacts> bot_candidate_;
+    lichess::BotVerdict bot_verdict_ = lichess::BotVerdict::Upgradable;
+    // The card's setup, on the engine it was started from: the account's steps, then the confirmation.
+    enum class BotStep { Card, Account, Confirm };
+    BotStep bot_step_ = BotStep::Card;
+    std::string bot_setup_engine_;
+    struct BotLink {  // the bot's account linked through Lichess's page, then checked
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<std::string> url;  // Lichess's page, as given to the browser
+        std::shared_ptr<std::atomic<bool>> opened;
+        std::future<lichess::BotTokenCheck> result;
+    };
+    std::unique_ptr<BotLink> bot_link_;
+    std::array<char, 600> bot_token_text_{};  // a token pasted
+    std::array<char, 40> bot_confirm_{};      // the name typed to confirm the upgrade
+    bool bot_confirm_focus_ = false;
+    std::future<lichess::Reply> bot_upgrade_;
+    std::future<std::string> bot_unlink_;
+    bool bot_unlink_asked_ = false;  // "Unlink…" armed: a second click
+    // Online: its event stream, its game, the challenges answered.
+    std::unique_ptr<lichess::EventListener> bot_events_;
+    bool bot_online_  = false;  // accepting the challenges its rules allow
+    bool bot_closing_ = false;  // "Put offline": no new challenge, the game being played goes on to its end
+    std::string bot_online_error_;
+    std::unique_ptr<lichess::BotGame> bot_game_;
+    lichess::BotGame::State bot_state_;
+    uint64_t bot_version_ = 0;
+    std::vector<std::pair<std::string, bool>> bot_waiting_;  // games started while one plays: id, the bot's side
+    std::string bot_accepted_;  // a challenge accepted, its game not started yet: one at a time
+    std::chrono::steady_clock::time_point bot_accepted_at_{};
+    struct BotAnswer {
+        lichess::Challenge challenge;
+        std::string reason;  // Lichess's key; empty: accepted
+    };
+    std::vector<BotAnswer> bot_answered_;  // the latest first
+    struct BotCall {
+        std::string what;      // what it asks, as said if it fails
+        std::string accepted;  // the challenge it accepts, when it does: free again if Lichess refuses
+        std::future<lichess::Reply> reply;
+    };
+    std::vector<BotCall> bot_calls_;  // its requests under way
+    bool bot_shown_       = false;    // the Board follows its game
+    bool bot_flipped_     = false;
+    bool bot_board_dirty_ = false;
+    std::string bot_shown_id_;  // the game the Board follows, ended or not
+    struct BotArrival {
+        std::string id;
+        std::size_t index = 0;
+        std::future<lichess::Arrival> arrival;
+    };
+    std::vector<BotArrival> bot_arrivals_;  // its games that ended, brought into its database
+    bool quit_bot_open_ = false;            // closing during a live game of the bot's: asked first
+    bool quit_bot_said_ = false;
+    void pollBot();
+    void botEvent(const lichess::GameEvent& e);
+    void startBotLink();
+    void checkBotToken(std::string token);  // pasted
+    void keepBotAccount(const lichess::Account& account);
+    void forgetBotAccount();
+    void setBotOnline(bool online);
+    void startBotGame(const std::string& id, bool white);
+    void finishBotGame(const lichess::BotGame::State& st);
+    void openBotGame();                     // the bot's game on the Board
+    void showBotGame();                     // the Board follows its state
+    [[nodiscard]] bool botReady() const;    // an account that is a bot, its engine in the library
+    [[nodiscard]] bool botPlaying() const;  // a game of the bot's being played
+    [[nodiscard]] bool botLive() const;     // a live one: closing RookStudio would lose it on time
+    [[nodiscard]] bool botShown() const;    // the Board follows it
+    [[nodiscard]] int botThreads() const;   // its engine's threads while it plays, in the core budget
+    // A tournament needs the cores the bot's engine would take (R6): the tournament first.
+    [[nodiscard]] bool botCoresNeeded() const;
+    // The user's own live game on Lichess: the bot's search is not shown (fair play, #48).
+    [[nodiscard]] bool botSearchHidden() const { return liveGameOn() != nullptr; }
+    [[nodiscard]] const EngineEntry* botEngine() const;
+    [[nodiscard]] lichess::BotPlay botPlay() const;
+    [[nodiscard]] std::optional<std::string> botStripClock(chess::Color side) const;
+    [[nodiscard]] std::string botOpponent() const;  // "Bot_2 (2410)"
+    void drawBotPart(const EngineEntry& e);         // on the engine's card
+    void drawBotIntro(const EngineEntry& e);
+    void drawBotSteps();
+    void drawBotConfirm();
+    void drawBotRefusal();
+    void drawBotRules(const EngineEntry& e);
+    void drawBotOnline();
+    void drawBotGameCard();          // over the Board's column, while it follows the bot's game
+    void drawBotRunning(bool home);  // the Home page's "In progress", the Tournaments page's card
+    void drawQuitBot();
     // From the Board to lichess.org (#54, mockup M8, board "Lien"): the position opened on the analysis board, the
     // game shared, the position played out (an open challenge), a game of Lichess bookmarked; what each sends said
     // beside it, and nothing on the line of a game being played (R17).

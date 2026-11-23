@@ -78,6 +78,7 @@ void App::drawHome() {
         drawNeedsAction();
         drawRunCards();
     }
+    drawBotRunning(false);  // the Lichess bot online, its game (#85)
     {
         ui::TopicRegion topic(guide::topics::Queue);
         drawQueue();
@@ -337,6 +338,13 @@ std::vector<home::ResourceBar> App::resourceBars() {
                                 trn("The Board page: {} core for its analysis and its games",
                                     "The Board page: {} cores for its analysis and its games", board, board),
                                 double(board), ui::WARN});
+    }
+    // The Lichess bot's game (#85).
+    if (const int bot = botThreads(); bot > 0) {
+        cores.shares.push_back(
+            {fmt::format("{} · {}", TR("Lichess bot"), bot),
+             trn("The Lichess bot: {} core for its game", "The Lichess bot: {} cores for its game", bot, bot),
+             double(bot), ui::MUTED});
     }
     // In use: every tournament's games, and the window's engines.
     double in_use = 0;

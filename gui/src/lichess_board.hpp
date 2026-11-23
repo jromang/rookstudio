@@ -55,22 +55,27 @@ inline constexpr const char* SCOPE_BOARD_PLAY = "board:play";
 // ---------------------------------------------------------------------------
 // One request each
 
+// The two APIs a game is played through: the Board API, for people (#84), and the Bot API, for a bot account's engine
+// (#85, lichess_bot.hpp). A game's endpoints are the same under /api/board/ and /api/bot/.
+enum class PlayApi { Board, Bot };
+
 // What Lichess answered: taken, or why not (its own words when it gave some: "Not your turn, or game already over").
 struct Reply {
     bool ok    = false;
     int status = 0;  // HTTP's, 0 without an answer (a cut)
     std::string error;
 };
-// A move (UCI) in a game of the user's, a draw offered (or taken) with it.
+// A move (UCI) in a game of the user's (of the bot's), a draw offered (or taken) with it.
 [[nodiscard]] Reply boardMove(const std::string& token, const std::string& game, const std::string& uci,
-                              bool offer_draw = false, const std::atomic<bool>* cancel = nullptr);
+                              bool offer_draw = false, const std::atomic<bool>* cancel = nullptr,
+                              PlayApi api = PlayApi::Board);
 // What the game's card asks: "resign", "abort", "draw/yes" (offer, or take the offer), "draw/no", "takeback/yes",
 // "takeback/no", "claim-victory", "claim-draw" (the opponent gone long enough).
 [[nodiscard]] Reply boardAction(const std::string& token, const std::string& game, std::string_view action,
-                                const std::atomic<bool>* cancel = nullptr);
+                                const std::atomic<bool>* cancel = nullptr, PlayApi api = PlayApi::Board);
 // A line in the game's chat, the players' room.
 [[nodiscard]] Reply boardChat(const std::string& token, const std::string& game, const std::string& text,
-                              const std::atomic<bool>* cancel = nullptr);
+                              const std::atomic<bool>* cancel = nullptr, PlayApi api = PlayApi::Board);
 // A challenge received taken, or declined with one of Lichess's reasons ("generic", "later", "tooFast", "tooSlow",
 // "timeControl", "rated", "casual", "standard", "variant", "noBot", "onlyBot"); one sent called back.
 [[nodiscard]] Reply acceptChallenge(const std::string& token, const std::string& id,
@@ -198,7 +203,8 @@ struct ChatLine {
 
 // The players' chat of a game so far (its stream tells the lines said after it opens).
 [[nodiscard]] Answer<std::vector<ChatLine>> boardChatLines(const std::string& token, const std::string& game,
-                                                           const std::atomic<bool>* cancel = nullptr);
+                                                           const std::atomic<bool>* cancel = nullptr,
+                                                           PlayApi api                     = PlayApi::Board);
 
 // A game as its stream told it (gameFull, then gameState, chatLine, opponentGone), and the stream's connection.
 struct BoardState {
@@ -251,10 +257,10 @@ bool readBoardLine(std::string_view line, BoardState& state);
 
 // The game's stream, held on a thread of its own: opened again after a break (1 s, 2 s, 3 s, then every 5 s), the
 // whole game coming back each time (gameFull), the players' chat so far asked first; it stops once the game is over,
-// or when Lichess does not know it or refuses the token.
+// or when Lichess does not know it or refuses the token. Through the Board API, or the Bot API for a bot's game.
 class GameStream {
    public:
-    GameStream(std::string token, std::string id);
+    GameStream(std::string token, std::string id, PlayApi api = PlayApi::Board);
     ~GameStream();
     GameStream(const GameStream&)            = delete;
     GameStream& operator=(const GameStream&) = delete;
@@ -270,6 +276,7 @@ class GameStream {
     void update(F f);
 
     std::string token_, id_;
+    PlayApi api_ = PlayApi::Board;
     std::atomic<bool> stop_{false};
     mutable std::mutex mutex_;
     BoardState state_;

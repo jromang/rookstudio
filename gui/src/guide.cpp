@@ -145,6 +145,7 @@ const std::vector<const char*>& allTopics() {
                                               AfterGame,
                                               PlayLichess,
                                               LichessGame,
+                                              LichessBot,
                                               LichessPage,
                                               LichessLink,
                                               LichessGames,

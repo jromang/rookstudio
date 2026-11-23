@@ -379,6 +379,8 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>A</kbd> | The library of the setup | Select every engine shown |
 | <kbd>Ctrl</kbd>+click, <kbd>Shift</kbd>+click | Lists | Select several |
 | <kbd>Delete</kbd> | The Engines page | Remove the engine selected (after a confirmation) |
+| <kbd>Enter</kbd> | An engine's card, its Lichess bot ready | Put the bot online |
+| <kbd>Enter</kbd>, <kbd>Escape</kbd> | Making an account a Lichess bot, its name typed | Make it a bot; cancel |
 | <kbd>Enter</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | An engine's console | Send the line; bring the earlier lines back |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | The headless mode | Stop after the games being played |
 
@@ -398,7 +400,8 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
 - **In progress**: a game on Lichess played from RookStudio (*Back to the game*) and the challenges received (see [On
-  Lichess](#on-lichess)), the game's analysis, the position's, an import, the assistant (its download, its model
+  Lichess](#on-lichess)), your Lichess bot online and its game (see [A Lichess bot](#a-lichess-bot)), the game's
+  analysis, the position's, an import, the assistant (its download, its model
   loaded, *Unload*), a series of puzzles, a session of exercises, a game guessed, an endgame or a vision exercise under
   way, and what the day's review has
   due, in one count, a click reviewing it all (see [The day's review](#the-days-review)).
@@ -417,7 +420,7 @@ The **Tournaments** page is a control room: what runs and what needs you come fi
   all**, which resumes them and lets the queue go on, at once if a tournament ended meanwhile.
 - **Cores**: the machine's hardware threads, and those the games being played take, the rest free. A game takes
   the `Threads` of its engine that has the most, since the two engines think in turn; the bar shows each tournament's
-  name and its count, the cursor the details.
+  name and its count (the Board page's engines and the Lichess bot's game too), the cursor the details.
 - **Needs action**, when something does, each with its fix in place: an engine that cannot start (see [An engine
   that cannot start](#an-engine-that-cannot-start): *Try again*, *Withdraw…*, *Replace…*, *Engine log*); the
   tournament an error or an engine stopped, with what stopped it, *Open the engine*, *Open the log*, *Resume*, *Open*
@@ -431,6 +434,8 @@ The **Tournaments** page is a control room: what runs and what needs you come fi
   bounds, then the Elo and the score. *Open* goes to its workspace, *Pause* pauses it. A tournament that can be
   resumed shows instead under *Interrupted*, with *Resume*. See [Several tournaments at
   once](#several-tournaments-at-once) for the weights and the cores of each.
+- **Your Lichess bot**, while it is online: its engine, its game in progress with *On the Board*, *Its card* and *Put
+  offline*; it declines challenges *later* while the tournaments need the cores (see [A Lichess bot](#a-lichess-bot)).
 - **Queue**: the tournaments waiting, each with its length and when it starts, and when everything ends (see
   [Queue and relaunch](#queue-and-relaunch)).
 - **Last finished**: the last five tournaments finished, with their result: a match's score, the SPRT's decision,
@@ -605,6 +610,72 @@ output, resignation. Engines marked ↔ in the list are WinBoard engines.
 - An engine that asks to be started again for every game (`feature reuse=0`) gets *Restart the engine for every
   game* ticked when it is added.
 - `FCG_WB2UCI_LOG=FILE` in the environment writes every line exchanged with WinBoard engines to `FILE`.
+
+### A Lichess bot
+
+An engine's card has a line **On Lichess, as a bot**: *Make it a Lichess bot…* sets the engine up to play on Lichess
+under a bot account, through Lichess's Bot API (where engines are allowed), accepting the challenges you choose while
+RookStudio is open. The line becomes a part of the card, which leads through the steps below.
+
+- **The bot's account** is a second Lichess account, apart from yours: new, with a name of its own, and with no game
+  played. RookStudio does not create accounts: *Create the account on lichess.org* opens Lichess's page. *Link the
+  bot's account…* opens Lichess's page asking for one permission, *play as a bot* (`bot:play`): log in there with the
+  bot's account, not yours (a private window of the browser avoids logging you out). Or paste a token of the bot's
+  account made on lichess.org (*Make a token on lichess.org* opens the page with that permission ticked) and *Check it*.
+  Your own account stays linked apart, for the rest of RookStudio; the bot has its own token, kept in the profile's
+  `lichess-bot.json`, readable by you alone.
+- **The checks**, before anything is asked that changes the account: its name and when it was created, the games it
+  played (none), whether it is a bot already (then it serves as it is), and that it is not your own linked account.
+  Your own account is never kept (the token RookStudio got for it is revoked at once); a closed account, or a token
+  without the permission, neither. An account that has played is refused, as Lichess would: create a new one, play
+  nothing on it, then link it (*Link another account…*, *Unlink this one*).
+- **Make it a bot…** cannot be undone: the account never plays as a person again, Lichess marks it BOT, and it plays
+  challenges only (no lobby, no tournaments but the arenas open to bots). The step says so and asks for the account's
+  name: *Make it a bot* lights up once the name typed is its own (Escape cancels). What leaves the machine: that
+  request, with the bot's token. A refusal is said with Lichess's words; without an answer, nothing changed: try again.
+- **The challenges it accepts**, on the card: the speeds (bullet, blitz, rapid, classical, correspondence; never
+  UltraBullet, which Lichess does not let bots play), rated games or casual only, people and bots, a rating range for
+  the challenger (0: no bound), Chess960 when the engine knows it (`UCI_Chess960`), one game at a time. At first:
+  casual only, blitz and rapid, as Lichess asks bots to play casual while they are tested; widen them afterwards. A
+  rated challenge from your own account is declined (Lichess forbids rated games between one person's accounts); a
+  casual one is played. The other challenges are declined politely, with the reason Lichess shows the challenger:
+  *too fast*, *too slow*, *not this clock*, *casual only*, *standard chess only*, *not this variant*, *no bots*, *bots
+  only*, or *later* while it plays, goes offline, or a tournament needs the cores.
+- **Its play**: the engine with its options of the library (its `Threads` and `Hash` counted in the machine's core
+  budget while it plays), a Polyglot book of your library played while it has a move, the tournaments' tables
+  (`SyzygyPath`, for an engine that has the option and no path of its own), and no thinking on the opponent's time.
+  Its clock comes from Lichess at each move, less a margin for the network (a tenth of it, from 0.2 to 1 second);
+  before both sides have moved, it plays within the time Lichess gives for the first move; by correspondence, it
+  thinks 15 seconds a move. It takes a draw offered when the engine stands clearly worse, or no better late in the
+  game, declines a takeback, and claims the victory when its opponent left long enough. Its words, said in the
+  players' chat at the start and the end, are yours to choose (empty: nothing said). An engine that cannot start or
+  stops resigns the game (aborts it before both sides moved), and the card says why.
+- **Put online** (Enter) opens the bot's own event stream (Lichess keeps one per token): the challenges come, answered
+  at once by its rules. Online, the card shows the bot's day (games won, drawn and lost, challenges declined), its game
+  on a small board with the engine's evaluation, *On the Board*, its last games and the challenges declined, *Its page
+  on lichess.org* and **Put offline**: no new challenge, the game in progress plays on to its end, then the stream
+  closes. A correspondence game waits on Lichess while the bot is offline; it comes back when the bot is online again.
+  The bot plays only while RookStudio is open: closing RookStudio during one of its live games asks first (*Stay* ·
+  Escape, *Put it offline*, *Close anyway*), as the game would be lost on time.
+- **Its game on the Board**: followed move by move, the bot's side below, the players' ratings and clocks in their
+  strips, and over the column its card: what the game is, whose move it is, the engine's search (its evaluation, depth
+  and expected line: its own, as it plays the game), *Open on lichess.org*, *Resign for it…* (a second click) and *Put
+  offline*. The moves on the board are the bot's alone. At its end, the game comes into the database *Lichess · its
+  name*, made when missing.
+- **Where it shows**: online, the bot shows where what runs shows: on the Home page under *In progress*, and on the
+  Tournaments page, with its game, *On the Board*, *Its card* and *Put offline*.
+- **A tournament first**: a challenge is declined *later* while a tournament playing on this computer needs the cores
+  the bot's engine would take. A game of the bot's already playing when a tournament starts goes on to its end, its
+  engine's threads counted in the core budget as the Board page's engines are; no new challenge is taken meanwhile.
+- **Fair play**: the bot's games are not yours, and they do not lock your aids. During your own live game on Lichess,
+  the bot's search is not shown on its card nor on the Board (the card says why); its games go on.
+- **Unlink the bot…** (a second click) revokes its token at Lichess and deletes it here; the account stays a bot.
+- What leaves the machine: the engine's moves, its words in the chat, its answers to the challenges, with the bot's
+  token; nothing of your account. Its profile (name, description) is set on lichess.org. Its choices and its last
+  games are kept in the profile's `bot/bot.json`.
+
+The command palette has *Put the Lichess bot online*, *Put the Lichess bot offline*, *The Lichess bot's game on the
+Board* and *The Lichess bot's card*, and on the Engines page *Make … a Lichess bot…*.
 
 ## Books
 
@@ -1910,7 +1981,9 @@ browser or on a phone:
 
 A banner on the Board page says which game locks what. The Home page's Lichess card lists your games in progress,
 those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*, or *On the
-Board* once RookStudio may play your games (see [A game on Lichess](#a-game-on-lichess)).
+Board* once RookStudio may play your games (see [A game on Lichess](#a-game-on-lichess)). Your Lichess bot's games are
+not yours and lock nothing; during your own live game, the bot's search is not shown (see [A Lichess
+bot](#a-lichess-bot)).
 
 Your games in progress are asked for with your account's token when the Home page shows, every half-minute while a
 live game lasts and every ten minutes while a correspondence game does. The Lichess page offers once to hear them start

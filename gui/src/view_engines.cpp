@@ -1399,6 +1399,9 @@ void App::drawEngines() {
     ImGui::EndDisabled();
     if (in_use) ImGui::TextDisabled("%s", TR("Engine used by the running match: changes are locked."));
 
+    // On Lichess, as a bot (#85, mockup M12, board 6).
+    drawBotPart(e);
+
     ImGui::Separator();
     if (!e.id_name.empty()) {
         ImGui::Text("%s", e.id_name.c_str());

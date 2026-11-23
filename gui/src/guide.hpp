@@ -42,6 +42,7 @@ inline constexpr const char* Rebuilt            = "rebuilt-programs";
 inline constexpr const char* Import             = "importing-engines-and-ratings";
 inline constexpr const char* PopularEngines     = "popular-engines";
 inline constexpr const char* WinBoard           = "winboard-engines";
+inline constexpr const char* LichessBot         = "a-lichess-bot";
 inline constexpr const char* Books              = "books";
 inline constexpr const char* BookChecks         = "checking-a-book";
 inline constexpr const char* CreatingBooks      = "creating-books";

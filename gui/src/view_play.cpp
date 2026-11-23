@@ -1325,7 +1325,7 @@ void App::drawPlayEngine() {
         bool ready = !playStartFen(s, s.colour == 1 ? chess::Color::WHITE : chess::Color::BLACK, &why).empty();
         if (ready && s.colour == 2) ready = !playStartFen(s, chess::Color::WHITE, &why).empty();
         const int need  = engine->threads();
-        const int busy  = tournamentThreads() + boardThreads();
+        const int busy  = tournamentThreads() + boardThreads() + botThreads();  // the Lichess bot's game too (#85)
         const bool full = busy + need > topology_.logical;
         if (primaryButton(TR("Play"), ready && lock.empty()) || (enter && ready && !engineGameRunning()))
             startEngineGame();

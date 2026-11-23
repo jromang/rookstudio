@@ -95,10 +95,15 @@ struct TokenState {
                                    std::chrono::milliseconds within = std::chrono::minutes(5),
                                    const std::atomic<bool>* cancel = nullptr, std::string_view username = {});
 
-// In the profile: lichess-account.json, readable and writable by its owner alone.
-[[nodiscard]] std::optional<Account> loadAccount(const std::filesystem::path& profile);
-void saveAccount(const std::filesystem::path& profile, const Account& account);  // throws std::runtime_error
+// In the profile, readable and writable by its owner alone: lichess-account.json, the user's account; a Lichess bot's
+// account has its own (#85), its token apart from the user's.
+inline constexpr const char* ACCOUNT_FILE     = "lichess-account.json";
+inline constexpr const char* BOT_ACCOUNT_FILE = "lichess-bot.json";
+[[nodiscard]] std::optional<Account> loadAccount(const std::filesystem::path& profile, const char* file = ACCOUNT_FILE);
+// Throws std::runtime_error.
+void saveAccount(const std::filesystem::path& profile, const Account& account, const char* file = ACCOUNT_FILE);
 // Unlinks: the token revoked at Lichess, then the file removed whatever Lichess said; Lichess's error, if any.
-std::string forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel = nullptr);
+std::string forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel = nullptr,
+                          const char* file = ACCOUNT_FILE);
 
 }  // namespace fcg::lichess

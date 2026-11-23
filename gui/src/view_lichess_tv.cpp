@@ -631,9 +631,9 @@ void App::drawTvBoardCard() {
         ImGui::TextUnformatted(trf("Kept in “{}”", stored->second).c_str());
     } else if (kept != tv_kept_.end()) {
         tv_keep_menu_ = false;
-        ImGui::TextUnformatted(trf("Kept in “{}” at its end", kept->base).c_str());
+        ImGui::TextUnformatted(trf("Goes into “{}” at its end", kept->base).c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Not any more"))) {
+        if (ImGui::SmallButton(TR("Don't keep it"))) {
             tv_kept_.erase(kept);
             saveTvKept();
         }
@@ -683,7 +683,7 @@ void App::drawTvEngineLine(const EngineEntry& e) {
                       "analysed by {} on your machine; no account needed.",
                       e.name));
     }
-    const char* summary = TR("Lichess's best bots, this engine analysing beside them");
+    const char* summary = TR("Lichess's best bots, or players against its AI, this engine analysing each game");
     ui::sameLineOrWrap(ImGui::CalcTextSize(summary).x);
     ImGui::TextDisabled("%s", summary);
 }

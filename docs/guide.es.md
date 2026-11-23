@@ -74,7 +74,7 @@ match terminado.
 <!-- en: the-window 3a5230d4 -->
 
 ### Las páginas
-<!-- en: the-pages 39322f52 -->
+<!-- en: the-pages 80c43812 -->
 
 Una barra de navegación a la izquierda lleva a las páginas de la [vista](#vistas) mostrada, en su orden:
 
@@ -86,7 +86,7 @@ Una barra de navegación a la izquierda lleva a las páginas de la [vista](#vist
 | Bases de datos | Tus bases de datos de partidas: importación, la lista de partidas, las búsquedas |
 | Aperturas | Tus repertorios, su cobertura y sus huecos |
 | Lichess | Tu cuenta de Lichess, las partidas de un jugador, las retransmisiones oficiales, lo que el análisis puede consultar a Lichess |
-| Jugar | Una partida contra un motor, en la página Tablero |
+| Jugar | Una partida contra un motor de la biblioteca con la fuerza que elijas, con sus aperturas y una ventaja, jugada en la página Tablero (consulta [La página Jugar](#la-página-jugar)) |
 | Motores | La biblioteca de motores: opciones, comprobaciones, grupos, Elo de referencia, importación de las listas de otros programas, los motores populares |
 | Libros | La biblioteca de libros de aperturas, y las aperturas de cada libro con lo que tienen de malo |
 | Suites | Suites de tests (STS, WAC, ERET…): motores frente a las posiciones de un archivo EPD |
@@ -95,7 +95,7 @@ Una barra de navegación a la izquierda lleva a las páginas de la [vista](#vist
 | Ajustes | Idioma, tema, tamaño de la interfaz, notificaciones, la apariencia de los tableros, las vistas, el asistente, las carpetas del perfil y de torneos, las máquinas remotas, el token de lichess, la versión, la forma en que se dibuja la ventana: primero las secciones de las páginas de la vista, las demás en *Otros ajustes* |
 
 ### Vistas
-<!-- en: views 3d580a43 -->
+<!-- en: views 9c72e404 -->
 
 Una vista es un conjunto de páginas a tu medida: hasta tres, cada una con su nombre, su icono y su color, que se cambian
 en lo alto de la barra lateral. Cada vista tiene allí su botón, relleno para la vista mostrada, y el nombre de la vista
@@ -103,8 +103,10 @@ mostrada se escribe debajo de ellos; un clic en un botón, o de Ctrl+1 a Ctrl+3,
 que estaba. Con una sola vista, el selector desaparece.
 
 El primer inicio ofrece tres: *Pruebas* (Torneos, Motores, Libros, Tablero, Suites, Clasificaciones, Registro),
-*Estudio* (Inicio, Tablero, Bases de datos, Aperturas, Lichess, Motores) y *Todo* (todas las páginas). Ajustes está en
-todas las vistas.
+*Estudio* (Inicio, Tablero, Bases de datos, Aperturas, Entrenamiento, Jugar, Lichess, Motores) y *Todo* (todas las
+páginas). Ajustes está en todas las vistas. Una página que llega con una versión nueva no se añade sola a una vista que
+ya tienes: la página Inicio la ofrece una vez (consulta [La página Entrenamiento](#la-página-entrenamiento) y [La
+página Jugar](#la-página-jugar)).
 
 *Editar las vistas* abre la hoja de las vistas en lugar de la página: *Ajustes* > *Vistas*, ⋯ bajo el selector, un clic
 derecho en un botón (la hoja se abre en su vista), o *Editar las vistas…* en Ctrl+K. Contiene:
@@ -338,7 +340,7 @@ tableros siguen planos y *Apariencia* dice por qué. Las piezas son las Staunton
 licencia MIT; *Apariencia* enlaza con ellas.
 
 ## Atajos de teclado
-<!-- en: keyboard-shortcuts 88be4815 -->
+<!-- en: keyboard-shortcuts 4be4d428 -->
 
 | Teclas | Dónde | Qué hacen |
 |---|---|---|
@@ -373,7 +375,7 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | El Tablero de estudio | Deshacer, rehacer |
 | <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>S</kbd> | El Tablero de estudio | Guardar la partida; guardar una copia en otro sitio |
 | <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | El Tablero de estudio | La partida anterior, la siguiente de la lista de la que vino |
-| <kbd>Alt</kbd>+<kbd>H</kbd> | El Tablero de estudio | Desplegar las cabeceras de la partida |
+| <kbd>Alt</kbd>+<kbd>H</kbd> | El Tablero de estudio | Desplegar las cabeceras de la partida (una pista durante una partida contra un motor) |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | El Tablero de estudio | Las pestañas Notación, Análisis, Árbol, Referencias y Preguntas |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | El Tablero de estudio | El asistente comenta la jugada |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Mayús</kbd>+<kbd>N</kbd> | El Tablero de estudio | Lo que hacen F, A, X, G, N y Mayús+N en el Tablero de los motores (aquí las letras escriben jugadas) |
@@ -381,6 +383,24 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Intro</kbd> | La página Aperturas | Iniciar el entrenamiento del repertorio mostrado |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espacio</kbd>, <kbd>Esc</kbd> | Una sesión de entrenamiento | Una pista, «No lo sé», detener |
 | <kbd>Intro</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Una sesión de entrenamiento | La siguiente posición, o de nuevo tras una respuesta equivocada; quitar una jugada añadida al repertorio |
+| <kbd>Intro</kbd> | La página Entrenamiento | Repasar todo; o iniciar los ejercicios una vez que se ha hecho clic en una de sus opciones |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espacio</kbd>, <kbd>Esc</kbd> | Una serie de ejercicios | Una pista, «No lo sé», detener |
+| <kbd>Intro</kbd>, <kbd>→</kbd> | Una serie de ejercicios | El siguiente ejercicio, o de nuevo tras una respuesta equivocada; la solución jugada a jugada |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Espacio</kbd>, <kbd>Esc</kbd> | Un ejercicio de tus errores | Una pista, «No lo sé», detener |
+| <kbd>Intro</kbd> | Un ejercicio de tus errores | El siguiente ejercicio, o de nuevo tras una respuesta equivocada |
+| <kbd>Intro</kbd>, <kbd>Esc</kbd> | Adivinar las jugadas | La partida sigue enseguida tras una puntuación; detener |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Intro</kbd> | Los finales de la página Entrenamiento | Elegir un final una vez que se ha hecho clic en uno; jugarlo |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Esc</kbd> | Un final contra las tablas | Deshacer una jugada, la jugada correcta, detener |
+| <kbd>Intro</kbd> | Un final contra las tablas | Tras un fallo: deshacerlo; al final: otra vez, o el siguiente |
+| <kbd>Intro</kbd>, <kbd>Esc</kbd> | Visión del tablero | Empezar, continuar; detener |
+| <kbd>Intro</kbd> | La página Jugar | Jugar una partida contra el motor elegido |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> | Una partida contra un motor | Deshacer tu última jugada; una pista |
+| <kbd>Intro</kbd> | Una partida contra un motor | Confirmar *Abandonar…*; reanudar una partida guardada al cerrar RookStudio; cuando ha terminado, revisarla |
+| <kbd>Intro</kbd>, <kbd>Esc</kbd> | La página Jugar, en Lichess | Aceptar el desafío recibido, si no buscar una partida; retirar la búsqueda o el desafío |
+| <kbd>Intro</kbd>, <kbd>Esc</kbd> | Una partida en Lichess | Enviar la jugada por correspondencia en espera, confirmar *Abandonar…*; retirar la jugada en espera o anticipada |
+| Una letra y luego una cifra | Las coordenadas, *¿Dónde está…?* | Nombrar una casilla |
+| <kbd>Mayús</kbd> pulsada, <kbd>F2</kbd> | A ciegas | Las piezas visibles 2 segundos, tres veces por partida; *¿Dónde está…?* |
+| <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | Una línea leída mentalmente | La pieza como la escribe la FEN (un caballo blanco, uno negro), o ninguna |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Intro</kbd> | Una lista de partidas | Recorrer la lista, abrir la partida |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | La página Bases de datos | El panel de búsqueda |
 | <kbd>Esc</kbd> | La página Bases de datos | Cerrar el panel de búsqueda, luego la lista |
@@ -401,7 +421,7 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | El modo sin interfaz gráfica | Detenerse tras las partidas en juego |
 
 ## La página Inicio
-<!-- en: the-home-page fde97c98 -->
+<!-- en: the-home-page 8f520943 -->
 
 La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, primero lo que está en marcha:
 
@@ -409,17 +429,19 @@ La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, 
   pequeño, de dónde viene (su base de datos y su número, su lugar en un filtro, o su archivo), sus comentarios, y si
   tiene cambios aún sin guardar. *Reanudar* (Intro) vuelve a ella; Ctrl+Tab lista las partidas recientes.
 - Lo que se puede empezar, cada cosa con su tecla: *Abrir un PGN…* (Ctrl+O), *Pegar una partida o un FEN* (Ctrl+V),
-  *Nueva partida* (Ctrl+N), *Importar a una base de datos…*, *Jugar contra un motor*, *Nuevo torneo*: los de las páginas
-  de la vista.
+  *Nueva partida* (Ctrl+N), *Importar a una base de datos…*, *Jugar contra un motor* (la página Jugar), *Nuevo torneo*:
+  los de las páginas de la vista.
 - Los torneos en marcha, como en la página Torneos, cuando la vista tiene Torneos.
 - **Recientes**: las partidas abiertas en el tablero; un clic vuelve a abrir una con sus cambios.
 - **Mis bases de datos**: cada una con sus partidas y el estado de su árbol de aperturas, la importación en curso, *+
   Importar…*, y los torneos leídos sin copia (consulta [Bases de datos](#bases-de-datos)).
 - **Lichess**: la cuenta, las partidas de un jugador con *Sincronizar*, las partidas nuevas contadas si lo elegiste, las
   retransmisiones en directo (consulta [La página Lichess](#la-página-lichess)).
-- **En curso**: el análisis de la partida, el de la posición, una importación, el asistente (su descarga, su modelo
-  cargado, *Liberar*), y las posiciones de tus repertorios por repasar; un clic las entrena (consulta
-  [Entrenar un repertorio](#entrenar-un-repertorio)).
+- **En curso**: una partida en Lichess jugada desde RookStudio (*Volver a la partida*) y los desafíos recibidos
+  (consulta [En Lichess](#en-lichess)), el análisis de la partida, el de la posición, una importación, el asistente (su
+  descarga, su modelo cargado, *Liberar*), una serie de ejercicios, una sesión de ejercicios, una partida que se
+  adivina, un final o un ejercicio de visión en curso, y lo que el repaso del día tiene pendiente, en una sola cifra; un
+  clic lo repasa todo (consulta [El repaso del día](#el-repaso-del-día)).
 
 El botón de búsqueda de arriba, o Ctrl+K, encuentra un comando, una partida, una base de datos.
 
@@ -968,7 +990,7 @@ regla de las 50 jugadas está cerca. Las tablas son las del proceso del programa
 torneo en él.
 
 ### Jugar una partida desde una posición
-<!-- en: playing-a-game-from-a-position 1e310963 -->
+<!-- en: playing-a-game-from-a-position 6b5eb32f -->
 
 **Jugar una partida…** juega una partida desde la posición del tablero entre dos motores de la biblioteca, o entre tú y
 uno de ellos (ver *Humano* más abajo) (*Blancas* y *Negras*; `<->` los intercambia con sus relojes), con un reloj para
@@ -999,6 +1021,10 @@ partida* la termina en cualquier momento, ganada por el motor; con una segunda p
 invertido. Tus partidas se guardan con tu nombre de usuario, y solo el motor cuenta en el presupuesto de núcleos. No se
 puede deshacer una jugada, y el motor juega a plena fuerza salvo que su tarjeta fije una menor (`UCI_LimitStrength` y
 `UCI_Elo`, o `Skill Level`, si los tiene).
+
+En una vista para estudiar, la tarjeta también lleva a la página Jugar: una partida tuya contra un motor con la fuerza
+que elijas, con sus aperturas, una ventaja, jugadas deshechas y pistas, y sus ayudas ocultas hasta el final (consulta
+[La página Jugar](#la-página-jugar)).
 
 ### El Tablero de estudio
 <!-- en: the-study-board 60138fbd -->
@@ -1069,7 +1095,7 @@ menú de un motor o en la paleta de comandos, termina sus procesos. Cada gesto d
 comandos (Ctrl+K): un motor añadido, hecho el primero o quitado, sus ajustes, los hilos del análisis.
 
 ### Notación
-<!-- en: notation a447e870 -->
+<!-- en: notation 5147406e -->
 
 La notación se escribe en su sitio, sin ningún cuadro de diálogo:
 
@@ -1092,6 +1118,19 @@ distinguen de los tuyos, en gris azulado y en cursiva, tras un bocadillo, o en u
 comentario que ya estaba (consulta [Los comentarios del asistente](#los-comentarios-del-asistente)). Cuando tus estudios
 de teoría comentan la posición mostrada, *Teoría · 3* sobre las jugadas lleva a sus notas en la pestaña Árbol (consulta
 [Estudios de teoría](#estudios-de-teoría)).
+
+**La partida de un torneo**, en cualquiera de los dos estilos de su PGN (el de fastchess `{+0.35/18 1.234s, n=…}` o el
+estilo ChessBase `[%eval]`, `[%clk]` y `[%emt]`), tanto si se abre desde su archivo como desde una base de datos que la
+importó o desde un torneo leído como base de datos, muestra condensados los comentarios de sus motores: junto a cada
+jugada, en gris y en pequeño, la evaluación que dio su motor (para las blancas, como la barra y la curva) y su
+profundidad, *+1.44/22*, con el final del libro marcado. Al pasar el ratón por una jugada se ve el resto: su motor y su
+bando, la evaluación también desde su lado, la profundidad y la profundidad selectiva, el tiempo y cuándo se decidió por
+la jugada, los nodos y la velocidad, los accesos a las tablas de finales, sus posibilidades de victoria, tablas y
+derrota, y la línea que esperaba tras ella, escrita en jugadas. El botón derecho sobre la jugada muestra esa línea en el
+tablero, la convierte en variante desde donde la partida la dejó (Ctrl+Z la quita), o copia el comentario del motor tal
+cual. La línea bajo las jugadas elige lo que se muestra junto a ellas: la evaluación y la profundidad, también el
+tiempo, o nada (también con Ctrl+K). El PGN no cambia: Ctrl+S y *Copiar PGN* vuelven a escribir el comentario de cada
+motor tal como se leyó, con todos sus campos, mientras los datos de la jugada sigan siendo los mismos.
 
 ### Flechas y casillas
 <!-- en: arrows-and-squares a46e6347 -->
@@ -1132,10 +1171,10 @@ posición en lichess.org* abre con ella el tablero de análisis de Lichess en el
 dirección, nada más. *Compartir la partida* la importa en Lichess sin cuenta y copia su dirección: quien tenga la
 dirección ve la partida, también los nombres de sus jugadores. *Hacer jugar la posición*, con un control de tiempo (de
 3+2 a 30+20, o días por jugada), crea un desafío abierto desde la posición: un enlace para cada bando, para enviárselo a
-su jugador; una partida así no es puntuable. *Añadir la partida a tus marcadores de Lichess*, para una partida que viene
-de allí, la pone en tus marcadores: envía el id de la partida con tu token, y pide una vez a Lichess el permiso para
-cambiar tus preferencias. *A un estudio de Lichess…* envía la partida a uno de tus estudios o a uno nuevo (consulta [Tus
-estudios de Lichess](#tus-estudios-de-lichess)).
+su jugador; una partida así es amistosa, no por puntos. *Añadir la partida a tus marcadores de Lichess*, para una
+partida que viene de allí, la pone en tus marcadores: envía el id de la partida con tu token, y pide una vez a Lichess
+el permiso para cambiar tus preferencias. *A un estudio de Lichess…* envía la partida a uno de tus estudios o a uno
+nuevo (consulta [Tus estudios de Lichess](#tus-estudios-de-lichess)).
 
 Mientras juegas una partida en Lichess, ninguna de ellas toca su línea: una posición en el camino hacia su posición, o
 la partida que pasa por ella, no sale de la máquina (consulta [Juego limpio](#juego-limpio)). Lo demás sigue siendo
@@ -1197,7 +1236,17 @@ anteriores. El resumen dice lo mismo de la posición. Cuesta una petición por j
 lo pides; el explorador de los maestros no tiene meses.
 
 ### La revisión de una partida
-<!-- en: the-review-of-a-game 1bad0f30 -->
+<!-- en: the-review-of-a-game 7c5c4437 -->
+
+En el Tablero de estudio, la partida de un torneo muestra arriba de la pestaña *Revisión* lo que pensaban sus dos
+motores, en cuanto se abre y sin ningún análisis: las posibilidades de las blancas a lo largo de la partida según cada
+motor en sus propias jugadas (a partir de la proporción de victorias, tablas y derrotas que dio, invertida para las
+negras, o si no a partir de su evaluación convertida como hace la revisión), el libro sombreado, y teñidos los tramos en
+los que los dos motores veían partidas distintas; debajo, el tiempo de cada jugada, el de las blancas sobre la línea y
+el de las negras debajo; el tiempo, la profundidad media y la velocidad de cada motor. Luego sus momentos, cada uno a un
+clic: cómo veía cada motor la partida al salir del libro, dónde discreparon, dónde entraron las tablas de finales en una
+búsqueda, dónde se vio un mate, y cómo terminó la partida. Una vez analizada la partida, la curva de la revisión se
+dibuja sobre las suyas, más gruesa.
 
 En el Tablero de estudio, la pestaña *Revisión*, junto a la notación, lee el análisis de la partida (Alt+G) como lo
 haría un entrenador:
@@ -1370,7 +1419,7 @@ tiene no se añade dos veces. Las partidas conservan su fuente, la página de la
 que compartas de ellas se comparte bajo la misma licencia. Lo que sale de la máquina: la petición de la página, y luego
 del archivo del mes.
 
-*Desde una fuente… › Partidas de Lichess* lee un mes de partidas puntuables de Lichess (CC0, unos 95 millones de
+*Desde una fuente… › Partidas de Lichess* lee un mes de partidas por puntos de Lichess (CC0, unos 95 millones de
 partidas y 30 GB comprimidos) a medida que se descarga, y solo conserva las partidas que pasan sus filtros: por defecto,
 ambos jugadores con 2400 o más, sin bullet (un tiempo base más 40 incrementos por debajo de tres minutos). Solo las
 partidas conservadas llegan al disco, añadidas por lotes a la base de datos elegida, que se puede leer todo el tiempo.
@@ -1414,7 +1463,7 @@ siguen el repertorio que encuentran respuesta hasta el final de sus líneas, o h
 línea que termina en una jugada del rival. Un clic muestra la posición, con el árbol al lado.
 
 ### Entrenar un repertorio
-<!-- en: training-a-repertoire d5d14dcc -->
+<!-- en: training-a-repertoire 6b0acafe -->
 
 Cada posición de un repertorio en la que te toca jugar, y en la que el repertorio tiene tu jugada, es una posición que
 entrenar. RookStudio te las pregunta una y otra vez, cada vez más espaciadas a medida que las sabes, con FSRS, la
@@ -1450,9 +1499,10 @@ ahora las … posiciones falladas*.
 
 Los repasos se guardan en el perfil junto al repertorio (`Najdorf.training.json`, y `Najdorf.reviews.jsonl`, una línea
 por respuesta): su PGN no cambia. Una jugada cambiada en el repertorio vuelve a hacer nueva su posición. Nada sale de la
-máquina. *En curso*, en la página Inicio, dice cuántas posiciones hay por repasar, y un clic las entrena; también Ctrl+K
-*Entrenar el repertorio*. Mientras se juega en directo en Lichess una de tus partidas, el entrenamiento espera; las
-posiciones de la línea de una de tus partidas por correspondencia quedan fuera hasta que termine.
+máquina. Las posiciones pendientes cuentan en el repaso del día con los demás tipos (consulta [El repaso del
+día](#el-repaso-del-día)); también Ctrl+K *Entrenar el repertorio*. Mientras se juega en directo en Lichess una de tus
+partidas, el entrenamiento espera; las posiciones de la línea de una de tus partidas por correspondencia quedan fuera
+hasta que termine.
 
 ### Estudios de teoría
 <!-- en: theory-studies 8ba97ca4 -->
@@ -1487,6 +1537,466 @@ sobre una nota de una jugada muestra la jugada como la flecha del árbol; sobre 
 flechas y casillas en el tablero. En la pestaña **Notación**, *Teoría · 3* sobre las jugadas dice cuántas notas tiene
 la posición, y lleva a la pestaña Árbol (Alt+3). Mientras se juega en directo en Lichess una de tus partidas, las notas
 se ocultan con el árbol.
+
+## La página Entrenamiento
+<!-- en: the-training-page 5ebf17d1 -->
+
+La página **Entrenamiento** reúne lo que vuelve hoy, y luego los ejercicios por tipo. Está en la barra lateral entre
+Aperturas y Lichess, en las vistas *Estudio* y *Todo*. Una vista que creaste antes no cambia sola: la página Inicio
+ofrece una vez añadir la página a la vista mostrada (*Añadirla a …*, o *Ahora no*), y mientras tanto Ctrl+K
+*Entrenamiento* lleva allí.
+
+Su título tiene seis partes: **Hoy** (el repaso del día, los tipos de ejercicios, los ejercicios que iniciar),
+**Ejercicios** (la misma elección de ejercicios, la base de datos de Lichess guardada en tu disco, tus resultados por
+tema), **Mis errores** (consulta [Tus errores como ejercicios](#tus-errores-como-ejercicios)), **Adivinar las jugadas**
+(consulta [Adivinar las jugadas](#adivinar-las-jugadas)), **Finales** (consulta [Finales contra las
+tablas](#finales-contra-las-tablas) y [Mates](#mates)) y **Visión** (consulta [Visión del
+tablero](#visión-del-tablero)). Una tarjeta para cada tipo de ejercicio lleva a su parte. Todo funciona sin conexión; lo
+que va a Lichess se indica donde lo eliges.
+
+### El repaso del día
+<!-- en: the-days-review b7049c16 -->
+
+*Por repasar hoy* cuenta lo que cada tipo de entrenamiento tiene pendiente hoy, cada uno con su repetición espaciada
+(FSRS), en una sola cola: los errores de tus partidas (consulta [Tus errores como
+ejercicios](#tus-errores-como-ejercicios)), las posiciones de tus repertorios (su entrenamiento sigue en la página
+Aperturas, consulta [Entrenar un repertorio](#entrenar-un-repertorio)), los ejercicios y los finales que fallaste.
+*Repasar todo* (Intro) los toma uno tras otro en la página Tablero: tus errores pendientes, las posiciones pendientes de
+cada repertorio, los ejercicios por repasar, y luego los finales. Al final de cada tipo, *Siguiente: …* (Intro) continúa
+y *Volver a la página Entrenamiento* (Esc) se detiene ahí; lo respondido se conserva. Junto al botón, el tiempo que
+debería llevar, según el ritmo de tus respuestas; debajo, lo que vuelve mañana y en tres días. Cuando hay errores o
+ejercicios pendientes junto con otros tipos, *Solo mis errores* y *Solo los ejercicios* los repasan por separado.
+
+*En curso*, en la página Inicio, tiene la misma cifra (*35 por repasar hoy · Repasar todo*), y un clic lo repasa todo;
+también Ctrl+K *Repasar todo*.
+
+### Ejercicios
+<!-- en: puzzles e825fb2f -->
+
+Lichess publica cada mes sus ejercicios como base de datos (database.lichess.org, CC0): 6.193.530 ejercicios en
+noviembre de 2026, cada uno con su rating, sus temas y, antes de la jugada 20, su apertura. RookStudio la guarda en tu
+disco y te da ejercicios de ella sin red.
+
+**La base de datos.** *Descargar* trae el archivo (unos 295 MB) y lo lee a medida que llega en un almacén de unos 293 MB
+en el perfil; el archivo en sí no se guarda. Una descarga interrumpida (*Cancelar*, la red, el programa cerrado)
+continúa desde donde se detuvo: *Continuar*, o *Empezar de nuevo*. *Un archivo ya descargado…* lee en su lugar
+`lichess_db_puzzle.csv.zst` de tu disco. Una vez allí: *Actualizar* pregunta a database.lichess.org la fecha de su
+archivo y lee uno más reciente mientras los ejercicios guardados siguen disponibles; *Quitar* libera el disco (tu
+rating, tus resultados y tus ejercicios por repasar se quedan, guardados aparte). Nada sale de la máquina salvo la
+petición del archivo.
+
+**La elección.** *Sin conexión* (la base de datos) o *En línea* (tu cuenta de Lichess, consulta [Los ejercicios de
+Lichess en línea](#los-ejercicios-de-lichess-en-línea)); un tema entre los primeros ofrecidos, cada uno con la
+frecuencia con la que lo resuelves al primer intento, o entre *Todos los temas…*, que lista cada tema y cada apertura
+con sus ejercicios (escribe unas letras para encontrar uno); y una dificultad: *Más fácil* (300 puntos por debajo de tu
+rating), *Tu rating*, *Más difícil* (300 por encima). *Iniciar · 20 ejercicios* (Intro) empieza una serie cerca de tu
+rating, nunca con un ejercicio que ya hayas visto; Ctrl+K tiene *Ejercicios: Ataque doble* y los demás temas, que
+inician una serie al momento.
+
+**Una serie** ocupa la página Tablero, cuya columna pasa a ser la del ejercicio, como hace el entrenamiento de los
+repertorios; la partida del tablero espera entre las partidas recientes y vuelve después. El tablero muestra la posición
+desde tu lado, con la jugada del rival recién hecha en verde claro. Haz tu jugada en el tablero, o escríbela (sus
+letras, luego Intro); RookStudio hace las respuestas del rival, el resto de la solución. Durante la pregunta, el motor,
+el árbol y tus notas se ocultan, y también los temas del ejercicio.
+
+- **Alt+H**: una pista, la casilla de la pieza que hay que jugar en azul; el ejercicio cuenta entonces como fallado.
+- **Espacio**: «No lo sé»; se muestra la solución y el ejercicio cuenta como fallado.
+- **Esc**: detener; lo respondido se conserva.
+
+Correcto: la solución en jugadas, el cambio de tu rating y los temas del ejercicio; *Siguiente* llega con Intro, o por
+sí solo tras un segundo (el ajuste del entrenamiento de los repertorios); *Analizar aquí* (Alt+A) pone el motor en la
+posición; *La partida en lichess.org* abre la partida de la que viene el ejercicio. Cualquier jugada que da mate es
+correcta, como en Lichess. Incorrecto: tu jugada en naranja y la primera jugada de la solución como flecha verde;
+*Reintentar* (Intro) lo vuelve a jugar, sin volver a contar; *La solución jugada a jugada* (→) la juega una jugada cada
+vez; *Siguiente* continúa.
+
+Al final: los ejercicios resueltos al primer intento, los fallados, el cambio de tu rating, y la lista de los fallados
+(un clic muestra la posición con la solución); *Repasarlos ahora* los vuelve a preguntar sin contar, y *Volver a la
+página Entrenamiento* sale.
+
+**Tu rating** es el propio de RookStudio, calculado con Glicko-2 como calcula Lichess sus ratings de ejercicios: un
+ejercicio resuelto al primer intento, sin pista, se gana frente al rating del ejercicio. Parte de tu rating de
+ejercicios de Lichess cuando tu cuenta está vinculada, si no de 1500, y se mueve deprisa mientras es nuevo; los
+resultados de los ejercicios sin conexión no pueden volver a Lichess. *Tus resultados por tema* (la parte Ejercicios)
+cuenta los ejercicios de cada tema y con qué frecuencia los resolviste al primer intento.
+
+Un ejercicio que fallas pasa a ser una tarjeta del repaso del día: vuelve mañana, y luego cada vez más espaciado cada
+vez que lo resuelves; fallado de nuevo, más tarde en la misma serie, y luego al día siguiente. Todo ello se guarda en la
+carpeta `puzzles` del perfil (`rating.json`, `results.jsonl` con una línea por ejercicio, `review.json`), y la base de
+datos en `lichess-puzzles`.
+
+### Los ejercicios de Lichess en línea
+<!-- en: lichess-puzzles-online 51fd9d60 -->
+
+*En línea* da ejercicios de tu cuenta de Lichess: ejercicios que nunca viste, a tu rating de Lichess, cuyos resultados
+vuelven a Lichess. Necesita tu cuenta vinculada (consulta [Vincular tu cuenta](#vincular-tu-cuenta)); la primera vez,
+Lichess pide dos permisos más, *puzzle:read* y *puzzle:write*: *Autorizar en Lichess…* abre su página, tu cuenta sigue
+vinculada mientras tanto, y el token que sustituye se revoca.
+
+*Pedir una tanda · 50 ejercicios* pide a Lichess cincuenta ejercicios del tema y la dificultad elegidos. La tanda se
+guarda en tu disco: también se resuelve sin conexión, en tantas series como quieras (*Reanudar · quedan N*). *Por
+puntos* o *Sin puntuar, para probar* se envía con cada respuesta. Al final de la tanda, sus respuestas van a Lichess en
+una sola petición, que trae la siguiente tanda; tu rating de Lichess se mueve entonces, y la página dice cuándo se
+aceptaron las últimas respuestas. Lichess pide a los programas que no descarguen su colección con estas peticiones: para
+eso está la base de datos.
+
+Cuando Lichess no puede aceptar las respuestas, se quedan en el disco, indicando lo que hay que hacer: demasiadas
+peticiones (429), se vuelven a enviar solas un minuto después, aunque RookStudio se haya cerrado mientras tanto; la red
+caída, se vuelven a enviar un minuto después; el token rechazado, se envían cuando la cuenta vuelve a estar vinculada.
+*Reintentar ahora* no espera. Lo que sale de la máquina: la tanda pedida (su tema o su apertura, su dificultad), y luego
+el id de cada ejercicio con correcto o incorrecto, por puntos o no.
+
+### Tus errores como ejercicios
+<!-- en: your-mistakes-as-exercises b0e75f68 -->
+
+Los errores de tus propias partidas vuelven como ejercicios: la posición antes de tu jugada, para encontrar algo mejor.
+Tus partidas son aquellas en las que juegas con uno de tus nombres (consulta [Tus nombres](#tus-nombres)), en tus bases
+de datos. Cada una que tiene una revisión (consulta [La revisión de una partida](#la-revisión-de-una-partida)) da las
+jugadas que la revisión marcó con **?** y **??** en tu bando, donde hay una jugada mejor clara: la revisión buscó la
+posición lo bastante a fondo para nombrar su mejor jugada (su tercera pasada como mínimo), y la partida no estaba
+decidida de todos modos (la mejor jugada de la revisión te mantiene en la partida; tu jugada no conservaba una
+victoria). Las imprecisiones (?!) quedan fuera: rara vez tienen una única buena respuesta.
+
+La parte **Mis errores** cuenta los ejercicios y las partidas de las que vienen, los pendientes de hoy, los nuevos y los
+que sabes, pendientes para más tarde. Sus tipos salen de *En qué trabajar* de cada revisión: ataques dobles, piezas
+dejadas colgadas, finales de torres…; un botón para cada uno limita la lista y la sesión a ese tipo, y *Todos los tipos*
+los toma todos. La lista da de cada ejercicio la partida, dónde y cuándo se jugó, tu jugada y la de la revisión, y
+cuándo vuelve. *Iniciar · N ejercicios* (Intro) pregunta los pendientes, y luego los nuevos de hoy (tantos al día como
+las posiciones nuevas de los repertorios).
+
+Tus últimas partidas sin revisión se indican bajo la lista: *Revisarlas · en segundo plano* las revisa una tras otra,
+como la página Tablero revisa una partida (su motor, sus ajustes, los procesos que deja libres un torneo), y cada
+revisión se guarda con su partida; sus ejercicios llegan partida a partida. Mientras tanto se muestran el progreso, el
+tiempo que queda y *Cancelar*; las revisiones esperan mientras la página Tablero analiza.
+
+**Un ejercicio** ocupa la página Tablero, cuya columna pasa a ser la del ejercicio, como hace el entrenamiento de los
+repertorios: la partida hasta la posición, desde tu lado, con la última jugada del rival en verde claro; bajo el
+tablero, cuándo se jugó y lo que jugaste entonces. Haz tu jugada en el tablero, o escríbela. La mejor jugada de la
+revisión es correcta al momento; cualquier otra jugada la busca el motor de la revisión con los ajustes de la revisión
+(un hilo, su número de nodos, desde una tabla vacía), y es correcta cuando pierde como máximo 0,3 peones frente a la
+mejor de la revisión, o conserva una victoria que la revisión no marcaría. El motor, el árbol y tus notas se ocultan
+durante la pregunta.
+
+- **Alt+H**: una pista, la casilla de la pieza que hay que jugar en azul.
+- **Espacio**: «No lo sé»; se muestra la jugada de la revisión.
+- **Esc**: detener; lo respondido se conserva.
+
+Cada respuesta se califica sola, como una posición del repertorio: correcta al primer intento, *bien*; correcta tras una
+pista o tras más de 20 segundos, *difícil*; equivocada, *otra vez*. Correcto: la línea de la revisión y la de tu
+partida, lo que la revisión dijo de tu jugada, y cuándo vuelve el ejercicio; *Abrir la partida en esta jugada* la abre
+en la página Tablero. Incorrecto: tu jugada en naranja, la jugada de la revisión como flecha verde, y lo que el motor
+encontró tras la tuya; *Reintentar* (Intro) lo vuelve a jugar sin volver a contar; un ejercicio fallado vuelve unos
+ejercicios más tarde, y luego al día siguiente.
+
+Los ejercicios pendientes cuentan en el repaso del día (consulta [El repaso del día](#el-repaso-del-día)), y *Solo mis
+errores* los repasa por separado; Ctrl+K tiene *Repasar mis errores* y *Ejercicios de mis errores*. Una posición que
+entrena tu repertorio no se toma aquí: se entrena en la página Aperturas. Una partida quitada de su base de datos se
+lleva sus ejercicios. Los ejercicios y sus tarjetas se guardan en la carpeta `mistakes` del perfil (`exercises.json`, y
+`answers.jsonl`, una línea por respuesta); tus partidas no cambian, y nada sale de la máquina. Lo que dicen tus partidas
+también ordena los temas de los ejercicios de Lichess: los tipos de tus errores del último mes van primero entre ellos,
+indicados bajo los botones.
+
+### Tus nombres
+<!-- en: your-names 4a0ddfdd -->
+
+*Ajustes › Tus nombres* (o la parte *Mis errores*, antes de ningún nombre) lista los nombres con los que juegas, tal
+como los escriben tus bases de datos: una partida en la que juega uno de ellos es tuya. Un nombre coincide por sus
+palabras enteras, sin contar mayúsculas ni acentos: *Tester* es *Tester, Sam* y *TESTER, S.*, *Sam Tester* es *Tester,
+Sam*, pero *Test* no es nadie. El nombre de tu cuenta de Lichess vinculada cuenta por sí solo. Haz clic en un nombre
+para quitarlo: los ejercicios de sus partidas se van, pero sus tarjetas se conservan, y vuelven con ellos si añades de
+nuevo el nombre.
+
+### Adivinar las jugadas
+<!-- en: guessing-the-moves e004de63 -->
+
+**Adivinar las jugadas** reproduce una partida de tus bases de datos desde un bando: en cada una de sus jugadas,
+adivinas la que se hizo. El motor puntúa cada intento frente a la jugada de la partida: *como en la partida*, 3 puntos;
+*igual de buena* según el motor (como mucho 0,2 peones peor, o mejor), 2; *jugable* (como mucho 0,5 peones peor), 1; si
+no, ninguno. Es el motor de análisis, con un hilo, un segundo por jugada; la jugada de la partida se busca mientras
+piensas.
+
+*Una partida al azar* sortea una de la base de datos elegida, a través de un filtro: el filtro rápido de la lista de
+partidas (jugadores, evento, un código ECO, un año) y el Elo de los jugadores. Elige tu bando, y luego *Iniciar · una
+partida al azar* (Intro). Con *Las jugadas de teoría pasan solas* (que se conserva para la próxima vez), la adivinanza
+empieza donde la partida se aparta de las jugadas que hicieron muchas partidas de tus bases de datos (su árbol de
+aperturas). *La partida de la página Tablero* adivina la partida mostrada desde su posición, para el bando que juega:
+Ctrl+K *Adivinar las jugadas* en la página Tablero.
+
+La partida ocupa la página Tablero, cuya columna pasa a ser la de la adivinanza; la partida no se modifica, y sus
+jugadas posteriores no se muestran. Tras cada intento: tu jugada como flecha azul, la de la partida como flecha verde,
+los puntos y las dos evaluaciones; la partida sigue sola tras un momento (con Intro, al instante), con la respuesta del
+rival jugada, y la jugada siguiente es tuya. Debajo: cada intento y sus puntos, y la puntuación hasta ahora. Al final:
+tus puntos, cuántos intentos fueron la jugada de la partida, los peones perdidos por jugada de media, y las jugadas que
+más te costaron (un clic muestra su posición); la partida entera está en el tablero, ← y → la recorren. Cada partida
+adivinada se guarda en la carpeta `guess` del perfil; la página Entrenamiento muestra los puntos de la última.
+
+### Finales contra las tablas
+<!-- en: endgames-against-the-tables 6ded57cf -->
+
+La parte **Finales** es un catálogo de finales que ganar o que aguantar, jugados contra las tablas de finales:
+dieciocho, en cuatro grupos. *Mates elementales*: la dama, la torre, los dos alfiles, alfil y caballo. *Peones*: la
+oposición, la regla del cuadrado, el peón pasado alejado, la maniobra de Réti. *Torres*: Lucena, Philidor, Vancura,
+torre contra peón, torre y dos peones contra torre. *Piezas y dama*: dama contra torre, dama contra peón, el alfil del
+color equivocado, torre contra alfil, alfil contra caballo. Cada uno dice lo que pide (*mate*, *victoria* o *mantener
+las tablas*) y en qué punto estás: *por hacer*, *hecho*, *hecho en 9 (las tablas: 7)* para un mate, *por repetir* tras
+un fallo. Uno que las tablas disponibles no pueden responder aparece en gris, con sus piezas indicadas (consulta [Tablas
+para los finales](#tablas-para-los-finales)); pasa el ratón por uno para ver la idea que lo gana o lo aguanta. Un clic
+lo juega; luego ↑ y ↓ eligen otro e Intro lo juega. Ctrl+K tiene *Final: Lucena* y los demás.
+
+**Un final** ocupa la página Tablero, cuya columna pasa a ser la del final, como hacen los ejercicios; la partida del
+tablero espera entre las partidas recientes. Juegas desde tu lado; las tablas responden a cada jugada con la que resiste
+más tiempo (con las tablas Syzygy, la más larga hasta la siguiente captura o jugada de peón, y entre jugadas igual de
+largas la que te deja menos buenas respuestas). Encima de la pregunta: el veredicto de las tablas ahora (*Tablas de
+finales: ganan las blancas*), y a qué distancia: las jugadas hasta el mate cuando Lichess las conoce, si no las jugadas
+como máximo antes de una captura o una jugada de peón.
+
+- **Ctrl+Z**: deshacer tu última jugada y la respuesta de las tablas.
+- **Alt+H**: la jugada correcta, como flecha verde; el final cuenta entonces como hecho con ayuda.
+- **Empezar de nuevo**: volver al inicio. **Esc**: detener.
+
+Cada jugada se juzga al momento. Una que convierte una victoria en tablas, o unas tablas en derrota, es un fallo: las
+tablas responden, y luego la columna lo indica (*1.Kd5? Ke7: ahora, tablas*) con las jugadas que mantenían el resultado
+(*Mantenían la victoria: 1.Kd6!, 1.Kf6!*, con sus casillas en verde y tu jugada en naranja) y la idea del final.
+*Deshacer jugada* (Intro, o Ctrl+Z) la vuelve a jugar; *Ver la victoria* la deshace y escribe desde ahí la línea de las
+tablas; *Continuar de todos modos* sigue jugando con el nuevo veredicto. Debajo, el veredicto al principio y cada jugada
+que lo cambió.
+
+Una victoria cuenta con el mate, o en cuanto un peón tuyo se convierte en dama o el otro rey se queda solo, manteniendo
+la victoria; en los mates elementales el propio mate es el objetivo, y tus jugadas se comparan con el mate de las tablas
+desde el inicio. Unas tablas cuentan cuando una regla declara tablas (ahogado, material insuficiente, la triple
+repetición, las cincuenta jugadas), o tras aguantar 15 jugadas. Al final: *Otra vez* (Intro), *Siguiente:* el siguiente
+final aún no hecho, *Volver a la página Entrenamiento*.
+
+La posición anterior a un fallo pasa a ser una tarjeta del repaso del día (consulta [El repaso del
+día](#el-repaso-del-día)): vuelve mañana, con el final jugado de nuevo desde ella, y luego cada vez más espaciada cada
+vez que lo ganas o lo aguantas sin fallo (con ayuda, cuenta como difícil; con un fallo, como fallado). Ctrl+K *Repasar
+los finales fallados*.
+
+**De tus partidas** toma las posiciones de 7 piezas o menos entre tus errores (consulta [Tus errores como
+ejercicios](#tus-errores-como-ejercicios)), donde la revisión de tu partida vio escaparse la victoria, o las tablas.
+*Iniciar* las juega una tras otra contra las tablas, cada una desde la posición anterior a tu jugada; una que según las
+tablas estaba perdida de todos modos queda fuera. Los resultados y las tarjetas se guardan en la carpeta `endgames` del
+perfil (`record.json`).
+
+### Tablas para los finales
+<!-- en: tables-for-the-endgames 0e49bbca -->
+
+Las tablas son las de tu disco, las carpetas Syzygy de los torneos (*Adjudicación* > tablas de finales, consulta [Tablas
+de finales en la página Tablero](#tablas-de-finales-en-la-página-tablero)), con las propias del perfil una vez
+descargadas; para más piezas de las que tienen, las de Lichess en línea, hasta 7 piezas, con tu consentimiento para las
+tablas en línea (el de la página Tablero, consulta [En línea para el análisis](#en-línea-para-el-análisis)). Mientras un
+torneo se juega en el proceso del programa, las tablas del disco son suyas: entretanto responden las de Lichess, o el
+final espera.
+
+Cuando un final necesita tablas que no tienes, la parte lo indica (*No hay tablas para «Lucena»*) y ofrece tres
+opciones:
+
+- **Descargar las tablas de 3 a 5 piezas** (290 archivos, 938 MB) del espejo de Lichess, un archivo tras otro, primero
+  los más pequeños: los finales de 3 y 4 piezas están listos en unos segundos, los demás a medida que llegan sus
+  archivos. Una descarga interrumpida continúa desde donde se detuvo (*Continuar*); cada archivo se comprueba (su tamaño
+  y la marca de Syzygy). Las tablas van a la carpeta `syzygy` del perfil y, una vez completas, a las carpetas de los
+  torneos.
+- **Una carpeta de tablas ya en el disco…**: elegida también para los torneos.
+- **Las de Lichess, en línea**: hasta 7 piezas, una petición por posición jugada; elegirlas da el consentimiento.
+
+Sin tablas, los finales que las necesitan aparecen en gris, cada uno con lo que necesita; los demás ejercicios
+funcionan. En línea, un corte deja el final en espera: tu jugada se conserva, y se juzga cuando vuelve la red
+(*Reintentar ahora* no espera); un 429 espera el minuto que pide Lichess. Lo que sale de la máquina: con las tablas del
+disco, nada; con las de Lichess, cada posición jugada, como su FEN; para la descarga, la petición de cada archivo.
+
+### Mates
+<!-- en: mates 803d99bd -->
+
+La tarjeta **Mates** (en la parte Finales, a la que lleva la tarjeta de la parte Hoy) inicia 20 ejercicios de mate de
+Lichess (consulta [Ejercicios](#ejercicios)): de 1 a 5 jugadas, o por patrón (del pasillo, de la coz, de Anastasia,
+árabe, de Boden, de los dos alfiles, del gancho), cada botón con la frecuencia con la que lo resuelves al primer
+intento. Vienen de la base de datos de tu disco, si no de una tanda de tu cuenta de Lichess; sin ninguna de las dos, el
+clic lleva a la parte Ejercicios. Los mates elementales contra las tablas están en el catálogo de arriba, con tus
+jugadas contadas frente al mate de las tablas.
+
+### Visión del tablero
+<!-- en: board-vision dd34b350 -->
+
+La parte **Visión** entrena a ver el tablero mentalmente. Nada sale de la máquina; los récords se guardan en el
+`vision.json` del perfil.
+
+**Coordenadas**: treinta segundos de casillas. *Encontrar la casilla*: se nombra una casilla, haz clic en ella en un
+tablero sin sus letras ni sus cifras; *Nombrar la casilla*: se marca una casilla en azul, escribe su nombre (una letra,
+luego una cifra). Visto desde las blancas, desde las negras, o *Al azar*, con el tablero girando casilla a casilla. Un
+fallo muestra la casilla pedida en verde y la tuya en naranja. Al final, tu cifra y tu récord para esa modalidad y ese
+lado. Intro empieza, Esc detiene.
+
+**A ciegas**: una partida contra el motor de la página Jugar, con la fuerza y las aperturas elegidas allí (*Cambiar en
+la página Jugar*, consulta [Contra un motor](#contra-un-motor)). Juegas con blancas, con negras o con cualquiera al
+azar; el tablero oculta todas las piezas, todas las piezas tras la jugada 10, o todas salvo los peones, con la última
+jugada marcada. Escribe tus jugadas, o hazlas en el tablero; las jugadas hasta ahora se escriben en la columna. Mantén
+pulsada Mayús un momento para ver las piezas 2 segundos, tres veces por partida; F2 pregunta *¿Dónde está…?* por una
+pieza que sus palabras nombran sin ambigüedad (*el alfil negro de casillas oscuras*): haz clic en su casilla, o
+escríbela. Tu reloj es largo, el del motor corto; cada partida se añade al `games/blindfold.pgn` del perfil.
+
+**Una línea leída mentalmente**: una posición de una apertura conocida, con las seis jugadas que siguen escritas al lado
+sin mover las piezas, y luego una pregunta: ¿qué pieza hay en una casilla que cambiaron? Haz clic en la respuesta, o
+escribe la pieza como la escribe la FEN (*N* un caballo blanco, *n* uno negro, *-* una casilla vacía); el tablero
+muestra entonces la posición tras las jugadas. Diez líneas por serie.
+
+## La página Jugar
+<!-- en: the-play-page 468c2ade -->
+
+La página **Jugar** tiene dos partes: *Contra un motor*, una partida contra un motor de tu biblioteca jugada en la
+página Tablero, y *En Lichess*, tus partidas de Lichess jugadas desde RookStudio (consulta [En Lichess](#en-lichess));
+vuelve la última parte mostrada. Está en la barra lateral tras la página Entrenamiento, en las vistas *Estudio* y
+*Todo*. Una vista que creaste antes no cambia sola: la página Inicio ofrece una vez añadirla a la vista mostrada
+(*Añadirla a …*, o *Ahora no*), y mientras tanto Ctrl+K *Jugar contra un motor* (o *Jugar en Lichess*) lleva allí, igual
+que *Jugar contra un motor* en la página Inicio y *La página Jugar* en la tarjeta *Jugar una partida…* de la página
+Tablero. Contra un motor, nada sale de la máquina: el motor funciona en ella. Mientras se juega en directo en Lichess
+una de tus partidas, la página lo indica y no inicia ninguna partida contra un motor (consulta [Juego
+limpio](#juego-limpio)).
+
+### Contra un motor
+<!-- en: against-an-engine d08e9a6c -->
+
+La elección se conserva para la próxima partida: una vez hecha, basta con *Jugar* (Intro).
+
+- **El rival**: un motor de tu biblioteca, con las fuerzas que admite.
+- **Su fuerza**: el Elo al que apunta (`UCI_Elo`, con `UCI_LimitStrength`), en su propia escala: una indicación, no un
+  rating FIDE. Un motor sin ese ajuste juega en su lugar un número de nodos por jugada, de 1 a un millón, menos para un
+  juego más débil. *Fuerza máxima* lo deja en su mejor nivel, limite lo que limite su ficha.
+- **Su estilo: sus aperturas**, lo que juega antes de sus propias jugadas: *Las suyas* (sin libro); *Tus bases de datos*
+  (las jugadas más frecuentes allí, en todas tus bases de datos con árbol de aperturas o en una de ellas); *Tu
+  repertorio* (las jugadas contra las que te preparaste, y luego el motor; juegas con el color del repertorio, que
+  elegirlo fija); *Las partidas de un jugador* (las jugadas que un jugador hizo con el color del motor, de una base de
+  datos llamada *Lichess · nombre*, como la que crea preparar una partida contra él, consulta [Preparar una
+  partida](#preparar-una-partida)); *Un libro de la biblioteca* (un libro Polyglot o CTG de la página Libros, sin sus
+  jugadas a evitar). *Variar* elige al azar entre las jugadas hechas al menos 5 veces, con la frecuencia con la que se
+  hicieron (las de un libro según sus pesos, las de un repertorio por igual); sin marcar, la jugada más frecuente,
+  primero la jugada principal de un libro. Cuando sus aperturas no tienen jugada para la posición, el motor juega hasta
+  el final. Su estilo son sus aperturas: los ajustes propios del motor se quedan en su ficha. Con una pieza de ventaja,
+  las aperturas encuentran posiciones que no tienen, y el motor juega desde la primera jugada.
+- **Tú**: blancas, negras o al azar; el reloj, minutos y un incremento, *El mismo para ambos* o, sin marcar, uno propio
+  del motor (tiempo desigual); desde la posición inicial, o desde la de la página Tablero.
+- **La ventaja**: lo que el motor da al principio: nada, su peón f, su caballo b, su torre a (y con ella el enroque de
+  ese lado) o su dama; una pieza que no tiene donde empieza aparece en gris, y Chess960 no tiene ninguna. *Deshacer una
+  jugada* (permitido salvo que se desmarque) y las *Pistas* (3 por partida) también son ventajas, y se cuentan.
+
+La partida cuenta en el presupuesto de núcleos (los hilos del motor, como en una partida jugada desde el tablero); la
+página indica cuándo la máquina está llena.
+
+### La partida contra un motor
+<!-- en: the-game-against-an-engine bfdb25dc -->
+
+*Jugar* lleva la partida a la página Tablero, en una vista para estudiar: el tablero girado hacia tu lado, los relojes
+en marcha en las franjas de los jugadores (la del motor con su fuerza), y sobre la columna la tarjeta de la partida: a
+quién le toca, *Ofrecer tablas*, *Abandonar…*, *Deshacer jugada · Ctrl+Z*, *Pista · Alt+H*, *Detener*.
+
+- Haz tus jugadas en el tablero, o escríbelas: la primera letra de una jugada abre el campo, e Intro la juega.
+- **Las ayudas están ocultas hasta el final**: las pestañas Análisis, Árbol, Referencias y Preguntas, el análisis
+  (Alt+A), la amenaza, el análisis de la partida (Alt+G), las tablas de finales y el asistente. El motor tampoco muestra
+  nada de su búsqueda: sus evaluaciones llegan con la partida terminada. *Mostrarlas*, en la tarjeta o en lugar de una
+  pestaña, las devuelve durante la partida, que queda entonces marcada *con ayudas*.
+- *Deshacer jugada* (Ctrl+Z) deshace tu última jugada y la respuesta del motor, o tu jugada mientras el motor piensa,
+  con los relojes como estaban antes: se cuenta, y se escribe en la partida.
+- *Pista* (Alt+H): cuando te toca, la jugada del motor de análisis tras un segundo de búsqueda, como flecha verde; tres
+  por partida, contadas y escritas en la partida.
+- *Ofrecer tablas*: el motor responde con su próxima jugada. Acepta las tablas cuando va a recibir mate o está
+  claramente peor, o cuando no está mejor tras 20 jugadas; una jugada de sus aperturas las rechaza.
+- *Abandonar…* pide Intro, o un segundo clic, en unos segundos; *Detener* termina la partida sin resultado, guardada tal
+  cual.
+- Donde terminaron las aperturas del motor, la notación lo indica (*fin de tu repertorio · luego el motor*).
+
+Cerrar RookStudio durante la partida la conserva: en el próximo inicio vuelve a la página Tablero, con sus relojes
+esperando hasta que la reanudes (*Reanudar*, Intro) o la detengas (*Detenerla*). Otra partida abierta mientras tanto en
+el tablero deja la tuya en marcha, con tu reloj corriendo cuando te toca: *Volver a la partida* la recupera.
+
+### Después de la partida
+<!-- en: after-the-game 44d80f6b -->
+
+Al final, las ayudas vuelven, y la tarjeta dice cómo terminó la partida (*Tablas: triple repetición en la jugada 34*),
+contra qué y cómo: la fuerza, tu color, el reloj, las jugadas deshechas, las pistas, con o sin ayudas. La partida se
+guarda en la base de datos **Mis partidas contra motores**, creada con la primera partida, con sus ajustes en sus
+etiquetas: `Strength` (`UCI_Elo 1800`, `nodes 1000`, `full`), `Openings` (`repertoire Najdorf`, `database Mine`,
+`databases`, `player Somebody`, `book Human`, `engine`), `Handicap` (`knight b8`, con la posición inicial), `Takebacks`,
+`Hints`, `Aids`. Ctrl+S la vuelve a guardar allí tras un cambio.
+
+- *Revisarla* (Intro): el análisis de la partida, como hace Alt+G (consulta [La revisión de una
+  partida](#la-revisión-de-una-partida)); una vez revisada, tus errores en ella se convierten en ejercicios (consulta
+  [Tus errores como ejercicios](#tus-errores-como-ejercicios)) cuando tus nombres dicen que la partida es tuya (consulta
+  [Tus nombres](#tus-nombres)).
+- *Revancha, con los colores invertidos*: la misma elección, el otro color.
+- *Cambiar los ajustes*: la página Jugar.
+- *Cerrar*: la partida se queda en el tablero como cualquier otra.
+
+Debajo, **tus partidas contra ese motor a ese nivel**: ganadas, tablas y perdidas, las que tienen ayudas aparte y sin
+contar, y dónde perdiste la última (*un final de torres*), indicando si está entre tus ejercicios. El siguiente nivel se
+elige ahí o en la página Jugar: nada sube solo. Cada partida es también una línea del `play/games.jsonl` del perfil.
+
+### En Lichess
+<!-- en: on-lichess 4e5ccbb8 -->
+
+La parte **En Lichess** de la página Jugar juega tus partidas de Lichess desde RookStudio, a través de la Board API de
+Lichess, que está hecha para personas. Necesita tu cuenta vinculada (consulta [Vincular tu
+cuenta](#vincular-tu-cuenta)); la primera vez, Lichess pide un permiso más, *Jugar tus partidas* (`board:play`):
+*Autorizar en Lichess…* (Intro) abre la página de Lichess, tu cuenta sigue vinculada mientras tanto, y el token que
+sustituye se revoca. RookStudio nunca hace una jugada que no hayas hecho tú. Lo que sale de la máquina: tus búsquedas y
+desafíos, tus jugadas, tus mensajes de chat, tablas y abandonos, con el token de tu cuenta; las elecciones se guardan en
+el `play/lichess.json` del perfil.
+
+- **Buscar una partida**: rápida (10+0, 10+5, 15+10), clásica (30+0, 30+20) o por correspondencia (de 1 a 14 días por
+  jugada), por puntos o no, contra rivales de cualquier rating o de un rating cercano al tuyo a ese ritmo (±). Lichess
+  reserva el blitz y el bullet para su sitio web: un programa no los busca, y el blitz sigue siendo posible como desafío
+  directo. *Buscar un rival* (Intro) pone la búsqueda en la sala de espera de Lichess una vez abierto el flujo de
+  eventos de Lichess, como pide Lichess, para no perderse el inicio de la partida. Una búsqueda en directo sigue viva
+  mientras RookStudio la mantiene abierta: Esc la retira, y también cerrar RookStudio; la partida encontrada se abre en
+  la página Tablero. Una búsqueda por correspondencia se queda en la sala de espera hasta que alguien la acepta (la API
+  no puede retirarla; la sala de espera de lichess.org sí), y su partida aparece entre tus partidas en curso.
+- **Desafiar a un jugador**: su nombre, el reloj (3+2, 5+3, 10+5, 15+10, 3 días, u *otro…*: minutos y segundos añadidos
+  por jugada, o días por jugada; tres minutos como mínimo, contando el incremento cuarenta veces, ya que la Board API no
+  juega bullet), por puntos o no, tu color. Un desafío en directo espera la respuesta mientras te quedas (Esc, o
+  *Retirarlo*). Si lo rechaza, se indica el motivo de Lichess (*demasiado rápida para el rival*) con otros relojes a un
+  clic (más lentos tras «demasiado rápida»); si lo acepta, la partida se abre en la página Tablero.
+- **Un desafío recibido** aparece arriba de la parte (*Aceptar* · Intro, *Rechazar ▾* con los motivos de Lichess: *Ahora
+  no*, *Más tarde*, *Demasiado rápida para mí*, *Demasiado lenta para mí*, *Solo amistosas*, *Solo por puntos*), en la
+  página Inicio bajo *En curso*, y en un aviso en la esquina de la ventana estés donde estés, con un sonido cuando los
+  sonidos están activados; *Más tarde* aparta el aviso. Durante una partida en directo, espera al final de la partida.
+  Una partida que la Board API no puede jugar (bullet, una variante que no sea Chess960) se juega en lichess.org.
+- **Tus partidas en curso**: primero aquellas en las que te toca, con el tiempo que queda para jugar; un clic abre una
+  en la página Tablero, donde se hace tu jugada.
+
+El flujo de eventos es el de [Juego limpio](#juego-limpio): Lichess abre uno por token, y comunica los inicios y finales
+de las partidas, los desafíos recibidos y la suerte de los que enviaste.
+
+### Una partida en Lichess
+<!-- en: a-game-on-lichess 15ac0e49 -->
+
+La partida se juega en la página Tablero, en una vista para estudiar: el tablero girado hacia tu lado, los ratings y
+relojes de los jugadores en sus franjas, y sobre la columna la tarjeta de la partida: qué es (*Por puntos · Rápida 10+5
+contra …*), a quién le toca, *Ofrecer tablas*, *Abandonar…* (Intro, o un segundo clic, en unos segundos), *Proponer
+deshacer la jugada*, *Cancelar partida* (antes de que ambos bandos hayan movido), *Chat* (el chat de los jugadores),
+*Abrir en lichess.org*.
+
+- En directo, tus jugadas se envían en cuanto se hacen, en el tablero o escritas (la primera letra de una jugada abre el
+  campo, e Intro la juega). Una jugada hecha durante el turno de tu rival espera al tuyo (una flecha discontinua), y se
+  hace entonces si es legal; Esc la retira. Antes de tu primera jugada, la tarjeta cuenta el tiempo que da Lichess antes
+  de cancelar la partida.
+- Por correspondencia, una jugada espera tu confirmación (*Tu jugada: 10.g4 · aún no enviada*, una flecha en el
+  tablero): *Enviar* (Intro), o *Retirarla* (Esc). La tarjeta lista tus otras partidas por correspondencia, a un clic.
+- La oferta de tablas o la propuesta de deshacer jugada de tu rival llegan a la tarjeta con *Aceptar* y *Rechazar*; las
+  tuyas esperan su respuesta. Si tu rival sale de la partida, la tarjeta cuenta hasta que Lichess te deja reclamar la
+  victoria (*Reclamar la victoria*, *Reclamar tablas*).
+- **Las ayudas**: el bloqueo de [Juego limpio](#juego-limpio) se aplica, como en cualquier partida tuya. En directo,
+  todas las ayudas se bloquean en cualquier posición: las pestañas Análisis, Árbol, Referencias y Preguntas, el
+  análisis, la amenaza, las tablas, la nube y el asistente. Por correspondencia, el motor, la nube, las tablas y el
+  asistente se bloquean en la partida; el árbol de tus bases de datos y tus libros siguen abiertos, ya que Lichess
+  permite ahí un libro.
+- **Un corte**: la tarjeta lo indica (*tu reloj corre en Lichess*) y lo vuelve a intentar sola, tras 1, 2, 3 y luego
+  cada 5 segundos; la partida entera vuelve con la conexión, también el chat. Una jugada hecha mientras tanto no se
+  envía: vuelve a hacerla cuando vuelva la conexión. *Abrir la partida en lichess.org* sigue a mano.
+- **Cerrar RookStudio** durante una partida en directo pregunta antes (*Quedarse* · Esc, *Cerrar de todos modos*): la
+  partida sigue en Lichess, con tu reloj en marcha. En el próximo inicio, una partida que siga en juego vuelve a la
+  página Tablero, y la página Inicio la muestra primero. Otra partida abierta mientras tanto en el tablero deja la tuya
+  en marcha: *Volver a la partida* la recupera.
+- Al final, la tarjeta dice cómo terminó la partida y qué hizo con tu rating; la partida entra en tu base de datos de
+  Lichess, con el análisis de Lichess cuando lo hay, y su revisión a un clic, como tus demás partidas terminadas
+  (consulta [Tus partidas terminadas](#tus-partidas-terminadas)). *Otra partida* busca de nuevo con el mismo reloj.
 
 ## La página Lichess
 <!-- en: the-lichess-page ea1e19cc -->
@@ -1618,7 +2128,7 @@ retransmisiones, con una cuenta con permiso para leerlas, que se pide una vez, c
 marcadores necesitan una cuenta vinculada.
 
 ### Juego limpio
-<!-- en: fair-play e42fbcbd -->
+<!-- en: fair-play 12bbcbc4 -->
 
 Lichess prohíbe cualquier ayuda durante una partida. Con tu cuenta vinculada, RookStudio lo respeta juegues donde
 juegues, en el navegador o en un teléfono:
@@ -1635,13 +2145,15 @@ juegues, en el navegador o en un teléfono:
 
 Un aviso en la página Tablero dice qué partida bloquea qué. La tarjeta Lichess de la página Inicio lista tus partidas en
 curso, primero aquellas en las que te toca jugar, cada una con su reloj o el tiempo que queda para jugar, y *Abrir en
-lichess.org*.
+lichess.org*, o *En el Tablero* una vez que RookStudio puede jugar tus partidas (consulta [Una partida en
+Lichess](#una-partida-en-lichess)).
 
 Tus partidas en curso se piden con el token de tu cuenta cuando se muestra la página Inicio, cada medio minuto mientras
 dura una partida en directo y cada diez minutos mientras dura una por correspondencia. La página Lichess ofrece una vez
-enterarse en su lugar de su inicio y su final, mientras RookStudio está abierto: un permiso más, leer tus desafíos.
-RookStudio no lee ninguna jugada durante una partida y no juega ninguna. Sin ese permiso, el bloqueo llega cuando se
-muestra la página Inicio.
+enterarse en su lugar de su inicio y su final, mientras RookStudio está abierto: un permiso más, leer tus desafíos; el
+permiso para jugar tus partidas (consulta [En Lichess](#en-lichess)) se entera de ellos por el mismo flujo. RookStudio
+solo lee las jugadas de las partidas que juegas desde él, y solo hace las jugadas que haces tú. Sin ninguno de los dos
+permisos, el bloqueo llega cuando se muestra la página Inicio.
 
 ### Tus partidas terminadas
 <!-- en: your-finished-games 2e1cf545 -->
@@ -1701,7 +2213,7 @@ Lichess tiene una.
   leído.
 - Una vez terminada la preparación, la tarjeta da las posiciones, el tamaño y la fecha del archivo. Lichess vuelve a
   publicar el archivo cada mes: *Actualizar* pregunta a database.lichess.org su fecha y lee un archivo más reciente,
-  mientras las evaluaciones guardadas siguen respondiendo hasta que esté listo. *Quitarlas* libera el disco.
+  mientras las evaluaciones guardadas siguen respondiendo hasta que esté listo. *Quitar* libera el disco.
 
 Se muestran en tres lugares:
 

@@ -73,7 +73,7 @@ match terminato.
 <!-- en: the-window 3a5230d4 -->
 
 ### Le pagine
-<!-- en: the-pages 39322f52 -->
+<!-- en: the-pages 80c43812 -->
 
 Una barra di navigazione a sinistra porta alle pagine della [vista](#viste) mostrata, nel suo ordine:
 
@@ -85,7 +85,7 @@ Una barra di navigazione a sinistra porta alle pagine della [vista](#viste) most
 | Database | I tuoi database di partite: importazione, lista delle partite, ricerche |
 | Aperture | I tuoi repertori, la loro copertura e le loro lacune |
 | Lichess | Il tuo account Lichess, le partite di un giocatore, le trasmissioni ufficiali, ciò che l'analisi può chiedere a Lichess |
-| Gioca | Una partita contro un motore, nella pagina Scacchiera |
+| Gioca | Una partita contro un motore della libreria alla forza che scegli, con le sue aperture e un handicap, giocata nella pagina Scacchiera (vedi [La pagina Gioca](#la-pagina-gioca)) |
 | Motori | La libreria dei motori: opzioni, verifiche, gruppi, Elo di riferimento, importazione delle liste di altri programmi, i motori popolari |
 | Libri | La libreria dei libri di aperture, e le aperture di ogni libro con i loro difetti |
 | Suite | Suite di test (STS, WAC, ERET…): motori contro le posizioni di un file EPD |
@@ -94,7 +94,7 @@ Una barra di navigazione a sinistra porta alle pagine della [vista](#viste) most
 | Impostazioni | Lingua, tema, dimensione dell'interfaccia, notifiche, aspetto delle scacchiere, viste, assistente, cartelle del profilo e dei tornei, macchine remote, token lichess, versione, modo in cui viene disegnata la finestra: prima le sezioni delle pagine della vista, le altre sotto *Altre impostazioni* |
 
 ### Viste
-<!-- en: views 3d580a43 -->
+<!-- en: views 9c72e404 -->
 
 Una vista è un insieme di pagine tutto tuo: fino a tre, ciascuna con il suo nome, la sua icona e il suo colore, da
 scegliere in cima alla barra laterale. Ogni vista vi ha un pallino, pieno per la vista mostrata, e il nome della vista
@@ -102,7 +102,9 @@ mostrata è scritto sotto di essi; un clic su un pallino, o da Ctrl+1 a Ctrl+3, 
 era. Con una sola vista, il selettore scompare.
 
 Il primo avvio ne propone tre: *Test* (Tornei, Motori, Libri, Scacchiera, Suite, Classifiche, Log), *Studio* (Home,
-Scacchiera, Database, Aperture, Lichess, Motori) e *Tutto* (tutte le pagine). Impostazioni è in ogni vista.
+Scacchiera, Database, Aperture, Allenamento, Gioca, Lichess, Motori) e *Tutto* (tutte le pagine). Impostazioni è in ogni
+vista. Una pagina che arriva con una nuova versione non viene aggiunta da sola a una vista che hai già: la pagina Home
+la propone una volta (vedi [La pagina Allenamento](#la-pagina-allenamento) e [La pagina Gioca](#la-pagina-gioca)).
 
 *Modifica le viste* apre l'editor delle viste al posto della pagina: *Impostazioni* > *Viste*, ⋯ sotto il selettore, un
 clic destro su un pallino (l'editor si apre sulla sua vista), o *Modifica le viste…* in Ctrl+K. Contiene:
@@ -337,7 +339,7 @@ piatte e *Aspetto* dice perché. I pezzi sono gli Staunton-Pieces di clarkerubbe
 collegamento.
 
 ## Scorciatoie da tastiera
-<!-- en: keyboard-shortcuts 88be4815 -->
+<!-- en: keyboard-shortcuts 4be4d428 -->
 
 | Tasti | Dove | Cosa fanno |
 |---|---|---|
@@ -372,7 +374,7 @@ collegamento.
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | La Scacchiera per lo studio | Annulla, ripristina |
 | <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>S</kbd> | La Scacchiera per lo studio | Salva la partita; ne salva una copia altrove |
 | <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | La Scacchiera per lo studio | La partita precedente, la successiva della lista da cui viene |
-| <kbd>Alt</kbd>+<kbd>H</kbd> | La Scacchiera per lo studio | Espande le intestazioni della partita |
+| <kbd>Alt</kbd>+<kbd>H</kbd> | La Scacchiera per lo studio | Espande le intestazioni della partita (un suggerimento durante una partita contro un motore) |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | La Scacchiera per lo studio | Le schede Notazione, Analisi, Albero, Riferimenti e Domande |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | La Scacchiera per lo studio | L'assistente commenta la mossa |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Maiusc</kbd>+<kbd>N</kbd> | La Scacchiera per lo studio | Ciò che fanno F, A, X, G, N e Maiusc+N sulla Scacchiera dei motori (qui le lettere servono a digitare mosse) |
@@ -380,6 +382,24 @@ collegamento.
 | <kbd>Invio</kbd> | La pagina Aperture | Avvia l'allenamento del repertorio mostrato |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Spazio</kbd>, <kbd>Esc</kbd> | Una sessione di allenamento | Un suggerimento, «Non lo so», ferma |
 | <kbd>Invio</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Una sessione di allenamento | La posizione successiva, o di nuovo dopo una risposta sbagliata; toglie una mossa aggiunta al repertorio |
+| <kbd>Invio</kbd> | La pagina Allenamento | Ripassa tutto; oppure avvia i problemi dopo un clic su una delle loro scelte |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Spazio</kbd>, <kbd>Esc</kbd> | Una serie di problemi | Un suggerimento, «Non lo so», ferma |
+| <kbd>Invio</kbd>, <kbd>→</kbd> | Una serie di problemi | Il problema successivo, o di nuovo dopo una risposta sbagliata; la soluzione una mossa alla volta |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Spazio</kbd>, <kbd>Esc</kbd> | Un esercizio dei tuoi errori | Un suggerimento, «Non lo so», ferma |
+| <kbd>Invio</kbd> | Un esercizio dei tuoi errori | L'esercizio successivo, o di nuovo dopo una risposta sbagliata |
+| <kbd>Invio</kbd>, <kbd>Esc</kbd> | Indovina le mosse | La partita prosegue subito dopo un punteggio; ferma |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Invio</kbd> | I finali della pagina Allenamento | Scegli un finale dopo averne cliccato uno; giocalo |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Esc</kbd> | Un finale contro le tablebase | Ritira una mossa, la mossa giusta, ferma |
+| <kbd>Invio</kbd> | Un finale contro le tablebase | Dopo un errore: ritirala; alla fine: di nuovo, o il successivo |
+| <kbd>Invio</kbd>, <kbd>Esc</kbd> | Visione della scacchiera | Avvia, prosegui; ferma |
+| <kbd>Invio</kbd> | La pagina Gioca | Gioca una partita contro il motore scelto |
+| <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> | Una partita contro un motore | Ritira la tua ultima mossa; un suggerimento |
+| <kbd>Invio</kbd> | Una partita contro un motore | Conferma *Abbandona…*; riprende una partita conservata alla chiusura di RookStudio; una volta finita, la esamina |
+| <kbd>Invio</kbd>, <kbd>Esc</kbd> | La pagina Gioca, su Lichess | Accetta la sfida ricevuta, altrimenti cerca una partita; ritira la ricerca o la sfida |
+| <kbd>Invio</kbd>, <kbd>Esc</kbd> | Una partita su Lichess | Invia la mossa per corrispondenza in attesa, conferma *Abbandona…*; ritira la mossa in attesa o fatta in anticipo |
+| Una lettera, poi un numero | Le coordinate, *Dov'è…?* | Nomina una casa |
+| <kbd>Maiusc</kbd> tenuto premuto, <kbd>F2</kbd> | Alla cieca | I pezzi mostrati per 2 secondi, tre volte a partita; *Dov'è…?* |
+| <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | Una linea letta a mente | Il pezzo come lo scrive il FEN (un cavallo bianco, uno nero), o nessuno |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Invio</kbd> | Una lista di partite | Scorre la lista, apre la partita |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | La pagina Database | Il pannello di ricerca |
 | <kbd>Esc</kbd> | La pagina Database | Chiude il pannello di ricerca, poi la lista |
@@ -400,7 +420,7 @@ collegamento.
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | La modalità headless | Ferma dopo le partite in corso |
 
 ## La pagina Home
-<!-- en: the-home-page fde97c98 -->
+<!-- en: the-home-page 8f520943 -->
 
 La pagina **Home** di una vista raccoglie in schede le pagine della vista, a cominciare da ciò che è in corso:
 
@@ -408,17 +428,19 @@ La pagina **Home** di una vista raccoglie in schede le pagine della vista, a com
   piccola scacchiera, da dove viene (il suo database e il suo numero, il suo posto in un filtro, o il suo file), i suoi
   commenti, e se ha modifiche non ancora salvate. *Riprendi* (Invio) vi ritorna; Ctrl+Tab elenca le partite recenti.
 - Cosa avviare, ciascuno con il suo tasto: *Apri un PGN…* (Ctrl+O), *Incolla una partita o un FEN* (Ctrl+V), *Nuova
-  partita* (Ctrl+N), *Importa in un database…*, *Gioca contro un motore*, *Nuovo torneo*: quelli delle pagine della
-  vista.
+  partita* (Ctrl+N), *Importa in un database…*, *Gioca contro un motore* (la pagina Gioca), *Nuovo torneo*: quelli
+  delle pagine della vista.
 - I tornei in corso, come nella pagina Tornei, quando la vista contiene Tornei.
 - **Di recente**: le partite aperte sulla scacchiera; un clic ne riapre una con le sue modifiche.
 - **I miei database**: ciascuno con le sue partite e lo stato del suo albero delle aperture, l'importazione in corso,
   *+ Importa…*, e i tornei letti senza copia (vedi [Database](#database)).
 - **Lichess**: l'account, le partite di un giocatore con *Sincronizza*, le nuove partite contate se l'hai scelto, le
   trasmissioni in diretta (vedi [La pagina Lichess](#la-pagina-lichess)).
-- **In corso**: l'analisi della partita, quella della posizione, un'importazione, l'assistente (il suo download, il
-  suo modello caricato, *Scarica dalla memoria*), e le posizioni dei tuoi repertori da ripassare, che un clic allena
-  (vedi [Allenare un repertorio](#allenare-un-repertorio)).
+- **In corso**: una partita su Lichess giocata da RookStudio (*Torna alla partita*) e le sfide ricevute (vedi [Su
+  Lichess](#su-lichess)), l'analisi della partita, quella della posizione, un'importazione, l'assistente (il suo
+  download, il suo modello caricato, *Scarica dalla memoria*), una serie di problemi, una sessione di esercizi, una
+  partita da indovinare, un finale o un esercizio di visione in corso, e ciò che il ripasso del giorno ha da ripassare,
+  in un unico conteggio, che un clic ripassa tutto (vedi [Il ripasso del giorno](#il-ripasso-del-giorno)).
 
 Il pulsante di ricerca in alto, o Ctrl+K, trova un comando, una partita, un database.
 
@@ -965,7 +987,7 @@ dove la regola delle 50 mosse è vicina. Le tabelle sono quelle del processo del
 mentre un torneo vi gioca.
 
 ### Giocare una partita da una posizione
-<!-- en: playing-a-game-from-a-position 1e310963 -->
+<!-- en: playing-a-game-from-a-position 6b5eb32f -->
 
 **Gioca una partita…** gioca una partita dalla posizione sulla scacchiera tra due motori della libreria, o tra te e uno
 di essi (vedi *Umano* più sotto) (*Bianco* e *Nero*, `<->` li scambia con i loro orologi), con un orologio per ciascuno
@@ -996,6 +1018,10 @@ partita finita li ha, pronta per *Analizza la partita*. *Abbandona la partita* l
 motore; con una seconda partita, questa segue, con il tuo colore invertito. Le tue partite vengono salvate con il tuo
 nome utente, e solo il motore conta nel budget dei core. Non si può ritirare una mossa, e il motore gioca a piena forza
 a meno che la sua scheda non ne imposti una minore (`UCI_LimitStrength` e `UCI_Elo`, o `Skill Level`, se li ha).
+
+In una vista per lo studio, la scheda porta anche alla pagina Gioca: una tua partita contro un motore alla forza che
+scegli, con le sue aperture, un handicap, mosse ritirate e suggerimenti, e gli aiuti nascosti fino alla fine (vedi [La
+pagina Gioca](#la-pagina-gioca)).
 
 ### La Scacchiera per lo studio
 <!-- en: the-study-board 60138fbd -->
@@ -1068,7 +1094,7 @@ menu di un motore o nella tavolozza dei comandi, ne termina i processi. Ogni ges
 comandi (Ctrl+K): un motore aggiunto, reso il primo o rimosso, le sue impostazioni, i thread dell'analisi.
 
 ### Notazione
-<!-- en: notation a447e870 -->
+<!-- en: notation 5147406e -->
 
 La notazione si scrive direttamente, senza finestre di dialogo:
 
@@ -1091,6 +1117,19 @@ distinguono dai tuoi, in grigio azzurro e in corsivo, dopo un fumetto, o in un r
 commento che c'era già (vedi [I commenti dell'assistente](#i-commenti-dellassistente)). Quando i tuoi studi di teoria
 commentano la posizione mostrata, *Teoria · 3* sopra le mosse porta alle loro note nella scheda Albero (vedi [Studi di
 teoria](#studi-di-teoria)).
+
+**La partita di un torneo**, in entrambi gli stili del suo PGN (quello di fastchess `{+0.35/18 1.234s, n=…}` o lo stile
+ChessBase `[%eval]`, `[%clk]` e `[%emt]`), che sia aperta dal suo file, da un database che l'ha importata o da un torneo
+letto come database, mostra i commenti dei suoi motori in forma condensata: accanto a ogni mossa, in piccolo e in
+grigio, la valutazione data dal suo motore (per il Bianco, come la barra e la curva) e la sua profondità, *+1.44/22*,
+con la fine del libro segnata. Passando il mouse su una mossa si vede il resto: il suo motore e il suo lato, la
+valutazione anche dal suo lato, la profondità e la profondità selettiva, il tempo e quando ha scelto la mossa, i nodi e
+la velocità, gli accessi alle tablebase, le sue probabilità di vittoria, patta e sconfitta, e la linea che si aspettava
+dopo di essa, scritta in mosse. Il tasto destro sulla mossa mostra quella linea sulla scacchiera, la rende una variante
+dal punto in cui la partita l'ha lasciata (Ctrl+Z la toglie), o copia il commento del motore così com'è. La riga sotto
+le mosse sceglie cosa compare accanto a esse: la valutazione e la profondità, anche il tempo, o niente (anche con
+Ctrl+K). Il PGN non cambia: Ctrl+S e *Copia PGN* riscrivono il commento di ogni motore come è stato letto, con ogni
+campo conservato, finché i dati della mossa restano gli stessi.
 
 ### Frecce e case
 <!-- en: arrows-and-squares a46e6347 -->
@@ -1196,7 +1235,17 @@ precedenti. Il riepilogo dice lo stesso della posizione. Costa una richiesta per
 non lo chiedi; l'esploratore dei maestri non ha i mesi.
 
 ### Il resoconto di una partita
-<!-- en: the-review-of-a-game 1bad0f30 -->
+<!-- en: the-review-of-a-game 7c5c4437 -->
+
+Sulla Scacchiera per lo studio, la partita di un torneo mostra in cima alla scheda *Resoconto* cosa pensavano i suoi due
+motori, appena viene aperta e senza alcuna analisi: le probabilità del Bianco lungo la partita secondo ciascun motore
+alle sue mosse (dalla quota di vittorie, patte e sconfitte che ha dato, invertita per il Nero, altrimenti dalla sua
+valutazione convertita come fa il resoconto), il libro in ombra, i tratti in cui i due motori vedevano partite diverse
+colorati; sotto, il tempo di ogni mossa, quello del Bianco sopra la linea e quello del Nero sotto; il tempo, la
+profondità media e la velocità di ciascun motore. Poi i suoi momenti, ciascuno a un clic: come ciascun motore vedeva la
+partita all'uscita dal libro, dove non erano d'accordo, dove le tablebase sono entrate in una ricerca, dove è stato
+visto un matto, e come è finita la partita. Una volta analizzata la partita, la curva del resoconto viene disegnata
+sopra le loro, più spessa.
 
 Sulla Scacchiera per lo studio, la scheda *Resoconto* accanto alla notazione legge l'analisi della partita (Alt+G) come
 farebbe un allenatore:
@@ -1417,7 +1466,7 @@ frequenti per prime: una mossa dell'avversario giocata abbastanza spesso senza u
 su una mossa dell'avversario. Un clic mostra la posizione, con l'albero accanto.
 
 ### Allenare un repertorio
-<!-- en: training-a-repertoire d5d14dcc -->
+<!-- en: training-a-repertoire 6b0acafe -->
 
 Ogni posizione di un repertorio in cui tocca a te, e in cui il repertorio ha la tua mossa, è una posizione da allenare.
 RookStudio te le chiede ancora e ancora, a intervalli sempre più lunghi ogni volta che le sai, con FSRS, la
@@ -1454,9 +1503,10 @@ Alla fine: i conteggi, le mosse che hai sbagliato (un clic mostra la posizione, 
 
 I ripassi vengono conservati nel profilo accanto al repertorio (`Najdorf.training.json`, e `Najdorf.reviews.jsonl`,
 una riga per risposta): il suo PGN non cambia. Una mossa cambiata nel repertorio rende di nuovo nuova la sua posizione.
-Niente esce dalla macchina. *In corso* della pagina Home dice quante posizioni sono da ripassare, e un clic le allena;
-anche Ctrl+K *Allena il repertorio*. Mentre una delle tue partite si gioca in diretta su Lichess, l'allenamento
-aspetta; le posizioni sulla linea di una delle tue partite per corrispondenza sono escluse finché non finisce.
+Niente esce dalla macchina. Le posizioni da ripassare contano nel ripasso del giorno insieme agli altri tipi (vedi [Il
+ripasso del giorno](#il-ripasso-del-giorno)); anche Ctrl+K *Allena il repertorio*. Mentre una delle tue partite si gioca
+in diretta su Lichess, l'allenamento aspetta; le posizioni sulla linea di una delle tue partite per corrispondenza sono
+escluse finché non finisce.
 
 ### Studi di teoria
 <!-- en: theory-studies 8ba97ca4 -->
@@ -1491,6 +1541,468 @@ mossa. Il mouse su una nota su una mossa mostra la mossa come freccia dell'alber
 frecce e case sulla scacchiera. Nella scheda **Notazione**, *Teoria · 3* sopra le mosse dice quante note ha la
 posizione, e porta alla scheda Albero (Alt+3). Mentre una delle tue partite si gioca in diretta su Lichess, le note
 sono nascoste insieme all'albero.
+
+## La pagina Allenamento
+<!-- en: the-training-page 5ebf17d1 -->
+
+La pagina **Allenamento** raccoglie ciò che torna oggi, poi gli esercizi per tipo. Si trova nella barra laterale tra le
+Aperture e Lichess, nelle viste *Studio* e *Tutto*. Una vista che hai creato prima non cambia da sola: la pagina Home
+propone una volta di aggiungere la pagina alla vista mostrata (*Aggiungila a …*, o *Non ora*), e nel frattempo Ctrl+K
+*Allenamento* porta lì.
+
+Il suo titolo ha sei parti: **Oggi** (il ripasso del giorno, i tipi di esercizi, i problemi da avviare), **Problemi**
+(la stessa scelta di problemi, il database di Lichess conservato sul tuo disco, i tuoi risultati per tema), **I miei
+errori** (vedi [I tuoi errori come esercizi](#i-tuoi-errori-come-esercizi)), **Indovina le mosse** (vedi [Indovinare le
+mosse](#indovinare-le-mosse)), **Finali** (vedi [Finali contro le tablebase](#finali-contro-le-tablebase) e
+[Matti](#matti)) e **Visione** (vedi [Visione della scacchiera](#visione-della-scacchiera)). Una scheda per ogni tipo di
+esercizio porta alla sua parte. Tutto funziona offline; ciò che va a Lichess viene indicato dove lo scegli.
+
+### Il ripasso del giorno
+<!-- en: the-days-review b7049c16 -->
+
+*Da ripassare oggi* conta ciò che ogni tipo di allenamento ha da ripassare oggi, ciascuno con la sua ripetizione
+dilazionata (FSRS), in un'unica coda: gli errori delle tue partite (vedi [I tuoi errori come
+esercizi](#i-tuoi-errori-come-esercizi)), le posizioni dei tuoi repertori (il loro allenamento resta nella pagina
+Aperture, vedi [Allenare un repertorio](#allenare-un-repertorio)), i problemi e i finali che hai sbagliato. *Ripassa
+tutto* (Invio) li propone uno dopo l'altro nella pagina Scacchiera: i tuoi errori da ripassare, le posizioni da
+ripassare di ogni repertorio, i problemi da ripassare, poi i finali. Alla fine di ciascuno, *Avanti: …* (Invio)
+prosegue, *Torna alla pagina Allenamento* (Esc) si ferma lì; ciò a cui hai risposto viene conservato. Accanto al
+pulsante, il tempo che dovrebbe servire, secondo il ritmo delle tue risposte; sotto, ciò che torna domani ed entro tre
+giorni. Quando errori o problemi sono da ripassare insieme ad altri tipi, *Solo i miei errori* e *Solo i problemi* li
+ripassano da soli.
+
+*In corso* della pagina Home ha lo stesso conteggio (*35 da ripassare oggi · Ripassa tutto*), e un clic ripassa tutto;
+lo stesso fa Ctrl+K *Ripassa tutto*.
+
+### Problemi
+<!-- en: puzzles e825fb2f -->
+
+Lichess pubblica ogni mese i suoi problemi come database (database.lichess.org, CC0): 6.193.530 problemi a novembre
+2026, ciascuno con il suo rating, i suoi temi e, prima della mossa 20, la sua apertura. RookStudio lo conserva sul tuo
+disco e ti dà problemi da esso senza rete.
+
+**Il database.** *Scarica* scarica il file (circa 295 MB) e lo legge mentre arriva in un archivio di circa 293 MB nel
+profilo; il file stesso non viene conservato. Un download interrotto (*Annulla*, la rete, il programma chiuso) riprende
+da dove si era fermato: *Continua*, o *Ricomincia*. *Un file già scaricato…* legge invece `lichess_db_puzzle.csv.zst`
+dal tuo disco. Una volta lì: *Aggiorna* chiede a database.lichess.org la data del suo file e legge un file più recente
+mentre i problemi conservati continuano a rispondere; *Rimuovi* libera il disco (il tuo rating, i tuoi risultati e i
+tuoi problemi da ripassare restano, conservati a parte). Dalla macchina non esce nient'altro che la richiesta del file.
+
+**La scelta.** *Offline* (il database) o *Online* (il tuo account Lichess, vedi [Problemi di Lichess
+online](#problemi-di-lichess-online)); un tema tra i primi proposti, ciascuno con quanto spesso lo risolvi al primo
+tentativo, o tra *Tutti i temi…*, che elenca ogni tema e ogni apertura con i suoi problemi (digita qualche lettera per
+trovarne uno); e una difficoltà: *Più facile* (300 punti sotto il tuo rating), *Il tuo rating*, *Più difficile* (300
+sopra). *Inizia · 20 problemi* (Invio) avvia una serie vicina al tuo rating, mai un problema che hai già visto; Ctrl+K
+ha *Problemi: Forchetta* e gli altri temi, che avviano subito una serie.
+
+**Una serie** occupa la pagina Scacchiera, la cui colonna diventa quella del problema, come fa l'allenamento dei
+repertori; la partita sulla scacchiera aspetta tra le partite recenti e torna dopo. La scacchiera mostra la posizione
+dal tuo lato, con la mossa dell'avversario appena giocata in verde chiaro. Gioca la tua mossa sulla scacchiera, o
+digitala (le sue lettere, poi Invio); RookStudio gioca le risposte dell'avversario, il resto della soluzione. Durante
+la domanda il motore, l'albero e le tue note sono nascosti, e così i temi del problema.
+
+- **Alt+H**: un suggerimento, la casa del pezzo da giocare in blu; il problema conta allora come sbagliato.
+- **Spazio**: «Non lo so»; viene mostrata la soluzione e il problema conta come sbagliato.
+- **Esc**: ferma; ciò a cui hai risposto viene conservato.
+
+Giusto: la soluzione in mosse, la variazione del tuo rating e i temi del problema; *Avanti* arriva con Invio, o da solo
+dopo un secondo (l'impostazione dell'allenamento dei repertori); *Analizza qui* (Alt+A) avvia il motore sulla
+posizione; *La partita su lichess.org* apre la partita da cui viene il problema. Qualsiasi mossa che dà matto è giusta,
+come su Lichess. Sbagliato: la tua mossa in arancione e la prima mossa della soluzione come freccia verde; *Riprova*
+(Invio) la fa rigiocare, senza contare di nuovo; *La soluzione mossa per mossa* (→) la gioca una mossa alla volta;
+*Avanti* prosegue.
+
+Alla fine: i problemi risolti al primo tentativo, quanti ne hai sbagliati, la variazione del tuo rating, e l'elenco di
+quelli sbagliati (un clic mostra la posizione con la soluzione); *Ripassali ora* li ripropone senza contare, *Torna alla
+pagina Allenamento* esce.
+
+**Il tuo rating** è proprio di RookStudio, calcolato con Glicko-2 come Lichess calcola i rating dei suoi problemi: un
+problema risolto al primo tentativo, senza suggerimenti, è vinto contro il rating del problema. Parte dal tuo rating dei
+problemi di Lichess quando il tuo account è collegato, altrimenti da 1500, e si muove in fretta finché è nuovo; i
+risultati dei problemi offline non possono tornare a Lichess. *I tuoi risultati per tema* (la parte Problemi) conta i
+problemi di ogni tema e quanto spesso li hai risolti al primo tentativo.
+
+Un problema che sbagli diventa una scheda del ripasso del giorno: torna domani, poi a intervalli sempre più lunghi ogni
+volta che lo risolvi; sbagliato di nuovo, più avanti nella stessa serie, poi il giorno dopo. Tutto viene conservato
+nella cartella `puzzles` del profilo (`rating.json`, `results.jsonl` una riga per problema, `review.json`), il database
+in `lichess-puzzles`.
+
+### Problemi di Lichess online
+<!-- en: lichess-puzzles-online 51fd9d60 -->
+
+*Online* dà problemi dal tuo account Lichess: problemi che non hai mai visto, al tuo rating Lichess, i cui risultati
+tornano a Lichess. Richiede il tuo account collegato (vedi [Collegare il tuo account](#collegare-il-tuo-account)); la
+prima volta, Lichess chiede due permessi in più, *puzzle:read* e *puzzle:write*: *Autorizza su Lichess…* apre la sua
+pagina, nel frattempo il tuo account resta collegato, e il token che sostituisce viene revocato.
+
+*Chiedi un lotto · 50 problemi* chiede a Lichess cinquanta problemi del tema e della difficoltà scelti. Il lotto viene
+conservato sul tuo disco: si risolve anche offline, in quante serie vuoi (*Riprendi · ne restano N*). *Classificata* o
+*Non classificata, per provare* viene inviato con ogni risposta. Alla fine del lotto, le sue risposte vanno a Lichess
+con una sola richiesta, che porta il lotto successivo; il tuo rating Lichess si muove allora, e la pagina dice quando
+sono state accettate le ultime risposte. Lichess chiede ai programmi di non scaricare la sua raccolta tramite queste
+richieste: per questo c'è il database.
+
+Quando Lichess non può accettare le risposte, restano sul disco, con l'indicazione di cosa fare: troppe richieste
+(429), reinviate da sole un minuto dopo, anche se nel frattempo RookStudio è stato chiuso; la rete assente, reinviate
+un minuto dopo; il token rifiutato, inviate una volta collegato di nuovo l'account. *Riprova ora* non aspetta. Cosa
+esce dalla macchina: il lotto richiesto (il suo tema o la sua apertura, la sua difficoltà), poi l'id di ogni problema
+con giusto o sbagliato, classificato o no.
+
+### I tuoi errori come esercizi
+<!-- en: your-mistakes-as-exercises b0e75f68 -->
+
+Gli errori delle tue partite tornano come esercizi: la posizione prima della tua mossa, per trovare di meglio. Le tue
+partite sono quelle in cui giochi con uno dei tuoi nomi (vedi [I tuoi nomi](#i-tuoi-nomi)), nei tuoi database. Ognuna
+di esse che ha un resoconto (vedi [Il resoconto di una partita](#il-resoconto-di-una-partita)) dà le mosse che il
+resoconto ha segnato **?** e **??** dalla tua parte, dove una mossa migliore è chiara: il resoconto ha cercato la
+posizione abbastanza a fondo da indicarne la mossa migliore (almeno il suo terzo passaggio), e la partita non era
+comunque decisa (la mossa migliore del resoconto ti tiene in partita; la tua mossa non ha mantenuto una vittoria). Le
+imprecisioni (?!) sono escluse: di rado hanno una sola buona risposta.
+
+La parte **I miei errori** conta gli esercizi e le partite da cui vengono, quelli da ripassare oggi, quelli nuovi e
+quelli che sai, da ripassare più avanti. I loro tipi vengono da *Su cosa lavorare* di ogni resoconto: forchette, pezzi
+lasciati in presa, finali di torre…; un chip per ciascuno limita l'elenco e la sessione a quel tipo, *Ogni tipo* li
+prende tutti. L'elenco dà per ogni esercizio la partita, dove e quando è stata giocata, la tua mossa e quella del
+resoconto, e quando torna. *Inizia · N esercizi* (Invio) chiede quelli da ripassare, poi i nuovi di oggi (tanti al
+giorno quante le nuove posizioni dei repertori).
+
+Le tue ultime partite senza resoconto sono indicate sotto l'elenco: *Esaminale · in background* le esamina una dopo
+l'altra, come la pagina Scacchiera fa il resoconto di una partita (il suo motore, le sue impostazioni, i processi
+lasciati liberi accanto a un torneo), e ogni resoconto viene conservato con la sua partita; i loro esercizi arrivano
+partita per partita. Nel frattempo compaiono l'avanzamento, il tempo rimasto e *Annulla*; i resoconti aspettano mentre
+la pagina Scacchiera analizza.
+
+**Un esercizio** occupa la pagina Scacchiera, la cui colonna diventa quella dell'esercizio, come fa l'allenamento dei
+repertori: la partita fino alla posizione, dal tuo lato, l'ultima mossa dell'avversario in verde chiaro; sotto la
+scacchiera, quando è stata giocata e cosa hai giocato allora. Gioca la tua mossa sulla scacchiera, o digitala. La mossa
+migliore del resoconto è subito giusta; qualsiasi altra mossa viene cercata dal motore del resoconto con le impostazioni
+del resoconto (un thread, il suo numero di nodi, partendo da una tabella vuota), ed è giusta quando perde al massimo
+0,3 pedoni rispetto alla migliore del resoconto, o mantiene una vittoria che il resoconto non segnerebbe. Il motore,
+l'albero e le tue note sono nascosti durante la domanda.
+
+- **Alt+H**: un suggerimento, la casa del pezzo da giocare in blu.
+- **Spazio**: «Non lo so»; viene mostrata la mossa del resoconto.
+- **Esc**: ferma; ciò a cui hai risposto viene conservato.
+
+Ogni risposta viene valutata da sola, come una posizione di repertorio: giusta al primo tentativo, *buona*; giusta dopo
+un suggerimento o dopo più di 20 secondi, *difficile*; sbagliata, *di nuovo*. Giusta: la linea del resoconto e quella
+della tua partita, cosa ha detto il resoconto della tua mossa, e quando l'esercizio torna; *Apri la partita a questa
+mossa* la apre nella pagina Scacchiera. Sbagliata: la tua mossa in arancione, la mossa del resoconto come freccia
+verde, e cosa ha trovato il motore dopo la tua; *Riprova* (Invio) la fa rigiocare senza contare di nuovo; un esercizio
+sbagliato torna qualche esercizio dopo, poi il giorno dopo.
+
+Gli esercizi da ripassare contano nel ripasso del giorno (vedi [Il ripasso del giorno](#il-ripasso-del-giorno)), *Solo i
+miei errori* li ripassa da soli; Ctrl+K ha *Ripassa i miei errori* ed *Esercizi dai miei errori*. Una posizione che il
+tuo repertorio allena non viene presa qui: si allena nella pagina Aperture. Una partita tolta dal suo database porta
+via con sé i suoi esercizi. Gli esercizi e le loro schede sono conservati nella cartella `mistakes` del profilo
+(`exercises.json`, e `answers.jsonl`, una riga per risposta); le tue partite non cambiano, e niente esce dalla macchina.
+Ciò che dicono le tue partite ordina anche i temi dei problemi: i tipi dei tuoi errori dell'ultimo mese vengono per
+primi tra essi, indicati sotto i chip.
+
+### I tuoi nomi
+<!-- en: your-names 4a0ddfdd -->
+
+*Impostazioni › I tuoi nomi* (o la parte *I miei errori*, prima di qualsiasi nome) elenca i nomi con cui giochi, come
+li scrivono i tuoi database: una partita in cui gioca uno di essi è tua. Un nome corrisponde per parole intere, senza
+badare a maiuscole e accenti: *Tester* è *Tester, Sam* e *TESTER, S.*, *Sam Tester* è *Tester, Sam*, ma *Test* non è
+nessuno. Il nome del tuo account Lichess collegato conta da solo. Clicca un nome per toglierlo: gli esercizi delle sue
+partite se ne vanno, ma le loro schede vengono conservate, e tornano con essi se aggiungi di nuovo il nome.
+
+### Indovinare le mosse
+<!-- en: guessing-the-moves e004de63 -->
+
+**Indovina le mosse** rigioca una partita dei tuoi database da un lato: a ognuna delle sue mosse, indovini quella
+giocata. Il motore dà un punteggio a ogni tentativo rispetto alla mossa della partita: *come la partita* 3 punti;
+*altrettanto buona* per il motore (al massimo 0,2 pedoni peggio, o meglio) 2; *giocabile* (al massimo 0,5 pedoni
+peggio) 1; altrimenti nessuno. È il motore di analisi, su un thread, un secondo per mossa; la mossa della partita viene
+cercata mentre pensi.
+
+*Una partita a caso* ne estrae una dal database scelto, attraverso un filtro: il filtro rapido della lista delle
+partite (giocatori, evento, un codice ECO, un anno) e l'Elo dei giocatori. Scegli il tuo lato, poi *Inizia · una
+partita a caso* (Invio). Con *Le mosse di teoria passano da sole* (conservato per la volta successiva), si inizia a
+indovinare dove la partita lascia le mosse che molte partite dei tuoi database hanno giocato (il loro albero delle
+aperture). *La partita della pagina Scacchiera* fa indovinare la partita mostrata dalla sua posizione, per il lato al
+tratto: Ctrl+K *Indovina le mosse* nella pagina Scacchiera.
+
+La partita occupa la pagina Scacchiera, la cui colonna diventa quella di Indovina le mosse; la partita non viene
+modificata, e le sue mosse successive non vengono mostrate. Dopo ogni tentativo: la tua mossa come freccia blu, quella
+della partita come freccia verde, i punti ed entrambe le valutazioni; la partita prosegue da sola dopo un momento
+(subito con Invio), con la risposta dell'avversario giocata, e la mossa successiva è tua. Sotto: ogni tentativo con i
+suoi punti, e il punteggio finora. Alla fine: i tuoi punti, quanti tentativi erano la mossa della partita, i pedoni
+persi in media per mossa, e le mosse che ti sono costate di più (un clic mostra la loro posizione); tutta la partita è
+sulla scacchiera, ← e → la percorrono. Ogni partita indovinata viene conservata nella cartella `guess` del profilo; la
+pagina Allenamento mostra i punti dell'ultima.
+
+### Finali contro le tablebase
+<!-- en: endgames-against-the-tables 6ded57cf -->
+
+La parte **Finali** è un catalogo di finali da vincere o da tenere, giocati contro le tablebase: diciotto, in quattro
+gruppi. *Matti elementari*: la donna, la torre, i due alfieri, alfiere e cavallo. *Pedoni*: l'opposizione, la regola
+del quadrato, il pedone passato lontano, la manovra di Réti. *Torri*: Lucena, Philidor, Vancura, torre contro pedone,
+torre e due pedoni contro torre. *Pezzi e donna*: donna contro torre, donna contro pedone, l'alfiere sbagliato, torre
+contro alfiere, alfiere contro cavallo. Ognuno dice cosa chiede (*matto*, *vittoria* o *tenere la patta*) e a che punto
+sei: *da fare*, *fatto*, *fatto in 9 (le tablebase: 7)* per un matto, *da rifare* dopo un errore. Uno a cui le
+tablebase disponibili non sanno rispondere è in grigio, con i suoi pezzi indicati (vedi [Tablebase per i
+finali](#tablebase-per-i-finali)); passa il mouse su uno per l'idea che lo vince o lo tiene. Un clic lo gioca; poi ↑ e
+↓ ne scelgono un altro e Invio lo gioca. Ctrl+K ha *Finale: Lucena* e gli altri.
+
+**Un finale** occupa la pagina Scacchiera, la cui colonna diventa quella del finale, come fanno i problemi; la partita
+sulla scacchiera aspetta tra le partite recenti. Giochi dal tuo lato; le tablebase rispondono a ogni mossa con quella
+che resiste più a lungo (con le tablebase Syzygy, la più lunga fino alla prossima cattura o mossa di pedone, e tra
+mosse altrettanto lunghe quella che ti lascia meno buone risposte). Sopra la domanda: il verdetto attuale delle
+tablebase (*Le tablebase: vince il Bianco*), e a che distanza, le mosse al matto quando Lichess le conosce, altrimenti
+le mosse al massimo prima di una cattura o di una mossa di pedone.
+
+- **Ctrl+Z**: ritira la tua ultima mossa e la risposta delle tablebase.
+- **Alt+H**: la mossa giusta, come freccia verde; il finale conta allora come fatto con aiuto.
+- **Ricomincia**: torna all'inizio. **Esc**: ferma.
+
+Ogni mossa viene giudicata subito. Una che trasforma una vittoria in patta, o una patta in sconfitta, è un errore: le
+tablebase rispondono, poi la colonna lo dice (*1.Kd5? Ke7: ora è patta*) con le mosse che mantenevano il risultato
+(*Mantenevano la vittoria: 1.Kd6!, 1.Kf6!*, con le loro case in verde e la tua mossa in arancione) e l'idea del finale.
+*Ritira la mossa* (Invio, o Ctrl+Z) la fa rigiocare; *Vedi la vittoria* la ritira e scrive da lì la linea delle
+tablebase; *Continua comunque* prosegue con il nuovo verdetto. Sotto, il verdetto all'inizio e ogni mossa che lo ha
+cambiato.
+
+Una vittoria conta al matto, o quando un tuo pedone diventa donna o l'altro re resta solo, con la vittoria mantenuta;
+nei matti elementari l'obiettivo è il matto stesso, con le tue mosse confrontate con il matto delle tablebase
+dall'inizio. Una patta conta quando una regola rende patta la partita (stallo, materiale insufficiente, la triplice
+ripetizione, le cinquanta mosse), o dopo 15 mosse tenute. Alla fine: *Di nuovo* (Invio), *Avanti:* il finale
+successivo non ancora fatto, *Torna alla pagina Allenamento*.
+
+La posizione prima di un errore diventa una scheda del ripasso del giorno (vedi [Il ripasso del
+giorno](#il-ripasso-del-giorno)): torna domani, con il finale rigiocato da lì, poi a intervalli sempre più lunghi ogni
+volta che lo vinci o lo tieni senza errori (con aiuto conta come difficile; con un errore, come sbagliato). Ctrl+K
+*Ripassa i finali sbagliati*.
+
+**Dalle tue partite** prende le posizioni con 7 pezzi o meno tra i tuoi errori (vedi [I tuoi errori come
+esercizi](#i-tuoi-errori-come-esercizi)), in cui il resoconto della tua partita ha visto sfuggire la vittoria, o la
+patta. *Inizia* le gioca una dopo l'altra contro le tablebase, ciascuna dalla posizione prima della tua mossa; una che
+le tablebase dicono persa comunque viene esclusa. I risultati e le schede sono conservati nella cartella `endgames` del
+profilo (`record.json`).
+
+### Tablebase per i finali
+<!-- en: tables-for-the-endgames 0e49bbca -->
+
+Le tablebase sono quelle del tuo disco, le cartelle Syzygy dei tornei (*Aggiudicazione* > tablebase, vedi [Le tablebase
+nella pagina Scacchiera](#le-tablebase-nella-pagina-scacchiera)), con quelle proprie del profilo una volta scaricate;
+per più pezzi di quanti ne contengano, quelle online di Lichess, fino a 7 pezzi, con il tuo consenso alle tablebase
+online (quello della pagina Scacchiera, vedi [Online per l'analisi](#online-per-lanalisi)). Mentre un torneo gioca nel
+processo del programma, le tablebase del disco sono sue: nel frattempo rispondono quelle di Lichess, o il finale
+aspetta.
+
+Quando un finale richiede tablebase che non hai, la parte lo dice (*Nessuna tablebase per «Lucena»*) e propone tre
+strade:
+
+- **Scarica le tablebase da 3 a 5 pezzi** (290 file, 938 MB) dal mirror di Lichess, un file alla volta, prima i più
+  piccoli: i finali con 3 e 4 pezzi sono pronti in pochi secondi, gli altri man mano che arrivano i loro file. Un
+  download interrotto riprende da dove si era fermato (*Continua*); ogni file viene verificato (la sua dimensione e il
+  marchio di Syzygy). Le tablebase vanno nella cartella `syzygy` del profilo e, una volta tutte lì, nelle cartelle dei
+  tornei.
+- **Una cartella di tablebase già sul disco…**: scelta anche per i tornei.
+- **Quelle di Lichess, online**: fino a 7 pezzi, una richiesta per posizione giocata; sceglierle dà il consenso.
+
+Senza tablebase, i finali che ne hanno bisogno sono in grigio, ciascuno con ciò che gli serve; gli altri esercizi
+funzionano. Online, un'interruzione fa aspettare il finale: la tua mossa viene conservata, e giudicata quando torna la
+rete (*Riprova ora* non aspetta); un 429 aspetta il minuto che chiede Lichess. Cosa esce dalla macchina: con le
+tablebase del disco, niente; con quelle di Lichess, ogni posizione giocata, come FEN; per il download, la richiesta di
+ogni file.
+
+### Matti
+<!-- en: mates 803d99bd -->
+
+La scheda **Matti** (nella parte Finali, a cui porta la scheda della parte Oggi) avvia 20 problemi di matto di Lichess
+(vedi [Problemi](#problemi)): da 1 a 5 mosse, o per schema (del corridoio, affogato, di Anastasia, arabo, di Boden, dei
+due alfieri, a uncino), ciascun chip con quanto spesso lo risolvi al primo tentativo. Vengono dal database sul tuo
+disco, altrimenti da un lotto del tuo account Lichess; senza nessuno dei due, il clic porta alla parte Problemi. I
+matti elementari contro le tablebase sono nel catalogo qui sopra, con le tue mosse contate rispetto al matto delle
+tablebase.
+
+### Visione della scacchiera
+<!-- en: board-vision dd34b350 -->
+
+La parte **Visione** allena a vedere la scacchiera a mente. Niente esce dalla macchina; i record sono conservati nel
+file `vision.json` del profilo.
+
+**Coordinate**: trenta secondi di case. *Trova la casa*: viene nominata una casa, cliccala su una scacchiera senza
+lettere né numeri; *Nomina la casa*: una casa è segnata in blu, digita il suo nome (una lettera, poi un numero). Vista
+dal Bianco, dal Nero, o *A caso*, con la scacchiera che ruota casa per casa. Un errore mostra la casa richiesta in verde
+e la tua in arancione. Alla fine, il tuo conteggio e il tuo record per quel modo e quel lato. Invio avvia, Esc ferma.
+
+**Alla cieca**: una partita contro il motore della pagina Gioca, alla forza e con le aperture scelte lì (*Cambia nella
+pagina Gioca*, vedi [Contro un motore](#contro-un-motore)). Giochi con il Bianco, il Nero o uno dei due a caso; la
+scacchiera nasconde tutti i pezzi, tutti i pezzi dopo la 10ª mossa, o tutti tranne i pedoni, con l'ultima mossa
+segnata. Digita le tue mosse, o giocale sulla scacchiera; le mosse fatte finora sono scritte nella colonna. Tieni
+premuto Maiusc un momento per vedere i pezzi per 2 secondi, tre volte a partita; F2 chiede *Dov'è…?* di un pezzo che le
+sue parole nominano da sole (*l'alfiere nero camposcuro*): clicca la sua casa, o digitala. Il tuo orologio è lungo,
+quello del motore breve; ogni partita viene aggiunta al file `games/blindfold.pgn` del profilo.
+
+**Una linea letta a mente**: una posizione di un'apertura nota, le sei mosse che seguono scritte accanto senza che i
+pezzi si muovano, poi una domanda: quale pezzo c'è su una casa che hanno cambiato? Clicca la risposta, o digita il
+pezzo come lo scrive il FEN (*N* un cavallo bianco, *n* uno nero, *-* una casa vuota); la scacchiera mostra poi la
+posizione dopo le mosse. Dieci linee per serie.
+
+## La pagina Gioca
+<!-- en: the-play-page 468c2ade -->
+
+La pagina **Gioca** ha due parti: *Contro un motore*, una partita contro un motore della tua libreria giocata nella
+pagina Scacchiera, e *Su Lichess*, le tue partite Lichess giocate da RookStudio (vedi [Su Lichess](#su-lichess));
+riappare la parte mostrata per ultima. Si trova nella barra laterale dopo la pagina Allenamento, nelle viste *Studio* e
+*Tutto*. Una vista che hai creato prima non cambia da sola: la pagina Home propone una volta di aggiungerla alla vista
+mostrata (*Aggiungila a …*, o *Non ora*), e nel frattempo Ctrl+K *Gioca contro un motore* (o *Gioca su Lichess*) porta
+lì, come *Gioca contro un motore* nella pagina Home e *La pagina Gioca* nella scheda *Gioca una partita…* della pagina
+Scacchiera. Contro un motore, niente esce dalla macchina: il motore gira su di essa. Mentre una delle tue partite si
+gioca in diretta su Lichess, la pagina lo dice e non avvia nessuna partita contro un motore (vedi [Fair
+play](#fair-play)).
+
+### Contro un motore
+<!-- en: against-an-engine d08e9a6c -->
+
+La scelta viene conservata per la partita successiva: una volta fatta, basta *Gioca* (Invio).
+
+- **L'avversario**: un motore della tua libreria, con le forze che può assumere.
+- **La sua forza**: l'Elo a cui mira (`UCI_Elo`, con `UCI_LimitStrength`), sulla sua scala: un'indicazione, non un Elo
+  FIDE. Un motore senza quell'impostazione gioca invece un numero di nodi per mossa, da 1 a un milione, meno per un
+  gioco più debole. *Piena forza* lo lascia al suo meglio, qualunque limite imponga la sua scheda.
+- **Il suo stile: le sue aperture**, ciò che gioca prima delle sue mosse: *Le proprie* (nessun libro); *I tuoi
+  database* (le mosse più giocate lì, in tutti i tuoi database con un albero delle aperture o in uno di essi); *Il tuo
+  repertorio* (le mosse contro cui ti sei preparato, poi il motore; giochi il colore del repertorio, che sceglierlo
+  imposta); *Le partite di un giocatore* (le mosse che un giocatore ha giocato con il colore del motore, da un database
+  chiamato *Lichess · nome*, come quello che crea la preparazione di una partita contro di lui, vedi [Preparare una
+  partita](#preparare-una-partita)); *Un libro della libreria* (un libro Polyglot o CTG della pagina Libri, senza le
+  sue mosse da evitare). *Varia* sceglie a caso tra le mosse giocate almeno 5 volte, con la frequenza con cui sono
+  state giocate (le mosse di un libro secondo i loro pesi, quelle di un repertorio allo stesso modo); senza spunta, la
+  mossa più giocata, prima la mossa principale di un libro. Quando le sue aperture non hanno più mosse per la
+  posizione, il motore gioca fino alla fine. Il suo stile sono le sue aperture: le impostazioni proprie del motore
+  restano sulla sua scheda. Con un pezzo dato, le aperture incontrano posizioni che non hanno, e il motore gioca dalla
+  prima mossa.
+- **Tu**: Bianco, Nero o a caso; l'orologio, minuti e un incremento, *Lo stesso per entrambi* o, senza spunta, quello
+  proprio del motore (tempo diseguale); dalla posizione iniziale, o da quella della pagina Scacchiera.
+- **L'handicap**: ciò che il motore dà all'inizio: niente, il suo pedone f, il suo cavallo b, la sua torre a (e con
+  essa l'arrocco da quel lato) o la sua donna; un pezzo che non ha dove inizia è in grigio, e Chess960 non ne ha.
+  *Ritirare una mossa* (permesso, a meno che non togli la spunta) e *Suggerimenti* (3 a partita) sono anch'essi
+  handicap, conteggiati.
+
+La partita conta nel budget dei core (i thread del motore, come per una partita giocata dalla scacchiera); la pagina
+dice quando la macchina è piena.
+
+### La partita contro un motore
+<!-- en: the-game-against-an-engine bfdb25dc -->
+
+*Gioca* porta la partita nella pagina Scacchiera, in una vista per lo studio: la scacchiera girata dal tuo lato, gli
+orologi che corrono nelle strisce dei giocatori (quella del motore con la sua forza), e sopra la colonna la scheda della
+partita: a chi tocca, *Proponi patta*, *Abbandona…*, *Ritira la mossa · Ctrl+Z*, *Suggerimento · Alt+H*, *Ferma*.
+
+- Gioca le tue mosse sulla scacchiera, o digitale: la prima lettera di una mossa apre il campo, Invio la gioca.
+- **Gli aiuti sono nascosti fino alla fine**: le schede Analisi, Albero, Riferimenti e Domande, l'analisi (Alt+A), la
+  minaccia, l'analisi della partita (Alt+G), le tablebase e l'assistente. Nemmeno il motore mostra qualcosa della sua
+  ricerca: le sue valutazioni arrivano con la partita finita. *Mostrali*, nella scheda della partita o al posto di una
+  scheda nascosta, li restituisce durante la partita, che viene allora segnata *con aiuti*.
+- *Ritira la mossa* (Ctrl+Z) ritira la tua ultima mossa e la risposta del motore, o la tua mossa mentre il motore
+  pensa, con gli orologi come erano prima: conteggiato, e scritto nella partita.
+- *Suggerimento* (Alt+H): quando tocca a te, la mossa del motore di analisi dopo un secondo di ricerca, come freccia
+  verde; tre a partita, conteggiati e scritti nella partita.
+- *Proponi patta*: il motore risponde con la sua prossima mossa. Accetta la patta quando sta per subire matto o sta
+  chiaramente peggio, o quando non sta meglio dopo 20 mosse giocate; una mossa delle sue aperture la rifiuta.
+- *Abbandona…* chiede Invio, o un secondo clic, entro pochi secondi; *Ferma* chiude la partita senza risultato,
+  salvata così com'è.
+- Dove sono finite le aperture del motore, la notazione lo dice (*fine del tuo repertorio · poi il motore*).
+
+Chiudere RookStudio durante la partita la conserva: al prossimo avvio è di nuovo nella pagina Scacchiera, con gli
+orologi in attesa finché non la riprendi (*Riprendi*, Invio) o la fermi (*Fermala*). Un'altra partita aperta sulla
+scacchiera nel frattempo lascia proseguire la tua, con il tuo orologio che corre quando tocca a te: *Torna alla
+partita* la riporta.
+
+### Dopo la partita
+<!-- en: after-the-game 44d80f6b -->
+
+Alla fine, gli aiuti tornano, e la scheda dice come è finita la partita (*Patta: triplice ripetizione alla mossa 34*),
+contro cosa e come: la forza, il tuo colore, l'orologio, le mosse ritirate, i suggerimenti, con o senza aiuti. La
+partita viene salvata nel database **Le mie partite contro i motori**, creato alla prima partita, con le sue
+impostazioni nei suoi tag: `Strength` (`UCI_Elo 1800`, `nodes 1000`, `full`), `Openings` (`repertoire Najdorf`,
+`database Mine`, `databases`, `player Somebody`, `book Human`, `engine`), `Handicap` (`knight b8`, con la posizione
+iniziale), `Takebacks`, `Hints`, `Aids`. Ctrl+S la rimette lì dopo una modifica.
+
+- *Esaminala* (Invio): l'analisi della partita, come fa Alt+G (vedi [Il resoconto di una
+  partita](#il-resoconto-di-una-partita)); una volta fatto il resoconto, i tuoi errori in essa diventano esercizi (vedi
+  [I tuoi errori come esercizi](#i-tuoi-errori-come-esercizi)) quando i tuoi nomi dicono che la partita è tua (vedi [I
+  tuoi nomi](#i-tuoi-nomi)).
+- *Rivincita, a colori invertiti*: la stessa scelta, l'altro colore.
+- *Cambia le impostazioni*: la pagina Gioca.
+- *Chiudi*: la partita resta sulla scacchiera come qualsiasi partita.
+
+Sotto, **le tue partite contro quel motore a quel livello**: vinte, patte e perse, quelle con aiuti a parte e non
+contate, e dove hai perso l'ultima (*un finale di torre*), con l'indicazione se è tra i tuoi esercizi. Il livello
+successivo si sceglie lì o nella pagina Gioca: niente sale da solo. Ogni partita è anche una riga del file
+`play/games.jsonl` del profilo.
+
+### Su Lichess
+<!-- en: on-lichess 4e5ccbb8 -->
+
+La parte **Su Lichess** della pagina Gioca gioca le tue partite Lichess da RookStudio, tramite la Board API di Lichess,
+che è fatta per le persone. Richiede il tuo account collegato (vedi [Collegare il tuo
+account](#collegare-il-tuo-account)); la prima volta, Lichess chiede un permesso in più, *Giocare le tue partite*
+(`board:play`): *Autorizza su Lichess…* (Invio) apre la pagina di Lichess, nel frattempo il tuo account resta
+collegato, e il token che sostituisce viene revocato. RookStudio non gioca mai una mossa che non hai giocato tu. Cosa
+esce dalla macchina: le tue ricerche e sfide, le tue mosse, i tuoi messaggi in chat, patte e abbandoni, con il token del
+tuo account; le scelte sono conservate nel file `play/lichess.json` del profilo.
+
+- **Cerca una partita**: rapida (10+0, 10+5, 15+10), classica (30+0, 30+20) o per corrispondenza (da 1 a 14 giorni per
+  mossa), classificata o no, contro avversari di qualsiasi rating o di un rating vicino al tuo a quella cadenza (±).
+  Lichess riserva blitz e bullet al suo sito: un programma non li cerca, e il blitz resta possibile come sfida diretta.
+  *Cerca un avversario* (Invio) mette la ricerca nella lobby di Lichess una volta aperto il flusso di eventi di
+  Lichess, come chiede Lichess, così che l'inizio della partita non venga perso. Una ricerca in diretta vive finché
+  RookStudio la tiene aperta: Esc la ritira, e così chiudere RookStudio; la partita trovata si apre nella pagina
+  Scacchiera. Una ricerca per corrispondenza resta nella lobby finché qualcuno non la accetta (l'API non può ritirarla;
+  la lobby di lichess.org sì), e la sua partita arriva tra le tue partite in corso.
+- **Sfida un giocatore**: il suo nome, l'orologio (3+2, 5+3, 10+5, 15+10, 3 giorni, o *altro…*: minuti e secondi
+  aggiunti per mossa, o giorni per mossa; almeno tre minuti, con l'incremento contato quaranta volte, perché la Board
+  API non gioca il bullet), classificata o no, il tuo colore. Una sfida in diretta aspetta la risposta finché resti
+  (Esc, o *Ritirala*). Rifiutata, viene indicato il motivo di Lichess (*troppo veloce*) con altre cadenze a un clic (più
+  lente dopo «troppo veloce»); accettata, la partita si apre nella pagina Scacchiera.
+- **Una sfida ricevuta** arriva in cima alla parte (*Accetta* · Invio, *Rifiuta ▾* con i motivi di Lichess: *Non ora*,
+  *Più tardi*, *Troppo veloce per me*, *Troppo lenta per me*, *Solo amichevoli*, *Solo classificate*), nella pagina Home
+  sotto *In corso*, e in un avviso nell'angolo della finestra ovunque tu sia, con un suono quando i suoni sono attivi;
+  *Più tardi* mette da parte l'avviso. Durante una partita in diretta, aspetta la fine della partita. Una partita che la
+  Board API non può giocare (bullet, una variante diversa da Chess960) si gioca su lichess.org.
+- **Le tue partite in corso**: prima quelle in cui tocca a te, con il tempo rimasto per muovere; un clic ne apre una
+  nella pagina Scacchiera, dove si gioca la tua mossa.
+
+Il flusso di eventi è quello del [Fair play](#fair-play): Lichess ne apre uno per token, e comunica l'inizio e la fine
+delle partite, le sfide ricevute e la sorte di quelle che hai inviato.
+
+### Una partita su Lichess
+<!-- en: a-game-on-lichess 15ac0e49 -->
+
+La partita si gioca nella pagina Scacchiera, in una vista per lo studio: la scacchiera girata dal tuo lato, i rating e
+gli orologi dei giocatori nelle loro strisce, e sopra la colonna la scheda della partita: cos'è (*Classificata · Rapida
+10+5 contro …*), a chi tocca, *Proponi patta*, *Abbandona…* (Invio, o un secondo clic, entro pochi secondi), *Chiedi di
+ritirare la mossa*, *Annulla partita* (prima che entrambi i lati abbiano mosso), *Chat* (la chat dei giocatori), *Apri
+su lichess.org*.
+
+- In diretta, le tue mosse partono appena giocate, sulla scacchiera o digitate (la prima lettera di una mossa apre il
+  campo, Invio la gioca). Una mossa fatta durante il turno dell'avversario aspetta il tuo (una freccia tratteggiata), e
+  viene giocata allora se è legale; Esc la ritira. Prima della tua prima mossa, la scheda conta alla rovescia il tempo
+  che Lichess concede prima di annullare la partita.
+- Per corrispondenza, una mossa aspetta la tua conferma (*La tua mossa: 10.g4 · non ancora inviata*, una freccia sulla
+  scacchiera): *Invia* (Invio), o *Ritirala* (Esc). La scheda elenca le tue altre partite per corrispondenza, a un clic.
+- La proposta di patta o la richiesta di ritirare la mossa del tuo avversario arriva nella scheda con *Accetta* e
+  *Rifiuta*; la tua aspetta la sua risposta. Se il tuo avversario lascia la partita, la scheda conta alla rovescia
+  finché Lichess non ti permette di rivendicare la vittoria (*Rivendica la vittoria*, *Rivendica la patta*).
+- **Gli aiuti**: vale il blocco del [Fair play](#fair-play), come per qualsiasi tua partita. In diretta, ogni aiuto è
+  bloccato su ogni posizione: le schede Analisi, Albero, Riferimenti e Domande, l'analisi, la minaccia, le tablebase, il
+  cloud e l'assistente. Per corrispondenza, il motore, il cloud, le tablebase e l'assistente sono bloccati sulla
+  partita; l'albero dei tuoi database e i tuoi libri restano aperti, perché lì Lichess permette un libro.
+- **Un'interruzione**: la scheda lo dice (*il tuo orologio corre su Lichess*) e riprova da sola, dopo 1, 2, 3, poi ogni
+  5 secondi; l'intera partita torna con la connessione, anche la chat. Una mossa giocata nel frattempo non parte:
+  rigiocala una volta tornata la connessione. *Apri la partita su lichess.org* resta a portata di mano.
+- **Chiudere RookStudio** durante una partita in diretta chiede prima (*Resta* · Esc, *Chiudi comunque*): la partita
+  continua su Lichess, con il tuo orologio che corre. Al prossimo avvio, una partita ancora in corso torna nella pagina
+  Scacchiera, e la pagina Home la mostra per prima. Un'altra partita aperta sulla scacchiera nel frattempo lascia
+  proseguire la tua: *Torna alla partita* la riporta.
+- Alla fine, la scheda dice come è finita la partita e cosa ha fatto al tuo rating; la partita entra nel tuo database
+  Lichess, con l'analisi di Lichess quando c'è, e il suo resoconto a un clic, come le tue altre partite finite (vedi
+  [Le tue partite finite](#le-tue-partite-finite)). *Un'altra partita* cerca di nuovo con lo stesso orologio.
 
 ## La pagina Lichess
 <!-- en: the-lichess-page ea1e19cc -->
@@ -1621,7 +2133,7 @@ trasmissioni con un account autorizzato a leggerle, permesso chiesto una volta, 
 preferiti richiedono un account collegato.
 
 ### Fair play
-<!-- en: fair-play e42fbcbd -->
+<!-- en: fair-play 12bbcbc4 -->
 
 Lichess vieta qualsiasi aiuto durante una partita. Con il tuo account collegato, RookStudio rispetta questa regola
 ovunque tu giochi, nel browser o su un telefono:
@@ -1638,13 +2150,15 @@ ovunque tu giochi, nel browser o su un telefono:
 
 Un banner nella pagina Scacchiera dice quale partita blocca cosa. La scheda Lichess della pagina Home elenca le tue
 partite in corso, prima quelle in cui tocca a te, ciascuna con il suo orologio o il tempo rimasto per muovere, e *Apri
-su lichess.org*.
+su lichess.org*, o *Sulla Scacchiera* una volta che RookStudio può giocare le tue partite (vedi [Una partita su
+Lichess](#una-partita-su-lichess)).
 
 Le tue partite in corso vengono chieste con il token del tuo account quando compare la pagina Home, ogni mezzo minuto
 finché dura una partita in diretta e ogni dieci minuti finché dura una partita per corrispondenza. La pagina Lichess
 propone una volta di sapere invece quando iniziano e finiscono, mentre RookStudio è aperto: un permesso in più, leggere
-le tue sfide. RookStudio non legge nessuna mossa durante una partita e non ne gioca nessuna. Senza quel permesso, il
-blocco arriva quando compare la pagina Home.
+le tue sfide; il permesso di giocare le tue partite (vedi [Su Lichess](#su-lichess)) le ascolta tramite lo stesso
+flusso. RookStudio legge le mosse solo delle partite che giochi da esso, e gioca solo le mosse che giochi tu. Senza
+nessuno dei due permessi, il blocco arriva quando compare la pagina Home.
 
 ### Le tue partite finite
 <!-- en: your-finished-games 2e1cf545 -->
@@ -1705,7 +2219,7 @@ abbia una.
   stato letto.
 - Pronta, la scheda dà le posizioni, la dimensione e la data del file. Lichess ripubblica il file ogni mese: *Aggiorna*
   chiede a database.lichess.org la sua data e legge un file più recente, mentre le valutazioni conservate continuano a
-  rispondere finché non è pronto. *Rimuovile* libera il disco.
+  rispondere finché non è pronto. *Rimuovi* libera il disco.
 
 Compaiono in tre punti:
 

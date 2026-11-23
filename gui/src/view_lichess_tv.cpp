@@ -511,7 +511,7 @@ void App::drawLichessTvCard() {
                                trf("Lichess: {}. The list shown was read earlier.", tv_rows_.error).c_str());
     }
     ImGui::TextDisabled("%s", TR("The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again "
-                                 "when the card shows, every 30 s at most."));
+                                 "when the card shows, at most once every 30 s."));
     ImGui::TextDisabled("%s", TR("Asked of Lichess without an account: the channels, and the games you follow. Nothing "
                                  "is kept unless you keep it."));
     ImGui::PopTextWrapPos();
@@ -527,7 +527,12 @@ void App::drawTvKeepMenu() {
     if (!ImGui::BeginPopup(kId)) return;
     auto& s                = shelf();
     const std::string name = "Lichess TV";
-    ImGui::TextDisabled("%s", TR("Keep the game, at its end, in"));
+    // A game over goes into the database at once, one in progress at its end.
+    bool ended = false;
+    if (board_tv_ && tv_follower_)
+        for (const auto& g : tv_follower_->games())
+            if (g.url == gameUrl(board_tv_->game)) ended = !g.result.empty() && g.result != "*";
+    ImGui::TextDisabled("%s", ended ? TR("Keep the game in") : TR("Keep the game, at its end, in"));
     // The database kept into last first, then "Lichess TV" (made when missing), then the user's others.
     std::vector<std::size_t> order;
     for (std::size_t i = 0; i < s.entries().size(); ++i)

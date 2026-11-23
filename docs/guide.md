@@ -2022,7 +2022,7 @@ name are followed. Your own account and your own games never come there.
 The Lichess page's *Lichess TV* card lists the channels of standard chess: *Top rated*, *Bullet*, *Blitz*, *Rapid*,
 *Classical*, *UltraBullet*, *Bots* and *Computer* (players against Lichess's AI); the variants' channels are not shown.
 Each gives the game Lichess features on it, its two players with their ratings, and its clock. The list is read again
-when the card shows, every 30 seconds at most.
+when the card shows, at most once every 30 seconds.
 
 *The mosaic* shows the channel's games in progress in the broadcasts' mosaic, its third source: the line at its top goes
 from one to another (*Broadcasts*, *Followed players*, *Lichess TV*), and the channels are chips under it. The same
@@ -2045,7 +2045,7 @@ Your own games never show, even featured: those of your linked account and of yo
 bot](#a-lichess-bot)). While one of your live games lasts, the mosaic's engines rest (see [Fair play](#fair-play)).
 What leaves the machine: the channel asked and the games followed, without an account; nothing is kept by itself.
 Ctrl+K has *Lichess TV*, each channel in the mosaic (and on the Board once the card was read), and, for the Board's
-game, *Stay on this game*, *Keep this game…* and *Back to the mosaic*.
+game, staying on it or going on to the channel's next game, keeping it, and going back to the mosaic.
 
 ### Preparing a game
 

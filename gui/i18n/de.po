@@ -247,6 +247,9 @@ msgstr "1 illegaler Zug"
 msgid "1 loss on time"
 msgstr "1 Zeitverlust"
 
+msgid "1 point"
+msgstr ""
+
 msgid "1.{} in {} % · score {} %"
 msgstr ""
 
@@ -373,6 +376,9 @@ msgstr ""
 msgid "A click on a game opens it on the Board page, with this dossier as its list (Ctrl+← and Ctrl+→)."
 msgstr ""
 
+msgid "A click on a game opens it, on a name their dossier, on a tie-break's heading changes the tie-breaks, kept for this tournament. The rating change: FIDE's formula, each player's K from FIDE's list when they are matched with it, else by FIDE's rules."
+msgstr ""
+
 msgid "A click on a line opens it on the Board page, the Tree tab on their games alone, from their side."
 msgstr ""
 
@@ -391,8 +397,14 @@ msgstr "Ein Klick öffnet sie auf dem Brett; dein Zug wird dort gespielt."
 msgid "A click opens one, the right button on a changed one discards its changes; Ctrl+Tab from any page of a view whose Board is for study"
 msgstr "Ein Klick öffnet eine, die rechte Maustaste auf einer geänderten verwirft ihre Änderungen; Strg+Tab von jeder Seite einer Ansicht, deren Brett fürs Studium ist"
 
+msgid "A click opens their dossier."
+msgstr ""
+
 msgid "A click plays an endgame; then ↑ ↓ choose another and Enter plays it."
 msgstr "Ein Klick spielt ein Endspiel; danach wählen ↑ ↓ ein anderes, und Enter spielt es."
+
+msgid "A click puts it first, moves, replaces or removes it."
+msgstr ""
 
 msgid "A click puts the man chosen (again: takes it away); Shift and a click: an empty square; the rest: anything."
 msgstr "Ein Klick setzt den gewählten Stein (noch einmal: entfernt ihn); Umschalt und ein Klick: ein leeres Feld; der Rest: beliebig."
@@ -460,11 +472,17 @@ msgstr "Ein anderswo erstellter Datenbankordner (Name.fcgdb): hier aufgeführt, 
 msgid "A date"
 msgstr "Datum"
 
+msgid "A decisive result without moves is read as a forfeit (+ and −): in the points, not in the performance nor the rating change."
+msgstr ""
+
 msgid "A double click corrects the comment"
 msgstr "Ein Doppelklick korrigiert den Kommentar"
 
 msgid "A double click opens it on the Board."
 msgstr "Ein Doppelklick öffnet es auf dem Brett."
+
+msgid "A draw"
+msgstr ""
 
 msgid "A draw: the win slipped away"
 msgstr "Remis: Der Gewinn ist entglitten"
@@ -576,6 +594,9 @@ msgstr "Ein Hinweis: Die Analyse-Engine sucht…"
 msgid "A hint: the green arrow on the board"
 msgstr "Ein Hinweis: der grüne Pfeil auf dem Brett"
 
+msgid "A knockout: its crosstable comes later."
+msgstr ""
+
 msgid "A lichess broadcast: its board, evaluation bar and chat, for anyone, on the internet. The games in progress are pushed every few seconds, each finished game once with its evaluations and clocks."
 msgstr "Eine lichess-Übertragung: ihr Brett, ihre Bewertungsleiste und ihr Chat, für alle, im Internet. Die laufenden Partien werden alle paar Sekunden gesendet, jede beendete Partie einmal mit ihren Bewertungen und Uhren."
 
@@ -680,6 +701,9 @@ msgstr "Ein Pfad dort, getippt oder eingefügt, dann Enter."
 
 msgid "A pawn is on the first or the last rank."
 msgstr "Ein Bauer steht auf der ersten oder letzten Reihe."
+
+msgid "A player under two names?"
+msgstr ""
 
 msgid "A player's games"
 msgstr "Partien eines Spielers"
@@ -789,6 +813,12 @@ msgstr "Der Name einer Studie hat 2 bis 100 Zeichen."
 msgid "A table that GitHub and forums show as one, with the same header as the HTML page."
 msgstr "Eine Tabelle, die GitHub und Foren als solche anzeigen, mit demselben Kopf wie die HTML-Seite."
 
+msgid "A team event: Lichess's team standings stay beside; its crosstable comes later."
+msgstr ""
+
+msgid "A team event: its crosstable comes later."
+msgstr ""
+
 msgid "A team match board by board takes no new engine: its board would have no opponent. Replace an engine of a team instead."
 msgstr "Ein Mannschaftskampf Brett gegen Brett nimmt keine neue Engine auf: Ihr Brett hätte keinen Gegner. Ersetze stattdessen eine Engine einer Mannschaft."
 
@@ -822,6 +852,9 @@ msgstr "Ein Turnier braucht die Kerne: Die Herausforderungen werden währenddess
 msgid "A tournament waits to start."
 msgstr "Ein Turnier wartet auf seinen Start."
 
+msgid "A tournament: the games of one event, its site and year. Its system is guessed (a round robin when each played each, Swiss otherwise); a click on it changes it. A click on a tournament, or Enter, opens its crosstable; Esc goes back."
+msgstr ""
+
 msgid "A variation"
 msgstr "Eine Variante"
 
@@ -845,6 +878,12 @@ msgstr "A: auf der Seite Brett analysieren"
 
 msgid "API token (with the study:write scope)"
 msgstr "API-Token (mit der Berechtigung study:write)"
+
+msgid "ARO"
+msgstr ""
+
+msgid "ARO-C1"
+msgstr ""
 
 msgid "Abort"
 msgstr "Partie abbrechen"
@@ -916,6 +955,9 @@ msgstr "Maschine hinzufügen…"
 
 msgid "Add a popular engine"
 msgstr "Beliebte Engine hinzufügen"
+
+msgid "Add a tie-break"
+msgstr ""
 
 msgid "Add all shown"
 msgstr "Alle angezeigten hinzufügen"
@@ -1144,6 +1186,9 @@ msgstr "Alle Gruppen"
 
 msgid "All openings"
 msgstr "Alle Eröffnungen"
+
+msgid "All players ({})"
+msgstr ""
 
 msgid "All the broadcasts live ({})"
 msgstr "Alle laufenden Übertragungen ({})"
@@ -1471,6 +1516,9 @@ msgstr "So gut wie {} der Auswertung: {} gibt {} danach."
 msgid "As good by the engine ({} against {}): {}."
 msgstr "Laut Engine gleich gut ({} gegen {}): {}."
 
+msgid "As guessed: {}"
+msgstr ""
+
 msgid "As text"
 msgstr "Als Text"
 
@@ -1671,6 +1719,12 @@ msgstr "Durchschnittliche Länge der Partien, in Zügen."
 msgid "Average loss"
 msgstr "Mittlerer Verlust"
 
+msgid "Average rating of the opponents"
+msgstr ""
+
+msgid "Average rating of the opponents, cut 1"
+msgstr ""
+
 msgid "Avg NPS"
 msgstr "Ø NPS"
 
@@ -1685,6 +1739,21 @@ msgstr "B (Referenz)"
 
 msgid "B always White"
 msgstr "B immer mit Weiß"
+
+msgid "BH"
+msgstr ""
+
+msgid "BH-C1"
+msgstr ""
+
+msgid "BH-M1"
+msgstr ""
+
+msgid "BPG"
+msgstr ""
+
+msgid "BWG"
+msgstr ""
 
 msgid "Back"
 msgstr "Zurück"
@@ -1715,6 +1784,9 @@ msgstr "Zurück zu den Büchern"
 
 msgid "Back to the choice of the engines and the clocks, for another game."
 msgstr "Zurück zur Wahl der Engines und Uhren, für eine weitere Partie."
+
+msgid "Back to the crosstable"
+msgstr ""
 
 msgid "Back to the current move"
 msgstr "Zurück zum aktuellen Zug"
@@ -1802,6 +1874,9 @@ msgstr "Wird erstellt aus {}"
 
 msgid "Being shared."
 msgstr "Wird geteilt."
+
+msgid "Below, each player's points and games, round by round."
+msgstr ""
 
 msgid "Benoni"
 msgstr ""
@@ -2067,6 +2142,9 @@ msgstr "Heller oder dunkler, als die Beleuchtung es macht, in Blendenstufen: Jed
 msgid "Brilliant move"
 msgstr "Brillanter Zug"
 
+msgid "Bring them together"
+msgstr ""
+
 msgid "Bring together"
 msgstr ""
 
@@ -2110,6 +2188,18 @@ msgstr "Braun"
 
 msgid "Browse…"
 msgstr "Durchsuchen…"
+
+msgid "Buchholz"
+msgstr ""
+
+msgid "Buchholz cut 1"
+msgstr ""
+
+msgid "Buchholz without its lowest and its highest values."
+msgstr ""
+
+msgid "Buchholz without its lowest value (a round the player chose not to play goes first)."
+msgstr ""
 
 msgid "Budget"
 msgstr "Budget"
@@ -2563,6 +2653,9 @@ msgstr "Wähle zwei Engines: ihre Partien gegeneinander, über alle Turniere."
 msgid "Choose…"
 msgstr "Wählen…"
 
+msgid "Chosen by you: a click changes it."
+msgstr ""
+
 msgid "Claim a draw"
 msgstr "Remis beanspruchen"
 
@@ -2589,6 +2682,20 @@ msgstr "Leeren"
 
 msgid "Clear everything"
 msgstr "Alles leeren"
+
+msgid "Clear the points set by hand"
+msgstr ""
+
+msgid "Clear the result set by hand"
+msgstr ""
+
+msgid "Clear the {} result set by hand"
+msgid_plural "Clear the {} results set by hand"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Clear them"
+msgstr ""
 
 msgid "Clearance"
 msgstr "Räumung"
@@ -2812,6 +2919,9 @@ msgstr "Koordinaten: das Feld finden"
 msgid "Coordinates: name the square"
 msgstr "Koordinaten: das Feld benennen"
 
+msgid "Copied from “{}” into this tournament, its event, site and players written as here. Ctrl+Z undoes."
+msgstr ""
+
 msgid "Copies RookStudio {} to {} on the machine (resumed if the copy is cut), then checks it starts there."
 msgstr "Kopiert RookStudio {} nach {} auf der Maschine (bei Abbruch fortgesetzt) und prüft, ob es dort startet."
 
@@ -2844,6 +2954,9 @@ msgstr "Als BBCode kopieren"
 
 msgid "Copy it"
 msgstr "Kopieren"
+
+msgid "Copy it into this tournament"
+msgstr ""
 
 msgid "Copy its comment as it is"
 msgstr "Ihren Kommentar unverändert kopieren"
@@ -2956,6 +3069,12 @@ msgstr "Erstellen…"
 msgid "Crosstable"
 msgstr "Kreuztabelle"
 
+msgid "Crosstable of {}"
+msgstr ""
+
+msgid "Crosstable: {}"
+msgstr ""
+
 msgid "Crushing"
 msgstr "Vernichtend"
 
@@ -3000,6 +3119,9 @@ msgstr "Zyklus {} · {} / {} Partien"
 
 msgid "Cycles"
 msgstr "Zyklen"
+
+msgid "DE"
+msgstr ""
 
 msgid "DTZ {}: half-moves to a capture or a pawn move"
 msgstr "DTZ {}: Halbzüge bis zu einem Schlag oder Bauernzug"
@@ -3087,6 +3209,9 @@ msgstr "Abtrennen"
 
 msgid "Details under the boards"
 msgstr "Details unter den Brettern"
+
+msgid "Direct encounter"
+msgstr ""
 
 msgid "Directories separated by ':' (WDL files are enough)."
 msgstr "Verzeichnisse, getrennt durch ':' (WDL-Dateien genügen)."
@@ -3379,6 +3504,9 @@ msgstr "Die jeder Engine"
 msgid "Each group merged into one game, the fullest of each field; the others marked deleted. The results that differ are left to you."
 msgstr ""
 
+msgid "Each kept as one game with the fullest fields of each source, as the maintenance merges duplicates; Ctrl+Z undoes."
+msgstr ""
+
 msgid "Each kept once, with the fullest of each field; the other marked deleted. Ctrl+Z undoes, on the maintenance page that opens."
 msgstr ""
 
@@ -3387,6 +3515,9 @@ msgstr "Jeder Zug Monat für Monat"
 
 msgid "Each new game of the gauntlet is shown from the side of its seed, the engine that meets all the others. Flip still turns the board over."
 msgstr "Jede neue Partie des Gauntlets wird von der Seite ihrer getesteten Engine gezeigt, die gegen alle anderen spielt. Drehen dreht das Brett weiterhin um."
+
+msgid "Each opponent's score times the points scored against them, added up."
+msgstr ""
 
 msgid "Each pair is two games on the same opening, colours reversed."
 msgstr "Jedes Paar besteht aus zwei Partien mit derselben Eröffnung und vertauschten Farben."
@@ -3402,6 +3533,9 @@ msgstr "Jede Runde des Turniers wird eine Runde der Übertragung, und jede Parti
 
 msgid "Each round pairs engines with similar scores, never twice the same; for large fields. The list order is the seeding."
 msgstr "Jede Runde paart Engines mit ähnlicher Punktzahl, nie zweimal dieselben; für große Felder. Die Reihenfolge der Liste ist die Setzliste."
+
+msgid "Earlier"
+msgstr ""
 
 msgid "Easier"
 msgstr "Leichter"
@@ -3465,6 +3599,12 @@ msgstr "Elo {}  ·  LOS {:.1f} %"
 
 msgid "Elo {} ± {:.0f}"
 msgstr "Elo {} ± {:.0f}"
+
+msgid "Elo ±"
+msgstr ""
+
+msgid "Elo ± live"
+msgstr ""
 
 msgid "Elo: {} = {:.0f}, 95 % interval"
 msgstr "Elo: {} = {:.0f}, 95-%-Intervall"
@@ -3922,6 +4062,15 @@ msgstr ""
 msgid "FIDE ids"
 msgstr ""
 
+msgid "FIDE's for a Swiss"
+msgstr ""
+
+msgid "FIDE's for a Swiss (the average rating left out: a player has no rating)"
+msgstr ""
+
+msgid "FIDE's for a round robin"
+msgstr ""
+
 msgid "FIDE's list"
 msgstr ""
 
@@ -3988,6 +4137,9 @@ msgstr "Datei nicht gefunden: {}"
 msgid "Files"
 msgstr "Dateien"
 
+msgid "Filter: event, site, year"
+msgstr ""
+
 msgid "Filter: name, group, notes"
 msgstr "Filter: Name, Gruppe, Notizen"
 
@@ -4017,6 +4169,9 @@ msgstr "Beendet"
 
 msgid "Finishes the running games first, or stops now; either way the tournament can be resumed where it stopped."
 msgstr "Spielt zuerst die laufenden Partien zu Ende oder stoppt sofort; so oder so kann das Turnier dort fortgesetzt werden, wo es aufgehört hat."
+
+msgid "First"
+msgstr ""
 
 msgid "First: {} {}/{}"
 msgstr "Erster: {} {}/{}"
@@ -4359,6 +4514,9 @@ msgstr "Partien, von denen ein Zug nicht gelesen werden konnte: bis dahin behalt
 msgid "Games also appended to {}"
 msgstr "Partien auch angehängt an {}"
 
+msgid "Games are missing from the database: the crosstable counts them “?”."
+msgstr ""
+
 msgid "Games at this structure"
 msgstr ""
 
@@ -4376,6 +4534,12 @@ msgstr "Partien anderer Programme oder Ranglisten, mit denen der Turniere gezäh
 
 msgid "Games played from this position."
 msgstr "Partien aus dieser Stellung."
+
+msgid "Games with Black"
+msgstr ""
+
+msgid "Games won"
+msgstr ""
 
 msgid "Games written to {}"
 msgstr "Partien nach {} geschrieben"
@@ -4483,6 +4647,12 @@ msgstr "Züge erraten"
 
 msgid "Guess the moves: a random game"
 msgstr "Züge erraten: eine zufällige Partie"
+
+msgid "Guessed from its games: a click changes it."
+msgstr ""
+
+msgid "Guessed, uncertain: a click chooses it."
+msgstr ""
 
 msgid "Guessing · {}"
 msgstr "Raten · {}"
@@ -4622,6 +4792,9 @@ msgstr "Navigationsknöpfe ausblenden"
 
 msgid "Hide the navigation buttons under the boards"
 msgstr "Navigationsknöpfe unter den Brettern ausblenden"
+
+msgid "Hide the results set by hand"
+msgstr ""
 
 msgid "Hide the text"
 msgstr ""
@@ -4824,6 +4997,9 @@ msgstr[1] "Im Hintergrund: {} von {}{} · {} Prozesse · die Übungen kommen Par
 msgid "In the database"
 msgstr "In der Datenbank"
 
+msgid "In the database's table of names: the games stay as they are written."
+msgstr ""
+
 msgid "In the guide: {}"
 msgstr "In der Anleitung: {}"
 
@@ -4848,6 +5024,9 @@ msgstr "In „{}“: jedes Kapitel eine Partie; beim erneuten Lesen werden nur d
 msgid "In “{}”: {} added, {} replaced, {} unchanged."
 msgstr "In „{}“: {} hinzugefügt, {} ersetzt, {} unverändert."
 
+msgid "In “{}”: {} – {}, round {}, {}"
+msgstr ""
+
 msgid "Inaccuracy"
 msgstr "Ungenauigkeit"
 
@@ -4871,6 +5050,9 @@ msgstr "RookStudio installieren"
 
 msgid "Installed: {}. Version {} is out."
 msgstr "Installiert: {}. Version {} ist erschienen."
+
+msgid "Instead"
+msgstr ""
 
 msgid "Interesting move"
 msgstr "Interessanter Zug"
@@ -4981,6 +5163,9 @@ msgstr "Es geht genau dort weiter, wo es aufgehört hat: keine Partie geht verlo
 
 msgid "It could not go into “{}”: {}."
 msgstr "Sie konnte nicht in „{}“ gespeichert werden: {}."
+
+msgid "It counts a result that is not in the database."
+msgstr ""
 
 msgid "It ended: {}. The board stays on it."
 msgstr "Die Partie ist zu Ende: {}. Das Brett bleibt bei ihr."
@@ -5189,6 +5374,9 @@ msgstr "Die Partien auf dem Brett, als Kopie: Strg+S speichert sie anderswo · E
 msgid "Its games played so far stop counting"
 msgstr "Ihre bisher gespielten Partien zählen nicht mehr"
 
+msgid "Its games share no event whose rounds are told: online games, for instance. Their list is under “Games”."
+msgstr ""
+
 msgid "Its games stop counting and are played again by the new engine."
 msgstr "Ihre Partien zählen nicht mehr und werden von der neuen Engine erneut gespielt."
 
@@ -5342,8 +5530,17 @@ msgstr "Jun"
 msgid "June"
 msgstr ""
 
+msgid "K {} by FIDE's rules"
+msgstr ""
+
+msgid "K {} from FIDE's list"
+msgstr ""
+
 msgid "KEY MOMENTS"
 msgstr "SCHLÜSSELMOMENTE"
+
+msgid "KS"
+msgstr ""
 
 msgid "Keep"
 msgstr "Behalten"
@@ -5441,6 +5638,9 @@ msgstr "Den Gewinn hätten gehalten: {} (die grünen Felder)."
 msgid "Kept when RookStudio closed, at move {}: the clocks wait until you resume."
 msgstr "Beim Schließen von RookStudio aufbewahrt, bei Zug {}: Die Uhren warten, bis du fortsetzt."
 
+msgid "Kept with this tournament in your profile; the database is unchanged."
+msgstr ""
+
 msgid "Kept: {}"
 msgstr ""
 
@@ -5482,6 +5682,9 @@ msgstr "Erfahren, wann meine Lichess-Partien beginnen und enden…"
 
 msgid "Know when one of your games starts and ends, wherever you play"
 msgstr "Erfahren, wann eine deiner Partien beginnt und endet, wo immer du spielst"
+
+msgid "Koya"
+msgstr ""
 
 msgid "LOS {:.1f} %"
 msgstr "LOS {:.1f} %"
@@ -6153,6 +6356,12 @@ msgstr "Verknüpft als {}"
 msgid "Listed among lichess' broadcasts"
 msgstr "Unter den lichess-Übertragungen aufgeführt"
 
+msgid "Listing its tournaments again: the list below is the previous one."
+msgstr ""
+
+msgid "Listing its tournaments…"
+msgstr ""
+
 msgid "Listing the tablebases of {}…"
 msgstr "Liste die Endspieldatenbanken von {} auf…"
 
@@ -6229,6 +6438,9 @@ msgid "Look for their new versions once a day, when the Engines page opens"
 msgstr "Einmal am Tag nach neuen Versionen suchen, wenn sich die Seite Engines öffnet"
 
 msgid "Look for them"
+msgstr ""
+
+msgid "Look for them in your other databases"
 msgstr ""
 
 msgid "Look in the whole database"
@@ -6499,11 +6711,17 @@ msgstr "Maximale Zugzahl"
 msgid "May"
 msgstr "Mai"
 
+msgid "Mean Elo"
+msgstr ""
+
 msgid "Measured on"
 msgstr "Gemessen an"
 
 msgid "Measuring…"
 msgstr "Messe…"
+
+msgid "Median Buchholz"
+msgstr ""
 
 msgid "Memory"
 msgstr "Speicher"
@@ -7066,6 +7284,9 @@ msgstr "Noch kein Spieler: Füge einen über seinen Namen hinzu."
 msgid "No player yet: add one by name; those your account follows come with their games' mosaic."
 msgstr "Noch kein Spieler: Füge einen über seinen Namen hinzu; die, denen dein Konto folgt, kommen mit dem Mosaik ihrer Partien."
 
+msgid "No point"
+msgstr ""
+
 msgid "No position with bm, am or c0 in this file."
 msgstr "Keine Stellung mit bm, am oder c0 in dieser Datei."
 
@@ -7156,8 +7377,14 @@ msgstr "Keine Theorie aus „{}“ vor dem ersten Fehler"
 msgid "No theory study yet."
 msgstr "Noch keine Theoriestudie."
 
+msgid "No tournament in this database."
+msgstr ""
+
 msgid "No tournament is open."
 msgstr "Kein Turnier geöffnet."
+
+msgid "No tournament matches."
+msgstr ""
 
 msgid "No tournament yet. Start with a new tournament."
 msgstr "Noch kein Turnier. Beginne mit einem neuen Turnier."
@@ -7287,6 +7514,9 @@ msgstr ""
 msgid "Not enough memory to draw it."
 msgstr "Nicht genug Speicher, um es zu zeichnen."
 
+msgid "Not found in your other databases."
+msgstr ""
+
 msgid "Not found where it was: {}. Put it back there, or find it where it went."
 msgstr "Nicht mehr dort, wo es war: {}. Leg es dorthin zurück oder finde es dort, wo es jetzt ist."
 
@@ -7316,6 +7546,9 @@ msgstr ""
 
 msgid "Not on the line of a game you are playing."
 msgstr "Nicht auf der Variante einer Partie, die du spielst."
+
+msgid "Not played yet against {}"
+msgstr ""
 
 msgid "Not saved in “{}” ({}), nor in {} ({})."
 msgstr "Nicht in „{}“ gespeichert ({}), auch nicht in {} ({})."
@@ -7961,6 +8194,9 @@ msgstr "PGN-Spieler und Engines der Bibliothek"
 msgid "PGN players…"
 msgstr "PGN-Spieler…"
 
+msgid "PS"
+msgstr ""
+
 msgid "PV agreement"
 msgstr "PV-Übereinstimmung"
 
@@ -8071,6 +8307,9 @@ msgstr "Menschen"
 msgid "Perf."
 msgstr "Perf."
 
+msgid "Performance"
+msgstr ""
+
 msgid "Perhaps {}?"
 msgstr "Vielleicht {}?"
 
@@ -8124,6 +8363,9 @@ msgstr "Fesselungen"
 
 msgid "Pins every game to its own processor, shared by its two engines since they never think at the same time: 2 games keep 2 cores busy and leave the others idle. Useful with a clock, irrelevant to a node count."
 msgstr "Bindet jede Partie an einen eigenen Prozessor, geteilt von ihren zwei Engines, da sie nie gleichzeitig rechnen: 2 Partien beschäftigen 2 Kerne und lassen die anderen frei. Nützlich mit Uhr, bedeutungslos bei fester Knotenzahl."
+
+msgid "Pl."
+msgstr ""
 
 msgid "Play"
 msgstr "Spielen"
@@ -8179,11 +8421,20 @@ msgstr "{} spielen"
 msgid "Playable by the engine ({} against {}): {}."
 msgstr "Laut Engine spielbar ({} gegen {}): {}."
 
+msgid "Played"
+msgstr ""
+
 msgid "Played again right, it no longer counts: the grade is given at the first move."
 msgstr "Beim erneuten Spielen richtig, zählt es nicht mehr: Die Bewertung wird beim ersten Zug vergeben."
 
 msgid "Played again: it no longer counts."
 msgstr "Erneut gespielt: Es zählt nicht mehr."
+
+msgid "Played as"
+msgstr ""
+
+msgid "Played as a {}, as you chose."
+msgstr ""
 
 msgid "Played in pairs: each opening is played twice, with colours reversed."
 msgstr "In Paaren gespielt: jede Eröffnung wird zweimal gespielt, mit vertauschten Farben."
@@ -8358,6 +8609,9 @@ msgstr "Programme"
 msgid "Progress"
 msgstr "Fortschritt"
 
+msgid "Progressive score"
+msgstr ""
+
 msgid "Promote the variation"
 msgstr "Variante hochstufen"
 
@@ -8369,6 +8623,9 @@ msgstr ""
 
 msgid "Protocol"
 msgstr "Protokoll"
+
+msgid "Pts"
+msgstr ""
 
 msgid "Public"
 msgstr "Öffentlich"
@@ -8623,6 +8880,9 @@ msgstr "Gelesen, in eine Datenbank importiert, verfolgt, vom Brett aus gefüllt.
 
 msgid "Reading its games, in the background…"
 msgstr "Lese die Partien im Hintergrund…"
+
+msgid "Reading its games…"
+msgstr ""
 
 msgid "Reading the book…"
 msgstr "Lese das Buch…"
@@ -9147,6 +9407,9 @@ msgstr "Runde"
 msgid "Round (its URL or id; empty: a new broadcast named after the tournament)"
 msgstr "Runde (ihre URL oder ID; leer: eine neue Übertragung mit dem Namen des Turniers)"
 
+msgid "Round not known"
+msgstr ""
+
 msgid "Round robin"
 msgstr "Rundenturnier"
 
@@ -9161,6 +9424,18 @@ msgstr "Runde {} / {}"
 
 msgid "Round {} · {} / {} games"
 msgstr "Runde {} · {} / {} Partien"
+
+msgid "Round {}: {}"
+msgstr ""
+
+msgid "Round {}: {} against {}"
+msgstr ""
+
+msgid "Round {}: {} – {}"
+msgstr ""
+
+msgid "Round {}: {}, without a game"
+msgstr ""
 
 msgid "Rounds"
 msgstr "Runden"
@@ -9200,6 +9475,9 @@ msgstr "R{}"
 
 msgid "Réti's manoeuvre"
 msgstr "Das Réti-Manöver"
+
+msgid "SB"
+msgstr ""
 
 msgid "SDL renderer"
 msgstr "SDL-Renderer"
@@ -9399,6 +9677,9 @@ msgstr ""
 msgid "See them in the list"
 msgstr "In der Liste zeigen"
 
+msgid "See those that differ"
+msgstr ""
+
 msgid "Seed"
 msgstr "Startwert"
 
@@ -9551,6 +9832,9 @@ msgstr "Ergebnis setzen"
 
 msgid "Set the result of game {}…"
 msgstr "Ergebnis von Partie {} setzen…"
+
+msgid "Set the results by hand"
+msgstr ""
 
 msgid "Set up a position: pieces, side to move, castling, en passant, Chess960."
 msgstr "Eine Stellung aufbauen: Figuren, Seite am Zug, Rochade, en passant, Chess960."
@@ -9741,6 +10025,9 @@ msgstr "Lösung"
 
 msgid "Some engines take every core by default. Games played at the same time then slow each other down, and the engines lose on time or play weaker than they are."
 msgstr "Manche Engines nehmen standardmäßig alle Kerne. Gleichzeitig gespielte Partien bremsen sich dann gegenseitig, und die Engines verlieren auf Zeit oder spielen schwächer, als sie sind."
+
+msgid "Sonneborn-Berger"
+msgstr ""
 
 msgid "Sorting them by rating: {} puzzles of {}"
 msgstr "Sortiere sie nach Wertung: {} von {} Aufgaben"
@@ -10068,6 +10355,9 @@ msgstr "Schweizer System, {} Engines"
 msgid "Sync"
 msgstr "Abgleichen"
 
+msgid "System"
+msgstr ""
+
 msgid "Syzygy tablebases"
 msgstr "Syzygy-Tablebases"
 
@@ -10134,6 +10424,9 @@ msgstr "DIE GESCHICHTE DER PARTIE"
 
 msgid "TLCS server"
 msgstr "TLCS-Server"
+
+msgid "TPR"
+msgstr ""
 
 msgid "TWIC {} is out"
 msgstr "TWIC {} ist erschienen"
@@ -10536,6 +10829,15 @@ msgstr "Das Modell des Assistenten schreibt die Geschichte: {} von {} Abschnitte
 msgid "The assistant's model, held to the review's facts"
 msgstr "Das Modell des Assistenten, an die Fakten der Auswertung gebunden"
 
+msgid "The average rating of the opponents met over the board, plus the difference FIDE's table gives the score there."
+msgstr ""
+
+msgid "The average rating of the opponents met over the board, without the lowest (nothing more cut for a player who had a round without a game)."
+msgstr ""
+
+msgid "The average rating of the opponents met over the board."
+msgstr ""
+
 msgid "The average rating of the opponents met, game by game."
 msgstr "Die durchschnittliche Wertung der Gegner, Partie für Partie."
 
@@ -10733,6 +11035,9 @@ msgstr "Die Kopie von {} auf {} hat {} Bytes statt {}: kopiere sie erneut."
 
 msgid "The copy of {} on {} is not the same as here: copy it again."
 msgstr "Die Kopie von {} auf {} ist nicht dieselbe wie hier: kopiere sie erneut."
+
+msgid "The crosstable of the rounds followed, in place of the boards: the games being played, those to come, the live rating change."
+msgstr ""
 
 msgid "The cryptography cannot start."
 msgstr "Die Kryptografie kann nicht starten."
@@ -10991,6 +11296,9 @@ msgstr "Die ersten sind die Gesetzten, die getesteten Engines: sie spielen gegen
 msgid "The first participant, {}, has no reference Elo."
 msgstr "Der erste Teilnehmer, {}, hat keine Referenz-Elo."
 
+msgid "The first ten"
+msgstr ""
+
 msgid "The first time, Lichess asks you to allow RookStudio to write in your studies (study:write)."
 msgstr "Beim ersten Mal bittet Lichess dich, RookStudio das Schreiben in deine Studien zu erlauben (study:write)."
 
@@ -11201,6 +11509,9 @@ msgstr "Die Partien der Spieler, denen du folgst."
 msgid "The games opened on the board come here."
 msgstr "Die auf dem Brett geöffneten Partien erscheinen hier."
 
+msgid "The games played with Black over the board."
+msgstr ""
+
 msgid "The games reviewed so far keep their reviews and their exercises."
 msgstr "Die bisher ausgewerteten Partien behalten ihre Auswertungen und ihre Übungen."
 
@@ -11210,11 +11521,20 @@ msgstr "Die Partien, die sie nicht erreichen können (ihre Bauern, ihr Material)
 msgid "The games wait for {}: {}. Another try after each game."
 msgstr "Die Partien warten auf {}: {}. Neuer Versuch nach jeder Partie."
 
+msgid "The games won over the board."
+msgstr ""
+
+msgid "The games won with Black over the board."
+msgstr ""
+
 msgid "The games you bookmarked on Lichess."
 msgstr "Die Partien, denen du auf Lichess ein Lesezeichen gegeben hast."
 
 msgid "The games you open on the board come here, Ctrl+Tab away."
 msgstr "Die Partien, die du auf dem Brett öffnest, erscheinen hier, mit Strg+Tab erreichbar."
+
+msgid "The games' boards again (Esc)."
+msgstr ""
 
 msgid "The graphics driver cannot draw the 3D board ({}): the boards stay flat."
 msgstr "Der Grafiktreiber kann das 3D-Brett nicht zeichnen ({}): Die Bretter bleiben flach."
@@ -11591,6 +11911,9 @@ msgstr "Der beste Zug des Gegners, dürfte er noch einmal ziehen, als roter Pfei
 msgid "The opponent's tactics"
 msgstr "Die Taktik des Gegners"
 
+msgid "The opponents' average {} over {} games, {} %: {} (FIDE's table)."
+msgstr ""
+
 msgid "The opposition"
 msgstr "Die Opposition"
 
@@ -11645,6 +11968,9 @@ msgstr "Das pausierte Turnier läuft weiter, und die Warteschlange startet ihr n
 msgid "The pawns alone"
 msgstr ""
 
+msgid "The performance as FIDE computes it: the average rating of the opponents met over the board, plus the difference its table gives the score."
+msgstr ""
+
 msgid "The permission lets RookStudio read the players you follow on Lichess; it writes nothing. Lichess's page opens for it; your account stays linked meanwhile, and the token it replaces is revoked."
 msgstr "Die Berechtigung erlaubt RookStudio, die Spieler zu lesen, denen du auf Lichess folgst; es schreibt nichts. Dafür öffnet sich die Seite von Lichess; dein Konto bleibt währenddessen verknüpft, und das Token, das sie ersetzt, wird widerrufen."
 
@@ -11692,6 +12018,12 @@ msgstr "Die Spieler der PGN-Dateien, die als Engines der Bibliothek gelten, nach
 
 msgid "The players of the PGN files that are no library engine by their name, letter case and spaces aside. Say which library engine a player is, and its games are the engine's; the choice is kept for every PGN file that names the player. A name that two library engines have waits for your choice; a hint is a guess, never applied."
 msgstr "Die Spieler der PGN-Dateien, die dem Namen nach keine Engine der Bibliothek sind, von Groß-/Kleinschreibung und Leerzeichen abgesehen. Gib an, welche Engine der Bibliothek ein Spieler ist, und seine Partien sind die der Engine; die Wahl gilt für jede PGN-Datei, die den Spieler nennt. Ein Name, den zwei Engines der Bibliothek tragen, wartet auf deine Wahl; ein Hinweis ist eine Vermutung und wird nie angewendet."
+
+msgid "The points scored against the players who scored half the points or more."
+msgstr ""
+
+msgid "The points scored in the games between the players tied, when all of them met (in a Swiss, one is ranked first when the games they did not play could not change it)."
+msgstr ""
 
 msgid "The popular engines, from their authors' releases (the Engines page)."
 msgstr "Die beliebten Engines, aus den Releases ihrer Autoren (die Seite Engines)."
@@ -11841,6 +12173,9 @@ msgstr "Die Warteschlange wartet auf Alles fortsetzen."
 msgid "The rail"
 msgstr "Die Leiste"
 
+msgid "The rating change by FIDE's formula: K × (score − expected score) over the games rated; a forfeit counts in the points only."
+msgstr ""
+
 msgid "The rating of the engines chosen after each tournament they played: the versions of an engine, side by side."
 msgstr "Die Wertung der gewählten Engines nach jedem gespielten Turnier: die Versionen einer Engine nebeneinander."
 
@@ -11907,6 +12242,9 @@ msgstr "Die Runde konnte nicht in „{}“ gespeichert werden: {}"
 msgid "The rounds"
 msgstr "Die Runden"
 
+msgid "The rounds won, over the board or not: forfeits and byes worth a win count."
+msgstr ""
+
 msgid "The rounds you follow."
 msgstr "Die Runden, die du verfolgst."
 
@@ -11946,8 +12284,14 @@ msgstr "Dasselbe Match mit einer neuen Engine A anstelle von {}, z. B. ihrer nä
 msgid "The same opening for every pair of a round"
 msgstr "Dieselbe Eröffnung für alle Paare einer Runde"
 
+msgid "The same players, round and moves from two sources, their headers written otherwise."
+msgstr ""
+
 msgid "The samples the picture is made of before it rests: more is finer, and keeps the graphics card at work longer. Fewer spare a processor's graphics during tournaments."
 msgstr "Die Samples, aus denen das Bild besteht, bevor es ruht: mehr ist feiner und beschäftigt die Grafikkarte länger. Weniger schonen die Grafik eines Prozessors während Turnieren."
+
+msgid "The score after each round, added up."
+msgstr ""
 
 msgid "The search covers what is already committed ({}) and is made again by itself at the end."
 msgstr ""
@@ -12054,8 +12398,17 @@ msgstr ""
 msgid "The structure of the Board page, or pawns set up."
 msgstr ""
 
+msgid "The sum of the opponents' scores. In a Swiss, a round without a game counts as one against an opponent with the player's own score, at most half the rounds' points."
+msgstr ""
+
 msgid "The system could not open:"
 msgstr "Das System konnte nicht öffnen:"
+
+msgid "The system is uncertain"
+msgstr ""
+
+msgid "The system is uncertain while the tournament is played:"
+msgstr ""
 
 msgid "The tablebase adjudication's Max pieces, in this tournament's Adjudication section."
 msgstr "Max. Steine der Tablebase-Abschätzung, im Abschnitt Abschätzung dieses Turniers."
@@ -12562,6 +12915,9 @@ msgstr "Hake links Engines an."
 
 msgid "Ticked, they are voided as well: they stay in the PGN files and the journal but no longer count. Otherwise they count, and only its games left are dropped."
 msgstr "Angehakt werden sie ebenfalls annulliert: Sie bleiben in den PGN-Dateien und im Journal, zählen aber nicht mehr. Sonst zählen sie, und nur ihre restlichen Partien entfallen."
+
+msgid "Tie-breaks:"
+msgstr ""
 
 msgid "Time"
 msgstr "Zeit"
@@ -13085,6 +13441,9 @@ msgstr "WORAN ZU ARBEITEN IST"
 msgid "WHO SAW IT FIRST"
 msgstr "WER ES ZUERST SAH"
 
+msgid "WON"
+msgstr ""
+
 msgid "Waiting for Lichess's event stream ({}): a seek goes once it is open."
 msgstr "Warte auf den Ereignisstrom von Lichess ({}): Ein Partiegesuch geht los, sobald er offen ist."
 
@@ -13467,6 +13826,9 @@ msgstr "Siege"
 msgid "Wins of A"
 msgstr "Siege von A"
 
+msgid "Wins with Black"
+msgstr ""
+
 msgid "Wins."
 msgstr "Siege."
 
@@ -13560,6 +13922,9 @@ msgstr "Ohne Tablebases sind die Endspiele, die sie brauchen, ausgegraut, jedes 
 msgid "Without the unbalanced"
 msgstr "Ohne die unausgeglichenen"
 
+msgid "Won"
+msgstr ""
+
 msgid "Won twice by one engine"
 msgstr "Zweimal von derselben Engine gewonnen"
 
@@ -13598,6 +13963,9 @@ msgstr "Die Live-Dateien schreiben"
 
 msgid "Write the story of the game again"
 msgstr "Die Geschichte der Partie neu schreiben"
+
+msgid "Writing in the database…"
+msgstr ""
 
 msgid "Writing the Polyglot copy: {} positions"
 msgstr "Schreibe die Polyglot-Kopie: {} Stellungen"
@@ -14084,6 +14452,9 @@ msgstr "ein Bot seit heute, {} Uhr"
 msgid "a bot since {}"
 msgstr "ein Bot seit {}"
 
+msgid "a click on a heading sorts"
+msgstr ""
+
 msgid "a click on each square"
 msgstr ""
 
@@ -14110,6 +14481,9 @@ msgstr "ein Fehler"
 
 msgid "a file downloaded on its site"
 msgstr "eine auf ihrer Website heruntergeladene Datei"
+
+msgid "a game copied in"
+msgstr ""
 
 msgid "a game the database has already (the same tags and moves) is not added twice"
 msgstr "eine Partie, die die Datenbank schon hat (gleiche Tags und Züge), wird nicht doppelt hinzugefügt"
@@ -14641,6 +15015,9 @@ msgstr "geschafft"
 msgid "done in {} (the tables: {})"
 msgstr "geschafft in {} (die Tablebases: {})"
 
+msgid "double round robin"
+msgstr ""
+
 msgid "downloaded at {} %, then checked"
 msgstr "zu {} % heruntergeladen, dann geprüft"
 
@@ -14805,6 +15182,9 @@ msgstr "bereits beendete Partien"
 
 msgid "games at least"
 msgstr "Partien mindestens"
+
+msgid "games that came twice and differ"
+msgstr ""
 
 msgid "games wait for a GPU"
 msgstr "Partien warten auf eine GPU"
@@ -15095,6 +15475,9 @@ msgstr "Richter"
 msgid "just now"
 msgstr "gerade eben"
 
+msgid "knockout"
+msgstr ""
+
 msgid "known, to review later"
 msgstr "gewusst, später zu wiederholen"
 
@@ -15133,6 +15516,9 @@ msgstr "live"
 
 msgid "live analysis"
 msgstr "Live-Analyse"
+
+msgid "live · round {}"
+msgstr ""
 
 msgid "live · {}"
 msgstr "live · {}"
@@ -15186,6 +15572,9 @@ msgstr ""
 
 msgid "mates in 1 to 5, by pattern"
 msgstr "Matts in 1 bis 5, nach Muster"
+
+msgid "mean Elo {}"
+msgstr ""
 
 msgid "millions of games, over-the-board and online, CC BY-NC 4.0"
 msgstr "Millionen Partien, am Brett und online, CC BY-NC 4.0"
@@ -15320,6 +15709,9 @@ msgstr "keine Zugrücknahme"
 msgid "no token: link the account with the permission to create broadcasts, or paste one in the Broadcast tab"
 msgstr "kein Token: Verknüpfe das Konto mit der Berechtigung, Übertragungen zu erstellen, oder füge eines im Tab Übertragung ein"
 
+msgid "no. {}"
+msgstr ""
+
 msgid "nodes"
 msgstr "Knoten"
 
@@ -15364,6 +15756,9 @@ msgstr "nicht in der Bibliothek"
 
 msgid "not in the library any more"
 msgstr "nicht mehr in der Bibliothek"
+
+msgid "not known"
+msgstr ""
 
 msgid "not now"
 msgstr "nicht jetzt"
@@ -15703,8 +16098,17 @@ msgstr "im ersten Versuch richtig"
 msgid "round"
 msgstr ""
 
+msgid "round robin"
+msgstr ""
+
+msgid "round robin, {} cycles"
+msgstr ""
+
 msgid "round {}"
 msgstr "Runde {}"
+
+msgid "round {}, {}"
+msgstr ""
 
 msgid "running a program"
 msgstr "Ausführen eines Programms"
@@ -15753,6 +16157,9 @@ msgstr "kurz: Er steht unter dem Umschalter"
 msgid "site"
 msgstr ""
 
+msgid "sorted by mean Elo"
+msgstr ""
+
 msgid "stalemate"
 msgstr "Patt"
 
@@ -15796,6 +16203,9 @@ msgstr ""
 
 msgid "tb {}"
 msgstr "TB {}"
+
+msgid "team event"
+msgstr ""
 
 msgid "the Board page's position"
 msgstr ""
@@ -15880,6 +16290,9 @@ msgstr "die Datei sofort neu geschrieben, ihre anderen Partien unverändert"
 
 msgid "the file's games kept, this one after them"
 msgstr "die Partien der Datei bleiben, diese kommt danach"
+
+msgid "the first ten"
+msgstr ""
 
 msgid "the game already has this result"
 msgstr "die Partie hat schon dieses Ergebnis"
@@ -16415,6 +16828,9 @@ msgstr "dein Repertoire „{}“"
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
 msgstr "deine Studien, die Online-Aufgaben von Lichess, deine Partien auf Lichess von der Seite Spielen aus."
 
+msgid "yours, kept for this tournament"
+msgstr ""
+
 msgid "{:+.2f}  (DrawElo {:.0f})"
 msgstr "{:+.2f}  (DrawElo {:.0f})"
 
@@ -16462,6 +16878,9 @@ msgstr "{} (Analyse)"
 
 msgid "{} (preparing the book: {} %)"
 msgstr "{} (Buch wird vorbereitet: {} %)"
+
+msgid "{} (set by hand)"
+msgstr ""
 
 msgid "{} (their turn)"
 msgstr "{} (Gegner am Zug)"
@@ -16914,6 +17333,24 @@ msgstr "{} für jede Engine"
 msgid "{} for {}"
 msgstr "{} bei {}"
 
+msgid "{} for {} players, but {} pair met more often than its system allows."
+msgid_plural "{} for {} players, but {} pairs met more often than its system allows."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} for {} players, {} of {} games."
+msgstr ""
+
+msgid "{} forfeit"
+msgid_plural "{} forfeits"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} forfeit, round {}"
+msgid_plural "{} forfeits, rounds {}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{} found so far"
 msgstr ""
 
@@ -16978,6 +17415,11 @@ msgid "{} game being played"
 msgid_plural "{} games being played"
 msgstr[0] "{} Partie läuft"
 msgstr[1] "{} Partien laufen"
+
+msgid "{} game came twice, counted once"
+msgid_plural "{} games came twice, counted once"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} game cannot be read"
 msgid_plural "{} games cannot be read"
@@ -17044,6 +17486,11 @@ msgid_plural "{} games in {}"
 msgstr[0] "{} Partie in {}"
 msgstr[1] "{} Partien in {}"
 
+msgid "{} game is missing"
+msgid_plural "{} games are missing"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{} game left out by the options (a rating below the minimum, or no result)."
 msgid_plural "{} games left out by the options (a rating below the minimum, or no result)."
 msgstr[0] "{} Partie durch die Optionen ausgelassen (eine Wertung unter dem Minimum oder kein Ergebnis)."
@@ -17083,6 +17530,11 @@ msgid "{} game per tested engine"
 msgid_plural "{} games per tested engine"
 msgstr[0] "{} Partie pro getesteter Engine"
 msgstr[1] "{} Partien pro getesteter Engine"
+
+msgid "{} game played"
+msgid_plural "{} games played"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} game played blindfold"
 msgid_plural "{} games played blindfold"
@@ -17412,6 +17864,11 @@ msgstr "{} ist die PGN-Datei des Turniers selbst: Wähle eine andere."
 
 msgid "{} is twice in the list of participants."
 msgstr "{} steht zweimal in der Teilnehmerliste."
+
+msgid "{} kept in “Broadcasts”"
+msgid_plural "{} kept in “Broadcasts”"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} kept in “{}”"
 msgstr "{} in „{}“ gespeichert"
@@ -18026,6 +18483,16 @@ msgstr[1] "{} ersetzt"
 msgid "{} resigns"
 msgstr "{} gibt auf"
 
+msgid "{} result is not in the database: the points may be more."
+msgid_plural "{} results are not in the database: the points may be more."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} result set by hand"
+msgid_plural "{} results set by hand"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{} right of {} so far"
 msgstr "bisher {} von {} richtig"
 
@@ -18200,6 +18667,9 @@ msgid_plural "{} to review today"
 msgstr[0] "{} heute zu wiederholen"
 msgstr[1] "{} heute zu wiederholen"
 
+msgid "{} to {}"
+msgstr ""
+
 msgid "{} to {} %"
 msgstr "{} bis {} %"
 
@@ -18311,6 +18781,9 @@ msgstr ""
 msgid "{} with a GPU engine at a time"
 msgstr "{} mit einer GPU-Engine gleichzeitig"
 
+msgid "{} without a game"
+msgstr ""
+
 msgid "{} won against {}."
 msgstr "{} hat gegen {} gewonnen."
 
@@ -18374,6 +18847,9 @@ msgstr "{} · auf der Festplatte geändert, {} neu gelesen"
 
 msgid "{} · depth {} · {}"
 msgstr "{} · Tiefe {} · {}"
+
+msgid "{} · expected {}, scored {}, over {} rated games"
+msgstr ""
 
 msgid "{} · game {}"
 msgstr "{} · Partie {}"
@@ -18478,6 +18954,9 @@ msgstr "{} × {} Paarungen × 2 Partien × {} Zyklen"
 
 msgid "{} – RookStudio"
 msgstr "{} – RookStudio"
+
+msgid "{} – {}"
+msgstr ""
 
 msgid "{} – {} ({} – {}): a click opens it on the board, asked of Lichess."
 msgstr "{} – {} ({} – {}): Ein Klick öffnet sie auf dem Brett, bei Lichess abgefragt."
@@ -18597,6 +19076,9 @@ msgstr "{}-Steiner-Syzygy für jede Engine"
 msgid "{}-man Syzygy for {} of {} engines"
 msgstr "{}-Steiner-Syzygy für {} von {} Engines"
 
+msgid "{}. Counted “?”: the points, the tie-breaks and the rating change say so."
+msgstr ""
+
 msgid "{}. Score {} %."
 msgstr ""
 
@@ -18605,6 +19087,9 @@ msgstr "{}:"
 
 msgid "{}: Lichess cannot be reached ({})"
 msgstr "{}: Lichess ist nicht erreichbar ({})"
+
+msgid "{}: a bye, the only player unpaired (a win's points)"
+msgstr ""
 
 msgid "{}: a different build there than this computer's (Replace with this computer's copies it)."
 msgstr "{}: dort ein anderer Build als der dieses Computers (Durch den dieses Computers ersetzen kopiert ihn)."
@@ -18623,6 +19108,9 @@ msgstr "{}: Genauigkeit {} · {}"
 
 msgid "{}: added to your repertoire"
 msgstr "{}: zu deinem Repertoire hinzugefügt"
+
+msgid "{}: being played against {}; a click follows it on the board"
+msgstr ""
 
 msgid "{}: cancelled, nothing written."
 msgstr "{}: abgebrochen, nichts geschrieben."
@@ -18660,11 +19148,26 @@ msgstr "{}: ihre Linien, Threads und Hash; zur ersten machen, entfernen"
 msgid "{}: kept, judged when the tables answer."
 msgstr "{}: behalten, beurteilt, sobald die Tablebases antworten."
 
+msgid "{}: later"
+msgstr ""
+
+msgid "{}: lost by forfeit against {}"
+msgstr ""
+
 msgid "{}: never"
 msgstr "{}: nie"
 
 msgid "{}: no Syzygy file in {}: the adjudication does without them; push them from Settings > Machines > Books and tablebases."
 msgstr "{}: keine Syzygy-Datei in {}: die Abschätzung kommt ohne sie aus; übertrage sie über Einstellungen > Maschinen > Bücher und Endspieldatenbanken."
+
+msgid "{}: no game (a bye asked for, or not playing)"
+msgstr ""
+
+msgid "{}: no game in the database (a game missing whose pairing is not known, or a bye); a click sets its points by hand"
+msgstr ""
+
+msgid "{}: no game, its points set by hand"
+msgstr ""
 
 msgid "{}: not found while {}."
 msgstr "{}: nicht gefunden (Schritt: {})."
@@ -18699,6 +19202,9 @@ msgstr "{}: der für diese Maschine gewählte Build."
 msgid "{}: the disk is full while {}: free some space on the machine."
 msgstr "{}: die Festplatte ist voll (Schritt: {}): mach auf der Maschine Platz frei."
 
+msgid "{}: the game against {} is not in the database; a click sets its result by hand"
+msgstr ""
+
 msgid "{}: the game went another way here"
 msgstr "{}: Die Partie ging hier anders weiter"
 
@@ -18725,6 +19231,15 @@ msgstr "{}: neuer Startversuch."
 
 msgid "{}: unknown to the engine"
 msgstr "{}: der Engine unbekannt"
+
+msgid "{}: with Black against {}, {}"
+msgstr ""
+
+msgid "{}: with White against {}, {}"
+msgstr ""
+
+msgid "{}: won by forfeit against {} (in the points, not in the performance nor the rating change)"
+msgstr ""
 
 msgid "{}: your move"
 msgstr "{}: dein Zug"
@@ -18908,6 +19423,11 @@ msgid_plural "· {} endgames of your reviewed games, of 7 pieces or fewer"
 msgstr[0] "· {} Endspiel aus deinen ausgewerteten Partien, mit 7 Steinen oder weniger"
 msgstr[1] "· {} Endspiele aus deinen ausgewerteten Partien, mit 7 Steinen oder weniger"
 
+msgid "· {} game"
+msgid_plural "· {} games"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "· {} games read, none damaged · {} · {} · {} · checked at {}"
 msgstr ""
 
@@ -18918,6 +19438,9 @@ msgid "· {} note at this position"
 msgid_plural "· {} notes at this position"
 msgstr[0] "· {} Notiz zu dieser Stellung"
 msgstr[1] "· {} Notizen zu dieser Stellung"
+
+msgid "· {} of {} games"
+msgstr ""
 
 msgid "· {} pieces · Lichess · asked at {}, kept in your profile"
 msgstr "· {} Steine · Lichess · abgefragt um {}, in deinem Profil gespeichert"
@@ -18933,7 +19456,13 @@ msgstr "· {} Aufgaben, {} % im ersten Versuch richtig · nach Thema, mit puzzle
 msgid "· {} · {} · received at {}"
 msgstr "· {} · {} · empfangen um {}"
 
+msgid "½ point"
+msgstr ""
+
 msgid "— proposed: the nearest to its games' ratings"
+msgstr ""
+
+msgid "“4b½”: against no. 4, with Black, a draw; “+” and “−” forfeits. In the accent colour, the games between the players shown. A click on a game opens it, on a name their dossier, on a tie-break's heading changes the tie-breaks, kept for this tournament. The start numbers follow the ratings."
 msgstr ""
 
 msgid "“Always” can be changed on the Lichess page, under Online for the analysis, which also says what is sent."
@@ -18951,8 +19480,17 @@ msgstr "„{}{}{}“ ist kein legaler Zug; bis Zug {} behalten"
 msgid "“{}”"
 msgstr "„{}“"
 
+msgid "“{}” (rounds {} to {}) and “{}” (rounds {} to {}), never paired together."
+msgstr ""
+
 msgid "“{}” added: its notes show in the Tree tab once it is read."
 msgstr "„{}“ hinzugefügt: Die Notizen erscheinen nach dem Lesen im Tab Baum."
+
+msgid "“{}” and “{}” brought together"
+msgstr ""
+
+msgid "“{}” and “{}” brought together in the table of names. Ctrl+Z undoes."
+msgstr ""
 
 msgid "“{}” and “{}” cannot both be true. Told before searching: nothing is started."
 msgstr ""
@@ -19106,6 +19644,9 @@ msgstr "● Live · {} Zuschauer"
 
 msgid "● Reconnecting in a moment: {}"
 msgstr "● Neue Verbindung gleich: {}"
+
+msgid "● a game being played (a click follows it on the board); · not played yet. Made of the rounds RookStudio follows and those it kept in the “Broadcasts” database; Lichess's standings stay beside. Nothing more is asked of Lichess for it."
+msgstr ""
 
 msgid "✓ As expected for the {} engines measured"
 msgstr "✓ Wie erwartet für die {} gemessenen Engines"

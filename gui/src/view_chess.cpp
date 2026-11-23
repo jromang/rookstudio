@@ -240,8 +240,11 @@ void App::drawChessHome() {
                                       .c_str()))
                 page_ = Page::Databases;
         }
-        if (shown == 0)
+        if (shown == 0) {  // wrapped: longer in other languages than the card is wide
+            ImGui::PushTextWrapPos();
             ImGui::TextDisabled("%s", TR("No database yet: import a PGN file, or drop one on the Databases page."));
+            ImGui::PopTextWrapPos();
+        }
         drawTwicHomeNotice();  // a new issue of TWIC, when the weekly look found one (#71)
         ui::endCard();
     }

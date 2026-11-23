@@ -120,18 +120,24 @@ bool chip(const char* id, const std::string& text, bool on) {
     return clicked;
 }
 
+// A text that wraps, its percentages ("44 %") kept whole on a line: the space before "%" one that does not break.
+std::string percentsKept(std::string text) {
+    for (std::size_t at = 0; (at = text.find(" %", at)) != std::string::npos; at += 3) text.replace(at, 1, "\u00a0");
+    return text;
+}
+
 // A card of the overview: what it is, its value large, what it means.
 void card(const char* id, const char* title, const std::string& big, const std::string& text) {
     ui::beginCard(id);
     ImGui::TextDisabled("%s", title);
     ImGui::PushFont(ui::titleFont(), ImGui::GetFontSize() * 1.15f);
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(big.empty() ? "–" : big.c_str());
+    ImGui::TextUnformatted(big.empty() ? "–" : percentsKept(big).c_str());
     ImGui::PopTextWrapPos();
     ImGui::PopFont();
     if (!text.empty()) {
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("%s", text.c_str());
+        ImGui::TextDisabled("%s", percentsKept(text).c_str());
         ImGui::PopTextWrapPos();
     }
     ui::endCard();
@@ -165,7 +171,7 @@ const char* formationName(int kind) {
 std::string structureLabel(const study::DossierStructure& s) {
     const char* name = formationName(s.kind);
     if (s.theirs) return s.white ? trf("{}, theirs, with White", name) : trf("{}, theirs, with Black", name);
-    return s.white ? trf("{}, the opponent's, with White", name) : trf("{}, the opponent's, with Black", name);
+    return s.white ? trf("{}, their opponent's, with White", name) : trf("{}, their opponent's, with Black", name);
 }
 
 }  // namespace
@@ -786,11 +792,11 @@ void App::drawDossierOverview() {
         if (!p.with_white.empty())
             big[0] = trf("1.{} in {} % · score {} %", p.with_white[0].san, percent(p.with_white[0].share),
                          percent(p.with_white[0].score));
+        // Their openings by family ("Ruy Lopez: Berlin Defense (34)"), the lines of a family counted together.
         std::vector<std::string> lines;
-        for (std::size_t i = 0; i < b.lines_white.size() && i < 3; ++i) {
-            const auto& l = b.lines_white[i];
-            lines.push_back(trf("{} ({})", l.opening ? names[*l.opening].name : l.eco, l.score.games));
-        }
+        const auto played = study::dossierFamilies(dossier, study::DossierParts::Board, true, -1, names);
+        for (std::size_t i = 0; i < played.size() && i < 3; ++i)
+            lines.push_back(trf("{} ({})", played[i].family, played[i].score.games));
         text[0] = listed(lines);
         std::vector<std::string> families, against;
         for (std::size_t i = 0; i < p.with_black.size(); ++i) {
@@ -1143,12 +1149,18 @@ void App::drawDossierRating() {
                     auto most = by.begin();
                     for (auto it = by.begin(); it != by.end(); ++it)
                         if (it->second.size() > most->second.size()) most = it;
-                    const auto& latest = dossier.games[s.games.front()];
-                    auto& st           = db_search_.structure;
-                    st.pawns           = latest.pawns;
-                    st.taken           = true;
-                    st.set             = false;
-                    st.said            = trf("at move 20 of game {}", ui::exactCount(latest.id + 1));
+                    // The latest of them in that database (the structure's games come the latest first).
+                    const auto* latest = &dossier.games[s.games.front()];
+                    for (const auto gi : s.games)
+                        if (dossier.games[gi].source == most->first) {
+                            latest = &dossier.games[gi];
+                            break;
+                        }
+                    auto& st = db_search_.structure;
+                    st.pawns = latest->pawns;
+                    st.taken = true;
+                    st.set   = false;
+                    st.said  = trf("at move 20 of game {}", ui::exactCount(latest->id + 1));
                     dossierInList(most->first, most->second,
                                   trf("the games of {} in this structure: {}", d.subject.name, structureLabel(s)));
                     db_search_open_ = true;
@@ -1285,10 +1297,17 @@ void App::drawDossierOnline() {
         std::string level, from = TR("their public profile");
         if (p && p->profile) {
             std::vector<std::string> each;
-            for (const auto& sp : p->profile->speeds)
-                if (sp.key != "correspondence" && sp.games > 0 &&
-                    (sp.key == "rapid" || sp.key == "blitz" || sp.key == "classical" || sp.key == "bullet"))
-                    each.push_back(fmt::format("{} {}{}", sp.key, sp.rating, sp.provisional ? "?" : ""));
+            for (const auto& sp : p->profile->speeds) {
+                // Each speed in the interface's language, a provisional rating with "?".
+                const char* format = sp.key == "bullet"      ? TR("bullet {}")
+                                     : sp.key == "blitz"     ? TR("blitz {}")
+                                     : sp.key == "rapid"     ? TR("rapid {}")
+                                     : sp.key == "classical" ? TR("classical {}")
+                                                             : nullptr;
+                if (format && sp.games > 0)
+                    each.push_back(
+                        fmt::format(fmt::runtime(format), fmt::format("{}{}", sp.rating, sp.provisional ? "?" : "")));
+            }
             for (const auto& e : each) level += (level.empty() ? "" : " · ") + e;
         } else if (p && !p->profile_error.empty()) {
             from = p->profile_error;

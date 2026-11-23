@@ -443,9 +443,15 @@ void App::drawLichessAccount() {
                                  "offers it then."));
     } else {
         ImGui::TextDisabled("%s", TR("No account linked. Linked, it brings:"));
-        ImGui::BulletText("%s", TR("Lichess's opening explorer in the Tree tab: masters, all players, one player;"));
-        ImGui::BulletText("%s", TR("your games synced faster, your private ones too;"));
-        ImGui::BulletText("%s", TR("later: your studies, playing online (the next previews)."));
+        // Wrapped, unlike BulletText: a long line in another language stays inside the card.
+        for (const char* line : {TR("Lichess's opening explorer in the Tree tab: masters, all players, one player;"),
+                                 TR("your games synced faster, your private ones too;"),
+                                 TR("your studies, Lichess's puzzles online, your games on Lichess from the Play "
+                                    "page.")}) {
+            ImGui::Bullet();
+            ImGui::SameLine();
+            ImGui::TextWrapped("%s", line);
+        }
         // What went wrong last, and the gesture that mends it (M4, board 2).
         if (!lichess_error_.empty()) {
             const bool refused = lichess_error_.find("refused") != std::string::npos;

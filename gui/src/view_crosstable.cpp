@@ -753,6 +753,14 @@ App::CrossClicks App::drawCrossTable(const study::Crosstable& table, bool all, b
     const int middle  = swiss ? std::max(table.rounds, 1) : static_cast<int>(rows.size());
     const int tbs     = static_cast<int>(table.tiebreaks.size());
     const int first   = swiss ? 4 : 3;  // place, (number), player, Elo
+    // A tie-break's column with quarters (a Sonneborn-Berger of a double round robin): two decimals all along it.
+    std::vector<bool> decimals(static_cast<std::size_t>(tbs), false);
+    for (const auto& row : table.rows)
+        for (std::size_t k = 0; k < decimals.size() && k < row.tiebreaks.size(); ++k)
+            if (row.states[k] != study::TiebreakState::None) {
+                const double twice = row.tiebreaks[k] * 2;
+                if (std::abs(twice - std::round(twice)) > 1e-9) decimals[k] = true;
+            }
     // A round robin's wins, after its tie-breaks when they do not have them.
     const bool wins      = !swiss && std::find(table.tiebreaks.begin(), table.tiebreaks.end(), study::Tiebreak::Wins) ==
                                          table.tiebreaks.end();
@@ -979,7 +987,8 @@ App::CrossClicks App::drawCrossTable(const study::Crosstable& table, bool all, b
                 const auto state = row.states[static_cast<std::size_t>(k)];
                 if (state == study::TiebreakState::None) continue;
                 const auto t = table.tiebreaks[static_cast<std::size_t>(k)];
-                auto text    = tiebreakValue(t, row.tiebreaks[static_cast<std::size_t>(k)]);
+                auto text =
+                    tiebreakValue(t, row.tiebreaks[static_cast<std::size_t>(k)], decimals[static_cast<std::size_t>(k)]);
                 if (state == study::TiebreakState::Unsure) text += "?";
                 if (state == study::TiebreakState::Unsure)
                     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", text.c_str());
@@ -1245,9 +1254,11 @@ void App::drawStudyCrosstable() {
                 ImGui::PopID();
             }
             if (!c.settings.hand.empty()) {
-                if (ImGui::SmallButton(trn("Clear the {} result set by hand", "Clear the {} results set by hand",
-                                           c.settings.hand.size(), c.settings.hand.size())
-                                           .c_str())) {
+                const auto clear = c.settings.hand.size() == 1
+                                       ? std::string(TR("Clear the result set by hand"))
+                                       : trn("Clear the {} result set by hand", "Clear the {} results set by hand",
+                                             c.settings.hand.size(), c.settings.hand.size());
+                if (ImGui::SmallButton(clear.c_str())) {
                     c.settings.hand.clear();
                     changed = true;
                 }
@@ -1344,7 +1355,8 @@ void App::drawStudyCrosstable() {
     if (t.shape.uncertain && !c.settings.system && t.shape.choices.size() >= 2) {
         std::string why;
         if (t.shape.over_met > 0)
-            why = trf("{} for {} players, but {} pairs met more often than its system lets them.",
+            why = trn("{} for {} players, but {} pair met more often than its system allows.",
+                      "{} for {} players, but {} pairs met more often than its system allows.", t.shape.over_met,
                       trn("{} round", "{} rounds", t.rounds, t.rounds), t.players.size(), t.shape.over_met);
         else
             why = trf("{} for {} players, {} of {} games.", trn("{} round", "{} rounds", t.rounds, t.rounds),

@@ -273,12 +273,12 @@ std::string pointsText(double points, int unknown) {
     return text;
 }
 
-std::string tiebreakValue(study::Tiebreak t, double value) {
+std::string tiebreakValue(study::Tiebreak t, double value, bool decimals) {
     if (t == study::Tiebreak::AverageRating || t == study::Tiebreak::AverageRatingCut1 ||
         t == study::Tiebreak::Performance)
         return fmt::format("{}", static_cast<long>(std::lround(value)));
     const double twice = value * 2;
-    if (std::abs(twice - std::round(twice)) < 1e-9) return pointsText(value);
+    if (!decimals && std::abs(twice - std::round(twice)) < 1e-9) return pointsText(value);
     return fmt::format("{:.2f}", value);
 }
 

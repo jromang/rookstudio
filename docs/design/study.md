@@ -191,16 +191,16 @@ the games of one key).
 FIDE's combined list (players_list_foa.txt in players_list.zip): a header naming its columns, then a line of fixed
 columns a player. `prepareFideList` finds each column by its name in the header (a list whose columns differ is refused:
 `FideFormatError`), reads the lines (a value of the other titles longer than its column pushes the columns after it: 3
-lines of the list of November 2026), and writes RookStudio's file: a header, the federations, 24 bytes a player sorted by
-FIDE id (id, the place of its name, birth year, three ratings, federation, title, woman, inactive, and since #92 the K of
-each rating, a crosstable's rating change reading them; a file of the first version, 20 bytes a player, is read, its K
-not known), the names, and two indexes of the players by surname and by its skeleton (`nameSkeleton`: Kowalenko and
-Kovalenko alike), searched by halves. `analyseNames` (`names.hpp`) groups a database's spellings (the table's players, the FIDE ids their games give,
-then surname and given name, an initial joining the one name that starts with it) and matches each group with the list:
-a single player of that surname whose given name fits (its transliterations when the games' ratings are within 150 of
-the player's; an initial alone needs a rating within 200), never a player born after the games or less than five years
-before them, nor a name of one word on either side; several are left to confirm, the nearest to the games' ratings
-first.
+lines of the list of November 2026), and writes RookStudio's file: a header, the federations, 24 bytes a player sorted
+by FIDE id (id, the place of its name, birth year, three ratings, federation, title, woman, inactive, and since #92 the
+K of each rating, a crosstable's rating change reading them; a file of the first version, 20 bytes a player, is read,
+its K not known), the names, and two indexes of the players by surname and by its skeleton (`nameSkeleton`: Kowalenko
+and Kovalenko alike), searched by halves. `analyseNames` (`names.hpp`) groups a database's spellings (the table's
+players, the FIDE ids their games give, then surname and given name, an initial joining the one name that starts with
+it) and matches each group with the list: a single player of that surname whose given name fits (its transliterations
+when the games' ratings are within 150 of the player's; an initial alone needs a rating within 200), never a player born
+after the games or less than five years before them, nor a name of one word on either side; several are left to confirm,
+the nearest to the games' ratings first.
 
 Measured on the list of November 2026 (downloaded once, on this machine only): 1 960 520 players, 800 241 rated
 (standard 573 475, rapid 486 148, blitz 321 078); read in 3.1 s, 476 MB at most, into 89.3 MB; a lookup by surname 10

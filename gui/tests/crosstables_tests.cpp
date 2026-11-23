@@ -104,6 +104,10 @@ TEST_CASE("crosstables: the words and cells the views show") {
     CHECK(tiebreakValue(study::Tiebreak::Buchholz, 48.5) == "48½");
     CHECK(tiebreakValue(study::Tiebreak::SonnebornBerger, 12.25) == "12.25");
     CHECK(tiebreakValue(study::Tiebreak::AverageRatingCut1, 2367) == "2367");
+    // A column that has quarters: two decimals all along it.
+    CHECK(tiebreakValue(study::Tiebreak::SonnebornBerger, 112.5, true) == "112.50");
+    CHECK(tiebreakValue(study::Tiebreak::SonnebornBerger, 121, true) == "121.00");
+    CHECK(tiebreakValue(study::Tiebreak::Performance, 2367, true) == "2367");
     CHECK(changeText(11.24) == "+11.2");
     CHECK(changeText(-3.06) == "−3.1");
     CHECK(changeText(0.01) == "±0.0");

@@ -60,8 +60,9 @@ class CrosstableStore {
 [[nodiscard]] const char* tiebreakName(study::Tiebreak t);
 [[nodiscard]] const char* tiebreakHeading(study::Tiebreak t);
 [[nodiscard]] const char* tiebreakHelp(study::Tiebreak t);
-// A tie-break's value: halves with ½ ("45½"), other fractions with two decimals ("12.25"), ratings whole.
-[[nodiscard]] std::string tiebreakValue(study::Tiebreak t, double value);
+// A tie-break's value: halves with ½ ("45½"), other fractions with two decimals ("12.25"), ratings whole; with
+// `decimals` (a column that has quarters), two decimals whatever the value ("112.50").
+[[nodiscard]] std::string tiebreakValue(study::Tiebreak t, double value, bool decimals = false);
 // Points: "5½", "½", "0"; "5½?" when results are not known.
 [[nodiscard]] std::string pointsText(double points, int unknown = 0);
 // A rating change: "+11.2", "−3.1", "±0.0".

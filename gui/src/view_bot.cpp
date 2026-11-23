@@ -1154,7 +1154,7 @@ void App::drawBotRules(const EngineEntry& e) {
     if (ImGui::Checkbox(TR("Rated games too"), &r.rated)) changed = true;
     ImGui::SameLine();
     ImGui::TextDisabled("%s", r.rated ? TR("· never against your own account (Lichess forbids it)")
-                                      : TR("· no, while testing (Lichess asks it) · to open afterwards"));
+                                      : TR("· unrated while you test it, as Lichess asks; tick it afterwards"));
     // Opponents.
     row(TR("Opponents"));
     if (ImGui::Checkbox(TR("People"), &r.humans)) changed = true;

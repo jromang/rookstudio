@@ -3831,10 +3831,11 @@ void App::drawBoardReview() {
         });
         std::string text;
         for (const auto& [ply, who] : seen) {
-            const auto at = ply < 0    ? std::string(TR("never"))
-                            : ply == 0 ? std::string(TR("at the start"))
-                                       : boardMoveLabel(ply);
-            text += (text.empty() ? "" : " · ") + trf("{} at {}", who, at);
+            // A sentence of its own each: "at at the start" and "at never" did not read.
+            const auto said = ply < 0    ? trf("{}: never", who)
+                              : ply == 0 ? trf("{} from the start", who)
+                                         : trf("{} at {}", who, boardMoveLabel(ply));
+            text += (text.empty() ? "" : " · ") + said;
         }
         ImGui::Spacing();
         ImGui::TextDisabled("%s", TR("WHO SAW IT FIRST"));

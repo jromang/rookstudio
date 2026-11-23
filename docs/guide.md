@@ -1658,13 +1658,14 @@ The choice is kept for the next game: once made, *Play* (Enter) is all it takes.
   weaker game. *Full strength* leaves it at its best, whatever its card limits.
 - **Its style: its openings**, what it plays before its own moves: *Its own* (no book); *Your databases* (the moves
   played most there, in all your databases with an opening tree or in one of them); *Your repertoire* (the moves you
-  prepared against, then the engine; you play the repertoire's colour, which choosing it sets); *A player's games*
-  (the moves a player played with the engine's colour, from a database named *Lichess · name*, such as preparing a game
+  prepared against, then the engine; you play the repertoire's colour, which choosing it sets); *A player's games* (the
+  moves a player played with the engine's colour, from a database named *Lichess · name*, such as preparing a game
   against them makes, see [Preparing a game](#preparing-a-game)); *A book of the library* (a Polyglot or CTG book of the
   Books page, its moves to avoid left out). *Vary* picks at random among the moves played at least 5 times, as often as
-  they were played (a book's moves as its weights say, a repertoire's alike); unticked, the move played most, a book's
-  main move first. Once its openings have no move for the position, the engine plays to the end. Its style is its openings: the engine's own settings stay on its card. With
-  a man given, the openings meet positions they do not have, and the engine plays from the first move.
+  they were played (a book's moves as often as its weights say, a repertoire's moves equally often); unticked, the move
+  played most, a book's main move first. Once its openings have no move for the position, the engine plays to the end.
+  Its style is its openings: the engine's own settings stay on its card. With a handicap, the openings meet positions
+  they do not have, and the engine plays from the first move.
 - **You**: White, Black or at random; the clock, minutes and an increment, *The same for both* or, unticked, the
   engine's own (unequal time); from the start position, or from the Board page's.
 - **The handicap**: what the engine gives at the start: nothing, its f-pawn, its b-knight, its a-rook (castling on that

@@ -593,7 +593,7 @@ void App::drawPuzzlePage() {
         const auto start = ImGui::GetCursorPosX();
         std::string what = p.title;
         if (p.phase != PuzzlePhase::End && p.current < p.puzzles.size())
-            what += " · " + trf("puzzle {}", ui::exactCount(static_cast<uint64_t>(p.puzzles[p.current].rating)));
+            what += " · " + trf("puzzle rated {}", ui::exactCount(static_cast<uint64_t>(p.puzzles[p.current].rating)));
         ImGui::TextDisabled("%s", what.c_str());
         std::string where;
         if (p.phase != PuzzlePhase::End) {

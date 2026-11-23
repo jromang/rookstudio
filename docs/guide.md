@@ -1325,8 +1325,8 @@ ones, with their Monday, their games and whether each is already in the database
 database (*A new database, “TWIC”* at first), then *Download and add*: each issue's PGN is downloaded, then imported,
 one after the other, the database read all along; *Cancel* stops after what was added. A game the database already
 has, the same tags and moves, is not added twice. Then a report gives the strongest tournaments of the games added (the
-average rating of their players) and the best-rated players; a name opens its games in the list. The games that came
-already from another source, a broadcast followed before for instance, are told there with *Merge them*.
+average rating of their players) and the best-rated players; a name opens its games in the list. The games already there
+from another source, a broadcast followed before for instance, are told there with *Merge them*.
 
 *Every Monday, look for a new issue* is off until you tick it. Ticked, RookStudio asks for the list of issues while it
 is open, four times a day at most; a new issue shows under the list of databases, in *Followed sources*, and on the

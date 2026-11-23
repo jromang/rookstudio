@@ -1243,9 +1243,9 @@ void App::drawGameList() {
                             std::string line = known->federation;
                             if (!known->title.empty()) line += " · " + known->title;
                             if (known->born) line += " · " + trf("born {}", known->born);
-                            if (known->standard) line += " · " + trf("standard {}", ui::exactCount(known->standard));
-                            if (known->rapid) line += " · " + trf("rapid {}", ui::exactCount(known->rapid));
-                            if (known->blitz) line += " · " + trf("blitz {}", ui::exactCount(known->blitz));
+                            if (known->standard) line += " · " + trf("standard {}", known->standard);
+                            if (known->rapid) line += " · " + trf("rapid {}", known->rapid);
+                            if (known->blitz) line += " · " + trf("blitz {}", known->blitz);
                             ImGui::TextDisabled("%s", line.c_str());
                             ImGui::TextDisabled("%s", trf("FIDE id {}", known->fide).c_str());
                         }

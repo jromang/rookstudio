@@ -437,8 +437,8 @@ void App::drawTwicReport() {
                                    .c_str());
         // The same games from another source, headers written differently (M13, board 1): merged on a click.
         if (!d.others.empty()) {
-            ImGui::TextDisabled("%s", trn("{} game came already from another source, its headers written differently.",
-                                          "{} games came already from another source, their headers written "
+            ImGui::TextDisabled("%s", trn("{} game already there from another source, its headers written differently.",
+                                          "{} games already there from another source, their headers written "
                                           "differently.",
                                           d.others.size(), ui::exactCount(d.others.size()))
                                           .c_str());

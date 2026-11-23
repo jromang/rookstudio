@@ -632,7 +632,7 @@ void App::drawCareDuplicates(std::size_t index) {
         ImGui::SameLine();
         ImGui::BeginGroup();
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(c.since ? TR("No game of the import came already from another source")
+        ImGui::TextUnformatted(c.since ? TR("No game of the import was already there from another source")
                                        : TR("No duplicate from another source"));
         ImGui::TextDisabled("%s", trf("The {} games looked at in {}. A database made of one source has none: the "
                                       "duplicates of one file do not come in at the import.",
@@ -651,7 +651,7 @@ void App::drawCareDuplicates(std::size_t index) {
     // What was found, and Merge all.
     ui::beginCard("care_duplicates");
     ImGui::PushTextWrapPos();
-    ImGui::TextUnformatted(c.since ? TR("The import's games that came already from another source")
+    ImGui::TextUnformatted(c.since ? TR("The import's games already there from another source")
                                    : TR("The same games from two sources"));
     ImGui::TextDisabled("%s", trf("Looked for in the background: the same moves, the same players (read in the table "
                                   "of names), the same year. The {} games looked at in {}; a game already there "
@@ -712,7 +712,7 @@ void App::drawCareDuplicates(std::size_t index) {
             if (files.size() == 1 && !files.begin()->empty()) {
                 key = TR("the same file imported twice");
             } else {
-                for (const auto& source : sources) key += (key.empty() ? "" : TR(" and ")) + source;
+                for (const auto& source : sources) key = key.empty() ? source : trf("{} and {}", key, source);
                 if (sources.size() == 1) key = trf("{}, twice", *sources.begin());
             }
             ++pairs[key];
@@ -722,7 +722,8 @@ void App::drawCareDuplicates(std::size_t index) {
         std::sort(ranked.rbegin(), ranked.rend());
         c.where.clear();
         for (std::size_t i = 0; i < ranked.size() && i < 4; ++i)
-            c.where += (c.where.empty() ? "" : " · ") + ranked[i].second + " " + ui::exactCount(ranked[i].first);
+            c.where += (c.where.empty() ? "" : " · ") +
+                       fmt::format("{} ({})", ranked[i].second, ui::exactCount(ranked[i].first));
     }
     if (!c.where.empty()) {
         ImGui::PushTextWrapPos();
@@ -836,6 +837,16 @@ void App::drawCarePair(std::size_t index) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", trf("group {} of {}", c.pair + 1, ui::exactCount(found.groups.size())).c_str());
 
+    // A value wider than its cell (a broadcast's address) ends in "…", whole under the mouse.
+    const auto fitted = [](const std::string& text, float room) {
+        if (ImGui::CalcTextSize(text.c_str()).x <= room) return text;
+        std::string cut = text;
+        while (!cut.empty() && ImGui::CalcTextSize((cut + "…").c_str()).x > room) {
+            while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80) cut.pop_back();
+            if (!cut.empty()) cut.pop_back();
+        }
+        return cut + "…";
+    };
     const int columns = static_cast<int>(games.size()) + 2;
     if (ImGui::BeginTable("##care_pair", columns,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp)) {
@@ -861,13 +872,17 @@ void App::drawCarePair(std::size_t index) {
                 const bool chosen = c.choice[f] == g;
                 if (chosen && !all_same) ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, tinted(ui::ACCENT, 55));
                 if (all_same) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-                if (ImGui::Selectable(text.c_str(), false)) c.choice[f] = static_cast<uint8_t>(g);
+                const auto shown = fitted(text, ImGui::GetContentRegionAvail().x);
+                if (ImGui::Selectable(shown.c_str(), false)) c.choice[f] = static_cast<uint8_t>(g);
+                if (shown != text && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", text.c_str());
                 if (all_same) ImGui::PopStyleColor();
                 ImGui::PopID();
             }
             ImGui::TableNextColumn();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
-                               fieldText(field, mfield[f], merged.plies).c_str());
+            const auto text  = fieldText(field, mfield[f], merged.plies);
+            const auto shown = fitted(text, ImGui::GetContentRegionAvail().x);
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", shown.c_str());
+            if (shown != text && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", text.c_str());
         }
         ImGui::EndTable();
     }
@@ -1181,11 +1196,11 @@ void App::drawCareNames(std::size_t index) {
         if (p.born) line += " · " + trf("born {}", p.born);
         if (!p.title.empty()) line += " · " + p.title;
         if (p.standard)
-            line += " · " + trf("standard {}", ui::exactCount(p.standard));
+            line += " · " + trf("standard {}", p.standard);
         else if (p.rapid)
-            line += " · " + trf("rapid {}", ui::exactCount(p.rapid));
+            line += " · " + trf("rapid {}", p.rapid);
         else if (p.blitz)
-            line += " · " + trf("blitz {}", ui::exactCount(p.blitz));
+            line += " · " + trf("blitz {}", p.blitz);
         if (p.inactive) line += " · " + std::string(TR("inactive"));
         return line;
     };
@@ -1330,7 +1345,7 @@ void App::drawCareNames(std::size_t index) {
                 const auto& pl = snap->players()->players()[*p.player];
                 if (pl.fide)
                     card = " · " + pl.federation + (pl.title.empty() ? "" : " · " + pl.title) +
-                           (pl.standard ? " · " + trf("standard {}", ui::exactCount(pl.standard)) : "");
+                           (pl.standard ? " · " + trf("standard {}", pl.standard) : "");
             } else if (p.match == study::NameMatch::None && !a.list_month.empty()) {
                 card = TR("· not on FIDE's list");
             }
@@ -1620,8 +1635,8 @@ void App::drawCareHomeNotice() {
         const auto index = indexOf(shelf(), db_outcome_->folder);
         if (index < shelf().entries().size()) {
             ImGui::Spacing();
-            ImGui::TextUnformatted(trn("“{}”: {} game came already from another source",
-                                       "“{}”: {} games came already from another source",
+            ImGui::TextUnformatted(trn("“{}”: {} game already there from another source",
+                                       "“{}”: {} games already there from another source",
                                        db_outcome_->duplicates.size(), shelf().entries()[index].name,
                                        ui::exactCount(db_outcome_->duplicates.size()))
                                        .c_str());

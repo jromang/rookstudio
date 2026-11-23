@@ -2921,6 +2921,9 @@ msgstr ""
 msgid "Dismiss what changed: {}"
 msgstr ""
 
+msgid "Don't keep it"
+msgstr ""
+
 msgid "Done"
 msgstr ""
 
@@ -4116,6 +4119,9 @@ msgstr ""
 msgid "Go to the engines"
 msgstr ""
 
+msgid "Goes into “{}” at its end"
+msgstr ""
+
 msgid "Golden hour"
 msgstr ""
 
@@ -4980,6 +4986,9 @@ msgstr ""
 msgid "Keep the engine log of every game"
 msgstr ""
 
+msgid "Keep the game in"
+msgstr ""
+
 msgid "Keep the game, at its end, in"
 msgstr ""
 
@@ -5023,9 +5032,6 @@ msgid "Kept in the profile only, never in a tournament's files or the log."
 msgstr ""
 
 msgid "Kept in “{}”"
-msgstr ""
-
-msgid "Kept in “{}” at its end"
 msgstr ""
 
 msgid "Kept searches"
@@ -5420,7 +5426,7 @@ msgstr ""
 msgid "Lichess's analysis"
 msgstr ""
 
-msgid "Lichess's best bots, this engine analysing beside them"
+msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
 msgstr ""
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
@@ -6672,9 +6678,6 @@ msgid "Not a value the new build takes: fastchess would play without it."
 msgstr ""
 
 msgid "Not an https link."
-msgstr ""
-
-msgid "Not any more"
 msgstr ""
 
 msgid "Not checked"
@@ -11308,7 +11311,7 @@ msgstr ""
 msgid "The variance of a game when the games are counted in pairs, over the variance of single games: below 1, the pairs need that much fewer games for the same precision."
 msgstr ""
 
-msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
+msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
 msgstr ""
 
 msgid "The version and the system, for a bug report."

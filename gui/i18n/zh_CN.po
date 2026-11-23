@@ -2906,6 +2906,9 @@ msgstr "关闭"
 msgid "Dismiss what changed: {}"
 msgstr "关闭更改提示：{}"
 
+msgid "Don't keep it"
+msgstr ""
+
 msgid "Done"
 msgstr "完成"
 
@@ -4093,6 +4096,9 @@ msgstr "走到你的象控制不到的角落：在那里，象能挡住将军。
 msgid "Go to the engines"
 msgstr "前往引擎页"
 
+msgid "Goes into “{}” at its end"
+msgstr ""
+
 msgid "Golden hour"
 msgstr "黄金时刻"
 
@@ -4951,6 +4957,9 @@ msgstr "保留我的所有值：{}"
 msgid "Keep the engine log of every game"
 msgstr "保存每局对局的引擎日志"
 
+msgid "Keep the game in"
+msgstr ""
+
 msgid "Keep the game, at its end, in"
 msgstr "对局结束时保存到"
 
@@ -4995,9 +5004,6 @@ msgstr "只保存在配置文件中，绝不写入锦标赛文件或日志。"
 
 msgid "Kept in “{}”"
 msgstr "已保存到“{}”"
-
-msgid "Kept in “{}” at its end"
-msgstr "对局结束时保存到“{}”"
 
 msgid "Kept searches"
 msgstr "已保存的搜索"
@@ -5390,8 +5396,8 @@ msgstr "Lichess 的 Board API 是为人类棋手设计的：快棋、慢棋和�
 msgid "Lichess's analysis"
 msgstr "Lichess 的分析"
 
-msgid "Lichess's best bots, this engine analysing beside them"
-msgstr "Lichess 上最强的机器人，由这个引擎在旁分析"
+msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
+msgstr ""
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Lichess 的直播采用 CC BY-SA 4.0 许可：其对局保留来源，即 Site 标签中的直播页面；你分享其中的内容时须以相同方式共享。"
@@ -6634,9 +6640,6 @@ msgstr "新版本不接受此值：fastchess 会不带它进行对局。"
 
 msgid "Not an https link."
 msgstr "不是 https 链接。"
-
-msgid "Not any more"
-msgstr "不再保存"
 
 msgid "Not checked"
 msgstr "未检查"
@@ -11232,8 +11235,8 @@ msgstr "锦标赛的设置（设置 › 裁定）：{}。"
 msgid "The variance of a game when the games are counted in pairs, over the variance of single games: below 1, the pairs need that much fewer games for the same precision."
 msgstr "按对局对计算时单局的方差与单独计算时单局方差之比：低于 1 时，成对对局只需相应更少的对局即可达到同样精度。"
 
-msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
-msgstr "变体频道（疯狂屋、原子棋……）不显示。卡片显示时会重新读取列表，最多每 30 秒一次。"
+msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
+msgstr ""
 
 msgid "The version and the system, for a bug report."
 msgstr "版本和系统信息，用于错误报告。"

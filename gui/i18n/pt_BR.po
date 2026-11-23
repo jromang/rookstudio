@@ -2921,6 +2921,9 @@ msgstr "Fechar"
 msgid "Dismiss what changed: {}"
 msgstr "Fechar o aviso de mudanças: {}"
 
+msgid "Don't keep it"
+msgstr ""
+
 msgid "Done"
 msgstr "Pronto"
 
@@ -4116,6 +4119,9 @@ msgstr "Vá para o canto que o seu bispo não controla: ali ele bloqueia os xequ
 msgid "Go to the engines"
 msgstr "Ir para os engines"
 
+msgid "Goes into “{}” at its end"
+msgstr ""
+
 msgid "Golden hour"
 msgstr "Hora dourada"
 
@@ -4980,6 +4986,9 @@ msgstr "Manter os meus valores: {}"
 msgid "Keep the engine log of every game"
 msgstr "Manter o log do engine de cada partida"
 
+msgid "Keep the game in"
+msgstr ""
+
 msgid "Keep the game, at its end, in"
 msgstr "Guardar a partida, no fim dela, em"
 
@@ -5024,9 +5033,6 @@ msgstr "Guardado só no perfil, nunca nos arquivos de um torneio nem no log."
 
 msgid "Kept in “{}”"
 msgstr "Guardada em “{}”"
-
-msgid "Kept in “{}” at its end"
-msgstr "Guardada em “{}” no fim dela"
 
 msgid "Kept searches"
 msgstr "Buscas salvas"
@@ -5420,8 +5426,8 @@ msgstr "A Board API do Lichess é feita para pessoas: partidas rápidas, clássi
 msgid "Lichess's analysis"
 msgstr "Análise do Lichess"
 
-msgid "Lichess's best bots, this engine analysing beside them"
-msgstr "Os melhores bots do Lichess, com este engine analisando ao lado deles"
+msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
+msgstr ""
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "As transmissões do Lichess estão sob CC BY-SA 4.0: suas partidas mantêm a fonte, a página da transmissão na tag Site; o que você compartilhar delas é compartilhado sob a mesma licença."
@@ -6673,9 +6679,6 @@ msgstr "Não é um valor que a nova versão aceita: o fastchess jogaria sem ele.
 
 msgid "Not an https link."
 msgstr "Não é um link https."
-
-msgid "Not any more"
-msgstr "Não mais"
 
 msgid "Not checked"
 msgstr "Não verificado"
@@ -11308,8 +11311,8 @@ msgstr "A configuração dos torneios (Preferências › Adjudicação): {}."
 msgid "The variance of a game when the games are counted in pairs, over the variance of single games: below 1, the pairs need that much fewer games for the same precision."
 msgstr "A variância de uma partida quando as partidas são contadas em pares, dividida pela variância das partidas isoladas: abaixo de 1, os pares precisam de proporcionalmente menos partidas para a mesma precisão."
 
-msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
-msgstr "Os canais das variantes (Crazyhouse, Atomic…) não são mostrados. A lista é lida de novo quando o cartão aparece, no máximo a cada 30 s."
+msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
+msgstr ""
 
 msgid "The version and the system, for a bug report."
 msgstr "A versão e o sistema, para um relatório de bug."

@@ -2936,6 +2936,9 @@ msgstr "Закрыть"
 msgid "Dismiss what changed: {}"
 msgstr "Закрыть уведомление об изменениях: {}"
 
+msgid "Don't keep it"
+msgstr ""
+
 msgid "Done"
 msgstr "Готово"
 
@@ -4139,6 +4142,9 @@ msgstr "Идите в угол, поля которого не контроли�
 msgid "Go to the engines"
 msgstr "Перейти к движкам"
 
+msgid "Goes into “{}” at its end"
+msgstr ""
+
 msgid "Golden hour"
 msgstr "Золотой час"
 
@@ -5009,6 +5015,9 @@ msgstr "Оставить мои значения: {}"
 msgid "Keep the engine log of every game"
 msgstr "Сохранять журнал движков для каждой партии"
 
+msgid "Keep the game in"
+msgstr ""
+
 msgid "Keep the game, at its end, in"
 msgstr "Сохранить партию по её окончании в"
 
@@ -5053,9 +5062,6 @@ msgstr "Хранится только в профиле, никогда — в �
 
 msgid "Kept in “{}”"
 msgstr "Сохранена в «{}»"
-
-msgid "Kept in “{}” at its end"
-msgstr "Сохранится в «{}» по окончании"
 
 msgid "Kept searches"
 msgstr "Сохранённые поиски"
@@ -5450,8 +5456,8 @@ msgstr "Board API Lichess создан для людей: заявки отсю�
 msgid "Lichess's analysis"
 msgstr "Анализ Lichess"
 
-msgid "Lichess's best bots, this engine analysing beside them"
-msgstr "лучшие боты Lichess, а рядом с ними анализирует этот движок"
+msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
+msgstr ""
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Трансляции Lichess распространяются по лицензии CC BY-SA 4.0: их партии сохраняют источник — страницу трансляции в теге Site; то, чем вы из них делитесь, распространяется на тех же условиях."
@@ -6712,9 +6718,6 @@ msgstr "Новая версия не принимает это значение:
 
 msgid "Not an https link."
 msgstr "Это не https-ссылка."
-
-msgid "Not any more"
-msgstr "Не сохранять"
 
 msgid "Not checked"
 msgstr "Не проверен"
@@ -11384,8 +11387,8 @@ msgstr "Настройка турниров (Параметры › Присуж
 msgid "The variance of a game when the games are counted in pairs, over the variance of single games: below 1, the pairs need that much fewer games for the same precision."
 msgstr "Дисперсия партии при подсчёте по парам, делённая на дисперсию отдельных партий: если она меньше 1, парам нужно во столько же раз меньше партий для той же точности."
 
-msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
-msgstr "Каналы вариантов шахмат (Крейзихаус, Атомные шахматы…) не показываются. Список перечитывается при показе карточки, не чаще раза в 30 с."
+msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
+msgstr ""
 
 msgid "The version and the system, for a bug report."
 msgstr "Версия и система — для сообщения об ошибке."

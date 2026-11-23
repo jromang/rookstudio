@@ -929,10 +929,10 @@ void App::drawVisionColumn() {
             const auto& l = v.lines[v.line];
             beginTinted("##line_card", ui::CARD_BD);
             const chess::Board board(l.fen);
-            ImGui::TextDisabled(
-                "%s", (board.sideToMove() == chess::Color::WHITE ? trf("From the {}, White to play", TR(l.opening))
-                                                                 : trf("From the {}, Black to play", TR(l.opening)))
-                          .c_str());
+            ImGui::TextDisabled("%s",
+                                (board.sideToMove() == chess::Color::WHITE ? trf("{} · White to play", TR(l.opening))
+                                                                           : trf("{} · Black to play", TR(l.opening)))
+                                    .c_str());
             ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.2f);
             wrapped(movesText(board, l.moves));
             ImGui::PopFont();

@@ -186,7 +186,7 @@ std::string App::playStartFen(const PlaySettings& s, chess::Color engine_side, s
         if (!given) {
             if (why)
                 *why = chess960 ? std::string(TR("No handicap in Chess960."))
-                                : trf("The engine has no {} to give in this position.", handicapName(s.handicap));
+                                : trf("The engine cannot give {} in this position.", handicapName(s.handicap));
             return {};
         }
         fen = *given;

@@ -137,8 +137,9 @@ const char* questionText(chess::Color side, const EndgameTask& t) {
     return white ? TR("Your move, White: hold the draw") : TR("Your move, Black: hold the draw");
 }
 
-// The verdict for the user as a word: "win", "draw", "loss".
-const char* verdictWord(int result) { return result > 0 ? TR("win") : result < 0 ? TR("loss") : TR("draw"); }
+// The verdict for the user as the Board's online tables say it: "a win", "a draw", "a loss" (the goal's "win" is a
+// verb).
+const char* verdictWord(int result) { return result > 0 ? TR("a win") : result < 0 ? TR("a loss") : TR("a draw"); }
 
 // The verdict of the tables, by the side it favours: "The tables: White wins".
 const char* tablesVerdict(int user_result, chess::Color user) {

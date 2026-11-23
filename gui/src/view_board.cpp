@@ -295,7 +295,8 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     board_.message.clear();
     board_.new_game = true;
     board_.watching = false;
-    page_           = Page::Board;
+    if (online_game_) online_game_->shown = false;  // a game on Lichess goes on meanwhile (#84)
+    page_ = Page::Board;
     if (analyse) setBoardAnalysis(true);
 }
 
@@ -783,6 +784,7 @@ void App::boardPlayAsked(chess::Move move) {
     if (guess_) return guessAnswer(move);
     if (endgame_) return endgameAnswer(move);  // to the endgame's, the vision's (#82)
     if (vision_) return visionAnswer(move);
+    if (onlineShown()) return onlineMoveAsked(move);  // a game on Lichess: sent, waiting for Enter or its turn (#84)
     auto& b = board_;
     // In a game the user plays, a move typed is theirs, at their turn only (#83); a game kept waits for Resume.
     if (b.humanGame()) {
@@ -1071,6 +1073,8 @@ void App::boardEditKeys() {
     // A game against an engine (#83): its keys while it lasts (Ctrl+Z takes back, Alt+H a hint, the moves typed);
     // Enter reviews it once it is over.
     if (engineGameKeys()) return;
+    // A game on Lichess (#84): Enter sends the move waiting, Escape takes it back; the moves typed.
+    if (onlineGameKeys()) return;
     // Enter writes a comment, unless a move of the tree is chosen (Up, Down): it plays it then.
     const bool tree_chosen = board_side_tab_ == 2 && tree_row_ >= 0;
     if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen && !linkCardTakesKeys() &&
@@ -1124,7 +1128,8 @@ void App::drawMoveField() {
     auto& b = board_;
     if (!b.move_typed) return;
     const bool french = i18n::language() == i18n::Language::French;
-    const auto board  = boardAt(b.game, b.chess960, b.ply);
+    // During the opponent's turn of a live game on Lichess, the user's moves, made in advance (#84).
+    const auto board = boardForPicking(boardAt(b.game, b.chess960, b.ply));
     // Focused, the field would select its text, which the next letter would replace: the cursor after it instead.
     static bool cursor_at_end = false;
     if (b.move_focus) {
@@ -1261,6 +1266,16 @@ void App::boardClick(const chess::Board& board, chess::Square square) {
             return;
         }
     }
+    // A game on Lichess (#84): its position only, the user's men only (during the opponent's turn too, in a live game:
+    // a move made in advance).
+    if (onlineShown()) {
+        auto& b        = board_;
+        const int last = static_cast<int>(b.game.moves.size());
+        if (b.line >= 0 || b.ply != last) {
+            showBoardLine(-1, last);
+            return;
+        }
+    }
     if (board_.selected) {
         std::vector<chess::Move> moves;
         for (const auto& m : movesFrom(board, *board_.selected)) {
@@ -1277,8 +1292,10 @@ void App::boardClick(const chess::Board& board, chess::Square square) {
         }
     }
     const auto piece = board.at(square);
+    const bool theirs =
+        onlineShown() && piece != chess::Piece::NONE && (piece.color() == chess::Color::WHITE) != online_game_->white;
     if (piece != chess::Piece::NONE && piece.color() == board.sideToMove() && board_.selected != square &&
-        !movesFrom(board, square).empty()) {
+        !movesFrom(board, square).empty() && !theirs) {
         board_.selected = square;
     } else {
         board_.selected.reset();
@@ -1375,15 +1392,22 @@ void App::drawBoardPage() {
             ImGui::SetTooltip("%s", TR("Set up a position: pieces, side to move, castling, en passant, Chess960."));
         }
         ImGui::SameLine();
+        // Engines playing on from a position the fair play locks would be an aid (#48, #84).
+        const bool engines_locked = chessBoard() && aidsLocked();
+        ImGui::BeginDisabled(engines_locked);
         if (ui::iconButton("board_play", ui::Icon::Play, play)) b.play_open = !b.play_open;
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", TR("A game, or two with the colours reversed, between two engines of the library "
-                                       "from this position, with a clock for each."));
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            ImGui::SetTooltip("%s", engines_locked
+                                        ? TR("Locked while one of your games is played on Lichess.")
+                                        : TR("A game, or two with the colours reversed, between two engines of the "
+                                             "library from this position, with a clock for each."));
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
         // The game analysed in passes, up to the time per position chosen beside.
-        const bool live_game = (b.watching && b.match && b.match_state.running) || engineGameHidesAids();
+        const bool live_game =
+            (b.watching && b.match && b.match_state.running) || engineGameHidesAids() || onlineShown();
         ImGui::BeginDisabled(b.editor.has_value() || (!b.reviewing() && (b.game.moves.empty() || live_game)));
         if (ui::iconButton("board_review", b.reviewing() ? ui::Icon::Stop : ui::Icon::Chart, review))
             b.reviewing() ? cancelGameReview() : startGameReview();
@@ -1533,6 +1557,7 @@ void App::drawBoardPage() {
     drawLinkCard();             // a Lichess link pasted (#47)
     drawStudySendCard();        // the game sent to a Lichess study (#79)
     drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
+    if (online_game_) drawOnlineGameCard();  // a game on Lichess played here (#84)
     // A game against an engine of the Play page (#83); once it is over, the card of the games from here closes it.
     if (engine_game_ && engine_game_->over && b.play_open) closeEngineGame();
     if (engine_game_)
@@ -2011,6 +2036,8 @@ void App::drawBoardColumn(float size) {
     auto& b          = board_;
     const auto board = boardAt(b.game, b.chess960, b.ply);
     const auto stm   = board.sideToMove();
+    // The men the user may pick: during the opponent's turn of a live game on Lichess, theirs (#84).
+    const auto pick = boardForPicking(board);
 
     BoardDecor decor;
     decor.flipped = b.flip;
@@ -2066,7 +2093,12 @@ void App::drawBoardColumn(float size) {
     }
     decor.selected = b.selected;
     if (b.selected) {
-        for (const auto& m : movesFrom(board, *b.selected)) decor.targets.push_back(shownTarget(m));
+        for (const auto& m : movesFrom(pick, *b.selected)) decor.targets.push_back(shownTarget(m));
+    }
+    // A game on Lichess (#84): a move made in advance, dashed; by correspondence, the move waiting for Enter.
+    if (onlineShown() && b.line < 0 && b.ply == static_cast<int>(b.game.moves.size())) {
+        if (online_game_->premove) decor.arrows.push_back({*online_game_->premove, IM_COL32(47, 111, 222, 160), true});
+        if (online_game_->held) decor.arrows.push_back({*online_game_->held, IM_COL32(47, 111, 222, 210)});
     }
     // A piece dragged: off its square in 2D, a ghost of it in 3D; where it would land, tinted.
     const bool dragging = b.drag && b.drag->moved && b.selected == b.drag->from;
@@ -2171,7 +2203,7 @@ void App::drawBoardColumn(float size) {
         if (line_board && (input.clicked || input.right_click)) {
             b.preview.reset();
         } else {
-            boardPointer(board, input.clicked, input.hovered, input.right_click);
+            boardPointer(pick, input.clicked, input.hovered, input.right_click);
         }
     } else {
         if (!appearance::current().board3d.on) board3d_.release();
@@ -2195,7 +2227,7 @@ void App::drawBoardColumn(float size) {
         if (line_board && (left || right)) {
             b.preview.reset();
         } else {
-            boardPointer(board, left ? hover : std::nullopt, hover, right);
+            boardPointer(pick, left ? hover : std::nullopt, hover, right);
         }
         // The piece dragged, at the pointer.
         if (dragging && b.drag) drawDraggedPiece(atlas_, board.at(b.drag->from), size);
@@ -2211,7 +2243,7 @@ void App::drawBoardColumn(float size) {
         dl->AddText(ImVec2(p0.x + px(8), p0.y + px(4)), IM_COL32(240, 243, 248, 255), label.c_str());
     }
 
-    drawPromotionPopup(board);  // the piece a pawn becomes
+    drawPromotionPopup(pick);  // the piece a pawn becomes
 
     if (strips)
         drawPlayerStrip(b.flip ? chess::Color::BLACK : chess::Color::WHITE, size, clocks);
@@ -2221,7 +2253,7 @@ void App::drawBoardColumn(float size) {
 
     // Through the moves, back to the move being played while a game from here goes on, and the position as text.
     const int total = static_cast<int>(b.game.moves.size());
-    const bool live = b.match && b.match_state.running && b.watching;
+    const bool live = (b.match && b.match_state.running && b.watching) || onlineShown();
     if (setup_.nav_buttons || (live && b.ply < total)) {
         const float copy = ImGui::CalcTextSize(TR("Copy FEN")).x + ImGui::GetStyle().FramePadding.x * 2 +
                            ImGui::GetStyle().ItemSpacing.x;
@@ -2630,6 +2662,12 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
     const bool playing     = engine_game && b.match && b.match_state.running && at_end;
     if (engine_game && (side == chess::Color::WHITE) != engine_game_->kept.white)
         name += " · " + strengthText(engine_game_->kept.strength);
+    // A game on Lichess (#84): the players' ratings, and the clocks as Lichess tells them, running.
+    const bool online = online_game_ && online_game_->shown && online_game_->state.full;
+    if (online) {
+        const auto& player = side == chess::Color::WHITE ? online_game_->state.white : online_game_->state.black;
+        if (player.rating > 0) name += " · " + ui::exactCount(player.rating) + (player.provisional ? "?" : "");
+    }
     dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     dl->AddText(ImVec2(x + 0.6f, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     x += ImGui::CalcTextSize(name.c_str()).x + px(10);
@@ -2668,8 +2706,14 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
     } else if (engine_game && engine_game_->waiting && at_end) {
         clock = engine_game_->kept.clock_ms[side == chess::Color::WHITE ? 0 : 1];  // as they wait for Resume
     }
-    if (clock) {
-        const auto text = ui::formatClock(*clock);
+    std::optional<std::string> online_clock;
+    if (online && at_end) online_clock = onlineStripClock(side);
+    if (online_clock && online_clock->empty()) {  // by correspondence, the other side's time is not told
+        online_clock.reset();
+        clock.reset();
+    }
+    if (clock || online_clock) {
+        const auto text = online_clock ? *online_clock : ui::formatClock(*clock);
         ImGui::PushFont(ui::titleFont(), ImGui::GetFontSize() * 1.1f);
         const ImVec2 ts = ImGui::CalcTextSize(text.c_str());
         const float x1 = p.x + bar + size, x0 = x1 - ts.x - px(20);

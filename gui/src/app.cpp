@@ -188,6 +188,12 @@ bool App::initGraphics() {
 }
 
 void App::requestQuit() {
+    // A live game being played on Lichess goes on there, the clock running: asked first (#84, M12 board 5).
+    if (!quit_online_said_ && online_game_ && !online_game_->ended && online_game_->state.full &&
+        !online_game_->state.over() && online_game_->state.live()) {
+        quit_online_open_ = true;
+        return;
+    }
     if (runsPlaying() > 0) {
         open_quit_modal_ = true;
     } else {
@@ -316,6 +322,7 @@ void App::frame() {
     pollMistakes();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
     pollEndgames();         // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
     pollEngineGame();       // a game against an engine: kept at each move, its end, a hint (#83)
+    pollOnlinePlay();       // playing on Lichess: a seek, the challenges, the game on the Board (#84)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -600,8 +607,18 @@ void App::frame() {
             page_ = Page::Board;
             openPositionEditor();
         } else if (w == "play" || w == "play-start") {  // the Play page (#83); a game against an engine started
-            page_ = Page::Play;
+            page_      = Page::Play;
+            play_part_ = 0;
             if (w == "play-start") startEngineGame();
+        } else if (w == "play-lichess") {  // the Play page's "On Lichess" part (#84)
+            page_      = Page::Play;
+            play_part_ = 1;
+        } else if (w.rfind("lichess-game=", 0) == 0) {
+            // lichess-game=ID[@black]: a game of the user's on Lichess played on the Board (#84), its stream asked of
+            // the server --focus lichess-api= named.
+            const auto spec = w.substr(13);
+            const auto at   = spec.find('@');
+            openOnlineGame(spec.substr(0, at), at == std::string::npos || spec.substr(at + 1) != "black");
         } else if (w == "board-play" || w == "board-play-start") {  // a game from the board: its settings; started
             page_             = Page::Board;
             board_.play_open  = true;
@@ -848,6 +865,7 @@ void App::frame() {
     drawPanels();
     drawSprtCalculator();
     drawQuitModal();
+    drawQuitOnline();  // closing during a live game on Lichess (#84)
     drawImportPreview();
     // Asked from any page: a machine key's passphrase, a machine's files.
     drawPassphrasePrompt();

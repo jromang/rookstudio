@@ -357,6 +357,8 @@ them.
 | <kbd>Enter</kbd> | The Play page | Play a game against the engine chosen |
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> | A game against an engine | Take back your last move; a hint |
 | <kbd>Enter</kbd> | A game against an engine | Confirm *Resign…*; resume a game kept when RookStudio closed; once it is over, review it |
+| <kbd>Enter</kbd>, <kbd>Escape</kbd> | The Play page, on Lichess | Accept the challenge received, else seek a game; call the seek or the challenge back |
+| <kbd>Enter</kbd>, <kbd>Escape</kbd> | A game on Lichess | Send the correspondence move waiting, confirm *Resign…*; take back the move waiting or made in advance |
 | A letter, then a figure | The coordinates, *Where is…?* | Name a square |
 | <kbd>Shift</kbd> held, <kbd>F2</kbd> | Blindfold | The pieces shown 2 seconds, three times a game; *Where is…?* |
 | <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | A line read in your head | The piece as FEN writes it (a white knight, a black one), or none |
@@ -394,9 +396,10 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
   tournaments read without a copy (see [Databases](#databases)).
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
-- **In progress**: the game's analysis, the position's, an import, the assistant (its download, its model loaded,
-  *Unload*), a series of puzzles, a session of exercises, a game guessed, an endgame or a vision exercise under way, and
-  what the day's review has
+- **In progress**: a game on Lichess played from RookStudio (*Back to the game*) and the challenges received (see [On
+  Lichess](#on-lichess)), the game's analysis, the position's, an import, the assistant (its download, its model
+  loaded, *Unload*), a series of puzzles, a session of exercises, a game guessed, an endgame or a vision exercise under
+  way, and what the day's review has
   due, in one count, a click reviewing it all (see [The day's review](#the-days-review)).
 
 The search button at the top, or Ctrl+K, finds a command, a game, a database.
@@ -1635,12 +1638,14 @@ Ten lines a series.
 
 ## The Play page
 
-The **Play** page sets up a game against an engine of your library, played on the Board page. It is in the rail after
-the Training page, in the views *Study* and *Everything*. A view you made before it does not change by itself: the
-Home page offers once to add it to the view shown (*Add it to …*, or *Not now*), and Ctrl+K *Play against an engine*
-leads there meanwhile, as do *Play against an engine* on the Home page and *The Play page* in the Board page's card
-*Play a game…*. Nothing leaves the machine: the engine runs on it. While one of your games is played live on Lichess,
-the page says so and starts no game (see [Fair play](#fair-play)).
+The **Play** page has two parts: *Against an engine*, a game against an engine of your library played on the Board
+page, and *On Lichess*, your Lichess games played from RookStudio (see [On Lichess](#on-lichess)); the part shown last
+comes back. It is in the rail after the Training page, in the views *Study* and *Everything*. A view you made before it
+does not change by itself: the Home page offers once to add it to the view shown (*Add it to …*, or *Not now*), and
+Ctrl+K *Play against an engine* (or *Play on Lichess*) leads there meanwhile, as do *Play against an engine* on the
+Home page and *The Play page* in the Board page's card *Play a game…*. Against an engine, nothing leaves the machine:
+the engine runs on it. While one of your games is played live on Lichess, the page says so and starts no game against
+an engine (see [Fair play](#fair-play)).
 
 ### Against an engine
 
@@ -1713,6 +1718,68 @@ Under it, **your games against that engine at that level**: won, drawn and lost,
 counted, and where you lost the last one (*a rook endgame*), with whether it is among your exercises. The next level
 is chosen there or on the Play page: nothing goes up by itself. Each game is also a line of the profile's
 `play/games.jsonl`.
+
+### On Lichess
+
+The Play page's **On Lichess** part plays your Lichess games from RookStudio, through Lichess's Board API, which is made
+for people. It needs your account linked (see [Linking your account](#linking-your-account)); the first time, Lichess
+asks for one more permission, *Playing your games* (`board:play`): *Allow on Lichess…* (Enter) opens Lichess's page,
+your account stays linked meanwhile, and the token it replaces is revoked. RookStudio never plays a move you did not
+play. What leaves the machine: your seeks and challenges, your moves, your chat messages, draws and resignations, with
+your account's token; the choices are kept in the profile's `play/lichess.json`.
+
+- **Seek a game**: rapid (10+0, 10+5, 15+10), classical (30+0, 30+20) or correspondence (1 to 14 days a move), rated
+  or not, against opponents of any rating or of a rating around yours in that speed (±). Lichess keeps blitz and
+  bullet for its site: a program does not seek them, and blitz stays possible as a direct challenge. *Seek an
+  opponent* (Enter) puts the seek in Lichess's lobby once Lichess's event stream is open, as Lichess asks, so that the
+  game's start is not missed. A live seek lives while RookStudio holds it open: Escape calls it back, and so does
+  closing RookStudio; the game found opens on the Board page. A correspondence seek stays in the lobby until someone
+  takes it (the API cannot call it back; lichess.org's lobby can), and its game comes among your games in progress.
+- **Challenge a player**: their name, the clock (3+2, 5+3, 10+5, 15+10, 3 days, or *other…*: minutes and seconds
+  added a move, or days a move; three minutes at least, the increment counted forty times, since the Board API plays no
+  bullet), rated or not, your colour. A live challenge waits for the answer while you stay (Escape, or *Call it
+  back*). Declined, Lichess's reason is said (*too fast for them*) with other clocks a click away (slower ones after
+  "too fast"); accepted, the game opens on the Board page.
+- **A challenge received** comes at the top of the part (*Accept* · Enter, *Decline ▾* with Lichess's reasons: *Not
+  now*, *Later*, *Too fast for me*, *Too slow for me*, *Casual only*, *Rated only*), on the Home page under *In
+  progress*, and in a notice at the window's corner wherever you are, with a sound when the sounds are on; *Later* puts
+  the notice aside. During a live game, it waits for the game's end. A game the Board API cannot play (bullet, a
+  variant other than Chess960) is played on lichess.org.
+- **Your games in progress**: your turn first, with the time left to move; a click opens one on the Board page, where
+  your move is played.
+
+The event stream is the one of [Fair play](#fair-play): Lichess opens one per token, and it tells the games' starts and
+ends, the challenges received and the fate of those you sent.
+
+### A game on Lichess
+
+The game is played on the Board page, in a view for study: the board turned to your side, the players' ratings and
+clocks in their strips, and over the column the game's card: what it is (*Rated · Rapid 10+5 against …*), whose move it
+is, *Offer a draw*, *Resign…* (Enter, or a second click, within a few seconds), *Ask for a takeback*, *Abort* (before
+both sides have moved), *Chat* (the players' chat), *Open on lichess.org*.
+
+- Live, your moves go as soon as they are played, on the board or typed (a move's first letter opens the field, Enter
+  plays it). A move made during your opponent's turn waits for yours (a dashed arrow), and is played then if it is
+  legal; Escape takes it back. Before your first move, the card counts down the time Lichess gives before it aborts
+  the game.
+- By correspondence, a move waits for your confirmation (*Your move: 10.g4 · not sent yet*, an arrow on the board):
+  *Send* (Enter), or *Take it back* (Escape). The card lists your other correspondence games, a click away.
+- Your opponent's draw offer or takeback request comes in the card with *Accept* and *Decline*; your own waits for
+  their answer. If your opponent leaves the game, the card counts down until Lichess lets you claim the victory
+  (*Claim the victory*, *Claim a draw*).
+- **The aids**: the lock of [Fair play](#fair-play) holds, as for any game of yours. Live, every aid is locked on every
+  position: the Analysis, Tree, References and Questions tabs, the analysis, the threat, the tables, the cloud and the
+  assistant. By correspondence, the engine, the cloud, the tables and the assistant are locked on the game; the tree of
+  your databases and your books stay open, as Lichess allows a book there.
+- **A cut**: the card says so (*your clock runs on Lichess*) and tries again by itself, after 1, 2, 3, then every 5
+  seconds; the whole game comes back with the connection, the chat too. A move played meanwhile does not go: play it
+  again once the connection is back. *Open the game on lichess.org* stays at hand.
+- **Closing RookStudio** during a live game asks first (*Stay* · Escape, *Close anyway*): the game goes on on Lichess,
+  your clock running. At the next launch, a game still being played comes back on the Board page, and the Home page
+  shows it first. Another game opened on the board meanwhile leaves yours going: *Back to the game* brings it back.
+- At the end, the card says how the game ended and what it did to your rating; the game comes into your Lichess
+  database, with Lichess's analysis when there is one, its review a click away, as your other finished games do (see
+  [Your finished games](#your-finished-games)). *Another game* seeks again with the same clock.
 
 ## The Lichess page
 
@@ -1840,12 +1907,15 @@ browser or on a phone:
   open. On any other game, everything works.
 
 A banner on the Board page says which game locks what. The Home page's Lichess card lists your games in progress,
-those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*.
+those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*, or *On the
+Board* once RookStudio may play your games (see [A game on Lichess](#a-game-on-lichess)).
 
 Your games in progress are asked for with your account's token when the Home page shows, every half-minute while a
 live game lasts and every ten minutes while a correspondence game does. The Lichess page offers once to hear them start
-and end instead, while RookStudio is open: one more permission, reading your challenges. RookStudio reads no move
-during a game and plays none. Without that permission, the lock comes when the Home page shows.
+and end instead, while RookStudio is open: one more permission, reading your challenges; the permission to play your
+games (see [On Lichess](#on-lichess)) hears them through the same stream. RookStudio reads the moves of the games you
+play from it only, and plays only the moves you play. Without either permission, the lock comes when the Home page
+shows.
 
 ### Your finished games
 

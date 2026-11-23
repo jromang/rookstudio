@@ -258,10 +258,14 @@ void App::drawChessHome() {
     const bool importing = job != nullptr;
     const auto assistant = assistantStatus();
     const bool training  = trainingDue();
-    if (b.reviewing() || b.analysing || importing || !assistant.empty() || training) {
+    // A game on Lichess played here, the challenges received (#84): first.
+    const bool online =
+        (online_game_ && !online_game_->ended && !online_game_->state.over()) || !online_incoming_.empty();
+    if (b.reviewing() || b.analysing || importing || !assistant.empty() || training || online) {
         ImGui::Dummy(ImVec2(0, px(6)));
         ui::beginCard("chess_running");
         ImGui::TextUnformatted(TR("In progress"));
+        if (online) drawOnlineHome();
         if (training) drawTrainingHome();
         for (const auto& task : b.review_tasks) {
             const auto& done  = task.state.done;

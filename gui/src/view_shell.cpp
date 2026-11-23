@@ -286,6 +286,7 @@ void App::drawShell() {
     ui::drawOpenPathError();
 
     ImGui::End();
+    drawOnlineNotice();  // a challenge received on Lichess, at the window's corner, wherever the user is (#84)
 }
 
 int App::gamesPlaying(bool all) const {

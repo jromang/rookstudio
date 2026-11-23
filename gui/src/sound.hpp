@@ -1,15 +1,16 @@
 #pragma once
 
-// The move sounds: a short knock for a move, a heavier double knock for a capture, made here as samples (no sound
-// file, so no license to track) and played through SDL's audio. Off by default: SDL's audio is started only when they
-// are switched on, and stopped when they are switched off. Without a sound device, a line in the log says so and the
-// program stays silent. One window: the module's own state, used from the window's thread.
+// The move sounds: a short knock for a move, a heavier double knock for a capture, two soft bell tones for what wants
+// an answer (a challenge received on Lichess, #84), made here as samples (no sound file, so no license to track) and
+// played through SDL's audio. Off by default: SDL's audio is started only when they are switched on, and stopped when
+// they are switched off. Without a sound device, a line in the log says so and the program stays silent. One window:
+// the module's own state, used from the window's thread.
 
 #include <vector>
 
 namespace fcg::sound {
 
-enum class Kind { Move, Capture };
+enum class Kind { Move, Capture, Notify };
 
 inline constexpr int RATE = 44100;  // samples per second
 

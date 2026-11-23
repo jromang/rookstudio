@@ -19,6 +19,24 @@ std::string textOf(const nlohmann::json& j, const char* key) {
     return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
 }
 
+int intOf(const nlohmann::json& j, const char* key, int otherwise = 0) {
+    const auto it = j.find(key);
+    return it != j.end() && it->is_number_integer() ? it->get<int>() : otherwise;
+}
+
+bool boolOf(const nlohmann::json& j, const char* key, bool otherwise = false) {
+    const auto it = j.find(key);
+    return it != j.end() && it->is_boolean() ? it->get<bool>() : otherwise;
+}
+
+// A variant's key, whether Lichess writes it as {"key": ...} or as the key itself.
+std::string variantOf(const nlohmann::json& j) {
+    const auto it = j.find("variant");
+    if (it == j.end()) return {};
+    if (it->is_string()) return it->get<std::string>();
+    return it->is_object() ? textOf(*it, "key") : std::string();
+}
+
 }  // namespace
 
 std::optional<PlayingGame> readPlayingGame(const nlohmann::json& j) {
@@ -43,7 +61,76 @@ std::optional<PlayingGame> readPlayingGame(const nlohmann::json& j) {
         if (const auto r = it->find("rating"); r != it->end() && r->is_number_integer())
             g.opponent_rating = r->get<int>();
     }
+    if (const auto it = j.find("compat"); it != j.end() && it->is_object())
+        if (const auto b = it->find("board"); b != it->end() && b->is_boolean()) g.board = b->get<bool>();
+    g.source  = textOf(j, "source");
+    g.variant = variantOf(j);
+    if (const auto it = j.find("status"); it != j.end())
+        g.status = it->is_object() ? textOf(*it, "name") : it->is_string() ? it->get<std::string>() : std::string();
+    g.winner      = textOf(j, "winner");
+    g.rating_diff = intOf(j, "ratingDiff");
     return g;
+}
+
+bool playableHere(const PlayingGame& game) {
+    if (!game.variant.empty() && game.variant != "standard" && game.variant != "chess960" &&
+        game.variant != "fromPosition")
+        return false;
+    if (game.board) return *game.board;
+    if (game.speed == "rapid" || game.speed == "classical" || game.speed == "correspondence") return true;
+    return game.speed == "blitz" && (game.source == "friend" || game.source == "ai" || game.source == "api");
+}
+
+std::optional<bool> Challenge::userWhite() const {
+    if (final_colour != "white" && final_colour != "black") {
+        if (colour != "white" && colour != "black") return std::nullopt;
+        return incoming ? colour == "black" : colour == "white";
+    }
+    return incoming ? final_colour == "black" : final_colour == "white";
+}
+
+std::optional<Challenge> readChallenge(const nlohmann::json& j, const nlohmann::json* compat) {
+    if (!j.is_object()) return std::nullopt;
+    Challenge c;
+    c.id = textOf(j, "id");
+    if (c.id.empty()) return std::nullopt;
+    c.incoming = textOf(j, "direction") != "out";
+    if (const auto it = j.find("challenger"); it != j.end() && it->is_object()) {
+        c.challenger             = textOf(*it, "name");
+        c.challenger_title       = textOf(*it, "title");
+        c.challenger_rating      = intOf(*it, "rating");
+        c.challenger_provisional = boolOf(*it, "provisional");
+    }
+    if (const auto it = j.find("destUser"); it != j.end() && it->is_object()) {
+        c.dest        = textOf(*it, "name");
+        c.dest_rating = intOf(*it, "rating");
+    }
+    c.rated = boolOf(j, "rated");
+    c.speed = textOf(j, "speed");
+    if (auto v = variantOf(j); !v.empty()) c.variant = std::move(v);
+    if (const auto it = j.find("timeControl"); it != j.end() && it->is_object()) {
+        const auto type = textOf(*it, "type");
+        if (type == "clock") {
+            const int limit   = intOf(*it, "limit");
+            c.clock.minutes   = limit / 60;
+            c.clock.increment = intOf(*it, "increment");
+            c.clock.days      = 0;
+            c.limit_s         = limit;
+        } else if (type == "correspondence") {
+            c.clock.days = std::max(1, intOf(*it, "daysPerTurn", 1));
+        } else {
+            c.unlimited = true;
+            c.clock     = ChallengeClock{0, 0, 0};
+        }
+    }
+    c.colour       = textOf(j, "color");
+    c.final_colour = textOf(j, "finalColor");
+    c.fen          = textOf(j, "initialFen");
+    if (compat && compat->is_object()) c.board = boolOf(*compat, "board", true);
+    if (const auto it = j.find("compat"); it != j.end() && it->is_object()) c.board = boolOf(*it, "board", true);
+    c.decline_reason = textOf(j, "declineReason");
+    c.decline_key    = textOf(j, "declineReasonKey");
+    return c;
 }
 
 int PlayingGame::move() const {
@@ -134,12 +221,26 @@ std::optional<GameEvent> readGameEvent(std::string_view line) {
     try {
         const auto j    = nlohmann::json::parse(line);
         const auto type = textOf(j, "type");
+        if (type == "challenge" || type == "challengeCanceled" || type == "challengeDeclined") {
+            const auto it = j.find("challenge");
+            if (it == j.end()) return std::nullopt;
+            const auto compat = j.find("compat");
+            auto challenge    = readChallenge(*it, compat != j.end() ? &*compat : nullptr);
+            if (!challenge) return std::nullopt;
+            GameEvent e;
+            e.kind      = type == "challenge"           ? GameEvent::Kind::Challenge
+                          : type == "challengeCanceled" ? GameEvent::Kind::ChallengeCanceled
+                                                        : GameEvent::Kind::ChallengeDeclined;
+            e.challenge = std::move(*challenge);
+            return e;
+        }
         if (type != "gameStart" && type != "gameFinish") return std::nullopt;
         const auto it = j.find("game");
         if (it == j.end()) return std::nullopt;
         auto game = readPlayingGame(*it);
         if (!game) return std::nullopt;
-        return GameEvent{type == "gameStart" ? GameEvent::Kind::Started : GameEvent::Kind::Finished, std::move(*game)};
+        return GameEvent{
+            type == "gameStart" ? GameEvent::Kind::Started : GameEvent::Kind::Finished, std::move(*game), {}};
     } catch (const std::exception&) {
         return std::nullopt;
     }
@@ -165,6 +266,7 @@ std::string EventListener::error() const {
 }
 
 void EventListener::run() {
+    int breaks = 0;  // in a row: the wait before the next try grows with them
     while (!stop_) {
         HttpRequest request;
         request.url    = servers().api + "/api/stream/event";
@@ -179,7 +281,9 @@ void EventListener::run() {
             if (s == 200) {
                 std::lock_guard lock(mutex_);
                 error_.clear();
-                events_.push_back(GameEvent{GameEvent::Kind::Opened, {}});
+                events_.push_back(GameEvent{GameEvent::Kind::Opened, {}, {}});
+                connected_ = true;
+                breaks     = 0;
             }
             return s == 200;
         };
@@ -199,6 +303,7 @@ void EventListener::run() {
         stream.cancel     = &stop_;
         stream.idle_s     = 30;  // Lichess sends an empty line every 7 s
         const auto result = politeStream(request, stream);
+        connected_        = false;
         if (stop_) break;
         {
             std::lock_guard lock(mutex_);
@@ -211,8 +316,12 @@ void EventListener::run() {
             refused_ = true;
             break;
         }
-        // Opened again a minute later, the stop heard meanwhile.
-        for (int i = 0; i < 240 && !stop_; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        // Opened again after 5 s, then 15 s, 30 s, and a minute from the fourth break in a row on, the stop heard
+        // meanwhile: a cut comes back soon, a stream refused again and again waits.
+        static constexpr int WAIT_S[] = {5, 15, 30, 60};
+        const int wait_s              = WAIT_S[std::min(breaks, 3)];
+        ++breaks;
+        for (int i = 0; i < wait_s * 4 && !stop_; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 }
 

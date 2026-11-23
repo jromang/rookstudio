@@ -75,7 +75,7 @@ klicke beim beendeten Match auf *Neu starten mit…*.
 <!-- en: the-window 3a5230d4 -->
 
 ### Die Seiten
-<!-- en: the-pages 39322f52 -->
+<!-- en: the-pages 80c43812 -->
 
 Eine Navigationsleiste links führt zu den Seiten der gezeigten [Ansicht](#ansichten), in ihrer Reihenfolge:
 
@@ -87,7 +87,7 @@ Eine Navigationsleiste links führt zu den Seiten der gezeigten [Ansicht](#ansic
 | Datenbanken | Deine Partiedatenbanken: Import, die Partieliste, die Suchen |
 | Eröffnungen | Deine Repertoires, ihre Abdeckung und ihre Lücken |
 | Lichess | Dein Lichess-Konto, die Partien eines Spielers, die offiziellen Übertragungen, was die Analyse Lichess fragen darf |
-| Spielen | Eine Partie gegen eine Engine, auf der Seite Brett |
+| Spielen | Eine Partie gegen eine Engine der Bibliothek in der Stärke, die du wählst, mit ihren Eröffnungen und einer Vorgabe, gespielt auf der Seite Brett (siehe [Die Seite Spielen](#die-seite-spielen)) |
 | Engines | Die Engine-Bibliothek: Optionen, Prüfungen, Gruppen, Referenz-Elo, Import der Listen anderer Programme, die beliebten Engines |
 | Bücher | Die Bibliothek der Eröffnungsbücher, und die Eröffnungen jedes Buchs mit dem, was an ihnen nicht stimmt |
 | Suiten | Testsuiten (STS, WAC, ERET…): Engines gegen die Stellungen einer EPD-Datei |
@@ -96,7 +96,7 @@ Eine Navigationsleiste links führt zu den Seiten der gezeigten [Ansicht](#ansic
 | Einstellungen | Sprache, Design, Größe der Oberfläche, Benachrichtigungen, das Aussehen der Bretter, die Ansichten, der Assistent, der Profil- und der Turnierordner, die entfernten Maschinen, das lichess-Token, die Version, die Art, wie das Fenster gezeichnet wird: zuerst die Abschnitte der Seiten der Ansicht, die anderen unter *Weitere Einstellungen* |
 
 ### Ansichten
-<!-- en: views 3d580a43 -->
+<!-- en: views 9c72e404 -->
 
 Eine Ansicht ist eine eigene Zusammenstellung von Seiten: bis zu drei, jede mit Name, Symbol und Farbe, umgeschaltet
 oben in der Leiste. Jede Ansicht hat dort eine Marke, gefüllt für die gezeigte Ansicht, und der Name der gezeigten
@@ -104,8 +104,10 @@ Ansicht steht darunter; ein Klick auf eine Marke oder Strg+1 bis Strg+3 zeigt di
 war. Mit einer einzigen Ansicht verschwindet der Umschalter.
 
 Der erste Start bietet drei an: *Tests* (Turniere, Engines, Bücher, Brett, Suiten, Elo-Listen, Protokoll), *Studium*
-(Startseite, Brett, Datenbanken, Eröffnungen, Lichess, Engines) und *Alles* (alle Seiten). Die Seite Einstellungen ist
-in jeder Ansicht.
+(Startseite, Brett, Datenbanken, Eröffnungen, Training, Spielen, Lichess, Engines) und *Alles* (alle Seiten). Die Seite
+Einstellungen ist in jeder Ansicht. Eine Seite, die mit einer neuen Version kommt, wird nicht von selbst zu einer deiner
+Ansichten hinzugefügt: Die Startseite bietet sie einmal an (siehe [Die Seite Training](#die-seite-training) und [Die
+Seite Spielen](#die-seite-spielen)).
 
 *Ansichten bearbeiten* öffnet anstelle der Seite die Bearbeitung der Ansichten: über *Einstellungen* > *Ansichten*, ⋯
 unter dem Umschalter, einen Rechtsklick auf eine Marke (die Bearbeitung öffnet sich bei ihrer Ansicht) oder *Ansichten
@@ -346,7 +348,7 @@ bleiben die Bretter flach, und die *Darstellung* sagt, warum. Die Figuren sind c
 der MIT-Lizenz; die *Darstellung* verlinkt sie.
 
 ## Tastenkürzel
-<!-- en: keyboard-shortcuts 88be4815 -->
+<!-- en: keyboard-shortcuts 4be4d428 -->
 
 | Tasten | Wo | Was sie tun |
 |---|---|---|
@@ -381,7 +383,7 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Strg</kbd>+<kbd>Z</kbd>, <kbd>Strg</kbd>+<kbd>Y</kbd> | Das Brett fürs Studium | Rückgängig, wiederherstellen |
 | <kbd>Strg</kbd>+<kbd>S</kbd>, <kbd>Strg</kbd>+<kbd>Umschalt</kbd>+<kbd>S</kbd> | Das Brett fürs Studium | Die Partie speichern; eine Kopie anderswo speichern |
 | <kbd>Strg</kbd>+<kbd>←</kbd>, <kbd>Strg</kbd>+<kbd>→</kbd> | Das Brett fürs Studium | Die vorige, die nächste Partie der Liste, aus der sie kam |
-| <kbd>Alt</kbd>+<kbd>H</kbd> | Das Brett fürs Studium | Die Kopfdaten der Partie aufklappen |
+| <kbd>Alt</kbd>+<kbd>H</kbd> | Das Brett fürs Studium | Die Kopfdaten der Partie aufklappen (ein Hinweis während einer Partie gegen eine Engine) |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | Das Brett fürs Studium | Die Tabs Notation, Analyse, Baum, Referenzen und Fragen |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | Das Brett fürs Studium | Der Assistent kommentiert den Zug |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Umschalt</kbd>+<kbd>N</kbd> | Das Brett fürs Studium | Was F, A, X, G, N und Umschalt+N auf dem Brett für die Engine-Analyse tun (auf diesem Brett tippen die Buchstaben Züge) |
@@ -389,6 +391,24 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Enter</kbd> | Die Seite Eröffnungen | Das Training des gezeigten Repertoires starten |
 | <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Leertaste</kbd>, <kbd>Esc</kbd> | Eine Trainingssitzung | Ein Hinweis, „Ich weiß es nicht“, anhalten |
 | <kbd>Enter</kbd>, <kbd>Strg</kbd>+<kbd>Z</kbd> | Eine Trainingssitzung | Die nächste Stellung oder noch einmal nach einer falschen Antwort; einen zum Repertoire hinzugefügten Zug zurücknehmen |
+| <kbd>Enter</kbd> | Die Seite Training | Alles wiederholen; oder die Aufgaben starten, sobald eine ihrer Auswahlen angeklickt wurde |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Leertaste</kbd>, <kbd>Esc</kbd> | Eine Serie von Aufgaben | Ein Hinweis, „Ich weiß es nicht“, anhalten |
+| <kbd>Enter</kbd>, <kbd>→</kbd> | Eine Serie von Aufgaben | Die nächste Aufgabe oder noch einmal nach einer falschen Antwort; die Lösung Zug für Zug |
+| <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Leertaste</kbd>, <kbd>Esc</kbd> | Eine Übung aus deinen Fehlern | Ein Hinweis, „Ich weiß es nicht“, anhalten |
+| <kbd>Enter</kbd> | Eine Übung aus deinen Fehlern | Die nächste Übung oder noch einmal nach einer falschen Antwort |
+| <kbd>Enter</kbd>, <kbd>Esc</kbd> | Züge erraten | Die Partie geht nach einer Bewertung sofort weiter; anhalten |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | Die Endspiele der Seite Training | Ein Endspiel wählen, sobald eines angeklickt wurde; es spielen |
+| <kbd>Strg</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd>, <kbd>Esc</kbd> | Ein Endspiel gegen die Tablebases | Einen Zug zurücknehmen, der richtige Zug, anhalten |
+| <kbd>Enter</kbd> | Ein Endspiel gegen die Tablebases | Nach einem Fehler: ihn zurücknehmen; am Ende: noch einmal oder das nächste |
+| <kbd>Enter</kbd>, <kbd>Esc</kbd> | Brettvisualisierung | Starten, weitermachen; anhalten |
+| <kbd>Enter</kbd> | Die Seite Spielen | Eine Partie gegen die gewählte Engine spielen |
+| <kbd>Strg</kbd>+<kbd>Z</kbd>, <kbd>Alt</kbd>+<kbd>H</kbd> | Eine Partie gegen eine Engine | Deinen letzten Zug zurücknehmen; ein Hinweis |
+| <kbd>Enter</kbd> | Eine Partie gegen eine Engine | *Aufgeben…* bestätigen; eine beim Schließen von RookStudio aufbewahrte Partie fortsetzen; nach ihrem Ende sie auswerten |
+| <kbd>Enter</kbd>, <kbd>Esc</kbd> | Die Seite Spielen, auf Lichess | Die empfangene Herausforderung annehmen, sonst eine Partie suchen; das Partiegesuch oder die Herausforderung zurückziehen |
+| <kbd>Enter</kbd>, <kbd>Esc</kbd> | Eine Partie auf Lichess | Den wartenden Fernschachzug senden, *Aufgeben…* bestätigen; den wartenden oder vorausgezogenen Zug zurücknehmen |
+| Ein Buchstabe, dann eine Ziffer | Die Koordinaten, *Wo steht…?* | Ein Feld benennen |
+| <kbd>Umschalt</kbd> gehalten, <kbd>F2</kbd> | Blind | Die Figuren 2 Sekunden lang gezeigt, dreimal pro Partie; *Wo steht…?* |
+| <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | Eine Variante im Kopf nachspielen | Die Figur, wie FEN sie schreibt (ein weißer Springer, ein schwarzer), oder keine |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | Eine Partieliste | Durch die Liste gehen, die Partie öffnen |
 | <kbd>Strg</kbd>+<kbd>F</kbd> | Die Seite Datenbanken | Der Suchbereich |
 | <kbd>Esc</kbd> | Die Seite Datenbanken | Den Suchbereich schließen, dann die Liste |
@@ -409,7 +429,7 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Strg</kbd>+<kbd>C</kbd> | Der Headless-Modus | Nach den laufenden Partien anhalten |
 
 ## Die Startseite
-<!-- en: the-home-page fde97c98 -->
+<!-- en: the-home-page 8f520943 -->
 
 Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das Laufende zuerst:
 
@@ -417,18 +437,20 @@ Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das La
   einem kleinen Brett, woher sie stammt (ihre Datenbank und Nummer, ihr Platz in einem Filter oder ihre Datei), ihre
   Kommentare und ob sie noch nicht gespeicherte Änderungen hat. *Fortsetzen* (Enter) kehrt zu ihr zurück; Strg+Tab
   listet die letzten Partien auf.
-- Was sich starten lässt, jeweils mit seiner Taste: *PGN öffnen…* (Strg+O), *Partie oder FEN einfügen* (Strg+V),
-  *Neue Partie* (Strg+N), *In eine Datenbank importieren…*, *Gegen eine Engine spielen*, *Neues Turnier*: die der
-  Seiten der Ansicht.
+- Was sich starten lässt, jeweils mit seiner Taste: *PGN öffnen…* (Strg+O), *Partie oder FEN einfügen* (Strg+V), *Neue
+  Partie* (Strg+N), *In eine Datenbank importieren…*, *Gegen eine Engine spielen* (die Seite Spielen), *Neues Turnier*:
+  die der Seiten der Ansicht.
 - Die laufenden Turniere, wie auf der Seite Turniere, wenn die Ansicht die Seite Turniere enthält.
 - **Zuletzt geöffnet**: die auf dem Brett geöffneten Partien; ein Klick öffnet eine wieder, mit ihren Änderungen.
 - **Meine Datenbanken**: jede mit ihren Partien und dem Stand ihres Eröffnungsbaums, der laufende Import,
   *+ Importieren…* und die ohne Kopie gelesenen Turniere (siehe [Datenbanken](#datenbanken)).
 - **Lichess**: das Konto, die Partien eines Spielers mit *Abgleichen*, die neuen Partien gezählt, wenn du es gewählt
   hast, die laufenden Übertragungen (siehe [Die Seite Lichess](#die-seite-lichess)).
-- **Laufend**: die Analyse der Partie, die der Stellung, ein Import, der Assistent (sein Download, sein geladenes
-  Modell, *Entladen*) und die zu wiederholenden Stellungen deiner Repertoires; ein Klick trainiert sie (siehe
-  [Ein Repertoire trainieren](#ein-repertoire-trainieren)).
+- **Laufend**: eine von RookStudio aus gespielte Partie auf Lichess (*Zurück zur Partie*) und die empfangenen
+  Herausforderungen (siehe [Auf Lichess](#auf-lichess)), die Analyse der Partie, die der Stellung, ein Import, der
+  Assistent (sein Download, sein geladenes Modell, *Entladen*), eine laufende Serie von Aufgaben, eine Sitzung mit
+  Übungen, eine geratene Partie, ein Endspiel oder eine Visualisierungsübung, und was die Wiederholung des Tages fällig
+  hat, in einer Zahl; ein Klick wiederholt alles (siehe [Die Wiederholung des Tages](#die-wiederholung-des-tages)).
 
 Der Suchknopf oben oder Strg+K findet einen Befehl, eine Partie, eine Datenbank.
 
@@ -995,7 +1017,7 @@ wird abgefragt, als wäre gerade ein Schlagzug oder ein Bauernzug gespielt worde
 darin spielt.
 
 ### Eine Partie aus einer Stellung spielen
-<!-- en: playing-a-game-from-a-position 1e310963 -->
+<!-- en: playing-a-game-from-a-position 6b5eb32f -->
 
 **Eine Partie spielen…** spielt eine Partie aus der Stellung auf dem Brett zwischen zwei Engines der Bibliothek oder
 zwischen dir und einer davon (siehe *Mensch* weiter unten) (*Weiß* und *Schwarz*, `<->` tauscht sie samt ihren Uhren),
@@ -1026,6 +1048,10 @@ beendete Partie hat es, bereit für *Partie analysieren*. *Partie aufgeben* been
 Engine; mit einer zweiten Partie folgt diese, mit vertauschter Farbe. Deine Partien werden unter deinem Anmeldenamen
 gespeichert, und nur die Engine zählt im Kernbudget. Zurücknehmen geht nicht, und die Engine spielt mit voller Stärke,
 außer ihre Karte stellt eine geringere ein (`UCI_LimitStrength` und `UCI_Elo` oder `Skill Level`, wo sie diese hat).
+
+In einer Ansicht fürs Studium führt die Karte auch zur Seite Spielen: eine Partie von dir gegen eine Engine in der
+Stärke, die du wählst, mit ihren Eröffnungen, einer Vorgabe, Zugrücknahmen und Hinweisen, ihre Hilfsmittel bis zum Ende
+ausgeblendet (siehe [Die Seite Spielen](#die-seite-spielen)).
 
 ### Das Brett fürs Studium
 <!-- en: the-study-board 60138fbd -->
@@ -1098,7 +1124,7 @@ Befehlspalette, beendet ihre Prozesse. Jede Geste des Tabs steht in der Befehlsp
 hinzugefügt, zur ersten gemacht oder entfernt, ihre Einstellungen, die Threads der Analyse.
 
 ### Notation
-<!-- en: notation a447e870 -->
+<!-- en: notation 5147406e -->
 
 Die Notation wird direkt bearbeitet, ohne Dialog:
 
@@ -1122,6 +1148,19 @@ Assistenten erscheinen getrennt von deinen, in Blaugrau und kursiv, nach einer S
 seinem Namen nach einem Kommentar, der schon da war (siehe [Kommentare des Assistenten](#kommentare-des-assistenten)).
 Wenn deine Theoriestudien die gezeigte Stellung kommentieren, führt *Theorie · 3* über den Zügen zu ihren Notizen im
 Tab Baum (siehe [Theoriestudien](#theoriestudien)).
+
+**Die Partie eines Turniers**, in einem der beiden Stile ihres PGN (`{+0.35/18 1.234s, n=…}` von fastchess oder
+`[%eval]`, `[%clk]` und `[%emt]` im ChessBase-Stil), ob aus ihrer Datei geöffnet, aus einer Datenbank, die sie
+importiert hat, oder aus einem als Datenbank gelesenen Turnier, zeigt die Kommentare ihrer Engines verdichtet: neben
+jedem Zug, klein und grau, die Bewertung, die seine Engine angab (für Weiß, wie der Balken und die Kurve), und ihre
+Tiefe, *+1.44/22*, das Ende des Buchs markiert. Steht die Maus über einem Zug, nennt er den Rest: seine Engine und
+Seite, die Bewertung auch aus ihrer Sicht, die Tiefe und die selektive Tiefe, die Zeit und wann sie sich für den Zug
+entschied, die Knoten und die Geschwindigkeit, die Tablebase-Treffer, ihre Chancen auf Sieg, Remis und Niederlage und
+die Linie, die sie danach erwartete, in Zügen geschrieben. Die rechte Maustaste auf dem Zug zeigt diese Linie auf dem
+Brett, macht sie zu einer Variante ab der Stelle, an der die Partie sie verließ (Strg+Z nimmt sie zurück), oder kopiert
+den Kommentar der Engine unverändert. Die Zeile unter den Zügen wählt, was neben ihnen erscheint: die Bewertung und die
+Tiefe, auch die Zeit, oder nichts (ebenso in Strg+K). Das PGN ändert sich nicht: Strg+S und *PGN kopieren* schreiben den
+Kommentar jeder Engine so zurück, wie er gelesen wurde, jedes Feld erhalten, solange die Daten des Zugs dieselben sind.
 
 ### Pfeile und Felder
 <!-- en: arrows-and-squares a46e6347 -->
@@ -1229,7 +1268,17 @@ gegenüber den sechs davor. Die Zusammenfassung sagt dasselbe über die Stellung
 bleibt es aus, bis es verlangt wird; der Explorer der Meister hat keine Monate.
 
 ### Die Auswertung einer Partie
-<!-- en: the-review-of-a-game 1bad0f30 -->
+<!-- en: the-review-of-a-game 7c5c4437 -->
+
+Auf dem Brett fürs Studium zeigt die Partie eines Turniers oben im Tab *Auswertung*, was ihre beiden Engines dachten,
+sobald sie geöffnet ist und ohne jede Analyse: die Chancen von Weiß im Verlauf der Partie laut jeder Engine bei ihren
+eigenen Zügen (aus dem Anteil an Siegen, Remis und Niederlagen, den sie angab, für Schwarz umgedreht, sonst aus ihrer
+Bewertung, umgerechnet wie bei der Auswertung), das Buch schraffiert, die Abschnitte, in denen die beiden Engines
+verschiedene Partien sahen, eingefärbt; darunter die Zeit jedes Zugs, die von Weiß über der Linie, die von Schwarz
+darunter; die Zeit, die mittlere Tiefe und die Geschwindigkeit jeder Engine. Dann ihre Momente, jeder einen Klick
+entfernt: wie jede Engine die Partie nach dem Buch sah, wo sie uneins waren, wo die Tablebases in eine Suche einflossen,
+wo ein Matt gesehen wurde und wie die Partie endete. Sobald die Partie analysiert ist, wird die Kurve der Auswertung
+dicker über ihre gezeichnet.
 
 Auf dem Brett fürs Studium liest der Tab *Auswertung* neben der Notation die Analyse der Partie (Alt+G), wie es ein
 Trainer täte:
@@ -1457,7 +1506,7 @@ Partien entlang des Repertoires, die bis zum Ende seiner Varianten eine Antwort 
 eine Variante, die mit einem Zug des Gegners endet. Ein Klick zeigt die Stellung, mit dem Baum daneben.
 
 ### Ein Repertoire trainieren
-<!-- en: training-a-repertoire d5d14dcc -->
+<!-- en: training-a-repertoire 6b0acafe -->
 
 Jede Stellung eines Repertoires, in der du am Zug bist und für die das Repertoire deinen Zug hat, ist eine
 Trainingsstellung. RookStudio fragt sie immer wieder ab, in immer größeren Abständen, je öfter du sie weißt, mit FSRS,
@@ -1494,10 +1543,10 @@ verfehlten Stellungen jetzt wiederholen*.
 
 Die Wiederholungen werden im Profil neben dem Repertoire aufbewahrt (`Najdorf.training.json` und
 `Najdorf.reviews.jsonl`, eine Zeile pro Antwort): Sein PGN ändert sich nicht. Ein im Repertoire geänderter Zug macht
-seine Stellung wieder neu. Nichts verlässt den Computer. *Laufend* auf der Startseite sagt, wie viele Stellungen fällig
-sind, ein Klick trainiert sie; ebenso *Das Repertoire … trainieren* in Strg+K. Während eine deiner Partien live auf
-Lichess gespielt wird, wartet das Training; die Stellungen auf der Variante einer deiner Fernpartien werden ausgelassen,
-bis sie endet.
+seine Stellung wieder neu. Nichts verlässt den Computer. Die fälligen Stellungen zählen mit den anderen Arten zur
+Wiederholung des Tages (siehe [Die Wiederholung des Tages](#die-wiederholung-des-tages)); dazu *Das Repertoire …
+trainieren* in Strg+K. Während eine deiner Partien live auf Lichess gespielt wird, wartet das Training; die Stellungen
+auf der Variante einer deiner Fernpartien werden ausgelassen, bis sie endet.
 
 ### Theoriestudien
 <!-- en: theory-studies 8ba97ca4 -->
@@ -1534,6 +1583,480 @@ dem Brett bei ihrem Zug öffnet. Steht die Maus über einer Notiz zu einem Zug, 
 über einer Notiz zur Stellung ihre Pfeile und Felder auf dem Brett. Im Tab **Notation** sagt *Theorie · 3* über den
 Zügen, wie viele Notizen die Stellung hat, und führt zum Tab Baum (Alt+3). Während eine deiner Partien live auf Lichess
 gespielt wird, sind die Notizen mit dem Baum ausgeblendet.
+
+## Die Seite Training
+<!-- en: the-training-page 5ebf17d1 -->
+
+Die Seite **Training** versammelt, was heute wiederkommt, dann die Übungen nach Art. Sie steht in der Leiste zwischen
+Eröffnungen und Lichess, in den Ansichten *Studium* und *Alles*. Eine Ansicht, die du vorher erstellt hast, ändert sich
+nicht von selbst: Die Startseite bietet einmal an, die Seite zur gezeigten Ansicht hinzuzufügen (*Zu … hinzufügen* oder
+*Nicht jetzt*), und Strg+K *Training* führt bis dahin dorthin.
+
+Ihr Titel hat sechs Teile: **Heute** (die Wiederholung des Tages, die Arten von Übungen, die zu startenden Aufgaben),
+**Aufgaben** (dieselbe Auswahl an Aufgaben, die auf deiner Festplatte aufbewahrte Datenbank von Lichess, deine
+Ergebnisse nach Thema), **Meine Fehler** (siehe [Deine Fehler als Übungen](#deine-fehler-als-übungen)), **Züge erraten**
+(siehe [Züge erraten](#züge-erraten)), **Endspiele** (siehe [Endspiele gegen die
+Tablebases](#endspiele-gegen-die-tablebases) und [Matts](#matts)) und **Visualisierung** (siehe
+[Brettvisualisierung](#brettvisualisierung)). Eine Karte für jede Art von Übung führt zu ihrem Teil. Alles funktioniert
+offline; was an Lichess geht, steht dort, wo du es wählst.
+
+### Die Wiederholung des Tages
+<!-- en: the-days-review b7049c16 -->
+
+*Heute zu wiederholen* zählt, was jede Art von Training heute fällig hat, jede mit ihrer verteilten Wiederholung (FSRS),
+in einer Warteschlange: die Fehler deiner Partien (siehe [Deine Fehler als Übungen](#deine-fehler-als-übungen)), die
+Stellungen deiner Repertoires (ihr Training bleibt auf der Seite Eröffnungen, siehe [Ein Repertoire
+trainieren](#ein-repertoire-trainieren)), die Aufgaben und die Endspiele, die du verfehlt hast. *Alles wiederholen*
+(Enter) nimmt sie nacheinander auf der Seite Brett: deine fälligen Fehler, die fälligen Stellungen jedes Repertoires,
+die zu wiederholenden Aufgaben, dann die Endspiele. Am Ende jeder Art geht *Als Nächstes: …* (Enter) weiter, *Zurück zur
+Seite Training* (Esc) hört dort auf; was beantwortet wurde, bleibt erhalten. Neben dem Knopf die Zeit, die es dauern
+sollte, nach dem Tempo deiner Antworten; darunter, was morgen und innerhalb von drei Tagen wiederkommt. Sind Fehler oder
+Aufgaben zusammen mit anderen Arten fällig, wiederholen *Nur meine Fehler* und *Nur die Aufgaben* sie allein.
+
+*Laufend* auf der Startseite hat dieselbe Zahl (*35 heute zu wiederholen · Alles wiederholen*); ein Klick wiederholt
+alles, ebenso Strg+K *Alles wiederholen*.
+
+### Aufgaben
+<!-- en: puzzles e825fb2f -->
+
+Lichess veröffentlicht seine Aufgaben jeden Monat als Datenbank (database.lichess.org, CC0): 6.193.530 Aufgaben im
+November 2026, jede mit ihrer Wertung, ihren Themen und, vor Zug 20, ihrer Eröffnung. RookStudio bewahrt sie auf deiner
+Festplatte auf und gibt dir daraus Aufgaben ohne Netz.
+
+**Die Datenbank.** *Herunterladen* holt die Datei (etwa 295 MB) und liest sie, während sie ankommt, in einen Speicher
+von etwa 293 MB im Profil; die Datei selbst wird nicht aufbewahrt. Ein abgebrochener Download (*Abbrechen*, das Netz,
+das Programm geschlossen) geht dort weiter, wo er aufhörte: *Fortsetzen* oder *Neu beginnen*. *Eine schon
+heruntergeladene Datei…* liest stattdessen `lichess_db_puzzle.csv.zst` von deiner Festplatte. Einmal da: *Aktualisieren*
+fragt database.lichess.org nach dem Datum seiner Datei und liest eine neuere, während die aufbewahrten Aufgaben
+antworten; *Entfernen* gibt die Festplatte frei (deine Wertung, deine Ergebnisse und deine zu wiederholenden Aufgaben
+bleiben, getrennt aufbewahrt). Außer der Anfrage nach der Datei verlässt nichts den Computer.
+
+**Die Auswahl.** *Offline* (die Datenbank) oder *Online* (dein Lichess-Konto, siehe [Lichess-Aufgaben
+online](#lichess-aufgaben-online)); ein Thema unter den ersten angebotenen, jedes damit, wie oft du es im ersten Versuch
+löst, oder unter *Alle Themen…*, das jedes Thema und jede Eröffnung mit ihren Aufgaben auflistet (tippe ein paar
+Buchstaben, um eines zu finden); und eine Schwierigkeit: *Leichter* (300 Punkte unter deiner Wertung), *Deine Wertung*,
+*Schwerer* (300 darüber). *Start · 20 Aufgaben* (Enter) beginnt eine Serie nahe deiner Wertung, nie mit einer Aufgabe,
+die du schon gesehen hast; Strg+K hat *Aufgaben: Gabel* und die anderen Themen, die sofort eine Serie starten.
+
+**Eine Serie** nimmt die Seite Brett ein, deren Spalte zu der der Aufgabe wird, wie beim Training der Repertoires; die
+Partie auf dem Brett wartet unter den letzten Partien und kommt danach zurück. Das Brett zeigt die Stellung von deiner
+Seite aus, den gerade gespielten Zug des Gegners in Hellgrün. Spiele deinen Zug auf dem Brett oder tippe ihn ein (seine
+Buchstaben, dann Enter); RookStudio spielt die Antworten des Gegners, den Rest der Lösung. Während der Frage sind die
+Engine, der Baum und deine Notizen ausgeblendet, ebenso die Themen der Aufgabe.
+
+- **Alt+H**: ein Hinweis, das Feld der zu ziehenden Figur in Blau; die Aufgabe zählt dann als verfehlt.
+- **Leertaste**: „Ich weiß es nicht“; die Lösung wird gezeigt, und die Aufgabe zählt als verfehlt.
+- **Esc**: anhalten; was beantwortet wurde, bleibt erhalten.
+
+Richtig: die Lösung in Zügen, die Änderung deiner Wertung und die Themen der Aufgabe; *Weiter* kommt mit Enter oder von
+selbst nach einer Sekunde (die Einstellung des Trainings der Repertoires); *Hier analysieren* (Alt+A) startet die Engine
+auf der Stellung; *Die Partie auf lichess.org* öffnet die Partie, aus der die Aufgabe stammt. Jeder Zug, der mattsetzt,
+ist richtig, wie auf Lichess. Falsch: dein Zug in Orange und der erste Zug der Lösung als grüner Pfeil; *Noch einmal*
+(Enter) spielt sie erneut, ohne erneut zu zählen; *Die Lösung Zug für Zug* (→) spielt sie Zug für Zug; *Weiter* geht
+weiter.
+
+Am Ende: die im ersten Versuch gelösten Aufgaben, die verfehlten, die Änderung deiner Wertung und die verfehlten
+Aufgaben (ein Klick zeigt die Stellung mit der Lösung); *Alle jetzt wiederholen* fragt sie erneut ab, ohne zu zählen,
+*Zurück zur Seite Training* verlässt die Serie.
+
+**Deine Wertung** ist die eigene von RookStudio, mit Glicko-2 berechnet, wie Lichess seine Aufgabenwertungen berechnet:
+Eine im ersten Versuch ohne Hinweis gelöste Aufgabe ist gegen die Wertung der Aufgabe gewonnen. Sie beginnt bei deiner
+Lichess-Aufgabenwertung, wenn dein Konto verknüpft ist, sonst bei 1500, und bewegt sich schnell, solange sie neu ist;
+Ergebnisse von Offline-Aufgaben können nicht an Lichess zurückgehen. *Deine Ergebnisse nach Thema* (der Teil Aufgaben)
+zählt die Aufgaben jedes Themas und wie oft du sie im ersten Versuch gelöst hast.
+
+Eine verfehlte Aufgabe wird zu einer Karte der Wiederholung des Tages: Sie kommt morgen wieder, dann in größeren
+Abständen, je öfter du sie löst; erneut verfehlt, später in derselben Serie, dann am nächsten Tag. All das wird im
+Ordner `puzzles` des Profils aufbewahrt (`rating.json`, `results.jsonl` mit einer Zeile pro Aufgabe, `review.json`), die
+Datenbank in `lichess-puzzles`.
+
+### Lichess-Aufgaben online
+<!-- en: lichess-puzzles-online 51fd9d60 -->
+
+*Online* gibt Aufgaben von deinem Lichess-Konto: Aufgaben, die du nie gesehen hast, auf deiner Lichess-Wertung, deren
+Ergebnisse an Lichess zurückgehen. Es braucht dein verknüpftes Konto (siehe [Dein Konto
+verknüpfen](#dein-konto-verknüpfen)); beim ersten Mal verlangt Lichess zwei weitere Berechtigungen, *puzzle:read* und
+*puzzle:write*: *Auf Lichess erlauben…* öffnet seine Seite, dein Konto bleibt währenddessen verknüpft, und das Token,
+das sie ersetzt, wird widerrufen.
+
+*Ein Paket holen · 50 Aufgaben* fragt Lichess nach fünfzig Aufgaben zum gewählten Thema und in der gewählten
+Schwierigkeit. Das Paket wird auf deiner Festplatte aufbewahrt: Es wird auch offline gelöst, in beliebig vielen Serien
+(*Fortsetzen · noch N*). *Gewertet* oder *Ungewertet, zum Ausprobieren* wird mit jeder Antwort gesendet. Am Ende des
+Pakets gehen seine Antworten in einer Anfrage an Lichess, die das nächste Paket bringt; dann bewegt sich deine
+Lichess-Wertung, und die Seite sagt, wann die letzten Antworten angenommen wurden. Lichess bittet Programme, seine
+Sammlung nicht über diese Anfragen herunterzuladen: Dafür gibt es die Datenbank.
+
+Kann Lichess die Antworten nicht annehmen, bleiben sie auf der Festplatte, und es wird gesagt, was zu tun ist: zu viele
+Anfragen (429), eine Minute später von selbst erneut gesendet, auch wenn RookStudio inzwischen geschlossen wurde; das
+Netz weg, eine Minute später erneut gesendet; das Token abgelehnt, gesendet, sobald das Konto erneut verknüpft ist.
+*Jetzt erneut versuchen* wartet nicht. Was den Computer verlässt: die Anfrage nach dem Paket (sein Thema oder seine
+Eröffnung, seine Schwierigkeit), dann die ID jeder Aufgabe mit richtig oder falsch, gewertet oder nicht.
+
+### Deine Fehler als Übungen
+<!-- en: your-mistakes-as-exercises b0e75f68 -->
+
+Die Fehler deiner eigenen Partien kommen als Übungen zurück: die Stellung vor deinem Zug, um Besseres zu finden. Deine
+Partien sind die, in denen du unter einem deiner Namen spielst (siehe [Deine Namen](#deine-namen)), in deinen
+Datenbanken. Jede von ihnen, die eine Auswertung hat (siehe [Die Auswertung einer
+Partie](#die-auswertung-einer-partie)), liefert die Züge deiner Seite, die die Auswertung mit **?** und **??** markiert
+hat, wo ein besserer Zug klar ist: Die Auswertung hat die Stellung tief genug durchsucht, um ihren besten Zug zu nennen
+(mindestens ihr dritter Durchgang), und die Partie war nicht ohnehin entschieden (der beste Zug der Auswertung hält dich
+in der Partie; dein Zug hat keinen Gewinn gehalten). Ungenauigkeiten (?!) werden ausgelassen: Sie haben selten eine
+einzige gute Antwort.
+
+Der Teil **Meine Fehler** zählt die Übungen und die Partien, aus denen sie stammen, die heute fälligen, die neuen und
+die, die du kannst, später fällig. Ihre Arten stammen aus *Woran zu arbeiten ist* jeder Auswertung: Gabeln, hängen
+gelassene Figuren, Turmendspiele…; ein Chip für jede beschränkt die Liste und die Sitzung auf diese Art, *Alle Arten*
+nimmt sie alle. Die Liste nennt für jede Übung die Partie, wo und wann sie gespielt wurde, deinen Zug und den der
+Auswertung und wann sie wiederkommt. *Start · N Übungen* (Enter) fragt die fälligen ab, dann die neuen von heute (so
+viele pro Tag wie die neuen Stellungen der Repertoires).
+
+Deine letzten Partien ohne Auswertung werden unter der Liste genannt: *Auswerten · im Hintergrund* wertet sie
+nacheinander aus, so wie die Seite Brett eine Partie auswertet (ihre Engine, ihre Einstellungen, die neben einem Turnier
+übrig gelassenen Prozesse), jede Auswertung mit ihrer Partie aufbewahrt; ihre Übungen kommen Partie für Partie. Der
+Fortschritt, die verbleibende Zeit und *Abbrechen* erscheinen währenddessen; die Auswertungen warten, solange die Seite
+Brett analysiert.
+
+**Eine Übung** nimmt die Seite Brett ein, deren Spalte zu der der Übung wird, wie beim Training der Repertoires: die
+Partie bis zur Stellung, von deiner Seite aus, der letzte Zug des Gegners in Hellgrün; unter dem Brett, wann sie
+gespielt wurde und was du damals gespielt hast. Spiele deinen Zug auf dem Brett oder tippe ihn ein. Der beste Zug der
+Auswertung ist sofort richtig; jeder andere Zug wird von der Engine der Auswertung mit den Einstellungen der Auswertung
+durchsucht (ein Thread, ihre Knotenzahl, ab einer leeren Tabelle), und er ist richtig, wenn er höchstens 0,3 Bauern
+gegenüber dem besten der Auswertung verliert oder einen Gewinn hält, den die Auswertung nicht markieren würde. Die
+Engine, der Baum und deine Notizen sind während der Frage ausgeblendet.
+
+- **Alt+H**: ein Hinweis, das Feld der zu ziehenden Figur in Blau.
+- **Leertaste**: „Ich weiß es nicht“; der Zug der Auswertung wird gezeigt.
+- **Esc**: anhalten; was beantwortet wurde, bleibt erhalten.
+
+Jede Antwort wird von selbst bewertet, wie eine Stellung eines Repertoires: im ersten Versuch richtig, *gut*; richtig
+nach einem Hinweis oder nach mehr als 20 Sekunden, *schwer*; falsch, *noch einmal*. Richtig: die Variante der Auswertung
+und die deiner Partie, was die Auswertung über deinen Zug sagte und wann die Übung wiederkommt; *Die Partie bei diesem
+Zug öffnen* öffnet sie auf der Seite Brett. Falsch: dein Zug in Orange, der Zug der Auswertung als grüner Pfeil und was
+die Engine nach deinem fand; *Noch einmal* (Enter) spielt sie erneut, ohne erneut zu zählen; eine verfehlte Übung kommt
+ein paar Übungen später wieder, dann am nächsten Tag.
+
+Die fälligen Übungen zählen zur Wiederholung des Tages (siehe [Die Wiederholung des
+Tages](#die-wiederholung-des-tages)), *Nur meine Fehler* wiederholt sie allein; Strg+K hat *Meine Fehler wiederholen*
+und *Übungen aus meinen Fehlern*. Eine Stellung, die dein Repertoire trainiert, wird hier nicht übernommen: Sie wird auf
+der Seite Eröffnungen trainiert. Eine aus ihrer Datenbank entfernte Partie nimmt ihre Übungen mit. Die Übungen und ihre
+Karten werden im Ordner `mistakes` des Profils aufbewahrt (`exercises.json` und `answers.jsonl`, eine Zeile pro
+Antwort); deine Partien ändern sich nicht, und nichts verlässt den Computer. Was deine Partien sagen, ordnet auch die
+Themen der Aufgaben: Die Arten deiner Fehler des letzten Monats kommen unter ihnen zuerst, unter den Chips genannt.
+
+### Deine Namen
+<!-- en: your-names 4a0ddfdd -->
+
+*Einstellungen › Deine Namen* (oder der Teil *Meine Fehler*, solange es keinen Namen gibt) listet die Namen auf, unter
+denen du spielst, so wie deine Datenbanken sie schreiben: Eine Partie, in der einer von ihnen spielt, ist deine. Ein
+Name passt über seine ganzen Wörter, Groß- und Kleinschreibung und Akzente außer Acht gelassen: *Tester* ist *Tester,
+Sam* und *TESTER, S.*, *Sam Tester* ist *Tester, Sam*, aber *Test* ist niemand. Der Name deines verknüpften
+Lichess-Kontos zählt von selbst. Klicke auf einen Namen, um ihn zu entfernen: Die Übungen seiner Partien gehen, aber
+ihre Karten bleiben erhalten und kommen mit ihnen zurück, wenn du den Namen wieder hinzufügst.
+
+### Züge erraten
+<!-- en: guessing-the-moves e004de63 -->
+
+**Züge erraten** spielt eine Partie deiner Datenbanken von einer Seite aus nach: Bei jedem ihrer Züge errätst du den
+gespielten. Die Engine bewertet jeden Tipp gegen den Zug der Partie: *wie in der Partie* 3 Punkte; laut Engine *gleich
+gut* (höchstens 0,2 Bauern schlechter, oder besser) 2; *spielbar* (höchstens 0,5 Bauern schlechter) 1; sonst keinen. Es
+ist die Analyse-Engine, mit einem Thread, eine Sekunde pro Zug; der Zug der Partie wird durchsucht, während du
+nachdenkst.
+
+*Eine zufällige Partie* zieht eine aus der gewählten Datenbank, über einen Filter: den Schnellfilter der Partieliste
+(Spieler, Veranstaltung, ein ECO-Code, ein Jahr) und die Elo der Spieler. Wähle deine Seite, dann *Start · eine
+zufällige Partie* (Enter). Mit *Die Theoriezüge laufen von selbst durch* (für das nächste Mal gespeichert) beginnt das
+Raten dort, wo die Partie die Züge verlässt, die viele Partien deiner Datenbanken gespielt haben (ihr Eröffnungsbaum).
+*Die Partie der Seite Brett* lässt die gezeigte Partie ab ihrer Stellung erraten, für die Seite am Zug: Strg+K *Züge
+erraten* auf der Seite Brett.
+
+Die Partie nimmt die Seite Brett ein, deren Spalte zu der des Ratens wird; die Partie wird nicht verändert, und ihre
+späteren Züge werden nicht gezeigt. Nach jedem Tipp: dein Zug als blauer Pfeil, der der Partie als grüner, die Punkte
+und beide Bewertungen; die Partie geht nach einem Moment von selbst weiter (sofort mit Enter), die Antwort des Gegners
+wird gespielt, und der nächste Zug gehört dir. Darunter: jeder Tipp mit seinen Punkten und der bisherige Stand. Am Ende:
+deine Punkte, wie viele Tipps der Zug der Partie waren, die im Schnitt pro Zug verlorenen Bauern und die Züge, die dich
+am meisten gekostet haben (ein Klick zeigt ihre Stellung); die ganze Partie steht auf dem Brett, ← und → gehen durch
+sie. Jede geratene Partie wird im Ordner `guess` des Profils aufbewahrt; die Seite Training zeigt die Punkte der
+letzten.
+
+### Endspiele gegen die Tablebases
+<!-- en: endgames-against-the-tables 6ded57cf -->
+
+Der Teil **Endspiele** ist ein Katalog von Endspielen zum Gewinnen oder Halten, gespielt gegen die Tablebases: achtzehn
+in vier Gruppen. *Elementare Mattführungen*: die Dame, der Turm, die zwei Läufer, Läufer und Springer. *Bauern*: die
+Opposition, die Quadratregel, der entfernte Freibauer, das Réti-Manöver. *Türme*: Lucena, Philidor, Vancura, Turm gegen
+Bauer, Turm und zwei Bauern gegen Turm. *Figuren und Dame*: Dame gegen Turm, Dame gegen Bauer, der falsche Läufer, Turm
+gegen Läufer, Läufer gegen Springer. Jedes sagt, was es verlangt (*Matt*, *Gewinn* oder *Remis halten*) und wo du
+stehst: *zu tun*, *geschafft*, bei einem Matt *geschafft in 9 (die Tablebases: 7)*, *erneut zu tun* nach einem Fehler.
+Eines, das die verfügbaren Tablebases nicht beantworten können, ist ausgegraut, seine Steine genannt (siehe [Tablebases
+für die Endspiele](#tablebases-für-die-endspiele)); steht die Maus darüber, erscheint die Idee, die es gewinnt oder
+hält. Ein Klick spielt es; danach wählen ↑ und ↓ ein anderes, und Enter spielt es. Strg+K hat *Endspiel: Lucena* und die
+anderen.
+
+**Ein Endspiel** nimmt die Seite Brett ein, deren Spalte zu der des Endspiels wird, wie bei den Aufgaben; die Partie auf
+dem Brett wartet unter den letzten Partien. Du spielst von deiner Seite aus; die Tablebases beantworten jeden Zug mit
+dem, der am längsten Widerstand leistet (mit den Syzygy-Tablebases der längste bis zum nächsten Schlagen oder Bauernzug,
+und unter gleich langen der, der dir die wenigsten guten Antworten lässt). Über der Frage: das Urteil der Tablebases
+jetzt (*Die Tablebases: Weiß gewinnt*) und wie weit, die Züge bis zum Matt, wenn Lichess sie kennt, sonst höchstens die
+Züge vor einem Schlagen oder Bauernzug.
+
+- **Strg+Z**: deinen letzten Zug und die Antwort der Tablebases zurücknehmen.
+- **Alt+H**: der richtige Zug, als grüner Pfeil; das Endspiel zählt dann als mit Hilfe geschafft.
+- **Neu beginnen**: zurück zum Anfang. **Esc**: anhalten.
+
+Jeder Zug wird sofort beurteilt. Einer, der einen Gewinn in ein Remis oder ein Remis in eine Niederlage verwandelt, ist
+ein Fehler: Die Tablebases antworten, dann sagt es die Spalte (*1.Kd5? Ke7: jetzt Remis*) mit den Zügen, die das
+Ergebnis gehalten hätten (*Den Gewinn hätten gehalten: 1.Kd6!, 1.Kf6!*, ihre Felder in Grün, dein Zug in Orange), und
+der Idee des Endspiels. *Zurücknehmen* (Enter oder Strg+Z) spielt ihn erneut; *Den Gewinn zeigen* nimmt ihn zurück und
+schreibt die Variante der Tablebases ab dort; *Trotzdem weiter* spielt im neuen Urteil weiter. Darunter das Urteil zu
+Beginn und jeder Zug, der es geändert hat.
+
+Ein Gewinn zählt beim Matt oder sobald ein Bauer von dir zur Dame wird oder der andere König allein steht, der Gewinn
+gehalten; in den elementaren Mattführungen ist das Matt selbst das Ziel, deine Züge gemessen am Matt der Tablebases ab
+dem Anfang. Ein Remis zählt, wenn eine Regel die Partie remis macht (Patt, zu wenig Material, die dreifache
+Wiederholung, die fünfzig Züge), oder nach 15 gehaltenen Zügen. Am Ende: *Noch einmal* (Enter), *Als Nächstes:* das
+nächste noch nicht geschaffte Endspiel, *Zurück zur Seite Training*.
+
+Die Stellung vor einem Fehler wird zu einer Karte der Wiederholung des Tages (siehe [Die Wiederholung des
+Tages](#die-wiederholung-des-tages)): Sie kommt morgen wieder, das Endspiel ab ihr erneut gespielt, dann in größeren
+Abständen, je öfter du es ohne Fehler gewinnst oder hältst (mit Hilfe zählt es als schwer, ein Fehler als verfehlt).
+Strg+K *Die verfehlten Endspiele wiederholen*.
+
+**Aus deinen Partien** nimmt die Stellungen mit 7 Steinen oder weniger unter deinen Fehlern (siehe [Deine Fehler als
+Übungen](#deine-fehler-als-übungen)), in denen die Auswertung deiner Partie den Gewinn oder das Remis entgleiten sah.
+*Start* spielt sie nacheinander gegen die Tablebases, jede ab der Stellung vor deinem Zug; eine, die laut den Tablebases
+ohnehin verloren war, wird ausgelassen. Die Ergebnisse und die Karten werden im Ordner `endgames` des Profils aufbewahrt
+(`record.json`).
+
+### Tablebases für die Endspiele
+<!-- en: tables-for-the-endgames 0e49bbca -->
+
+Die Tablebases sind die deiner Festplatte, die Syzygy-Ordner der Turniere (*Abschätzung* > Tablebases, siehe [Tablebases
+auf der Seite Brett](#tablebases-auf-der-seite-brett)), mit den eigenen des Profils, sobald sie heruntergeladen sind;
+für mehr Steine, als sie enthalten, die von Lichess online, bis 7 Steine, mit deiner Zustimmung zu den Online-Tablebases
+(der der Seite Brett, siehe [Online für die Analyse](#online-für-die-analyse)). Während ein Turnier im Prozess des
+Programms spielt, gehören die Tablebases der Festplatte ihm: Dann antworten die von Lichess, oder das Endspiel wartet.
+
+Braucht ein Endspiel Tablebases, die du nicht hast, sagt der Teil das (*Keine Tablebases für „Lucena“*) und bietet drei
+Wege an:
+
+- **Die Tablebases für 3 bis 5 Steine herunterladen** (290 Dateien, 938 MB) vom Spiegelserver von Lichess, eine Datei
+  nach der anderen, die kleinsten zuerst: Die Endspiele mit 3 und 4 Steinen sind in Sekunden bereit, die anderen, sobald
+  ihre Dateien ankommen. Ein abgebrochener Download geht dort weiter, wo er aufhörte (*Fortsetzen*); jede Datei wird
+  geprüft (ihre Größe und die Kennung von Syzygy). Die Tablebases kommen in den Ordner `syzygy` des Profils und, sobald
+  alle da sind, in die Ordner der Turniere.
+- **Ein Ordner mit Tablebases, schon auf der Festplatte…**: auch für die Turniere gewählt.
+- **Die von Lichess, online**: bis 7 Steine, eine Anfrage pro gespielter Stellung; die Wahl gibt die Zustimmung.
+
+Ohne Tablebases sind die Endspiele, die sie brauchen, ausgegraut, jedes mit dem, was es braucht; die anderen Übungen
+funktionieren. Online lässt eine Unterbrechung das Endspiel warten: Dein Zug bleibt erhalten und wird beurteilt, wenn
+das Netz zurückkommt (*Jetzt erneut versuchen* wartet nicht); ein 429 wartet die Minute, um die Lichess bittet. Was den
+Computer verlässt: mit den Tablebases der Festplatte nichts; mit denen von Lichess jede gespielte Stellung als FEN; für
+den Download die Anfrage nach jeder Datei.
+
+### Matts
+<!-- en: mates 803d99bd -->
+
+Die Karte **Matts** (im Teil Endspiele, zu dem die Karte des Teils Heute führt) startet 20 Mattaufgaben von Lichess
+(siehe [Aufgaben](#aufgaben)): in 1 bis 5 Zügen oder nach Muster (Grundreihe, erstickt, Anastasia, arabisch, Boden,
+Doppelläufer, Haken), jeder Chip damit, wie oft du es im ersten Versuch löst. Sie kommen aus der Datenbank auf deiner
+Festplatte, sonst aus einem Paket deines Lichess-Kontos; ohne beides führt der Klick zum Teil Aufgaben. Die elementaren
+Mattführungen gegen die Tablebases stehen im Katalog oben, deine Züge gemessen am Matt der Tablebases.
+
+### Brettvisualisierung
+<!-- en: board-vision dd34b350 -->
+
+Der Teil **Visualisierung** trainiert, das Brett im Kopf zu sehen. Nichts verlässt den Computer; die Rekorde werden in
+`vision.json` im Profil aufbewahrt.
+
+**Koordinaten**: dreißig Sekunden Felder. *Das Feld finden*: Ein Feld wird genannt, klicke es auf einem Brett ohne seine
+Buchstaben und Ziffern an; *Das Feld benennen*: Ein Feld ist blau markiert, tippe seinen Namen ein (einen Buchstaben,
+dann eine Ziffer). Aus Sicht von Weiß, von Schwarz oder *Zufällig*, wobei sich das Brett von Feld zu Feld dreht. Ein
+Fehler zeigt das gefragte Feld in Grün und deines in Orange. Am Ende deine Zahl und dein Rekord für diese Art und Seite.
+Enter startet, Esc beendet.
+
+**Blind**: eine Partie gegen die Engine der Seite Spielen, in der Stärke und mit den Eröffnungen, die dort gewählt sind
+(*Auf der Seite Spielen ändern*, siehe [Gegen eine Engine](#gegen-eine-engine)). Du spielst Weiß, Schwarz oder zufällig
+eines von beiden; das Brett verbirgt alle Figuren, alle Figuren ab dem 10. Zug oder alle außer den Bauern, der letzte
+Zug markiert. Tippe deine Züge oder spiele sie auf dem Brett; die bisherigen Züge stehen in der Spalte. Halte Umschalt
+einen Moment, um die Figuren 2 Sekunden lang zu sehen, dreimal pro Partie; F2 fragt *Wo steht…?* nach einer Figur, die
+ihre Worte allein bezeichnen (*der schwarzfeldrige Läufer von Schwarz*): Klicke auf ihr Feld oder tippe es ein. Deine
+Uhr ist lang, die der Engine kurz; jede Partie wird an `games/blindfold.pgn` im Profil angehängt.
+
+**Eine Variante im Kopf nachspielen**: eine Stellung einer bekannten Eröffnung, die sechs folgenden Züge daneben
+geschrieben, ohne dass sich die Figuren bewegen, dann eine Frage: Welche Figur steht auf einem Feld, das sie verändert
+haben? Klicke die Antwort an oder tippe die Figur so, wie FEN sie schreibt (*N* ein weißer Springer, *n* ein schwarzer,
+*-* ein leeres Feld); das Brett zeigt dann die Stellung nach den Zügen. Zehn Varianten pro Serie.
+
+## Die Seite Spielen
+<!-- en: the-play-page 468c2ade -->
+
+Die Seite **Spielen** hat zwei Teile: *Gegen eine Engine*, eine auf der Seite Brett gespielte Partie gegen eine Engine
+deiner Bibliothek, und *Auf Lichess*, deine von RookStudio aus gespielten Lichess-Partien (siehe [Auf
+Lichess](#auf-lichess)); der zuletzt gezeigte Teil kommt wieder. Sie steht in der Leiste nach der Seite Training, in den
+Ansichten *Studium* und *Alles*. Eine Ansicht, die du vorher erstellt hast, ändert sich nicht von selbst: Die Startseite
+bietet einmal an, sie zur gezeigten Ansicht hinzuzufügen (*Zu … hinzufügen* oder *Nicht jetzt*), und Strg+K *Gegen eine
+Engine spielen* (oder *Auf Lichess spielen*) führt bis dahin dorthin, ebenso *Gegen eine Engine spielen* auf der
+Startseite und *Die Seite Spielen* in der Karte *Eine Partie spielen…* der Seite Brett. Gegen eine Engine verlässt
+nichts den Computer: Die Engine läuft auf ihm. Während eine deiner Partien live auf Lichess gespielt wird, sagt die
+Seite das und startet keine Partie gegen eine Engine (siehe [Fairplay](#fairplay)).
+
+### Gegen eine Engine
+<!-- en: against-an-engine d08e9a6c -->
+
+Die Wahl wird für die nächste Partie gespeichert: Einmal getroffen, genügt *Spielen* (Enter).
+
+- **Der Gegner**: eine Engine deiner Bibliothek, mit den Stärken, die sie annehmen kann.
+- **Ihre Stärke**: die Elo, die sie anstrebt (`UCI_Elo`, mit `UCI_LimitStrength`), auf ihrer eigenen Skala: ein
+  Anhaltspunkt, keine FIDE-Wertung. Eine Engine ohne diese Einstellung spielt stattdessen eine Anzahl Knoten pro Zug,
+  von 1 bis zu einer Million, weniger für ein schwächeres Spiel. *Volle Stärke* lässt sie in Bestform, was auch immer
+  ihre Karte begrenzt.
+- **Ihr Stil: ihre Eröffnungen**, was sie vor ihren eigenen Zügen spielt: *Ihre eigenen* (kein Buch); *Deine
+  Datenbanken* (die dort am häufigsten gespielten Züge, in all deinen Datenbanken mit Eröffnungsbaum oder in einer
+  davon); *Dein Repertoire* (die Züge, gegen die du dich vorbereitet hast, dann die Engine; du spielst die Farbe des
+  Repertoires, die seine Wahl einstellt); *Partien eines Spielers* (die Züge, die ein Spieler mit der Farbe der Engine
+  gespielt hat, aus einer Datenbank namens *Lichess · Name*, wie sie das Vorbereiten einer Partie gegen ihn anlegt,
+  siehe [Eine Partie vorbereiten](#eine-partie-vorbereiten)); *Ein Buch der Bibliothek* (ein Polyglot- oder CTG-Buch der
+  Seite Bücher, ohne seine zu vermeidenden Züge). *Variieren* wählt zufällig unter den mindestens 5-mal gespielten
+  Zügen, so oft, wie sie gespielt wurden (die Züge eines Buchs nach seinen Gewichten, die eines Repertoires ebenso);
+  nicht angehakt, der am häufigsten gespielte Zug, bei einem Buch zuerst sein Hauptzug. Sobald ihre Eröffnungen für die
+  Stellung keinen Zug haben, spielt die Engine bis zum Ende. Ihr Stil sind ihre Eröffnungen: Die eigenen Einstellungen
+  der Engine bleiben auf ihrer Karte. Mit einem vorgegebenen Stein treffen die Eröffnungen auf Stellungen, die sie nicht
+  haben, und die Engine spielt ab dem ersten Zug.
+- **Du**: Weiß, Schwarz oder zufällig; die Uhr, Minuten und ein Inkrement, *Für beide gleich* oder, nicht angehakt, eine
+  eigene für die Engine (ungleiche Zeit); ab der Ausgangsstellung oder ab der der Seite Brett.
+- **Die Vorgabe**: was die Engine zu Beginn vorgibt: nichts, ihren f-Bauern, ihren b-Springer, ihren a-Turm (die Rochade
+  auf dieser Seite fällt mit ihm weg) oder ihre Dame; ein Stein, den sie dort, wo sie beginnt, nicht hat, ist
+  ausgegraut, und Chess960 hat keine. *Zugrücknahme* (erlaubt, außer nicht angehakt) und *Hinweise* (3 pro Partie) sind
+  ebenfalls Vorgaben, gezählt.
+
+Die Partie zählt zum Kernbudget (die Threads der Engine, wie bei einer vom Brett aus gespielten Partie); die Seite sagt,
+wenn die Maschine voll ist.
+
+### Die Partie gegen die Engine
+<!-- en: the-game-against-an-engine bfdb25dc -->
+
+*Spielen* bringt die Partie auf die Seite Brett, in einer Ansicht fürs Studium: das Brett zu deiner Seite gedreht, die
+Uhren laufen in den Streifen der Spieler (der der Engine mit ihrer Stärke), und über der Spalte die Karte der Partie:
+wer am Zug ist, *Remis anbieten*, *Aufgeben…*, *Zurücknehmen · Strg+Z*, *Hinweis · Alt+H*, *Stopp*.
+
+- Spiele deine Züge auf dem Brett oder tippe sie ein: Der erste Buchstabe eines Zugs öffnet das Feld, Enter spielt ihn.
+- **Die Hilfsmittel sind bis zum Ende ausgeblendet**: die Tabs Analyse, Baum, Referenzen und Fragen, die Analyse
+  (Alt+A), die Drohung, die Analyse der Partie (Alt+G), die Tablebases und der Assistent. Auch die Engine zeigt nichts
+  von ihrer Suche: Ihre Bewertungen kommen mit der beendeten Partie. *Zeigen*, in der Karte oder anstelle eines Tabs,
+  gibt sie während der Partie zurück, die dann als *mit Hilfsmitteln* markiert wird.
+- *Zurücknehmen* (Strg+Z) nimmt deinen letzten Zug und die Antwort der Engine zurück, oder deinen Zug, während die
+  Engine nachdenkt, die Uhren wie zuvor: gezählt und in der Partie vermerkt.
+- *Hinweis* (Alt+H): wenn du am Zug bist, der Zug der Analyse-Engine nach einer Sekunde Suche, als grüner Pfeil; drei
+  pro Partie, gezählt und in der Partie vermerkt.
+- *Remis anbieten*: Die Engine antwortet mit ihrem nächsten Zug. Sie nimmt das Remis an, wenn sie mattgesetzt wird oder
+  klar schlechter steht oder wenn sie nicht besser steht, sobald 20 Züge gespielt sind; ein Zug aus ihren Eröffnungen
+  lehnt es ab.
+- *Aufgeben…* verlangt innerhalb weniger Sekunden Enter oder einen zweiten Klick; *Stopp* beendet die Partie ohne
+  Ergebnis, so gespeichert, wie sie ist.
+- Wo die Eröffnungen der Engine endeten, sagt es die Notation (*Ende deines Repertoires · dann die Engine*).
+
+Das Schließen von RookStudio während der Partie bewahrt sie auf: Beim nächsten Start ist sie wieder auf der Seite Brett,
+ihre Uhren warten, bis du sie fortsetzt (*Fortsetzen*, Enter) oder beendest (*Beenden*). Eine inzwischen auf dem Brett
+geöffnete andere Partie lässt deine weiterlaufen, deine Uhr läuft, wenn du am Zug bist: *Zurück zur Partie* holt sie
+zurück.
+
+### Nach der Partie
+<!-- en: after-the-game 44d80f6b -->
+
+Am Ende kommen die Hilfsmittel zurück, und die Karte sagt, wie die Partie endete (*Remis: dreifache
+Stellungswiederholung, bei Zug 34*), gegen wen und wie: die Stärke, deine Farbe, die Uhr, die Zugrücknahmen, die
+Hinweise, mit oder ohne Hilfsmittel. Die Partie wird in der Datenbank **Meine Partien gegen Engines** gespeichert, die
+bei der ersten Partie angelegt wird, mit ihren Einstellungen in ihren Tags: `Strength` (`UCI_Elo 1800`, `nodes 1000`,
+`full`), `Openings` (`repertoire Najdorf`, `database Mine`, `databases`, `player Somebody`, `book Human`, `engine`),
+`Handicap` (`knight b8`, mit der Ausgangsstellung), `Takebacks`, `Hints`, `Aids`. Strg+S speichert sie nach einer
+Änderung wieder dorthin.
+
+- *Auswerten* (Enter): die Analyse der Partie, wie Alt+G sie macht (siehe [Die Auswertung einer
+  Partie](#die-auswertung-einer-partie)); sobald sie ausgewertet ist, werden deine Fehler darin zu Übungen (siehe [Deine
+  Fehler als Übungen](#deine-fehler-als-übungen)), wenn deine Namen sagen, dass die Partie deine ist (siehe [Deine
+  Namen](#deine-namen)).
+- *Revanche, mit vertauschten Farben*: dieselbe Wahl, die andere Farbe.
+- *Einstellungen ändern*: die Seite Spielen.
+- *Schließen*: Die Partie bleibt wie jede Partie auf dem Brett.
+
+Darunter **deine Partien gegen diese Engine auf dieser Stufe**: gewonnen, remis und verloren, die mit Hilfsmitteln
+getrennt und nicht gezählt, und wo du die letzte verloren hast (*ein Turmendspiel*), mit der Angabe, ob sie unter deinen
+Übungen ist. Die nächste Stufe wird dort oder auf der Seite Spielen gewählt: Nichts steigt von selbst. Jede Partie ist
+außerdem eine Zeile von `play/games.jsonl` im Profil.
+
+### Auf Lichess
+<!-- en: on-lichess 4e5ccbb8 -->
+
+Der Teil **Auf Lichess** der Seite Spielen spielt deine Lichess-Partien aus RookStudio, über die Board-API von Lichess,
+die für Menschen gemacht ist. Er braucht dein verknüpftes Konto (siehe [Dein Konto verknüpfen](#dein-konto-verknüpfen));
+beim ersten Mal verlangt Lichess eine weitere Berechtigung, *Deine Partien spielen* (`board:play`): *Auf Lichess
+erlauben…* (Enter) öffnet die Seite von Lichess, dein Konto bleibt währenddessen verknüpft, und das Token, das sie
+ersetzt, wird widerrufen. RookStudio spielt nie einen Zug, den du nicht gespielt hast. Was den Computer verlässt: deine
+Partiegesuche und Herausforderungen, deine Züge, deine Chatnachrichten, Remisangebote und Aufgaben, mit dem Token deines
+Kontos; die Wahl wird in `play/lichess.json` im Profil gespeichert.
+
+- **Eine Partie suchen**: Schnellschach (10+0, 10+5, 15+10), klassisch (30+0, 30+20) oder Fernschach (1 bis 14 Tage pro
+  Zug), gewertet oder nicht, gegen Gegner jeder Wertung oder mit einer Wertung um deine in dieser Bedenkzeit (±).
+  Lichess behält Blitz und Bullet seiner Website vor: Ein Programm sucht sie nicht, und Blitz bleibt als direkte
+  Herausforderung möglich. *Einen Gegner suchen* (Enter) stellt das Partiegesuch in die Lobby von Lichess, sobald der
+  Ereignisstrom von Lichess offen ist, wie Lichess es verlangt, damit der Beginn der Partie nicht verpasst wird. Ein
+  Live-Gesuch lebt, solange RookStudio es offen hält: Esc zieht es zurück, ebenso das Schließen von RookStudio; die
+  gefundene Partie öffnet sich auf der Seite Brett. Ein Fernschachgesuch bleibt in der Lobby, bis jemand es annimmt (die
+  API kann es nicht zurückziehen, die Lobby von lichess.org schon), und seine Partie erscheint unter deinen laufenden
+  Partien.
+- **Einen Spieler herausfordern**: sein Name, die Bedenkzeit (3+2, 5+3, 10+5, 15+10, 3 Tage oder *andere…*: Minuten und
+  Sekunden Zuschlag pro Zug oder Tage pro Zug; mindestens drei Minuten, das Inkrement vierzigmal gezählt, da die
+  Board-API kein Bullet spielt), gewertet oder nicht, deine Farbe. Eine Live-Herausforderung wartet auf die Antwort,
+  solange du bleibst (Esc oder *Zurückziehen*). Abgelehnt wird der Grund von Lichess genannt (*zu schnell für ihn*), mit
+  anderen Bedenkzeiten einen Klick entfernt (langsameren nach „zu schnell“); angenommen öffnet sich die Partie auf der
+  Seite Brett.
+- **Eine empfangene Herausforderung** erscheint oben im Teil (*Annehmen* · Enter, *Ablehnen ▾* mit den Gründen von
+  Lichess: *Nicht jetzt*, *Später*, *Zu schnell für mich*, *Zu langsam für mich*, *Nur ungewertet*, *Nur gewertet*), auf
+  der Startseite unter *Laufend* und in einem Hinweis in der Ecke des Fensters, wo immer du bist, mit einem Ton, wenn
+  die Töne eingeschaltet sind; *Später* legt den Hinweis beiseite. Während einer Live-Partie wartet sie auf deren Ende.
+  Eine Partie, die die Board-API nicht spielen kann (Bullet, eine andere Variante als Chess960), wird auf lichess.org
+  gespielt.
+- **Deine laufenden Partien**: die, in denen du am Zug bist, zuerst, mit der verbleibenden Zeit für den Zug; ein Klick
+  öffnet eine auf der Seite Brett, wo dein Zug gespielt wird.
+
+Der Ereignisstrom ist der von [Fairplay](#fairplay): Lichess öffnet einen pro Token, und er meldet Beginn und Ende der
+Partien, die empfangenen Herausforderungen und was aus denen wird, die du gesendet hast.
+
+### Eine Partie auf Lichess
+<!-- en: a-game-on-lichess 15ac0e49 -->
+
+Die Partie wird auf der Seite Brett gespielt, in einer Ansicht fürs Studium: das Brett zu deiner Seite gedreht, die
+Wertungen und Uhren der Spieler in ihren Streifen, und über der Spalte die Karte der Partie: was sie ist (*Gewertet ·
+Schnellschach 10+5 gegen …*), wer am Zug ist, *Remis anbieten*, *Aufgeben…* (innerhalb weniger Sekunden Enter oder ein
+zweiter Klick), *Um Zugrücknahme bitten*, *Partie abbrechen* (bevor beide Seiten gezogen haben), *Chat* (der Chat der
+Spieler), *Auf lichess.org öffnen*.
+
+- Live gehen deine Züge los, sobald sie gespielt sind, auf dem Brett oder getippt (der erste Buchstabe eines Zugs öffnet
+  das Feld, Enter spielt ihn). Ein während des Zugs deines Gegners gemachter Zug wartet auf deinen (ein gestrichelter
+  Pfeil) und wird dann gespielt, wenn er legal ist; Esc nimmt ihn zurück. Vor deinem ersten Zug zählt die Karte die Zeit
+  herunter, die Lichess gibt, bevor es die Partie abbricht.
+- Im Fernschach wartet ein Zug auf deine Bestätigung (*Dein Zug: 10.g4 · noch nicht gesendet*, ein Pfeil auf dem Brett):
+  *Senden* (Enter) oder *Zurücknehmen* (Esc). Die Karte listet deine anderen Fernpartien auf, einen Klick entfernt.
+- Das Remisangebot oder die Bitte um Zugrücknahme deines Gegners erscheint in der Karte mit *Annehmen* und *Ablehnen*;
+  deines wartet auf seine Antwort. Verlässt dein Gegner die Partie, zählt die Karte herunter, bis Lichess dich den Sieg
+  beanspruchen lässt (*Sieg beanspruchen*, *Remis beanspruchen*).
+- **Die Hilfsmittel**: Die Sperre aus [Fairplay](#fairplay) gilt, wie für jede deiner Partien. Live ist jedes
+  Hilfsmittel für jede Stellung gesperrt: die Tabs Analyse, Baum, Referenzen und Fragen, die Analyse, die Drohung, die
+  Tablebases, die Cloud und der Assistent. Im Fernschach sind die Engine, die Cloud, die Tablebases und der Assistent
+  für die Partie gesperrt; der Baum deiner Datenbanken und deine Bücher bleiben offen, da Lichess dort ein Buch erlaubt.
+- **Eine Unterbrechung**: Die Karte sagt das (*deine Uhr läuft auf Lichess*) und versucht es von selbst erneut, nach 1,
+  2, 3, dann alle 5 Sekunden; die ganze Partie kommt mit der Verbindung zurück, der Chat auch. Ein inzwischen gespielter
+  Zug geht nicht durch: Spiele ihn erneut, sobald die Verbindung zurück ist. *Die Partie auf lichess.org öffnen* bleibt
+  zur Hand.
+- **Das Schließen von RookStudio** während einer Live-Partie fragt zuerst nach (*Bleiben* · Esc, *Trotzdem schließen*):
+  Die Partie geht auf Lichess weiter, deine Uhr läuft. Beim nächsten Start kommt eine noch laufende Partie auf die Seite
+  Brett zurück, und die Startseite zeigt sie zuerst. Eine inzwischen auf dem Brett geöffnete andere Partie lässt deine
+  weiterlaufen: *Zurück zur Partie* holt sie zurück.
+- Am Ende sagt die Karte, wie die Partie endete und was sie an deiner Wertung geändert hat; die Partie kommt in deine
+  Lichess-Datenbank, mit der Analyse von Lichess, wenn es eine gibt, ihre Auswertung einen Klick entfernt, wie bei
+  deinen anderen beendeten Partien (siehe [Deine beendeten Partien](#deine-beendeten-partien)). *Noch eine Partie* sucht
+  erneut mit derselben Bedenkzeit.
 
 ## Die Seite Lichess
 <!-- en: the-lichess-page ea1e19cc -->
@@ -1667,7 +2190,7 @@ deinem Token; Übertragungen mit einem Konto, das sie lesen darf, einmal angefra
 Lesezeichen brauchen ein verknüpftes Konto.
 
 ### Fairplay
-<!-- en: fair-play e42fbcbd -->
+<!-- en: fair-play 12bbcbc4 -->
 
 Lichess verbietet jede Hilfe während einer Partie. Mit verknüpftem Konto hält sich RookStudio daran, wo immer du
 spielst, im Browser oder auf einem Telefon:
@@ -1684,13 +2207,15 @@ spielst, im Browser oder auf einem Telefon:
 
 Ein Banner auf der Seite Brett sagt, welche Partie was sperrt. Die Karte Lichess der Startseite listet deine laufenden
 Partien auf, die, in denen du am Zug bist, zuerst, jede mit ihrer Uhr oder der verbleibenden Zeit für den Zug, und *Auf
-lichess.org öffnen*.
+lichess.org öffnen* oder *Aufs Brett*, sobald RookStudio deine Partien spielen darf (siehe [Eine Partie auf
+Lichess](#eine-partie-auf-lichess)).
 
 Deine laufenden Partien werden mit dem Token deines Kontos abgefragt, wenn die Startseite erscheint, alle halbe Minute,
 solange eine Live-Partie dauert, und alle zehn Minuten, solange eine Fernpartie läuft. Die Seite Lichess bietet einmal
 an, stattdessen auf ihren Beginn und ihr Ende zu hören, solange RookStudio offen ist: eine weitere Berechtigung, deine
-Herausforderungen lesen. RookStudio liest während einer Partie keinen Zug und spielt keinen. Ohne diese Berechtigung
-greift die Sperre, wenn die Startseite erscheint.
+Herausforderungen lesen; die Berechtigung, deine Partien zu spielen (siehe [Auf Lichess](#auf-lichess)), hört sie über
+denselben Strom. RookStudio liest nur die Züge der Partien, die du von ihm aus spielst, und spielt nur die Züge, die du
+spielst. Ohne eine der beiden Berechtigungen greift die Sperre, wenn die Startseite erscheint.
 
 ### Deine beendeten Partien
 <!-- en: your-finished-games 2e1cf545 -->

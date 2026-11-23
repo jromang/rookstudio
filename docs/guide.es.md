@@ -74,7 +74,7 @@ match terminado.
 <!-- en: the-window 3a5230d4 -->
 
 ### Las páginas
-<!-- en: the-pages 80c43812 -->
+<!-- en: the-pages 1cab137d -->
 
 Una barra de navegación a la izquierda lleva a las páginas de la [vista](#vistas) mostrada, en su orden:
 
@@ -85,8 +85,9 @@ Una barra de navegación a la izquierda lleva a las páginas de la [vista](#vist
 | Tablero | Una partida o una posición de cualquier procedencia, analizada por un motor de la biblioteca; en una vista para estudiar, la notación escrita en su sitio (consulta [El Tablero de estudio](#el-tablero-de-estudio)) |
 | Bases de datos | Tus bases de datos de partidas: importación, la lista de partidas, las búsquedas |
 | Aperturas | Tus repertorios, su cobertura y sus huecos |
+| Entrenamiento | El repaso del día, los ejercicios de Lichess, tus errores como ejercicios, adivinar las jugadas, finales contra las tablas, mates, visión del tablero (consulta [La página Entrenamiento](#la-página-entrenamiento)) |
+| Jugar | Una partida contra un motor de la biblioteca con la fuerza que elijas, con sus aperturas y una ventaja, y tus partidas en Lichess, ambas jugadas en la página Tablero (consulta [La página Jugar](#la-página-jugar)) |
 | Lichess | Tu cuenta de Lichess, las partidas de un jugador, las retransmisiones oficiales, lo que el análisis puede consultar a Lichess |
-| Jugar | Una partida contra un motor de la biblioteca con la fuerza que elijas, con sus aperturas y una ventaja, jugada en la página Tablero (consulta [La página Jugar](#la-página-jugar)) |
 | Motores | La biblioteca de motores: opciones, comprobaciones, grupos, Elo de referencia, importación de las listas de otros programas, los motores populares |
 | Libros | La biblioteca de libros de aperturas, y las aperturas de cada libro con lo que tienen de malo |
 | Suites | Suites de tests (STS, WAC, ERET…): motores frente a las posiciones de un archivo EPD |
@@ -340,7 +341,7 @@ tableros siguen planos y *Apariencia* dice por qué. Las piezas son las Staunton
 licencia MIT; *Apariencia* enlaza con ellas.
 
 ## Atajos de teclado
-<!-- en: keyboard-shortcuts 4be4d428 -->
+<!-- en: keyboard-shortcuts 65140e2d -->
 
 | Teclas | Dónde | Qué hacen |
 |---|---|---|
@@ -417,11 +418,13 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Ctrl</kbd>+<kbd>A</kbd> | La biblioteca de la configuración | Seleccionar todos los motores mostrados |
 | <kbd>Ctrl</kbd>+clic, <kbd>Mayús</kbd>+clic | Listas | Seleccionar varios |
 | <kbd>Supr</kbd> | La página Motores | Quitar el motor seleccionado (tras una confirmación) |
+| <kbd>Intro</kbd> | La ficha de un motor, con su bot de Lichess listo | Conectar el bot |
+| <kbd>Intro</kbd>, <kbd>Esc</kbd> | Convertir una cuenta en bot de Lichess, con su nombre escrito | Convertirla en bot; cancelar |
 | <kbd>Intro</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | La consola de un motor | Enviar la línea; recuperar las líneas anteriores |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | El modo sin interfaz gráfica | Detenerse tras las partidas en juego |
 
 ## La página Inicio
-<!-- en: the-home-page 8f520943 -->
+<!-- en: the-home-page 317baace -->
 
 La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, primero lo que está en marcha:
 
@@ -438,7 +441,8 @@ La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, 
 - **Lichess**: la cuenta, las partidas de un jugador con *Sincronizar*, las partidas nuevas contadas si lo elegiste, las
   retransmisiones en directo (consulta [La página Lichess](#la-página-lichess)).
 - **En curso**: una partida en Lichess jugada desde RookStudio (*Volver a la partida*) y los desafíos recibidos
-  (consulta [En Lichess](#en-lichess)), el análisis de la partida, el de la posición, una importación, el asistente (su
+  (consulta [En Lichess](#en-lichess)), tu bot de Lichess en línea y su partida (consulta [Un bot de
+  Lichess](#un-bot-de-lichess)), el análisis de la partida, el de la posición, una importación, el asistente (su
   descarga, su modelo cargado, *Liberar*), una serie de ejercicios, una sesión de ejercicios, una partida que se
   adivina, un final o un ejercicio de visión en curso, y lo que el repaso del día tiene pendiente, en una sola cifra; un
   clic lo repasa todo (consulta [El repaso del día](#el-repaso-del-día)).
@@ -446,7 +450,7 @@ La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, 
 El botón de búsqueda de arriba, o Ctrl+K, encuentra un comando, una partida, una base de datos.
 
 ## La página Torneos
-<!-- en: the-tournaments-page eb693479 -->
+<!-- en: the-tournaments-page dc32391d -->
 
 La página **Torneos** es una sala de control: primero lo que está en marcha y lo que te necesita, después el resto.
 
@@ -457,9 +461,10 @@ La página **Torneos** es una sala de control: primero lo que está en marcha y 
   ningún par de partidas nuevo, las partidas en curso se juegan hasta el final) y retiene la cola: ningún torneo en
   cola empieza hasta **Reanudar todo**, que los reanuda y deja que la cola siga, de inmediato si mientras tanto
   terminó un torneo.
-- **Núcleos**: los hilos de hardware de la máquina, y los que ocupan las partidas en juego, el resto libres. Una
-  partida ocupa los `Threads` de aquel de sus dos motores que tiene más, ya que los dos motores piensan por turnos; la
-  barra muestra el nombre de cada torneo y su número, y el cursor, los detalles.
+- **Núcleos**: los hilos de hardware de la máquina, y los que ocupan las partidas en juego, el resto libres. Una partida
+  ocupa los `Threads` de aquel de sus dos motores que tiene más, ya que los dos motores piensan por turnos; la barra
+  muestra el nombre de cada torneo y su número (también los motores de la página Tablero y la partida del bot de
+  Lichess), y el cursor, los detalles.
 - **Requiere atención**, cuando algo lo requiere, cada cosa con su solución a mano: un motor que no arranca (consulta
   [Un motor que no arranca](#un-motor-que-no-arranca): *Reintentar*, *Retirar…*, *Reemplazar…*, *Registro del
   motor*); el torneo que un error o un motor detuvo, con lo que lo detuvo, *Abrir el motor*, *Abrir el registro*,
@@ -475,6 +480,9 @@ La página **Torneos** es una sala de control: primero lo que está en marcha y 
   su espacio de trabajo, *Pausa* lo pone en pausa. Un torneo que se puede reanudar aparece en cambio bajo
   *Interrumpido*, con *Reanudar*. Consulta [Varios torneos a la vez](#varios-torneos-a-la-vez) para los pesos y los
   núcleos de cada uno.
+- **Tu bot de Lichess**, mientras está en línea: su motor, su partida en curso con *En el Tablero*, *Su ficha* y
+  *Desconectar*; rechaza los desafíos con *más tarde* mientras los torneos necesitan los núcleos (consulta [Un bot de
+  Lichess](#un-bot-de-lichess)).
 - **Cola**: los torneos en espera, cada uno con su duración y cuándo empieza, y cuándo termina todo (consulta
   [Cola y relanzamiento](#cola-y-relanzamiento)).
 - **Últimos terminados**: los cinco últimos torneos terminados, con su resultado: el marcador de un match, la
@@ -669,6 +677,81 @@ posiciones con `setboard`, o modo de edición; jugadas en coordenadas o en SAN; 
 - Un motor que pide que se lo vuelva a arrancar en cada partida (`feature reuse=0`) recibe *Reiniciar el motor en
   cada partida* marcado al añadirlo.
 - `FCG_WB2UCI_LOG=FILE` en el entorno escribe en `FILE` cada línea intercambiada con los motores WinBoard.
+
+### Un bot de Lichess
+<!-- en: a-lichess-bot c8e717b7 -->
+
+La ficha de un motor tiene una línea **En Lichess, como bot**: *Convertirlo en un bot de Lichess…* prepara el motor para
+jugar en Lichess con una cuenta de bot, a través de la Bot API de Lichess (donde se permiten los motores), aceptando los
+desafíos que elijas mientras RookStudio está abierto. La línea se convierte en una parte de la ficha, que guía por los
+pasos siguientes.
+
+- **La cuenta del bot** es una segunda cuenta de Lichess, aparte de la tuya: nueva, con un nombre propio y sin ninguna
+  partida jugada. RookStudio no crea cuentas: *Crear la cuenta en lichess.org* abre la página de Lichess. *Vincular la
+  cuenta del bot…* abre la página de Lichess que pide un solo permiso, *jugar con la API para bots* (`bot:play`): inicia
+  sesión allí con la cuenta del bot, no con la tuya (una ventana privada del navegador evita cerrar tu sesión). O pega
+  un token de la cuenta del bot creado en lichess.org (*Crear un token en lichess.org* abre la página con ese permiso
+  marcado) y pulsa *Comprobarlo*. Tu propia cuenta sigue vinculada aparte, para el resto de RookStudio; el bot tiene su
+  propio token, guardado en `lichess-bot.json` del perfil, legible solo por ti.
+- **Las comprobaciones**, antes de pedir nada que cambie la cuenta: su nombre y cuándo se creó, las partidas que ha
+  jugado (ninguna), si ya es un bot (entonces sirve tal cual), y que no es tu propia cuenta vinculada. Tu propia cuenta
+  nunca se guarda (el token que RookStudio obtuvo para ella se revoca de inmediato); una cuenta cerrada, o un token sin
+  el permiso, tampoco. Una cuenta que ha jugado se rechaza, como haría Lichess: crea una nueva, no juegues ninguna
+  partida con ella y luego vincúlala (*Vincular otra cuenta…*, *Desvincular esta*).
+- **Convertirla en bot…** no se puede deshacer: la cuenta nunca vuelve a jugar como una persona, Lichess la marca como
+  BOT, y solo juega desafíos (ni sala de espera ni torneos, salvo las arenas abiertas a bots). El paso lo advierte y
+  pide el nombre de la cuenta: *Convertirla en bot* se activa cuando el nombre escrito es el suyo (Esc cancela). Lo que
+  sale de la máquina: esa petición, con el token del bot. Un rechazo se indica con las palabras de Lichess; sin
+  respuesta, no ha cambiado nada: inténtalo de nuevo.
+- **Los desafíos que acepta**, en la ficha: los ritmos (bullet, blitz, rápidas, clásicas, correspondencia; nunca
+  UltraBullet, que Lichess no deja jugar a los bots), partidas por puntos o solo amistosas, personas y bots, un
+  intervalo de rating para el retador (0: sin límite), Chess960 cuando el motor lo conoce (`UCI_Chess960`), una partida
+  a la vez. Al principio: solo amistosas, blitz y rápidas, ya que Lichess pide a los bots que jueguen amistosas mientras
+  se prueban; amplíalos después. Un desafío por puntos de tu propia cuenta se rechaza (Lichess prohíbe las partidas por
+  puntos entre las cuentas de una misma persona); uno amistoso se juega. Los demás desafíos se rechazan con cortesía,
+  con el motivo que Lichess muestra al retador: *demasiado rápido*, *demasiado lento*, *no con este control de tiempo*,
+  *solo amistosas*, *solo ajedrez estándar*, *no esta variante*, *bots no*, *solo bots*, o *más tarde* mientras juega,
+  se desconecta o un torneo necesita los núcleos.
+- **Su juego**: el motor con sus opciones de la biblioteca (sus `Threads` y su `Hash` contados en el presupuesto de
+  núcleos de la máquina mientras juega), un libro Polyglot de tu biblioteca jugado mientras tenga jugada, las tablas de
+  los torneos (`SyzygyPath`, para un motor que tiene la opción y no tiene ruta propia), y sin pensar en el tiempo del
+  rival. Su reloj viene de Lichess en cada jugada, menos un margen para la red (la décima parte, entre 0,2 y 1 segundo);
+  antes de que ambos bandos hayan jugado, juega dentro del tiempo que Lichess da para la primera jugada; por
+  correspondencia, piensa 15 segundos por jugada. Acepta las tablas que le ofrecen cuando el motor está claramente peor,
+  o no está mejor en una fase avanzada de la partida, rechaza las peticiones de deshacer jugada, y reclama la victoria
+  cuando su rival lleva fuera el tiempo suficiente. Sus mensajes, dichos en el chat de los jugadores al principio y al
+  final, los eliges tú (vacíos: no se dice nada). Un motor que no arranca o que se detiene abandona la partida (la
+  cancela antes de que ambos bandos hayan jugado), y la ficha dice por qué.
+- **Conectar** (Intro) abre el flujo de eventos propio del bot (Lichess mantiene uno por token): llegan los desafíos,
+  respondidos de inmediato según sus reglas. En línea, la ficha muestra el día del bot (partidas ganadas, en tablas y
+  perdidas, desafíos rechazados), su partida en un tablero pequeño con la evaluación del motor, *En el Tablero*, sus
+  últimas partidas y los desafíos rechazados, *Su página en lichess.org* y **Desconectar**: ningún desafío nuevo, la
+  partida en curso se juega hasta el final y luego el flujo se cierra. Una partida por correspondencia espera en Lichess
+  mientras el bot está desconectado; se reanuda cuando el bot vuelve a estar en línea. El bot solo juega mientras
+  RookStudio está abierto: cerrar RookStudio durante una de sus partidas en directo pregunta antes (*Quedarse* · Esc,
+  *Desconectarlo*, *Cerrar de todos modos*), ya que la partida se perdería por tiempo.
+- **Su partida en el Tablero**: seguida jugada a jugada, el bando del bot abajo, los ratings y relojes de los jugadores
+  en sus franjas, y sobre la columna su tarjeta: qué partida es, a quién le toca, la búsqueda del motor (su evaluación,
+  profundidad y línea esperada: la suya propia, ya que es él quien juega la partida), *Abrir en lichess.org*, *Abandonar
+  por él…* (con un segundo clic) y *Desconectar*. Las jugadas del tablero son solo del bot. Al terminar, la partida va a
+  la base de datos *Lichess · su nombre*, creada si falta.
+- **Dónde aparece**: en línea, el bot aparece donde aparece lo que está en marcha: en la página Inicio bajo *En curso*,
+  y en la página Torneos, con su partida, *En el Tablero*, *Su ficha* y *Desconectar*.
+- **Primero un torneo**: un desafío se rechaza con *más tarde* mientras un torneo que se juega en este ordenador
+  necesita los núcleos que ocuparía el motor del bot. Una partida del bot que ya se esté jugando cuando empieza un
+  torneo sigue hasta el final, con los hilos de su motor contados en el presupuesto de núcleos como los de los motores
+  de la página Tablero; mientras tanto no se acepta ningún desafío nuevo.
+- **Juego limpio**: las partidas del bot no son tuyas, y no bloquean tus ayudas. Durante tu propia partida en directo en
+  Lichess, la búsqueda del bot no se muestra ni en su ficha ni en el Tablero (la ficha dice por qué); sus partidas
+  continúan.
+- **Desvincular el bot…** (con un segundo clic) revoca su token en Lichess y lo borra aquí; la cuenta sigue siendo un
+  bot.
+- Lo que sale de la máquina: las jugadas del motor, sus mensajes en el chat, sus respuestas a los desafíos, con el token
+  del bot; nada de tu cuenta. Su perfil (nombre, descripción) se configura en lichess.org. Sus elecciones y sus últimas
+  partidas se guardan en `bot/bot.json` del perfil.
+
+La paleta de comandos tiene *Conectar el bot de Lichess*, *Desconectar el bot de Lichess*, *La partida del bot de
+Lichess en el Tablero* y *La ficha del bot de Lichess*, y en la página Motores *Convertir … en un bot de Lichess…*.
 
 ## Libros
 <!-- en: books 4cf13005 -->
@@ -1571,7 +1654,7 @@ ejercicios pendientes junto con otros tipos, *Solo mis errores* y *Solo los ejer
 también Ctrl+K *Repasar todo*.
 
 ### Ejercicios
-<!-- en: puzzles e825fb2f -->
+<!-- en: puzzles 4fd9ffec -->
 
 Lichess publica cada mes sus ejercicios como base de datos (database.lichess.org, CC0): 6.193.530 ejercicios en
 noviembre de 2026, cada uno con su rating, sus temas y, antes de la jugada 20, su apertura. RookStudio la guarda en tu
@@ -1581,9 +1664,9 @@ disco y te da ejercicios de ella sin red.
 en el perfil; el archivo en sí no se guarda. Una descarga interrumpida (*Cancelar*, la red, el programa cerrado)
 continúa desde donde se detuvo: *Continuar*, o *Empezar de nuevo*. *Un archivo ya descargado…* lee en su lugar
 `lichess_db_puzzle.csv.zst` de tu disco. Una vez allí: *Actualizar* pregunta a database.lichess.org la fecha de su
-archivo y lee uno más reciente mientras los ejercicios guardados siguen disponibles; *Quitar* libera el disco (tu
-rating, tus resultados y tus ejercicios por repasar se quedan, guardados aparte). Nada sale de la máquina salvo la
-petición del archivo.
+archivo y lee uno más reciente mientras los ejercicios guardados siguen disponibles; *Quitar los ejercicios* libera el
+disco (tu rating, tus resultados y tus ejercicios por repasar se quedan, guardados aparte). Nada sale de la máquina
+salvo la petición del archivo.
 
 **La elección.** *Sin conexión* (la base de datos) o *En línea* (tu cuenta de Lichess, consulta [Los ejercicios de
 Lichess en línea](#los-ejercicios-de-lichess-en-línea)); un tema entre los primeros ofrecidos, cada uno con la
@@ -1611,8 +1694,8 @@ correcta, como en Lichess. Incorrecto: tu jugada en naranja y la primera jugada 
 vez; *Siguiente* continúa.
 
 Al final: los ejercicios resueltos al primer intento, los fallados, el cambio de tu rating, y la lista de los fallados
-(un clic muestra la posición con la solución); *Repasarlos ahora* los vuelve a preguntar sin contar, y *Volver a la
-página Entrenamiento* sale.
+(un clic muestra la posición con la solución); *Repasar los 3 ahora* (tantos como fallados) los vuelve a preguntar sin
+contar, y *Volver a la página Entrenamiento* sale.
 
 **Tu rating** es el propio de RookStudio, calculado con Glicko-2 como calcula Lichess sus ratings de ejercicios: un
 ejercicio resuelto al primer intento, sin pista, se gana frente al rating del ejercicio. Parte de tu rating de
@@ -1853,7 +1936,7 @@ una de tus partidas, la página lo indica y no inicia ninguna partida contra un 
 limpio](#juego-limpio)).
 
 ### Contra un motor
-<!-- en: against-an-engine d08e9a6c -->
+<!-- en: against-an-engine 1cf4f880 -->
 
 La elección se conserva para la próxima partida: una vez hecha, basta con *Jugar* (Intro).
 
@@ -1868,10 +1951,11 @@ La elección se conserva para la próxima partida: una vez hecha, basta con *Jug
   datos llamada *Lichess · nombre*, como la que crea preparar una partida contra él, consulta [Preparar una
   partida](#preparar-una-partida)); *Un libro de la biblioteca* (un libro Polyglot o CTG de la página Libros, sin sus
   jugadas a evitar). *Variar* elige al azar entre las jugadas hechas al menos 5 veces, con la frecuencia con la que se
-  hicieron (las de un libro según sus pesos, las de un repertorio por igual); sin marcar, la jugada más frecuente,
-  primero la jugada principal de un libro. Cuando sus aperturas no tienen jugada para la posición, el motor juega hasta
-  el final. Su estilo son sus aperturas: los ajustes propios del motor se quedan en su ficha. Con una pieza de ventaja,
-  las aperturas encuentran posiciones que no tienen, y el motor juega desde la primera jugada.
+  hicieron (las de un libro con la frecuencia que indican sus pesos, las de un repertorio todas con la misma
+  frecuencia); sin marcar, la jugada más frecuente, primero la jugada principal de un libro. Cuando sus aperturas no
+  tienen jugada para la posición, el motor juega hasta el final. Su estilo son sus aperturas: los ajustes propios del
+  motor se quedan en su ficha. Con una ventaja, las aperturas encuentran posiciones que no tienen, y el motor juega
+  desde la primera jugada.
 - **Tú**: blancas, negras o al azar; el reloj, minutos y un incremento, *El mismo para ambos* o, sin marcar, uno propio
   del motor (tiempo desigual); desde la posición inicial, o desde la de la página Tablero.
 - **La ventaja**: lo que el motor da al principio: nada, su peón f, su caballo b, su torre a (y con ella el enroque de
@@ -1951,10 +2035,10 @@ el `play/lichess.json` del perfil.
 - **Desafiar a un jugador**: su nombre, el reloj (3+2, 5+3, 10+5, 15+10, 3 días, u *otro…*: minutos y segundos añadidos
   por jugada, o días por jugada; tres minutos como mínimo, contando el incremento cuarenta veces, ya que la Board API no
   juega bullet), por puntos o no, tu color. Un desafío en directo espera la respuesta mientras te quedas (Esc, o
-  *Retirarlo*). Si lo rechaza, se indica el motivo de Lichess (*demasiado rápida para el rival*) con otros relojes a un
-  clic (más lentos tras «demasiado rápida»); si lo acepta, la partida se abre en la página Tablero.
+  *Retirarlo*). Si lo rechaza, se indica el motivo de Lichess (*demasiado rápido para el rival*) con otros relojes a un
+  clic (más lentos tras «demasiado rápido»); si lo acepta, la partida se abre en la página Tablero.
 - **Un desafío recibido** aparece arriba de la parte (*Aceptar* · Intro, *Rechazar ▾* con los motivos de Lichess: *Ahora
-  no*, *Más tarde*, *Demasiado rápida para mí*, *Demasiado lenta para mí*, *Solo amistosas*, *Solo por puntos*), en la
+  no*, *Más tarde*, *Demasiado rápido para mí*, *Demasiado lento para mí*, *Solo amistosas*, *Solo por puntos*), en la
   página Inicio bajo *En curso*, y en un aviso en la esquina de la ventana estés donde estés, con un sonido cuando los
   sonidos están activados; *Más tarde* aparta el aviso. Durante una partida en directo, espera al final de la partida.
   Una partida que la Board API no puede jugar (bullet, una variante que no sea Chess960) se juega en lichess.org.
@@ -2128,7 +2212,7 @@ retransmisiones, con una cuenta con permiso para leerlas, que se pide una vez, c
 marcadores necesitan una cuenta vinculada.
 
 ### Juego limpio
-<!-- en: fair-play 12bbcbc4 -->
+<!-- en: fair-play d8b24b4b -->
 
 Lichess prohíbe cualquier ayuda durante una partida. Con tu cuenta vinculada, RookStudio lo respeta juegues donde
 juegues, en el navegador o en un teléfono:
@@ -2146,7 +2230,8 @@ juegues, en el navegador o en un teléfono:
 Un aviso en la página Tablero dice qué partida bloquea qué. La tarjeta Lichess de la página Inicio lista tus partidas en
 curso, primero aquellas en las que te toca jugar, cada una con su reloj o el tiempo que queda para jugar, y *Abrir en
 lichess.org*, o *En el Tablero* una vez que RookStudio puede jugar tus partidas (consulta [Una partida en
-Lichess](#una-partida-en-lichess)).
+Lichess](#una-partida-en-lichess)). Las partidas de tu bot de Lichess no son tuyas y no bloquean nada; durante tu propia
+partida en directo, la búsqueda del bot no se muestra (consulta [Un bot de Lichess](#un-bot-de-lichess)).
 
 Tus partidas en curso se piden con el token de tu cuenta cuando se muestra la página Inicio, cada medio minuto mientras
 dura una partida en directo y cada diez minutos mientras dura una por correspondencia. La página Lichess ofrece una vez
@@ -2213,7 +2298,7 @@ Lichess tiene una.
   leído.
 - Una vez terminada la preparación, la tarjeta da las posiciones, el tamaño y la fecha del archivo. Lichess vuelve a
   publicar el archivo cada mes: *Actualizar* pregunta a database.lichess.org su fecha y lee un archivo más reciente,
-  mientras las evaluaciones guardadas siguen respondiendo hasta que esté listo. *Quitar* libera el disco.
+  mientras las evaluaciones guardadas siguen respondiendo hasta que esté listo. *Quitarlas* libera el disco.
 
 Se muestran en tres lugares:
 

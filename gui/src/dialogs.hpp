@@ -67,7 +67,8 @@ class Dialogs {
         MachineProgram,      // the fastchess-gui to install on a remote machine of another system
         MachineEngineBuild,  // an engine's build for a remote machine's system, copied there
         ImportGames,         // a PGN (.pgn, .zst, .gz, .zip) imported into a database
-        AddDatabase          // a database folder made elsewhere, added to the list
+        AddDatabase,         // a database folder made elsewhere, added to the list
+        FideList             // FIDE's rating list downloaded before (#88)
     };
 
     struct Answer {

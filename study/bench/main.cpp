@@ -29,6 +29,10 @@
 //                                                 compared with its line, the picks and the reading of a puzzle, cold
 //                                                 and warm)
 //   fcg-study-bench puzzles-pick <folder>          (the picks and reads again, on the folder's store)
+//   fcg-study-bench maintenance <database> [--threads N]   (the check, the duplicates and the players' names, timed)
+//   fcg-study-bench compact <database>             (the database compacted in place: work on a copy)
+//   fcg-study-bench fide <players_list.zip> <list.bin>   (FIDE's rating list read into RookStudio's file, timed)
+//   fcg-study-bench fide-names <database> <list.bin>     (the database's players matched with the list, timed)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -50,9 +54,12 @@
 #include <tour/chess_text.hpp>
 
 #include <study/chessbase.hpp>
+#include <study/duplicates.hpp>
 #include <study/evals_index.hpp>
+#include <study/fide_list.hpp>
 #include <study/import.hpp>
 #include <study/mapped_file.hpp>
+#include <study/names.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/puzzles.hpp>
 #include <study/query.hpp>
@@ -1823,6 +1830,148 @@ int runPuzzlePicks(const Args& a) {
     return 0;
 }
 
+// A database's maintenance (#88): its check, its duplicates and its players' names, timed.
+int runMaintenance(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    const auto db   = Database::openReadOnly(a.words[1]);
+    const auto snap = db->snapshot();
+    std::atomic<bool> cancel{false};
+    std::printf("%llu games, %.1f MB on disk\n", static_cast<unsigned long long>(snap->games()),
+                static_cast<double>(folderBytes(a.words[1])) / 1e6);
+    auto t = Clock::now();
+    CheckProgress check;
+    const auto report = db->check(check, cancel, a.threads);
+    std::printf("check: %.2f s, %llu records, %zu damaged, %zu segments that cannot be read, tree %s, signatures %s\n",
+                seconds(t), static_cast<unsigned long long>(report.games), report.damaged.size(),
+                report.segments.size(), report.tree ? "up to date" : "to build", report.signatures ? "all" : "missing");
+    for (std::size_t i = 0; i < std::min<std::size_t>(report.damaged.size(), 5); ++i)
+        std::printf("  damaged: game %llu\n", static_cast<unsigned long long>(report.damaged[i] + 1));
+    t = Clock::now();
+    DuplicateProgress dupes;
+    const auto found = findDuplicates(snap, 0, dupes, cancel);
+    std::printf(
+        "duplicates: %.2f s, %llu games looked at, %zu groups: %zu same moves, %zu one shorter, %zu results "
+        "that differ; peak %.0f MB\n",
+        seconds(t), static_cast<unsigned long long>(found.games), found.groups.size(),
+        found.count(DuplicateKind::SameMoves), found.count(DuplicateKind::Shorter), found.count(DuplicateKind::Results),
+        peakMb());
+    // A few groups of each kind, to see that they are one game.
+    if (!a.quiet)
+        for (const auto kind : {DuplicateKind::SameMoves, DuplicateKind::Shorter, DuplicateKind::Results}) {
+            int shown = 0;
+            for (const auto& g : found.groups) {
+                if (g.kind != kind || shown++ >= 3) continue;
+                for (const auto id : g.games) {
+                    const auto r = snap->row(id);
+                    std::printf("  %d #%llu %.*s - %.*s | %.*s | r %.*s | %s | %u plies | %c\n", static_cast<int>(kind),
+                                static_cast<unsigned long long>(id + 1), static_cast<int>(r.white.size()),
+                                r.white.data(), static_cast<int>(r.black.size()), r.black.data(),
+                                static_cast<int>(r.event.size()), r.event.data(), static_cast<int>(r.round.size()),
+                                r.round.data(), dateText(r.date).c_str(), r.plies, r.result);
+                }
+            }
+        }
+    t = Clock::now();
+    NamesProgress names;
+    const auto analysis = analyseNames(snap, nullptr, names, cancel);
+    std::printf("names without the list: %.2f s, %zu spellings, %zu players, %zu brought together by FIDE ids\n",
+                seconds(t), analysis.spellings.size(), analysis.proposals.size(), analysis.bringing());
+    return 0;
+}
+
+int runCompact(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    const auto db   = Database::open(a.words[1]);
+    const auto plan = db->compactPlan();
+    std::printf("plan: %llu games deleted, %llu replaced, %.1f MB given back, %.1f MB written; %zu segments\n",
+                static_cast<unsigned long long>(plan.deleted), static_cast<unsigned long long>(plan.replaced),
+                static_cast<double>(plan.bytes) / 1e6, static_cast<double>(plan.needed) / 1e6, plan.segments.size());
+    std::atomic<bool> cancel{false};
+    CompactProgress progress;
+    const auto t    = Clock::now();
+    const auto done = db->compact(progress, cancel);
+    std::printf("compacted in %.2f s: %s, %.1f MB given back once closed\n", seconds(t),
+                done.error.empty() ? "done" : done.error.c_str(), static_cast<double>(done.bytes) / 1e6);
+    return done.error.empty() ? 0 : 1;
+}
+
+int runFide(const Args& a) {
+    if (a.words.size() < 3) return 2;
+    FidePrepareProgress progress;
+    std::atomic<bool> cancel{false};
+    const auto t    = Clock::now();
+    const auto info = prepareFideList(a.words[1], a.words[2], "list", progress, cancel);
+    std::printf(
+        "read in %.2f s: %llu players, %llu rated (standard %llu, rapid %llu, blitz %llu); %.1f MB; peak %.0f "
+        "MB\n",
+        seconds(t), static_cast<unsigned long long>(info.players), static_cast<unsigned long long>(info.rated),
+        static_cast<unsigned long long>(info.standard), static_cast<unsigned long long>(info.rapid),
+        static_cast<unsigned long long>(info.blitz), static_cast<double>(fs::file_size(a.words[2])) / 1e6, peakMb());
+    const FideList list(a.words[2]);
+    auto t2           = Clock::now();
+    std::size_t found = 0;
+    for (std::size_t i = 0; i < 20000; ++i) found += list.bySurname("smith").size() > 0;
+    std::printf("20000 lookups by surname: %.1f ms (%zu found)\n", ms(t2), found);
+    return 0;
+}
+
+int runFideNames(const Args& a) {
+    if (a.words.size() < 3) return 2;
+    const auto db = Database::openReadOnly(a.words[1]);
+    const FideList list(a.words[2]);
+    std::atomic<bool> cancel{false};
+    NamesProgress progress;
+    const auto t        = Clock::now();
+    const auto analysis = analyseNames(db->snapshot(), &list, progress, cancel);
+    std::printf(
+        "names: %.2f s, %zu spellings, %zu players: %zu brought together at once (%zu bringing something), "
+        "%zu to confirm, %zu kept as they are\n",
+        seconds(t), analysis.spellings.size(), analysis.proposals.size(), analysis.count(NameMatch::Auto),
+        analysis.bringing(), analysis.count(NameMatch::Confirm), analysis.count(NameMatch::None));
+    // The table that bringing them together makes: its size, written and read.
+    {
+        std::vector<Bringing> all;
+        for (std::size_t i = 0; i < analysis.proposals.size(); ++i)
+            if (analysis.proposals[i].match == NameMatch::Auto)
+                all.push_back(
+                    {i, analysis.proposals[i].candidates.empty() ? std::nullopt : std::optional<std::size_t>(0)});
+        auto t3          = Clock::now();
+        const auto table = bringTogether(*db->snapshot()->players(), analysis, all, &list, *db->snapshot());
+        const auto made  = ms(t3);
+        t3               = Clock::now();
+        const auto bytes = table.bytes();
+        const auto wrote = ms(t3);
+        t3               = Clock::now();
+        const auto back  = PlayerTable::fromBytes(bytes);
+        std::printf("table of %zu players: made in %.0f ms, %.1f MB written in %.0f ms, read in %.0f ms\n",
+                    back.players().size(), made, static_cast<double>(bytes.size()) / 1e6, wrote, ms(t3));
+    }
+    // A few of each kind at random, to see whether they are right.
+    if (!a.quiet) {
+        std::mt19937 random(7);
+        const auto snap = db->snapshot();
+        for (const auto match : {NameMatch::Auto, NameMatch::Confirm}) {
+            std::vector<std::size_t> of;
+            for (std::size_t i = 0; i < analysis.proposals.size(); ++i)
+                if (analysis.proposals[i].match == match && !analysis.proposals[i].candidates.empty()) of.push_back(i);
+            for (int k = 0; k < 12 && !of.empty(); ++k) {
+                const auto& p     = analysis.proposals[of[random() % of.size()]];
+                const auto card   = list.player(p.candidates.front());
+                const auto& first = analysis.spellings[p.spellings.front()];
+                const auto name   = snap->name(first.name);
+                std::printf(
+                    "  %s %.*s (%zu spellings, %llu games, %d-%d, elo %d-%d, reason %d) -> %.*s %s %d std %d, %zu "
+                    "candidates\n",
+                    match == NameMatch::Auto ? "auto" : "confirm", static_cast<int>(name.size()), name.data(),
+                    p.spellings.size(), static_cast<unsigned long long>(p.games), p.year_min, p.year_max, p.elo_min,
+                    p.elo_max, static_cast<int>(p.reason), static_cast<int>(card.name.size()), card.name.data(),
+                    card.federation.c_str(), card.born, card.standard, p.candidates.size());
+            }
+        }
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1847,6 +1996,10 @@ int main(int argc, char** argv) {
         if (a.words[0] == "evals-lookup") rc = runEvalsLookup(a);
         if (a.words[0] == "puzzles") rc = runPuzzles(a);
         if (a.words[0] == "puzzles-pick") rc = runPuzzlePicks(a);
+        if (a.words[0] == "maintenance") rc = runMaintenance(a);
+        if (a.words[0] == "compact") rc = runCompact(a);
+        if (a.words[0] == "fide") rc = runFide(a);
+        if (a.words[0] == "fide-names") rc = runFideNames(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

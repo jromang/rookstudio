@@ -425,6 +425,18 @@ const char* glyph(Icon icon) {
             return "\uE1BB";  // bot
         case Icon::Tv:
             return "\uE195";  // tv
+        case Icon::ShieldCheck:
+            return "\uE1FF";  // shield-check
+        case Icon::Archive:
+            return "\uE041";  // archive
+        case Icon::Info:
+            return "\uE0F9";  // info
+        case Icon::WifiOff:
+            return "\uE1AF";  // wifi-off
+        case Icon::Merge:
+            return "\uE43F";  // merge
+        case Icon::Users:
+            return "\uE1A4";  // users
     }
     return "";
 }

@@ -38,7 +38,8 @@ A database is a folder:
 
 ```
 Name.fcgdb/
-  manifest.json   {"format":"rookstudio-database","version":1,"generation":N,"segments":[{name,games,names}]}
+  manifest.json   {"format":"rookstudio-database","version":1,"generation":N,"segments":[{name,games,names,source}],
+                   "edits":"edits-NNNNNN.bin","players":"players-NNNNNN.bin"}
   tournament.lock held while a program writes to it (flock: released when the program ends, however it ends)
   seg-NNNNNN/     a segment, written whole and never changed:
     cols.bin      the header columns
@@ -87,7 +88,7 @@ A game keeps its number. `replace` writes its new version in a segment of versio
 each game replaced with its version's place, and the games deleted), written and synced before the manifest that
 names it, the rename of the manifest still the only commit. `setDeleted` marks games deleted, or no longer: the list
 shows them only when asked (`Filter::with_deleted`), the searches and the tree leave them out. The old versions stay
-in their segments until the database is tidied (not written yet). A crash at any step of a replacement leaves the game
+in their segments until the database is compacted (see The compaction). A crash at any step of a replacement leaves the game
 as it was, or as it is to be, as the tests check.
 
 ### Duplicates
@@ -96,6 +97,87 @@ A game's key is a hash of its event, site, round, players, date, start position,
 a game whose key the database has, or a game before it in the same append, unless asked to keep them. Two rounds of a
 tournament with the same moves are two games.
 
+### Sources
+
+Each segment an import writes keeps the file it came from (`"source"` in its manifest entry): `Snapshot::source()` gives
+a game's, also once it is replaced. The maintenance names a game's source with it ("TWIC 1672", "Lichess broadcasts
+2026-10", "club.pgn"; else from its tags: "Lichess broadcast"), tells where duplicates come from, and imports a damaged
+game's file again (`importInto`'s `forget`: the keys of the damaged games do not count as games the database has).
+
+### The table of names
+
+A player written several ways ("Lindqvist, Erik", "Lindqvist,E", "Erik Lindqvist") is one player of the database's
+table of names (`players.hpp`): its name as everything shows it (FIDE's list's, or a spelling chosen), its FIDE id, its
+card from FIDE's list when it was matched with it (federation, title, birth year, ratings, the list's month), and the
+name ids it gathers; a name id is in one player at most. The games are not changed. The table is a file named in the
+manifest (`players-NNNNNN.bin`: "RSPLAYR1", the pairs of games told apart by hand, then each player), written and
+synced before the manifest that names it, the rename of the manifest still the only commit; the edits generation does
+not change, so the opening tree stays valid. A snapshot holds its table (`Snapshot::players()`, never null):
+
+- `Snapshot::shownName(id)` is the name of a name id's player, else the name as written: the game list, the opening
+  tree's reference games and the sources' reports show it;
+- the filters and sorts fold a name with its player's name (a word of either finds the game) and rank the spellings of
+  one player together (`query.cpp`'s name index, kept for a names count and a table);
+- a player's dossier (#90) finds its games by the name ids of its player (`PlayerTable::players()[p].spellings`, the
+  White and Black columns of `Snapshot::rowIds()`), its identity in the player's FIDE fields; a tournament's crosstable
+  (#92) counts each player of an event once, by `PlayerTable::playerOf()` of the names of its games, its rating from the
+  table when the games give none.
+
+Measured: a table of about 270 000 players (the reference database's players matched with FIDE's list) takes 15.7 MB,
+made in 254 ms, written in 15 ms, read in 64 ms.
+
+An import's new spellings join a player of the table by themselves (`joinNewSpellings`, in the import's background
+job) when their games give the player's FIDE id, or write its surname and given name in full; an initial alone waits
+for the user.
+
+### Duplicates from other sources
+
+The same game can come from two sources with its headers written otherwise (a Lichess broadcast, then TWIC): their keys
+differ, so the import keeps both. `findDuplicates` puts each game in a bucket of its players (the name the table of
+names gives, else its surname and first initial: `nameParts()`) and its year, sorts each bucket by start and moves, and
+compares each game with the games that follow it while their moves begin with its own: one game when the moves are the
+same, or those of one the start of the other's and that one unfinished ('*', a broadcast cut short), the rounds
+compatible ("9" and "9.2", or one not known), no part of the dates known in both that differs, and ten moves at least
+(twenty when a day is not known); two games with an address of their own (Lichess's) differ, and the pairs told apart
+by hand (the table's) are left out. A group is the same moves, one shorter, or results that differ.
+
+On the reference database (11.7 M games, 6 threads), 1.6 s: one group, a game of two rounds' numbers ("1", "1.1"). The
+rules came from it: games with no moves (results only) and short prefixes matched games of other events, hundreds of
+them, before the ten moves and the unfinished prefix. On the month of Lichess games, 0.03 s and no group (games of
+their own addresses).
+
+`mergeGames` makes a group's game, the fullest of each field (`fullestChoice`, or the user's choice field by field): a
+name in full over an initial, the longer event, a place over an address for the site (the address kept as GameURL), the
+round that says more, the date that knows more, both ratings, the ECO code, the FIDE ids, the longer moves (an annotated
+game's for the same moves, its text's tags and result written again), the most clocks and evaluations, a result over
+none; the other tags of every game, and a MergedFrom tag that says which game each field came from.
+`Database::merge` commits the groups in one manifest: each kept game (the oldest) replaced by its merged version in a
+segment of versions, the others deleted; it gives the games' states before (`GameState`: version and deleted), which
+`Database::restore` puts back in one commit (Ctrl+Z).
+
+### The check
+
+`Database::check` reads every segment again from the disk (a new mapping) and replays every game the database reads (its
+last version, not deleted): its names within the database's, its offsets within its files, its annex whole, its moves
+decoded to their end, its signature made again and compared, and its key (a hash of its headers and moves) made again
+from the game read and compared with the key stored. The key is what tells a byte changed in the moves or the headers. A
+segment that cannot be read again counts all its games. On the reference database (11.7 M games of the first format,
+without signatures), 11.4 s on 6 threads, no game damaged: the key read back is the key written; on the month of Lichess
+games, 0.1 s.
+
+### The compaction
+
+Games deleted and versions replaced keep their room in the files. `Database::compact` writes again the segments that
+hold a replaced game or a deleted one not emptied yet, each game in its place: its last version's record copied (a
+deleted game's headers alone, an empty game); the segments of versions become segments of their names only (0 games),
+since the name ids after them count them. The numbers, the names, the keys and the deleted games do not change, nor
+the edits generation: the opening tree stays valid. The new segments are written from the snapshot of when it starts,
+without the writers' lock; the commit takes it, rereads the manifest (segments added meanwhile kept) and stops when a
+game was replaced or deleted meanwhile. The old files are kept until the database is closed (`undoCompaction()` puts
+the manifest before back while nothing was committed after); one segment at a time, each step commits and removes its
+old files at once, needing the room of one segment. The tests stop it at each of its steps: the database reopens with
+the games as they were, compacted or not.
+
 ### Views
 
 A view is the list of a snapshot's game ids that pass a filter, in the order of a column: the game list pages through
@@ -103,6 +185,26 @@ it with no query per page. A filter folds each name once (letter case and Latin 
 word it looks for, then checks each game in a few operations on its columns, on all cores. A sort reads one column,
 names by their rank in alphabetical order, and sorts it four bytes at a time (stable; descending without reversing
 the games of one key).
+
+## FIDE's rating list
+
+FIDE's combined list (players_list_foa.txt in players_list.zip): a header naming its columns, then a line of fixed
+columns a player. `prepareFideList` finds each column by its name in the header (a list whose columns differ is refused:
+`FideFormatError`), reads the lines (a value of the other titles longer than its column pushes the columns after it: 3
+lines of the list of November 2026), and writes RookStudio's file: a header, the federations, 20 bytes a player sorted by
+FIDE id (id, the place of its name, birth year, three ratings, federation, title, woman, inactive), the names, and two
+indexes of the players by surname and by its skeleton (`nameSkeleton`: Kowalenko and Kovalenko alike), searched by
+halves. `analyseNames` (`names.hpp`) groups a database's spellings (the table's players, the FIDE ids their games give,
+then surname and given name, an initial joining the one name that starts with it) and matches each group with the list:
+a single player of that surname whose given name fits (its transliterations when the games' ratings are within 150 of
+the player's; an initial alone needs a rating within 200), never a player born after the games or less than five years
+before them, nor a name of one word on either side; several are left to confirm, the nearest to the games' ratings
+first.
+
+Measured on the list of November 2026 (downloaded once, on this machine only): 1 960 520 players, 800 241 rated
+(standard 573 475, rapid 486 148, blitz 321 078); read in 3.1 s, 476 MB at most, into 89.3 MB; a lookup by surname 10
+to 50 µs. The reference database's spellings (about 480 000) matched in 19 s (about 270 000 players at once, 33 000 to
+confirm); the month of Lichess games' 4 879 accounts are names of one word, all kept as they are.
 
 ## Signatures
 
@@ -229,6 +331,10 @@ build/fcg-study-bench tree <database> [--plies N] [--memory MB] # the opening tr
 build/fcg-study-bench search <database>                        # positions, material, patterns, a cancel
 build/fcg-study-bench evals <lichess_db_eval.jsonl.zst> <folder> [--min-men N]  # Lichess's evaluations kept offline
 build/fcg-study-bench evals-lookup <folder>                    # their lookups again, cold then warm
+build/fcg-study-bench maintenance <database>                   # its check, duplicates and players' names, timed
+build/fcg-study-bench compact <database>                       # compacted in place: work on a copy
+build/fcg-study-bench fide <players_list.zip> <list.bin>       # FIDE's list read into RookStudio's file
+build/fcg-study-bench fide-names <database> <list.bin>         # the database's players matched with the list
 ```
 
 ### Results

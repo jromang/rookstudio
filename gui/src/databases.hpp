@@ -15,8 +15,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include <study/duplicates.hpp>
 #include <study/import.hpp>
 #include <study/linked.hpp>
 #include <study/query.hpp>
@@ -94,15 +96,23 @@ class DatabaseShelf {
         study::ImportProgress progress;
         study::TreeProgress tree;
         std::atomic<bool> cancel{false};
-        std::atomic<bool> building{false};  // the import done, the tree being built
+        std::atomic<bool> looking{false};   // the import done, the same games from other sources looked for
+        std::atomic<bool> building{false};  // then the tree being built
         std::chrono::steady_clock::time_point started;
         std::future<study::DatabaseImport> done;
+        // The groups of duplicates that hold games of the import (M13, board 1): the same game from another source.
+        uint64_t games_before = 0;
+        study::DuplicateProgress duplicates_progress;
+        study::Duplicates duplicates;
     };
     // False when one runs already, or the database cannot be opened.
-    bool startImport(std::size_t index, const std::filesystem::path& file, const std::string& password = {});
+    bool startImport(std::size_t index, const std::filesystem::path& file, const std::string& password = {},
+                     std::vector<uint64_t> forget = {});
     [[nodiscard]] Import* import() noexcept { return import_.get(); }
     // The import's report once it is over (its tree built), taken once; none while it runs.
     [[nodiscard]] std::optional<study::DatabaseImport> finishedImport();
+    // The duplicates the import whose report finishedImport() just gave found, taken once.
+    [[nodiscard]] study::Duplicates takeImportDuplicates() { return std::exchange(import_duplicates_, {}); }
     void cancelImport();
 
     // A database's opening tree built again in the background, when an edit made it stale (a game saved or deleted):
@@ -148,6 +158,7 @@ class DatabaseShelf {
     };
     std::map<std::filesystem::path, CachedTree> trees_;  // by the database's folder, filled by treeSource()
     std::unique_ptr<Import> import_;
+    study::Duplicates import_duplicates_;
     std::unique_ptr<TreeJob> tree_job_;
     std::chrono::steady_clock::time_point read_only_read_{}, read_only_tried_{};
     std::optional<std::size_t> tree_again_;  // a build asked for while another ran, or during an import

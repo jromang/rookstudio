@@ -632,6 +632,15 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     };
     add(TR("Home"), where(Page::ChessHome), page(Page::ChessHome));
     add(TR("Databases"), where(Page::Databases), page(Page::Databases));
+    // A database's maintenance (#88, M13, board 1): of the database chosen, else of the first of the user's.
+    add(TR("Duplicate games"), where(Page::Databases), [this] { openCare(db_selected_, CarePart::Duplicates); });
+    add(TR("Players' names"), where(Page::Databases), [this] { openCare(db_selected_, CarePart::Names); });
+    add(TR("FIDE's rating list"), where(Page::Databases), [this] { openCare(db_selected_, CarePart::Names); });
+    add(TR("Check the database"), where(Page::Databases), [this] {
+        openCare(db_selected_, CarePart::Checks);
+        if (care_) care_->start_check = true;
+    });
+    add(TR("Compact the database"), where(Page::Databases), [this] { openCare(db_selected_, CarePart::Checks); });
     add(TR("Openings: repertoires"), where(Page::Openings), [this, go = page(Page::Openings)] {
         go();
         openings_theory_ = false;

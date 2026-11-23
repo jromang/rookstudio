@@ -125,16 +125,22 @@ enum class Icon {
     Crown,
     Swords,
     Rook,
-    Lock,    // fair play: the aids locked (#48)
-    Check,   // done: a game of the user's that ended (#49)
-    Puzzle,  // the puzzles (#80)
-    Alert,   // a warning: what went wrong, and what is kept
-    Target,  // your mistakes as exercises (#81)
-    Eye,     // guessing the moves of a game (#81)
-    Zap,     // the mates (#82)
-    Grid,    // board vision (#82)
-    Bot,     // a Lichess bot for an engine (#85)
-    Tv       // Lichess TV (#86)
+    Lock,         // fair play: the aids locked (#48)
+    Check,        // done: a game of the user's that ended (#49)
+    Puzzle,       // the puzzles (#80)
+    Alert,        // a warning: what went wrong, and what is kept
+    Target,       // your mistakes as exercises (#81)
+    Eye,          // guessing the moves of a game (#81)
+    Zap,          // the mates (#82)
+    Grid,         // board vision (#82)
+    Bot,          // a Lichess bot for an engine (#85)
+    Tv,           // Lichess TV (#86)
+    ShieldCheck,  // a database checked (#88)
+    Archive,      // a database compacted (#88)
+    Info,         // a state said calmly: nothing to do
+    WifiOff,      // a download cut short
+    Merge,        // duplicate games merged (#88)
+    Users         // the players' names brought together (#88)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

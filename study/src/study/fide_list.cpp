@@ -18,9 +18,11 @@ namespace fs = std::filesystem;
 namespace {
 
 constexpr std::array<char, 8> MAGIC{'R', 'S', 'F', 'I', 'D', 'E', '1', '\0'};
-constexpr uint32_t VERSION      = 1;
+// Version 2 keeps each player's K (four bytes more a player); a list of version 1 is read, its K not known.
+constexpr uint32_t VERSION      = 2;
 constexpr std::size_t HEADER    = 128;
-constexpr std::size_t RECORD    = 20;
+constexpr std::size_t RECORD_V1 = 20;
+constexpr std::size_t RECORD    = 24;
 constexpr uint8_t FLAG_WOMAN    = 1;
 constexpr uint8_t FLAG_INACTIVE = 2;
 constexpr std::array<const char*, 9> TITLES{"", "GM", "IM", "FM", "CM", "WGM", "WIM", "WFM", "WCM"};
@@ -37,6 +39,7 @@ struct Record {
     uint16_t born = 0, standard = 0, rapid = 0, blitz = 0;
     std::string federation;
     uint8_t title = 0, flags = 0;
+    uint8_t k_standard = 0, k_rapid = 0, k_blitz = 0;
 };
 
 std::string_view trimmed(std::string_view s) {
@@ -148,6 +151,10 @@ FideListInfo prepareFideList(const fs::path& source, const fs::path& out, const 
         r.standard         = clamp16(number(field(SRTNG)));
         r.rapid            = clamp16(number(field(RRTNG)));
         r.blitz            = clamp16(number(field(BRTNG)));
+        const auto clamp8  = [](uint32_t v) { return static_cast<uint8_t>(std::min<uint32_t>(v, 255)); };
+        r.k_standard       = clamp8(number(field(SK)));
+        r.k_rapid          = clamp8(number(field(RK)));
+        r.k_blitz          = clamp8(number(field(BK)));
         const auto born    = number(field(BDAY));
         r.born             = born >= 1800 && born <= 2200 ? static_cast<uint16_t>(born) : uint16_t{0};
         const auto flag    = field(FLAG);
@@ -218,6 +225,10 @@ FideListInfo prepareFideList(const fs::path& source, const fs::path& out, const 
         put(body, r.title);
         put(body, r.flags);
         put(body, uint8_t{0});
+        put(body, r.k_standard);
+        put(body, r.k_rapid);
+        put(body, r.k_blitz);
+        put(body, uint8_t{0});
         names += r.name;
     }
     std::string head(HEADER, '\0');
@@ -261,8 +272,10 @@ FideList::FideList(const fs::path& file) : file_(file) {
     const auto* p  = file_.data();
     const auto bad = [&] { return std::runtime_error(file.string() + ": not a FIDE list of RookStudio's"); };
     if (file_.size() < HEADER || std::memcmp(p, MAGIC.data(), MAGIC.size()) != 0) throw bad();
-    if (readAt<uint32_t>(p, 8) > VERSION) throw bad();
-    count_ = readAt<uint32_t>(p, 12);
+    const auto version = readAt<uint32_t>(p, 8);
+    if (version == 0 || version > VERSION) throw bad();
+    record_ = version >= 2 ? RECORD : RECORD_V1;
+    count_  = readAt<uint32_t>(p, 12);
     info_.month.assign(reinterpret_cast<const char*>(p) + 16, strnlen(reinterpret_cast<const char*>(p) + 16, 8));
     info_.players         = count_;
     info_.rated           = readAt<uint32_t>(p, 24);
@@ -273,7 +286,7 @@ FideList::FideList(const fs::path& file) : file_(file) {
     const auto records_at = readAt<uint64_t>(p, 48), names_at = readAt<uint64_t>(p, 56),
                names_bytes = readAt<uint64_t>(p, 64), surname_at = readAt<uint64_t>(p, 72),
                skel_at = readAt<uint64_t>(p, 80), feds_at = readAt<uint64_t>(p, 88), end = readAt<uint64_t>(p, 96);
-    if (end != file_.size() || records_at + count_ * RECORD > names_at || names_at + names_bytes > surname_at ||
+    if (end != file_.size() || records_at + count_ * record_ > names_at || names_at + names_bytes > surname_at ||
         surname_at + count_ * 4 != skel_at || skel_at + count_ * 4 != end || feds_at + feds * 3 > records_at)
         throw bad();
     for (uint32_t f = 0; f < feds; ++f) {
@@ -290,14 +303,14 @@ FideList::FideList(const fs::path& file) : file_(file) {
 }
 
 std::string_view FideList::nameOf(std::size_t i) const {
-    const auto from = readAt<uint32_t>(records_, i * RECORD + 4);
-    const auto to   = i + 1 < count_ ? readAt<uint32_t>(records_, (i + 1) * RECORD + 4) : names_end_;
+    const auto from = readAt<uint32_t>(records_, i * record_ + 4);
+    const auto to   = i + 1 < count_ ? readAt<uint32_t>(records_, (i + 1) * record_ + 4) : names_end_;
     return {names_ + from, to - from};
 }
 
 FidePlayer FideList::player(std::size_t i) const {
     FidePlayer out;
-    const auto o = i * RECORD;
+    const auto o = i * record_;
     out.id       = readAt<uint32_t>(records_, o);
     out.name     = nameOf(i);
     out.born     = readAt<uint16_t>(records_, o + 8);
@@ -310,6 +323,11 @@ FidePlayer FideList::player(std::size_t i) const {
     if (t < TITLES.size()) out.title = TITLES[t];
     out.woman    = records_[o + 18] & FLAG_WOMAN;
     out.inactive = records_[o + 18] & FLAG_INACTIVE;
+    if (record_ >= RECORD) {
+        out.k_standard = records_[o + 20];
+        out.k_rapid    = records_[o + 21];
+        out.k_blitz    = records_[o + 22];
+    }
     return out;
 }
 
@@ -317,7 +335,7 @@ std::optional<std::size_t> FideList::byId(uint32_t id) const {
     std::size_t lo = 0, hi = count_;
     while (lo < hi) {
         const auto mid = (lo + hi) / 2;
-        const auto v   = readAt<uint32_t>(records_, mid * RECORD);
+        const auto v   = readAt<uint32_t>(records_, mid * record_);
         if (v == id) return mid;
         if (v < id)
             lo = mid + 1;

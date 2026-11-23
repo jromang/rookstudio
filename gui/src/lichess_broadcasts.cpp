@@ -38,6 +38,7 @@ BroadcastEntry entryOf(const nlohmann::json& e) {
             out.tour.players      = textOf(*info, "players");
             out.tour.location     = textOf(*info, "location");
             out.tour.time_control = textOf(*info, "fideTC");
+            out.tour.format       = textOf(*info, "format");
         }
     }
     if (const auto r = e.find("round"); r != e.end() && r->is_object()) {

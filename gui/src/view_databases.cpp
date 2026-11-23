@@ -161,7 +161,8 @@ void App::pasteGamesInto(int index) {
 }
 
 void App::pollDatabases() {
-    pollCare();  // the maintenance's tasks (M13, board 1), FIDE's list
+    pollCare();         // the maintenance's tasks (M13, board 1), FIDE's list
+    pollTournaments();  // the lists of tournaments, the crosstable shown (#92)
     if (!shelf_) return;
     shelf_->pollTreeJob();
     shelf_->keepReadOnlyCurrent();
@@ -1043,6 +1044,16 @@ void App::drawGameList() {
         return;
     }
     const auto snapshot = db->snapshot();
+    // A tournament's crosstable, or the database's tournaments, in place of its games (#92, M13, board 5).
+    if (crosstable_ && crosstable_->folder == s.entries()[index].folder) {
+        drawStudyCrosstable();
+        return;
+    }
+    crosstable_.reset();  // another database's
+    if (db_tournaments_ && snapshot->games() > 0) {
+        drawTournamentList(index);
+        return;
+    }
 
     // Where it is: Databases › Name · N games.
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup) &&
@@ -1063,6 +1074,11 @@ void App::drawGameList() {
                         trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(snapshot->games(), 1000000000)),
                             ui::exactCount(snapshot->games() - snapshot->deletedCount()))
                             .c_str());
+    // Its tournaments beside its games (#92).
+    if (snapshot->games() > 0) {
+        ImGui::SameLine(0, px(14));
+        if (drawListSwitch()) return;
+    }
     // None yet: what to put in it, in place of an empty list (M1, board 4).
     if (snapshot->games() == 0 && !s.entries()[index].source && !(s.import() && s.import()->index == index)) {
         ImGui::Dummy(ImVec2(0, px(8)));

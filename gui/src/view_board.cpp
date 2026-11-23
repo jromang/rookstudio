@@ -2322,11 +2322,13 @@ void App::drawBoardColumn(float size) {
         if (ui::iconButton("board_back", ui::Icon::Back, back)) backToMosaic();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("Esc"));
     } else if (board_back_ && !board_tv_) {
-        const bool dossier = board_back_->dossier && dossier_;
-        const char* back   = dossier                                 ? TR("Back to the dossier")
-                             : board_back_->page == Page::Tournament ? TR("Back to the tournament")
-                             : board_back_->page == Page::Books      ? TR("Back to the books")
-                                                                     : TR("Back");
+        const bool dossier    = board_back_->dossier && dossier_;
+        const bool crosstable = board_back_->crosstable && crosstable_;  // #92
+        const char* back      = dossier                                 ? TR("Back to the dossier")
+                                : crosstable                            ? TR("Back to the crosstable")
+                                : board_back_->page == Page::Tournament ? TR("Back to the tournament")
+                                : board_back_->page == Page::Books      ? TR("Back to the books")
+                                                                        : TR("Back");
         ui::sameLineOrWrap(back);
         if (ui::iconButton("board_back", ui::Icon::Back, back)) {
             page_ = board_back_->page;

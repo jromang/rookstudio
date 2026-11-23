@@ -463,6 +463,51 @@ void App::frame() {
             if (online) subject.lichess = spec;
             openDossier(std::move(subject), online);
             if (dossier_) dossier_->tab = tab == "openings" ? 1 : tab == "rating" ? 2 : tab == "lichess" ? 3 : 0;
+        } else if (w == "tournaments" || w.rfind("tournaments=", 0) == 0 || w.rfind("crosstable=", 0) == 0) {
+            // tournaments[=DATABASE]: the tournaments of the first database, or of the one of that name (#92);
+            // crosstable=WORDS[@DATABASE]: the crosstable of its first tournament whose name holds WORDS, once listed.
+            const bool table = w[0] == 'c';
+            auto spec        = w.find('=') == std::string::npos ? std::string() : w.substr(w.find('=') + 1);
+            std::string base = table ? std::string() : spec;
+            if (table) {
+                if (const auto at = spec.rfind('@'); at != std::string::npos) {
+                    base = spec.substr(at + 1);
+                    spec = spec.substr(0, at);
+                }
+                crosstable_request_ = std::make_pair(spec, base);
+            }
+            page_           = Page::Databases;
+            db_selected_    = 0;
+            db_list_        = true;
+            db_tournaments_ = true;
+            auto& s         = shelf();
+            for (std::size_t i = 0; i < s.entries().size(); ++i)
+                if (!base.empty() && s.entries()[i].name == base) db_selected_ = static_cast<int>(i);
+        } else if (w.rfind("broadcast-follow=", 0) == 0) {
+            // broadcast-follow=ROUND@TOUR@NAME[@FORMAT][,WORD]: a broadcast's round followed (lichess-api= before it),
+            // its mosaic shown (#92); then WORD, another of these (broadcast-crosstable).
+            auto spec = w.substr(17);
+            if (const auto comma = spec.find(','); comma != std::string::npos) {
+                focus_next_ = spec.substr(comma + 1);
+                spec        = spec.substr(0, comma);
+            }
+            std::vector<std::string> parts;
+            for (std::size_t at = 0;;) {
+                const auto end = spec.find('@', at);
+                parts.push_back(spec.substr(at, end == std::string::npos ? std::string::npos : end - at));
+                if (end == std::string::npos) break;
+                at = end + 1;
+            }
+            lichess::BroadcastEntry entry;
+            entry.round.id   = parts[0];
+            entry.round.name = "Round";
+            if (parts.size() > 1) entry.tour.id = parts[1];
+            if (parts.size() > 2) entry.tour.name = parts[2];
+            if (parts.size() > 3) entry.tour.format = parts[3];
+            page_ = Page::Lichess;
+            followBroadcast(entry, true);
+        } else if (w == "broadcast-crosstable") {  // the followed round's crosstable in place of its mosaic (#92)
+            broadcast_crosstable_ = true;
         } else if (w.rfind("fide-server=http://127.0.0.1:", 0) == 0) {
             // fide-server=http://127.0.0.1:PORT[,WORD]: a test's server in place of ratings.fide.com (#88), on this
             // machine only; then WORD, another of these.

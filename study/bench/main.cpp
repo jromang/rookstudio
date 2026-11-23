@@ -39,6 +39,10 @@
 //                                                 games, timed: their spellings, their games, what they tell; only
 //                                                 their numbers printed, never a name. FILE: the named openings'
 //                                                 table, commentary/data/openings.tsv by default)
+//   fcg-study-bench crosstables <database> [--threads N]   (the database's tournaments listed as the program lists
+//                                                 them, on the machine's threads, 4 and 1; then the crosstables of its
+//                                                 largest Swiss and round robin: their games found, read and computed;
+//                                                 only numbers printed, never a name)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -61,6 +65,7 @@
 
 #include <study/background.hpp>
 #include <study/chessbase.hpp>
+#include <study/crosstable.hpp>
 #include <study/dossier.hpp>
 #include <study/duplicates.hpp>
 #include <study/evals_index.hpp>
@@ -2174,6 +2179,78 @@ int runDossier(const Args& a) {
     return 0;
 }
 
+// The tournaments of a database (#92), timed as the program lists them: in the background (the lowest priority), on the
+// machine's threads, then 4 and 1; then the crosstables of its largest Swiss and its largest round robin. Only numbers
+// are printed: the database's players and events may be real.
+int runCrosstables(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    enterBackground();
+    const auto db   = Database::openReadOnly(a.words[1]);
+    const auto snap = db->snapshot();
+    std::printf("crosstables %s: %llu games, %u names; %.1f MB held\n", a.words[1].c_str(),
+                static_cast<unsigned long long>(snap->games()), snap->names(), heldMb().first);
+    TournamentList list;
+    const int machine = a.threads > 0 ? a.threads : static_cast<int>(std::thread::hardware_concurrency());
+    for (const int threads : {machine, 4, 1}) {
+        TournamentProgress progress;
+        std::atomic<bool> cancel{false};
+        const auto t = Clock::now();
+        list         = listTournaments(snap, progress, cancel, threads);
+        std::printf("  listed on %2d threads: %zu tournaments in %.0f ms (%llu games in none); %.1f MB held\n", threads,
+                    list.tournaments.size(), ms(t), static_cast<unsigned long long>(list.others), heldMb().first);
+    }
+    std::map<std::string, std::size_t> systems;
+    std::size_t uncertain = 0, missing = 0, duplicates = 0;
+    const TournamentEntry* swiss = nullptr;
+    const TournamentEntry* robin = nullptr;
+    std::size_t largest_rr_games = 0;
+    for (const auto& e : list.tournaments) {
+        const auto& s    = e.shape.system;
+        std::string name = s.system == TournamentSystem::RoundRobin
+                               ? (s.cycles == 1 ? "round robin" : std::to_string(s.cycles) + " cycles round robin")
+                           : s.system == TournamentSystem::Swiss    ? "Swiss"
+                           : s.system == TournamentSystem::Team     ? "team"
+                           : s.system == TournamentSystem::Knockout ? "knockout"
+                                                                    : "unknown";
+        ++systems[name];
+        uncertain += e.shape.uncertain;
+        missing += e.shape.expected > e.shape.games;
+        duplicates += e.duplicates > 0;
+        if (s.system == TournamentSystem::Swiss && (!swiss || e.shape.players > swiss->shape.players)) swiss = &e;
+        if (s.system == TournamentSystem::RoundRobin && e.shape.games > largest_rr_games) {
+            robin            = &e;
+            largest_rr_games = e.shape.games;
+        }
+    }
+    for (const auto& [name, count] : systems) std::printf("  %-26s %8zu\n", name.c_str(), count);
+    std::printf("  system not sure %zu; games missing in %zu; games come twice in %zu\n", uncertain, missing,
+                duplicates);
+    for (const auto* e : {swiss, robin}) {
+        if (!e) continue;
+        std::atomic<bool> cancel{false};
+        auto t           = Clock::now();
+        const auto ids   = tournamentGames(*snap, e->ref, cancel);
+        const auto found = ms(t);
+        t                = Clock::now();
+        auto in          = tournamentInput(*snap, ids);
+        const auto read  = ms(t);
+        CrossOptions options;
+        options.kind      = in.kind;
+        options.year      = in.year;
+        t                 = Clock::now();
+        const auto table  = makeCrosstable(in.players, in.games, options);
+        const auto made   = ms(t);
+        std::size_t twice = 0;
+        for (const auto& g : in.twice) twice += g.games.size() - 1;
+        std::printf(
+            "  the largest %s: %u players, %d rounds, %u of %u games (%zu come twice), %zu missing, %zu "
+            "forfeits, %zu under two names: games found in %.0f ms, read in %.1f ms, computed in %.1f ms\n",
+            e == swiss ? "Swiss" : "round robin", e->shape.players, e->shape.rounds, e->shape.games, e->shape.expected,
+            twice, table.missing.size(), table.forfeits.size(), table.two_names.size(), found, read, made);
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2204,6 +2281,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "fide") rc = runFide(a);
         if (a.words[0] == "fide-names") rc = runFideNames(a);
         if (a.words[0] == "dossier") rc = runDossier(a);
+        if (a.words[0] == "crosstables") rc = runCrosstables(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

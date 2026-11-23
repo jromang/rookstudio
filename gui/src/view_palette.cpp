@@ -95,7 +95,7 @@ const char* App::guideSection() const {
                     return StudyBoard;
             }
         case Page::Databases:
-            return Databases;
+            return db_list_ && db_tournaments_ && !care_ ? Crosstables : Databases;
         case Page::Openings:
             return openings_theory_ ? TheoryStudies : OpeningsPage;
         case Page::Lichess:
@@ -1082,6 +1082,14 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             study::DossierSubject subject;
             subject.name = name;
             openDossier(std::move(subject));
+        });
+    // A tournament's crosstable (#92): the tournaments of the user's databases whose names have the words typed.
+    lookForCrosstableNames(palette_query_);
+    for (const auto& n : crosstable_names_)
+        add(trf("Crosstable: {}", n.label), n.database, [this, folder = n.folder, key = n.key] {
+            auto& s = shelf();
+            for (std::size_t i = 0; i < s.entries().size(); ++i)
+                if (s.entries()[i].folder == folder) openCrosstable(i, key);
         });
     // The tournament on the user's own Lichess broadcast (#51).
     if (run_->running() && !setup_.broadcast_lichess)

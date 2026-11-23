@@ -369,6 +369,8 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>Page Down</kbd>, <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> | A player's dossier | The next tab, the previous one |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | A player's dossier | Choose among namesakes, keep the choice; undo it |
 | <kbd>Escape</kbd> | A player's dossier | Back to the page it was opened from |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A database's tournaments | Choose a tournament, open its crosstable |
+| <kbd>Escape</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | A tournament's crosstable | Back to the tournaments; undo its last change to the database |
 | <kbd>←</kbd> <kbd>→</kbd> | The big screen | The previous or next game |
 | <kbd>+</kbd> <kbd>-</kbd> | The big screen | Larger or smaller text |
 | <kbd>Escape</kbd> | The big screen | Leave it |
@@ -1264,7 +1266,8 @@ The list gives each game's number, players, Elo, result, event, date, ECO code a
 it. A player's spellings brought together in the database's table of names (see [Players' names](#players-names)) show
 under the player's name, and under the mouse the name says how the game writes it. The quick filter above takes free words: players, event, year, ECO code, result (`carlsen 2024 B90`). ↑ ↓ go
 through the list and the game chosen shows beside, on a small board with its moves; Enter or a double click opens it
-on the Board page. Millions of games scroll and sort at once.
+on the Board page. Millions of games scroll and sort at once. **Games** and **Tournaments**, beside the database's name
+above the list, switch between its games and its tournaments (see [Tournaments and crosstables](#tournaments-and-crosstables)).
 
 ### FIDE cards
 
@@ -1322,6 +1325,83 @@ databases is told so, with *From a source…* and *+ Lichess…* to bring some. 
 Lichess source ticked, what preparing a game sends: their name with the filters of their games, and their public
 profile. Offline, the source shows the games of its last sync, dated. While you play them on Lichess, the dossier shows
 nothing of them.
+
+### Tournaments and crosstables
+
+*Tournaments*, beside *Games* above a database's list, shows its tournaments: the games of one event, its site and its
+year (a tournament from December to January stays one; the same event in two places, with players of their own, makes
+two). Online games, which share no event whose rounds are told, are in none: a database of them says it has no
+tournament and offers *Games*. Each tournament gives its system, its players, its rounds, the mean Elo of its players
+and its games, *286 of 288* in orange when games are missing. The list is sorted by mean Elo; a click on a heading
+sorts it otherwise, and its filter (Ctrl+L) takes words of the event, the site or the year. A large database's list is
+made in the background with its progress (a few seconds for ten million games), and kept until the database changes.
+
+The system is guessed from the games: a round robin when each played each (a double round robin when each pair met
+twice), Swiss otherwise; *?* when it is not sure (a pair met more often than its system lets them, games missing in a
+field as small as a round robin's). Team events and knockouts are said, their crosstables for later. A click on the
+system changes it, kept for the tournament.
+
+A click on a tournament, or Enter, opens its **crosstable** in place of the list, Esc going back; Ctrl+K opens one too
+(*Crosstable: Autumn Open*). Its players are those of the database's table of names (see
+[Players' names](#players-names)): all of a player's spellings together. The games that came twice from two sources
+(the same players with the same colours, rounds that can be one) are counted once, and each game's round is read from
+its Round tag (*9.2*: round 9, board 2).
+
+- A round robin's crosstable has a cell for each opponent: 1, ½ or 0 (a result for each cycle in a double round robin),
+  + and − for a forfeit; then the points, the tie-breaks, the wins, the performance and the rating change.
+- A Swiss's has the start numbers, by rating, then a cell for each round: *4b½* is a draw against number 4, with Black;
+  *bye*, the only player unpaired in the round (a win's points, FIDE's rule for a pairing-allocated bye); *–*, a round
+  without a game. The first ten show, their games between them in the accent colour; *All players* shows the others.
+
+A click on a game opens it on the Board page, the tournament's games as its list (Ctrl+← and Ctrl+→, *Back to the
+crosstable*); a click on a name opens the player's dossier (see [A player's dossier](#a-players-dossier)). The
+performance and the rating change say how they were counted under the mouse.
+
+Above the crosstable, a line for each thing wrong with the data, with what fixes it:
+
+- **games missing** (a round robin's pair that did not meet, a Swiss's two players without a game in a round) are
+  counted "?", and the points, tie-breaks and rating changes that read them say "?". *Look for them in your other
+  databases* finds them under other spellings, *Copy it into this tournament* adds one, its event, site and players
+  written as the tournament's (Ctrl+Z takes it out again); *Set the results by hand* gives each its result, as a click
+  on a "?" does, kept with the tournament in your profile, the database unchanged;
+- **a player under two names**: two names that can be one player's, never paired together, their rounds apart; *Bring
+  them together* joins them in the table of names (Ctrl+Z undoes);
+- **games that came twice**: *Merge them* keeps each as one game, its fullest fields from each source, as the
+  maintenance's duplicates do (Ctrl+Z undoes); those whose moves or results differ are shown in the list instead;
+- **a forfeit**: a decisive result without moves (a PGN has no word for it) counts in the points, not in the performance
+  nor the rating change;
+- **a system that is not sure**: a click chooses it.
+
+A followed broadcast has its crosstable too: *Crosstable*, beside the standings in the mosaic's column, shows it in
+place of the boards (*The mosaic*, or Esc, brings them back). It is made of the rounds RookStudio follows and of those
+it kept in the *Broadcasts* database: ● a game being played (a click follows it on the Board page), · a game to come,
+the points, the games played and the rating change so far. Lichess's own standings stay beside it, and nothing more is
+asked of Lichess for it; a team broadcast keeps Lichess's team standings.
+
+### Tie-breaks, performance and rating change
+
+The tie-breaks order the players on the same points, one after the other: FIDE's by default, the line above the table
+saying which. The current FIDE tie-break regulations (C.07, effective from 1 March 2026) recommend none for a system,
+so RookStudio takes those of FIDE's own events: for a round robin, as the Candidates Tournament 2026, Sonneborn-Berger,
+the wins, the direct encounter; for a Swiss, as the Grand Swiss 2025, the average rating of the opponents cut 1,
+Buchholz cut 1, Buchholz, the direct encounter (the average rating left out when a player has no rating, as C.07 asks).
+A click on a tie-break, in that line or on its heading, puts it first, moves it, replaces it or removes it; *+* adds
+one; *FIDE's* puts theirs back. The order is kept for the tournament.
+
+They are FIDE's: direct encounter, wins (forfeits and byes worth a win count), games won, games with Black, wins with
+Black, progressive score, Buchholz, Buchholz cut 1, median Buchholz, Sonneborn-Berger, Koya, the average rating of the
+opponents (also cut 1) and the performance. In a Swiss, a round without a game counts in Buchholz and Sonneborn-Berger
+as FIDE says (C.07, article 16): as against an opponent of the player's own score, at most a draw a round (at most the
+scheduled opponent's score for a forfeit), and a player's rounds after withdrawing count as draws for their opponents.
+
+The **performance** is FIDE's: the average rating of the rated opponents met over the board, plus the difference
+FIDE's table gives the score in those games (rounded to the hundredth). The **rating change** is FIDE's formula: for
+each game played over the board against a rated opponent, the score less the expected score from FIDE's table (a
+difference counted as 400 at most, below 2650), times K. K is the player's own from FIDE's rating list when they are
+matched with it in the table of names and the list is of the tournament's year or the next (see
+[FIDE's rating list](#fides-rating-list)); otherwise FIDE's rules give it: 40 until the end of the year of their 18th
+birthday while under 2300, 10 from 2400, 20 otherwise, smaller when 700 would be passed over all their games. A rapid
+or blitz tournament follows FIDE's rapid and blitz rules. A forfeit counts in the points only.
 
 ### Searching
 
@@ -2159,7 +2239,8 @@ an account; they are asked again every two minutes while the mosaic shows.
 
 *The whole tournament*, beside a round's name, follows all of the tournament's ongoing rounds, and each next one as it
 starts: the mosaic shows the round live, and **The rounds** above it shows another (a click on the live one follows the
-next ones again). Each round goes into the *Broadcasts* database as it ends.
+next ones again). Each round goes into the *Broadcasts* database as it ends. *Crosstable*, beside the standings, shows
+the crosstable of the rounds followed in place of the boards (see [Tournaments and crosstables](#tournaments-and-crosstables)).
 
 **Search the broadcasts**, at the top of the official broadcasts, looks for a recent one by its name: Lichess answers
 only an account allowed to read broadcasts, asked the first time. *Back to the list* shows the broadcasts on now

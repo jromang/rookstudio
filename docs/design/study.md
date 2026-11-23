@@ -191,15 +191,16 @@ the games of one key).
 FIDE's combined list (players_list_foa.txt in players_list.zip): a header naming its columns, then a line of fixed
 columns a player. `prepareFideList` finds each column by its name in the header (a list whose columns differ is refused:
 `FideFormatError`), reads the lines (a value of the other titles longer than its column pushes the columns after it: 3
-lines of the list of November 2026), and writes RookStudio's file: a header, the federations, 20 bytes a player sorted by
-FIDE id (id, the place of its name, birth year, three ratings, federation, title, woman, inactive), the names, and two
-indexes of the players by surname and by its skeleton (`nameSkeleton`: Kowalenko and Kovalenko alike), searched by
-halves. `analyseNames` (`names.hpp`) groups a database's spellings (the table's players, the FIDE ids their games give,
-then surname and given name, an initial joining the one name that starts with it) and matches each group with the list:
-a single player of that surname whose given name fits (its transliterations when the games' ratings are within 150 of
-the player's; an initial alone needs a rating within 200), never a player born after the games or less than five years
-before them, nor a name of one word on either side; several are left to confirm, the nearest to the games' ratings
-first.
+lines of the list of November 2026), and writes RookStudio's file: a header, the federations, 24 bytes a player sorted
+by FIDE id (id, the place of its name, birth year, three ratings, federation, title, woman, inactive, and since #92 the
+K of each rating, a crosstable's rating change reading them; a file of the first version, 20 bytes a player, is read,
+its K not known), the names, and two indexes of the players by surname and by its skeleton (`nameSkeleton`: Kowalenko
+and Kovalenko alike), searched by halves. `analyseNames` (`names.hpp`) groups a database's spellings (the table's
+players, the FIDE ids their games give, then surname and given name, an initial joining the one name that starts with
+it) and matches each group with the list: a single player of that surname whose given name fits (its transliterations
+when the games' ratings are within 150 of the player's; an initial alone needs a rating within 200), never a player born
+after the games or less than five years before them, nor a name of one word on either side; several are left to confirm,
+the nearest to the games' ratings first.
 
 Measured on the list of November 2026 (downloaded once, on this machine only): 1 960 520 players, 800 241 rated
 (standard 573 475, rapid 486 148, blitz 321 078); read in 3.1 s, 476 MB at most, into 89.3 MB; a lookup by surname 10
@@ -392,6 +393,47 @@ The scan of every game's players takes most of it (about 80 ms on one thread for
 the rest; the threads help little on a busy machine. The tree of their games holds up to 374 205 positions (the player
 of rank 10, 6 482 games); the bench's process held 76 MB after its twelve dossiers. The mockup expected a few seconds:
 a tenth of a second, the reviews and the repertoires' gaps added in the program (a few milliseconds more each).
+
+## A tournament's crosstable (#92)
+
+`listTournaments` (`crosstable.hpp`) lists a database's tournaments: the event names written (a bit a name, on the
+machine's threads) read once into keys (folded, their years and punctuation left out: "Autumn Open 2026" and "Autumn
+Open" are one event), each game counted into the group of its event and year (the group of the last game asked first:
+a tournament's games come one after another), an event's games without a date joined to its only year and a group of
+December to one of January following it within a month joined to it, then each group's game numbers gathered in one
+array and the groups read on the machine's threads. A group's sites are told apart when their players are (a site joins
+another through a player of both: two events of one name in two places), its games that came twice counted once (the
+same players' surnames and initials with the same colours, rounds and dates that can be one, and their rounds told or
+their lengths the same; a pair's games by the hundred, online or an engines' match, compared with their sixteen
+neighbours only), its players read through the table of names. A group is a tournament with three players or more and
+its rounds told (or each having met each): online games are none. `tournamentShape` guesses its system from how often
+its pairs met: nine pairs in ten or more, a round robin of the cycles most pairs met; half of them in as many rounds as a
+round robin needs, one with games missing (not sure); fewer rounds than a round robin needs, a Swiss; games of one pair
+within one round, a knockout; games that give teams, a team event. What a Swiss expects: in each round, half its players
+between their first round and their last.
+
+`makeCrosstable` computes a crosstable from players and games of its own (a database's from `tournamentInput`, a
+broadcast's from the window's games followed): each player's games and rounds (a Swiss's rounds without a game read as a
+bye when one player alone of an odd field misses it, as a game missing when two who never met miss it, as an absence
+not known otherwise; two names of one player found first, so that the second's first round is no bye), the points, the
+tie-breaks of C.07 (2026) with its rules for unplayed rounds (article 16: the scores adjusted for the opponents, the
+dummy of the player's own score capped, a voluntary unplayed round cut first), the direct encounter applied to each tie
+and again to the smaller ties it leaves (6.2; in a Swiss, one alone at the top whatever the missing games give, 6.3),
+the performance (C.07 10.2 with FIDE's table of B.02 8.1.1) and the rating change (B.02 8.3: the table of 8.1.2, the 400
+points' rule below 2650 since October 2025, K from FIDE's list, now kept in its file, when the player is matched with it,
+else its rules). A result not in the data is counted "?" in what reads it.
+
+Measured on 2026-11-23 on the reference database (11.7 M games, 561 343 names), at the lowest priority beside other work
+that kept about 20 of the 32 threads busy (`fcg-study-bench crosstables`): its 89 934 tournaments listed in 0.63 s on 32
+threads, 1.2 s on 4, 2.9 s on one; 662 424 games in none (online games, games without an event). They are 22 015 round
+robins, 2 175 double ones and 94 of more cycles, 64 131 Swiss tournaments, 1 519 knockouts; 1 998 have a system not
+sure, 48 474 games missing (opens whose top boards alone were kept, mostly), 569 games come twice. Its largest Swiss, 968
+players over 11 rounds, 3 933 of 3 948 games: found in 76 ms (every game's event read), read in 3.2 ms, computed in 3.9
+ms; its largest round robin, a double one of 22 players, 462 games: 78 ms, 0.2 ms and 0.3 ms. The bench's process held
+100 MB after the first list (the list of 89 934 tournaments some 25 MB of it). The first measure listed them in 1.7 s on
+32 threads and 13 s on one: the tournaments' last years were looked for among all the groups, for each, and each thread
+kept its names' keys of its own; both done once now. The mockup expected a few milliseconds ("it is a sort"): so they
+are for a database of a few thousand games, a large one's list is made in the background with its progress (R18).
 
 ## Beside the tournaments
 

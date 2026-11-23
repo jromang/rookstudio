@@ -775,8 +775,17 @@ void App::drawBroadcastMosaic() {
     ImGui::BeginChild("##broadcast_grid", ImVec2(grid_w, 0));
     const float line = ImGui::GetTextLineHeight();
     std::vector<std::size_t> cards;  // those of the round shown
-    for (std::size_t i = 0; i < broadcast_boards_.size(); ++i)
-        if (shown(broadcast_boards_[i])) cards.push_back(i);
+    // The crosstable of the rounds followed in place of the tiles (#92); Esc brings the tiles back.
+    const bool crosstable = broadcast_crosstable_ && round;
+    if (crosstable) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup) &&
+            !ImGui::GetIO().WantTextInput)
+            broadcast_crosstable_ = false;
+        drawBroadcastCrosstable();
+    } else {
+        for (std::size_t i = 0; i < broadcast_boards_.size(); ++i)
+            if (shown(broadcast_boards_[i])) cards.push_back(i);
+    }
     for (std::size_t k = 0; k < cards.size(); ++k) {
         auto& b = broadcast_boards_[cards[k]];
         if (k % static_cast<std::size_t>(cols) != 0) ImGui::SameLine(0, px(8));
@@ -925,6 +934,18 @@ void App::drawBroadcastMosaic() {
         ImGui::EndTable();
     }
     ui::endCard();
+    // Its crosstable, made of the rounds followed, beside the standings Lichess gives (#92).
+    if (round) {
+        ImGui::Dummy(ImVec2(0, px(4)));
+        if (ui::iconButton("broadcast_crosstable", broadcast_crosstable_ ? ui::Icon::Grid : ui::Icon::Chart,
+                           broadcast_crosstable_ ? TR("The mosaic") : TR("Crosstable")))
+            broadcast_crosstable_ = !broadcast_crosstable_;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", broadcast_crosstable_
+                                        ? TR("The games' boards again (Esc).")
+                                        : TR("The crosstable of the rounds followed, in place of the boards: the games "
+                                             "being played, those to come, the live rating change."));
+    }
     if (round) drawBroadcastStandings();  // the players' standings, a team event's (#55)
     ImGui::TextDisabled("%s", tv ? TR("The moves come three moves late: Lichess's rule for spectators. A finished "
                                       "game gives its place to another of the channel; a double click follows a game "

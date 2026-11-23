@@ -42,6 +42,7 @@
 #include "broadcaster.hpp"
 #include "chesscom.hpp"
 #include "console.hpp"
+#include "crosstables.hpp"
 #include "databases.hpp"
 #include "dialogs.hpp"
 #include "dossier.hpp"
@@ -594,13 +595,17 @@ class App {
         std::optional<Care::Undo> undo;  // a change's, pushed when it is done
         std::string said, error;
         std::size_t merged = 0;
+        bool crosstable    = false;  // asked from a tournament's crosstable (#92): its undo there
     };
     std::unique_ptr<CareJob> care_job_;
     [[nodiscard]] bool careBusy(const std::filesystem::path& folder) const;  // a compaction of that database runs
     // A change of the database in the background: merges, a table of names, an undoing.
     void startCareMerges(std::size_t index, std::vector<study::DuplicateGroup> groups,
-                         std::vector<study::MergeChoice> choices);
-    void startCarePlayers(std::size_t index, study::PlayerTable table, std::string what, std::string said);
+                         std::vector<study::MergeChoice> choices, bool crosstable = false);
+    void startCarePlayers(std::size_t index, study::PlayerTable table, std::string what, std::string said,
+                          bool crosstable = false);
+    // A change undone: the games and the table of names put back.
+    void startCareRestore(std::size_t index, Care::Undo undo, bool crosstable);
     // FIDE's rating list (fide_rating_list.hpp): kept in the profile, read when needed, offered each month.
     [[nodiscard]] const fide::Kept* fideKept();
     [[nodiscard]] std::shared_ptr<const study::FideList> fideList();
@@ -1953,6 +1958,116 @@ class App {
     std::string dossier_names_of_;
     std::vector<DossierName> dossier_names_;
     void lookForDossierNames(const std::string& query);
+    // A tournament's crosstable and standings (#92, mockup M13, board 5; view_crosstable.cpp, crosstables.hpp): a
+    // database's tournaments in place of its games ("Tournaments" beside "Games" above the list), a tournament's
+    // crosstable in place of the list (Esc goes back), a followed broadcast's in place of its mosaic. The lists are
+    // made in the background and kept for their snapshot; each crosstable's system, tie-breaks and results set by hand
+    // are kept in the profile.
+    bool db_tournaments_ = false;  // the game list shows the database's tournaments
+    struct DbTournamentsJob {
+        std::filesystem::path folder;
+        uint64_t generation = 0;
+        std::shared_ptr<const study::Snapshot> snapshot;
+        std::shared_ptr<study::TournamentProgress> progress = std::make_shared<study::TournamentProgress>();
+        std::shared_ptr<std::atomic<bool>> cancel           = std::make_shared<std::atomic<bool>>(false);
+        std::chrono::steady_clock::time_point started;
+        std::future<study::TournamentList> done;
+    };
+    struct TournamentsKept {
+        uint64_t generation = 0;
+        std::shared_ptr<const study::Snapshot> snapshot;
+        std::shared_ptr<const study::TournamentList> list;
+    };
+    std::map<std::filesystem::path, TournamentsKept> tournament_lists_;
+    std::optional<DbTournamentsJob> db_tournaments_job_;
+    std::vector<std::filesystem::path> tournaments_wanted_;  // lists asked for (Ctrl+K), made one after another
+    std::size_t tournament_row_ = 0;
+    std::array<char, 128> tournament_filter_{};
+    int tournament_sort_        = -1;  // a column; -1: by mean Elo
+    bool tournament_descending_ = true;
+    std::vector<std::size_t> tournaments_shown_;  // the list's rows, filtered and sorted
+    std::string tournaments_shown_of_;
+    // A database's list of tournaments: the one kept for its snapshot, else none and, with `start`, made in the
+    // background.
+    const TournamentsKept* tournamentsOf(std::size_t database, bool start);
+    void pollTournaments();  // each frame: a list made, the next one asked for started
+    void drawTournamentList(std::size_t database);
+    // The crosstable shown, of a database's tournament.
+    struct CrosstableView {
+        std::filesystem::path folder;
+        std::string database;
+        study::TournamentEntry entry;
+        std::string title;
+        std::shared_ptr<const study::Snapshot> snapshot;  // its games'
+        std::optional<study::TournamentInput> input;
+        study::Crosstable table;
+        CrosstableSettings settings;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::future<study::TournamentInput> job;
+        uint64_t generation     = ~uint64_t{0};  // the snapshot it was read from
+        bool all                = false;         // a Swiss's players all shown, not the first ten
+        int tiebreak_menu       = -1;  // the tie-break whose menu is open (its place; the list's length: one more)
+        bool tiebreak_menu_open = false;
+        bool hand_open          = false;               // the games missing, their results set by hand
+        int cell_menu_row = -1, cell_menu_entry = -1;  // a "?" clicked: its result set by hand
+        bool cell_menu_open = false;
+        // The games missing looked for in the user's other databases.
+        std::shared_ptr<std::atomic<bool>> look_cancel;
+        std::future<std::vector<FoundMissing>> looking;
+        std::optional<std::vector<FoundMissing>> found;
+        std::vector<MissingAsked> asked;
+        std::string said, error;
+    };
+    std::optional<CrosstableView> crosstable_;
+    std::vector<Care::Undo> crosstable_undo_;  // its changes to the database, Ctrl+Z
+    std::filesystem::path crosstable_undo_folder_;
+    std::unique_ptr<CrosstableStore> crosstable_store_;
+    CrosstableStore& crosstableStore();
+    // A database's tournament (its key) shown as a crosstable: the database's list of tournaments under it.
+    void openCrosstable(std::size_t database, const std::string& key);
+    void startCrosstable();
+    void pollCrosstable();
+    void remakeCrosstable();  // its settings changed: computed again from its games read
+    void keepCrosstableSettings();
+    void drawStudyCrosstable();
+    void crosstableUndo();
+    // The table of a crosstable, a database's or a broadcast's: a click on a game (`game` its place in the table's
+    // games), on a player's name, on a game's "?" to set its result by hand.
+    struct CrossClicks {
+        std::optional<uint32_t> game;
+        std::optional<uint32_t> player;
+        std::optional<std::pair<int, int>> unknown;  // row, entry
+        std::optional<int> tiebreak;                 // a heading: its place
+    };
+    CrossClicks drawCrossTable(const study::Crosstable& table, bool all, bool live);
+    // The menu of a tie-break heading: put first, moved, replaced, removed, FIDE's again. True when changed.
+    bool crossTiebreakMenu(std::vector<study::Tiebreak>& order, int index, const study::Crosstable& table, bool custom,
+                           bool& reset);
+    void drawCrossTiebreakLine(const study::Crosstable& table, bool& open, int& index);
+    // A followed broadcast's crosstable (#92), in place of its mosaic: its games, those being played among them, and
+    // the rounds it kept in the "Broadcasts" database.
+    bool broadcast_crosstable_ = false;
+    struct LiveCrosstableState {
+        std::string key;  // the followed round's
+        uint64_t changes          = ~uint64_t{0};
+        uint64_t saved_generation = ~uint64_t{0};
+        double made_at            = -100;  // ImGui's time
+        LiveCrosstable input;
+        study::Crosstable table;
+        CrosstableSettings settings;
+        int tiebreak_menu       = -1;
+        bool tiebreak_menu_open = false;
+    };
+    LiveCrosstableState live_crosstable_;
+    void drawBroadcastCrosstable();  // of the round the mosaic shows
+    // Ctrl+K's "Crosstable: …": the tournaments of the user's databases whose names have the words typed.
+    std::vector<CrosstableName> crosstable_names_;
+    std::string crosstable_names_of_;  // the words and lists they were found for
+    // --focus crosstable=WORDS[@DATABASE]: the tournament to open once its database's list is made.
+    std::optional<std::pair<std::string, std::string>> crosstable_request_;
+    void lookForCrosstableNames(const std::string& query);
+    // "Games | Tournaments" above a database's list: true when changed.
+    bool drawListSwitch();
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;
@@ -3540,7 +3655,8 @@ class App {
     struct BoardBack {
         Page page;
         std::optional<Tab> tab;
-        bool dossier = false;  // opened from a player's dossier: back to it (#90)
+        bool dossier    = false;  // opened from a player's dossier: back to it (#90)
+        bool crosstable = false;  // from a tournament's crosstable: back to it (#92)
     };
     std::optional<BoardBack> board_back_;
     bool board_key_taken_  = false;  // key A served a board this frame

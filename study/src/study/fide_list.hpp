@@ -30,6 +30,9 @@ struct FidePlayer {
     std::string title;                       // "GM", "IM", "WGM"…: the title, else the woman's title; empty when none
     int born     = 0;                        // year, 0 when not told
     int standard = 0, rapid = 0, blitz = 0;  // 0 when not rated
+    // The development coefficients K of each rating (#92: a crosstable's rating change); 0 when the list does not
+    // give them (a list read before they were kept).
+    int k_standard = 0, k_rapid = 0, k_blitz = 0;
     bool woman    = false;
     bool inactive = false;
 };
@@ -74,6 +77,7 @@ class FideList {
     MappedFile file_;
     FideListInfo info_;
     std::size_t count_          = 0;
+    std::size_t record_         = 0;  // the bytes of a player: 20 in the first version, 24 with the K
     const uint8_t* records_     = nullptr;
     const char* names_          = nullptr;
     uint64_t names_end_         = 0;

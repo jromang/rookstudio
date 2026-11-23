@@ -236,12 +236,13 @@ std::size_t indexOf(DatabaseShelf& s, const fs::path& folder) {
 }  // namespace
 
 void App::startCareMerges(std::size_t index, std::vector<study::DuplicateGroup> groups,
-                          std::vector<study::MergeChoice> choices) {
+                          std::vector<study::MergeChoice> choices, bool crosstable) {
     if (care_job_ || groups.empty()) return;
     const auto db = shelf().open(index);
     if (!db || db->readOnly()) return;
-    auto job     = std::make_unique<CareJob>();
-    job->kind    = CareJob::Kind::Merge;
+    auto job        = std::make_unique<CareJob>();
+    job->kind       = CareJob::Kind::Merge;
+    job->crosstable = crosstable;
     job->folder  = shelf().entries()[index].folder;
     job->started = std::chrono::steady_clock::now();
     CareJob* j   = job.get();
@@ -287,12 +288,14 @@ void App::startCareMerges(std::size_t index, std::vector<study::DuplicateGroup> 
     care_job_    = std::move(job);
 }
 
-void App::startCarePlayers(std::size_t index, study::PlayerTable table, std::string what, std::string said) {
+void App::startCarePlayers(std::size_t index, study::PlayerTable table, std::string what, std::string said,
+                           bool crosstable) {
     if (care_job_) return;
     const auto db = shelf().open(index);
     if (!db || db->readOnly()) return;
-    auto job     = std::make_unique<CareJob>();
-    job->kind    = CareJob::Kind::Players;
+    auto job        = std::make_unique<CareJob>();
+    job->kind       = CareJob::Kind::Players;
+    job->crosstable = crosstable;
     job->folder  = shelf().entries()[index].folder;
     job->started = std::chrono::steady_clock::now();
     job->said    = std::move(said);
@@ -320,12 +323,20 @@ void App::careUndo() {
     if (!db || db->readOnly()) return;
     auto undo = std::move(care_->undo.back());
     care_->undo.pop_back();
-    auto job     = std::make_unique<CareJob>();
-    job->kind    = CareJob::Kind::Restore;
-    job->folder  = care_->folder;
-    job->started = std::chrono::steady_clock::now();
-    job->said    = trf("Undone: {}.", undo.what);
-    CareJob* j   = job.get();
+    startCareRestore(index, std::move(undo), false);
+}
+
+void App::startCareRestore(std::size_t index, Care::Undo undo, bool crosstable) {
+    if (care_job_) return;
+    const auto db = shelf().open(index);
+    if (!db || db->readOnly()) return;
+    auto job        = std::make_unique<CareJob>();
+    job->kind       = CareJob::Kind::Restore;
+    job->folder     = shelf().entries()[index].folder;
+    job->started    = std::chrono::steady_clock::now();
+    job->said       = trf("Undone: {}.", undo.what);
+    job->crosstable = crosstable;
+    CareJob* j      = job.get();
     j->done      = std::async(std::launch::async, [db, j, undo = std::move(undo)]() mutable {
         study::enterBackground();
         try {
@@ -388,10 +399,23 @@ void App::pollCare() {
         case CareJob::Kind::Players:
         case CareJob::Kind::Restore:
             if (!job->error.empty()) {
-                if (here) care_->error = trf("Not done: {}.", job->error);
+                if (job->crosstable && crosstable_ && crosstable_->folder == job->folder)
+                    crosstable_->error = trf("Not done: {}.", job->error);
+                else if (here)
+                    care_->error = trf("Not done: {}.", job->error);
                 break;
             }
-            if (here) {
+            if (job->crosstable) {  // asked from a crosstable (#92): its undo, and what it says, there
+                if (job->undo) {
+                    if (crosstable_undo_folder_ != job->folder) crosstable_undo_.clear();
+                    crosstable_undo_folder_ = job->folder;
+                    crosstable_undo_.push_back(std::move(*job->undo));
+                }
+                if (crosstable_ && crosstable_->folder == job->folder) {
+                    crosstable_->said = job->said;
+                    crosstable_->error.clear();
+                }
+            } else if (here) {
                 if (job->undo) care_->undo.push_back(std::move(*job->undo));
                 care_->said = job->said;
                 care_->error.clear();

@@ -26,6 +26,7 @@ struct BroadcastTour {
     std::string id, name, url;
     int tier = 0;  // Lichess's rank of the event: 5 the best known
     std::string players, location, time_control;
+    std::string format;  // what its organisers call it: "8-player round-robin", "9-round Swiss" (#92)
 };
 struct BroadcastEntry {
     BroadcastTour tour;

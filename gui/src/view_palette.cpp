@@ -829,7 +829,7 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
                 });
     }
     if (!mistake_unreviewed_.empty() && !mistake_reviews_)
-        add(trn("Review my latest game in the background", "Review my {} latest games in the background",
+        add(trn("Review {} recent game of mine in the background", "Review {} recent games of mine in the background",
                 mistake_unreviewed_.size(), mistake_unreviewed_.size()),
             TR("Training"), [this] { startMistakeReviews(); });
     if (mistake_reviews_) add(TR("Cancel the reviews of my games"), TR("Training"), [this] { cancelMistakeReviews(); });

@@ -847,12 +847,12 @@ void App::drawPuzzleColumn() {
             if (!p.retry && !p.practice) {
                 std::string what;
                 if (p.source == PuzzleRun::Source::Offline)
-                    what = trf("Missed: your rating {}. It comes back in “To review”, tomorrow.",
+                    what = trf("Missed: your rating {}. It comes back tomorrow in “To review today”.",
                                ratingChange(p.rating_before, p.rating_after));
                 else if (p.source == PuzzleRun::Source::Online)
-                    what =
-                        TR("Missed: its result goes to Lichess at the batch's end; it comes back in “To review”, "
-                           "tomorrow.");
+                    what = TR(
+                        "Missed: its result goes to Lichess at the batch's end; it comes back tomorrow in “To review "
+                        "today”.");
                 else
                     what = p.next_again ? std::string(TR("Asked again in this series, then tomorrow."))
                                         : trf("Next review {}.", whenText(p.next_review - epochNow()));
@@ -995,7 +995,7 @@ void App::drawPuzzleEnd() {
         return;
     }
     if (!missed.empty() && !p.practice) {
-        if (primaryButton(trn("Review it now", "Review the {} now", missed.size(), missed.size()).c_str()))
+        if (primaryButton(trn("Review {} now", "Review the {} now", missed.size(), missed.size()).c_str()))
             return reviewMissedPuzzles();
         ImGui::SameLine();
         if (ImGui::Button(TR("Back to the Training page"))) return closePuzzles(true);
@@ -1009,8 +1009,8 @@ void App::drawPuzzleEnd() {
     ImGui::Dummy(ImVec2(0, px(4)));
     wrapped(p.source == PuzzleRun::Source::Online
                 ? TR("A series stopped midway keeps its answers; the batch's results go to Lichess at its end.")
-                : TR("A series stopped midway keeps its answers. The missed come back in “To review” (FSRS): "
-                     "tomorrow, then further apart when they are right."),
+                : TR("A series stopped midway keeps its answers. The missed ones come back in “To review today” "
+                     "(FSRS): tomorrow, then further apart when they are right."),
             true);
 }
 

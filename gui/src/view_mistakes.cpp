@@ -1586,7 +1586,7 @@ void App::drawMistakeEnd() {
         return;
     }
     if (!missed.empty() && !r.practice) {
-        if (primaryButton(trn("Review it now", "Review the {} now", missed.size(), missed.size()).c_str()))
+        if (primaryButton(trn("Review {} now", "Review the {} now", missed.size(), missed.size()).c_str()))
             return reviewMissedMistakes();
         ImGui::SameLine();
         if (ImGui::Button(TR("Back to the Training page"))) return closeMistakes(true);

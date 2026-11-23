@@ -86,6 +86,12 @@ def write(path, comments, header, messages, entries, nplurals):
 
 def main():
     messages = extract()
+    # Russian's first form also serves 21, 31…, Chinese's only form every number: a singular without the plural's
+    # placeholders cannot show the number there (gui/tests/i18n_tests.cpp fails on it too).
+    mark = re.compile(r'\{[^{}]*\}|%[-+#0]*\d*(?:\.\d+)?(?:zu|ld|lld|[dsfcu%])')
+    for one, other in messages.items():
+        if other is not None and sorted(mark.findall(one)) != sorted(mark.findall(other)):
+            print(f'warning: the singular "{one}" lacks the placeholders of its plural "{other}"')
     pot = os.path.join(HERE, 'messages.pot')
     comments, header, _ = parse(pot)
     write(pot, comments, header, messages, {}, 2)

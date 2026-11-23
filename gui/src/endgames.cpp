@@ -40,7 +40,7 @@ const std::vector<EndgameEntry> CATALOGUE = {
     // Pawns: Kd6 and Kf6 alone win the opposition; a5 alone the square; every move the outside pawn; Kg7 alone holds
     // Réti's.
     {"opposition", EndgameGroup::Pawns, N_("The opposition"), EndgameGoal::Win, "4k3/8/4K3/4P3/8/8/8/8 w - - 0 1",
-     N_("The king stands in front of its pawn, beside it, and takes the opposition.")},
+     N_("The king stays ahead of its pawn, on a file beside it, and takes the opposition.")},
     {"square", EndgameGroup::Pawns, N_("The rule of the square"), EndgameGoal::Win, "8/8/8/8/P4k2/8/8/7K w - - 0 1",
      N_("Outside the pawn's square, the king cannot catch it: push the pawn at once.")},
     {"outside_pawn", EndgameGroup::Pawns, N_("The outside passed pawn"), EndgameGoal::Win,

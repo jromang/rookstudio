@@ -230,8 +230,8 @@ void App::drawTrainingGuess() {
         if (ImGui::Checkbox(TR("The moves of theory pass by themselves"), &trainingSettings().guess_theory))
             saveTrainingSettings();
         tip(
-            TR("Those many games of your databases played (their opening tree): the guessing starts where the game "
-               "leaves them."));
+            TR("The moves played by many games of your databases (their opening tree): the guessing starts where the "
+               "game leaves them."));
         if (!guess_error_.empty())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", guess_error_.c_str());
         const bool drawing = guess_pick_.valid();
@@ -668,8 +668,8 @@ void App::drawGuessPage() {
     else if (g.phase == GuessPhase::End && g.shown_guess >= 0)
         ImGui::TextDisabled("%s", TR("Your move in blue, the game's in green."));
     else if (g.book > 0 && g.guesses.empty() && g.phase == GuessPhase::Asking)
-        ImGui::TextDisabled("%s", trn("The first move, theory of your databases, passed by itself.",
-                                      "The first {} moves, theory of your databases, passed by themselves.",
+        ImGui::TextDisabled("%s", trn("{} opening move, theory in your databases, went by itself.",
+                                      "{} opening moves, theory in your databases, went by themselves.",
                                       (g.book + 1) / 2, (g.book + 1) / 2)
                                       .c_str());
     ImGui::PopTextWrapPos();

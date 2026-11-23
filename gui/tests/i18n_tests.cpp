@@ -49,19 +49,30 @@ TEST_CASE("every TR(), trf(), trn() and N_() message has a translation in every 
     if (fs::is_directory(dir)) {
         const std::string lits = R"re(((?:"(?:[^"\\]|\\.)*"\s*)+))re";
         const std::regex call(R"re(\b(TR|trf|trn|N_)\(\s*)re" + lits);
+        const std::regex plural_call(R"re(\btrn\(\s*)re" + lits + R"re(,\s*)re" + lits);
         const std::regex literal(R"re("((?:[^"\\]|\\.)*)")re");
+        const auto joined = [&](const std::string& parts) {
+            std::string text;
+            for (std::sregex_iterator p(parts.begin(), parts.end(), literal), e; p != e; ++p)
+                text += unescape((*p)[1].str());
+            return text.substr(0, text.find("##"));
+        };
         for (const auto& entry : fs::directory_iterator(dir)) {
             if (entry.path().extension() != ".cpp") continue;
             std::ifstream in(entry.path(), std::ios::binary);
             const std::string source((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             for (std::sregex_iterator it(source.begin(), source.end(), call), end; it != end; ++it) {
-                const auto parts = (*it)[2].str();
-                std::string text;
-                for (std::sregex_iterator p(parts.begin(), parts.end(), literal), e; p != e; ++p)
-                    text += unescape((*p)[1].str());
-                text = text.substr(0, text.find("##"));
+                const auto text = joined((*it)[2].str());
                 used.insert(text);
                 if ((*it)[1] == "trn") plural.insert(text);
+            }
+            // A translation's forms keep the singular's placeholders, and Russian's first form also serves 21, 31…,
+            // Chinese's only form every number: the singular shows the number wherever the plural does.
+            for (std::sregex_iterator it(source.begin(), source.end(), plural_call), end; it != end; ++it) {
+                const auto one = joined((*it)[1].str()), other = joined((*it)[2].str());
+                CHECK_MESSAGE(
+                    placeholders(one) == placeholders(other),
+                    "a plural whose singular has other placeholders: \"" << one << "\" / \"" << other << "\"");
             }
         }
         CHECK(used.size() > 150);

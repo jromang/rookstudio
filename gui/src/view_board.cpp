@@ -296,6 +296,7 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     board_.new_game = true;
     board_.watching = false;
     if (online_game_) online_game_->shown = false;  // a game on Lichess goes on meanwhile (#84)
+    bot_shown_ = false;                             // and the Lichess bot's (#85)
     page_ = Page::Board;
     if (analyse) setBoardAnalysis(true);
 }
@@ -785,6 +786,10 @@ void App::boardPlayAsked(chess::Move move) {
     if (endgame_) return endgameAnswer(move);  // to the endgame's, the vision's (#82)
     if (vision_) return visionAnswer(move);
     if (onlineShown()) return onlineMoveAsked(move);  // a game on Lichess: sent, waiting for Enter or its turn (#84)
+    if (botShown()) {                                 // the Lichess bot's game: its engine plays it (#85)
+        boardToast(TR("The bot plays this game: its moves are its engine's"));
+        return;
+    }
     auto& b = board_;
     // In a game the user plays, a move typed is theirs, at their turn only (#83); a game kept waits for Resume.
     if (b.humanGame()) {
@@ -1276,6 +1281,14 @@ void App::boardClick(const chess::Board& board, chess::Square square) {
             return;
         }
     }
+    // The Lichess bot's game (#85): its engine plays it; a click brings the board back to its move.
+    if (botShown()) {
+        auto& b        = board_;
+        const int last = static_cast<int>(b.game.moves.size());
+        if (b.line >= 0 || b.ply != last) showBoardLine(-1, last);
+        b.selected.reset();
+        return;
+    }
     if (board_.selected) {
         std::vector<chess::Move> moves;
         for (const auto& m : movesFrom(board, *board_.selected)) {
@@ -1407,7 +1420,7 @@ void App::drawBoardPage() {
         ImGui::SameLine();
         // The game analysed in passes, up to the time per position chosen beside.
         const bool live_game =
-            (b.watching && b.match && b.match_state.running) || engineGameHidesAids() || onlineShown();
+            (b.watching && b.match && b.match_state.running) || engineGameHidesAids() || onlineShown() || botShown();
         ImGui::BeginDisabled(b.editor.has_value() || (!b.reviewing() && (b.game.moves.empty() || live_game)));
         if (ui::iconButton("board_review", b.reviewing() ? ui::Icon::Stop : ui::Icon::Chart, review))
             b.reviewing() ? cancelGameReview() : startGameReview();
@@ -1558,6 +1571,7 @@ void App::drawBoardPage() {
     drawStudySendCard();        // the game sent to a Lichess study (#79)
     drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
     if (online_game_) drawOnlineGameCard();  // a game on Lichess played here (#84)
+    if (bot_shown_) drawBotGameCard();       // the Lichess bot's game followed here (#85)
     // A game against an engine of the Play page (#83); once it is over, the card of the games from here closes it.
     if (engine_game_ && engine_game_->over && b.play_open) closeEngineGame();
     if (engine_game_)
@@ -2253,7 +2267,7 @@ void App::drawBoardColumn(float size) {
 
     // Through the moves, back to the move being played while a game from here goes on, and the position as text.
     const int total = static_cast<int>(b.game.moves.size());
-    const bool live = (b.match && b.match_state.running && b.watching) || onlineShown();
+    const bool live = (b.match && b.match_state.running && b.watching) || onlineShown() || botShown();
     if (setup_.nav_buttons || (live && b.ply < total)) {
         const float copy = ImGui::CalcTextSize(TR("Copy FEN")).x + ImGui::GetStyle().FramePadding.x * 2 +
                            ImGui::GetStyle().ItemSpacing.x;
@@ -2668,6 +2682,12 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
         const auto& player = side == chess::Color::WHITE ? online_game_->state.white : online_game_->state.black;
         if (player.rating > 0) name += " · " + ui::exactCount(player.rating) + (player.provisional ? "?" : "");
     }
+    // The Lichess bot's game (#85): the same.
+    const bool bot = !online && botShown() && bot_state_.game.full;
+    if (bot) {
+        const auto& player = side == chess::Color::WHITE ? bot_state_.game.white : bot_state_.game.black;
+        if (player.rating > 0) name += " · " + ui::exactCount(player.rating) + (player.provisional ? "?" : "");
+    }
     dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     dl->AddText(ImVec2(x + 0.6f, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     x += ImGui::CalcTextSize(name.c_str()).x + px(10);
@@ -2708,6 +2728,7 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
     }
     std::optional<std::string> online_clock;
     if (online && at_end) online_clock = onlineStripClock(side);
+    if (bot && at_end) online_clock = botStripClock(side);
     if (online_clock && online_clock->empty()) {  // by correspondence, the other side's time is not told
         online_clock.reset();
         clock.reset();
@@ -4219,7 +4240,7 @@ void App::drawBoardPlay() {
     // Its place among the cores: refused, or played anyway, when the machine is full.
     const int need  = std::max(s.game_human == 0 ? 0 : engineThreads(s.game_first),
                                s.game_human == 1 ? 0 : engineThreads(s.game_second));
-    const int busy  = tournamentThreads() + boardThreads();
+    const int busy  = tournamentThreads() + boardThreads() + botThreads();  // the Lichess bot's game too (#85)
     const bool full = busy + need > topology_.logical;
     ImGui::TextDisabled("%s", trf("Counts in the core budget · {} of {} threads", need, topology_.logical).c_str());
     if (ImGui::IsItemHovered()) {

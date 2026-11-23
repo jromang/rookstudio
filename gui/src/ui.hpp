@@ -132,7 +132,8 @@ enum class Icon {
     Target,  // your mistakes as exercises (#81)
     Eye,     // guessing the moves of a game (#81)
     Zap,     // the mates (#82)
-    Grid     // board vision (#82)
+    Grid,    // board vision (#82)
+    Bot      // a Lichess bot for an engine (#85)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

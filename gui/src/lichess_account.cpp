@@ -19,8 +19,6 @@ namespace fcg::lichess {
 
 namespace {
 
-constexpr const char* ACCOUNT_FILE = "lichess-account.json";
-
 std::string base64url(const uint8_t* data, std::size_t n) {
     static constexpr char ALPHABET[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     std::string out;
@@ -322,8 +320,8 @@ Answer<Account> link(const std::function<bool(const std::string& url)>& open, co
     return a;
 }
 
-std::optional<Account> loadAccount(const std::filesystem::path& profile) {
-    std::ifstream in(profile / ACCOUNT_FILE, std::ios::binary);
+std::optional<Account> loadAccount(const std::filesystem::path& profile, const char* file) {
+    std::ifstream in(profile / file, std::ios::binary);
     if (!in) return std::nullopt;
     try {
         const auto j = nlohmann::json::parse(in);
@@ -339,19 +337,19 @@ std::optional<Account> loadAccount(const std::filesystem::path& profile) {
     }
 }
 
-void saveAccount(const std::filesystem::path& profile, const Account& account) {
+void saveAccount(const std::filesystem::path& profile, const Account& account, const char* file) {
     const nlohmann::json j{{"username", account.username},
                            {"token", account.token},
                            {"expires", account.expires},
                            {"scopes", account.scopes}};
-    tour::replaceFile(profile / ACCOUNT_FILE, j.dump(1), false, true);
+    tour::replaceFile(profile / file, j.dump(1), false, true);
 }
 
-std::string forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel) {
+std::string forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel, const char* file) {
     std::string error;
-    if (const auto account = loadAccount(profile)) error = revoke(account->token, cancel);
+    if (const auto account = loadAccount(profile, file)) error = revoke(account->token, cancel);
     std::error_code ec;
-    std::filesystem::remove(profile / ACCOUNT_FILE, ec);
+    std::filesystem::remove(profile / file, ec);
     return error;
 }
 

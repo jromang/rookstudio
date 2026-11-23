@@ -32,6 +32,9 @@ bool boolOf(const nlohmann::json& j, const char* key) {
     return it != j.end() && it->is_boolean() && it->get<bool>();
 }
 
+// The API's segment of a game's endpoints.
+const char* apiName(PlayApi api) { return api == PlayApi::Bot ? "bot" : "board"; }
+
 std::string refusal(int status, const std::string& error) {
     return status == 0     ? (error.empty() ? std::string("Lichess did not answer") : error)
            : status == 401 ? std::string("Lichess refused the token")
@@ -204,22 +207,22 @@ std::optional<chess::Move> legalUci(const chess::Board& board, std::string_view 
 // One request each
 
 Reply boardMove(const std::string& token, const std::string& game, const std::string& uci, bool offer_draw,
-                const std::atomic<bool>* cancel) {
+                const std::atomic<bool>* cancel, PlayApi api) {
     // A move waits less than the other requests: the clock runs.
-    return post(fmt::format("/api/board/game/{}/move/{}{}", urlEncode(game), urlEncode(uci),
+    return post(fmt::format("/api/{}/game/{}/move/{}{}", apiName(api), urlEncode(game), urlEncode(uci),
                             offer_draw ? "?offeringDraw=true" : ""),
                 token, {}, cancel, 10);
 }
 
 Reply boardAction(const std::string& token, const std::string& game, std::string_view action,
-                  const std::atomic<bool>* cancel) {
-    return post(fmt::format("/api/board/game/{}/{}", urlEncode(game), action), token, {}, cancel);
+                  const std::atomic<bool>* cancel, PlayApi api) {
+    return post(fmt::format("/api/{}/game/{}/{}", apiName(api), urlEncode(game), action), token, {}, cancel);
 }
 
 Reply boardChat(const std::string& token, const std::string& game, const std::string& text,
-                const std::atomic<bool>* cancel) {
-    return post(fmt::format("/api/board/game/{}/chat", urlEncode(game)), token, {{"room", "player"}, {"text", text}},
-                cancel);
+                const std::atomic<bool>* cancel, PlayApi api) {
+    return post(fmt::format("/api/{}/game/{}/chat", apiName(api), urlEncode(game)), token,
+                {{"room", "player"}, {"text", text}}, cancel);
 }
 
 Reply acceptChallenge(const std::string& token, const std::string& id, const std::atomic<bool>* cancel) {
@@ -442,10 +445,10 @@ void ChallengeOut::run() {
 // A game's stream
 
 Answer<std::vector<ChatLine>> boardChatLines(const std::string& token, const std::string& game,
-                                             const std::atomic<bool>* cancel) {
+                                             const std::atomic<bool>* cancel, PlayApi api) {
     Answer<std::vector<ChatLine>> out;
     HttpRequest request;
-    request.url    = fmt::format("{}/api/board/game/{}/chat", servers().api, urlEncode(game));
+    request.url    = fmt::format("{}/api/{}/game/{}/chat", servers().api, apiName(api), urlEncode(game));
     request.method = "GET";
     request.token  = token;
     request.headers.emplace_back("Accept", "application/json");
@@ -563,7 +566,8 @@ ReplayGame replayOf(const BoardState& s) {
     return g;
 }
 
-GameStream::GameStream(std::string token, std::string id) : token_(std::move(token)), id_(std::move(id)) {
+GameStream::GameStream(std::string token, std::string id, PlayApi api)
+    : token_(std::move(token)), id_(std::move(id)), api_(api) {
     state_.id = id_;
     thread_   = std::thread([this] { run(); });
 }
@@ -592,10 +596,10 @@ void GameStream::run() {
     int breaks = 0;  // in a row
     while (!stop_) {
         // The players' chat so far: what the stream says after it opens is added to it.
-        if (auto chat = boardChatLines(token_, id_, &stop_); chat.value)
+        if (auto chat = boardChatLines(token_, id_, &stop_, api_); chat.value)
             update([&](BoardState& st) { st.chat = std::move(*chat.value); });
         HttpRequest request;
-        request.url    = fmt::format("{}/api/board/game/stream/{}", servers().api, urlEncode(id_));
+        request.url    = fmt::format("{}/api/{}/game/stream/{}", servers().api, apiName(api_), urlEncode(id_));
         request.method = "GET";
         request.token  = token_;
         request.headers.emplace_back("Accept", "application/x-ndjson");

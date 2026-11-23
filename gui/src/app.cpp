@@ -194,6 +194,11 @@ void App::requestQuit() {
         quit_online_open_ = true;
         return;
     }
+    // A live game of the Lichess bot's would be lost on time: asked first (#85, M12 board 6).
+    if (!quit_bot_said_ && botLive()) {
+        quit_bot_open_ = true;
+        return;
+    }
     if (runsPlaying() > 0) {
         open_quit_modal_ = true;
     } else {
@@ -323,6 +328,7 @@ void App::frame() {
     pollEndgames();         // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
     pollEngineGame();       // a game against an engine: kept at each move, its end, a hint (#83)
     pollOnlinePlay();       // playing on Lichess: a seek, the challenges, the game on the Board (#84)
+    pollBot();              // a Lichess bot for an engine: its account, its challenges, its game (#85)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
@@ -613,6 +619,17 @@ void App::frame() {
         } else if (w == "play-lichess") {  // the Play page's "On Lichess" part (#84)
             page_      = Page::Play;
             play_part_ = 1;
+        } else if (w == "engines-bot" || w == "bot-online") {
+            // The Engines page, the first engine's card: its bot's setup started (#85); bot-online: the bot put online,
+            // its account linked already.
+            page_            = Page::Engines;
+            selected_engine_ = engines_.empty() ? -1 : 0;
+            loadBot();
+            if (w == "engines-bot" && !engines_.empty()) {
+                bot_setup_engine_ = engines_[0].name;
+                bot_step_         = BotStep::Account;
+            }
+            if (w == "bot-online") setBotOnline(true);
         } else if (w.rfind("lichess-game=", 0) == 0) {
             // lichess-game=ID[@black]: a game of the user's on Lichess played on the Board (#84), its stream asked of
             // the server --focus lichess-api= named.
@@ -866,6 +883,7 @@ void App::frame() {
     drawSprtCalculator();
     drawQuitModal();
     drawQuitOnline();  // closing during a live game on Lichess (#84)
+    drawQuitBot();     // closing during a live game of the Lichess bot's (#85)
     drawImportPreview();
     // Asked from any page: a machine key's passphrase, a machine's files.
     drawPassphrasePrompt();

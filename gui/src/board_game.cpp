@@ -22,83 +22,32 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-// An engine playing a game, spoken to in UCI (a WinBoard engine through the adapter), from the game's thread; or,
-// with a `seat`, the user, whose moves the window gives there.
+// An engine playing a game (EnginePlayer), from the game's thread; or, with a `seat`, the user, whose moves the window
+// gives there.
 class Player {
    public:
     Player(const EngineEntry& entry, const std::atomic<bool>& stop, const std::atomic<bool>& resign,
            const std::atomic<bool>& takeback, BoardSeat* seat = nullptr)
-        : entry_(entry), stop_(stop), resign_(resign), takeback_(takeback), seat_(seat) {}
+        : stop_(stop), resign_(resign), takeback_(takeback), seat_(seat), engine_(entry, stop, [&resign, &takeback] {
+              return resign || takeback;
+          }) {}
 
     // Started, given the library's option values (and Chess960 when asked), and ready. False with the reason.
-    bool start(bool chess960, std::string& error) {
-        if (seat_) return true;
-        std::string why;
-        if (!process_.start(engineLaunch(entry_), why)) {
-            error = trf("Cannot start {}: {}", entry_.name, toUtf8(why));
-            return false;
-        }
-        const auto timeout = entry_.start_timeout > 0
-                                 ? std::chrono::milliseconds(entry_.start_timeout * 1000LL)
-                                 : std::chrono::duration_cast<std::chrono::milliseconds>(ENGINE_STARTUP_TIME);
-        (void)process_.send("uci");
-        std::vector<UciOptionInfo> options;
-        if (!waitFor("uciok", Clock::now() + timeout, [&](const std::string& line) {
-                if (auto o = parseUciOption(line)) options.push_back(std::move(*o));
-            })) {
-            error = trf("{} does not answer uci: is it a UCI engine?", entry_.name);
-            return false;
-        }
-        for (const auto& [name, value] : tour::forEngine(entry_.options)) {
-            const auto it = std::find_if(options.begin(), options.end(), [&](const auto& o) { return o.name == name; });
-            if (it == options.end() || it->type == "button") continue;
-            (void)process_.send("setoption name " + name + " value " + value);
-        }
-        if (chess960 &&
-            std::any_of(options.begin(), options.end(), [](const auto& o) { return o.name == "UCI_Chess960"; }))
-            (void)process_.send("setoption name UCI_Chess960 value true");
-        if (!ready(timeout)) {
-            error = trf("{} does not answer isready.", entry_.name);
-            return false;
-        }
-        return true;
-    }
+    bool start(bool chess960, std::string& error) { return seat_ || engine_.start(chess960, error); }
 
-    bool newGame() {
-        if (seat_) return true;
-        (void)process_.send("ucinewgame");
-        return ready(std::chrono::seconds(60));
-    }
+    bool newGame() { return seat_ || engine_.newGame(); }
 
     // Its move for the position, within `budget` (its clock and the margin): the move in UCI, or nullopt (out of
     // time, stopped, resigned, a move taken back, or the engine ended). `info` gets each info line with a score.
     std::optional<std::string> go(const std::string& position, const std::string& go, std::chrono::milliseconds budget,
                                   const std::function<void(const std::string&)>& info) {
         if (seat_) return userMove(budget);
-        (void)process_.send(position);
-        (void)process_.send(go);
-        std::optional<std::string> move;
-        const bool got = waitFor(
-            "bestmove", Clock::now() + budget,
-            [&](const std::string& line) {
-                if (line.rfind("info", 0) == 0 && line.find(" score ") != std::string::npos) info(line);
-            },
-            &move, true);
-        if (!got) {
-            // The user resigned, or took their move back, while it searched: stopped and its bestmove read, ready for
-            // the next search.
-            if ((resign_ || takeback_) && !stop_ && process_.running()) {
-                (void)process_.send("stop");
-                (void)waitFor("bestmove", Clock::now() + std::chrono::seconds(2), [](const std::string&) {});
-            }
-            return std::nullopt;
-        }
-        return move;
+        return engine_.go(position, go, budget, info);
     }
 
-    [[nodiscard]] bool alive() const { return seat_ || process_.running(); }
+    [[nodiscard]] bool alive() const { return seat_ || engine_.alive(); }
     void quit() {
-        if (!seat_) process_.stop(std::chrono::milliseconds(500));
+        if (!seat_) engine_.quit();
     }
 
    private:
@@ -113,43 +62,11 @@ class Player {
         return std::exchange(seat_->move, std::nullopt);
     }
 
-    bool ready(std::chrono::milliseconds timeout) {
-        (void)process_.send("isready");
-        return waitFor("readyok", Clock::now() + timeout, [](const std::string&) {});
-    }
-
-    // Reads its lines until one starting with `word`, passing the others to `each`; `move` gets the word's first
-    // argument (bestmove e2e4). False on the deadline, a stop or the engine's end, and, `interruptible`, when the user
-    // resigns.
-    template <typename F>
-    bool waitFor(std::string_view word, Clock::time_point deadline, F each, std::optional<std::string>* move = nullptr,
-                 bool interruptible = false) {
-        while (true) {
-            for (auto& line : process_.take()) {
-                if (line.kind != EngineProcess::Line::Kind::Out) continue;
-                const auto& text = line.text;
-                if (text.rfind(word, 0) == 0 && (text.size() == word.size() || text[word.size()] == ' ')) {
-                    if (move) {
-                        auto rest = text.substr(std::min(text.size(), word.size() + 1));
-                        *move     = rest.substr(0, rest.find(' '));
-                    }
-                    return true;
-                }
-                each(text);
-            }
-            if (stop_ || (interruptible && (resign_ || takeback_)) || !process_.running() || Clock::now() >= deadline)
-                return false;
-            const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
-            process_.wait(std::clamp(left, std::chrono::milliseconds(1), std::chrono::milliseconds(50)));
-        }
-    }
-
-    const EngineEntry& entry_;
     const std::atomic<bool>& stop_;
     const std::atomic<bool>& resign_;
     const std::atomic<bool>& takeback_;
     BoardSeat* seat_ = nullptr;
-    EngineProcess process_;
+    EnginePlayer engine_;
 };
 
 // The game as the user sees it while they play it: the engine's scores, depths and lines left out.
@@ -184,6 +101,113 @@ std::string today() {
 std::string pgnTimeControl(const GameClock& c) { return fmt::format("{:g}+{:g}", c.base_s, c.inc_s); }
 
 }  // namespace
+
+EnginePlayer::EnginePlayer(EngineEntry entry, const std::atomic<bool>& stop, std::function<bool()> interrupt)
+    : entry_(std::move(entry)), stop_(stop), interrupt_(std::move(interrupt)) {}
+
+EnginePlayer::~EnginePlayer() { quit(); }
+
+bool EnginePlayer::start(bool chess960, std::string& error,
+                         const std::vector<std::pair<std::string, std::string>>& more) {
+    std::string why;
+    if (!process_.start(engineLaunch(entry_), why)) {
+        error = trf("Cannot start {}: {}", entry_.name, toUtf8(why));
+        return false;
+    }
+    const auto timeout = entry_.start_timeout > 0
+                             ? std::chrono::milliseconds(entry_.start_timeout * 1000LL)
+                             : std::chrono::duration_cast<std::chrono::milliseconds>(ENGINE_STARTUP_TIME);
+    (void)process_.send("uci");
+    std::vector<UciOptionInfo> options;
+    if (!waitFor("uciok", Clock::now() + timeout, [&](const std::string& line) {
+            if (auto o = parseUciOption(line)) options.push_back(std::move(*o));
+        })) {
+        error = trf("{} does not answer uci: is it a UCI engine?", entry_.name);
+        return false;
+    }
+    options_.clear();
+    for (const auto& o : options)
+        if (o.type != "button") options_.push_back(o.name);
+    for (const auto& [name, value] : tour::forEngine(entry_.options)) {
+        if (!has(name)) continue;
+        if (std::any_of(more.begin(), more.end(), [&](const auto& m) { return m.first == name; })) continue;
+        (void)process_.send("setoption name " + name + " value " + value);
+    }
+    if (chess960 && has("UCI_Chess960")) (void)process_.send("setoption name UCI_Chess960 value true");
+    for (const auto& [name, value] : more)
+        if (has(name)) (void)process_.send("setoption name " + name + " value " + value);
+    if (!ready(timeout)) {
+        error = trf("{} does not answer isready.", entry_.name);
+        return false;
+    }
+    return true;
+}
+
+bool EnginePlayer::newGame() {
+    (void)process_.send("ucinewgame");
+    return ready(std::chrono::seconds(60));
+}
+
+std::optional<std::string> EnginePlayer::go(const std::string& position, const std::string& go,
+                                            std::chrono::milliseconds budget,
+                                            const std::function<void(const std::string&)>& info, bool stop_late) {
+    (void)process_.send(position);
+    (void)process_.send(go);
+    std::optional<std::string> move;
+    const auto each = [&](const std::string& line) {
+        if (line.rfind("info", 0) == 0 && line.find(" score ") != std::string::npos) info(line);
+    };
+    if (waitFor("bestmove", Clock::now() + budget, each, &move, true)) return move;
+    // Interrupted while it searched: stopped and its bestmove read, ready for the next search. Late, with
+    // `stop_late`: stopped, and its move taken if it comes soon.
+    const bool interrupted = interrupt_ && interrupt_();
+    if (interrupted && !stop_ && process_.running()) {
+        (void)process_.send("stop");
+        (void)waitFor("bestmove", Clock::now() + std::chrono::seconds(2), [](const std::string&) {});
+    } else if (stop_late && !stop_ && process_.running()) {
+        (void)process_.send("stop");
+        if (waitFor("bestmove", Clock::now() + std::chrono::seconds(1), each, &move)) return move;
+    }
+    return std::nullopt;
+}
+
+bool EnginePlayer::alive() const { return process_.running(); }
+
+bool EnginePlayer::has(const std::string& option) const {
+    return std::find(options_.begin(), options_.end(), option) != options_.end();
+}
+
+void EnginePlayer::quit() {
+    if (process_.started()) process_.stop(std::chrono::milliseconds(500));
+}
+
+bool EnginePlayer::ready(std::chrono::milliseconds timeout) {
+    (void)process_.send("isready");
+    return waitFor("readyok", Clock::now() + timeout, [](const std::string&) {});
+}
+
+bool EnginePlayer::waitFor(std::string_view word, Clock::time_point deadline,
+                           const std::function<void(const std::string&)>& each, std::optional<std::string>* move,
+                           bool interruptible) {
+    while (true) {
+        for (auto& line : process_.take()) {
+            if (line.kind != EngineProcess::Line::Kind::Out) continue;
+            const auto& text = line.text;
+            if (text.rfind(word, 0) == 0 && (text.size() == word.size() || text[word.size()] == ' ')) {
+                if (move) {
+                    auto rest = text.substr(std::min(text.size(), word.size() + 1));
+                    *move     = rest.substr(0, rest.find(' '));
+                }
+                return true;
+            }
+            each(text);
+        }
+        if (stop_ || (interruptible && interrupt_ && interrupt_()) || !process_.running() || Clock::now() >= deadline)
+            return false;
+        const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
+        process_.wait(std::clamp(left, std::chrono::milliseconds(1), std::chrono::milliseconds(50)));
+    }
+}
 
 bool engineAcceptsDraw(const std::optional<fastchess::Score>& score, int plies) {
     if (!score) return false;

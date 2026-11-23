@@ -158,6 +158,12 @@ msgstr "+ Движок"
 msgid "+ Import…"
 msgstr "+ Импорт…"
 
+msgid "+ Lichess…"
+msgstr ""
+
+msgid "+ Lichess… (their account)"
+msgstr ""
+
 msgid "+ {} per move"
 msgstr "+ {} на ход"
 
@@ -247,6 +253,9 @@ msgstr "1 нелегальный ход"
 
 msgid "1 loss on time"
 msgstr "1 поражение по времени"
+
+msgid "1.{} in {} % · score {} %"
+msgstr ""
 
 msgid "10 games at 10+0.1 from 5 positions, to see before a long tournament whether it loses on time, crashes, plays an illegal move or uses its clock badly."
 msgstr "10 партий с контролем 10+0.1 из 5 позиций, чтобы перед долгим турниром проверить, не проигрывает ли движок по времени, не вылетает ли, не делает ли нелегальных ходов и хорошо ли распоряжается временем."
@@ -350,6 +359,9 @@ msgstr "Глава одного из ваших исследований или 
 msgid "A click adds it to the active repertoire"
 msgstr "Щелчок добавляет его в активный репертуар"
 
+msgid "A click asks Lichess for their games of the last year and their public profile: their name and those filters only."
+msgstr ""
+
 msgid "A click chooses the game; a double click follows it on the board."
 msgstr "Щелчок выбирает партию; двойной щелчок — следить за ней на доске."
 
@@ -363,6 +375,12 @@ msgid "A click goes to the move · the right button: the line it expected, on th
 msgstr "Щелчок — переход к ходу · правая кнопка: ожидавшаяся им линия, на доске или вариантом, и его комментарий как есть"
 
 msgid "A click on a cell takes that field from that source. The merged game keeps the number of the oldest (No. {}); the other is marked deleted, and Ctrl+Z brings it back. Where each field came from is kept with the game (its MergedFrom tag); a broadcast's game keeps its source."
+msgstr ""
+
+msgid "A click on a game opens it on the Board page, with this dossier as its list (Ctrl+← and Ctrl+→)."
+msgstr ""
+
+msgid "A click on a line opens it on the Board page, the Tree tab on their games alone, from their side."
 msgstr ""
 
 msgid "A click on a square then empties it. A right click empties a square whatever is chosen."
@@ -406,6 +424,9 @@ msgstr ""
 
 msgid "A click: each of its lines."
 msgstr "Щелчок: все его линии."
+
+msgid "A click: those games in the list, the Structure search starting from there."
+msgstr ""
 
 msgid "A clock: a base time and an increment, the base given again every N moves if you like (tc=40/900, tc=10+0.1)."
 msgstr "Часы: основное время и добавка, основное время при желании выдаётся заново каждые N ходов (tc=40/900, tc=10+0.1)."
@@ -710,8 +731,8 @@ msgstr "Рейтинг-лист для опорного рейтинга Elo…"
 msgid "A request to GitHub per engine taken from them, kept a day."
 msgstr "По запросу к GitHub на каждый взятый оттуда движок, ответ хранится сутки."
 
-msgid "A right click: their FIDE card, asked of Lichess (the name only, without an account)."
-msgstr "Щелчок правой кнопкой: карточка ФИДЕ игрока, запрашиваемая у Lichess (только имя, без учётной записи)."
+msgid "A right click: their dossier, or their FIDE card asked of Lichess (the name only, without an account)."
+msgstr ""
 
 msgid "A search"
 msgstr "Поиск"
@@ -874,6 +895,9 @@ msgstr[2] "По её файлу заголовков (.cbh), без открыт
 
 msgid "Accuracy by each analysis: {}"
 msgstr "Точность по каждому анализу: {}"
+
+msgid "Accuracy: opening {}, middlegame {}, endgame {}."
+msgstr ""
 
 msgid "Add"
 msgstr "Добавить"
@@ -1070,8 +1094,11 @@ msgstr "Ещё раз: ход белых"
 msgid "Again: the move of your repertoire"
 msgstr "Ещё раз: ход вашего репертуара"
 
-msgid "Against 1.{}: {}"
-msgstr "Против 1.{}: {}"
+msgid "Against 1.{}"
+msgstr ""
+
+msgid "Against 1.{}: {} in {} %"
+msgstr ""
 
 msgid "Against an engine"
 msgstr "Против движка"
@@ -1079,8 +1106,17 @@ msgstr "Против движка"
 msgid "Against an engine, at a strength, with its openings and a handicap:"
 msgstr "Против движка — с заданной силой, его дебютами и форой:"
 
+msgid "Against stronger players: {} %."
+msgstr ""
+
+msgid "Against stronger players: {} %; against weaker ones: {} %."
+msgstr ""
+
 msgid "Against the tables: win, or hold the draw."
 msgstr "Против таблиц: выиграйте или удержите ничью."
+
+msgid "Against weaker players: {} %."
+msgstr ""
 
 msgid "Against {}"
 msgstr "Против {}"
@@ -1493,6 +1529,9 @@ msgstr "Вопрос повторится в этом сеансе, затем �
 msgid "Asked of Lichess without an account: the channels, and the games you follow. Nothing is kept unless you keep it."
 msgstr "Запрашивается у Lichess без учётной записи: каналы и партии, за которыми вы следите. Сохраняется только то, что сохраните вы."
 
+msgid "Asked of Lichess: their name with a year of blitz, rapid and classical games, and their public profile. A click takes the source out."
+msgstr ""
+
 msgid "Asked of Lichess: their name with a year of blitz, rapid and classical games, and their public profile. Nothing of yours."
 msgstr "Запрос к Lichess: имя соперника с его партиями в блиц, рапид и классику за год и его публичный профиль. Ничего вашего."
 
@@ -1699,6 +1738,9 @@ msgstr "Вернуть по умолчанию"
 
 msgid "Back to the default value"
 msgstr "Вернуть значение по умолчанию"
+
+msgid "Back to the dossier"
+msgstr ""
 
 msgid "Back to the duplicates"
 msgstr ""
@@ -3113,6 +3155,21 @@ msgstr[2] "Готово: {} новых партий в «{}»"
 msgid "Done: {} new games{}."
 msgstr "Готово, новых партий: {}{}."
 
+msgid "Dossier"
+msgstr ""
+
+msgid "Dossier of {}"
+msgstr ""
+
+msgid "Dossier of “{}”"
+msgstr ""
+
+msgid "Dossier of “{}”: no game in your databases"
+msgstr ""
+
+msgid "Dossier: {}"
+msgstr ""
+
 msgid "Double bishop mate"
 msgstr "Мат двумя слонами"
 
@@ -3560,6 +3617,9 @@ msgstr "Enter"
 msgid "Enter it now…"
 msgstr "Ввести её сейчас…"
 
+msgid "Enter keeps the choice in the tables of names: the dossier then takes only that player's games."
+msgstr ""
+
 msgid "Enter or a double click in the list opens the game at this move."
 msgstr ""
 
@@ -3577,6 +3637,9 @@ msgstr "Enter · около {} мин"
 
 msgid "Enter · counts in the core budget: {} of {} threads"
 msgstr "Enter · учитывается в бюджете ядер: {} из {} потоков"
+
+msgid "Enter · kept in the tables of names"
+msgstr ""
 
 msgid "Enter · the review, then your mistakes as exercises"
 msgstr "Enter · разбор, затем ваши ошибки как упражнения"
@@ -3887,7 +3950,13 @@ msgstr ""
 msgid "FIDE's list could not be taken: {}."
 msgstr ""
 
+msgid "FIDE's list of {}"
+msgstr ""
+
 msgid "FIDE's list of {} is out"
+msgstr ""
+
+msgid "FIDE's list of {} says {}."
 msgstr ""
 
 msgid "FIDE's rating list"
@@ -3919,6 +3988,12 @@ msgstr "Фигур достаточно мало для присуждения �
 
 msgid "Fewer"
 msgstr "Меньше"
+
+msgid "Fewer than five games: no structures."
+msgstr ""
+
+msgid "Fewer than three years of rated games: no curve."
+msgstr ""
 
 msgid "Fifty puzzles you never saw, at your Lichess rating, of the theme chosen; kept on the disk until their results are sent."
 msgstr "Пятьдесят задач, которых вы не видели, под ваш рейтинг Lichess, на выбранную тему; хранятся на диске, пока их результаты не отправлены."
@@ -4166,6 +4241,9 @@ msgstr "Из исследования Lichess…"
 msgid "From a source…"
 msgstr "Из источника…"
 
+msgid "From a source… (TWIC, a broadcast)"
+msgstr ""
+
 msgid "From move"
 msgstr "С хода"
 
@@ -4198,6 +4276,9 @@ msgstr "Из вашего исследования Lichess"
 
 msgid "From your games"
 msgstr "Из ваших партий"
+
+msgid "From {} to {}, from their games; the highest, {} in {}."
+msgstr ""
 
 msgid "From {}: {}"
 msgstr "Из {}: {}"
@@ -4514,6 +4595,9 @@ msgstr "Заголовки"
 msgid "Health"
 msgstr "Надёжность"
 
+msgid "Hedgehog"
+msgstr ""
+
 msgid "Held by Pause all: no tournament starts until Resume all."
 msgstr "Задержана кнопкой «Приостановить всё»: ни один турнир не начнётся до «Продолжить всё»."
 
@@ -4784,6 +4868,9 @@ msgstr "В теории ›"
 msgid "In {} moves at most"
 msgstr ""
 
+msgid "In {}, from their games; the highest, {} in {}."
+msgstr ""
+
 msgid "In “{}”: each chapter a game; read again, only the changed chapters are replaced."
 msgstr "В «{}»: каждая глава — партия; при перечитывании заменяются только изменённые главы."
 
@@ -4882,6 +4969,9 @@ msgstr "В «{}», под её номером"
 
 msgid "Into “{}”, under its number · Ctrl+Shift+S: a copy elsewhere"
 msgstr "В «{}», под её номером · Ctrl+Shift+S: копия в другое место"
+
+msgid "Isolated queen's pawn"
+msgstr ""
 
 msgid "Issue"
 msgstr "Выпуск"
@@ -5336,6 +5426,9 @@ msgstr "Оставить играть и выйти"
 msgid "Keep this game…"
 msgstr "Сохранить эту партию…"
 
+msgid "Keep this one"
+msgstr ""
+
 msgid "Keep this search…"
 msgstr "Сохранить этот поиск…"
 
@@ -5359,6 +5452,9 @@ msgstr "Остаётся в библиотеке, но не предлагает
 
 msgid "Kept in the profile only, never in a tournament's files or the log."
 msgstr "Хранится только в профиле, никогда — в файлах турнира или в журнале."
+
+msgid "Kept in the tables of names: {}. Ctrl+Z undoes."
+msgstr ""
 
 msgid "Kept in “{}”"
 msgstr "Сохранена в «{}»"
@@ -5744,6 +5840,15 @@ msgstr "Lichess {}, оба игрока с рейтингом {} и выше"
 msgid "Lichess · {}"
 msgstr "Lichess · {}"
 
+msgid "Lichess · {} · never synced"
+msgstr ""
+
+msgid "Lichess · {} · synced on {}"
+msgstr ""
+
+msgid "Lichess · {} · {}"
+msgstr ""
+
 msgid "Lichess · {}: {}"
 msgstr "Lichess · {}: {}"
 
@@ -5984,6 +6089,9 @@ msgstr "Вероятность превосходства над следующ�
 msgid "Likelihood of superiority over the next engine of the list: the probability that it is the stronger of the two. Approximate: with more than 1000 engines, the covariance of the ratings is approximated from each one's games and the games the two played together."
 msgstr "Вероятность превосходства над следующим движком списка: вероятность того, что он сильнее из двух. Приблизительно: при более чем 1000 движков ковариация рейтингов оценивается по партиям каждого и по их партиям друг с другом."
 
+msgid "Line"
+msgstr ""
+
 msgid "Line {}, where game {} starts."
 msgstr "Строка {}, где начинается партия {}."
 
@@ -6052,6 +6160,9 @@ msgstr "Линии"
 
 msgid "Lines of"
 msgstr "Варианты длиной"
+
+msgid "Link"
+msgstr ""
 
 msgid "Link another account…"
 msgstr "Привязать другую учётную запись…"
@@ -6245,6 +6356,15 @@ msgstr "Компьютер: {} физических ядер, {} потоков"
 msgid "Machines"
 msgstr "Машины"
 
+msgid "Made in {:.1f} s; only what the Lichess source asks leaves the machine."
+msgstr ""
+
+msgid "Made of your databases alone, in {:.1f} s; nothing leaves the machine."
+msgstr ""
+
+msgid "Made of:"
+msgstr ""
+
 msgid "Maintenance"
 msgstr ""
 
@@ -6269,6 +6389,9 @@ msgstr "Сделать ботом…"
 msgid "Make it a theory study"
 msgstr "Добавить в теорию"
 
+msgid "Make it again"
+msgstr ""
+
 msgid "Make it first"
 msgstr "Сделать первым"
 
@@ -6292,6 +6415,9 @@ msgstr "Сделать {} первым в анализе"
 
 msgid "Makes the match an SPRT with these values: the bounds, the bias, alpha, beta and the model."
 msgstr "Делает матч SPRT с этими значениями: границы, сдвиг, alpha, beta и модель."
+
+msgid "Making the dossier… {} %"
+msgstr ""
 
 msgid "Making the folder {}…"
 msgstr "Создание папки {}…"
@@ -6707,6 +6833,9 @@ msgstr "По запросу «{}» трансляций не найдено."
 msgid "No browser opened: paste this address in a browser of this machine."
 msgstr "Браузер не открылся: вставьте этот адрес в браузер на этом компьютере."
 
+msgid "No clear mistake of theirs in these games."
+msgstr ""
+
 msgid "No crashes, time losses or illegal moves"
 msgstr "Нет вылетов, поражений по времени и нелегальных ходов"
 
@@ -6796,6 +6925,9 @@ msgstr "Упражнений пока нет: в ваших разобранны
 
 msgid "No folder of pieces is chosen."
 msgstr "Папка с фигурами не выбрана."
+
+msgid "No game between you"
+msgstr ""
 
 msgid "No game finished yet"
 msgstr "Пока ни одна партия не завершена"
@@ -6937,6 +7069,9 @@ msgstr "Звуков ходов не будет: не удалось запус�
 
 msgid "No move to guess"
 msgstr "Нечего угадывать"
+
+msgid "No named structure at move 20 in their games."
+msgstr ""
 
 msgid "No new challenge; the game in progress goes on to its end."
 msgstr "Новых вызовов не будет; идущая партия продолжится до конца."
@@ -7106,11 +7241,17 @@ msgstr "Нет"
 msgid "None has its opening tree yet: import games on the Databases page."
 msgstr "Ни у одной базы пока нет дебютного дерева: импортируйте партии на странице «Базы»."
 
+msgid "None in your databases (Settings › Your names)."
+msgstr ""
+
 msgid "None in your library: add a Polyglot or CTG book on the Books page."
 msgstr "В вашей библиотеке их нет: добавьте книгу Polyglot или CTG на странице «Книги»."
 
 msgid "None now. A correspondence game waits here for your move; a click opens it on the Board."
 msgstr "Сейчас нет. Партия по переписке ждёт здесь вашего хода; щелчок открывает её на доске."
+
+msgid "None of their games reaches this position."
+msgstr ""
 
 msgid "None of them plays now: their games come here as they start, three moves behind, as Lichess shows them."
 msgstr "Сейчас никто из них не играет: их партии появятся здесь, когда начнутся, с отставанием на три хода, как их показывает Lichess."
@@ -7195,6 +7336,9 @@ msgstr "Не из этой позиции: в начальной позиции 
 
 msgid "Not in this game's PGN: its tournament was played with \"{}\" off in the PGN options of the setup."
 msgstr "Нет в PGN этой партии: её турнир игрался с выключенным «{}» в параметрах PGN настройки."
+
+msgid "Not kept in the tables of names: {}"
+msgstr ""
 
 msgid "Not known"
 msgstr "Неизвестно"
@@ -7415,6 +7559,9 @@ msgstr "На доске: ваши ходы делаются там."
 msgid "On the board"
 msgstr "На доску"
 
+msgid "On the board (your databases)"
+msgstr ""
+
 msgid "On the board, the game moves on with each move received, and the board goes on to the channel's next game when it ends; going back to analyse it lets it move on behind, “Back to live” brings it back."
 msgstr "На доске партия продвигается с каждым полученным ходом, а когда она заканчивается, доска переходит к следующей партии канала; если вернуться назад для анализа, партия продолжится в фоне, а «Вернуться к эфиру» вернёт её."
 
@@ -7525,6 +7672,9 @@ msgstr "Задача в один ход"
 
 msgid "Online"
 msgstr "Онлайн"
+
+msgid "Online (Lichess)"
+msgstr ""
 
 msgid "Online for the analysis"
 msgstr "Онлайн-сервисы для анализа"
@@ -7939,6 +8089,12 @@ msgid_plural "Paused ({} games finishing)"
 msgstr[0] "На паузе (доигрывается {} партия)"
 msgstr[1] "На паузе (доигрываются {} партии)"
 msgstr[2] "На паузе (доигрываются {} партий)"
+
+msgid "Pawn chain towards the king's wing"
+msgstr ""
+
+msgid "Pawn chain towards the queen's wing"
+msgstr ""
 
 msgid "Pawn endgame"
 msgstr "Пешечный эндшпиль"
@@ -8446,6 +8602,9 @@ msgstr "Рейтинг"
 
 msgid "Rating after each tournament"
 msgstr "Рейтинг после каждого турнира"
+
+msgid "Rating and structures"
+msgstr ""
 
 msgid "Rating list"
 msgstr "Рейтинг-лист"
@@ -9203,6 +9362,9 @@ msgstr "Оценка за белых"
 msgid "Score of the side to move"
 msgstr "Оценка за сторону, чей ход"
 
+msgid "Score {} %."
+msgstr ""
+
 msgid "Score · White"
 msgstr "Оценка · белые"
 
@@ -9491,6 +9653,9 @@ msgstr "Собственные настройки"
 msgid "Settings › Views, or ⋯ under the switch · everything shows in the rail at once · Enter keeps, Esc leaves them as they were"
 msgstr "Параметры › Виды или ⋯ под переключателем · всё сразу отражается на панели · Enter — сохранить, Esc — оставить как было"
 
+msgid "Settings › Your names, and your linked account"
+msgstr ""
+
 msgid "Setup"
 msgstr "Настройка"
 
@@ -9577,6 +9742,9 @@ msgstr "Показать: {}"
 
 msgid "Shown here as they are played, and saved as PGN in games/ in the profile."
 msgstr "Показываются здесь по ходу игры и сохраняются в PGN в папке games/ профиля."
+
+msgid "Shown only when games of theirs were reviewed; nothing is analysed for the dossier."
+msgstr ""
 
 msgid "Showroom"
 msgstr "Выставочный зал"
@@ -9811,6 +9979,9 @@ msgstr "Пропущено: {}."
 
 msgid "Stays out, counted at the end"
 msgstr "Не переносится, подсчитывается в конце"
+
+msgid "Stonewall"
+msgstr ""
 
 msgid "Stonewall (Black's)"
 msgstr ""
@@ -10676,6 +10847,9 @@ msgstr "Глубина каждого хода, с seldepth."
 msgid "The directories are this computer's: no profile holds them."
 msgstr "Папки принадлежат этому компьютеру: ни один профиль их не содержит."
 
+msgid "The dossier is made of their games."
+msgstr ""
+
 msgid "The download stopped at {} of {}: {} files of {}."
 msgstr "Загрузка остановилась на {} из {}: файлов — {} из {}."
 
@@ -11129,6 +11303,9 @@ msgstr "Руководство по этой странице (F1)"
 msgid "The handicap"
 msgstr "Фора"
 
+msgid "The highest: {} in {}."
+msgstr ""
+
 msgid "The hint shows the piece to play; the answer then counts as hard."
 msgstr "Подсказка показывает фигуру, которой нужно ходить; ответ тогда считается трудным."
 
@@ -11207,6 +11384,12 @@ msgstr "Последнее изменение турнира отменено."
 msgid "The last check or reading failed."
 msgstr "Последняя проверка или чтение завершились неудачей."
 
+msgid "The last in {} (Settings › Your names)."
+msgstr ""
+
+msgid "The last in {}, at {} (Settings › Your names)."
+msgstr ""
+
 msgid "The last lost, {}: {}."
 msgstr "Последняя проигранная, {}: {}."
 
@@ -11242,6 +11425,12 @@ msgstr "Вариант на доске, партия не меняется."
 
 msgid "The lines of one tournament, or of the window."
 msgstr "Строки одного турнира или окна."
+
+msgid "The lines they play three times or more, in your databases, that your repertoires leave without an answer."
+msgstr ""
+
+msgid "The lines they play three times or more, on the board and online, that your repertoires leave without an answer."
+msgstr ""
 
 msgid "The linked Lichess account's name counts by itself."
 msgstr "Имя привязанной учётной записи Lichess учитывается само."
@@ -11473,9 +11662,6 @@ msgstr "Соперник"
 
 msgid "The opponent's best move if it could move again, as a red arrow (another process of the first engine, its threads counted)."
 msgstr "Лучший ход соперника, если бы он мог сходить ещё раз, — красной стрелкой (отдельный процесс первого движка, его потоки учитываются)."
-
-msgid "The opponent's games"
-msgstr "Партии соперника"
 
 msgid "The opponent's tactics"
 msgstr "Тактика соперника"
@@ -11969,6 +12155,9 @@ msgstr "Таблицы отвечают…"
 msgid "The tables attack with the move that leaves you the fewest ways to hold. Each move is judged at once: the verdict stays, or it changes, and you know before going on."
 msgstr "Таблицы атакуют ходом, который оставляет вам меньше всего способов удержаться. Каждый ход сразу оценивается: вердикт сохраняется или меняется, и вы узнаёте об этом, прежде чем продолжить."
 
+msgid "The tables of names are as they were."
+msgstr ""
+
 msgid "The tables of your disk are the tournament's while it plays: Lichess's online answer meanwhile."
 msgstr "Таблицы вашего диска заняты турниром, пока он идёт: тем временем отвечают таблицы Lichess онлайн."
 
@@ -12185,20 +12374,56 @@ msgstr ""
 msgid "The {} to confirm"
 msgstr ""
 
+msgid "Their Lichess account: its games of the last year beside those of your databases, the link kept in the tables of names."
+msgstr ""
+
+msgid "Their Lichess name"
+msgstr ""
+
 msgid "Their PGN file, its games listed beside the moves."
 msgstr "Их PGN-файл, партии перечислены рядом с ходами."
+
+msgid "Their clear mistakes fall mostly in the endgame ({} of {})."
+msgstr ""
+
+msgid "Their clear mistakes fall mostly in the middlegame ({} of {})."
+msgstr ""
+
+msgid "Their clear mistakes fall mostly in the opening ({} of {})."
+msgstr ""
+
+msgid "Their dossier comes back at the end of the game."
+msgstr ""
+
+msgid "Their dossier opens with its Lichess source: their games of the last year come into a database of their own; then what they play on the board and online, your games against them, and the lines they play that your repertoires do not answer."
+msgstr ""
 
 msgid "Their games"
 msgstr "Их партии"
 
+msgid "Their games in the list"
+msgstr ""
+
 msgid "Their games in the mosaic"
 msgstr "Их партии в мозаике"
 
-msgid "Their games of the last year come into a database of their own; then what they play, your games against them, and the lines they play that your repertoire does not answer."
-msgstr "Партии соперника за последний год попадают в отдельную базу; затем — что он играет, ваши партии против него и варианты, которые он играет и на которые нет ответа в вашем репертуаре."
+msgid "Their games in your databases, all their spellings together (the tables of names): nothing leaves the machine."
+msgstr ""
 
-msgid "Their level"
-msgstr "Его уровень"
+msgid "Their games reviewed: {}, by you (Alt+G)"
+msgid_plural "Their games reviewed: {}, by you (Alt+G)"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Their games: {}."
+msgstr ""
+
+msgid "Their last games"
+msgstr ""
+
+msgid "Their level online"
+msgstr ""
 
 msgid "Their licences"
 msgstr "Их лицензии"
@@ -12208,6 +12433,21 @@ msgstr "Его имя на Lichess"
 
 msgid "Their public games, with the filters of the sync on the Lichess page."
 msgstr "Публичные партии игрока, с фильтрами обновления со страницы Lichess."
+
+msgid "Their rating"
+msgstr ""
+
+msgid "Their rating, from the Elo of their games"
+msgstr ""
+
+msgid "Their results"
+msgstr ""
+
+msgid "Their structures"
+msgstr ""
+
+msgid "Their structures, from the assistant's facts at move 20"
+msgstr ""
 
 msgid "Their turn"
 msgstr "Ход соперника"
@@ -13316,8 +13556,23 @@ msgstr "Победы A"
 msgid "Wins."
 msgstr "Победы."
 
-msgid "With White: {}"
-msgstr "Белыми: {}"
+msgid "With Black"
+msgstr ""
+
+msgid "With Black · {} game"
+msgid_plural "With Black · {} games"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "With White"
+msgstr ""
+
+msgid "With White · {} game"
+msgid_plural "With White · {} games"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "With a clock, %d games × %d threads exceed the %d physical cores."
 msgstr "При игре с часами партии × потоки (%d × %d) превышают число физических ядер (%d)."
@@ -13484,6 +13739,9 @@ msgstr "Годы"
 msgid "You"
 msgstr "Вы"
 
+msgid "You against them"
+msgstr ""
+
 msgid "You had played {} {}."
 msgstr "Вы сыграли {} {}."
 
@@ -13606,6 +13864,12 @@ msgstr "Ваши часы идут, когда ваш ход."
 
 msgid "Your databases"
 msgstr "Ваши базы"
+
+msgid "Your databases · no game of theirs"
+msgstr ""
+
+msgid "Your databases · {} · {}"
+msgstr ""
 
 msgid "Your draw offer goes with your next move."
 msgstr "Ваше предложение ничьей уйдёт с вашим следующим ходом."
@@ -13754,6 +14018,9 @@ msgstr "Ваши ходы — вводом или на доске; удержа�
 msgid "Your names"
 msgstr "Ваши имена"
 
+msgid "Your names (Settings › Your names) tell your games against them."
+msgstr ""
+
 msgid "Your names first"
 msgstr "Сначала ваши имена"
 
@@ -13802,11 +14069,17 @@ msgstr "Ваши рекорды: {} со стороны белых · {} со с
 msgid "Your repertoire"
 msgstr "Ваш репертуар"
 
-msgid "Your repertoire against them"
-msgstr "Ваш репертуар против него"
-
 msgid "Your repertoire's move: {}"
 msgstr "Ход вашего репертуара: {}"
+
+msgid "Your repertoires against them"
+msgstr ""
+
+msgid "Your repertoires against them: {} gap, the most frequent first"
+msgid_plural "Your repertoires against them: {} gaps, the most frequent first"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Your repertoires answer the lines they play often."
 msgstr "Ваши репертуары отвечают на варианты, которые он часто играет."
@@ -14117,6 +14390,9 @@ msgstr "в этом же сеансе"
 msgid "against"
 msgstr "против"
 
+msgid "against 1.{}: {} in {} %"
+msgstr ""
+
 msgid "against {}"
 msgstr "против {}"
 
@@ -14222,6 +14498,9 @@ msgstr[2] "не более {} партий"
 msgid "at most {} moves"
 msgstr "не более {} ходов"
 
+msgid "at move 20 of game {}"
+msgstr ""
+
 msgid "at the end"
 msgstr "в конце"
 
@@ -14267,9 +14546,6 @@ msgstr "лучше {}"
 msgid "blitz {}"
 msgstr ""
 
-msgid "blitz, rapid and classical, {}, in their database"
-msgstr "блиц, рапид и классика, {}, в его базе"
-
 msgid "board by board"
 msgstr "по доскам"
 
@@ -14288,6 +14564,9 @@ msgstr "род. {}"
 msgid "both"
 msgstr "и то и другое"
 
+msgid "both sources together"
+msgstr ""
+
 msgid "bots only"
 msgstr "только от ботов"
 
@@ -14295,6 +14574,9 @@ msgid "brought together already"
 msgstr ""
 
 msgid "brought together at once: a FIDE id in the games, or a single player of that name"
+msgstr ""
+
+msgid "bullet {}"
 msgstr ""
 
 msgid "button"
@@ -14345,6 +14627,9 @@ msgstr "мат"
 msgid "chess.com knows no player of that name."
 msgstr "На chess.com нет игрока с таким именем."
 
+msgid "classical {}"
+msgstr ""
+
 msgid "clocks"
 msgstr ""
 
@@ -14380,6 +14665,9 @@ msgstr "копирование {} на {}"
 
 msgid "cores (now {})"
 msgstr "ядер (сейчас {})"
+
+msgid "correspondence {}"
+msgstr ""
 
 msgid "created on lichess.org"
 msgstr "создана на lichess.org"
@@ -15113,9 +15401,6 @@ msgstr "ни у одного движка нет SyzygyPath"
 msgid "no game"
 msgstr "нет партий"
 
-msgid "no game between you in their database"
-msgstr "в его базе нет ваших партий друг с другом"
-
 msgid "no hint"
 msgstr "без подсказок"
 
@@ -15134,9 +15419,6 @@ msgstr "здесь нет вашего хода"
 msgid "no path"
 msgstr "нет пути"
 
-msgid "no rated game"
-msgstr "нет рейтинговых партий"
-
 msgid "no reason given"
 msgstr "причина не указана"
 
@@ -15154,9 +15436,6 @@ msgstr "узлы"
 
 msgid "none"
 msgstr "нет"
-
-msgid "none in a year of blitz, rapid and classical"
-msgstr "нет за год в блице, рапиде и классике"
 
 msgid "none yet"
 msgstr "пока нет"
@@ -15436,6 +15715,12 @@ msgstr "готовый"
 
 msgid "private"
 msgstr "приватное"
+
+msgid "proposed: their games in your databases are at {}"
+msgstr ""
+
+msgid "proposed: their games in your databases are at {}–{}"
+msgstr ""
 
 msgid "provisional rating"
 msgstr "предварительный рейтинг"
@@ -15734,6 +16019,9 @@ msgstr "партия, без учётной записи. Любой, у ког�
 msgid "the games of {}"
 msgstr "партии {}"
 
+msgid "the games of {} in this structure: {}"
+msgstr ""
+
 msgid "the games pasted"
 msgstr "вставленных партий"
 
@@ -15923,9 +16211,6 @@ msgstr ""
 msgid "the whole tournament"
 msgstr "весь турнир"
 
-msgid "their database's tree is being built…"
-msgstr "дерево его базы строится…"
-
 msgid "their evaluations within {}"
 msgstr "оценки в пределах {}"
 
@@ -15934,6 +16219,9 @@ msgstr "оценки расходятся на {}"
 
 msgid "their pages, name, icon and colour; ⋯ under the switch, or a right click on a view"
 msgstr "их страницы, название, значок и цвет; ⋯ под переключателем или правый щелчок по виду"
+
+msgid "their public profile"
+msgstr ""
 
 msgid "themes: {}"
 msgstr "темы: {}"
@@ -16229,9 +16517,6 @@ msgstr "ваш выбор"
 msgid "your games synced faster, your private ones too;"
 msgstr "более быстрое обновление ваших партий, в том числе приватных;"
 
-msgid "your linked account tells them"
-msgstr "их покажет привязанная учётная запись"
-
 msgid "your names first"
 msgstr "сначала ваши имена"
 
@@ -16312,6 +16597,15 @@ msgid_plural "{} ({} chapters of {})"
 msgstr[0] "{} ({} глава из {})"
 msgstr[1] "{} ({} главы из {})"
 msgstr[2] "{} ({} глав из {})"
+
+msgid "{} ({} game, {} %)"
+msgid_plural "{} ({} games, {} %)"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "{} ({})"
+msgstr ""
 
 msgid "{} ({}) against {} ({})"
 msgstr "{} ({}) против {} ({})"
@@ -16408,6 +16702,12 @@ msgstr "{} на {}-м ходу"
 
 msgid "{} at {}"
 msgstr "{} на {}"
+
+msgid "{} blitz game"
+msgid_plural "{} blitz games"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} blunder"
 msgid_plural "{} blunders"
@@ -16516,6 +16816,12 @@ msgstr[2] "Прочитано {} глав."
 
 msgid "{} chapters, full"
 msgstr "глав: {}, заполнено"
+
+msgid "{} classical game"
+msgid_plural "{} classical games"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} comment"
 msgid_plural "{} comments"
@@ -16790,6 +17096,12 @@ msgstr[0] "{} партия"
 msgstr[1] "{} партии"
 msgstr[2] "{} партий"
 
+msgid "{} game ({})"
+msgid_plural "{} games ({})"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "{} game adjudicated"
 msgid_plural "{} games adjudicated"
 msgstr[0] "{} партия завершена присуждением"
@@ -16892,6 +17204,18 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
+msgid "{} game in a year"
+msgid_plural "{} games in a year"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "{} game in a year ({})"
+msgid_plural "{} games in a year ({})"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "{} game in progress"
 msgid_plural "{} games in progress"
 msgstr[0] "идёт {} партия"
@@ -16918,6 +17242,12 @@ msgstr[2] "{} партий в эфире"
 
 msgid "{} game of a source not known"
 msgid_plural "{} games of a source not known"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "{} game of the last year"
+msgid_plural "{} games of the last year"
 msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
@@ -17000,17 +17330,35 @@ msgstr[0] "{} партия «с помощью» не учитывается."
 msgstr[1] "{} партии «с помощью» не учитываются."
 msgstr[2] "{} партий «с помощью» не учитываются."
 
-msgid "{} game, the last on {}"
-msgid_plural "{} games, the last on {}"
-msgstr[0] "{} партия, последняя — {}"
-msgstr[1] "{} партии, последняя — {}"
-msgstr[2] "{} партий, последняя — {}"
+msgid "{} game, from {} to {}"
+msgid_plural "{} games, from {} to {}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "{} game, in {}"
+msgid_plural "{} games, in {}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} game, {} %"
 msgid_plural "{} games, {} %"
 msgstr[0] "{} партия, {} %"
 msgstr[1] "{} партии, {} %"
 msgstr[2] "{} партий, {} %"
+
+msgid "{} game: +{} ={} −{}"
+msgid_plural "{} games: +{} ={} −{}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "{} game: hints, not trends"
+msgid_plural "{} games: hints, not trends"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} game: {} won, {} drawn, {} lost."
 msgid_plural "{} games: {} won, {} drawn, {} lost."
@@ -17300,12 +17648,6 @@ msgstr[0] "{} вариант"
 msgstr[1] "{} варианта"
 msgstr[2] "{} вариантов"
 
-msgid "{} line they play often that your repertoire does not answer, the most frequent first: a click shows it, with the tree of their games."
-msgid_plural "{} lines they play often that your repertoire does not answer, the most frequent first: a click shows them, with the tree of their games."
-msgstr[0] "{} вариант, который он часто играет и на который нет ответа в вашем репертуаре, сначала самые частые: щелчок по варианту показывает его вместе с деревом партий соперника."
-msgstr[1] "{} варианта, которые он часто играет и на которые нет ответа в вашем репертуаре, сначала самые частые: щелчок по варианту показывает его вместе с деревом партий соперника."
-msgstr[2] "{} вариантов, которые он часто играет и на которые нет ответа в вашем репертуаре, сначала самые частые: щелчок по варианту показывает его вместе с деревом партий соперника."
-
 msgid "{} loses on time"
 msgstr "{} проигрывает по времени"
 
@@ -17383,6 +17725,12 @@ msgid_plural "{} months added before; the newest is asked for again, it may have
 msgstr[0] "{} месяц уже добавлен; последний запрашивается снова — он мог пополниться."
 msgstr[1] "{} месяца уже добавлены; последний запрашивается снова — он мог пополниться."
 msgstr[2] "{} месяцев уже добавлено; последний запрашивается снова — он мог пополниться."
+
+msgid "{} more line"
+msgid_plural "{} more lines"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} move"
 msgid_plural "{} moves"
@@ -17539,6 +17887,9 @@ msgstr "{} предлагает ничью"
 
 msgid "{} on the Engines page: its program and options"
 msgstr "{} на странице «Движки»: его программа и опции"
+
+msgid "{} on the board, {} online"
+msgstr ""
 
 msgid "{} on the disk · about 3 GB of memory while it serves"
 msgstr "{} на диске · около 3 ГБ памяти во время работы"
@@ -17909,6 +18260,12 @@ msgstr[2] "{} задач, решено {}"
 msgid "{} puzzles · {}"
 msgstr "задач: {} · {}"
 
+msgid "{} rapid game"
+msgid_plural "{} rapid games"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "{} read of {} · {} positions kept"
 msgstr "прочитано {} из {} · сохранено позиций: {}"
 
@@ -18046,6 +18403,12 @@ msgstr[2] "{} общих на все турниры"
 
 msgid "{} shown"
 msgstr "показано: {}"
+
+msgid "{} spelling brought together (the tables of names)"
+msgid_plural "{} spellings brought together (the tables of names)"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} square"
 msgid_plural "{} squares"
@@ -18254,6 +18617,12 @@ msgstr "{} выигрывают, но по правилу 50 ходов — ни
 msgid "{} wins, maybe: the 50-move rule and the game played do not settle it"
 msgstr "{} выигрывают — возможно: правило 50 ходов и сыгранная партия не дают ответа"
 
+msgid "{} with Black"
+msgstr ""
+
+msgid "{} with White"
+msgstr ""
+
 msgid "{} with a GPU engine at a time"
 msgstr "{} с GPU-движком одновременно"
 
@@ -18373,6 +18742,9 @@ msgstr "{} · их ход"
 
 msgid "{} · {}"
 msgstr "{} · {}"
+
+msgid "{} · {} %"
+msgstr ""
 
 msgid "{} · {} / {} games · {} playing"
 msgstr "{} · {} / {} партий · идёт: {}"
@@ -18497,6 +18869,9 @@ msgstr "{}, {}"
 msgid "{}, on {} in {} %"
 msgstr ""
 
+msgid "{}, round {}"
+msgstr ""
+
 msgid "{}, selective {}"
 msgstr "{}, селективная {}"
 
@@ -18505,6 +18880,18 @@ msgstr "{}, показываются на доске под мышью"
 
 msgid "{}, the engine of the review, is no longer in the library."
 msgstr "{}, движка разбора, больше нет в библиотеке."
+
+msgid "{}, their opponent's, with Black"
+msgstr ""
+
+msgid "{}, their opponent's, with White"
+msgstr ""
+
+msgid "{}, theirs, with Black"
+msgstr ""
+
+msgid "{}, theirs, with White"
+msgstr ""
 
 msgid "{}, twice"
 msgstr ""
@@ -18529,6 +18916,9 @@ msgstr "{}-фигурные таблицы Syzygy для каждого движ
 
 msgid "{}-man Syzygy for {} of {} engines"
 msgstr "{}-фигурные таблицы Syzygy для {} из {} движков"
+
+msgid "{}. Score {} %."
+msgstr ""
 
 msgid "{}:"
 msgstr "{}:"
@@ -18725,6 +19115,9 @@ msgstr "{}: {} · глубина {}"
 msgid "{}: {} → {} points"
 msgstr "{}: {} → {} очк."
 
+msgid "{}; {}"
+msgstr ""
+
 msgid "{}\nA new build, or another program: its results may not be those of the engine that played {}."
 msgstr "{}\nНовая версия или другая программа: его результаты могут не совпадать с результатами движка, игравшего в «{}»."
 
@@ -18856,6 +19249,12 @@ msgstr[2] "· {} заметок в этой позиции"
 
 msgid "· {} pieces · Lichess · asked at {}, kept in your profile"
 msgstr "· фигур: {} · Lichess · запрошено в {}, хранится в вашем профиле"
+
+msgid "· {} player of this name on FIDE's list: which one?"
+msgid_plural "· {} players of this name on FIDE's list: which one?"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "· {} puzzles, {} % right at the first try · by theme, read with puzzle:read"
 msgstr "· задач: {}, верно с первой попытки: {} % · по темам, прочитано с правом puzzle:read"

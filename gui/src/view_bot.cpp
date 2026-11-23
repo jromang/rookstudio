@@ -1389,7 +1389,12 @@ void App::drawBotOnline() {
     for (std::size_t i = 0; i < std::min<std::size_t>(games.size(), 4); ++i) {
         const auto& g     = games[i];
         const auto score  = lichess::botScore(g);
-        const char* state = !score ? TR("aborted") : *score > 0 ? TR("won") : *score < 0 ? TR("lost") : TR("drawn");
+        // Nouns ("a win"), as the Board's online tables say them: "won" is an endgame's result, another word in some
+        // languages.
+        const char* state = !score       ? TR("aborted")
+                            : *score > 0 ? TR("a win")
+                            : *score < 0 ? TR("a loss")
+                                         : TR("a draw");
         ImGui::TextUnformatted(
             fmt::format("{}{}", g.opponent, g.rating > 0 ? fmt::format(" ({})", g.rating) : "").c_str());
         ImGui::SameLine();

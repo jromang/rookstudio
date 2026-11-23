@@ -643,13 +643,13 @@ RookStudio is open. The line becomes a part of the card, which leads through the
   only*, or *later* while it plays, goes offline, or a tournament needs the cores.
 - **Its play**: the engine with its options of the library (its `Threads` and `Hash` counted in the machine's core
   budget while it plays), a Polyglot book of your library played while it has a move, the tournaments' tables
-  (`SyzygyPath`, for an engine that has the option and no path of its own), and no thinking on the opponent's time.
-  Its clock comes from Lichess at each move, less a margin for the network (a tenth of it, from 0.2 to 1 second);
-  before both sides have moved, it plays within the time Lichess gives for the first move; by correspondence, it
-  thinks 15 seconds a move. It takes a draw offered when the engine stands clearly worse, or no better late in the
-  game, declines a takeback, and claims the victory when its opponent left long enough. Its words, said in the
-  players' chat at the start and the end, are yours to choose (empty: nothing said). An engine that cannot start or
-  stops resigns the game (aborts it before both sides moved), and the card says why.
+  (`SyzygyPath`, for an engine that has the option and no path of its own), and no thinking on the opponent's time. Its
+  clock comes from Lichess at each move, less a margin for the network (a tenth of its time left, from 0.2 to 1 second);
+  before both sides have moved, it plays within the time Lichess gives for the first move; by correspondence, it thinks
+  15 seconds a move. It takes a draw offered when the engine stands clearly worse, or no better late in the game,
+  declines a takeback, and claims the victory when its opponent left long enough. Its words, said in the players' chat
+  at the start and the end, are yours to choose (empty: nothing said). An engine that cannot start or stops resigns the
+  game (aborts it before both sides moved), and the card says why.
 - **Put online** (Enter) opens the bot's own event stream (Lichess keeps one per token): the challenges come, answered
   at once by its rules. Online, the card shows the bot's day (games won, drawn and lost, challenges declined), its game
   on a small board with the engine's evaluation, *On the Board*, its last games and the challenges declined, *Its page

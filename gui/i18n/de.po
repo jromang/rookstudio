@@ -15010,7 +15010,7 @@ msgid "your repertoire “{}”"
 msgstr "dein Repertoire „{}“"
 
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
-msgstr ""
+msgstr "deine Studien, die Online-Aufgaben von Lichess, deine Partien auf Lichess von der Seite Spielen aus."
 
 msgid "{:+.2f}  (DrawElo {:.0f})"
 msgstr "{:+.2f}  (DrawElo {:.0f})"

@@ -14897,7 +14897,7 @@ msgid "your repertoire “{}”"
 msgstr "你的开局体系“{}”"
 
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
-msgstr ""
+msgstr "你的研究、Lichess 在线谜题，以及从“对弈”页面下你的 Lichess 对局。"
 
 msgid "{:+.2f}  (DrawElo {:.0f})"
 msgstr "{:+.2f}  (DrawElo {:.0f})"

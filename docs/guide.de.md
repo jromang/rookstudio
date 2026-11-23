@@ -75,7 +75,7 @@ klicke beim beendeten Match auf *Neu starten mit…*.
 <!-- en: the-window 3a5230d4 -->
 
 ### Die Seiten
-<!-- en: the-pages 80c43812 -->
+<!-- en: the-pages 1cab137d -->
 
 Eine Navigationsleiste links führt zu den Seiten der gezeigten [Ansicht](#ansichten), in ihrer Reihenfolge:
 
@@ -86,8 +86,9 @@ Eine Navigationsleiste links führt zu den Seiten der gezeigten [Ansicht](#ansic
 | Brett | Eine Partie oder eine Stellung von irgendwoher, analysiert von einer Engine der Bibliothek; in einer Ansicht fürs Studium die direkt bearbeitete Notation (siehe [Das Brett fürs Studium](#das-brett-fürs-studium)) |
 | Datenbanken | Deine Partiedatenbanken: Import, die Partieliste, die Suchen |
 | Eröffnungen | Deine Repertoires, ihre Abdeckung und ihre Lücken |
+| Training | Die Wiederholung des Tages, die Aufgaben von Lichess, deine Fehler als Übungen, Züge erraten, Endspiele gegen die Tablebases, Matts, Brettvisualisierung (siehe [Die Seite Training](#die-seite-training)) |
+| Spielen | Eine Partie gegen eine Engine der Bibliothek in der Stärke, die du wählst, mit ihren Eröffnungen und einer Vorgabe, und deine Partien auf Lichess, beide auf der Seite Brett gespielt (siehe [Die Seite Spielen](#die-seite-spielen)) |
 | Lichess | Dein Lichess-Konto, die Partien eines Spielers, die offiziellen Übertragungen, was die Analyse Lichess fragen darf |
-| Spielen | Eine Partie gegen eine Engine der Bibliothek in der Stärke, die du wählst, mit ihren Eröffnungen und einer Vorgabe, gespielt auf der Seite Brett (siehe [Die Seite Spielen](#die-seite-spielen)) |
 | Engines | Die Engine-Bibliothek: Optionen, Prüfungen, Gruppen, Referenz-Elo, Import der Listen anderer Programme, die beliebten Engines |
 | Bücher | Die Bibliothek der Eröffnungsbücher, und die Eröffnungen jedes Buchs mit dem, was an ihnen nicht stimmt |
 | Suiten | Testsuiten (STS, WAC, ERET…): Engines gegen die Stellungen einer EPD-Datei |
@@ -348,7 +349,7 @@ bleiben die Bretter flach, und die *Darstellung* sagt, warum. Die Figuren sind c
 der MIT-Lizenz; die *Darstellung* verlinkt sie.
 
 ## Tastenkürzel
-<!-- en: keyboard-shortcuts 4be4d428 -->
+<!-- en: keyboard-shortcuts 65140e2d -->
 
 | Tasten | Wo | Was sie tun |
 |---|---|---|
@@ -425,11 +426,13 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Strg</kbd>+<kbd>A</kbd> | Die Bibliothek der Einrichtung | Alle angezeigten Engines auswählen |
 | <kbd>Strg</kbd>+Klick, <kbd>Umschalt</kbd>+Klick | Listen | Mehrere auswählen |
 | <kbd>Entf</kbd> | Die Seite Engines | Die ausgewählte Engine entfernen (nach einer Bestätigung) |
+| <kbd>Enter</kbd> | Die Karte einer Engine, ihr Lichess-Bot bereit | Den Bot online schalten |
+| <kbd>Enter</kbd>, <kbd>Esc</kbd> | Ein Konto zum Lichess-Bot machen, sein Name eingetippt | Zum Bot machen; abbrechen |
 | <kbd>Enter</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | Die Konsole einer Engine | Die Zeile senden; die früheren Zeilen zurückholen |
 | <kbd>Strg</kbd>+<kbd>C</kbd> | Der Headless-Modus | Nach den laufenden Partien anhalten |
 
 ## Die Startseite
-<!-- en: the-home-page 8f520943 -->
+<!-- en: the-home-page 317baace -->
 
 Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das Laufende zuerst:
 
@@ -447,15 +450,16 @@ Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das La
 - **Lichess**: das Konto, die Partien eines Spielers mit *Abgleichen*, die neuen Partien gezählt, wenn du es gewählt
   hast, die laufenden Übertragungen (siehe [Die Seite Lichess](#die-seite-lichess)).
 - **Laufend**: eine von RookStudio aus gespielte Partie auf Lichess (*Zurück zur Partie*) und die empfangenen
-  Herausforderungen (siehe [Auf Lichess](#auf-lichess)), die Analyse der Partie, die der Stellung, ein Import, der
-  Assistent (sein Download, sein geladenes Modell, *Entladen*), eine laufende Serie von Aufgaben, eine Sitzung mit
-  Übungen, eine geratene Partie, ein Endspiel oder eine Visualisierungsübung, und was die Wiederholung des Tages fällig
-  hat, in einer Zahl; ein Klick wiederholt alles (siehe [Die Wiederholung des Tages](#die-wiederholung-des-tages)).
+  Herausforderungen (siehe [Auf Lichess](#auf-lichess)), dein Lichess-Bot online und seine Partie (siehe [Ein
+  Lichess-Bot](#ein-lichess-bot)), die Analyse der Partie, die der Stellung, ein Import, der Assistent (sein Download,
+  sein geladenes Modell, *Entladen*), eine laufende Serie von Aufgaben, eine Sitzung mit Übungen, eine geratene Partie,
+  ein Endspiel oder eine Visualisierungsübung, und was die Wiederholung des Tages fällig hat, in einer Zahl; ein Klick
+  wiederholt alles (siehe [Die Wiederholung des Tages](#die-wiederholung-des-tages)).
 
 Der Suchknopf oben oder Strg+K findet einen Befehl, eine Partie, eine Datenbank.
 
 ## Die Seite Turniere
-<!-- en: the-tournaments-page eb693479 -->
+<!-- en: the-tournaments-page dc32391d -->
 
 Die Seite **Turniere** ist ein Kontrollraum: Was läuft und was dich braucht, kommt zuerst, danach der Rest.
 
@@ -468,7 +472,8 @@ Die Seite **Turniere** ist ein Kontrollraum: Was läuft und was dich braucht, ko
   falls inzwischen ein Turnier zu Ende gegangen ist.
 - **Kerne**: die Hardware-Threads der Maschine, und die davon, die die laufenden Partien belegen, der Rest frei. Eine
   Partie belegt die `Threads` derjenigen ihrer beiden Engines, die die meisten hat, da die beiden Engines abwechselnd
-  denken; der Balken zeigt den Namen jedes Turniers und seine Zahl, der Mauszeiger die Einzelheiten.
+  denken; der Balken zeigt den Namen jedes Turniers und seine Zahl (auch die Engines der Seite Brett und die Partie des
+  Lichess-Bots), der Mauszeiger die Einzelheiten.
 - **Zu erledigen**, wenn etwas zu erledigen ist, jeweils mit der Behebung gleich daneben: eine Engine, die nicht
   startet (siehe [Wenn eine Engine nicht starten kann](#wenn-eine-engine-nicht-starten-kann): *Erneut versuchen*,
   *Zurückziehen…*, *Ersetzen…*, *Engine-Log*); das Turnier, das ein Fehler oder eine Engine angehalten hat, mit dem,
@@ -484,6 +489,9 @@ Die Seite **Turniere** ist ein Kontrollraum: Was läuft und was dich braucht, ko
   Arbeitsbereich, *Pause* pausiert es. Ein Turnier, das fortgesetzt werden kann, erscheint stattdessen unter
   *Unterbrochen*, mit *Fortsetzen*. Siehe [Mehrere Turniere gleichzeitig](#mehrere-turniere-gleichzeitig) für die
   Gewichte und die Kerne jedes Turniers.
+- **Dein Lichess-Bot**, solange er online ist: seine Engine, seine laufende Partie mit *Aufs Brett*, *Seine Karte* und
+  *Offline schalten*; er lehnt Herausforderungen mit *später* ab, solange die Turniere die Kerne brauchen (siehe [Ein
+  Lichess-Bot](#ein-lichess-bot)).
 - **Warteschlange**: die wartenden Turniere, jedes mit seiner Dauer und wann es startet, und wann alles endet (siehe
   [Warteschlange und Neustart](#warteschlange-und-neustart)).
 - **Zuletzt beendet**: die letzten fünf beendeten Turniere mit ihrem Ergebnis: der Stand eines Matches, die
@@ -689,6 +697,85 @@ WinBoard-Engines.
 - Eine Engine, die verlangt, für jede Partie neu gestartet zu werden (`feature reuse=0`), bekommt beim Hinzufügen
   *Die Engine für jede Partie neu starten* angehakt.
 - `FCG_WB2UCI_LOG=FILE` in der Umgebung schreibt jede mit WinBoard-Engines ausgetauschte Zeile in `FILE`.
+
+### Ein Lichess-Bot
+<!-- en: a-lichess-bot c8e717b7 -->
+
+Die Karte einer Engine hat eine Zeile **Auf Lichess, als Bot**: *Zum Lichess-Bot machen…* richtet die Engine so ein,
+dass sie auf Lichess unter einem Bot-Konto spielt, über die Bot-API von Lichess (wo Engines erlaubt sind), und die
+Herausforderungen annimmt, die du wählst, solange RookStudio offen ist. Die Zeile wird zu einem Teil der Karte, der
+durch die folgenden Schritte führt.
+
+- **Das Konto des Bots** ist ein zweites Lichess-Konto, getrennt von deinem: neu, mit einem eigenen Namen und ohne
+  gespielte Partie. RookStudio erstellt keine Konten: *Das Konto auf lichess.org erstellen* öffnet die Seite von
+  Lichess. *Das Konto des Bots verknüpfen…* öffnet die Seite von Lichess, die um eine Berechtigung bittet, *als Bot
+  spielen* (`bot:play`): Melde dich dort mit dem Konto des Bots an, nicht mit deinem (ein privates Fenster des Browsers
+  vermeidet, dass du abgemeldet wirst). Oder füge ein auf lichess.org erstelltes Token des Bot-Kontos ein (*Ein Token
+  auf lichess.org erstellen* öffnet die Seite mit dieser Berechtigung angehakt) und *Prüfen*. Dein eigenes Konto bleibt
+  getrennt verknüpft, für den Rest von RookStudio; der Bot hat sein eigenes Token, in `lichess-bot.json` im Profil
+  aufbewahrt, nur für dich lesbar.
+- **Die Prüfungen**, bevor irgendetwas erbeten wird, das das Konto verändert: sein Name und wann es erstellt wurde, die
+  Partien, die es gespielt hat (keine), ob es schon ein Bot ist (dann dient es so, wie es ist) und dass es nicht dein
+  eigenes verknüpftes Konto ist. Dein eigenes Konto wird nie behalten (das Token, das RookStudio dafür bekommen hat,
+  wird sofort widerrufen); ein geschlossenes Konto oder ein Token ohne die Berechtigung ebenso wenig. Ein Konto, das
+  gespielt hat, wird abgelehnt, wie Lichess es täte: Erstelle ein neues, spiele nichts darauf, dann verknüpfe es (*Ein
+  anderes Konto verknüpfen…*, *Dieses trennen*).
+- **Zum Bot machen…** lässt sich nicht rückgängig machen: Das Konto spielt nie wieder als Mensch, Lichess markiert es
+  als BOT, und es spielt nur Herausforderungen (keine Lobby, keine Turniere außer den für Bots offenen Arenen). Der
+  Schritt sagt das und fragt nach dem Namen des Kontos: *Zum Bot machen* wird aktiv, sobald der eingetippte Name seiner
+  ist (Esc bricht ab). Was den Computer verlässt: diese Anfrage, mit dem Token des Bots. Eine Ablehnung wird mit den
+  Worten von Lichess genannt; ohne Antwort hat sich nichts geändert: Versuche es erneut.
+- **Die Herausforderungen, die er annimmt**, auf der Karte: die Bedenkzeiten (Bullet, Blitz, Schnellschach, klassisch,
+  Fernschach; nie UltraBullet, das Lichess Bots nicht spielen lässt), gewertete Partien oder nur ungewertete, Menschen
+  und Bots, ein Wertungsbereich für den Herausforderer (0: keine Grenze), Chess960, wenn die Engine es kennt
+  (`UCI_Chess960`), eine Partie nach der anderen. Anfangs: nur ungewertet, Blitz und Schnellschach, da Lichess Bots
+  bittet, ungewertet zu spielen, solange sie getestet werden; erweitere sie danach. Eine gewertete Herausforderung von
+  deinem eigenen Konto wird abgelehnt (Lichess verbietet gewertete Partien zwischen den Konten einer Person); eine
+  ungewertete wird gespielt. Die anderen Herausforderungen werden höflich abgelehnt, mit dem Grund, den Lichess dem
+  Herausforderer zeigt: *zu schnell*, *zu langsam*, *nicht diese Bedenkzeit*, *nur ungewertet*, *nur Standardschach*,
+  *nicht diese Variante*, *keine Bots*, *nur Bots* oder *später*, solange er spielt, offline geht oder ein Turnier die
+  Kerne braucht.
+- **Sein Spiel**: die Engine mit ihren Optionen der Bibliothek (ihre `Threads` und ihr `Hash` zählen zum Kernbudget der
+  Maschine, solange sie spielt), ein Polyglot-Buch deiner Bibliothek, gespielt, solange es einen Zug hat, die Tablebases
+  der Turniere (`SyzygyPath`, für eine Engine, die die Option und keinen eigenen Pfad hat) und kein Nachdenken in der
+  Zeit des Gegners. Seine Uhr kommt bei jedem Zug von Lichess, abzüglich einer Reserve für das Netz (ein Zehntel davon,
+  von 0,2 bis 1 Sekunde); bevor beide Seiten gezogen haben, spielt er innerhalb der Zeit, die Lichess für den ersten Zug
+  gibt; im Fernschach denkt er 15 Sekunden pro Zug. Er nimmt ein angebotenes Remis an, wenn die Engine klar schlechter
+  steht oder spät in der Partie nicht besser, lehnt eine Zugrücknahme ab und beansprucht den Sieg, wenn sein Gegner
+  lange genug weg ist. Seine Worte, im Chat der Spieler zu Beginn und am Ende gesagt, wählst du (leer: nichts gesagt).
+  Eine Engine, die nicht startet oder stehen bleibt, gibt die Partie auf (bricht sie ab, bevor beide Seiten gezogen
+  haben), und die Karte sagt, warum.
+- **Online schalten** (Enter) öffnet den eigenen Ereignisstrom des Bots (Lichess hält einen pro Token): Die
+  Herausforderungen kommen und werden sofort nach seinen Regeln beantwortet. Online zeigt die Karte den Tag des Bots
+  (gewonnene, remis gespielte und verlorene Partien, abgelehnte Herausforderungen), seine Partie auf einem kleinen Brett
+  mit der Bewertung der Engine, *Aufs Brett*, seine letzten Partien und die abgelehnten Herausforderungen, *Seine Seite
+  auf lichess.org* und **Offline schalten**: keine neue Herausforderung, die laufende Partie geht bis zu ihrem Ende
+  weiter, dann schließt sich der Strom. Eine Fernpartie wartet auf Lichess, solange der Bot offline ist; sie kommt
+  zurück, wenn der Bot wieder online ist. Der Bot spielt nur, solange RookStudio offen ist: Das Schließen von RookStudio
+  während einer seiner Live-Partien fragt zuerst nach (*Bleiben* · Esc, *Offline schalten*, *Trotzdem schließen*), da
+  die Partie auf Zeit verloren ginge.
+- **Seine Partie auf dem Brett**: Zug für Zug verfolgt, die Seite des Bots unten, die Wertungen und Uhren der Spieler in
+  ihren Streifen, und über der Spalte seine Karte: was die Partie ist, wer am Zug ist, die Suche der Engine (ihre
+  Bewertung, Tiefe und erwartete Linie: ihre eigene, da sie die Partie spielt), *Auf lichess.org öffnen*, *Für ihn
+  aufgeben…* (ein zweiter Klick) und *Offline schalten*. Die Züge auf dem Brett gehören allein dem Bot. Am Ende kommt
+  die Partie in die Datenbank *Lichess · sein Name*, die angelegt wird, wenn sie fehlt.
+- **Wo er erscheint**: Online erscheint der Bot dort, wo das Laufende erscheint: auf der Startseite unter *Laufend* und
+  auf der Seite Turniere, mit seiner Partie, *Aufs Brett*, *Seine Karte* und *Offline schalten*.
+- **Das Turnier zuerst**: Eine Herausforderung wird mit *später* abgelehnt, solange ein auf diesem Computer spielendes
+  Turnier die Kerne braucht, die die Engine des Bots nähme. Eine Partie des Bots, die schon läuft, wenn ein Turnier
+  beginnt, geht bis zu ihrem Ende weiter, die Threads ihrer Engine zum Kernbudget gezählt wie die der Engines der Seite
+  Brett; währenddessen wird keine neue Herausforderung angenommen.
+- **Fairplay**: Die Partien des Bots sind nicht deine, und sie sperren deine Hilfsmittel nicht. Während deiner eigenen
+  Live-Partie auf Lichess wird die Suche des Bots weder auf seiner Karte noch auf dem Brett gezeigt (die Karte sagt,
+  warum); seine Partien gehen weiter.
+- **Den Bot trennen…** (ein zweiter Klick) widerruft sein Token bei Lichess und löscht es hier; das Konto bleibt ein
+  Bot.
+- Was den Computer verlässt: die Züge der Engine, seine Worte im Chat, seine Antworten auf die Herausforderungen, mit
+  dem Token des Bots; nichts von deinem Konto. Sein Profil (Name, Beschreibung) wird auf lichess.org eingestellt. Seine
+  Wahl und seine letzten Partien werden in `bot/bot.json` im Profil aufbewahrt.
+
+Die Befehlspalette hat *Den Lichess-Bot online schalten*, *Den Lichess-Bot offline schalten*, *Die Partie des
+Lichess-Bots auf dem Brett* und *Die Karte des Lichess-Bots*, und auf der Seite Engines *… zum Lichess-Bot machen…*.
 
 ## Bücher
 <!-- en: books 4cf13005 -->
@@ -1617,7 +1704,7 @@ Aufgaben zusammen mit anderen Arten fällig, wiederholen *Nur meine Fehler* und 
 alles, ebenso Strg+K *Alles wiederholen*.
 
 ### Aufgaben
-<!-- en: puzzles e825fb2f -->
+<!-- en: puzzles 4fd9ffec -->
 
 Lichess veröffentlicht seine Aufgaben jeden Monat als Datenbank (database.lichess.org, CC0): 6.193.530 Aufgaben im
 November 2026, jede mit ihrer Wertung, ihren Themen und, vor Zug 20, ihrer Eröffnung. RookStudio bewahrt sie auf deiner
@@ -1628,8 +1715,8 @@ von etwa 293 MB im Profil; die Datei selbst wird nicht aufbewahrt. Ein abgebroch
 das Programm geschlossen) geht dort weiter, wo er aufhörte: *Fortsetzen* oder *Neu beginnen*. *Eine schon
 heruntergeladene Datei…* liest stattdessen `lichess_db_puzzle.csv.zst` von deiner Festplatte. Einmal da: *Aktualisieren*
 fragt database.lichess.org nach dem Datum seiner Datei und liest eine neuere, während die aufbewahrten Aufgaben
-antworten; *Entfernen* gibt die Festplatte frei (deine Wertung, deine Ergebnisse und deine zu wiederholenden Aufgaben
-bleiben, getrennt aufbewahrt). Außer der Anfrage nach der Datei verlässt nichts den Computer.
+antworten; *Aufgaben entfernen* gibt die Festplatte frei (deine Wertung, deine Ergebnisse und deine zu wiederholenden
+Aufgaben bleiben, getrennt aufbewahrt). Außer der Anfrage nach der Datei verlässt nichts den Computer.
 
 **Die Auswahl.** *Offline* (die Datenbank) oder *Online* (dein Lichess-Konto, siehe [Lichess-Aufgaben
 online](#lichess-aufgaben-online)); ein Thema unter den ersten angebotenen, jedes damit, wie oft du es im ersten Versuch
@@ -1656,8 +1743,8 @@ ist richtig, wie auf Lichess. Falsch: dein Zug in Orange und der erste Zug der L
 weiter.
 
 Am Ende: die im ersten Versuch gelösten Aufgaben, die verfehlten, die Änderung deiner Wertung und die verfehlten
-Aufgaben (ein Klick zeigt die Stellung mit der Lösung); *Alle jetzt wiederholen* fragt sie erneut ab, ohne zu zählen,
-*Zurück zur Seite Training* verlässt die Serie.
+Aufgaben (ein Klick zeigt die Stellung mit der Lösung); *Die 3 jetzt wiederholen* (so viele wie verfehlt) fragt sie
+erneut ab, ohne zu zählen, *Zurück zur Seite Training* verlässt die Serie.
 
 **Deine Wertung** ist die eigene von RookStudio, mit Glicko-2 berechnet, wie Lichess seine Aufgabenwertungen berechnet:
 Eine im ersten Versuch ohne Hinweis gelöste Aufgabe ist gegen die Wertung der Aufgabe gewonnen. Sie beginnt bei deiner
@@ -1902,7 +1989,7 @@ nichts den Computer: Die Engine läuft auf ihm. Während eine deiner Partien liv
 Seite das und startet keine Partie gegen eine Engine (siehe [Fairplay](#fairplay)).
 
 ### Gegen eine Engine
-<!-- en: against-an-engine d08e9a6c -->
+<!-- en: against-an-engine 1cf4f880 -->
 
 Die Wahl wird für die nächste Partie gespeichert: Einmal getroffen, genügt *Spielen* (Enter).
 
@@ -1918,11 +2005,11 @@ Die Wahl wird für die nächste Partie gespeichert: Einmal getroffen, genügt *S
   gespielt hat, aus einer Datenbank namens *Lichess · Name*, wie sie das Vorbereiten einer Partie gegen ihn anlegt,
   siehe [Eine Partie vorbereiten](#eine-partie-vorbereiten)); *Ein Buch der Bibliothek* (ein Polyglot- oder CTG-Buch der
   Seite Bücher, ohne seine zu vermeidenden Züge). *Variieren* wählt zufällig unter den mindestens 5-mal gespielten
-  Zügen, so oft, wie sie gespielt wurden (die Züge eines Buchs nach seinen Gewichten, die eines Repertoires ebenso);
-  nicht angehakt, der am häufigsten gespielte Zug, bei einem Buch zuerst sein Hauptzug. Sobald ihre Eröffnungen für die
-  Stellung keinen Zug haben, spielt die Engine bis zum Ende. Ihr Stil sind ihre Eröffnungen: Die eigenen Einstellungen
-  der Engine bleiben auf ihrer Karte. Mit einem vorgegebenen Stein treffen die Eröffnungen auf Stellungen, die sie nicht
-  haben, und die Engine spielt ab dem ersten Zug.
+  Zügen, so oft, wie sie gespielt wurden (die Züge eines Buchs so oft, wie seine Gewichte es sagen, die eines
+  Repertoires gleich oft); nicht angehakt, der am häufigsten gespielte Zug, bei einem Buch zuerst sein Hauptzug. Sobald
+  ihre Eröffnungen für die Stellung keinen Zug haben, spielt die Engine bis zum Ende. Ihr Stil sind ihre Eröffnungen:
+  Die eigenen Einstellungen der Engine bleiben auf ihrer Karte. Mit einer Vorgabe treffen die Eröffnungen auf
+  Stellungen, die sie nicht haben, und die Engine spielt ab dem ersten Zug.
 - **Du**: Weiß, Schwarz oder zufällig; die Uhr, Minuten und ein Inkrement, *Für beide gleich* oder, nicht angehakt, eine
   eigene für die Engine (ungleiche Zeit); ab der Ausgangsstellung oder ab der der Seite Brett.
 - **Die Vorgabe**: was die Engine zu Beginn vorgibt: nichts, ihren f-Bauern, ihren b-Springer, ihren a-Turm (die Rochade
@@ -2190,7 +2277,7 @@ deinem Token; Übertragungen mit einem Konto, das sie lesen darf, einmal angefra
 Lesezeichen brauchen ein verknüpftes Konto.
 
 ### Fairplay
-<!-- en: fair-play 12bbcbc4 -->
+<!-- en: fair-play d8b24b4b -->
 
 Lichess verbietet jede Hilfe während einer Partie. Mit verknüpftem Konto hält sich RookStudio daran, wo immer du
 spielst, im Browser oder auf einem Telefon:
@@ -2208,7 +2295,8 @@ spielst, im Browser oder auf einem Telefon:
 Ein Banner auf der Seite Brett sagt, welche Partie was sperrt. Die Karte Lichess der Startseite listet deine laufenden
 Partien auf, die, in denen du am Zug bist, zuerst, jede mit ihrer Uhr oder der verbleibenden Zeit für den Zug, und *Auf
 lichess.org öffnen* oder *Aufs Brett*, sobald RookStudio deine Partien spielen darf (siehe [Eine Partie auf
-Lichess](#eine-partie-auf-lichess)).
+Lichess](#eine-partie-auf-lichess)). Die Partien deines Lichess-Bots sind nicht deine und sperren nichts; während deiner
+eigenen Live-Partie wird die Suche des Bots nicht gezeigt (siehe [Ein Lichess-Bot](#ein-lichess-bot)).
 
 Deine laufenden Partien werden mit dem Token deines Kontos abgefragt, wenn die Startseite erscheint, alle halbe Minute,
 solange eine Live-Partie dauert, und alle zehn Minuten, solange eine Fernpartie läuft. Die Seite Lichess bietet einmal

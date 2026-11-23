@@ -73,7 +73,7 @@ match terminato.
 <!-- en: the-window 3a5230d4 -->
 
 ### Le pagine
-<!-- en: the-pages 80c43812 -->
+<!-- en: the-pages 1cab137d -->
 
 Una barra di navigazione a sinistra porta alle pagine della [vista](#viste) mostrata, nel suo ordine:
 
@@ -84,8 +84,9 @@ Una barra di navigazione a sinistra porta alle pagine della [vista](#viste) most
 | Scacchiera | Una partita o una posizione di qualsiasi provenienza, analizzata da un motore della libreria; in una vista per lo studio, la notazione modificabile direttamente (vedi [La Scacchiera per lo studio](#la-scacchiera-per-lo-studio)) |
 | Database | I tuoi database di partite: importazione, lista delle partite, ricerche |
 | Aperture | I tuoi repertori, la loro copertura e le loro lacune |
+| Allenamento | Il ripasso del giorno, i problemi di Lichess, i tuoi errori come esercizi, indovinare le mosse, i finali contro le tablebase, i matti, la visione della scacchiera (vedi [La pagina Allenamento](#la-pagina-allenamento)) |
+| Gioca | Una partita contro un motore della libreria alla forza che scegli, con le sue aperture e un handicap, e le tue partite su Lichess, entrambe giocate nella pagina Scacchiera (vedi [La pagina Gioca](#la-pagina-gioca)) |
 | Lichess | Il tuo account Lichess, le partite di un giocatore, le trasmissioni ufficiali, ciò che l'analisi può chiedere a Lichess |
-| Gioca | Una partita contro un motore della libreria alla forza che scegli, con le sue aperture e un handicap, giocata nella pagina Scacchiera (vedi [La pagina Gioca](#la-pagina-gioca)) |
 | Motori | La libreria dei motori: opzioni, verifiche, gruppi, Elo di riferimento, importazione delle liste di altri programmi, i motori popolari |
 | Libri | La libreria dei libri di aperture, e le aperture di ogni libro con i loro difetti |
 | Suite | Suite di test (STS, WAC, ERET…): motori contro le posizioni di un file EPD |
@@ -339,7 +340,7 @@ piatte e *Aspetto* dice perché. I pezzi sono gli Staunton-Pieces di clarkerubbe
 collegamento.
 
 ## Scorciatoie da tastiera
-<!-- en: keyboard-shortcuts 4be4d428 -->
+<!-- en: keyboard-shortcuts 65140e2d -->
 
 | Tasti | Dove | Cosa fanno |
 |---|---|---|
@@ -416,11 +417,13 @@ collegamento.
 | <kbd>Ctrl</kbd>+<kbd>A</kbd> | La libreria della configurazione | Seleziona tutti i motori mostrati |
 | <kbd>Ctrl</kbd>+clic, <kbd>Maiusc</kbd>+clic | Elenchi | Selezionano più elementi |
 | <kbd>Canc</kbd> | La pagina Motori | Rimuove il motore selezionato (dopo una conferma) |
+| <kbd>Invio</kbd> | La scheda di un motore, con il suo bot Lichess pronto | Mette online il bot |
+| <kbd>Invio</kbd>, <kbd>Esc</kbd> | Rendere un account un bot Lichess, con il suo nome digitato | Lo rende un bot; annulla |
 | <kbd>Invio</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | La console di un motore | Invia la riga; richiamano le righe precedenti |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | La modalità headless | Ferma dopo le partite in corso |
 
 ## La pagina Home
-<!-- en: the-home-page 8f520943 -->
+<!-- en: the-home-page 317baace -->
 
 La pagina **Home** di una vista raccoglie in schede le pagine della vista, a cominciare da ciò che è in corso:
 
@@ -437,7 +440,8 @@ La pagina **Home** di una vista raccoglie in schede le pagine della vista, a com
 - **Lichess**: l'account, le partite di un giocatore con *Sincronizza*, le nuove partite contate se l'hai scelto, le
   trasmissioni in diretta (vedi [La pagina Lichess](#la-pagina-lichess)).
 - **In corso**: una partita su Lichess giocata da RookStudio (*Torna alla partita*) e le sfide ricevute (vedi [Su
-  Lichess](#su-lichess)), l'analisi della partita, quella della posizione, un'importazione, l'assistente (il suo
+  Lichess](#su-lichess)), il tuo bot Lichess online e la sua partita (vedi [Un bot Lichess](#un-bot-lichess)),
+  l'analisi della partita, quella della posizione, un'importazione, l'assistente (il suo
   download, il suo modello caricato, *Scarica dalla memoria*), una serie di problemi, una sessione di esercizi, una
   partita da indovinare, un finale o un esercizio di visione in corso, e ciò che il ripasso del giorno ha da ripassare,
   in un unico conteggio, che un clic ripassa tutto (vedi [Il ripasso del giorno](#il-ripasso-del-giorno)).
@@ -445,7 +449,7 @@ La pagina **Home** di una vista raccoglie in schede le pagine della vista, a com
 Il pulsante di ricerca in alto, o Ctrl+K, trova un comando, una partita, un database.
 
 ## La pagina Tornei
-<!-- en: the-tournaments-page eb693479 -->
+<!-- en: the-tournaments-page dc32391d -->
 
 La pagina **Tornei** è una sala di controllo: prima ciò che è in corso e ciò che ha bisogno di te, poi il resto.
 
@@ -458,7 +462,8 @@ La pagina **Tornei** è una sala di controllo: prima ciò che è in corso e ciò
   torneo è finito.
 - **Core**: i thread hardware della macchina, e quelli occupati dalle partite in corso, il resto libero. Una partita
   occupa i `Threads` del suo motore che ne ha di più, perché i due motori pensano a turno; la barra mostra il nome di
-  ogni torneo e il suo conteggio, e al passaggio del mouse i dettagli.
+  ogni torneo e il suo conteggio (anche i motori della pagina Scacchiera e la partita del bot Lichess), e al passaggio
+  del mouse i dettagli.
 - **Da sistemare**, quando c'è qualcosa, ognuno con la sua soluzione a portata di mano: un motore che non parte (vedi
   [Un motore che non parte](#un-motore-che-non-parte): *Riprova*, *Ritira…*, *Sostituisci…*, *Log del motore*); il
   torneo che un errore o un motore ha fermato, con ciò che l'ha fermato, *Apri il motore*, *Apri il log*, *Riprendi*,
@@ -472,6 +477,9 @@ La pagina **Tornei** è una sala di controllo: prima ciò che è in corso e ciò
   punteggio, o l'LLR di un SPRT con i suoi limiti, poi l'Elo e il punteggio. *Apri* va al suo spazio di lavoro,
   *Pausa* lo mette in pausa. Un torneo che si può riprendere compare invece sotto *Interrotto*, con *Riprendi*. Vedi
   [Più tornei insieme](#più-tornei-insieme) per i pesi e i core di ciascuno.
+- **Il tuo bot Lichess**, mentre è online: il suo motore, la sua partita in corso con *Sulla Scacchiera*, *La sua
+  scheda* e *Metti offline*; rifiuta le sfide con *più tardi* finché i tornei hanno bisogno dei core (vedi [Un bot
+  Lichess](#un-bot-lichess)).
 - **Coda**: i tornei in attesa, ciascuno con la sua durata e quando parte, e quando finisce tutto (vedi [Coda e
   rilancio](#coda-e-rilancio)).
 - **Ultimi terminati**: gli ultimi cinque tornei terminati, con il loro risultato: il punteggio di un match, la
@@ -667,6 +675,79 @@ pensiero, abbandono. I motori marcati ↔ nell'elenco sono motori WinBoard.
 - Un motore che chiede di essere riavviato per ogni partita (`feature reuse=0`) riceve *Riavvia il motore a ogni
   partita* spuntato quando viene aggiunto.
 - `FCG_WB2UCI_LOG=FILE` nell'ambiente scrive in `FILE` ogni riga scambiata con i motori WinBoard.
+
+### Un bot Lichess
+<!-- en: a-lichess-bot c8e717b7 -->
+
+La scheda di un motore ha una riga **Su Lichess, come bot**: *Rendilo un bot Lichess…* prepara il motore a giocare su
+Lichess con un account bot, tramite la Bot API di Lichess (dove i motori sono ammessi), accettando le sfide che scegli
+mentre RookStudio è aperto. La riga diventa una parte della scheda, che guida attraverso i passi qui sotto.
+
+- **L'account del bot** è un secondo account Lichess, separato dal tuo: nuovo, con un nome proprio, e senza nessuna
+  partita giocata. RookStudio non crea account: *Crea l'account su lichess.org* apre la pagina di Lichess. *Collega
+  l'account del bot…* apre la pagina di Lichess che chiede un solo permesso, *giocare come bot* (`bot:play`): accedi lì
+  con l'account del bot, non con il tuo (una finestra privata del browser evita di disconnetterti). Oppure incolla un
+  token dell'account del bot creato su lichess.org (*Crea un token su lichess.org* apre la pagina con quel permesso
+  spuntato) e *Verificalo*. Il tuo account resta collegato a parte, per il resto di RookStudio; il bot ha il suo token,
+  conservato nel file `lichess-bot.json` del profilo, leggibile solo da te.
+- **Le verifiche**, prima di chiedere qualsiasi cosa che modifichi l'account: il suo nome e quando è stato creato, le
+  partite che ha giocato (nessuna), se è già un bot (allora serve così com'è), e che non sia il tuo account collegato.
+  Il tuo account non viene mai conservato (il token che RookStudio ha ottenuto per esso viene revocato subito); né un
+  account chiuso, né un token senza il permesso. Un account che ha giocato viene rifiutato, come farebbe Lichess:
+  creane uno nuovo, non giocarci nulla, poi collegalo (*Collega un altro account…*, *Scollega questo*).
+- **Rendilo un bot…** è irreversibile: l'account non gioca mai più come persona, Lichess lo segna BOT, e gioca solo
+  sfide (niente lobby, niente tornei tranne le arene aperte ai bot). Il passo lo dice e chiede il nome dell'account:
+  *Rendilo un bot* si accende quando il nome digitato è il suo (Esc annulla). Cosa esce dalla macchina: quella
+  richiesta, con il token del bot. Un rifiuto viene indicato con le parole di Lichess; senza risposta, non è cambiato
+  niente: riprova.
+- **Le sfide che accetta**, sulla scheda: le cadenze (bullet, blitz, rapida, classica, corrispondenza; mai UltraBullet,
+  che Lichess non lascia giocare ai bot), le partite classificate o solo amichevoli, persone e bot, una fascia di
+  rating per lo sfidante (0: nessun limite), Chess960 quando il motore lo conosce (`UCI_Chess960`), una partita alla
+  volta. All'inizio: solo amichevoli, blitz e rapida, perché Lichess chiede ai bot di giocare amichevoli mentre vengono
+  provati; allargale dopo. Una sfida classificata dal tuo account viene rifiutata (Lichess vieta le partite classificate
+  tra account della stessa persona); una amichevole viene giocata. Le altre sfide vengono rifiutate con cortesia, con il
+  motivo che Lichess mostra allo sfidante: *troppo veloce*, *troppo lenta*, *non con questa cadenza*, *solo
+  amichevoli*, *solo scacchi standard*, *non questa variante*, *niente bot*, *solo bot*, o *più tardi* mentre gioca,
+  va offline, o un torneo ha bisogno dei core.
+- **Il suo gioco**: il motore con le sue opzioni della libreria (i suoi `Threads` e `Hash` contati nel budget dei core
+  della macchina mentre gioca), un libro Polyglot della tua libreria giocato finché ha una mossa, le tablebase dei
+  tornei (`SyzygyPath`, per un motore che ha l'opzione e nessun percorso proprio), e niente riflessione sul tempo
+  dell'avversario. Il suo orologio arriva da Lichess a ogni mossa, meno un margine per la rete (un decimo, da 0,2 a 1
+  secondo); prima che entrambi i lati abbiano mosso, gioca entro il tempo che Lichess concede per la prima mossa; per
+  corrispondenza, pensa 15 secondi per mossa. Accetta una patta proposta quando il motore sta chiaramente peggio, o
+  non meglio a partita inoltrata, rifiuta il ritiro di una mossa, e rivendica la vittoria quando il suo avversario se
+  n'è andato da abbastanza tempo. Le sue parole, dette nella chat dei giocatori all'inizio e alla fine, le scegli tu
+  (vuote: non dice niente). Un motore che non parte o che si ferma abbandona la partita (la annulla prima che entrambi
+  i lati abbiano mosso), e la scheda dice perché.
+- **Metti online** (Invio) apre il flusso di eventi proprio del bot (Lichess ne tiene uno per token): le sfide arrivano,
+  e ricevono subito risposta secondo le sue regole. Online, la scheda mostra la giornata del bot (partite vinte, patte e
+  perse, sfide rifiutate), la sua partita su una piccola scacchiera con la valutazione del motore, *Sulla Scacchiera*,
+  le sue ultime partite e le sfide rifiutate, *La sua pagina su lichess.org* e **Metti offline**: nessuna nuova sfida,
+  la partita in corso prosegue fino alla fine, poi il flusso si chiude. Una partita per corrispondenza aspetta su
+  Lichess mentre il bot è offline; torna quando il bot è di nuovo online. Il bot gioca solo mentre RookStudio è aperto:
+  chiudere RookStudio durante una delle sue partite in diretta chiede prima (*Resta* · Esc, *Mettilo offline*, *Chiudi
+  comunque*), perché la partita sarebbe persa per tempo.
+- **La sua partita sulla Scacchiera**: seguita mossa per mossa, con il lato del bot in basso, i rating e gli orologi dei
+  giocatori nelle loro strisce, e sopra la colonna la sua scheda: cos'è la partita, a chi tocca, la ricerca del motore
+  (la sua valutazione, la profondità e la linea che si aspetta: la sua, poiché gioca lui la partita), *Apri su
+  lichess.org*, *Abbandona al suo posto…* (un secondo clic) e *Metti offline*. Le mosse sulla scacchiera sono solo del
+  bot. Alla fine, la partita entra nel database *Lichess · il suo nome*, creato se manca.
+- **Dove compare**: online, il bot compare dove compare ciò che è in corso: nella pagina Home sotto *In corso*, e nella
+  pagina Tornei, con la sua partita, *Sulla Scacchiera*, *La sua scheda* e *Metti offline*.
+- **Prima il torneo**: una sfida viene rifiutata con *più tardi* finché un torneo che si gioca su questo computer ha
+  bisogno dei core che il motore del bot occuperebbe. Una partita del bot già in corso quando inizia un torneo prosegue
+  fino alla fine, con i thread del suo motore contati nel budget dei core come quelli dei motori della pagina
+  Scacchiera; nel frattempo non viene accettata nessuna nuova sfida.
+- **Fair play**: le partite del bot non sono tue, e non bloccano i tuoi aiuti. Durante una tua partita in diretta su
+  Lichess, la ricerca del bot non viene mostrata né sulla sua scheda né sulla Scacchiera (la scheda dice perché); le
+  sue partite continuano.
+- **Scollega il bot…** (un secondo clic) revoca il suo token su Lichess e lo elimina qui; l'account resta un bot.
+- Cosa esce dalla macchina: le mosse del motore, le sue parole nella chat, le sue risposte alle sfide, con il token del
+  bot; niente del tuo account. Il suo profilo (nome, descrizione) si imposta su lichess.org. Le sue scelte e le sue
+  ultime partite sono conservate nel file `bot/bot.json` del profilo.
+
+La tavolozza dei comandi ha *Metti online il bot Lichess*, *Metti offline il bot Lichess*, *La partita del bot Lichess
+sulla Scacchiera* e *La scheda del bot Lichess*, e nella pagina Motori *Rendi … un bot Lichess…*.
 
 ## Libri
 <!-- en: books 4cf13005 -->
@@ -1170,8 +1251,8 @@ posizione su lichess.org* apre su di essa la scacchiera di analisi di Lichess ne
 nell'indirizzo, nient'altro. *Condividi la partita* la importa su Lichess senza account e ne copia l'indirizzo: chi ha
 l'indirizzo vede la partita, anche i nomi dei suoi giocatori. *Fai giocare la posizione*, con una cadenza (da 3+2 a
 30+20, o giorni per mossa), crea una sfida aperta dalla posizione: un link per ogni lato, da mandare al suo giocatore;
-una partita così non è valida per il rating. *Aggiungi la partita ai preferiti su Lichess*, per una partita che viene
-da lì, la mette nei tuoi preferiti: invia l'id della partita con il tuo token, e chiede una volta a Lichess il permesso
+una partita così non è classificata. *Aggiungi la partita ai preferiti su Lichess*, per una partita che viene da
+lì, la mette nei tuoi preferiti: invia l'id della partita con il tuo token, e chiede una volta a Lichess il permesso
 di modificare le tue preferenze. *In uno studio Lichess…* invia la partita in uno dei tuoi studi o in uno nuovo (vedi
 [I tuoi studi Lichess](#i-tuoi-studi-lichess)).
 
@@ -1422,7 +1503,7 @@ tornei più forti e i giocatori con l'Elo più alto. Una partita che il database
 partite conservano la loro fonte, la pagina della trasmissione nel loro tag Site: ciò che ne condividi viene condiviso
 con la stessa licenza. Cosa esce dalla macchina: la richiesta della pagina, poi del file del mese.
 
-*Da una fonte… › Partite Lichess* legge un mese delle partite di Lichess valide per il rating (CC0, circa 95 milioni di
+*Da una fonte… › Partite Lichess* legge un mese delle partite classificate di Lichess (CC0, circa 95 milioni di
 partite e 30 GB compressi) mentre lo scarica, e conserva solo le partite che passano i suoi filtri: per impostazione
 predefinita entrambi i giocatori con Elo di 2400 e più, senza bullet (un tempo base più 40 incrementi sotto i tre
 minuti). Solo le partite conservate arrivano sul disco, aggiunte al database scelto a blocchi, con il database
@@ -1575,7 +1656,7 @@ ripassano da soli.
 lo stesso fa Ctrl+K *Ripassa tutto*.
 
 ### Problemi
-<!-- en: puzzles e825fb2f -->
+<!-- en: puzzles 4fd9ffec -->
 
 Lichess pubblica ogni mese i suoi problemi come database (database.lichess.org, CC0): 6.193.530 problemi a novembre
 2026, ciascuno con il suo rating, i suoi temi e, prima della mossa 20, la sua apertura. RookStudio lo conserva sul tuo
@@ -1585,8 +1666,9 @@ disco e ti dà problemi da esso senza rete.
 profilo; il file stesso non viene conservato. Un download interrotto (*Annulla*, la rete, il programma chiuso) riprende
 da dove si era fermato: *Continua*, o *Ricomincia*. *Un file già scaricato…* legge invece `lichess_db_puzzle.csv.zst`
 dal tuo disco. Una volta lì: *Aggiorna* chiede a database.lichess.org la data del suo file e legge un file più recente
-mentre i problemi conservati continuano a rispondere; *Rimuovi* libera il disco (il tuo rating, i tuoi risultati e i
-tuoi problemi da ripassare restano, conservati a parte). Dalla macchina non esce nient'altro che la richiesta del file.
+mentre i problemi conservati continuano a rispondere; *Rimuovi i problemi* libera il disco (il tuo rating, i tuoi
+risultati e i tuoi problemi da ripassare restano, conservati a parte). Dalla macchina non esce nient'altro che la
+richiesta del file.
 
 **La scelta.** *Offline* (il database) o *Online* (il tuo account Lichess, vedi [Problemi di Lichess
 online](#problemi-di-lichess-online)); un tema tra i primi proposti, ciascuno con quanto spesso lo risolvi al primo
@@ -1613,8 +1695,8 @@ come su Lichess. Sbagliato: la tua mossa in arancione e la prima mossa della sol
 *Avanti* prosegue.
 
 Alla fine: i problemi risolti al primo tentativo, quanti ne hai sbagliati, la variazione del tuo rating, e l'elenco di
-quelli sbagliati (un clic mostra la posizione con la soluzione); *Ripassali ora* li ripropone senza contare, *Torna alla
-pagina Allenamento* esce.
+quelli sbagliati (un clic mostra la posizione con la soluzione); *Ripassa ora i 3* (tanti quanti gli sbagliati) li
+ripropone senza contare, *Torna alla pagina Allenamento* esce.
 
 **Il tuo rating** è proprio di RookStudio, calcolato con Glicko-2 come Lichess calcola i rating dei suoi problemi: un
 problema risolto al primo tentativo, senza suggerimenti, è vinto contro il rating del problema. Parte dal tuo rating dei
@@ -1856,7 +1938,7 @@ gioca in diretta su Lichess, la pagina lo dice e non avvia nessuna partita contr
 play](#fair-play)).
 
 ### Contro un motore
-<!-- en: against-an-engine d08e9a6c -->
+<!-- en: against-an-engine 1cf4f880 -->
 
 La scelta viene conservata per la partita successiva: una volta fatta, basta *Gioca* (Invio).
 
@@ -1864,18 +1946,18 @@ La scelta viene conservata per la partita successiva: una volta fatta, basta *Gi
 - **La sua forza**: l'Elo a cui mira (`UCI_Elo`, con `UCI_LimitStrength`), sulla sua scala: un'indicazione, non un Elo
   FIDE. Un motore senza quell'impostazione gioca invece un numero di nodi per mossa, da 1 a un milione, meno per un
   gioco più debole. *Piena forza* lo lascia al suo meglio, qualunque limite imponga la sua scheda.
-- **Il suo stile: le sue aperture**, ciò che gioca prima delle sue mosse: *Le proprie* (nessun libro); *I tuoi
-  database* (le mosse più giocate lì, in tutti i tuoi database con un albero delle aperture o in uno di essi); *Il tuo
-  repertorio* (le mosse contro cui ti sei preparato, poi il motore; giochi il colore del repertorio, che sceglierlo
-  imposta); *Le partite di un giocatore* (le mosse che un giocatore ha giocato con il colore del motore, da un database
-  chiamato *Lichess · nome*, come quello che crea la preparazione di una partita contro di lui, vedi [Preparare una
-  partita](#preparare-una-partita)); *Un libro della libreria* (un libro Polyglot o CTG della pagina Libri, senza le
-  sue mosse da evitare). *Varia* sceglie a caso tra le mosse giocate almeno 5 volte, con la frequenza con cui sono
-  state giocate (le mosse di un libro secondo i loro pesi, quelle di un repertorio allo stesso modo); senza spunta, la
-  mossa più giocata, prima la mossa principale di un libro. Quando le sue aperture non hanno più mosse per la
-  posizione, il motore gioca fino alla fine. Il suo stile sono le sue aperture: le impostazioni proprie del motore
-  restano sulla sua scheda. Con un pezzo dato, le aperture incontrano posizioni che non hanno, e il motore gioca dalla
-  prima mossa.
+- **Il suo stile: le sue aperture**, ciò che gioca prima delle sue mosse: *Le proprie* (nessun libro); *I tuoi database*
+  (le mosse più giocate lì, in tutti i tuoi database con un albero delle aperture o in uno di essi); *Il tuo repertorio*
+  (le mosse contro cui ti sei preparato, poi il motore; giochi il colore del repertorio, che sceglierlo imposta); *Le
+  partite di un giocatore* (le mosse che un giocatore ha giocato con il colore del motore, da un database chiamato
+  *Lichess · nome*, come quello che crea la preparazione di una partita contro di lui, vedi [Preparare una
+  partita](#preparare-una-partita)); *Un libro della libreria* (un libro Polyglot o CTG della pagina Libri, senza le sue
+  mosse da evitare). *Varia* sceglie a caso tra le mosse giocate almeno 5 volte, con la frequenza con cui sono state
+  giocate (quelle di un libro con la frequenza indicata dai loro pesi, quelle di un repertorio con la stessa frequenza);
+  senza spunta, la mossa più giocata, prima la mossa principale di un libro. Quando le sue aperture non hanno più mosse
+  per la posizione, il motore gioca fino alla fine. Il suo stile sono le sue aperture: le impostazioni proprie del
+  motore restano sulla sua scheda. Con un handicap, le aperture incontrano posizioni che non hanno, e il motore gioca
+  dalla prima mossa.
 - **Tu**: Bianco, Nero o a caso; l'orologio, minuti e un incremento, *Lo stesso per entrambi* o, senza spunta, quello
   proprio del motore (tempo diseguale); dalla posizione iniziale, o da quella della pagina Scacchiera.
 - **L'handicap**: ciò che il motore dà all'inizio: niente, il suo pedone f, il suo cavallo b, la sua torre a (e con
@@ -2133,7 +2215,7 @@ trasmissioni con un account autorizzato a leggerle, permesso chiesto una volta, 
 preferiti richiedono un account collegato.
 
 ### Fair play
-<!-- en: fair-play 12bbcbc4 -->
+<!-- en: fair-play d8b24b4b -->
 
 Lichess vieta qualsiasi aiuto durante una partita. Con il tuo account collegato, RookStudio rispetta questa regola
 ovunque tu giochi, nel browser o su un telefono:
@@ -2151,7 +2233,8 @@ ovunque tu giochi, nel browser o su un telefono:
 Un banner nella pagina Scacchiera dice quale partita blocca cosa. La scheda Lichess della pagina Home elenca le tue
 partite in corso, prima quelle in cui tocca a te, ciascuna con il suo orologio o il tempo rimasto per muovere, e *Apri
 su lichess.org*, o *Sulla Scacchiera* una volta che RookStudio può giocare le tue partite (vedi [Una partita su
-Lichess](#una-partita-su-lichess)).
+Lichess](#una-partita-su-lichess)). Le partite del tuo bot Lichess non sono tue e non bloccano niente; durante una tua
+partita in diretta, la ricerca del bot non viene mostrata (vedi [Un bot Lichess](#un-bot-lichess)).
 
 Le tue partite in corso vengono chieste con il token del tuo account quando compare la pagina Home, ogni mezzo minuto
 finché dura una partita in diretta e ogni dieci minuti finché dura una partita per corrispondenza. La pagina Lichess
@@ -2219,7 +2302,7 @@ abbia una.
   stato letto.
 - Pronta, la scheda dà le posizioni, la dimensione e la data del file. Lichess ripubblica il file ogni mese: *Aggiorna*
   chiede a database.lichess.org la sua data e legge un file più recente, mentre le valutazioni conservate continuano a
-  rispondere finché non è pronto. *Rimuovi* libera il disco.
+  rispondere finché non è pronto. *Rimuovile* libera il disco.
 
 Compaiono in tre punti:
 

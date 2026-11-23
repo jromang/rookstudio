@@ -74,7 +74,7 @@ configuration est gardée : la prochaine fois, choisis la version suivante comme
 <!-- en: the-window 3a5230d4 -->
 
 ### Les pages
-<!-- en: the-pages 80c43812 -->
+<!-- en: the-pages 1cab137d -->
 
 Une barre de navigation, à gauche, mène aux pages de la [vue](#vues) affichée, dans son ordre :
 
@@ -85,8 +85,9 @@ Une barre de navigation, à gauche, mène aux pages de la [vue](#vues) affichée
 | Échiquier | Une partie ou une position venue de n'importe où, analysée par un moteur de la bibliothèque ; dans une vue pour l'étude, la notation écrite sur place (voir [L'Échiquier d'étude](#léchiquier-détude)) |
 | Bases | Tes bases de parties : l'import, la liste des parties, les recherches |
 | Ouvertures | Tes répertoires, leur couverture et leurs lacunes |
+| Entraînement | La révision du jour, les problèmes de Lichess, tes erreurs en exercices, deviner les coups, les finales contre les tables, les mats, la vision de l'échiquier (voir [La page Entraînement](#la-page-entraînement)) |
+| Jouer | Une partie contre un moteur de la bibliothèque à la force que tu choisis, avec ses ouvertures et un handicap, et tes parties sur Lichess, jouées les unes et les autres sur la page Échiquier (voir [La page Jouer](#la-page-jouer)) |
 | Lichess | Ton compte Lichess, les parties d'un joueur, les diffusions officielles, ce que l'analyse peut demander à Lichess |
-| Jouer | Une partie contre un moteur de la bibliothèque à la force que tu choisis, avec ses ouvertures et un handicap, jouée sur la page Échiquier (voir [La page Jouer](#la-page-jouer)) |
 | Moteurs | La bibliothèque de moteurs : options, vérifications, groupes, Elo de référence, import des listes d'autres programmes, les moteurs populaires |
 | Livres | La bibliothèque de livres d'ouvertures, et les ouvertures de chaque livre avec ce qui ne va pas chez elles |
 | Suites | Les suites de tests (STS, WAC, ERET…) : des moteurs face aux positions d'un fichier EPD |
@@ -342,7 +343,7 @@ L'échiquier 3D demande OpenGL 3.3. Là où la fenêtre est dessinée sans lui (
 licence MIT ; *Apparence* donne le lien vers elles.
 
 ## Raccourcis clavier
-<!-- en: keyboard-shortcuts 4be4d428 -->
+<!-- en: keyboard-shortcuts 65140e2d -->
 
 | Touches | Où | Ce qu'elles font |
 |---|---|---|
@@ -419,11 +420,13 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>Ctrl</kbd>+<kbd>A</kbd> | La bibliothèque de la configuration | Sélectionner tous les moteurs affichés |
 | <kbd>Ctrl</kbd>+clic, <kbd>Maj</kbd>+clic | Listes | En sélectionner plusieurs |
 | <kbd>Suppr</kbd> | La page Moteurs | Retirer le moteur sélectionné (après confirmation) |
+| <kbd>Entrée</kbd> | La fiche d'un moteur, son bot Lichess prêt | Mettre le bot en ligne |
+| <kbd>Entrée</kbd>, <kbd>Échap</kbd> | Faire d'un compte un bot Lichess, son nom tapé | En faire un bot ; annuler |
 | <kbd>Entrée</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | La console d'un moteur | Envoyer la ligne ; faire revenir les lignes précédentes |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Le mode sans interface | S'arrêter après les parties en cours |
 
 ## La page Accueil
-<!-- en: the-home-page 8f520943 -->
+<!-- en: the-home-page 317baace -->
 
 La page **Accueil** d'une vue fait des cartes des pages de la vue, ce qui tourne en premier :
 
@@ -441,15 +444,15 @@ La page **Accueil** d'une vue fait des cartes des pages de la vue, ce qui tourne
 - **Lichess** : le compte, les parties d'un joueur avec *Synchroniser*, les nouvelles parties comptées si tu l'as
   choisi, les diffusions en direct (voir [La page Lichess](#la-page-lichess)).
 - **En cours** : une partie sur Lichess jouée depuis RookStudio (*Revenir à la partie*) et les défis reçus (voir [Sur
-  Lichess](#sur-lichess)), l'analyse de la partie, celle de la position, un import, l'assistant (son téléchargement, son
-  modèle chargé, *Décharger*), une série de problèmes, une séance d'exercices, une partie à deviner, une finale ou un
+  Lichess](#sur-lichess)), ton bot Lichess en ligne et sa partie (voir [Un bot Lichess](#un-bot-lichess)), l'analyse de
+  la partie, celle de la position, un import, l'assistant (son téléchargement, son modèle chargé, *Décharger*), une série de problèmes, une séance d'exercices, une partie à deviner, une finale ou un
   exercice de vision en cours, et ce que la révision du jour a à revoir, en un seul compte, un clic révisant le tout
   (voir [La révision du jour](#la-révision-du-jour)).
 
 Le bouton de recherche en haut, ou Ctrl+K, trouve une commande, une partie, une base.
 
 ## La page Tournois
-<!-- en: the-tournaments-page eb693479 -->
+<!-- en: the-tournaments-page dc32391d -->
 
 La page **Tournois** est une salle de contrôle : d'abord ce qui tourne et ce qui a besoin de toi, puis le reste.
 
@@ -462,7 +465,8 @@ La page **Tournois** est une salle de contrôle : d'abord ce qui tourne et ce qu
   d'attente continuer, aussitôt si un tournoi s'est terminé entre-temps.
 - **Cœurs** : les threads matériels de la machine, et ceux que prennent les parties en cours, le reste libre. Une
   partie prend les `Threads` de celui de ses deux moteurs qui en a le plus, puisque les deux moteurs réfléchissent
-  chacun à leur tour ; la barre montre le nom de chaque tournoi et son nombre, les détails s'affichant au curseur.
+  chacun à leur tour ; la barre montre le nom de chaque tournoi et son nombre (les moteurs de la page Échiquier et la
+  partie du bot Lichess aussi), les détails s'affichant au curseur.
 - **À traiter**, quand quelque chose l'exige, chaque fois avec sa correction sur place : un moteur qui ne démarre pas
   (voir [Un moteur qui ne démarre pas](#un-moteur-qui-ne-démarre-pas) : *Réessayer*, *Retirer…*, *Remplacer…*,
   *Journal moteur*) ; le tournoi qu'une erreur ou un moteur a arrêté, avec ce qui l'a arrêté, *Ouvrir le moteur*,
@@ -477,6 +481,9 @@ La page **Tournois** est une salle de contrôle : d'abord ce qui tourne et ce qu
   LLR d'un SPRT avec ses bornes, puis l'Elo et le score. *Ouvrir* va à son espace de travail, *Pause* le met en pause.
   Un tournoi qui peut être repris s'affiche à la place sous *Interrompu*, avec *Reprendre*. Voir
   [Plusieurs tournois à la fois](#plusieurs-tournois-à-la-fois) pour les poids et les cœurs de chacun.
+- **Ton bot Lichess**, tant qu'il est en ligne : son moteur, sa partie en cours avec *Sur l'Échiquier*, *Sa fiche* et
+  *Mettre hors ligne* ; il refuse les défis *plus tard* tant que les tournois ont besoin des cœurs (voir [Un bot
+  Lichess](#un-bot-lichess)).
 - **File d'attente** : les tournois en attente, chacun avec sa durée et l'heure à laquelle il commence, et l'heure à
   laquelle tout se termine (voir [File d'attente et relance](#file-dattente-et-relance)).
 - **Derniers terminés** : les cinq derniers tournois terminés, avec leur résultat : le score d'un match, la décision
@@ -682,6 +689,80 @@ WinBoard.
 - Un moteur qui demande à être relancé à chaque partie (`feature reuse=0`) a *Relancer le moteur à chaque partie*
   coché quand il est ajouté.
 - `FCG_WB2UCI_LOG=FILE` dans l'environnement écrit dans `FILE` chaque ligne échangée avec les moteurs WinBoard.
+
+### Un bot Lichess
+<!-- en: a-lichess-bot c8e717b7 -->
+
+La fiche d'un moteur a une ligne **Sur Lichess, en bot** : *En faire un bot Lichess…* prépare le moteur à jouer sur
+Lichess sous un compte bot, par la Bot API de Lichess (là où les moteurs sont autorisés), en acceptant les défis que tu
+choisis pendant que RookStudio est ouvert. La ligne devient une section de la fiche, qui guide à travers les étapes
+ci-dessous.
+
+- **Le compte du bot** est un second compte Lichess, distinct du tien : nouveau, avec un nom à lui, et sans aucune
+  partie jouée. RookStudio ne crée pas de comptes : *Créer le compte sur lichess.org* ouvre la page de Lichess.
+  *Associer le compte du bot…* ouvre la page de Lichess qui demande une permission, *jouer en tant que bot*
+  (`bot:play`) : connecte-toi là avec le compte du bot, pas le tien (une fenêtre privée du navigateur évite de te
+  déconnecter). Ou colle un jeton du compte du bot créé sur lichess.org (*Créer un jeton sur lichess.org* ouvre la page
+  avec cette permission cochée) et *Le vérifier*. Ton propre compte reste associé à part, pour le reste de RookStudio ;
+  le bot a son propre jeton, gardé dans le `lichess-bot.json` du profil, lisible par toi seul.
+- **Les vérifications**, avant que rien qui modifie le compte ne soit demandé : son nom et sa date de création, les
+  parties qu'il a jouées (aucune), s'il est déjà un bot (il sert alors tel quel), et qu'il n'est pas ton propre compte
+  associé. Ton propre compte n'est jamais gardé (le jeton que RookStudio a obtenu pour lui est aussitôt révoqué) ; un
+  compte fermé, ou un jeton sans la permission, non plus. Un compte qui a joué est refusé, comme Lichess le ferait :
+  crée un nouveau compte, n'y joue rien, puis associe-le (*Associer un autre compte…*, *Dissocier celui-ci*).
+- **En faire un bot…** est irréversible : le compte ne joue plus jamais comme une personne, Lichess le marque BOT, et il
+  ne joue que des défis (pas de salon, pas de tournois sauf les arènes ouvertes aux bots). L'étape le dit et demande le
+  nom du compte : *En faire un bot* s'allume dès que le nom tapé est le sien (Échap annule). Ce qui quitte la machine :
+  cette demande, avec le jeton du bot. Un refus est dit avec les mots de Lichess ; sans réponse, rien n'a changé :
+  réessaie.
+- **Les défis qu'il accepte**, sur la fiche : les cadences (bullet, blitz, rapide, classique, correspondance ; jamais
+  l'UltraBullet, que Lichess ne laisse pas jouer aux bots), les parties classées ou seulement amicales, les personnes et
+  les bots, une fourchette de classement pour l'auteur du défi (0 : sans limite), le Chess960 quand le moteur le connaît
+  (`UCI_Chess960`), une partie à la fois. Au départ : amicales seulement, blitz et rapide, puisque Lichess demande aux
+  bots de jouer en amical pendant qu'on les essaie ; élargis-les ensuite. Un défi classé venant de ton propre compte est
+  refusé (Lichess interdit les parties classées entre les comptes d'une même personne) ; un défi amical est joué. Les
+  autres défis sont refusés poliment, avec la raison que Lichess montre à l'auteur du défi : *trop rapide*, *trop lent*,
+  *pas cette cadence*, *amicales seulement*, *échecs standard seulement*, *pas cette variante*, *pas de bots*, *bots
+  seulement*, ou *plus tard* pendant qu'il joue, qu'il passe hors ligne, ou qu'un tournoi a besoin des cœurs.
+- **Son jeu** : le moteur avec ses options de la bibliothèque (ses `Threads` et son `Hash` comptés dans le budget de
+  cœurs de la machine pendant qu'il joue), un livre Polyglot de ta bibliothèque joué tant qu'il a un coup, les tables des
+  tournois (`SyzygyPath`, pour un moteur qui a l'option et pas de chemin à lui), et pas de réflexion pendant le temps de
+  l'adversaire. Sa pendule vient de Lichess à chaque coup, moins une marge pour le réseau (un dixième, de 0,2 à 1
+  seconde) ; avant que les deux camps aient joué, il joue dans le temps que Lichess donne pour le premier coup ; par
+  correspondance, il réfléchit 15 secondes par coup. Il accepte une nulle proposée quand le moteur est nettement moins
+  bien, ou pas mieux tard dans la partie, refuse une reprise de coup, et revendique la victoire quand son adversaire est
+  parti assez longtemps. Ses mots, dits dans la discussion des joueurs au début et à la fin, sont à toi de choisir
+  (vides : rien n'est dit). Un moteur qui ne peut pas démarrer ou qui s'arrête abandonne la partie (l'annule avant que
+  les deux camps aient joué), et la fiche dit pourquoi.
+- **Mettre en ligne** (Entrée) ouvre le flux d'événements propre au bot (Lichess en garde un par jeton) : les défis
+  arrivent, auxquels ses règles répondent aussitôt. En ligne, la fiche montre la journée du bot (parties gagnées, nulles
+  et perdues, défis refusés), sa partie sur un petit échiquier avec l'évaluation du moteur, *Sur l'Échiquier*, ses
+  dernières parties et les défis refusés, *Sa page sur lichess.org* et **Mettre hors ligne** : plus de nouveau défi, la
+  partie en cours se joue jusqu'à sa fin, puis le flux se ferme. Une partie par correspondance attend sur Lichess pendant
+  que le bot est hors ligne ; elle revient quand le bot est de nouveau en ligne. Le bot ne joue que pendant que
+  RookStudio est ouvert : fermer RookStudio pendant une de ses parties en direct demande d'abord (*Rester* · Échap, *Le
+  mettre hors ligne*, *Fermer quand même*), puisque la partie serait perdue au temps.
+- **Sa partie sur l'Échiquier** : suivie coup par coup, le camp du bot en bas, les classements et les pendules des
+  joueurs dans leurs bandeaux, et au-dessus de la colonne sa carte : ce qu'est la partie, à qui c'est de jouer, la
+  recherche du moteur (son évaluation, sa profondeur et la ligne qu'il attend : la sienne, puisqu'il joue la partie),
+  *Ouvrir sur lichess.org*, *Abandonner pour lui…* (un second clic) et *Mettre hors ligne*. Les coups sur l'échiquier
+  sont ceux du bot seul. À sa fin, la partie arrive dans la base *Lichess · son nom*, créée si elle manque.
+- **Où il s'affiche** : en ligne, le bot s'affiche là où s'affiche ce qui tourne : sur la page Accueil sous *En cours*,
+  et sur la page Tournois, avec sa partie, *Sur l'Échiquier*, *Sa fiche* et *Mettre hors ligne*.
+- **Un tournoi d'abord** : un défi est refusé *plus tard* tant qu'un tournoi qui joue sur cet ordinateur a besoin des
+  cœurs que prendrait le moteur du bot. Une partie du bot déjà en cours quand un tournoi commence va jusqu'à sa fin, les
+  threads de son moteur comptés dans le budget de cœurs comme le sont ceux des moteurs de la page Échiquier ; aucun
+  nouveau défi n'est pris pendant ce temps.
+- **Fair-play** : les parties du bot ne sont pas les tiennes, et elles ne verrouillent pas tes aides. Pendant ta propre
+  partie en direct sur Lichess, la recherche du bot n'est montrée ni sur sa carte ni sur l'Échiquier (la carte dit
+  pourquoi) ; ses parties continuent.
+- **Dissocier le bot…** (un second clic) révoque son jeton chez Lichess et le supprime ici ; le compte reste un bot.
+- Ce qui quitte la machine : les coups du moteur, ses mots dans la discussion, ses réponses aux défis, avec le jeton du
+  bot ; rien de ton compte. Son profil (nom, description) se règle sur lichess.org. Ses choix et ses dernières parties
+  sont gardés dans le `bot/bot.json` du profil.
+
+La palette de commandes a *Mettre le bot Lichess en ligne*, *Mettre le bot Lichess hors ligne*, *La partie du bot
+Lichess sur l'Échiquier* et *La fiche du bot Lichess*, et sur la page Moteurs *Faire de … un bot Lichess…*.
 
 ## Livres
 <!-- en: books 4cf13005 -->
@@ -1595,7 +1676,7 @@ trois jours. Quand des erreurs ou des problèmes sont à revoir avec d'autres ty
 Ctrl+K *Tout réviser* aussi.
 
 ### Problèmes
-<!-- en: puzzles e825fb2f -->
+<!-- en: puzzles 4fd9ffec -->
 
 Lichess publie ses problèmes chaque mois sous forme de base (database.lichess.org, CC0) : 6 193 530 problèmes en
 novembre 2026, chacun avec son classement, ses thèmes et, avant le coup 20, son ouverture. RookStudio la garde sur ton
@@ -1606,7 +1687,7 @@ d'environ 293 Mo dans le profil ; le fichier lui-même n'est pas gardé. Un tél
 réseau, le programme fermé) reprend là où il s'était arrêté : *Continuer*, ou *Recommencer*. *Un fichier déjà
 téléchargé…* lit à la place `lichess_db_puzzle.csv.zst` sur ton disque. Une fois la base là : *Mettre à jour* demande à
 database.lichess.org la date de son fichier et lit un fichier plus récent pendant que les problèmes gardés répondent ;
-*Les retirer* libère le disque (ton classement, tes résultats et tes problèmes à revoir restent, gardés à part). Rien
+*Retirer les problèmes* libère le disque (ton classement, tes résultats et tes problèmes à revoir restent, gardés à part). Rien
 d'autre que la demande du fichier ne quitte la machine.
 
 **Le choix.** *Hors ligne* (la base) ou *En ligne* (ton compte Lichess, voir [Les problèmes Lichess en
@@ -1627,14 +1708,14 @@ le moteur, l'arbre et tes notes sont masqués, de même que les thèmes du probl
 - **Espace** : « Je ne sais pas » ; la solution est montrée et le problème compte comme manqué.
 - **Échap** : arrêter ; ce qui a été répondu est gardé.
 
-Juste : la solution en coups, la variation de ton classement et les thèmes du problème ; *Suivante* vient sur Entrée, ou
+Juste : la solution en coups, la variation de ton classement et les thèmes du problème ; *Suivant* vient sur Entrée, ou
 d'elle-même après une seconde (le réglage de l'entraînement des répertoires) ; *Analyser ici* (Alt+A) lance le moteur sur
 la position ; *La partie sur lichess.org* ouvre la partie d'où vient le problème. Tout coup qui mate est juste, comme
 sur Lichess. Faux : ton coup en orange et le premier coup de la solution en flèche verte ; *Réessayer* (Entrée) le fait
-rejouer, sans compter de nouveau ; *La solution coup par coup* (→) la joue un coup à la fois ; *Suivante* continue.
+rejouer, sans compter de nouveau ; *La solution coup par coup* (→) la joue un coup à la fois ; *Suivant* continue.
 
 À la fin : les problèmes résolus du premier coup, ceux manqués, la variation de ton classement, et les manqués (un clic
-montre la position avec la solution) ; *Réviser les … maintenant* les redemande sans compter, *Revenir à la page
+montre la position avec la solution) ; *Réviser les 3 maintenant* (autant que de manqués) les redemande sans compter, *Revenir à la page
 Entraînement* quitte.
 
 **Ton classement** est celui de RookStudio, calculé avec Glicko-2 comme Lichess calcule ses classements de problèmes :
@@ -1875,7 +1956,7 @@ page Échiquier. Contre un moteur, rien ne quitte la machine : le moteur y tourn
 en direct sur Lichess, la page le dit et ne lance aucune partie contre un moteur (voir [Fair-play](#fair-play)).
 
 ### Contre un moteur
-<!-- en: against-an-engine d08e9a6c -->
+<!-- en: against-an-engine 1cf4f880 -->
 
 Le choix est gardé pour la partie suivante : une fois fait, *Jouer* (Entrée) suffit.
 
@@ -1890,10 +1971,10 @@ Le choix est gardé pour la partie suivante : une fois fait, *Jouer* (Entrée) s
   *Lichess · nom*, comme en crée la préparation d'une partie contre lui, voir [Préparer une
   partie](#préparer-une-partie)) ; *Un livre de la bibliothèque* (un livre Polyglot ou CTG de la page Livres, ses coups
   à éviter écartés). *Varier* choisit au hasard parmi les coups joués au moins 5 fois, aussi souvent qu'ils ont été
-  joués (les coups d'un livre selon ses poids, ceux d'un répertoire de même) ; décoché, le coup le plus joué, le coup
+  joués (les coups d'un livre aussi souvent que le disent ses poids, ceux d'un répertoire aussi souvent les uns que les autres) ; décoché, le coup le plus joué, le coup
   principal d'un livre d'abord. Une fois que ses ouvertures n'ont plus de coup pour la position, le moteur joue jusqu'à
-  la fin. Son style, ce sont ses ouvertures : les réglages propres du moteur restent sur sa fiche. Avec une pièce
-  donnée, les ouvertures rencontrent des positions qu'elles n'ont pas, et le moteur joue dès le premier coup.
+  la fin. Son style, ce sont ses ouvertures : les réglages propres du moteur restent sur sa fiche. Avec un
+  handicap, les ouvertures rencontrent des positions qu'elles n'ont pas, et le moteur joue dès le premier coup.
 - **Toi** : les Blancs, les Noirs ou au hasard ; la pendule, des minutes et un incrément, *La même pour les deux* ou,
   décoché, celle du moteur à part (temps inégal) ; depuis la position initiale, ou depuis celle de la page Échiquier.
 - **Le handicap** : ce que le moteur donne au départ : rien, son pion f, son cavalier b, sa tour a (le roque de ce côté
@@ -2150,7 +2231,7 @@ Une partie est demandée par son identifiant, sans compte ; une étude privée a
 compte autorisé à les lire, demandé une fois, comme pour suivre une ronde ; tes favoris demandent un compte associé.
 
 ### Fair-play
-<!-- en: fair-play 12bbcbc4 -->
+<!-- en: fair-play d8b24b4b -->
 
 Lichess interdit toute aide pendant une partie. Avec ton compte associé, RookStudio s'y tient où que tu joues, dans le
 navigateur ou sur un téléphone :
@@ -2168,7 +2249,8 @@ navigateur ou sur un téléphone :
 Un bandeau sur la page Échiquier dit quelle partie verrouille quoi. La carte Lichess de la page Accueil liste tes
 parties en cours, celles où c'est ton tour d'abord, chacune avec sa pendule ou le temps qui reste pour jouer, et
 *Ouvrir sur lichess.org*, ou *Sur l'Échiquier* une fois que RookStudio peut jouer tes parties (voir [Une partie sur
-Lichess](#une-partie-sur-lichess)).
+Lichess](#une-partie-sur-lichess)). Les parties de ton bot Lichess ne sont pas les tiennes et ne verrouillent rien ;
+pendant ta propre partie en direct, la recherche du bot n'est pas montrée (voir [Un bot Lichess](#un-bot-lichess)).
 
 Tes parties en cours sont demandées avec le jeton de ton compte quand la page Accueil s'affiche, toutes les trente
 secondes tant que dure une partie en direct et toutes les dix minutes tant que dure une partie par correspondance. La

@@ -964,7 +964,7 @@ void App::drawBotSteps() {
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Make a token on lichess.org"))) SDL_OpenURL(LICHESS_BOT_TOKEN);
-    tip(TR("Lichess's page, logged in with the bot's account, the permission “Play bot moves” ticked."));
+    tip(TR("Lichess's page, logged in with the bot's account, the permission to play as a bot (bot:play) ticked."));
     if (bot_account_ && !shown_refusal) {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Unlink this one"))) forgetBotAccount();
@@ -1006,7 +1006,7 @@ void App::drawBotRefusal() {
             default:
                 coloured(TR("This token may not play as a bot."), ui::WARN);
                 wrapped(
-                    TR("Make one with the permission “Play bot moves” (bot:play), logged in with the bot's "
+                    TR("Make one with the permission to play as a bot (bot:play), logged in with the bot's "
                        "account, then paste it."));
                 break;
         }
@@ -1108,9 +1108,12 @@ void App::drawBotRules(const EngineEntry& e) {
 #else
         localtime_r(&t, &local);
 #endif
-        char text[32];
-        std::strftime(text, sizeof(text), "%H:%M", &local);
-        since = ui::dayText(t) == TR("today") ? trf("a bot since {}", text) : trf("a bot since {}", ui::dayText(t));
+        // The time today, else the date: "a bot since on Monday" did not read.
+        char time_text[16], date_text[16];
+        std::strftime(time_text, sizeof(time_text), "%H:%M", &local);
+        std::strftime(date_text, sizeof(date_text), "%Y-%m-%d", &local);
+        since =
+            ui::dayText(t) == TR("today") ? trf("a bot since today, {}", time_text) : trf("a bot since {}", date_text);
     } else {
         since = TR("a bot");
     }

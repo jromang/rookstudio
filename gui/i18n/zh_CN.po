@@ -14,9 +14,6 @@ msgstr "  决定于 {}"
 msgid " (decided at {})"
 msgstr "（决定于 {}）"
 
-msgid " (each game replayed up to the pattern)"
-msgstr "（每局都会重放到出现该棋型为止）"
-
 msgid " Export:"
 msgstr " 导出："
 
@@ -100,6 +97,9 @@ msgstr "（0：不限）"
 msgid "(It is in your exercises.)"
 msgstr "（它已在你的练习中。）"
 
+msgid "(a click on each square; Backspace takes the last off)"
+msgstr ""
+
 msgid "(already in the list)"
 msgstr "（已在列表中）"
 
@@ -114,6 +114,9 @@ msgstr "（已排除：{} 局作废，{} 局重复，{} 局崩溃）"
 
 msgid "(new)"
 msgstr "（新建）"
+
+msgid "(no check)"
+msgstr ""
 
 msgid "(not in the engine list)"
 msgstr "（不在引擎列表中）"
@@ -138,6 +141,12 @@ msgstr "（{} 子及以下）"
 
 msgid "({}, depth {})"
 msgstr "（{}，深度 {}）"
+
+msgid "+ A condition"
+msgstr ""
+
+msgid "+ A step"
+msgstr ""
 
 msgid "+ Engine"
 msgstr "+ 引擎"
@@ -345,6 +354,9 @@ msgstr ""
 msgid "A click on a square then empties it. A right click empties a square whatever is chosen."
 msgstr "选中后，点击格子即可将其清空。无论选中什么，右键点击都会清空格子。"
 
+msgid "A click on a square: a white pawn, a black pawn, nothing."
+msgstr ""
+
 msgid "A click on the curve goes to the move. The dots are the key moments: dark for a good move, orange for a mistake."
 msgstr "单击曲线即可跳到对应着法。圆点是关键时刻：深色为好着，橙色为失误。"
 
@@ -374,6 +386,9 @@ msgstr "单击即可开始你磁盘上数据库中的 20 道谜题；也可在 C
 
 msgid "A click starts a batch of your Lichess puzzles; the database offline is on the Puzzles part."
 msgstr "单击即可开始一批你的 Lichess 谜题；离线数据库位于“谜题”部分。"
+
+msgid "A click switches between “takes on” and “goes to”."
+msgstr ""
 
 msgid "A click: each of its lines."
 msgstr "单击：显示其每条变化。"
@@ -534,6 +549,9 @@ msgstr "提示：棋盘上的绿色箭头"
 
 msgid "A lichess broadcast: its board, evaluation bar and chat, for anyone, on the internet. The games in progress are pushed every few seconds, each finished game once with its evaluations and clocks."
 msgstr "lichess 直播：棋盘、评估条和聊天，任何人都可以在互联网上观看。进行中的对局每隔几秒推送一次，每局结束后连同评估和用时推送一次。"
+
+msgid "A line of positions"
+msgstr ""
 
 msgid "A line read in your head"
 msgstr "脑中推演变化"
@@ -730,6 +748,9 @@ msgstr "会说出一个格子：在棋盘上单击它，练习期间棋盘不显
 msgid "A star in the Board page's Tree tab starts one; or make one here."
 msgstr "在“棋盘”页面的“开局树”标签页中点星标即可开始一个；也可以在这里创建。"
 
+msgid "A step says a move (“the bishop takes on h7 with check”) or a position (“the queen on h5”). A move is also set by playing it on the small board."
+msgstr ""
+
 msgid "A study"
 msgstr "一个研究"
 
@@ -847,6 +868,9 @@ msgstr "向理论中添加 PGN…"
 
 msgid "Add a PGN…"
 msgstr "添加 PGN…"
+
+msgid "Add a condition"
+msgstr ""
 
 msgid "Add a database…"
 msgstr "添加数据库…"
@@ -1296,6 +1320,9 @@ msgstr "其他构建版本…"
 msgid "Another clock, sent at once:"
 msgstr "换一个时限，立即发出："
 
+msgid "Another condition narrows it."
+msgstr ""
+
 msgid "Another engine analyses the game too, for as long at each pass:"
 msgstr "再用一个引擎分析这盘棋，每轮用时相同："
 
@@ -1690,6 +1717,9 @@ msgstr "回到锦标赛"
 msgid "Back {}."
 msgstr "{}再次出现。"
 
+msgid "Back-rank mate"
+msgstr ""
+
 msgid "Back-rank mates"
 msgstr "底线杀"
 
@@ -1716,6 +1746,9 @@ msgstr "正在由 {} 生成"
 
 msgid "Being shared."
 msgstr "正在分享。"
+
+msgid "Benoni"
+msgstr ""
 
 msgid "Beside a tournament"
 msgstr "与锦标赛并行时"
@@ -1830,6 +1863,9 @@ msgstr "黑方连接无响应"
 
 msgid "Black's moves are played by RookStudio, along the repertoire; where it has several, the most frequent in your databases comes first."
 msgstr "黑方的着法由 RookStudio 沿开局体系走出；有多个着法时，优先走你的数据库中最常见的那个。"
+
+msgid "Black's pawns"
+msgstr ""
 
 msgid "Black's pieces on the same files as White's: 18 starting positions, added to the library."
 msgstr "黑方棋子与白方位于相同的列：18 个初始局面，加入库中。"
@@ -1959,6 +1995,9 @@ msgstr "在这些步数内，双方引擎的分数都必须超过阈值，胜方
 
 msgid "Both players rated at least"
 msgstr "双方棋手等级分至少为"
+
+msgid "Both sides"
+msgstr ""
 
 msgid "Bots"
 msgstr "机器人"
@@ -2120,6 +2159,9 @@ msgstr "取消复盘我的对局"
 msgid "Cancel · Esc"
 msgstr "取消 · Esc"
 
+msgid "Cancelled after looking at {}"
+msgstr ""
+
 msgid "Cancelled."
 msgstr "已取消。"
 
@@ -2185,6 +2227,9 @@ msgstr "无法写入 {}：{}"
 
 msgid "Capture the defender"
 msgstr "吃掉防守子"
+
+msgid "Carlsbad"
+msgstr ""
 
 msgid "Caro-Kann"
 msgstr "卡罗-卡恩防御"
@@ -2490,6 +2535,9 @@ msgstr "全部清除"
 msgid "Clearance"
 msgstr "腾挪"
 
+msgid "Click a man on the board, then the squares of its route."
+msgstr ""
+
 msgid "Click for its card."
 msgstr "点击查看其信息卡。"
 
@@ -2636,6 +2684,9 @@ msgstr "并发"
 
 msgid "Concurrent games"
 msgstr "同时进行的对局"
+
+msgid "Conditions, one per line, all true in the same position. A click on a word changes it."
+msgstr ""
 
 msgid "Confirmed: “{}”. Ctrl+Z undoes."
 msgstr ""
@@ -3471,6 +3522,9 @@ msgstr "Enter"
 msgid "Enter it now…"
 msgstr "立即输入…"
 
+msgid "Enter or a double click in the list opens the game at this move."
+msgstr ""
+
 msgid "Enter starts, Escape stops; the board without its letters and figures while it lasts."
 msgstr "Enter 开始，Esc 停止；练习期间棋盘不显示字母和数字。"
 
@@ -3706,6 +3760,12 @@ msgstr "已全部继续。"
 
 msgid "Everything: your games, your questions, its answers. Only the model's download goes through the Internet, once, from huggingface.co, checked when it arrives; it resumes where it was after a break."
 msgstr "全部：你的对局、你的问题、它的回答。只有模型的下载经过互联网，仅一次，来自 huggingface.co，下载完成后会校验；中断后会从中断处继续。"
+
+msgid "Exactly"
+msgstr ""
+
+msgid "Exactly: {} · {}: {}"
+msgstr ""
 
 msgid "Exercises from my mistakes · {}"
 msgid_plural "Exercises from my mistakes · {}"
@@ -4017,6 +4077,9 @@ msgstr "格式"
 msgid "Forward (Alt+Right)"
 msgstr "前进（Alt+Right）"
 
+msgid "Found at"
+msgstr ""
+
 msgid "Found for (plies)"
 msgstr "已找到（半回合）"
 
@@ -4061,6 +4124,9 @@ msgstr "从来源导入…"
 
 msgid "From move"
 msgstr "从第几步开始"
+
+msgid "From the Board page: Ctrl+K “This manoeuvre” takes the man under the mouse and its moves in the game. The grey arrow is the most played continuation, not a condition."
+msgstr ""
 
 msgid "From the clipboard"
 msgstr "来自剪贴板"
@@ -4188,6 +4254,9 @@ msgstr "有着法无法读取的对局：保留到该着法之前，其文本保
 
 msgid "Games also appended to {}"
 msgstr "对局也已追加到 {}"
+
+msgid "Games at this structure"
+msgstr ""
 
 msgid "Games for Ordo…"
 msgstr "用于 Ordo 的对局…"
@@ -4398,6 +4467,9 @@ msgstr "稳定性"
 msgid "Held by Pause all: no tournament starts until Resume all."
 msgstr "已被“全部暂停”挂起：在“全部继续”之前不会开始任何锦标赛。"
 
+msgid "Held {} plies at least"
+msgstr ""
+
 msgid "Held: a draw by the rules"
 msgstr "守和：按规则判和"
 
@@ -4440,6 +4512,9 @@ msgstr "隐藏导航按钮"
 
 msgid "Hide the navigation buttons under the boards"
 msgstr "隐藏棋盘下方的导航按钮"
+
+msgid "Hide the text"
+msgstr ""
 
 msgid "Hide the threat"
 msgstr "隐藏威胁"
@@ -4611,6 +4686,9 @@ msgstr "导入…"
 msgid "In Lichess's cloud"
 msgstr "Lichess 云端"
 
+msgid "In each game, the first position of the pattern; each game replayed up to it (the signatures leave out those that cannot have it)."
+msgstr ""
+
 msgid "In progress"
 msgstr "进行中"
 
@@ -4644,6 +4722,9 @@ msgstr ""
 
 msgid "In the theory ›"
 msgstr "已在理论中 ›"
+
+msgid "In {} moves at most"
+msgstr ""
 
 msgid "In “{}”: each chapter a game; read again, only the changed chapters are replaced."
 msgstr "在“{}”中：每一章为一局对局；重新读取时，只替换有更改的章。"
@@ -5150,6 +5231,9 @@ msgstr "保留"
 msgid "Keep both"
 msgstr ""
 
+msgid "Keep it as it is"
+msgstr ""
+
 msgid "Keep my value"
 msgstr "保留我的值"
 
@@ -5254,6 +5338,9 @@ msgstr "王翼攻击"
 
 msgid "Knight endgame"
 msgstr "马残局"
+
+msgid "Knight fork"
+msgstr ""
 
 msgid "Knights"
 msgstr "马"
@@ -5836,6 +5923,66 @@ msgstr "相对于列表中下一个引擎的优势概率：它是两者中更强
 msgid "Line {}, where game {} starts."
 msgstr "第 {} 行，第 {} 局从这里开始。"
 
+msgid "Line {}: a condition is wanted."
+msgstr ""
+
+msgid "Line {}: a pattern has one line of moves."
+msgstr ""
+
+msgid "Line {}: a step is wanted after the plies of anything."
+msgstr ""
+
+msgid "Line {}: a step is wanted after “{}”."
+msgstr ""
+
+msgid "Line {}: after “only”, P or p."
+msgstr ""
+
+msgid "Line {}: after “promote”, Q, R, B or N."
+msgstr ""
+
+msgid "Line {}: after “{}”, men or a name ($c) are wanted."
+msgstr ""
+
+msgid "Line {}: eight steps at most."
+msgstr ""
+
+msgid "Line {}: four names at most."
+msgstr ""
+
+msgid "Line {}: the squares of “{}” do not read (a1 to h8, a-h2, [a1,h8])."
+msgstr ""
+
+msgid "Line {}: “-->” follows a line “line --> …”."
+msgstr ""
+
+msgid "Line {}: “piece” wants a name, “in” and men: piece $c in N."
+msgstr ""
+
+msgid "Line {}: “{}” does not read: {}, 20 plies at most."
+msgstr ""
+
+msgid "Line {}: “{}” is CQL that RookStudio does not read."
+msgstr ""
+
+msgid "Line {}: “{}” is named twice."
+msgstr ""
+
+msgid "Line {}: “{}” is not a condition here."
+msgstr ""
+
+msgid "Line {}: “{}” is not a known word — “{}”?"
+msgstr ""
+
+msgid "Line {}: “{}” is not a known word."
+msgstr ""
+
+msgid "Line {}: “{}” is not named by a line “piece {} in …”."
+msgstr ""
+
+msgid "Line {}: “{}” is too much here."
+msgstr ""
+
 msgid "Lines"
 msgstr "变化"
 
@@ -6083,6 +6230,9 @@ msgstr "将比赛设为使用这些值的 SPRT：边界、偏移、alpha、beta 
 msgid "Making the folder {}…"
 msgstr "正在创建文件夹 {}…"
 
+msgid "Manoeuvre"
+msgstr ""
+
 msgid "Mar"
 msgstr "3月"
 
@@ -6106,6 +6256,12 @@ msgstr "标记已清除 · Ctrl+Z 恢复"
 
 msgid "Maroczy bind"
 msgstr "马罗齐包围"
+
+msgid "Maroczy bind (Black's)"
+msgstr ""
+
+msgid "Maroczy bind (White's)"
+msgstr ""
 
 msgid "Master games"
 msgstr "大师对局"
@@ -6194,6 +6350,9 @@ msgstr "内存"
 
 msgid "Memory for the engines"
 msgstr "引擎使用的内存"
+
+msgid "Men in FEN letters (K Q R B N P, lower case for Black; A and a: any man), a square after the letter (Nf3), _ for an empty square; attacks, defends, pin from … through … to, en prise, passed, check, mate, stalemate, move from … to … (capture, promote), line --> for a line of moves (.{0,2} for plies of anything), wtm and btm for the side to move, not, or, only P, piece $c in N to name a man. The rest of CQL is not read: its line is told."
+msgstr ""
 
 msgid "Merge all · {}"
 msgstr ""
@@ -6409,6 +6568,9 @@ msgstr "下次复习：{}。"
 msgid "Next · Enter"
 msgstr "下一个 · Enter"
 
+msgid "Next, {}: {}."
+msgstr ""
+
 msgid "Next: {}"
 msgstr "下一节：{}"
 
@@ -6574,6 +6736,9 @@ msgstr "此位置还没有对局。"
 
 msgid "No game in this speed yet."
 msgstr "该棋速还没有对局。"
+
+msgid "No game in {}"
+msgstr ""
 
 msgid "No game in {}."
 msgstr "{} 中没有对局。"
@@ -6898,6 +7063,9 @@ msgstr "没有：每个足够常见的着法都有应着。"
 msgid "Normalized Elo (fishtest, OpenBench), with its 95 % interval."
 msgstr "归一化 Elo（fishtest、OpenBench），及其 95 % 区间。"
 
+msgid "Not (the contrary)"
+msgstr ""
+
 msgid "Not a legal move here"
 msgstr "此处不是合法着法"
 
@@ -6921,6 +7089,9 @@ msgstr "未检查"
 
 msgid "Not checked yet."
 msgstr "尚未检查。"
+
+msgid "Not checkmate"
+msgstr ""
 
 msgid "Not connected to {}."
 msgstr "未连接到 {}。"
@@ -6973,11 +7144,17 @@ msgstr "未发送：{}。"
 msgid "Not shown: the logos are off in Settings › Appearance."
 msgstr "未显示：标志已在“设置 › 外观”中关闭。"
 
+msgid "Not stalemate"
+msgstr ""
+
 msgid "Not started: another start is waiting ({}). Cancel it first."
 msgstr "未开始：另一个启动正在等待（{}）。请先取消它。"
 
 msgid "Not started: the options of {} cannot be read."
 msgstr "未开始：无法读取 {} 的选项。"
+
+msgid "Not the same man any more"
+msgstr ""
 
 msgid "Not this position."
 msgstr "不是这个局面。"
@@ -7133,6 +7310,9 @@ msgstr "在 lichess.org 上查看"
 msgid "On macOS, a program copied from another computer may need a signature, or to leave the quarantine: on {}, run codesign -s - {} and xattr -d com.apple.quarantine {}, then Check the engines."
 msgstr "在 macOS 上，从其他计算机复制来的程序可能需要签名，或解除隔离：在 {} 上运行 codesign -s - {} 和 xattr -d com.apple.quarantine {}，然后点击“检查引擎”。"
 
+msgid "On squares (empty: anywhere)"
+msgstr ""
+
 msgid "On the Board"
 msgstr "在棋盘上"
 
@@ -7223,6 +7403,9 @@ msgstr "在棋盘页面上逐类进行：每次作答自动评分，每张卡片
 msgid "One more permission: creating studies and broadcasts, asked now on Lichess's page."
 msgstr "还需要一项权限：创建研究和直播，现在会在 Lichess 的页面上请求。"
 
+msgid "One of the {}, at the position found"
+msgstr ""
+
 msgid "One of your games is being played live on Lichess: no game against an engine meanwhile (fair play)."
 msgstr "你的一局对局正在 Lichess 上实时进行：在此期间不能与引擎对局（公平竞赛）。"
 
@@ -7234,6 +7417,9 @@ msgstr "你的一局对局正在 Lichess 上进行：辅助功能已锁定"
 
 msgid "One of your studies:"
 msgstr "你的某个研究："
+
+msgid "One pawn away"
+msgstr ""
 
 msgid "One place up in the queue."
 msgstr "在队列中上移一位。"
@@ -7523,6 +7709,9 @@ msgstr "排序："
 msgid "Other computers to run tournaments on, reached with SSH."
 msgstr "用于运行比赛的其他电脑，通过 SSH 连接。"
 
+msgid "Other moves between"
+msgstr ""
+
 msgid "Other programs call it concurrency too: the games played at the same time (-concurrency)."
 msgstr "其他程序也称之为 concurrency：同时进行的对局数（-concurrency）。"
 
@@ -7646,6 +7835,9 @@ msgstr "机器上的路径"
 msgid "Pattern"
 msgstr "棋型"
 
+msgid "Pattern: {}"
+msgstr ""
+
 msgid "Pause"
 msgstr "暂停"
 
@@ -7722,6 +7914,9 @@ msgstr "皮尔斯伯里杀"
 msgid "Pin"
 msgstr "牵制"
 
+msgid "Pin on the king"
+msgstr ""
+
 msgid "Pink"
 msgstr "粉色"
 
@@ -7763,6 +7958,9 @@ msgstr "在棋盘上走出，或输入着法后按 Enter。"
 
 msgid "Play the pair again from another opening"
 msgstr "用另一个开局重下这一对"
+
+msgid "Play the step's move: a click on the man, then on its square."
+msgstr ""
 
 msgid "Play the two games"
 msgstr "下这两局"
@@ -7836,6 +8034,9 @@ msgstr "从对局开始计算的半回合数，包括比赛的开局。"
 msgid "Plies since the last capture or pawn move; 100 is a draw."
 msgstr "自上次吃子或兵走动以来的半回合数；达到 100 即为和棋。"
 
+msgid "Point at a man on the board, then Ctrl+K “This manoeuvre”."
+msgstr ""
+
 msgid "Points"
 msgstr "积分"
 
@@ -7900,6 +8101,9 @@ msgstr "正在准备开局库… {} %"
 msgid "Preparing the session: what your databases play…"
 msgstr "正在准备训练：查看你的数据库中的着法…"
 
+msgid "Presets:"
+msgstr ""
+
 msgid "Press A, or Analyse, for the engine's best moves here."
 msgstr "按 A 或“分析”，在此查看引擎的最佳着法。"
 
@@ -7960,6 +8164,9 @@ msgstr "提升此变化"
 msgid "Promotion"
 msgstr "升变"
 
+msgid "Protected passed pawn"
+msgstr ""
+
 msgid "Protocol"
 msgstr "协议"
 
@@ -7990,8 +8197,8 @@ msgstr "让它下线"
 msgid "Put it offline to close once the game is over: it accepts no new challenge meanwhile."
 msgstr "先让它下线，等对局结束后再关闭：在此期间它不会接受新的挑战。"
 
-msgid "Put men on the board: the games where they stand so."
-msgstr "在棋盘上摆放棋子：查找棋子如此摆放的对局。"
+msgid "Put men on the board, or add a condition: the games where they hold."
+msgstr ""
 
 msgid "Put offline"
 msgstr "下线"
@@ -8073,6 +8280,9 @@ msgstr "后残局"
 
 msgid "Queen's Gambit Declined"
 msgstr "后翼弃兵拒绝"
+
+msgid "Queen's double attack"
+msgstr ""
 
 msgid "Queens"
 msgstr "后"
@@ -8161,6 +8371,9 @@ msgstr "等级分"
 
 msgid "Reachable from the local network; open the port in your router to share it further."
 msgstr "局域网内可访问；如需进一步共享，请在路由器中开放该端口。"
+
+msgid "Reached mostly by {}."
+msgstr ""
 
 msgid "Reaching {}…"
 msgstr "正在连接 {}…"
@@ -8803,6 +9016,9 @@ msgstr "SSH 代理"
 msgid "Sacrifice"
 msgstr "弃子"
 
+msgid "Sacrifice on h7"
+msgstr ""
+
 msgid "Same move as the analysis"
 msgstr "与分析着法相同"
 
@@ -9124,6 +9340,9 @@ msgstr "摆放局面：棋子、走棋方、易位、吃过路兵、Chess960。"
 msgid "Set up a tournament"
 msgstr "设置锦标赛"
 
+msgid "Set up the pawns…"
+msgstr ""
+
 msgid "Set up the pieces…"
 msgstr "摆放棋子…"
 
@@ -9315,6 +9534,9 @@ msgstr "速度"
 msgid "Speeds"
 msgstr "棋速"
 
+msgid "Squares as a1, a-h2, f3, g3"
+msgstr ""
+
 msgid "Stalemate"
 msgstr "逼和"
 
@@ -9464,6 +9686,12 @@ msgstr "被排除的内容：{}。"
 msgid "Stays out, counted at the end"
 msgstr "排除的内容（结束时统计）"
 
+msgid "Stonewall (Black's)"
+msgstr ""
+
+msgid "Stonewall (White's)"
+msgstr ""
+
 msgid "Stop"
 msgstr "停止"
 
@@ -9549,6 +9777,9 @@ msgstr "正在停止…"
 
 msgid "Strong games on Lichess"
 msgstr "Lichess 上的强手对局"
+
+msgid "Structure"
+msgstr ""
 
 msgid "Studio"
 msgstr "摄影棚"
@@ -9739,11 +9970,23 @@ msgstr "撤回 · Esc"
 msgid "Take out of the filter"
 msgstr "从筛选中移除"
 
+msgid "Take the Board page's pawns again"
+msgstr ""
+
 msgid "Take the GPU anyway"
 msgstr "仍然占用 GPU"
 
 msgid "Take the squares around the king: once Black has to move, the rook leaves its king and falls."
 msgstr "控制王周围的格子：一旦黑方不得不走棋，车就会离开它的王而被吃掉。"
+
+msgid "Take this condition away"
+msgstr ""
+
+msgid "Take this step away"
+msgstr ""
+
+msgid "Take “{}” away"
+msgstr ""
 
 msgid "Takes the last change back exactly; the games that were already running when it was made are kept."
 msgstr "精确撤销上一次修改；做出修改时已在进行的对局会保留。"
@@ -9864,6 +10107,9 @@ msgstr "棋盘页面的局面"
 
 msgid "The Board page's position instead"
 msgstr "改用棋盘页面的局面"
+
+msgid "The Board page's position, the route clicked"
+msgstr ""
 
 msgid "The Board page: {} core for its analysis and its games"
 msgid_plural "The Board page: {} cores for its analysis and its games"
@@ -10120,6 +10366,9 @@ msgstr "无法打开浏览器：新问题的地址已复制到剪贴板。"
 msgid "The browser opens on lichess.org: you allow RookStudio there, without giving it a password."
 msgstr "浏览器会打开 lichess.org：你在那里授权 RookStudio，无需向它提供密码。"
 
+msgid "The builder keeps the last version that reads; nothing is searched while the text does not read."
+msgstr ""
+
 msgid "The button lights up once the name typed is its own. What leaves the machine: the request to make it a bot, with the bot's token."
 msgstr "输入的名称与其名称一致后，按钮才会亮起。离开本机的内容：将其设为机器人的请求，附带机器人的令牌。"
 
@@ -10182,6 +10431,9 @@ msgstr "浅色主题下棋盘的颜色。"
 
 msgid "The colours of the squares on every board of the program, for the theme chosen above. Changing a colour below makes them Custom."
 msgstr "程序中所有棋盘的格子颜色，适用于上方所选的主题。更改下方的颜色会将其变为“自定义”。"
+
+msgid "The colours reversed too"
+msgstr ""
 
 msgid "The comments of your repertoires show in the Tree tab the same way, under their names."
 msgstr "你的开局体系的注释以同样的方式显示在“开局树”标签页中，并标注其名称。"
@@ -10480,6 +10732,9 @@ msgstr "第一局"
 
 msgid "The first move of each line of the Board page's analysis drawn as an arrow on the board, in 2D as in 3D. Without them the lines still show the moves."
 msgstr "棋盘页面分析中每条线路的第一步以箭头画在棋盘上，2D 和 3D 都是如此。关闭后，线路仍会显示着法。"
+
+msgid "The first ones are already in the list; the search goes on."
+msgstr ""
 
 msgid "The first ones are the seeds, the tested engines: they play all the others."
 msgstr "最前面的是种子，即被测引擎：它们与其他所有引擎对局。"
@@ -10907,6 +11162,9 @@ msgstr "机器在网络上的名称，或其地址（192.168.1.20）。"
 msgid "The main line now · Ctrl+Z undoes it"
 msgstr "现已成为主线 · Ctrl+Z 撤销"
 
+msgid "The man"
+msgstr ""
+
 msgid "The mate comes in a corner of your bishop's colour: drive the king there with the knight and your king."
 msgstr "将杀发生在与你的象同色的角落：用马和你的王把对方的王赶到那里。"
 
@@ -11008,6 +11266,9 @@ msgstr "你下棋时用的名称，按你的数据库中的写法（“Tester, S
 
 msgid "The names you play under, as your databases write them: a game where one of them plays is yours, and the mistakes of your reviewed games become exercises (the Training page)."
 msgstr "你下棋时用的名称，按你的数据库中的写法：有其中某个名称参与的对局就是你的，你已复盘对局中的错误会变成练习（“训练”页面）。"
+
+msgid "The neighbouring routes, a click sets them:"
+msgstr ""
 
 msgid "The new database's name"
 msgstr "新数据库的名称"
@@ -11114,8 +11375,14 @@ msgstr "密钥文件 {} 的口令不正确。"
 msgid "The passphrase of {}, for {}"
 msgstr "{} 的口令，用于 {}"
 
+msgid "The pattern is not there. Fewer conditions, or a line with more plies between its steps."
+msgstr ""
+
 msgid "The paused tournament goes on, and the queue starts its next tournament when the running one ends."
 msgstr "暂停的锦标赛继续进行，当前锦标赛结束后队列开始下一个锦标赛。"
+
+msgid "The pawns alone"
+msgstr ""
 
 msgid "The permission lets RookStudio read the players you follow on Lichess; it writes nothing. Lichess's page opens for it; your account stays linked meanwhile, and the token it replaces is revoked."
 msgstr "该权限允许 RookStudio 读取你在 Lichess 上关注的棋手；它不会写入任何内容。授权时会打开 Lichess 的页面；在此期间你的账户保持关联，被替换的令牌会被吊销。"
@@ -11203,6 +11470,9 @@ msgstr "Lichess 开局表中每条命名变化所到达的局面，用于引擎�
 
 msgid "The position each named line of Lichess's opening table comes to, out of the families, the lengths and the number chosen; written to an EPD file and added to the library. Nothing is downloaded."
 msgstr "Lichess 开局表中每条命名变化所到达的局面，按所选的类别、长度和数量挑选；写入 EPD 文件并加入库中。不下载任何内容。"
+
+msgid "The position found: the game opens at this move."
+msgstr ""
 
 msgid "The position of the question, the Tree tab beside it."
 msgstr "显示所提问的局面，旁边是“开局树”标签页。"
@@ -11377,6 +11647,12 @@ msgstr "轮次"
 msgid "The rounds you follow."
 msgstr "你跟随的轮次。"
 
+msgid "The route"
+msgstr ""
+
+msgid "The route is not there. Other moves between, or more moves."
+msgstr ""
+
 msgid "The rule of the square"
 msgstr "正方形法则"
 
@@ -11395,6 +11671,12 @@ msgstr "比赛中所有开局库共用此设置：也可在“开局”部分修
 msgid "The same games from two sources"
 msgstr ""
 
+msgid "The same man all along"
+msgstr ""
+
+msgid "The same man as in row {}"
+msgstr ""
+
 msgid "The same match with a new engine A in place of {}, e.g. its next version."
 msgstr "同样的比赛，用新引擎 A 替换 {}，例如它的下一版本。"
 
@@ -11404,11 +11686,17 @@ msgstr "同一轮中所有对局对使用同一开局"
 msgid "The samples the picture is made of before it rests: more is finer, and keeps the graphics card at work longer. Fewer spare a processor's graphics during tournaments."
 msgstr "画面在停止前由多少个采样组成：越多越精细，显卡工作时间也越长。较少的采样可在比赛期间减轻处理器集成显卡的负担。"
 
+msgid "The search covers what is already committed ({}) and is made again by itself at the end."
+msgstr ""
+
 msgid "The search for duplicates was cancelled."
 msgstr ""
 
 msgid "The search stops once a solution has stayed the engine's first move for this many more plies of depth. 0: every search takes its whole time."
 msgstr "当某个解答作为引擎首选着法又保持了这么多半回合深度后，搜索停止。0：每次搜索都用满全部时间。"
+
+msgid "The searches set add up: this pattern, and a material, and headers."
+msgstr ""
 
 msgid "The seek lives while RookStudio holds it open; it stops if RookStudio closes. The game found opens on the Board."
 msgstr "对局请求在 RookStudio 保持打开期间有效；RookStudio 关闭时会停止。找到的对局会在棋盘上打开。"
@@ -11428,11 +11716,17 @@ msgstr "在此时限下，两个引擎之间预期的和棋比例。"
 msgid "The side that is not to move is in check."
 msgstr "非走棋方正被将军。"
 
+msgid "The side to move is in check"
+msgstr ""
+
 msgid "The side to move is in check by more than two pieces."
 msgstr "走棋方被两个以上的棋子将军。"
 
 msgid "The side to move is in check: no threat beyond the check."
 msgstr "走棋方正被将军：除将军外没有其他威胁。"
+
+msgid "The side to move is not in check"
+msgstr ""
 
 msgid "The size of the text, for the distance it is read from (+ and - too)."
 msgstr "文字大小，按观看距离调整（也可用 + 和 -）。"
@@ -11484,6 +11778,18 @@ msgstr "最强的在前（按棋手的平均等级分），其次是最新的。
 
 msgid "The strongest tournaments"
 msgstr "最强的赛事"
+
+msgid "The structure"
+msgstr ""
+
+msgid "The structure is not there, even two pawns away."
+msgstr ""
+
+msgid "The structure is not there: two pawns away, or the colours reversed too."
+msgstr ""
+
+msgid "The structure of the Board page, or pawns set up."
+msgstr ""
 
 msgid "The system could not open:"
 msgstr "系统无法打开："
@@ -11690,6 +11996,9 @@ msgstr "由处理器（SDL 的软件渲染器）而不是显卡通过 OpenGL 绘
 msgid "The window is drawn without OpenGL (the software renderer of the Settings page, or a graphics driver without OpenGL 3.2): the boards stay flat."
 msgstr "窗口未使用 OpenGL 绘制（设置页面的软件渲染器，或显卡驱动不支持 OpenGL 3.2）：棋盘保持平面。"
 
+msgid "The words, as in CQL"
+msgstr ""
+
 msgid "The working directory of {} is not found: {}"
 msgstr "找不到 {} 的工作目录：{}"
 
@@ -11827,6 +12136,9 @@ msgstr "这局对局已经结束。"
 msgid "This is the latest version."
 msgstr "这是最新版本。"
 
+msgid "This manoeuvre"
+msgstr ""
+
 msgid "This match is already finished."
 msgstr "这场比赛已经结束。"
 
@@ -11835,6 +12147,9 @@ msgstr "本步"
 
 msgid "This needs the game's review first."
 msgstr "这需要先进行复盘。"
+
+msgid "This pattern cannot find anything"
+msgstr ""
 
 msgid "This player has no game on chess.com."
 msgstr "这位棋手在 chess.com 上没有对局。"
@@ -12185,6 +12500,9 @@ msgstr "两个引擎：新版本是否更强？统计以 A 的角度给出。"
 msgid "Two games, not one: never offered as duplicates again."
 msgstr ""
 
+msgid "Two pawns away"
+msgstr ""
+
 msgid "Two teams of engines, one family or version against another: every engine of a team meets every engine of the other, or board by board. The teams are scored as a whole, and each engine too."
 msgstr "两队引擎，一个系列或版本对另一个：一队的每个引擎与另一队的每个引擎对局，或逐台对抗。既计算两队的总分，也计算每个引擎的得分。"
 
@@ -12399,6 +12717,9 @@ msgstr "版本 {} 已发布，但还没有适用于此处理器的编译版本�
 
 msgid "Version {} is out."
 msgstr "版本 {} 已发布。"
+
+msgid "Very broad: {} ({} %)"
+msgstr ""
 
 msgid "Very long puzzle"
 msgstr "超长谜题"
@@ -12726,6 +13047,9 @@ msgstr "白方需要一个王，且只能有一个。"
 msgid "White resigns"
 msgstr "白方认输"
 
+msgid "White scores {} %"
+msgstr ""
+
 msgid "White to move"
 msgstr "白方走棋"
 
@@ -12770,6 +13094,9 @@ msgstr "白方连接无响应"
 
 msgid "White's moves are played by RookStudio, along the repertoire; where it has several, the most frequent in your databases comes first."
 msgstr "白方的着法由 RookStudio 沿开局体系走出；有多个着法时，优先走你的数据库中最常见的那个。"
+
+msgid "White's pawns"
+msgstr ""
 
 msgid "White's score over the games."
 msgstr "白方在各局中的得分。"
@@ -13375,6 +13702,12 @@ msgstr "黑马"
 msgid "a black pawn"
 msgstr "黑兵"
 
+msgid "a black pawn more on {}"
+msgstr ""
+
+msgid "a black pawn on {} instead of {}"
+msgstr ""
+
 msgid "a black queen"
 msgstr "黑后"
 
@@ -13392,6 +13725,12 @@ msgstr "今天 {} 起成为机器人"
 
 msgid "a bot since {}"
 msgstr "{}起成为机器人"
+
+msgid "a click on each square"
+msgstr ""
+
+msgid "a click on it, on the board"
+msgstr ""
 
 msgid "a click shows the position, the tree beside it"
 msgstr "单击可显示该局面，旁边显示开局树"
@@ -13453,6 +13792,12 @@ msgstr "来自 database.lichess.org 的一个月计等级分对局，边读取�
 msgid "a month of rated games, filtered"
 msgstr "一个月的计等级分对局，经过筛选"
 
+msgid "a move"
+msgstr ""
+
+msgid "a move played on the small board"
+msgstr ""
+
 msgid "a new file"
 msgstr "新文件"
 
@@ -13465,11 +13810,17 @@ msgstr "一个兵（f）"
 msgid "a pawn endgame"
 msgstr "兵残局"
 
+msgid "a pawn structure"
+msgstr ""
+
 msgid "a player's games"
 msgstr "某位棋手的对局"
 
 msgid "a player's games, from its public API, without an account"
 msgstr "某位棋手的对局，通过其公开 API，无需账户"
+
+msgid "a position"
+msgstr ""
 
 msgid "a program of a format RookStudio does not know"
 msgstr "RookStudio 无法识别其格式的程序"
@@ -13512,6 +13863,12 @@ msgstr "白马"
 
 msgid "a white pawn"
 msgstr "白兵"
+
+msgid "a white pawn more on {}"
+msgstr ""
+
+msgid "a white pawn on {} instead of {}"
+msgstr ""
 
 msgid "a white queen"
 msgstr "白后"
@@ -13625,6 +13982,9 @@ msgstr "分析中…"
 msgid "analysis"
 msgstr "分析"
 
+msgid "and mates"
+msgstr ""
+
 msgid "and the time"
 msgstr "以及用时"
 
@@ -13641,8 +14001,20 @@ msgstr "另一个程序正在写入它"
 msgid "any"
 msgstr "任意"
 
+msgid "any black man"
+msgstr ""
+
+msgid "any man"
+msgstr ""
+
+msgid "any white man"
+msgstr ""
+
 msgid "anyone"
 msgstr "任何人"
+
+msgid "anywhere"
+msgstr ""
 
 msgid "as the game"
 msgstr "与对局相同"
@@ -13678,6 +14050,12 @@ msgstr "停在 {}"
 msgid "at {} ply"
 msgid_plural "at {} plies"
 msgstr[0] ""
+
+msgid "attacks"
+msgstr ""
+
+msgid "attacks…"
+msgstr ""
 
 msgid "automatic"
 msgstr "自动"
@@ -13852,6 +14230,12 @@ msgstr "决定时间"
 msgid "default"
 msgstr "默认"
 
+msgid "defends"
+msgstr ""
+
+msgid "defends…"
+msgstr ""
+
 msgid "depth {}"
 msgstr "深度 {}"
 
@@ -13861,6 +14245,15 @@ msgstr[0] "深度 {} 半步"
 
 msgid "depth {}/{}"
 msgstr "深度 {}/{}"
+
+msgid "does not attack"
+msgstr ""
+
+msgid "does not defend"
+msgstr ""
+
+msgid "does not pin"
+msgstr ""
 
 msgid "done"
 msgstr "已完成"
@@ -13904,11 +14297,17 @@ msgstr "每项都可在此决定，或在首次使用时决定"
 msgid "each engine's own settings"
 msgstr "各引擎自己的设置"
 
+msgid "each step at the next ply"
+msgstr ""
+
 msgid "elo1 must be larger than elo0."
 msgstr "elo1 必须大于 elo0。"
 
 msgid "empty"
 msgstr "空"
+
+msgid "empty square"
+msgstr ""
 
 msgid "end of book"
 msgstr "开局库结束"
@@ -14033,6 +14432,12 @@ msgstr "对局在等待核心"
 msgid "games wait for memory"
 msgstr "对局在等待内存"
 
+msgid "gives check"
+msgstr ""
+
+msgid "goes to"
+msgstr ""
+
 msgid "gone"
 msgstr "已移除"
 
@@ -14050,6 +14455,12 @@ msgstr "引擎自身的哈希"
 
 msgid "hash {} %"
 msgstr "哈希 {}%"
+
+msgid "hedgehog (Black's)"
+msgstr ""
+
+msgid "hedgehog (White's)"
+msgstr ""
 
 msgid "held"
 msgstr "守和"
@@ -14123,6 +14534,45 @@ msgstr "{}安装"
 
 msgid "insufficient material"
 msgstr "子力不足"
+
+msgid "is en prise"
+msgstr ""
+
+msgid "is not en prise"
+msgstr ""
+
+msgid "is not on the board"
+msgstr ""
+
+msgid "is not passed"
+msgstr ""
+
+msgid "is not there"
+msgstr ""
+
+msgid "is on"
+msgstr ""
+
+msgid "is on the board"
+msgstr ""
+
+msgid "is on, attacks, defends, pins … on, gives check, mates, is en prise, empty square, then… (a line)"
+msgstr ""
+
+msgid "is on…"
+msgstr ""
+
+msgid "is passed"
+msgstr ""
+
+msgid "is there"
+msgstr ""
+
+msgid "isolated queen's pawn (Black's)"
+msgstr ""
+
+msgid "isolated queen's pawn (White's)"
+msgstr ""
 
 msgid "issue {} expected on {}"
 msgstr "第 {} 期预计于 {} 发布"
@@ -14323,6 +14773,9 @@ msgstr "告负"
 msgid "making the folder {}"
 msgstr "创建文件夹 {}"
 
+msgid "manoeuvre {}"
+msgstr ""
+
 msgid "margin {} ms"
 msgstr "余量 {} ms"
 
@@ -14341,6 +14794,9 @@ msgstr[0] "最快 {} 步将杀"
 
 msgid "mate in {} moves at best"
 msgstr "最快 {} 步将杀"
+
+msgid "mates"
+msgstr ""
 
 msgid "mates in 1 to 5, by pattern"
 msgstr "1 至 5 步杀，按杀型分类"
@@ -14623,6 +15079,9 @@ msgstr "本磁盘可用空间：{}"
 msgid "on {}"
 msgstr "在 {} 上"
 
+msgid "on {} in {} % of these games"
+msgstr ""
+
 msgid "one is shorter (a broadcast cut short)"
 msgstr ""
 
@@ -14693,6 +15152,9 @@ msgstr "A 分析时暂停"
 msgid "paused while Alt+A analyses"
 msgstr "Alt+A 分析时暂停"
 
+msgid "pawn chains"
+msgstr ""
+
 msgid "pawns lost a move, on average"
 msgstr "平均每步损失的兵数"
 
@@ -14701,6 +15163,15 @@ msgstr "表现分 {}"
 
 msgid "physical cores − 1, for a clock"
 msgstr "物理核心数 − 1，用于棋钟"
+
+msgid "pins"
+msgstr ""
+
+msgid "pins … on …"
+msgstr ""
+
+msgid "pins… on…"
+msgstr ""
 
 msgid "played as much lately"
 msgstr "近来走得一样多"
@@ -14877,6 +15348,9 @@ msgstr "启动时发送"
 msgid "set by hand"
 msgstr "手动设置"
 
+msgid "set up"
+msgstr ""
+
 msgid "setting the permissions of {}"
 msgstr "设置 {} 的权限"
 
@@ -14907,6 +15381,9 @@ msgstr "预计 {} 开始"
 msgid "stopped"
 msgstr "已停止"
 
+msgid "structure {}"
+msgstr ""
+
 msgid "symbol"
 msgid_plural "symbols"
 msgstr[0] "个符号"
@@ -14920,8 +15397,14 @@ msgstr "残局库"
 msgid "tables: {}"
 msgstr "残局库：{}"
 
+msgid "takes on"
+msgstr ""
+
 msgid "tb {}"
 msgstr "残局库 {}"
+
+msgid "the Board page's position"
+msgstr ""
 
 msgid "the Board's position"
 msgstr "棋盘上的局面"
@@ -14950,11 +15433,17 @@ msgstr "黑马"
 msgid "the black light-squared bishop"
 msgstr "黑方的白格象"
 
+msgid "the black pawn"
+msgstr ""
+
 msgid "the black queen"
 msgstr "黑后"
 
 msgid "the black rook"
 msgstr "黑车"
+
+msgid "the black {}-pawn on {}"
+msgstr ""
 
 msgid "the book “{}”"
 msgstr "开局库“{}”"
@@ -15037,6 +15526,9 @@ msgstr "上一次：{} / {} 分"
 msgid "the list follows it as it goes"
 msgstr "列表随输入实时更新"
 
+msgid "the men on the small board and the conditions above"
+msgstr ""
+
 msgid "the middlegame"
 msgstr "中局"
 
@@ -15100,16 +15592,49 @@ msgstr "复盘进行中：其标记会写入棋谱"
 msgid "the review's curve over theirs, thicker"
 msgstr "复盘的曲线叠加在它们的曲线上，较粗"
 
+msgid "the same bishop"
+msgstr ""
+
 msgid "the same evaluation"
 msgstr "评估相同"
 
 msgid "the same file imported twice"
 msgstr ""
 
+msgid "the same king"
+msgstr ""
+
+msgid "the same knight"
+msgstr ""
+
+msgid "the same man"
+msgstr ""
+
 msgid "the same moves, headers written differently"
 msgstr ""
 
+msgid "the same pawn"
+msgstr ""
+
+msgid "the same queen"
+msgstr ""
+
+msgid "the same rook"
+msgstr ""
+
+msgid "the side to move"
+msgstr ""
+
 msgid "the signatures there"
+msgstr ""
+
+msgid "the square {}"
+msgstr ""
+
+msgid "the squares {}"
+msgstr ""
+
+msgid "the start"
 msgstr ""
 
 msgid "the start position"
@@ -15157,11 +15682,17 @@ msgstr "白马"
 msgid "the white light-squared bishop"
 msgstr "白方的白格象"
 
+msgid "the white pawn"
+msgstr ""
+
 msgid "the white queen"
 msgstr "白后"
 
 msgid "the white rook"
 msgstr "白车"
+
+msgid "the white {}-pawn on {}"
+msgstr ""
 
 msgid "the whole tournament"
 msgstr "整个赛事"
@@ -15180,6 +15711,12 @@ msgstr "其页面、名称、图标和颜色；切换器下方的 ⋯，或在�
 
 msgid "themes: {}"
 msgstr "主题：{}"
+
+msgid "then"
+msgstr ""
+
+msgid "then… (a line)"
+msgstr ""
 
 msgid "theweekinchess.com did not answer: {}"
 msgstr "theweekinchess.com 没有响应：{}"
@@ -15373,6 +15910,9 @@ msgstr "胜和负"
 msgid "with aids"
 msgstr "使用了辅助"
 
+msgid "with check"
+msgstr ""
+
 msgid "with dot product"
 msgstr "支持点积"
 
@@ -15391,6 +15931,9 @@ msgstr "包含助手的注释（{}）"
 msgid "with {}"
 msgstr "支持 {}"
 
+msgid "within {} plies"
+msgstr ""
+
 msgid "without FIDE's list: kept as they are"
 msgstr ""
 
@@ -15402,6 +15945,12 @@ msgstr "未经分析：曲线取自对局"
 
 msgid "without mirrored positions"
 msgstr "不含镜像局面"
+
+msgid "without the black {}-pawn"
+msgstr ""
+
+msgid "without the white {}-pawn"
+msgstr ""
 
 msgid "won"
 msgstr "获胜"
@@ -15911,6 +16460,12 @@ msgstr "每个引擎：{}"
 
 msgid "{} for {}"
 msgstr "{}：{} 的首选"
+
+msgid "{} found so far"
+msgstr ""
+
+msgid "{} found until then, kept in the list."
+msgstr ""
 
 msgid "{} free"
 msgstr "{} 空闲"
@@ -16537,6 +17092,9 @@ msgstr "占用磁盘 {} · 运行时约占 3 GB 内存"
 msgid "{} on the disk · your rating {}"
 msgstr "磁盘上有 {} 道 · 你的等级分 {}"
 
+msgid "{} on {}"
+msgstr ""
+
 msgid "{} online"
 msgstr "{} 在线"
 
@@ -16563,6 +17121,9 @@ msgstr[0] "已选中 {} 个对手，最接近的在前：按 Enter 添加。"
 msgid "{} option read."
 msgid_plural "{} options read."
 msgstr[0] "已读取 {} 个选项。"
+
+msgid "{} or {}"
+msgstr ""
 
 msgid "{} other annotation"
 msgid_plural "{} other annotations"
@@ -16970,6 +17531,9 @@ msgid "{} text"
 msgid_plural "{} texts"
 msgstr[0] "{} 篇文本"
 
+msgid "{} that left {}"
+msgstr ""
+
 msgid "{} that two library engines may be"
 msgid_plural "{} that two library engines may be"
 msgstr[0] "{} 个有歧义"
@@ -17123,6 +17687,9 @@ msgstr "{} {}"
 msgid "{} {} game"
 msgid_plural "{} {} games"
 msgstr[0] "{} 局{}"
+
+msgid "{} {} {} on {}"
+msgstr ""
 
 msgid "{} {} · better: {}"
 msgstr "{} {} · 更好：{}"
@@ -17321,6 +17888,9 @@ msgstr "{}，可用 {}"
 msgid "{}, on {}"
 msgstr "{}，于 {}"
 
+msgid "{}, on {} in {} %"
+msgstr ""
+
 msgid "{}, selective {}"
 msgstr "{}，选择性深度 {}"
 
@@ -17331,6 +17901,9 @@ msgid "{}, the engine of the review, is no longer in the library."
 msgstr "复盘所用的引擎 {} 已不在引擎库中。"
 
 msgid "{}, twice"
+msgstr ""
+
+msgid "{}, {}"
 msgstr ""
 
 msgid "{}, {} thread"
@@ -17672,6 +18245,9 @@ msgstr ""
 msgid "“Always” can be changed on the Lichess page, under Online for the analysis, which also says what is sent."
 msgstr "“始终”可在 Lichess 页面的“分析中的在线服务”中更改，那里也说明了会发送哪些内容。"
 
+msgid "“One pawn away”: a pawn more, fewer or on another square, on either side; the pieces do not count. The name comes from the assistant's facts (Carlsbad, Maroczy, hedgehog, Stonewall, the pawn chains, Benoni, isolated queen's pawn)."
+msgstr ""
+
 msgid "“{}.{}” is not a legal move; kept without its moves"
 msgstr "“{}.{}”不是合法着法；保留时不含着法"
 
@@ -17684,7 +18260,13 @@ msgstr "“{}”"
 msgid "“{}” added: its notes show in the Tree tab once it is read."
 msgstr "已添加“{}”：读取后，其注解会显示在“开局树”标签页中。"
 
+msgid "“{}” and “{}” cannot both be true. Told before searching: nothing is started."
+msgstr ""
+
 msgid "“{}” brought together"
+msgstr ""
+
+msgid "“{}” can never be true. Told before searching: nothing is started."
 msgstr ""
 
 msgid "“{}” cannot be opened."
@@ -17733,6 +18315,9 @@ msgid "“{}” is being compacted: Ctrl+S once it has finished; the game stays 
 msgstr ""
 
 msgid "“{}” is being compacted: import once it has finished."
+msgstr ""
+
+msgid "“{}” is being imported"
 msgstr ""
 
 msgid "“{}” is in the theory already."

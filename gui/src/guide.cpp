@@ -161,6 +161,7 @@ const std::vector<const char*>& allTopics() {
                                               FairPlay,
                                               FinishedGames,
                                               FollowedPlayers,
+                                              LichessTv,
                                               LichessCast,
                                               Prep,
                                               OpeningSuite,

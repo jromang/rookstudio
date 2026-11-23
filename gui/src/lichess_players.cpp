@@ -193,6 +193,25 @@ bool addStreamMove(std::string& pgn, const nlohmann::json& event) {
     return true;
 }
 
+bool takeStreamMove(std::string& pgn, std::size_t& known, const nlohmann::json& event) {
+    const auto fen = textOf(event, "fen");
+    if (fen.empty() || !event.contains("lm")) return true;  // the game's state, no move
+    const auto replay = parseReplay(pgn);
+    if (!replay) return false;
+    // The game again from its start: a position the PGN reaches next, its move known already.
+    if (known < replay->moves.size()) {
+        const auto board = boardAt(*replay, false, static_cast<int>(known + 1));
+        if (placementOf(board.getFen()) == placementOf(fen)) {
+            ++known;
+            return true;
+        }
+    }
+    if (!addStreamMove(pgn, event)) return false;
+    const auto now = parseReplay(pgn);
+    known          = now ? now->moves.size() : 0;
+    return true;
+}
+
 bool streamEnded(const nlohmann::json& event) {
     const auto it = event.find("status");
     if (it == event.end()) return false;
@@ -208,10 +227,31 @@ PlayersFollower::~PlayersFollower() {
     if (manager_.joinable()) manager_.join();
 }
 
-void PlayersFollower::watch(std::vector<std::string> ids) {
-    if (ids.size() > most_) ids.resize(most_);
+void PlayersFollower::watch(std::vector<std::string> ids, std::size_t most) {
     std::lock_guard lock(mutex_);
-    wanted_ = std::move(ids);
+    wanted_      = std::move(ids);
+    wanted_most_ = most;
+}
+
+std::size_t PlayersFollower::open() const {
+    std::lock_guard lock(mutex_);
+    return static_cast<std::size_t>(
+        std::count_if(games_.begin(), games_.end(), [](const auto& g) { return g->running.load(); }));
+}
+
+std::set<std::string> PlayersFollower::over() const {
+    std::lock_guard lock(mutex_);
+    std::set<std::string> out;
+    for (const auto& g : games_)
+        if (!g->running) out.insert(g->id);
+    return out;
+}
+
+void PlayersFollower::again(const std::string& id) {
+    std::lock_guard lock(mutex_);
+    for (auto& g : games_)
+        if (g->id == id && !g->running && (g->game.result.empty() || g->game.result == "*"))
+            g->stop = true;  // gone at the manager's next turn, then started again while wanted
 }
 
 std::vector<BroadcastGame> PlayersFollower::games() const {
@@ -248,11 +288,13 @@ void PlayersFollower::manage() {
                     ++it;
                 }
             }
-            // The wanted ones start while there is room.
-            auto running = static_cast<std::size_t>(
-                std::count_if(games_.begin(), games_.end(), [](const auto& g) { return g->running && !g->stop; }));
+            // The wanted ones start while there is room: a game stopped holds its stream until its thread ends, so it
+            // counts until then, and the streams of this address are never more than Lichess allows.
+            const std::size_t most = wanted_most_ == SIZE_MAX ? most_ : wanted_most_;
+            auto running           = static_cast<std::size_t>(
+                std::count_if(games_.begin(), games_.end(), [](const auto& g) { return g->running.load(); }));
             for (const auto& id : wanted_) {
-                if (running >= most_) break;
+                if (running >= most) break;
                 if (std::any_of(games_.begin(), games_.end(), [&](const auto& g) { return g->id == id; })) continue;
                 auto g      = std::make_unique<Game>();
                 g->id       = id;
@@ -265,9 +307,10 @@ void PlayersFollower::manage() {
                 games_.push_back(std::move(g));
                 ++running;
             }
-            // The games that ended, beyond twice the room, the oldest first.
+            // The games that ended, beyond twice the room, the oldest no longer wanted first.
             while (games_.size() > 2 * most_) {
-                const auto it = std::find_if(games_.begin(), games_.end(), [](const auto& g) { return !g->running; });
+                const auto it = std::find_if(games_.begin(), games_.end(),
+                                             [&](const auto& g) { return !g->running && !wanted(g->id); });
                 if (it == games_.end()) break;
                 gone.push_back(std::move(*it));
                 games_.erase(it);
@@ -323,6 +366,7 @@ void PlayersFollower::follow(Game& g) {
         if (!result.empty() && result != "*") return;  // it ended
         // Its moves as they come; out of step with what came, or ended, it is asked whole again.
         bool ended = false, apart = false;
+        std::size_t known = 0;  // the plies the stream went through: it sends the game again from its start
         std::string pending;
         HttpRequest request;
         request.url    = fmt::format("{}/api/stream/game/{}", servers().api, g.id);
@@ -348,11 +392,12 @@ void PlayersFollower::follow(Game& g) {
                     return false;
                 }
                 if (!j.contains("lm")) continue;  // the game's state, sent first
-                if (!addStreamMove(pgn, j)) {
+                const auto before = pgn.size();
+                if (!takeStreamMove(pgn, known, j)) {
                     apart = true;
                     return false;
                 }
-                publish(g, pgn);
+                if (pgn.size() != before) publish(g, pgn);  // a move of the game again from its start changes nothing
             }
             pending.erase(0, at);
             return !g.stop;

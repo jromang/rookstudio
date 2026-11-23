@@ -92,16 +92,36 @@ void App::pollBroadcastBoards() {
     for (const auto& f : followed_rounds_)
         if (f.key() == broadcast_round_) round = &f;
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
-    if (!round && !players) {
+    const bool tv      = !tvChannelShown().empty();                    // a channel of Lichess TV's (#86)
+    if (!round && !players && !tv) {
         broadcast_boards_.clear();
         if (!broadcast_round_.empty()) broadcast_round_.clear();  // no longer followed: the page itself again
     }
     // The games, read again when Lichess sent them again.
-    if (round || players) {
-        const auto games = round               ? round->follower->games()
-                           : players_follower_ ? players_follower_->games()
-                                               : std::vector<lichess::BroadcastGame>{};
-        if (players)  // a player's game no longer followed leaves the mosaic
+    if (round || players || tv) {
+        std::vector<lichess::BroadcastGame> games;
+        if (round) {
+            games = round->follower->games();
+        } else if (players) {
+            if (players_follower_) games = players_follower_->games();
+        } else if (tv_follower_) {
+            // The channel's games in the order of their places, not the Board's game nor those kept; a game that ended
+            // keeps its tile until the one taking its place has come, so that the tiles do not move.
+            const auto all  = tv_follower_->games();
+            const auto find = [&](const std::string& url) {
+                return std::find_if(all.begin(), all.end(), [&](const auto& g) { return g.url == url; });
+            };
+            std::vector<std::string> slots;
+            for (std::size_t i = 0; i < tv_places_.size(); ++i) {
+                const auto url     = fmt::format("https://lichess.org/{}", tv_places_[i]);
+                const bool kept_on = find(url) == all.end() && i < tv_slots_.size() && find(tv_slots_[i]) != all.end();
+                slots.push_back(kept_on ? tv_slots_[i] : url);
+            }
+            tv_slots_ = std::move(slots);
+            for (const auto& url : tv_slots_)
+                if (const auto it = find(url); it != all.end()) games.push_back(*it);
+        }
+        if (players || tv)  // a game no longer followed leaves the mosaic
             std::erase_if(broadcast_boards_, [&](const auto& b) {
                 return std::none_of(games.begin(), games.end(), [&](const auto& g) { return g.url == b.url; });
             });
@@ -128,7 +148,18 @@ void App::pollBroadcastBoards() {
                 it->board = boardAt(it->game, false, static_cast<int>(it->game.moves.size()));
             }
         }
-        if (broadcast_selected_.empty() && !broadcast_boards_.empty()) broadcast_selected_ = broadcast_boards_[0].url;
+        // A channel's tiles in the order of their places: a game that ended gives its place to another.
+        if (tv) {
+            const auto place = [&](const BroadcastBoard& b) {
+                return std::find(tv_slots_.begin(), tv_slots_.end(), b.url) - tv_slots_.begin();
+            };
+            std::stable_sort(broadcast_boards_.begin(), broadcast_boards_.end(),
+                             [&](const auto& x, const auto& y) { return place(x) < place(y); });
+        }
+        const bool chosen = std::any_of(broadcast_boards_.begin(), broadcast_boards_.end(),
+                                        [&](const auto& b) { return b.url == broadcast_selected_; });
+        if ((broadcast_selected_.empty() || ((players || tv) && !chosen)) && !broadcast_boards_.empty())
+            broadcast_selected_ = broadcast_boards_[0].url;
     }
     // Their engines: one each for the games still played, while the mosaic shows (its engine and threads a game).
     const bool shown        = ImGui::GetFrameCount() - broadcast_drawn_ < 3;
@@ -234,8 +265,28 @@ void App::pollBroadcastBoards() {
                 }
             }
         }
+        // A game of Lichess TV's the mosaic does not show (another channel's, or the mosaic closed): from its follower.
+        if (!game && isTvMosaic(board_broadcast_->round) && tv_follower_) {
+            for (const auto& g : tv_follower_->games()) {
+                if (g.url != board_broadcast_->url || g.version == board_broadcast_->version) continue;
+                auto replay = parseReplay(g.pgn);
+                if (!replay) continue;
+                auto& bb = board_;
+                if (!bb.tree.variations.empty() || !bb.undo.empty()) {  // the user's own changes: the game is theirs
+                    board_broadcast_.reset();
+                    break;
+                }
+                const bool last = bb.ply >= static_cast<int>(bb.game.moves.size());
+                bb.game         = std::move(*replay);
+                bb.tree         = GameTree{bb.game, {}};
+                bb.line         = -1;
+                if (last) bb.ply = static_cast<int>(bb.game.moves.size());
+                bb.ply                    = std::min(bb.ply, static_cast<int>(bb.game.moves.size()));
+                board_broadcast_->version = g.version;
+            }
+        }
         auto& bb = board_;
-        if (game && game->version != board_broadcast_->version) {
+        if (game && board_broadcast_ && game->version != board_broadcast_->version) {
             // The user's own changes end the following: the game is theirs then.
             if (!bb.tree.variations.empty() || !bb.undo.empty()) {
                 board_broadcast_.reset();
@@ -446,6 +497,14 @@ void App::drawBroadcastStandings() {
 }
 
 void App::followBroadcastOnBoard(const BroadcastBoard& game) {
+    // A channel's game (#86): the Board goes on to the channel's next one when it ends.
+    if (const auto channel = tvChannelShown(); !channel.empty()) {
+        const auto id = game.url.substr(game.url.rfind('/') + 1);
+        followTvOnBoard(channel, id, id == tv_listed_.featured,
+                        fmt::format("{} – {}", tvName(game.white), tvName(game.black)),
+                        lichess::tvClockText(game.game.header("TimeControl")), &game.game, game.version);
+        return;
+    }
     openOnBoard(game.game, static_cast<int>(game.game.moves.size()), false,
                 fmt::format("{} – {}", game.white, game.black), false);
     BoardBroadcast follow;
@@ -481,11 +540,76 @@ void App::drawBroadcastMosaic() {
         return;
     }
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
-    if (!round && !players) return;
+    const auto channel = tvChannelShown();                             // a channel of Lichess TV's (#86)
+    const bool tv      = !channel.empty();
+    if (!round && !players && !tv) return;
+    if (round) mosaic_round_ = round->key();
+    // Its sources (mockup M12, board 7): the rounds followed, the followed players, Lichess TV.
     ImGui::SameLine();
-    if (players) {
-        ImGui::TextUnformatted(TR("Followed players"));
+    ImGui::TextDisabled("%s", TR("The mosaic"));
+    const auto source = [&](const char* label, bool shown, const std::string& tooltip) {
         ImGui::SameLine();
+        ImGui::TextDisabled("·");
+        ImGui::SameLine();
+        if (shown) ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
+        const ImVec2 size(ImGui::CalcTextSize(label).x, 0);
+        const bool clicked = ImGui::Selectable(label, shown, ImGuiSelectableFlags_None, size);
+        if (shown) {
+            const ImVec2 lo = ImGui::GetItemRectMin(), hi = ImGui::GetItemRectMax();
+            ImGui::GetWindowDrawList()->AddLine(ImVec2(lo.x, hi.y), hi, ui::ACCENT, px(2));
+            ImGui::PopFont();
+        }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltip.c_str());
+        return clicked && !shown;
+    };
+    if (source(TR("Broadcasts"), round != nullptr,
+               followed_rounds_.empty() ? TR("No round followed: the Lichess page lists the broadcasts.")
+                                        : TR("The rounds you follow."))) {
+        const bool known = std::any_of(followed_rounds_.begin(), followed_rounds_.end(),
+                                       [&](const auto& f) { return f.key() == mosaic_round_; });
+        if (followed_rounds_.empty())
+            broadcast_round_.clear();  // the page, its broadcasts
+        else
+            openBroadcastMosaic(known ? mosaic_round_ : followed_rounds_.front().key());
+        return;
+    }
+    if (source(TR("Followed players"), players, TR("The games of the players you follow."))) {
+        openPlayersMosaic();
+        return;
+    }
+    if (source(TR("Lichess TV"), tv, TR("The games of a channel of Lichess TV."))) {
+        openTvMosaic(lichess_.tv_channel);
+        return;
+    }
+    if (tv) {
+        // Its channels, as chips; the games it follows, Lichess's limit, the fair play.
+        for (const auto key : lichess::tvChannels()) {
+            if (key != lichess::tvChannels().front()) ImGui::SameLine();
+            const bool on = key == channel;
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, px(12));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(on ? ui::SELECT : ui::CARD_BG));
+            ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(on ? ui::ACCENT : ui::CARD_BD));
+            const bool clicked = ImGui::SmallButton(fmt::format("{}##tv_{}", tvChannelName(key), key).c_str());
+            ImGui::PopStyleColor(2);
+            ImGui::PopStyleVar(2);
+            if (clicked && !on) {
+                openTvMosaic(std::string(key));
+                return;
+            }
+        }
+        const auto live = std::count_if(broadcast_boards_.begin(), broadcast_boards_.end(),
+                                        [](const auto& b) { return playing(b.result); });
+        auto state      = trn("{} game in progress", "{} games in progress", static_cast<uint64_t>(live), live);
+        if (liveGameOn()) state += " · " + std::string(TR("the engines rest during your game on Lichess"));
+        state = "· " + state;
+        ui::sameLineOrWrap(ImGui::CalcTextSize(state.c_str()).x);
+        ImGui::TextDisabled("%s", state.c_str());
+        if (!tv_list_error_.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", trf("· Lichess: {}", tv_list_error_).c_str());
+        }
+    } else if (players) {
         const auto live = std::count_if(broadcast_boards_.begin(), broadcast_boards_.end(),
                                         [](const auto& b) { return playing(b.result); });
         if (live > 0)
@@ -493,7 +617,7 @@ void App::drawBroadcastMosaic() {
                                trn("{} game live", "{} games live", static_cast<uint64_t>(live), live).c_str());
         const auto error = players_follower_ ? players_follower_->error() : std::string();
         if (!error.empty()) {
-            ImGui::SameLine();
+            if (live > 0) ImGui::SameLine();
             ImGui::TextDisabled("%s", trf("· Lichess: {}", error).c_str());
         }
     } else {
@@ -559,7 +683,7 @@ void App::drawBroadcastMosaic() {
     ImGui::TextDisabled(
         "%s", trn("thread a game", "threads a game", static_cast<uint64_t>(lichess_.broadcast_threads)).c_str());
     ImGui::SameLine();
-    if (!players && ImGui::SmallButton(TR("Stop following"))) {
+    if (round && ImGui::SmallButton(TR("Stop following"))) {
         for (std::size_t r = 0; r < followed_rounds_.size(); ++r) {
             if (followed_rounds_[r].key() != broadcast_round_) continue;
             followed_rounds_[r].follower->stop();
@@ -616,12 +740,31 @@ void App::drawBroadcastMosaic() {
     }
 
     if (broadcast_boards_.empty()) {
-        ImGui::TextDisabled("%s", players
-                                      ? TR("None of them plays now: their games come here as they start, three "
-                                           "moves behind, as Lichess shows them.")
-                                      : TR("No game of the round has come yet: they appear as Lichess sends them."));
+        if (tv && tv_room_ == 0)  // the rounds and the players followed hold the streams Lichess allows
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               trf("Lichess lets an address follow {} games at once: the rounds and the players "
+                                   "followed take them all now.",
+                                   lichess::MOST_GAME_STREAMS)
+                                   .c_str());
+        else if (tv && !tv_list_error_.empty() && tv_listed_of_ != channel)
+            ImGui::TextDisabled("%s", trf("Lichess cannot be reached from here: {}.", tv_list_error_).c_str());
+        else
+            ImGui::TextDisabled("%s", tv        ? TR("No game of the channel has come yet: they appear as Lichess "
+                                                     "lists them, three moves late.")
+                                      : players ? TR("None of them plays now: their games come here as they start, "
+                                                     "three moves behind, as Lichess shows them.")
+                                                : TR("No game of the round has come yet: they appear as Lichess sends "
+                                                     "them."));
         return;
     }
+    // A side as a tile names it: a channel's and a player's games with their ratings, Lichess's AI by its level.
+    const auto side_name = [&](const BroadcastBoard& b, chess::Color color) {
+        const auto& name = color == chess::Color::WHITE ? b.white : b.black;
+        if (!players && !tv) return name;
+        const int elo   = color == chess::Color::WHITE ? b.white_elo : b.black_elo;
+        const auto said = tvName(name);
+        return elo > 0 && said == name ? fmt::format("{} {}", name, elo) : said;
+    };
     // The mosaic on the left, the game chosen and the round on the right.
     const float avail  = ImGui::GetContentRegionAvail().x;
     const float side_w = std::min(px(360), avail * 0.34f);
@@ -648,7 +791,7 @@ void App::drawBroadcastMosaic() {
                           ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         const auto name_row = [&](chess::Color color) {
-            const auto& name = color == chess::Color::WHITE ? b.white : b.black;
+            const auto name  = side_name(b, color);
             const auto clock = clockOf(b.game, color);
             const bool moves = playing(b.result) && b.board.sideToMove() == color;
             ImGui::PushStyleColor(ImGuiCol_Text, moves ? ui::ACCENT : ImGui::GetColorU32(ImGuiCol_Text));
@@ -696,7 +839,9 @@ void App::drawBroadcastMosaic() {
         } else if (lichess_.broadcast_engine.empty()) {
             ImGui::TextDisabled(" ");
         } else {
-            ImGui::TextDisabled("%s", b.analyser ? TR("analysing…") : TR("not analysed: the cores are taken"));
+            ImGui::TextDisabled("%s", b.analyser     ? TR("analysing…")
+                                      : liveGameOn() ? TR("resting during your game on Lichess")
+                                                     : TR("not analysed: the cores are taken"));
         }
         ImGui::EndChild();
         ImGui::PopStyleVar();
@@ -718,7 +863,7 @@ void App::drawBroadcastMosaic() {
     if (chosen) {
         ui::beginCard("broadcast_chosen");
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(fmt::format("{} – {}", chosen->white, chosen->black).c_str());
+        ImGui::TextUnformatted(fmt::format("{} – {}", tvName(chosen->white), tvName(chosen->black)).c_str());
         const auto moves = chosen->game.moves.size();
         const auto move  = moves / 2 + 1;
         ImGui::TextDisabled("%s", playing(chosen->result) ? (chosen->board.sideToMove() == chess::Color::WHITE
@@ -743,8 +888,11 @@ void App::drawBroadcastMosaic() {
         ImGui::TextUnformatted(last.c_str());
         if (ImGui::Button(TR("Follow on the board"))) followBroadcastOnBoard(*chosen);
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", TR("On the board, the game moves on with each move received; going back to "
-                                       "analyse it lets it move on behind, “Back to live” brings it back."));
+            ImGui::SetTooltip("%s", tv ? TR("On the board, the game moves on with each move received, and the board "
+                                            "goes on to the channel's next game when it ends; going back to analyse it "
+                                            "lets it move on behind, “Back to live” brings it back.")
+                                       : TR("On the board, the game moves on with each move received; going back to "
+                                            "analyse it lets it move on behind, “Back to live” brings it back."));
         ImGui::SameLine();
         if (ImGui::Button(TR("Copy the PGN"))) ImGui::SetClipboardText(chosen->pgn.c_str());
         ImGui::PopTextWrapPos();
@@ -752,7 +900,7 @@ void App::drawBroadcastMosaic() {
         ImGui::Dummy(ImVec2(0, px(6)));
     }
     ui::beginCard("broadcast_round");
-    ImGui::TextUnformatted(players ? TR("Their games") : TR("The round"));
+    ImGui::TextUnformatted(tv ? TR("The channel's games") : players ? TR("Their games") : TR("The round"));
     if (ImGui::BeginTable("##round_games", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("##game", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed);  // as wide as its widest
@@ -766,8 +914,8 @@ void App::drawBroadcastMosaic() {
                                        ? tablesSay(b.tb, b.board.sideToMove() == chess::Color::WHITE)
                                        : nullptr)
                 state += " · " + trf("tables: {}", says);
-            if (ImGui::Selectable(fmt::format("{} – {}##round", b.white, b.black).c_str(), b.url == broadcast_selected_,
-                                  ImGuiSelectableFlags_SpanAllColumns))
+            if (ImGui::Selectable(fmt::format("{} – {}##round", tvName(b.white), tvName(b.black)).c_str(),
+                                  b.url == broadcast_selected_, ImGuiSelectableFlags_SpanAllColumns))
                 broadcast_selected_ = b.url;
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) followBroadcastOnBoard(b);
             ImGui::TableNextColumn();
@@ -778,13 +926,17 @@ void App::drawBroadcastMosaic() {
     }
     ui::endCard();
     if (round) drawBroadcastStandings();  // the players' standings, a team event's (#55)
-    ImGui::TextDisabled("%s", players ? TR("The moves come from Lichess, three moves behind, as it shows them to "
-                                           "anyone; the analysis is made on your machine, with your engines. A game "
-                                           "that ends stays here until another takes its place.")
-                                      : TR("The moves come from Lichess's stream, opened again by itself after a "
-                                           "break; the analysis is made on your machine, with your engines. A "
-                                           "finished game stays here until the round ends, then the whole round "
-                                           "goes into the “Broadcasts” database."));
+    ImGui::TextDisabled("%s", tv ? TR("The moves come three moves late: Lichess's rule for spectators. A finished "
+                                      "game gives its place to another of the channel; a double click follows a game "
+                                      "on the board. The analysis is made on your machine, with your engines; nothing "
+                                      "is kept unless you keep it.")
+                              : players ? TR("The moves come from Lichess, three moves behind, as it shows them to "
+                                             "anyone; the analysis is made on your machine, with your engines. A game "
+                                             "that ends stays here until another takes its place.")
+                                        : TR("The moves come from Lichess's stream, opened again by itself after a "
+                                             "break; the analysis is made on your machine, with your engines. A "
+                                             "finished game stays here until the round ends, then the whole round "
+                                             "goes into the “Broadcasts” database."));
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
 }

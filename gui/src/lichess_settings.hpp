@@ -36,10 +36,14 @@ struct LichessSettings {
     std::vector<std::string> followed;
     bool follow_declined = false;
     std::string prep_player;  // the opponent prepared against last (#52)
+    // Lichess TV (#86): its mosaic's channel shown last; the database (its folder) a game was kept into last.
+    std::string tv_channel = "best";
+    std::string tv_keep_base;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
                                                 explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
                                                 sync_speeds, sync_since, sync_date, listen_declined, review_finished,
-                                                followed, follow_declined, prep_player, explorer_months)
+                                                followed, follow_declined, prep_player, explorer_months, tv_channel,
+                                                tv_keep_base)
 
 }  // namespace fcg

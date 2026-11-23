@@ -113,7 +113,7 @@ void App::pollFollowedPlayers() {
             if (!mine && std::find(ids.begin(), ids.end(), s.game) == ids.end()) ids.push_back(s.game);
         }
     }
-    players_follower_->watch(ids);
+    players_follower_->watch(ids, players_quota_);  // the streams Lichess allows, Lichess TV's counted (#86)
 }
 
 void App::openPlayersMosaic(bool asked) {

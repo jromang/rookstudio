@@ -269,6 +269,7 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     if (comment_job_) *comment_job_->cancel = true;
     ++board_game_serial_;
     board_broadcast_.reset();  // another game: the broadcast's, if it is one, is followed again by its caller
+    board_tv_.reset();         // and Lichess TV's (#86)
     board_origin_.reset();
     board_.undo.clear();
     board_.redo.clear();
@@ -1495,8 +1496,10 @@ void App::drawBoardPage() {
         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             if (b.preview)
                 b.preview.reset();
-            else
+            else if (b.selected)
                 b.selected.reset();
+            else if (boardBackToMosaic() && !linkCardTakesKeys() && !headers_open_ && !b.comment_edit)
+                backToMosaic();  // a game followed from a mosaic: back to it (#86)
         }
         if (ImGui::IsKeyPressed(ImGuiKey_N, false) && !ImGui::GetIO().KeyCtrl &&
             ImGui::GetIO().KeyAlt == chessBoard()) {
@@ -1572,6 +1575,7 @@ void App::drawBoardPage() {
     drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
     if (online_game_) drawOnlineGameCard();  // a game on Lichess played here (#84)
     if (bot_shown_) drawBotGameCard();       // the Lichess bot's game followed here (#85)
+    if (board_tv_) drawTvBoardCard();        // a game of Lichess TV's followed here (#86)
     // A game against an engine of the Play page (#83); once it is over, the card of the games from here closes it.
     if (engine_game_ && engine_game_->over && b.play_open) closeEngineGame();
     if (engine_game_)
@@ -2310,7 +2314,12 @@ void App::drawBoardColumn(float size) {
             ImGui::SetTooltip("%s", TR("The game's position this variation leaves it at; the variation stays in the "
                                        "moves."));
     }
-    if (board_back_) {
+    if (boardBackToMosaic() && !board_tv_) {  // a game followed from a mosaic; Lichess TV's card has it (#86)
+        const char* back = TR("Back to the mosaic");
+        ui::sameLineOrWrap(back);
+        if (ui::iconButton("board_back", ui::Icon::Back, back)) backToMosaic();
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("Esc"));
+    } else if (board_back_ && !board_tv_) {
         const char* back = board_back_->page == Page::Tournament ? TR("Back to the tournament")
                            : board_back_->page == Page::Books    ? TR("Back to the books")
                                                                  : TR("Back");
@@ -2687,6 +2696,12 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
     if (bot) {
         const auto& player = side == chess::Color::WHITE ? bot_state_.game.white : bot_state_.game.black;
         if (player.rating > 0) name += " · " + ui::exactCount(player.rating) + (player.provisional ? "?" : "");
+    }
+    // A game followed from Lichess's TV or the followed players (#86): the ratings its PGN gives, Lichess's AI named.
+    if (!online && !bot && board_broadcast_ && (board_tv_ || board_broadcast_->round == lichess::PLAYERS_MOSAIC)) {
+        const auto said = tvName(name);
+        const auto elo  = std::atoi(g.header(side == chess::Color::WHITE ? "WhiteElo" : "BlackElo").c_str());
+        name            = said != name || elo <= 0 ? said : name + " · " + ui::exactCount(elo);
     }
     dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     dl->AddText(ImVec2(x + 0.6f, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());

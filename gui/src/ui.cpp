@@ -423,6 +423,8 @@ const char* glyph(Icon icon) {
             return "\uE0E9";  // grid-3x3
         case Icon::Bot:
             return "\uE1BB";  // bot
+        case Icon::Tv:
+            return "\uE195";  // tv
     }
     return "";
 }

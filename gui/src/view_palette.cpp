@@ -974,6 +974,30 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         });
     // The followed players' games, in the broadcasts' mosaic (#50).
     add(TR("Followed players' games in the mosaic"), "Lichess", [this] { openPlayersMosaic(); });
+    // Lichess TV (#86): its card; each channel in the mosaic, its featured game on the Board once the card read them;
+    // the Board's game.
+    add(TR("Lichess TV"), where(Page::Lichess), [this] {
+        broadcast_round_.clear();  // the page itself, where its card is
+        page_ = Page::Lichess;
+    });
+    for (const auto key : lichess::tvChannels()) {
+        add(trf("Lichess TV: {} in the mosaic", tvChannelName(key)), "Lichess",
+            [this, k = std::string(key)] { openTvMosaic(k); });
+        if (tv_rows_.value)
+            add(trf("Lichess TV: {} on the Board", tvChannelName(key)), "Lichess",
+                [this, k = std::string(key)] { followTvFeatured(k); });
+    }
+    if (board_tv_) {
+        add(board_tv_->stay ? TR("Lichess TV: go on to the channel's next game") : TR("Lichess TV: stay on this game"),
+            TR("Board"), [this] {
+                if (board_tv_) board_tv_->stay = !board_tv_->stay;
+            });
+        add(TR("Lichess TV: keep this game…"), TR("Board"), [this] {
+            page_         = Page::Board;
+            tv_keep_menu_ = true;
+        });
+    }
+    if (boardBackToMosaic()) add(TR("Back to the mosaic"), TR("Board"), [this] { backToMosaic(); });
     // To lichess.org, from the Board (#54).
     if (page_ == Page::Board) {
         if (!toLichessLock(false)) {

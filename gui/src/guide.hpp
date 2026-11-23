@@ -103,6 +103,7 @@ inline constexpr const char* LichessStudies     = "your-lichess-studies";
 inline constexpr const char* FairPlay           = "fair-play";
 inline constexpr const char* FinishedGames      = "your-finished-games";
 inline constexpr const char* FollowedPlayers    = "followed-players";
+inline constexpr const char* LichessTv          = "lichess-tv";
 inline constexpr const char* LichessCast        = "your-own-lichess-broadcast";
 inline constexpr const char* Prep               = "preparing-a-game";
 inline constexpr const char* OpeningSuite       = "books-from-the-named-openings";

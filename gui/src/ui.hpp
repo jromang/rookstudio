@@ -133,7 +133,8 @@ enum class Icon {
     Eye,     // guessing the moves of a game (#81)
     Zap,     // the mates (#82)
     Grid,    // board vision (#82)
-    Bot      // a Lichess bot for an engine (#85)
+    Bot,     // a Lichess bot for an engine (#85)
+    Tv       // Lichess TV (#86)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

@@ -566,6 +566,17 @@ void App::frame() {
                 loadStudiesState();
                 studies_.shown = studies_.opened = true;
             }
+        } else if (w == "lichess-tv") {  // the Lichess page, its card of Lichess TV's channels (#86)
+            page_ = Page::Lichess;
+            broadcast_round_.clear();
+        } else if (w.rfind("tv-mosaic=", 0) == 0) {  // tv-mosaic=CHANNEL: a channel of Lichess TV in the mosaic (#86)
+            openTvMosaic(w.substr(10));
+        } else if (w.rfind("tv-board=", 0) == 0) {
+            // tv-board=CHANNEL:ID: a game of a channel of Lichess TV followed on the Board, as its featured game (#86).
+            const auto spec  = w.substr(9);
+            const auto colon = spec.find(':');
+            if (colon != std::string::npos && lichess::isTvChannel(spec.substr(0, colon)))
+                followTvOnBoard(spec.substr(0, colon), spec.substr(colon + 1), true, spec.substr(colon + 1), {});
         } else if (w.rfind("board-to-study=", 0) == 0) {  // board-to-study=FILE: on the Board, sent to a study (#79)
             std::ifstream in(w.substr(15), std::ios::binary);
             const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());

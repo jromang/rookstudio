@@ -2922,7 +2922,7 @@ msgid "Dismiss what changed: {}"
 msgstr "Cerrar el aviso de cambios: {}"
 
 msgid "Don't keep it"
-msgstr ""
+msgstr "No guardarla"
 
 msgid "Done"
 msgstr "Listo"
@@ -4120,7 +4120,7 @@ msgid "Go to the engines"
 msgstr "Ir a los motores"
 
 msgid "Goes into “{}” at its end"
-msgstr ""
+msgstr "Irá a «{}» al terminar"
 
 msgid "Golden hour"
 msgstr "Hora dorada"
@@ -4987,7 +4987,7 @@ msgid "Keep the engine log of every game"
 msgstr "Guardar el registro del motor de cada partida"
 
 msgid "Keep the game in"
-msgstr ""
+msgstr "Guardar la partida en"
 
 msgid "Keep the game, at its end, in"
 msgstr "Guardar la partida, al terminar, en"
@@ -5427,7 +5427,7 @@ msgid "Lichess's analysis"
 msgstr "El análisis de Lichess"
 
 msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
-msgstr ""
+msgstr "los mejores bots de Lichess, o jugadores contra su IA, con este motor analizando cada partida"
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Las retransmisiones de Lichess están bajo CC BY-SA 4.0: sus partidas conservan su fuente, la página de la retransmisión en su etiqueta Site; lo que compartas de ellas se comparte igual."
@@ -11312,7 +11312,7 @@ msgid "The variance of a game when the games are counted in pairs, over the vari
 msgstr "La varianza de una partida cuando las partidas se cuentan por pares, frente a la varianza de las partidas sueltas: por debajo de 1, los pares necesitan proporcionalmente menos partidas para la misma precisión."
 
 msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
-msgstr ""
+msgstr "Los canales de las variantes (Crazyhouse, Atomic…) no se muestran. La lista se vuelve a leer cuando se muestra la tarjeta, como mucho una vez cada 30 s."
 
 msgid "The version and the system, for a bug report."
 msgstr "La versión y el sistema, para un informe de error."

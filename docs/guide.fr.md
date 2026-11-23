@@ -2290,12 +2290,13 @@ une permission de plus, demandée la première fois ; *Sans elle*, les joueurs a
 propre compte et tes propres parties n'y viennent jamais.
 
 ### Lichess TV
-<!-- en: lichess-tv 07af67f5 -->
+<!-- en: lichess-tv f41a341a -->
 
 La carte *Lichess TV* de la page Lichess liste les chaînes d'échecs standard : *Mieux classés*, *Bullet*, *Blitz*,
 *Rapide*, *Classique*, *UltraBullet*, *Bots* et *Ordinateur* (des joueurs contre l'IA de Lichess) ; les chaînes des
 variantes ne sont pas montrées. Chacune donne la partie que Lichess met à la une sur elle, ses deux joueurs avec leurs
-classements, et sa cadence. La liste est relue quand la carte s'affiche, toutes les 30 secondes au plus.
+classements, et sa cadence. La liste est relue quand la carte s'affiche, au plus une fois toutes les
+30 secondes.
 
 *La mosaïque* montre les parties en cours de la chaîne dans la mosaïque des diffusions, sa troisième source : la ligne
 en haut passe de l'une à l'autre (*Diffusions*, *Joueurs suivis*, *Lichess TV*), et les chaînes sont des pastilles en
@@ -2319,7 +2320,8 @@ Tes propres parties ne s'affichent jamais, même à la une : celles de ton compt
 bot Lichess](#un-bot-lichess)). Tant que dure une de tes parties en direct, les moteurs de la mosaïque se reposent (voir
 [Fair-play](#fair-play)). Ce qui quitte la machine : la chaîne demandée et les parties suivies, sans compte ; rien n'est
 gardé de lui-même. Ctrl+K a *Lichess TV*, chaque chaîne dans la mosaïque (et sur l'Échiquier une fois la carte lue),
-et, pour la partie de l'Échiquier, *Rester sur cette partie*, *Garder cette partie…* et *Retour à la mosaïque*.
+et, pour la partie de l'Échiquier, rester sur elle ou passer à la partie suivante de la chaîne, la garder, et revenir à
+la mosaïque.
 
 ### Préparer une partie
 <!-- en: preparing-a-game 5bf402fc -->

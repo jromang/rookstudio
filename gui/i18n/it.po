@@ -2922,7 +2922,7 @@ msgid "Dismiss what changed: {}"
 msgstr "Chiudi l'avviso delle modifiche: {}"
 
 msgid "Don't keep it"
-msgstr ""
+msgstr "Non conservarla"
 
 msgid "Done"
 msgstr "Fatto"
@@ -4120,7 +4120,7 @@ msgid "Go to the engines"
 msgstr "Vai ai motori"
 
 msgid "Goes into “{}” at its end"
-msgstr ""
+msgstr "Andrà in «{}» alla fine"
 
 msgid "Golden hour"
 msgstr "Ora d'oro"
@@ -4987,7 +4987,7 @@ msgid "Keep the engine log of every game"
 msgstr "Conserva il log del motore di ogni partita"
 
 msgid "Keep the game in"
-msgstr ""
+msgstr "Conserva la partita in"
 
 msgid "Keep the game, at its end, in"
 msgstr "Conserva la partita, alla fine, in"
@@ -5427,7 +5427,7 @@ msgid "Lichess's analysis"
 msgstr "L'analisi di Lichess"
 
 msgid "Lichess's best bots, or players against its AI, this engine analysing each game"
-msgstr ""
+msgstr "I migliori bot di Lichess, o giocatori contro la sua IA, con questo motore che analizza ogni partita"
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Le trasmissioni di Lichess sono sotto CC BY-SA 4.0: le loro partite conservano la fonte, la pagina della trasmissione nel tag Site; ciò che ne condividi va condiviso allo stesso modo."
@@ -11312,7 +11312,7 @@ msgid "The variance of a game when the games are counted in pairs, over the vari
 msgstr "La varianza di una partita quando le partite sono contate a coppie, rapportata alla varianza delle partite singole: sotto 1, le coppie richiedono altrettante partite in meno per la stessa precisione."
 
 msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, at most once every 30 s."
-msgstr ""
+msgstr "I canali delle varianti (Crazyhouse, Atomic…) non vengono mostrati. L'elenco viene riletto quando compare la scheda, al massimo una volta ogni 30 s."
 
 msgid "The version and the system, for a bug report."
 msgstr "La versione e il sistema, per una segnalazione di bug."

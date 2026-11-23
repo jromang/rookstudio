@@ -74,8 +74,9 @@ A navigation rail on the left leads to the pages of the [view](#views) shown, in
 | Board | A game or a position from anywhere, analysed by an engine of the library; in a view for study, the notation written in place (see [The study Board](#the-study-board)) |
 | Databases | Your game databases: import, the game list, the searches |
 | Openings | Your repertoires, their coverage and their gaps |
+| Training | The day's review, Lichess's puzzles, your mistakes as exercises, guessing the moves, endgames against the tables, mates, board vision (see [The Training page](#the-training-page)) |
+| Play | A game against an engine of the library at the strength you choose, with its openings and a handicap, and your games on Lichess, both played on the Board page (see [The Play page](#the-play-page)) |
 | Lichess | Your Lichess account, a player's games, the official broadcasts, what the analysis may ask Lichess |
-| Play | A game against an engine of the library at the strength you choose, with its openings and a handicap, played on the Board page (see [The Play page](#the-play-page)) |
 | Engines | The engine library: options, checks, groups, reference Elo, import of other programs' lists, the popular engines |
 | Books | The opening book library, and the openings of each book with what is wrong with them |
 | Suites | Test suites (STS, WAC, ERET…): engines against the positions of an EPD file |
@@ -1407,12 +1408,12 @@ Lichess publishes its puzzles every month as a database (database.lichess.org, C
 2026, each with its rating, its themes and, before move 20, its opening. RookStudio keeps it on your disk and gives
 you puzzles from it without a network.
 
-**The database.** *Download* fetches the file (about 295 MB) and reads it while it arrives into a store of about 293
-MB in the profile; the file itself is not kept. A download cut short (*Cancel*, the network, the program closed) goes
-on from where it stopped: *Go on*, or *Start again*. *A file already downloaded…* reads `lichess_db_puzzle.csv.zst`
-from your disk instead. Once there: *Update* asks database.lichess.org for its file's date and reads a newer one while
-the puzzles kept answer; *Remove them* frees the disk (your rating, your results and your puzzles to review stay, kept
-apart). Nothing leaves the machine but the request for the file.
+**The database.** *Download* fetches the file (about 295 MB) and reads it while it arrives into a store of about 293 MB
+in the profile; the file itself is not kept. A download cut short (*Cancel*, the network, the program closed) goes on
+from where it stopped: *Go on*, or *Start again*. *A file already downloaded…* reads `lichess_db_puzzle.csv.zst` from
+your disk instead. Once there: *Update* asks database.lichess.org for its file's date and reads a newer one while the
+puzzles kept answer; *Remove the puzzles* frees the disk (your rating, your results and your puzzles to review stay,
+kept apart). Nothing leaves the machine but the request for the file.
 
 **The choice.** *Offline* (the database) or *Online* (your Lichess account, see [Lichess puzzles
 online](#lichess-puzzles-online)); a theme among the first ones offered, each with how often you solve it at the first
@@ -1438,8 +1439,8 @@ orange and the solution's first move as a green arrow; *Retry* (Enter) plays it 
 solution move by move* (→) plays it a move at a time; *Next* goes on.
 
 At the end: the puzzles solved at the first try, those missed, your rating's change, and the missed ones (a click shows
-the position with the solution); *Review them now* asks them again without counting, *Back to the Training page*
-leaves.
+the position with the solution); *Review the 3 now* (as many as missed) asks them again without counting, *Back to the
+Training page* leaves.
 
 **Your rating** is RookStudio's own, computed with Glicko-2 as Lichess computes its puzzle ratings: a puzzle solved at
 the first try, without a hint, is won against the puzzle's rating. It starts from your Lichess puzzle rating when your

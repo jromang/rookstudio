@@ -691,10 +691,11 @@ void App::drawTrainingToday() {
             card("##training_kind_mistakes", ui::Icon::Target, TR("My mistakes"),
                  TR("Your reviewed games' mistakes, turned into exercises."),
                  userNames().empty() ? std::string(TR("your names first"))
-                 : c.exercises == 0  ? std::string(TR("none yet"))
-                                     : trn("{} exercise", "{} exercises", c.exercises, ui::exactCount(c.exercises)) +
-                                           " " + trn("from {} game", "from {} games", c.games, c.games) +
-                                           (c.fresh > 0 ? " · " + trf("{} new", c.fresh) : std::string()),
+                 : c.exercises == 0
+                     ? std::string(TR("none yet"))
+                     : trn("{} exercise", "{} exercises", c.exercises, ui::exactCount(c.exercises)) + " " +
+                           trn("from {} game", "from {} games", c.games, c.games) +
+                           (c.fresh > 0 ? " · " + trn("{} new", "{} new", c.fresh, c.fresh) : std::string()),
                  2);
         }
         ImGui::SameLine(0, gap);
@@ -1320,14 +1321,14 @@ void App::drawPuzzleStoreCard() {
                                        "downloading the file again.",
                                        formatBytes(state.bytes))
                                        .c_str());
-            if (ImGui::Button(TR("Remove them##offline_puzzles_yes"))) {
+            if (ImGui::Button(TR("Remove the puzzles##offline_puzzles_yes"))) {
                 if (puzzle_ && puzzle_->source == PuzzleRun::Source::Offline) closePuzzles(true);
                 puzzles.remove();
                 offline_puzzles_remove_ = false;
                 offline_puzzles_note_.clear();
             }
             ImGui::SameLine();
-            if (ImGui::Button(TR("Keep them##offline_puzzles")) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+            if (ImGui::Button(TR("Keep the puzzles##offline_puzzles")) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
                 offline_puzzles_remove_ = false;
         } else {
             ImGui::BeginDisabled(offline_puzzles_update_.valid());
@@ -1341,7 +1342,7 @@ void App::drawPuzzleStoreCard() {
                 TR("Asks database.lichess.org for its file's date; a newer file is read while it downloads, the "
                    "puzzles kept answering until it is ready."));
             ImGui::SameLine();
-            if (ImGui::Button(trf("Remove them · frees {}##offline_puzzles", formatBytes(state.bytes)).c_str()))
+            if (ImGui::Button(trf("Remove the puzzles · frees {}##offline_puzzles", formatBytes(state.bytes)).c_str()))
                 offline_puzzles_remove_ = true;
             if (offline_puzzles_update_.valid()) ImGui::TextDisabled("%s", TR("Asking database.lichess.org…"));
             if (!offline_puzzles_note_.empty()) ImGui::TextDisabled("%s", offline_puzzles_note_.c_str());

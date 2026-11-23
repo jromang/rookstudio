@@ -893,8 +893,8 @@ void App::drawPlayLichess() {
         if (lichess_profile_)
             for (const auto& r : lichess_profile_->speeds)
                 if ((r.key == "rapid" || r.key == "classical" || r.key == "correspondence") && r.games > 0)
-                    line += " · " + trf("{} {}", lower(speedName(r.key)),
-                                        ui::exactCount(r.rating) + (r.provisional ? "?" : ""));
+                    line +=
+                        " · " + trf("{} {}", speedName(r.key), ui::exactCount(r.rating) + (r.provisional ? "?" : ""));
         ImGui::TextDisabled("%s", line.c_str());
     }
     // Enter: a challenge received taken first, else the seek.

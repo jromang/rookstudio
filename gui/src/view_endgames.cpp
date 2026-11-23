@@ -250,7 +250,7 @@ std::string App::endgameNeed(const std::string& fen) {
     if (pieces <= 7 && lichess_.tablebase == 1) return {};
     if (pieces > 7) return trf("{} pieces: more than any table knows", pieces);
     if (diskTablesLocked() && diskTablesPieces() >= pieces)
-        return TR("the tables of your disk are the tournament's while it plays, or Lichess's online");
+        return TR("Lichess's tables online, the tournament holding those of your disk while it plays");
     return pieces <= 5 ? trf("the tables of {} pieces, on the disk or Lichess's online", pieces)
                        : trf("Lichess's tables online ({} pieces)", pieces);
 }

@@ -1168,11 +1168,10 @@ void App::drawGameList() {
     if (!ids.empty()) db_row_ = std::min(db_row_, ids.size() - 1);
 
     // The list and, beside it, the game chosen.
-    // The panel wider for the tabs of the advanced searches: their builder, their board and their results.
-    const bool wide       = db_search_open_ && search_tab_ >= TabPattern;
-    const float preview_w = wide              ? std::min(px(600), ImGui::GetContentRegionAvail().x * 0.5f)
-                            : db_search_open_ ? std::min(px(420), ImGui::GetContentRegionAvail().x * 0.42f)
-                                              : std::min(px(300), ImGui::GetContentRegionAvail().x * 0.3f);
+    // The search panel as wide for each of its tabs, so that the tabs stay where they are when one is chosen: the
+    // advanced searches' builder, board and results want the room.
+    const float preview_w = db_search_open_ ? std::min(px(600), ImGui::GetContentRegionAvail().x * 0.5f)
+                                            : std::min(px(300), ImGui::GetContentRegionAvail().x * 0.3f);
     // Each game at the position its search found it at (the most precise search set): a column says the move.
     const auto* found_job = foundJob();
     const auto found      = found_job && !found_job->hits->empty() ? found_job->hits : nullptr;

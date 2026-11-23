@@ -1373,10 +1373,10 @@ moves in the game.
 ### Pawn structures
 
 The **Structure** tab looks for the pawns of the Board page alone, the pieces left aside: *Exactly*, *One pawn away*
-or *Two pawns away* (a pawn more, fewer or on another square, on either side, is one pawn), *Both sides* or one,
-*The colours reversed too*, held so many plies at least. *Take the Board page's again* takes its pawns anew; *Set up
-the pawns…* changes them square by square. Its name shows when the assistant's facts know it (Carlsbad, Maroczy,
-hedgehog, Stonewall, the pawn chains, Benoni, isolated queen's pawn).
+or *Two pawns away* (a pawn more, fewer or on another square, on either side, is one pawn), *Both sides*, or
+*White's pawns* or *Black's pawns* alone, *The colours reversed too*, held so many plies at least. *Take the Board
+page's pawns again* takes them anew; *Set up the pawns…* changes them square by square. Its name shows when the
+assistant's facts know it (Carlsbad, Maroczy, hedgehog, Stonewall, the pawn chains, Benoni, isolated queen's pawn).
 
 The results give the games held exactly and those near, the openings that reach it most, and the variants one pawn
 away with their games and White's score ("the white b-pawn on b4", "without the black a-pawn"); a click sets one.

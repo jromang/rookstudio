@@ -626,7 +626,8 @@ class Builder {
                 if (!m.captures) m.captured.reset();
                 changed = true;
             }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("A click: takes, or goes"));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("A click switches between “takes on” and “goes to”."));
             // Its target squares.
             const auto target = m.to ? squaresShown(m.to->men.squares) : std::string(TR("anywhere"));
             if (word(target, "to", Word::Man)) ImGui::OpenPopup("to");
@@ -1000,7 +1001,7 @@ void App::drawSearchState(SearchJob& job, const char* nothing, const char* how) 
             if (ImGui::SmallButton(TR("Keep it as it is"))) job.broad_kept = true;
         }
     } else if (job.cancelled && !job.search) {
-        box(false, trf("Cancelled at {} looked at", count(job.searched)),
+        box(false, trf("Cancelled after looking at {}", count(job.searched)),
             trf("{} found until then, kept in the list.", count(job.ids.size())));
         if (ImGui::Button(TR("Resume (the rest only)"))) {
             job.search = startSearch(job.cancelled->snapshot(), job.cancelled->query(), job.cancelled.get());
@@ -1020,9 +1021,9 @@ void App::drawSearchState(SearchJob& job, const char* nothing, const char* how) 
                 ImGui::SameLine(0, px(4));
                 ImGui::TextDisabled(
                     "· %s",
-                    trf("White {} %", static_cast<int>(std::lround(
-                                          100.0 * (static_cast<double>(r[0]) + 0.5 * static_cast<double>(r[1])) /
-                                          static_cast<double>(scored))))
+                    trf("White scores {} %", static_cast<int>(std::lround(
+                                                 100.0 * (static_cast<double>(r[0]) + 0.5 * static_cast<double>(r[1])) /
+                                                 static_cast<double>(scored))))
                         .c_str());
             }
             if (!job.broad_kept && job.ids.size() * 2 > total) {
@@ -1384,7 +1385,7 @@ void App::drawPatternTab() {
                 TR("The builder keeps the last version that reads; nothing is searched while the text does not read."));
         }
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(TR("The words, CQL's"));
+        ImGui::TextUnformatted(TR("The words, as in CQL"));
         ImGui::TextDisabled("%s",
                             TR("Men in FEN letters (K Q R B N P, lower case for Black; A and a: any man), a square "
                                "after the letter (Nf3), _ for an empty square; attacks, defends, pin from … "
@@ -1698,7 +1699,7 @@ void App::drawStructureTab() {
     ImGui::SameLine(0, px(12));
     ImGui::BeginGroup();
     ImGui::TextDisabled("%s", TR("The structure"));
-    if (ImGui::SmallButton(TR("Take the Board page's again"))) {
+    if (ImGui::SmallButton(TR("Take the Board page's pawns again"))) {
         board_pawns();
         s.set = true;
     }
@@ -1723,10 +1724,14 @@ void App::drawStructureTab() {
     }
     if (ImGui::Checkbox(TR("Both sides"), &s.both_sides)) s.set = true;
     if (!s.both_sides) {
-        ImGui::SameLine();
-        if (ImGui::RadioButton(TR("White's"), s.side == 0)) s.side = 0;
-        ImGui::SameLine();
-        if (ImGui::RadioButton(TR("Black's"), s.side == 1)) s.side = 1;
+        // Each side on the same line while it fits.
+        const auto side = [&](const char* label, int value) {
+            ui::sameLineOrWrap(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x +
+                               ImGui::CalcTextSize(label, nullptr, true).x);
+            if (ImGui::RadioButton(label, s.side == value)) s.side = value;
+        };
+        side(TR("White's pawns"), 0);
+        side(TR("Black's pawns"), 1);
     }
     if (ImGui::Checkbox(TR("The colours reversed too"), &s.reversed)) s.set = true;
     fieldPhrase(TR("Held {} plies at least"), [&] {

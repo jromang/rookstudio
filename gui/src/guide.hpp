@@ -125,6 +125,7 @@ inline constexpr const char* Lumbra             = "lumbras-gigabase";
 inline constexpr const char* Maintenance        = "maintenance";
 inline constexpr const char* DuplicateGames     = "duplicate-games";
 inline constexpr const char* PlayersNames       = "players-names";
+inline constexpr const char* Dossier            = "a-players-dossier";
 inline constexpr const char* FideList           = "fides-rating-list";
 inline constexpr const char* CheckCompact       = "checking-and-compacting";
 inline constexpr const char* Assistant          = "the-assistant";

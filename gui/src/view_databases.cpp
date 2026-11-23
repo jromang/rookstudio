@@ -630,7 +630,8 @@ void App::drawDatabases() {
         ImGui::TextDisabled("Ctrl+I");
         ImGui::SameLine();
         // The sources of games (#70, mockup M10): each with what it brings, its terms, the database it goes into.
-        if (ui::iconButton("db_sources", ui::Icon::Globe, sources)) ImGui::OpenPopup("##sources");
+        if (ui::iconButton("db_sources", ui::Icon::Globe, sources) || std::exchange(db_sources_open_, false))
+            ImGui::OpenPopup("##sources");
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s",
                               TR("Games from a site, downloaded when you ask: TWIC's issues of the week, Lichess's "
@@ -948,22 +949,32 @@ void App::openListedGame(std::size_t row) {
 }
 
 void App::openListRow(std::size_t row) {
-    if (!board_origin_ || !board_origin_->view || row >= board_origin_->view->ids.size()) return;
+    if (!board_origin_) return;
+    const auto& o = *board_origin_;
+    if (o.listed ? row >= o.listed->size() : (!o.view || row >= o.view->ids.size())) return;
     // The position shown, to open the next game at it when it passes through it.
     const auto shown = boardAt(board_.game, board_.chess960, board_.ply).hash();
     const bool keep  = board_.ply > 0;
     auto origin      = *board_origin_;
-    const auto id    = origin.view->ids[row];
-    origin.row       = row;
-    origin.id        = id;
+    // A list over several databases (a player's dossier): the game's own database.
+    std::shared_ptr<const study::Snapshot> snapshot = origin.view ? origin.view->snapshot : nullptr;
+    if (origin.listed) {
+        const auto& l = (*origin.listed)[row];
+        origin.folder = l.folder;
+        origin.name   = l.name;
+        origin.linked = false;
+        snapshot      = l.snapshot;
+    }
+    const auto id = origin.listed ? (*origin.listed)[row].id : origin.view->ids[row];
+    origin.row    = row;
+    origin.id     = id;
     // A game left with changes not saved comes back with them, where it was left.
     if (const auto copy = changedCopyOf(origin.folder, id)) {
         restoreRecentGame(*copy);
         board_origin_ = std::move(origin);  // in the list it is reached from now
         return;
     }
-    readOnBoard(study::importedPgn(origin.view->snapshot->game(id)),
-                trf("{}, game {}", origin.name, ui::exactCount(id + 1)));
+    readOnBoard(study::importedPgn(snapshot->game(id)), trf("{}, game {}", origin.name, ui::exactCount(id + 1)));
     board_origin_ = std::move(origin);
     page_         = Page::Board;
     // At the position its search found it at.
@@ -1259,13 +1270,15 @@ void App::drawGameList() {
                     if (known && !known->name.empty()) name = known->name;
                     text(name);
                     if (name.empty()) return;
-                    // Over the row's selectable, which spans the columns: its hover allowed.
+                    // Over the row's selectable, which spans the columns: its hover allowed. The right button: their
+                    // dossier (#90) or their FIDE card (#57).
                     constexpr auto over = ImGuiHoveredFlags_AllowWhenOverlappedByItem;
                     if (ImGui::IsItemHovered(over) && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         int64_t fide = 0;
                         for (const auto& [tag, value] : snap->game(id).tags)
                             if (tag == (white ? "WhiteFideId" : "BlackFideId")) fide = std::atoll(value.c_str());
-                        askFideCard(std::string(name), fide);
+                        db_name_menu_      = NameMenu{std::string(name), fide, shown_id, db_view_->snapshot};
+                        db_name_menu_open_ = true;
                     }
                     if (!ImGui::IsItemHovered(over | ImGuiHoveredFlags_DelayNormal)) return;
                     if (known && (known->fide || snap->name(shown_id) != known->name)) {
@@ -1292,8 +1305,8 @@ void App::drawGameList() {
                         drawFideCard(*card);
                         ImGui::EndTooltip();
                     } else {
-                        ImGui::SetTooltip("%s", TR("A right click: their FIDE card, asked of Lichess (the name only, "
-                                                   "without an account)."));
+                        ImGui::SetTooltip("%s", TR("A right click: their dossier, or their FIDE card asked of Lichess "
+                                                   "(the name only, without an account)."));
                     }
                 };
                 player(row.white, true);
@@ -1388,6 +1401,16 @@ void App::drawGameList() {
             }
             ImGui::PopID();
         }
+        // Their dossiers (#90).
+        for (const bool white : {true, false}) {
+            const auto name_id = white ? names.white : names.black;
+            const std::string name(snap->shownName(name_id));
+            if (name.empty() || study::anonymousName(name)) continue;
+            const auto label = trf("Dossier of {}", name);
+            if (!white) ui::sameLineOrWrap(label.c_str());
+            if (ImGui::SmallButton(fmt::format("{}##dossier_{}", label, white ? 'w' : 'b').c_str()))
+                openDossierOf(*snap, name_id);
+        }
         std::string where(row.event);
         const auto add = [&](const std::string& part) {
             if (part.empty()) return;
@@ -1417,6 +1440,22 @@ void App::drawGameList() {
     }
     ImGui::EndChild();
     drawFidePopup();  // a FIDE card asked for (#57)
+    // The right button on a name: their dossier (#90), their FIDE card (#57).
+    if (std::exchange(db_name_menu_open_, false)) ImGui::OpenPopup("##db_name_menu");
+    if (ImGui::BeginPopup("##db_name_menu")) {
+        if (db_name_menu_) {
+            const auto m = *db_name_menu_;
+            if (ImGui::Selectable(trf("Dossier of {}", m.name).c_str()) && m.snapshot) {
+                ImGui::CloseCurrentPopup();
+                openDossierOf(*m.snapshot, m.name_id);
+            }
+            if (ImGui::Selectable(trf("FIDE card of {}", m.name).c_str())) {
+                ImGui::CloseCurrentPopup();
+                askFideCard(m.name, m.fide);
+            }
+        }
+        ImGui::EndPopup();
+    }
     if (open) openListedGame(db_row_);
 }
 

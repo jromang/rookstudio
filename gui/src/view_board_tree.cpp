@@ -104,6 +104,7 @@ void App::rememberBoardGame() {
         if (r.changes.any()) return false;
         if (r.origin && game.origin)  // the same list, or the same game (a game kept from a session has no list)
             return (r.origin->view && r.origin->view == game.origin->view) ||
+                   (r.origin->listed && r.origin->listed == game.origin->listed) ||
                    (r.origin->folder == game.origin->folder && r.origin->id == game.origin->id);
         return !r.origin && !game.origin && r.title == game.title &&
                r.tree.main.moves.size() == game.tree.main.moves.size();
@@ -399,10 +400,10 @@ void App::drawBoardStrip() {
     const bool keys = !io.WantTextInput;  // Ctrl+Left and Ctrl+Right are a word back or forward in a field
     std::optional<std::size_t> go;
     bool left = false;
-    if (board_origin_ && board_origin_->view) {
+    if (board_origin_ && (board_origin_->view || board_origin_->listed)) {
         const auto& o    = *board_origin_;
         const auto row   = o.row;
-        const auto total = o.view->ids.size();
+        const auto total = o.listed ? o.listed->size() : o.view->ids.size();
         ImGui::BeginDisabled(row == 0);
         if (ImGui::SmallButton("◂##list_previous") ||
             (keys && row > 0 && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_LeftArrow)))
@@ -412,10 +413,19 @@ void App::drawBoardStrip() {
             ImGui::SetTooltip("%s", TR("The previous game of the list · Ctrl+←"));
         ImGui::SameLine(0, px(6));
         const auto place =
-            o.filter.empty()
+            o.listed ? trf("{} · game {} of {}", o.list_name, ui::exactCount(row + 1), ui::exactCount(total))
+            : o.filter.empty()
                 ? trf("{} · game {} of {}", o.name, ui::exactCount(row + 1), ui::exactCount(total))
                 : trf("{} · game {} of {} · “{}”", o.name, ui::exactCount(row + 1), ui::exactCount(total), o.filter);
-        ImGui::TextUnformatted(place.c_str());
+        if (o.listed && dossier_) {  // a player's dossier's games: a click shows the dossier again (#90)
+            if (ImGui::SmallButton(fmt::format("{}##list_place", place).c_str())) {
+                dossier_->shown = true;
+                dossier_->over  = page_;
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("Back to the dossier"));
+        } else {
+            ImGui::TextUnformatted(place.c_str());
+        }
         ImGui::SameLine(0, px(6));
         ImGui::BeginDisabled(row + 1 >= total);
         if (ImGui::SmallButton("▸##list_next") ||
@@ -581,17 +591,24 @@ void App::drawBoardTree() {
     // explorer: the masters, Lichess's players, the player whose games were imported (M3, board 2).
     const int together = databases.size() >= 2 ? 1 : 0;
     const int lichess_sources = lichess_.player.empty() ? 2 : 3;
-    const int count           = together + static_cast<int>(databases.size() + books.size()) + lichess_sources;
-    if (count == lichess_sources) {
+    // A player's dossier: the tree of their games with White, then with Black (#90), after Lichess's.
+    const auto* dossier =
+        dossier_ && dossier_->report && dossier_->report->dossier ? dossier_->report->dossier.get() : nullptr;
+    const int dossier_sources = dossier ? 2 : 0;
+    const int count = together + static_cast<int>(databases.size() + books.size()) + lichess_sources + dossier_sources;
+    if (count == lichess_sources + dossier_sources) {
         ImGui::PushTextWrapPos();
         ImGui::TextDisabled("%s", TR("No database with its opening tree, nor book: import games on the Databases "
                                      "page (the tree is built after the import), or add a Polyglot or CTG book on the "
                                      "Books page."));
         ImGui::PopTextWrapPos();
     }
-    tree_source_         = std::clamp(tree_source_, 0, count - 1);
     const int books_at   = together + static_cast<int>(databases.size());
     const int lichess_at = books_at + static_cast<int>(books.size());
+    const int dossier_at = lichess_at + lichess_sources;
+    if (tree_dossier_request_ >= 0 && dossier) tree_source_ = dossier_at + tree_dossier_request_;
+    tree_dossier_request_ = -1;
+    tree_source_          = std::clamp(tree_source_, 0, count - 1);
     if (!tree_book_request_.empty()) {  // a book the Books page opened in the tree (#68)
         for (std::size_t i = 0; i < books.size(); ++i)
             if (books[i]->path == tree_book_request_) tree_source_ = books_at + static_cast<int>(i);
@@ -613,7 +630,9 @@ void App::drawBoardTree() {
                            : i < lichess_at      ? books[static_cast<std::size_t>(i - books_at)]->name
                            : i == lichess_at     ? std::string(TR("Masters (Lichess)"))
                            : i == lichess_at + 1 ? "Lichess" + ratings_label
-                                                 : player_label;
+                           : i < dossier_at      ? player_label
+                           : i == dossier_at     ? trf("{} with White", dossier_->subject.name)
+                                                 : trf("{} with Black", dossier_->subject.name);
         // On as many lines as they need: the user's databases, the books, then Lichess's three.
         if (i > 0) ui::sameLineOrWrap(ImGui::CalcTextSize(label.c_str()).x + ImGui::GetStyle().FramePadding.x * 2);
         const bool on = tree_source_ == i;
@@ -697,19 +716,24 @@ void App::drawBoardTree() {
     }
 
     // The rows of the position shown, made again when it or the source changes.
-    const auto fen      = boardFen();
-    const bool online   = tree_source_ >= lichess_at;
+    const auto fen            = boardFen();
+    const bool dossier_source = dossier && tree_source_ >= dossier_at;
+    const bool online         = tree_source_ >= lichess_at && !dossier_source;
     if (online && !lichessTreeRows(tree_source_ - lichess_at, fen)) {
         drawTreeTheory(ImGui::GetContentRegionAvail().y);  // the studies' notes, whatever the source (#77)
         return;                                            // the card it needs instead
     }
-    const bool book     = tree_source_ >= books_at;
+    const bool book     = tree_source_ >= books_at && !dossier_source;
     const bool combined = tree_source_ < together;
-    tree_db_ =
-        !book && !combined ? static_cast<int>(databases[static_cast<std::size_t>(tree_source_ - together)].second) : -1;
+    tree_db_            = !book && !combined && !dossier_source
+                              ? static_cast<int>(databases[static_cast<std::size_t>(tree_source_ - together)].second)
+                              : -1;
     std::string counts;
     for (const auto& [name, i] : databases)
         counts += fmt::format("{}{},", tree_left_.count(s.entries()[i].folder) ? "-" : "", s.facts(i).games);
+    if (dossier_source)
+        counts =
+            fmt::format("dossier{}|{}|{}", static_cast<const void*>(dossier), dossier->games.size(), dossier_->lichess);
     const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
     if (!online && of != tree_rows_of_) {
         tree_rows_of_ = of;
@@ -727,7 +751,11 @@ void App::drawBoardTree() {
             // One database's answer, or those of all, added move by move (a move's code is the position's own).
             std::optional<study::TreeAnswer> answer;
             std::map<int, std::string> shares;
+            if (dossier_source)  // their games alone, from their side: the board's and, ticked, Lichess's
+                answer = dossier->at(scan.key(), tree_source_ == dossier_at,
+                                     dossier_->lichess ? study::DossierParts::Both : study::DossierParts::Board);
             for (const auto& [name, i] : databases) {
+                if (dossier_source) break;
                 if (!combined && static_cast<int>(i) != tree_db_) continue;
                 if (combined && tree_left_.count(s.entries()[i].folder)) continue;
                 const auto source = s.treeSource(i);
@@ -793,8 +821,9 @@ void App::drawBoardTree() {
                     tree_rows_.push_back(std::move(row));
                 }
             } else {
-                tree_summary_ = combined ? TR("No two games of these databases reach this position.")
-                                         : TR("No two games of this database reach this position.");
+                tree_summary_ = dossier_source ? TR("None of their games reaches this position.")
+                                : combined     ? TR("No two games of these databases reach this position.")
+                                               : TR("No two games of this database reach this position.");
             }
         } else if (tree_ctg_) {
             // A CTG book (#68, mockup M10, board 3): the games behind each move, its colour and its symbol; green

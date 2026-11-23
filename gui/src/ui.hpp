@@ -140,7 +140,8 @@ enum class Icon {
     Info,         // a state said calmly: nothing to do
     WifiOff,      // a download cut short
     Merge,        // duplicate games merged (#88)
-    Users         // the players' names brought together (#88)
+    Users,        // the players' names brought together (#88)
+    User          // a player's dossier (#90)
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).

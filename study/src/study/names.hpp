@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fide_list.hpp"
@@ -95,6 +96,12 @@ struct Bringing {
 [[nodiscard]] PlayerTable bringTogether(const PlayerTable& before, const NamesAnalysis& analysis,
                                         const std::vector<Bringing>& bringing, const FideList* list,
                                         const Snapshot& snapshot);
+
+// The players of FIDE's list who may be `name` ("Surname, Given"), as the names' analysis finds them: the same surname
+// (else the same as another alphabet writes it), given names that can be the same, not born after `first_year` less
+// five (0: not known); none for a name of one word. The nearest to `elo` (the games' mean rating, 0 not known) first.
+[[nodiscard]] std::vector<std::size_t> fideNamesakes(const FideList& list, std::string_view name, int first_year,
+                                                     double elo);
 
 // The spellings of the games numbered `from` or more (an import's) that join a player of the table by themselves: the
 // FIDE id their games give is the player's, or they write the player's surname and given name in full. None when

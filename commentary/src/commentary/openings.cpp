@@ -107,6 +107,10 @@ std::optional<OpeningCode> openingCode(std::span<const Move> moves) {
     return OpeningCode{std::string(found->eco), std::string(found->name)};
 }
 
+std::string_view openingsTable() {
+    return {reinterpret_cast<const char*>(assets::lichess_openings), assets::lichess_openings_size};
+}
+
 std::string ecoName(std::string_view eco) {
     // Each code's shortest line: its moves the fewest, its name the most general.
     static const auto table = [] {

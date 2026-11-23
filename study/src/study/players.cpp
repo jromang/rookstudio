@@ -84,7 +84,7 @@ struct Reader {
 
 std::string PlayerTable::bytes() const {
     std::string out(TABLE_MAGIC);
-    put(out, uint32_t{1});
+    put(out, uint32_t{2});
     put(out, static_cast<uint32_t>(players_.size()));
     put(out, static_cast<uint64_t>(apart_.size()));
     for (const auto& [a, b] : apart_) {
@@ -101,6 +101,7 @@ std::string PlayerTable::bytes() const {
         putText(out, p.federation);
         putText(out, p.title);
         putText(out, p.list);
+        putText(out, p.lichess);  // from the second version
         put(out, static_cast<uint32_t>(p.spellings.size()));
         for (const auto id : p.spellings) put(out, id);
     }
@@ -110,7 +111,8 @@ std::string PlayerTable::bytes() const {
 PlayerTable PlayerTable::fromBytes(std::string_view bytes) {
     if (bytes.substr(0, TABLE_MAGIC.size()) != TABLE_MAGIC) throw std::runtime_error("not a table of names");
     Reader r{bytes, TABLE_MAGIC.size()};
-    if (r.get<uint32_t>() > 1) throw std::runtime_error("a table of names of a newer program");
+    const auto version = r.get<uint32_t>();
+    if (version > 2) throw std::runtime_error("a table of names of a newer program");
     const auto count = r.get<uint32_t>();
     const auto pairs = r.get<uint64_t>();
     if (pairs > bytes.size() / 16) throw std::runtime_error("damaged table of names");
@@ -134,6 +136,7 @@ PlayerTable PlayerTable::fromBytes(std::string_view bytes) {
         p.federation = r.text();
         p.title      = r.text();
         p.list       = r.text();
+        if (version >= 2) p.lichess = r.text();
         const auto n = r.get<uint32_t>();
         if (n > (bytes.size() - r.at) / 4) throw std::runtime_error("damaged table of names");
         p.spellings.reserve(n);
@@ -142,6 +145,34 @@ PlayerTable PlayerTable::fromBytes(std::string_view bytes) {
     }
     if (r.at != bytes.size()) throw std::runtime_error("damaged table of names");
     return PlayerTable(std::move(players), std::move(apart));
+}
+
+PlayerTable withPlayer(const PlayerTable& before, const std::vector<uint32_t>& spellings, const std::string& name,
+                       const std::function<void(Player&)>& change) {
+    auto players = before.players();
+    std::optional<std::size_t> into;
+    for (const auto id : spellings)
+        if (const auto p = before.playerOf(id)) {
+            into = *p;
+            break;
+        }
+    if (!into) {
+        into = players.size();
+        players.emplace_back();
+        players.back().name = name;
+        players.back().how  = "hand";
+    }
+    for (std::size_t p = 0; p < players.size(); ++p) {
+        if (p == *into) continue;
+        std::erase_if(players[p].spellings, [&](uint32_t id) {
+            return std::find(spellings.begin(), spellings.end(), id) != spellings.end();
+        });
+    }
+    auto& player = players[*into];
+    player.spellings.insert(player.spellings.end(), spellings.begin(), spellings.end());
+    if (change) change(player);
+    std::erase_if(players, [](const Player& p) { return p.spellings.empty(); });
+    return PlayerTable(std::move(players), before.apart());
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

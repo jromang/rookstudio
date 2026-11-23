@@ -437,6 +437,8 @@ const char* glyph(Icon icon) {
             return "\uE43F";  // merge
         case Icon::Users:
             return "\uE1A4";  // users
+        case Icon::User:
+            return "\uE19F";  // user
     }
     return "";
 }

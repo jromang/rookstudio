@@ -44,6 +44,7 @@
 #include "console.hpp"
 #include "databases.hpp"
 #include "dialogs.hpp"
+#include "dossier.hpp"
 #include "endgames.hpp"
 #include "engine_changes.hpp"
 #include "engine_downloads.hpp"
@@ -84,7 +85,6 @@
 #include "opening_suite.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
-#include "prep.hpp"
 #include "profiles.hpp"
 #include "puzzles.hpp"
 #include "qr.hpp"
@@ -630,6 +630,16 @@ class App {
         std::size_t row  = 0;
         study::GameId id = 0;  // its number in the database: Ctrl+S puts it back there
         std::string filter;  // the quick filter it was made with
+        // A list over several databases (a player's dossier, #90), in place of `view`: each game's database and
+        // number; `folder`, `name` and `id` are then those of the game shown.
+        struct Listed {
+            std::filesystem::path folder;
+            std::string name;
+            std::shared_ptr<const study::Snapshot> snapshot;
+            study::GameId id = 0;
+        };
+        std::shared_ptr<const std::vector<Listed>> listed;
+        std::string list_name;  // what the strip calls that list
     };
     std::optional<BoardOrigin> board_origin_;
     void openListRow(std::size_t row);  // another game of the same list, at the same position when it has it
@@ -703,6 +713,16 @@ class App {
     // The games the maintenance shows in the list ("See in the list"): the others left out while it is set.
     std::optional<std::vector<study::GameId>> db_only_;
     std::string db_only_said_;
+    bool db_sources_open_ = false;  // the menu of the sources to open on the Databases page (a dossier's way out)
+    // The right button on a player's name in the game list: their dossier, their FIDE card.
+    struct NameMenu {
+        std::string name;
+        int64_t fide     = 0;  // the FIDE id the game gives
+        uint32_t name_id = 0;
+        std::shared_ptr<const study::Snapshot> snapshot;
+    };
+    std::optional<NameMenu> db_name_menu_;
+    bool db_name_menu_open_ = false;
     struct SearchFields {
         std::array<char, 64> player{}, opponent{}, event{};
         int side = 0;  // the player: 0 either colour, 1 White, 2 Black
@@ -1865,9 +1885,8 @@ class App {
         std::future<lichess::Answer<lichess::Profile>> profile_job;
         std::optional<lichess::Profile> profile;
         std::string profile_error;
-        std::future<PrepReport> report_job;
-        std::optional<PrepReport> report;
-        uint64_t reported = UINT64_MAX;  // the snapshot and tree the report was made from
+        uint64_t synced = 0;    // the syncs ended: the dossier made again after each (#90)
+        std::string last_sync;  // the day their database last took games ("2026-11-20"), empty when it never did
     };
     std::optional<Prep> prep_;
     std::array<char, 40> prep_name_{};
@@ -1876,7 +1895,64 @@ class App {
     void startPrep(const std::string& opponent);
     void pollPrep();
     void drawPrepCard();
-    void openPrepLine(const std::vector<std::string>& line, const std::string& move);
+    // A player's dossier (#90, mockup M13, board 3; view_dossier.cpp, dossier.hpp), in place of the page it is opened
+    // from, Esc going back to it: from a name of the game list (its right button), a game's preview, a FIDE card, the
+    // Lichess page's "Prepare a game against" (its Lichess source ticked) and Ctrl+K. Made again in the background at
+    // each opening, from the databases as they are; kept while the Board page shows one of its games or lines.
+    struct DossierState {
+        study::DossierSubject subject;
+        Page over     = Page::Databases;  // the page it shows in place of
+        bool shown    = true;
+        int tab       = 0;
+        int tab_shown = -1;
+        bool lichess  = false;  // its Lichess source ticked: their account's games (#52's sync), their profile
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<study::DossierProgress> progress;
+        std::future<DossierReport> job;
+        std::optional<DossierReport> report;
+        bool remake = false;                                                 // made again once the job running ends
+        std::vector<std::pair<std::filesystem::path, std::string>> folders;  // the sources' databases, in order
+        std::shared_ptr<const std::vector<BoardOrigin::Listed>> listed;      // its games as the Board's list
+        // A choice kept for the next one: a namesake, a Lichess account; tables put back (Ctrl+Z).
+        std::optional<DossierNamesake> keep_namesake;
+        std::string link_lichess;
+        std::vector<std::pair<std::filesystem::path, study::PlayerTable>> restore;
+        std::vector<std::pair<std::filesystem::path, study::PlayerTable>> undo;  // before the last choice kept
+        std::optional<study::DossierSubject> undo_subject;
+        int namesake         = 0;  // the namesake chosen with ↑ ↓
+        bool namesakes_aside = false;
+        bool lichess_typing = false, lichess_focus = false;  // "+ Lichess…": their account's name being typed
+        std::array<char, 40> lichess_name{};
+        std::string said;     // the choice just kept, and Ctrl+Z
+        uint64_t synced = 0;  // the Lichess sync it was last made after
+    };
+    std::optional<DossierState> dossier_;
+    void openDossier(study::DossierSubject subject, bool lichess = false);
+    void startDossier();
+    void pollDossier();  // each frame: the job that ended, the Lichess source's games that came
+    void drawDossier();
+    void drawDossierOverview();
+    void drawDossierOpenings();
+    void drawDossierRating();
+    void drawDossierOnline();
+    void drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how);
+    void openDossierGame(std::size_t index);                                  // on the Board, the dossier as its list
+    void openDossierLine(const std::vector<std::string>& moves, bool white);  // the Tree tab on their games
+    // Those of its games in the list of their database (`source`, in the dossier's sources), said "Only {said}".
+    void dossierInList(std::size_t source, std::vector<study::GameId> ids, std::string said);
+    // A name of the game list or of a game's preview: its dossier, the table's player when it is one.
+    void openDossierOf(const study::Snapshot& snapshot, uint32_t name_id);
+    int tree_dossier_request_ = -1;  // a dossier's line opened: the Tree tab on their games with White (0), Black (1)
+    // Ctrl+K's "Dossier: …": the players whose names have the words typed, looked for in the background.
+    struct DossierNamesJob {
+        std::string of;
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::future<std::vector<DossierName>> done;
+    };
+    std::optional<DossierNamesJob> dossier_names_job_;
+    std::string dossier_names_of_;
+    std::vector<DossierName> dossier_names_;
+    void lookForDossierNames(const std::string& query);
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;
@@ -3464,6 +3540,7 @@ class App {
     struct BoardBack {
         Page page;
         std::optional<Tab> tab;
+        bool dossier = false;  // opened from a player's dossier: back to it (#90)
     };
     std::optional<BoardBack> board_back_;
     bool board_key_taken_  = false;  // key A served a board this frame

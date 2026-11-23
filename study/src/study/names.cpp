@@ -49,7 +49,40 @@ std::size_t fullest(const Snapshot& snap, const std::vector<Spelling>& spellings
     return best;
 }
 
+// The list's players of a name's parts; else of its surname as another alphabet writes it (`transliterated` then). A
+// namesake born after the games were played, or too young to play them, is not the player; the nearest to the games'
+// mean rating first.
+std::vector<std::size_t> candidatesOf(const FideList& list, const NameParts& parts, int year_min, double mean,
+                                      bool& transliterated) {
+    const auto compatible = [&](std::size_t c) {
+        const auto card = list.player(c);
+        if (card.born && year_min && year_min < card.born + 5) return false;
+        const auto given = nameParts(card.name).given;
+        return !given.empty() && givenCompatible(parts.given, given);  // a name of one word on the list too
+    };
+    std::vector<std::size_t> found;
+    for (const auto c : list.bySurname(parts.surname))
+        if (compatible(c)) found.push_back(c);
+    transliterated = false;
+    if (found.empty()) {
+        for (const auto c : list.bySkeleton(nameSkeleton(parts.surname)))
+            if (compatible(c)) found.push_back(c);
+        transliterated = !found.empty();
+    }
+    std::stable_sort(found.begin(), found.end(), [&](std::size_t a, std::size_t b) {
+        return distance(list.player(a), mean) < distance(list.player(b), mean);
+    });
+    return found;
+}
+
 }  // namespace
+
+std::vector<std::size_t> fideNamesakes(const FideList& list, std::string_view name, int first_year, double elo) {
+    const auto parts = nameParts(name);
+    if (parts.surname.empty() || parts.given.empty()) return {};
+    bool transliterated = false;
+    return candidatesOf(list, parts, first_year, elo, transliterated);
+}
 
 NamesAnalysis analyseNames(const std::shared_ptr<const Snapshot>& snapshot, const FideList* list,
                            NamesProgress& progress, const std::atomic<bool>& cancel) {
@@ -280,26 +313,9 @@ NamesAnalysis analyseNames(const std::shared_ptr<const Snapshot>& snapshot, cons
             out.proposals.push_back(std::move(p));
             continue;
         }
-        // A namesake born after the games were played, or too young to play them, is not the player.
-        const auto compatible = [&](std::size_t c) {
-            const auto card = list->player(c);
-            if (card.born && p.year_min && p.year_min < card.born + 5) return false;
-            const auto given = nameParts(card.name).given;
-            return !given.empty() && givenCompatible(parts.given, given);  // a name of one word on the list too
-        };
-        std::vector<std::size_t> found;
-        for (const auto c : list->bySurname(parts.surname))
-            if (compatible(c)) found.push_back(c);
         bool transliterated = false;
-        if (found.empty()) {
-            for (const auto c : list->bySkeleton(nameSkeleton(parts.surname)))
-                if (compatible(c)) found.push_back(c);
-            transliterated = !found.empty();
-        }
-        std::stable_sort(found.begin(), found.end(), [&](std::size_t a, std::size_t b) {
-            return distance(list->player(a), mean) < distance(list->player(b), mean);
-        });
-        p.candidates = found;
+        const auto found    = candidatesOf(*list, parts, p.year_min, mean, transliterated);
+        p.candidates        = found;
         if (found.empty()) {
             p.match  = NameMatch::None;
             p.reason = NameReason::NotOnList;

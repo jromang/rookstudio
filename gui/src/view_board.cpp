@@ -2322,13 +2322,19 @@ void App::drawBoardColumn(float size) {
         if (ui::iconButton("board_back", ui::Icon::Back, back)) backToMosaic();
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("Esc"));
     } else if (board_back_ && !board_tv_) {
-        const char* back = board_back_->page == Page::Tournament ? TR("Back to the tournament")
-                           : board_back_->page == Page::Books    ? TR("Back to the books")
-                                                                 : TR("Back");
+        const bool dossier = board_back_->dossier && dossier_;
+        const char* back   = dossier                                 ? TR("Back to the dossier")
+                             : board_back_->page == Page::Tournament ? TR("Back to the tournament")
+                             : board_back_->page == Page::Books      ? TR("Back to the books")
+                                                                     : TR("Back");
         ui::sameLineOrWrap(back);
         if (ui::iconButton("board_back", ui::Icon::Back, back)) {
             page_ = board_back_->page;
             if (board_back_->tab) tab_request_ = board_back_->tab;
+            if (dossier) {  // the player's dossier again, over the page it was opened from (#90)
+                dossier_->shown = true;
+                dossier_->over  = page_;
+            }
             board_back_.reset();
         }
     }

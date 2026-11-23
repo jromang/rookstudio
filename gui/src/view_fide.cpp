@@ -131,6 +131,15 @@ void App::drawFideAsk(FideAsk& a) {
     } else if (a.shown) {
         drawFideCard(*a.shown);
         if (ImGui::SmallButton(TR("On lichess.org"))) SDL_OpenURL(lichess::fideUrl(*a.shown).c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(trf("Dossier of {}", a.name).c_str())) {  // #90
+            study::DossierSubject subject;
+            subject.name = a.name;
+            subject.fide = a.shown->id;
+            subject.born = a.shown->year;
+            ImGui::CloseCurrentPopup();
+            openDossier(std::move(subject));
+        }
         if (a.shown->asked > 0) {
             char day[32]           = "";
             const std::time_t when = static_cast<std::time_t>(a.shown->asked);

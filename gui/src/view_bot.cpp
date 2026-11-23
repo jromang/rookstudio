@@ -222,7 +222,7 @@ lichess::BotSettings& App::botSettings() {
         bot_settings_ = lichess::readBotSettings(botFolder());
         // Its words, until chosen: the interface's language's.
         if (!bot_settings_->words_set) {
-            bot_settings_->greeting = TR("Good game!");
+            bot_settings_->greeting = TR("Have a good game!");
             bot_settings_->thanks   = TR("Thank you for the game!");
         }
     }

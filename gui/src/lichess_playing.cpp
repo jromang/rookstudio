@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <string_view>
 
 #include <fmt/include/fmt/format.h>
 #include <study/import.hpp>
@@ -131,6 +132,13 @@ std::optional<Challenge> readChallenge(const nlohmann::json& j, const nlohmann::
     c.decline_reason = textOf(j, "declineReason");
     c.decline_key    = textOf(j, "declineReasonKey");
     return c;
+}
+
+bool PlayingGame::atStart() const {
+    // The men and the side to move; castling and the counters may be written otherwise.
+    constexpr std::string_view START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
+    return fen.size() >= START.size() && std::string_view(fen).substr(0, START.size()) == START &&
+           (fen.size() == START.size() || fen[START.size()] == ' ');
 }
 
 int PlayingGame::move() const {

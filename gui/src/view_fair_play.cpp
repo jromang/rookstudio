@@ -2,7 +2,7 @@
 // live game locks every aid on any position (Lichess forbids any help, a database's included), until it ends; a
 // correspondence game locks the engine, the cloud, the tables and the assistant on the whole of a line that passes
 // through its position, before it and after it, the tree of the user's databases staying open (Lichess allows a book
-// and a database there). The games are
+// and a database there); one with no move yet, the start position alone, which every game passes through. The games are
 // looked at when the Home page shows, every half-minute while a live one lasts and every ten minutes while a game by
 // correspondence does; with the right to read challenges, heard as they start and end. The Home page lists them, "your
 // turn" first (board "Main").
@@ -14,6 +14,7 @@
 #include <optional>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
@@ -81,6 +82,17 @@ std::optional<Men> menOf(std::string_view fen) {
     if (at + 1 >= fen.size()) return std::nullopt;
     m.white = fen[at + 1] != 'b';
     return m;
+}
+
+// A game still at the start position, when the board shows that position, which it locks alone: every game of
+// standard chess passes through it (the agreed exception to #48's rule, 2026-11-23).
+const lichess::PlayingGame* startGameOn(const std::vector<lichess::PlayingGame>& games, const chess::Board& shown,
+                                        bool live_too) {
+    static const Men start = *menOf(std::string_view(chess::constants::STARTPOS));
+    if (menOf(shown) != start) return nullptr;
+    for (const auto& g : games)
+        if ((live_too || !g.live()) && g.atStart()) return &g;
+    return nullptr;
 }
 
 const char* speedName(std::string_view key) {
@@ -225,8 +237,10 @@ int App::correspondencePly(const ReplayGame& line, bool chess960, int last, cons
 int App::playingPly(const ReplayGame& line, bool chess960, int last, const lichess::PlayingGame** game,
                     bool live_too) const {
     std::vector<std::pair<Men, const lichess::PlayingGame*>> wanted;
+    // A game still at the start position is not looked for on the lines, which all pass through it: it locks that
+    // position alone (startGameOn).
     for (const auto& g : lichess_playing_)
-        if (live_too || !g.live())
+        if ((live_too || !g.live()) && !g.atStart())
             if (const auto men = menOf(std::string_view(g.fen))) wanted.emplace_back(*men, &g);
     if (wanted.empty()) return -1;
     auto board    = boardAt(line, chess960, 0);
@@ -248,6 +262,8 @@ const lichess::PlayingGame* App::fairPlayLock(bool whole_game) const {
     if (const auto* live = liveGameOn()) return live;
     const auto& b                    = board_;
     const lichess::PlayingGame* game = nullptr;
+    if (!whole_game)
+        if (const auto* g = startGameOn(lichess_playing_, boardAt(b.game, b.chess960, b.ply), false)) return g;
     // The line shown passes through a correspondence game's position: the whole of it, the moves that led there too
     // (the engine's line from the position before the opponent's move would give the answer to it).
     if (correspondencePly(b.game, b.chess960, INT32_MAX, &game) >= 0) return game;
@@ -268,6 +284,8 @@ const lichess::PlayingGame* App::fairPlayLock(bool whole_game) const {
 const lichess::PlayingGame* App::toLichessLock(bool whole_game) const {
     const auto& b                    = board_;
     const lichess::PlayingGame* game = nullptr;
+    if (!whole_game)
+        if (const auto* g = startGameOn(lichess_playing_, boardAt(b.game, b.chess960, b.ply), true)) return g;
     if (playingPly(b.game, b.chess960, INT32_MAX, &game, true) >= 0) return game;
     if (playingPly(b.tree.main, b.chess960, INT32_MAX, &game, true) >= 0) {
         if (whole_game) return game;
@@ -300,6 +318,14 @@ void App::drawFairPlayBanner(bool whole_game) {
                                 "back when the game ends, by themselves.",
                                 speedName(g->speed), opponentText(*g))
                                 .c_str());
+    } else if (g->atStart()) {
+        ImGui::TextColored(
+            ImGui::ColorConvertU32ToFloat4(tone), "%s",
+            trf("Correspondence game against {}: the engine is locked on the start position", opponentText(*g))
+                .c_str());
+        ImGui::TextDisabled("%s", TR("The game has no move yet, and every game passes through the start position: "
+                                     "that position alone is locked. From the game's first move on, the engine, the "
+                                     "cloud, the tables and the assistant look at no position of it."));
     } else {
         ImGui::TextColored(
             ImGui::ColorConvertU32ToFloat4(tone), "%s",

@@ -53,6 +53,9 @@ struct PlayingGame {
 
     [[nodiscard]] bool live() const { return speed != "correspondence"; }
     [[nodiscard]] int move() const;  // the move being played, from its FEN; 0 unknown
+    // Still at the start position, before its first move. Every game of standard chess passes through it: by
+    // correspondence such a game locks that position alone, and the positions of its line from its first move on.
+    [[nodiscard]] bool atStart() const;
 };
 
 // Whether RookStudio can play the game on its Board (#84): the Board API can (compat.board when the stream told it;

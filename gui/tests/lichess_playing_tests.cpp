@@ -56,6 +56,26 @@ TEST_CASE("Lichess playing: the games in progress as Lichess lists them") {
     CHECK(readPlaying(nlohmann::json::array()).empty());
 }
 
+TEST_CASE("Lichess playing: a game still at the start position, which locks that position alone") {
+    PlayingGame g;
+    g.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    CHECK(g.atStart());
+    g.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1";  // castling written otherwise
+    CHECK(g.atStart());
+    g.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
+    CHECK(g.atStart());
+    g.fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";  // after 1.e4
+    CHECK_FALSE(g.atStart());
+    g.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1";  // the same men, Black to move
+    CHECK_FALSE(g.atStart());
+    g.fen = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN w KQkq - 0 1";  // another start, of Chess960
+    CHECK_FALSE(g.atStart());
+    g.fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNRR w KQkq - 0 1";
+    CHECK_FALSE(g.atStart());
+    g.fen.clear();
+    CHECK_FALSE(g.atStart());
+}
+
 TEST_CASE("Lichess playing: the event stream's lines, games only") {
     const auto start = readGameEvent(fmt::format(R"({{"type": "gameStart", "game": {}}})", GAME) + "\r");
     REQUIRE(start);

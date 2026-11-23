@@ -343,7 +343,7 @@ L'échiquier 3D demande OpenGL 3.3. Là où la fenêtre est dessinée sans lui (
 licence MIT ; *Apparence* donne le lien vers elles.
 
 ## Raccourcis clavier
-<!-- en: keyboard-shortcuts 65140e2d -->
+<!-- en: keyboard-shortcuts e7a7fc57 -->
 
 | Touches | Où | Ce qu'elles font |
 |---|---|---|
@@ -366,7 +366,7 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>G</kbd> | La page Échiquier | Analyser la partie, passe après passe ; une seconde fois : l'arrêter |
 | <kbd>X</kbd> | La page Échiquier | Afficher ou masquer la menace |
 | <kbd>N</kbd>, <kbd>Maj</kbd>+<kbd>N</kbd> | La page Échiquier | Le coup suivant, le coup précédent marqué par l'analyse |
-| <kbd>Échap</kbd> | La page Échiquier | Rétablir la partie après qu'une ligne a été montrée ; reposer la pièce prise en main |
+| <kbd>Échap</kbd> | La page Échiquier | Rétablir la partie après qu'une ligne a été montrée ; reposer la pièce prise en main ; une partie suivie depuis une mosaïque : retour à la mosaïque |
 | <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | Une vue pour l'étude | Ouvrir un fichier PGN sur la page Échiquier ; y commencer une nouvelle partie |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>Tab</kbd> | Une vue pour l'étude | Les parties récentes ; relâcher Ctrl ouvre celle choisie |
 | <kbd>Entrée</kbd> | La page Accueil | Reprendre la partie sur l'échiquier |
@@ -691,7 +691,7 @@ WinBoard.
 - `FCG_WB2UCI_LOG=FILE` dans l'environnement écrit dans `FILE` chaque ligne échangée avec les moteurs WinBoard.
 
 ### Un bot Lichess
-<!-- en: a-lichess-bot c8e717b7 -->
+<!-- en: a-lichess-bot 5ae494c4 -->
 
 La fiche d'un moteur a une ligne **Sur Lichess, en bot** : *En faire un bot Lichess…* prépare le moteur à jouer sur
 Lichess sous un compte bot, par la Bot API de Lichess (là où les moteurs sont autorisés), en acceptant les défis que tu
@@ -727,9 +727,9 @@ ci-dessous.
 - **Son jeu** : le moteur avec ses options de la bibliothèque (ses `Threads` et son `Hash` comptés dans le budget de
   cœurs de la machine pendant qu'il joue), un livre Polyglot de ta bibliothèque joué tant qu'il a un coup, les tables des
   tournois (`SyzygyPath`, pour un moteur qui a l'option et pas de chemin à lui), et pas de réflexion pendant le temps de
-  l'adversaire. Sa pendule vient de Lichess à chaque coup, moins une marge pour le réseau (un dixième, de 0,2 à 1
-  seconde) ; avant que les deux camps aient joué, il joue dans le temps que Lichess donne pour le premier coup ; par
-  correspondance, il réfléchit 15 secondes par coup. Il accepte une nulle proposée quand le moteur est nettement moins
+  l'adversaire. Sa pendule vient de Lichess à chaque coup, moins une marge pour le réseau (un dixième de son temps
+  restant, de 0,2 à 1 seconde) ; avant que les deux camps aient joué, il joue dans le temps que Lichess donne pour le
+  premier coup ; par correspondance, il réfléchit 15 secondes par coup. Il accepte une nulle proposée quand le moteur est nettement moins
   bien, ou pas mieux tard dans la partie, refuse une reprise de coup, et revendique la victoire quand son adversaire est
   parti assez longtemps. Ses mots, dits dans la discussion des joueurs au début et à la fin, sont à toi de choisir
   (vides : rien n'est dit). Un moteur qui ne peut pas démarrer ou qui s'arrête abandonne la partie (l'annule avant que
@@ -2175,7 +2175,7 @@ Lichess*, et envoie ses modifications de la même façon.
 Les limites de Lichess : 64 chapitres par étude, 30 nouvelles études par jour.
 
 ### Diffusions officielles
-<!-- en: official-broadcasts a02f4c35 -->
+<!-- en: official-broadcasts 9c582d92 -->
 
 Les diffusions officielles en direct, les plus connues d'abord (*Toutes les diffusions en direct* pour les autres), et
 les prochaines. *Suivre* ouvre une ronde dans une mosaïque sur la page Lichess : la carte de chaque partie avec les
@@ -2184,7 +2184,7 @@ par* ; à droite, la partie choisie avec ses derniers coups, *Suivre sur l'échi
 Les parties sont analysées sur ta machine, avec ton moteur, autant à la fois que le permettent les cœurs que laissent
 les tournois, la partie choisie en premier, et seulement tant que la mosaïque est affichée. Sur l'échiquier, la partie
 avance à chaque coup reçu ; revenir en arrière pour l'analyser la laisse avancer derrière, et *Retour au direct* la
-ramène.
+ramène ; *Retour à la mosaïque* (Échap) revient à la ronde.
 
 Lichess permet de suivre quatre rondes à la fois sans compte, huit avec un compte. Depuis août 2026, il ralentit
 fortement une diffusion suivie sans un compte autorisé à lire les diffusions : la première fois, RookStudio demande
@@ -2231,7 +2231,7 @@ Une partie est demandée par son identifiant, sans compte ; une étude privée a
 compte autorisé à les lire, demandé une fois, comme pour suivre une ronde ; tes favoris demandent un compte associé.
 
 ### Fair-play
-<!-- en: fair-play d8b24b4b -->
+<!-- en: fair-play 62d0ad7a -->
 
 Lichess interdit toute aide pendant une partie. Avec ton compte associé, RookStudio s'y tient où que tu joues, dans le
 navigateur ou sur un téléphone :
@@ -2251,6 +2251,8 @@ parties en cours, celles où c'est ton tour d'abord, chacune avec sa pendule ou 
 *Ouvrir sur lichess.org*, ou *Sur l'Échiquier* une fois que RookStudio peut jouer tes parties (voir [Une partie sur
 Lichess](#une-partie-sur-lichess)). Les parties de ton bot Lichess ne sont pas les tiennes et ne verrouillent rien ;
 pendant ta propre partie en direct, la recherche du bot n'est pas montrée (voir [Un bot Lichess](#un-bot-lichess)).
+Lichess TV ne montre jamais tes propres parties, même à la une, et les moteurs de la mosaïque se reposent pendant ta
+partie en direct (voir [Lichess TV](#lichess-tv)).
 
 Tes parties en cours sont demandées avec le jeton de ton compte quand la page Accueil s'affiche, toutes les trente
 secondes tant que dure une partie en direct et toutes les dix minutes tant que dure une partie par correspondance. La
@@ -2274,17 +2276,50 @@ de mes parties terminées*, sur la page Lichess, lance le bilan de lui-même, sa
 aux modifications non enregistrées ou un travail en cours ; le bandeau le propose alors.
 
 ### Joueurs suivis
-<!-- en: followed-players 72df1253 -->
+<!-- en: followed-players 9a60f4cb -->
 
 La carte *Joueurs suivis* de la page Lichess liste les joueurs que ton compte suit sur Lichess et ceux que tu ajoutes
 par leur nom, chacun avec un point : rouge pendant qu'il joue, avec la cadence de la partie, vert quand il est en
 ligne. Leur statut est demandé toutes les quinze secondes tant que la carte ou leur mosaïque est affichée, sans compte.
 
 *Leurs parties dans la mosaïque* montre les parties qu'ils jouent dans la mosaïque des diffusions, chacune analysée
-par ton moteur, huit au plus, comme Lichess le permet ; Lichess montre leurs coups avec trois coups de retard, à tout
-le monde. Une partie qui se termine reste avec son résultat jusqu'à ce qu'une autre prenne sa place. Lire les joueurs
-que suit ton compte demande une permission de plus, demandée la première fois ; *Sans elle*, les joueurs ajoutés par
-leur nom sont suivis. Ton propre compte et tes propres parties n'y viennent jamais.
+par ton moteur, huit au plus, comme Lichess le permet à une adresse, les rondes que tu suis et les parties de Lichess
+TV comptées avec elles ; Lichess montre leurs coups avec trois coups de retard, à tout le monde. Une partie qui se
+termine reste avec son résultat jusqu'à ce qu'une autre prenne sa place. Lire les joueurs que suit ton compte demande
+une permission de plus, demandée la première fois ; *Sans elle*, les joueurs ajoutés par leur nom sont suivis. Ton
+propre compte et tes propres parties n'y viennent jamais.
+
+### Lichess TV
+<!-- en: lichess-tv 07af67f5 -->
+
+La carte *Lichess TV* de la page Lichess liste les chaînes d'échecs standard : *Mieux classés*, *Bullet*, *Blitz*,
+*Rapide*, *Classique*, *UltraBullet*, *Bots* et *Ordinateur* (des joueurs contre l'IA de Lichess) ; les chaînes des
+variantes ne sont pas montrées. Chacune donne la partie que Lichess met à la une sur elle, ses deux joueurs avec leurs
+classements, et sa cadence. La liste est relue quand la carte s'affiche, toutes les 30 secondes au plus.
+
+*La mosaïque* montre les parties en cours de la chaîne dans la mosaïque des diffusions, sa troisième source : la ligne
+en haut passe de l'une à l'autre (*Diffusions*, *Joueurs suivis*, *Lichess TV*), et les chaînes sont des pastilles en
+dessous. Les mêmes tuiles, un de tes moteurs pour chaque partie, la partie choisie à droite avec *Suivre sur
+l'échiquier*. Lichess liste jusqu'à 30 parties par chaîne, et permet à une adresse de suivre 8 parties à la fois, les
+rondes que tu suis (une chacune) et les parties des joueurs suivis comptées avec elles : la mosaïque montre ce qui reste,
+la partie à la une d'abord. Une partie terminée montre son résultat quelques secondes, puis laisse sa place à une autre
+de la chaîne. Lichess montre les coups avec trois coups de retard à quiconque regarde, et la mosaïque le dit.
+
+*L'Échiquier* (ou un double clic sur une tuile) ouvre la partie sur l'Échiquier, qui la suit ; la carte au-dessus de sa
+colonne dit ce qu'elle est : *Lichess TV · Blitz · la partie à la une, 3+0*. Quand elle se termine, l'Échiquier passe de
+lui-même à la partie à la une suivante de la chaîne, la partie quittée à un Ctrl+Tab ; *Rester sur cette partie* garde
+l'échiquier sur elle. *Garder cette partie…* la met, à sa fin, dans une base de ton choix : *Lichess TV*, créée si elle
+manque, ou une autre des tiennes ; d'ici là, elle attend dans ton profil, même si RookStudio se ferme. *Retour à la
+mosaïque* (Échap) revient à la mosaïque de la chaîne.
+
+Sur la page Moteurs, la fiche d'un moteur a *Lichess TV : Bots, Ordinateur* : les meilleurs bots de Lichess, ou des
+joueurs contre son IA, dans la mosaïque, ce moteur analysant chaque partie.
+
+Tes propres parties ne s'affichent jamais, même à la une : celles de ton compte associé et de ton bot Lichess (voir [Un
+bot Lichess](#un-bot-lichess)). Tant que dure une de tes parties en direct, les moteurs de la mosaïque se reposent (voir
+[Fair-play](#fair-play)). Ce qui quitte la machine : la chaîne demandée et les parties suivies, sans compte ; rien n'est
+gardé de lui-même. Ctrl+K a *Lichess TV*, chaque chaîne dans la mosaïque (et sur l'Échiquier une fois la carte lue),
+et, pour la partie de l'Échiquier, *Rester sur cette partie*, *Garder cette partie…* et *Retour à la mosaïque*.
 
 ### Préparer une partie
 <!-- en: preparing-a-game 5bf402fc -->

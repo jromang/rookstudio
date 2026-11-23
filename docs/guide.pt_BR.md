@@ -334,7 +334,7 @@ tabuleiros continuam planos e *Aparência* diz por quê. As peças são as Staun
 MIT; *Aparência* tem o link para elas.
 
 ## Atalhos de teclado
-<!-- en: keyboard-shortcuts 65140e2d -->
+<!-- en: keyboard-shortcuts e7a7fc57 -->
 
 | Teclas | Onde | O que fazem |
 |---|---|---|
@@ -357,7 +357,7 @@ MIT; *Aparência* tem o link para elas.
 | <kbd>G</kbd> | A página Tabuleiro | Analisar a partida, passada após passada; de novo: parar |
 | <kbd>X</kbd> | A página Tabuleiro | Mostrar ou ocultar a ameaça |
 | <kbd>N</kbd>, <kbd>Shift</kbd>+<kbd>N</kbd> | A página Tabuleiro | O próximo, o anterior lance marcado pela análise |
-| <kbd>Esc</kbd> | A página Tabuleiro | A partida de volta depois que uma linha foi mostrada; soltar a peça levantada |
+| <kbd>Esc</kbd> | A página Tabuleiro | A partida de volta depois que uma linha foi mostrada; soltar a peça levantada; uma partida acompanhada a partir de um mosaico: voltar ao mosaico |
 | <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | Uma visão para estudo | Abrir um arquivo PGN na página Tabuleiro; uma nova partida nela |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> | Uma visão para estudo | As partidas recentes; soltar o Ctrl abre a escolhida |
 | <kbd>Enter</kbd> | A página Início | Retomar a partida do tabuleiro |
@@ -669,7 +669,7 @@ pensamento, abandono. Os engines marcados com ↔ na lista são engines WinBoard
 - `FCG_WB2UCI_LOG=FILE` no ambiente grava cada linha trocada com os engines WinBoard em `FILE`.
 
 ### Um bot do Lichess
-<!-- en: a-lichess-bot c8e717b7 -->
+<!-- en: a-lichess-bot 5ae494c4 -->
 
 A ficha de um engine tem uma linha **No Lichess, como bot**: *Torná-lo um bot do Lichess…* configura o engine para
 jogar no Lichess com uma conta de bot, pela Bot API do Lichess (onde os engines são permitidos), aceitando os desafios
@@ -703,8 +703,8 @@ que você escolher enquanto o RookStudio estiver aberto. A linha vira uma parte 
 - **O jogo dele**: o engine com as opções dele da biblioteca (os `Threads` e o `Hash` dele contados no orçamento de
   núcleos da máquina enquanto joga), um livro Polyglot da sua biblioteca jogado enquanto tiver um lance, as tablebases
   dos torneios (`SyzygyPath`, para um engine que tem a opção e nenhum caminho próprio), e sem pensar no tempo do
-  adversário. O relógio dele vem do Lichess a cada lance, menos uma margem para a rede (um décimo dele, de 0,2 a 1
-  segundo); antes de os dois lados jogarem, ele joga dentro do tempo que o Lichess dá para o primeiro lance; por
+  adversário. O relógio dele vem do Lichess a cada lance, menos uma margem para a rede (um décimo do tempo restante
+  dele, de 0,2 a 1 segundo); antes de os dois lados jogarem, ele joga dentro do tempo que o Lichess dá para o primeiro lance; por
   correspondência, ele pensa 15 segundos por lance. Ele aceita um empate oferecido quando o engine está claramente
   pior, ou não está melhor no fim da partida, recusa um pedido para voltar o lance, e reivindica a vitória quando o
   adversário saiu por tempo suficiente. As palavras dele, ditas no chat dos jogadores no início e no fim, são você quem
@@ -2102,7 +2102,7 @@ as alterações do mesmo jeito.
 Limites do Lichess: 64 capítulos por estudo, 30 estudos novos por dia.
 
 ### Transmissões oficiais
-<!-- en: official-broadcasts a02f4c35 -->
+<!-- en: official-broadcasts 9c582d92 -->
 
 As transmissões oficiais ao vivo, as mais conhecidas primeiro (*Todas as transmissões ao vivo* para as outras), e as
 próximas. *Seguir* abre uma rodada num mosaico na página Lichess: o cartão de cada partida com os nomes, os relógios,
@@ -2110,7 +2110,8 @@ o último lance, a barra de avaliação, e a pontuação e a linha do engine esc
 partida escolhida com os últimos lances, *Acompanhar no tabuleiro* e *Copiar o PGN*, depois a rodada. As partidas são
 analisadas na sua máquina, com o seu engine, tantas ao mesmo tempo quanto os núcleos deixados pelos torneios
 permitem, a partida escolhida primeiro, e só enquanto o mosaico está à vista. No tabuleiro, a partida avança a cada
-lance recebido; voltar para analisá-la a deixa avançar por trás, e *Voltar ao vivo* a traz de volta.
+lance recebido; voltar para analisá-la a deixa avançar por trás, e *Voltar ao vivo* a traz de volta; *Voltar ao
+mosaico* (Esc) volta à rodada.
 
 O Lichess deixa acompanhar quatro rodadas ao mesmo tempo sem conta, oito com uma. Desde agosto de 2026, ele torna
 muito lenta uma transmissão acompanhada sem uma conta autorizada a ler transmissões: na primeira vez, o RookStudio pede
@@ -2158,7 +2159,7 @@ escolhida. Uma partida é pedida pelo id, sem conta; um estudo privado, com o se
 autorizada a lê-las, pedida uma vez, como para acompanhar uma rodada; seus favoritos precisam de uma conta vinculada.
 
 ### Jogo limpo
-<!-- en: fair-play d8b24b4b -->
+<!-- en: fair-play 62d0ad7a -->
 
 O Lichess proíbe qualquer ajuda durante uma partida. Com a sua conta vinculada, o RookStudio respeita isso onde quer
 que você jogue, no navegador ou num celular:
@@ -2177,7 +2178,9 @@ Um aviso na página Tabuleiro diz qual partida bloqueia o quê. O cartão Liches
 andamento, primeiro aquelas em que é a sua vez, cada uma com o relógio ou o tempo restante para jogar, e *Abrir em
 lichess.org*, ou *No Tabuleiro* quando o RookStudio puder jogar as suas partidas (veja [Uma partida no
 Lichess](#uma-partida-no-lichess)). As partidas do seu bot do Lichess não são suas e não bloqueiam nada; durante a sua
-própria partida ao vivo, a busca do bot não é mostrada (veja [Um bot do Lichess](#um-bot-do-lichess)).
+própria partida ao vivo, a busca do bot não é mostrada (veja [Um bot do Lichess](#um-bot-do-lichess)). A Lichess TV
+nunca mostra as suas próprias partidas, nem em destaque, e os engines do mosaico descansam durante a sua partida ao vivo
+(veja [Lichess TV](#lichess-tv)).
 
 Suas partidas em andamento são consultadas com o token da sua conta quando a página Início aparece, a cada meio minuto
 enquanto uma partida ao vivo dura e a cada dez minutos enquanto uma partida por correspondência dura. A página Lichess
@@ -2201,7 +2204,7 @@ na página Lichess, inicia a revisão sozinho, a não ser que o Tabuleiro tenha 
 um trabalho em andamento; nesse caso, o aviso a oferece.
 
 ### Jogadores seguidos
-<!-- en: followed-players 72df1253 -->
+<!-- en: followed-players 9a60f4cb -->
 
 O cartão *Jogadores seguidos* da página Lichess lista os jogadores que a sua conta segue no Lichess e os que você
 adiciona pelo nome, cada um com um ponto: vermelho enquanto ele joga, com o controle de tempo da partida, verde quando
@@ -2209,10 +2212,42 @@ ele está online. O estado deles é consultado a cada quinze segundos enquanto o
 sem conta.
 
 *As partidas deles no mosaico* mostra as partidas que eles estão jogando no mosaico das transmissões, cada uma
-analisada pelo seu engine, oito no máximo, como o Lichess permite; o Lichess mostra os lances deles com três lances de
-atraso, para qualquer pessoa. Uma partida que termina fica com o resultado até que outra tome o lugar dela. Ler quem a
+analisada pelo seu engine, oito no máximo, como o Lichess permite a um endereço, contando com elas as rodadas que você
+acompanha e as partidas da Lichess TV; o Lichess mostra os lances deles com três lances de atraso, para qualquer pessoa. Uma partida que termina fica com o resultado até que outra tome o lugar dela. Ler quem a
 sua conta segue precisa de mais uma permissão, pedida na primeira vez; *Sem ela*, os jogadores adicionados pelo nome
 são acompanhados. Sua própria conta e suas próprias partidas nunca aparecem ali.
+
+### Lichess TV
+<!-- en: lichess-tv 07af67f5 -->
+
+O cartão *Lichess TV* da página Lichess lista os canais de xadrez padrão: *Melhores ratings*, *Bullet*, *Blitz*,
+*Rápida*, *Clássica*, *UltraBullet*, *Bots* e *Computador* (jogadores contra a IA do Lichess); os canais das variantes
+não são mostrados. Cada um dá a partida que o Lichess destaca nele, os dois jogadores com os ratings deles, e o
+relógio. A lista é lida de novo quando o cartão aparece, no máximo a cada 30 segundos.
+
+*O mosaico* mostra as partidas em andamento do canal no mosaico das transmissões, a terceira fonte dele: a linha no alto
+dele passa de uma a outra (*Transmissões*, *Jogadores seguidos*, *Lichess TV*), e os canais são botões abaixo dela. Os
+mesmos quadros, um engine seu para cada partida, a partida escolhida à direita com *Acompanhar no tabuleiro*. O Lichess
+lista até 30 partidas por canal, e deixa um endereço acompanhar 8 partidas ao mesmo tempo, contando com elas as rodadas
+que você acompanha (uma cada) e as partidas dos jogadores seguidos: o mosaico mostra o que sobra, a partida em destaque
+primeiro. Uma partida terminada mostra o resultado por alguns segundos, depois dá lugar a outra do canal. O Lichess
+mostra os lances com três lances de atraso a qualquer pessoa que assiste, e o mosaico o informa.
+
+*O Tabuleiro* (ou um duplo clique num quadro) abre a partida no Tabuleiro, que a acompanha; o cartão sobre a coluna
+dele diz o que ela é: *Lichess TV · Blitz · a partida em destaque, 3+0*. Quando ela termina, o Tabuleiro passa sozinho
+à próxima partida em destaque do canal, com a partida deixada a um Ctrl+Tab; *Ficar nesta partida* mantém o tabuleiro
+nela. *Guardar esta partida…* a coloca, no fim dela, numa base da sua escolha: *Lichess TV*, criada quando falta, ou
+outra sua; até lá, ela espera no seu perfil, mesmo que o RookStudio feche. *Voltar ao mosaico* (Esc) volta ao mosaico
+do canal.
+
+Na página Engines, a ficha de um engine tem *Lichess TV: Bots, Computador*: os melhores bots do Lichess, ou jogadores
+contra a IA dele, no mosaico, com esse engine analisando cada partida.
+
+As suas próprias partidas nunca aparecem, nem em destaque: as da sua conta vinculada e as do seu bot do Lichess (veja
+[Um bot do Lichess](#um-bot-do-lichess)). Enquanto uma das suas partidas ao vivo dura, os engines do mosaico descansam
+(veja [Jogo limpo](#jogo-limpo)). O que sai da máquina: o canal pedido e as partidas acompanhadas, sem conta; nada é
+guardado sozinho. O Ctrl+K tem *Lichess TV*, cada canal no mosaico (e no Tabuleiro depois que o cartão foi lido), e,
+para a partida do Tabuleiro, *Ficar nesta partida*, *Guardar esta partida…* e *Voltar ao mosaico*.
 
 ### Preparar uma partida
 <!-- en: preparing-a-game 5bf402fc -->

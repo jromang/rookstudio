@@ -332,83 +332,87 @@ TEST_CASE("mistakes: a game's exercises replaced by its new review's, their card
 
 TEST_CASE("mistakes: the user's games looked for in their databases, the reviewed ones giving their exercises") {
     const auto dir      = freshDir("mistakes-scan");
-    const auto analyses = dir / "analyses";
-    fs::create_directories(analyses);
-    auto db = study::Database::create(dir / "Games.fcgdb");
-    std::vector<study::ImportedGame> games;
-    for (const auto* pgn :
-         {forkPgn("Partner, Alex", "Tester, Sam", "2026.11.12"),
-          "[White \"Tester, Sam\"]\n[Black \"Other, Kim\"]\n[Date \"2026.11.14\"]\n[Result \"1-0\"]\n\n1. e4 e5 2. Nf3 "
-          "1-0\n",
-          "[White \"Other, Kim\"]\n[Black \"Partner, Alex\"]\n[Date \"2026.11.15\"]\n[Result \"0-1\"]\n\n1. d4 d5 "
-          "0-1\n",
-          "[White \"Tester, Sam\"]\n[Black \"Partner, Alex\"]\n[Date \"2026.11.01\"]\n[Result \"*\"]\n\n1. c4 *\n"}) {
-        study::ImportedGame g;
-        REQUIRE(study::readImportedGame(pgn, g));
-        games.push_back(std::move(g));
+    {  // the database and its snapshots closed before the folder goes: Windows removes no file still mapped
+        const auto analyses = dir / "analyses";
+        fs::create_directories(analyses);
+        auto db = study::Database::create(dir / "Games.fcgdb");
+        std::vector<study::ImportedGame> games;
+        for (const auto* pgn :
+             {forkPgn("Partner, Alex", "Tester, Sam", "2026.11.12"),
+              "[White \"Tester, Sam\"]\n[Black \"Other, Kim\"]\n[Date \"2026.11.14\"]\n[Result \"1-0\"]\n\n1. e4 e5 2. "
+              "Nf3 "
+              "1-0\n",
+              "[White \"Other, Kim\"]\n[Black \"Partner, Alex\"]\n[Date \"2026.11.15\"]\n[Result \"0-1\"]\n\n1. d4 d5 "
+              "0-1\n",
+              "[White \"Tester, Sam\"]\n[Black \"Partner, Alex\"]\n[Date \"2026.11.01\"]\n[Result \"*\"]\n\n1. c4 "
+              "*\n"}) {
+            study::ImportedGame g;
+            REQUIRE(study::readImportedGame(pgn, g));
+            games.push_back(std::move(g));
+        }
+        db->append(std::move(games), true);
+        const auto snapshot = db->snapshot();
+        // The first game reviewed, as the Board page keeps a review: under the key of the game it reads.
+        std::string error;
+        const auto first = readPgnGame(study::importedPgn(snapshot->game(0)), error);
+        REQUIRE(first);
+        REQUIRE(saveReview(analyses, *first, forkReview()));
+
+        const std::vector<MistakeSource> sources = {{"Games", dir / "Games.fcgdb", snapshot}};
+        const std::vector<std::string> names     = {"Tester"};
+        auto scan                                = scanMistakes(sources, names, analyses, {}, 20, commentary::Lang::En);
+        CHECK_FALSE(scan.cancelled);
+        CHECK(scan.games == 3);  // the third is not theirs
+        CHECK(scan.reviewed == 1);
+        REQUIRE(scan.record.exercises.size() == 1);
+        const auto& e = scan.record.exercises.begin()->second;
+        CHECK(e.database == "Games");
+        CHECK(e.folder == dir / "Games.fcgdb");
+        CHECK(e.game_id == 0);
+        CHECK(e.reviewed > 0);
+        CHECK(e.best == "d4c2");
+        REQUIRE(scan.record.games.size() == 1);
+        // The latest without a review, the latest first.
+        REQUIRE(scan.unreviewed.size() == 2);
+        CHECK(scan.unreviewed[0].id == 1);
+        CHECK(scan.unreviewed[0].side == chess::Color::WHITE);
+        CHECK(scan.unreviewed[0].game.moves.size() == 3);
+        CHECK(scan.unreviewed[1].id == 3);
+        // Only the latest one counts when one game is asked for.
+        CHECK(scanMistakes(sources, names, analyses, {}, 1, commentary::Lang::En).unreviewed.size() == 1);
+
+        // Scanned again with its card: kept, the review unchanged.
+        auto before                                = scan.record;
+        before.exercises.begin()->second.card.reps = 3;
+        before.exercises.begin()->second.card.last = 1000;
+        before.exercises.begin()->second.since     = 77;
+        auto again = scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En);
+        REQUIRE(again.record.exercises.size() == 1);
+        CHECK(again.record.exercises.begin()->second.card.reps == 3);
+        CHECK(again.record.exercises.begin()->second.since == 77);
+        // Under no name of theirs: nothing, the card answered kept apart; the name back, the exercise comes back with
+        // it.
+        const auto nobody = scanMistakes(sources, {"Nobody"}, analyses, before, 20, commentary::Lang::En);
+        CHECK(nobody.record.exercises.empty());
+        REQUIRE(nobody.record.kept.size() == 1);
+        const auto back = scanMistakes(sources, names, analyses, nobody.record, 20, commentary::Lang::En);
+        REQUIRE(back.record.exercises.size() == 1);
+        CHECK(back.record.exercises.begin()->second.card.reps == 3);
+        CHECK(back.record.exercises.begin()->second.since == 77);
+        CHECK(back.record.kept.empty());
+        // Kept in the profile too.
+        REQUIRE(writeMistakeRecord(dir / "kept", nobody.record));
+        const auto read = readMistakeRecord(dir / "kept");
+        REQUIRE(read.kept.size() == 1);
+        CHECK(read.kept.begin()->second.card.reps == 3);
+        CHECK(read.kept.begin()->second.since == 77);
+        // The review gone: its exercise goes.
+        REQUIRE(saveReviews(analyses, *first, {}));
+        CHECK(scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En).record.exercises.empty());
+        // Cancelled: nothing said.
+        std::atomic<bool> cancel{true};
+        CHECK(scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En, &cancel).cancelled);
     }
-    db->append(std::move(games), true);
-    const auto snapshot = db->snapshot();
-    // The first game reviewed, as the Board page keeps a review: under the key of the game it reads.
-    std::string error;
-    const auto first = readPgnGame(study::importedPgn(snapshot->game(0)), error);
-    REQUIRE(first);
-    REQUIRE(saveReview(analyses, *first, forkReview()));
-
-    const std::vector<MistakeSource> sources = {{"Games", dir / "Games.fcgdb", snapshot}};
-    const std::vector<std::string> names     = {"Tester"};
-    auto scan                                = scanMistakes(sources, names, analyses, {}, 20, commentary::Lang::En);
-    CHECK_FALSE(scan.cancelled);
-    CHECK(scan.games == 3);  // the third is not theirs
-    CHECK(scan.reviewed == 1);
-    REQUIRE(scan.record.exercises.size() == 1);
-    const auto& e = scan.record.exercises.begin()->second;
-    CHECK(e.database == "Games");
-    CHECK(e.folder == dir / "Games.fcgdb");
-    CHECK(e.game_id == 0);
-    CHECK(e.reviewed > 0);
-    CHECK(e.best == "d4c2");
-    REQUIRE(scan.record.games.size() == 1);
-    // The latest without a review, the latest first.
-    REQUIRE(scan.unreviewed.size() == 2);
-    CHECK(scan.unreviewed[0].id == 1);
-    CHECK(scan.unreviewed[0].side == chess::Color::WHITE);
-    CHECK(scan.unreviewed[0].game.moves.size() == 3);
-    CHECK(scan.unreviewed[1].id == 3);
-    // Only the latest one counts when one game is asked for.
-    CHECK(scanMistakes(sources, names, analyses, {}, 1, commentary::Lang::En).unreviewed.size() == 1);
-
-    // Scanned again with its card: kept, the review unchanged.
-    auto before                                = scan.record;
-    before.exercises.begin()->second.card.reps = 3;
-    before.exercises.begin()->second.card.last = 1000;
-    before.exercises.begin()->second.since     = 77;
-    auto again = scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En);
-    REQUIRE(again.record.exercises.size() == 1);
-    CHECK(again.record.exercises.begin()->second.card.reps == 3);
-    CHECK(again.record.exercises.begin()->second.since == 77);
-    // Under no name of theirs: nothing, the card answered kept apart; the name back, the exercise comes back with it.
-    const auto nobody = scanMistakes(sources, {"Nobody"}, analyses, before, 20, commentary::Lang::En);
-    CHECK(nobody.record.exercises.empty());
-    REQUIRE(nobody.record.kept.size() == 1);
-    const auto back = scanMistakes(sources, names, analyses, nobody.record, 20, commentary::Lang::En);
-    REQUIRE(back.record.exercises.size() == 1);
-    CHECK(back.record.exercises.begin()->second.card.reps == 3);
-    CHECK(back.record.exercises.begin()->second.since == 77);
-    CHECK(back.record.kept.empty());
-    // Kept in the profile too.
-    REQUIRE(writeMistakeRecord(dir / "kept", nobody.record));
-    const auto read = readMistakeRecord(dir / "kept");
-    REQUIRE(read.kept.size() == 1);
-    CHECK(read.kept.begin()->second.card.reps == 3);
-    CHECK(read.kept.begin()->second.since == 77);
-    // The review gone: its exercise goes.
-    REQUIRE(saveReviews(analyses, *first, {}));
-    CHECK(scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En).record.exercises.empty());
-    // Cancelled: nothing said.
-    std::atomic<bool> cancel{true};
-    CHECK(scanMistakes(sources, names, analyses, before, 20, commentary::Lang::En, &cancel).cancelled);
-    db.reset();
     fs::remove_all(dir);
 }
 

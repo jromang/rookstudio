@@ -665,8 +665,8 @@ msgstr "Um segundo participante com o mesmo engine, para lhe dar outro livro: ca
 msgid "A separate engine"
 msgstr "Uma engine à parte"
 
-msgid "A series stopped midway keeps its answers. The missed come back in “To review” (FSRS): tomorrow, then further apart when they are right."
-msgstr "Uma série interrompida no meio mantém as respostas. Os errados voltam em “A revisar” (FSRS): amanhã, depois com intervalos maiores quando estão certos."
+msgid "A series stopped midway keeps its answers. The missed ones come back in “To review today” (FSRS): tomorrow, then further apart when they are right."
+msgstr ""
 
 msgid "A series stopped midway keeps its answers; the batch's results go to Lichess at its end."
 msgstr "Uma série interrompida no meio mantém as respostas; os resultados do lote vão para o Lichess no fim dele."
@@ -2099,8 +2099,8 @@ msgstr "Só casual"
 msgid "Casual · {} {}"
 msgstr "Casual · {} {}"
 
-msgid "Catalan"
-msgstr "Catalã"
+msgid "Catalan Opening"
+msgstr ""
 
 msgid "Catch up the cycles already started"
 msgstr "Recuperar os ciclos já começados"
@@ -3256,8 +3256,8 @@ msgstr "Motores nesta máquina ({})"
 msgid "Engines' own books off"
 msgstr "Livros próprios dos engines desligados"
 
-msgid "English"
-msgstr "Inglesa"
+msgid "English Opening"
+msgstr ""
 
 msgid "Enter"
 msgstr "Enter"
@@ -3828,12 +3828,6 @@ msgstr "A partir da posição do tabuleiro"
 
 msgid "From the starting position: {} positions reached of the {} the book holds, {} moves."
 msgstr "A partir da posição inicial: {} posições alcançadas das {} que o livro contém, {} lances."
-
-msgid "From the {}, Black to play"
-msgstr "Abertura {}, pretas jogam"
-
-msgid "From the {}, White to play"
-msgstr "Abertura {}, brancas jogam"
 
 msgid "From your Lichess study"
 msgstr "Do seu estudo do Lichess"
@@ -4598,8 +4592,8 @@ msgstr "Ele espera a resposta no Lichess; a partida abre no Tabuleiro quando o a
 msgid "It waits for their answer while you stay; Esc calls it back."
 msgstr "Ele espera a resposta enquanto você fica aqui; Esc o cancela."
 
-msgid "Italian"
-msgstr "Italiana"
+msgid "Italian Game"
+msgstr ""
 
 msgid "Its PGN asked again, the changed chapters marked."
 msgstr "Seu PGN pedido de novo, com os capítulos alterados marcados."
@@ -4825,6 +4819,9 @@ msgstr "Mantenha o rei encurralado com a dama a um salto de cavalo dele, traga o
 
 msgid "Keep the old default"
 msgstr "Manter o padrão antigo"
+
+msgid "Keep the puzzles"
+msgstr ""
 
 msgid "Keep the rook beside the pawn, on its rank, and your king on g7 or h7: White's rook stays tied to it."
 msgstr "Mantenha a torre ao lado do peão, na fileira dele, e o seu rei em g7 ou h7: a torre das brancas fica presa a ele."
@@ -5317,6 +5314,9 @@ msgstr "As tablebases do Lichess podem conhecer este final: oito peças com peõ
 msgid "Lichess's tables online ({} pieces)"
 msgstr "Tablebases do Lichess online ({} peças)"
 
+msgid "Lichess's tables online, the tournament holding those of your disk while it plays"
+msgstr ""
+
 msgid "Lichess's, by theme and at your rating, offline or online."
 msgstr "Os do Lichess, por tema e no seu rating, offline ou online."
 
@@ -5696,11 +5696,11 @@ msgstr "Minutos para a partida."
 msgid "Missed chances"
 msgstr "Chances perdidas"
 
-msgid "Missed: its result goes to Lichess at the batch's end; it comes back in “To review”, tomorrow."
-msgstr "Errado: o resultado vai para o Lichess no fim do lote; ele volta em “A revisar”, amanhã."
+msgid "Missed: its result goes to Lichess at the batch's end; it comes back tomorrow in “To review today”."
+msgstr ""
 
-msgid "Missed: your rating {}. It comes back in “To review”, tomorrow."
-msgstr "Errado: seu rating {}. Ele volta em “A revisar”, amanhã."
+msgid "Missed: your rating {}. It comes back tomorrow in “To review today”."
+msgstr ""
 
 msgid "Mistake"
 msgstr "Erro"
@@ -7671,6 +7671,12 @@ msgstr "Remover o engine?"
 msgid "Remove the missing programs ({})…"
 msgstr "Remover os programas ausentes ({})…"
 
+msgid "Remove the puzzles"
+msgstr ""
+
+msgid "Remove the puzzles · frees {}"
+msgstr ""
+
 msgid "Remove the saved runs from the grid"
 msgstr "Remover as execuções salvas da grade"
 
@@ -7877,11 +7883,6 @@ msgstr[1] "Revisar tudo · {} a revisar hoje"
 msgid "Review it"
 msgstr "Revisar"
 
-msgid "Review it now"
-msgid_plural "Review the {} now"
-msgstr[0] "Revisá-lo agora"
-msgstr[1] "Revisar os {} agora"
-
 msgid "Review it · in the background"
 msgid_plural "Review them · in the background"
 msgstr[0] "Revisá-la · em segundo plano"
@@ -7889,11 +7890,6 @@ msgstr[1] "Revisá-las · em segundo plano"
 
 msgid "Review my finished games at once"
 msgstr "Revisar na hora minhas partidas terminadas"
-
-msgid "Review my latest game in the background"
-msgid_plural "Review my {} latest games in the background"
-msgstr[0] "Revisar minha última partida em segundo plano"
-msgstr[1] "Revisar minhas {} últimas partidas em segundo plano"
 
 msgid "Review my mistakes · {} due"
 msgid_plural "Review my mistakes · {} due"
@@ -7909,6 +7905,16 @@ msgid "Review the {} missed position now"
 msgid_plural "Review the {} missed positions now"
 msgstr[0] "Revisar agora {} posição errada"
 msgstr[1] "Revisar agora as {} posições erradas"
+
+msgid "Review {} now"
+msgid_plural "Review the {} now"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Review {} recent game of mine in the background"
+msgid_plural "Review {} recent games of mine in the background"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Review: the positions known at depth {} or more are taken as they are; the engine searches the others."
 msgstr "Revisão: as posições conhecidas com profundidade {} ou mais são usadas como estão; o engine busca as outras."
@@ -9560,6 +9566,9 @@ msgstr "Não foi possível guardar os resultados dos finais em {}"
 msgid "The engine answers with its next move: it takes the draw when it stands worse, or no better once 20 moves are played."
 msgstr "O engine responde com o próximo lance: aceita o empate quando está pior, ou quando não está melhor depois de 20 lances jogados."
 
+msgid "The engine cannot give {} in this position."
+msgstr ""
+
 msgid "The engine does not answer isready."
 msgstr "O engine não responde a isready."
 
@@ -9568,9 +9577,6 @@ msgstr "O motor terminou."
 
 msgid "The engine gave no answer, or the game is over."
 msgstr "O engine não deu resposta, ou a partida terminou."
-
-msgid "The engine has no {} to give in this position."
-msgstr "O engine não tem {} para dar nesta posição."
 
 msgid "The engine of the library that searches the position shown. Its options other than those beside are the library's, sent as a game sends them."
 msgstr "O engine da biblioteca que analisa a posição mostrada. As opções dele, fora as ao lado, são as da biblioteca, enviadas como uma partida as envia."
@@ -9709,11 +9715,6 @@ msgstr "A primeira partida"
 
 msgid "The first move of each line of the Board page's analysis drawn as an arrow on the board, in 2D as in 3D. Without them the lines still show the moves."
 msgstr "O primeiro lance de cada linha da análise da página Tabuleiro desenhado como seta no tabuleiro, em 2D e em 3D. Sem elas, as linhas continuam mostrando os lances."
-
-msgid "The first move, theory of your databases, passed by itself."
-msgid_plural "The first {} moves, theory of your databases, passed by themselves."
-msgstr[0] "O primeiro lance, teoria das suas bases, passou sozinho."
-msgstr[1] "Os {} primeiros lances, teoria das suas bases, passaram sozinhos."
 
 msgid "The first ones are the seeds, the tested engines: they play all the others."
 msgstr "Os primeiros são os cabeças de chave, os engines testados: jogam contra todos os outros."
@@ -9982,8 +9983,8 @@ msgstr "As teclas continuam funcionando. As preferências ou a paleta de comando
 msgid "The king and the rook are not where it needs them."
 msgstr "O rei e a torre não estão onde precisam estar."
 
-msgid "The king stands in front of its pawn, beside it, and takes the opposition."
-msgstr "O rei se coloca à frente do seu peão, ao lado dele, e toma a oposição."
+msgid "The king stays ahead of its pawn, on a file beside it, and takes the opposition."
+msgstr ""
 
 msgid "The king walks the diagonal: it chases the pawn and helps its own at the same time."
 msgstr "O rei anda pela diagonal: persegue o peão e ajuda o seu ao mesmo tempo."
@@ -10170,6 +10171,9 @@ msgstr "Os lances das suas partidas revisadas marcados com ? e ?? do seu lado, o
 
 msgid "The moves of your reviewed games marked ? and ?? on your side, where a better move is clear. Your games: those you played as {} (Settings › Your names)."
 msgstr "Os lances das suas partidas revisadas marcados com ? e ?? do seu lado, onde um lance melhor é claro. Suas partidas: as que você jogou como {} (Preferências › Seus nomes)."
+
+msgid "The moves played by many games of your databases (their opening tree): the guessing starts where the game leaves them."
+msgstr ""
 
 msgid "The moves played most there, then the engine."
 msgstr "Os lances mais jogados ali, depois o engine."
@@ -11026,9 +11030,6 @@ msgstr "Este torneio: seu “Jogar em”, em Paralelismo."
 
 msgid "This tournament: the time an engine may go over its clock before it loses on time (its time control's Margin)."
 msgstr "Este torneio: o tempo que um engine pode passar do relógio antes de perder por tempo (a Margem do controle de tempo dele)."
-
-msgid "Those many games of your databases played (their opening tree): the guessing starts where the game leaves them."
-msgstr "Os lances que muitas partidas das suas bases jogaram (a árvore de aberturas delas): a adivinhação começa onde a partida sai deles."
 
 msgid "Those of its first engine: the tournament was made by an older version, which did not record its own. Give the engine settings of its own if they are not the right ones."
 msgstr "As do seu primeiro engine: o torneio foi criado por uma versão anterior, que não registrava as suas. Dê ao engine configurações próprias se não forem as certas."
@@ -13309,9 +13310,6 @@ msgstr "login"
 msgid "looking at {}"
 msgstr "verificação de {}"
 
-msgid "loss"
-msgstr "derrota"
-
 msgid "loss on time or crash"
 msgstr "perda por tempo ou crash"
 
@@ -13733,8 +13731,8 @@ msgstr "rating provisório"
 msgid "public"
 msgstr "público"
 
-msgid "puzzle {}"
-msgstr "problema {}"
+msgid "puzzle rated {}"
+msgstr ""
 
 msgid "random"
 msgstr "aleatória"
@@ -14040,9 +14038,6 @@ msgstr "o fluxo caiu ({}): ele se reabre sozinho"
 
 msgid "the strongest engines, from their authors' GitHub releases"
 msgstr "os engines mais fortes, das versões publicadas pelos autores no GitHub"
-
-msgid "the tables of your disk are the tournament's while it plays, or Lichess's online"
-msgstr "as tablebases do seu disco são do torneio enquanto ele joga, ou as do Lichess online"
 
 msgid "the tables of {} pieces"
 msgstr "as tablebases de {} peças"
@@ -15366,7 +15361,9 @@ msgid "{} names {} of its folder: found in its copy there."
 msgstr "{} indica {} da pasta dele: encontrado na cópia dela lá."
 
 msgid "{} new"
-msgstr "{} novos"
+msgid_plural "{} new"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} new engine found. Untick those to leave out."
 msgid_plural "{} new engines found. Untick those to leave out."
@@ -15462,6 +15459,11 @@ msgid "{} opening"
 msgid_plural "{} openings"
 msgstr[0] "{} abertura"
 msgstr[1] "{} aberturas"
+
+msgid "{} opening move, theory in your databases, went by itself."
+msgid_plural "{} opening moves, theory in your databases, went by themselves."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} opening replaced"
 msgid_plural "{} openings replaced"
@@ -16095,6 +16097,9 @@ msgstr[1] "{} partidas ({})"
 msgid "{} {} · better: {}"
 msgstr "{} {} · melhor: {}"
 
+msgid "{} · Black to play"
+msgstr ""
+
 msgid "{} · Ctrl+{}"
 msgstr "{} · Ctrl+{}"
 
@@ -16103,6 +16108,9 @@ msgstr "{} · Ctrl+{} · clique direito: editar as visões"
 
 msgid "{} · Lichess puzzle rating {}"
 msgstr "{} · rating de problemas do Lichess {}"
+
+msgid "{} · White to play"
+msgstr ""
 
 msgid "{} · active · {}"
 msgstr "{} · ativo · {}"

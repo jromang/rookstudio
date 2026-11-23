@@ -22,6 +22,9 @@ struct OpeningCode {
 };
 [[nodiscard]] std::optional<OpeningCode> openingCode(std::span<const Move> moves);
 
+// The table itself, as the data set writes it: a header line, then "eco<TAB>name<TAB>pgn" a line.
+[[nodiscard]] std::string_view openingsTable();
+
 // The name an ECO code goes by ("D36": "Queen's Gambit Declined: Exchange Variation"): the name of its shortest line,
 // empty for a code the table does not have.
 [[nodiscard]] std::string ecoName(std::string_view eco);

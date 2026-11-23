@@ -217,7 +217,10 @@ void App::drawShell() {
     } else {
         drawPageInNoView();
     }
-    switch (views_sheet_.open ? Page::Count : page_) {
+    // A player's dossier in place of the page it was opened from (#90).
+    const bool dossier = !views_sheet_.open && dossier_ && dossier_->shown && dossier_->over == page_;
+    if (dossier) drawDossier();
+    switch (views_sheet_.open || dossier ? Page::Count : page_) {
         case Page::Home:
             drawHome();
             break;

@@ -316,7 +316,8 @@ void App::frame() {
     pollLichessPlaying();  // the user's games in progress on Lichess, and what they lock (#48)
     pollFollowedPlayers();  // the players followed live, their games in the mosaic (#50)
     pollCast();             // a tournament on the user's own Lichess broadcast, once allowed (#51)
-    pollPrep();             // a game prepared against an opponent: their games, then the report (#52)
+    pollPrep();             // a game prepared against an opponent: their games (#52)
+    pollDossier();          // a player's dossier: the job that ended, their Lichess games that came (#90)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
     pollOfflineEvals();     // Lichess's evaluations kept offline: a preparation's runs, its end (#58)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
@@ -445,6 +446,23 @@ void App::frame() {
                 care_->start_check     = part == "check";
                 care_->open_first_pair = part == "pair";
             }
+        } else if (w.rfind("dossier=", 0) == 0 || w.rfind("dossier-lichess=", 0) == 0) {
+            // dossier=NAME[@TAB]: the dossier of NAME (as the databases write it) over the Databases page (#90), at
+            // its tab (overview, openings, rating, lichess); dossier-lichess=ACCOUNT[@TAB]: theirs from the Lichess
+            // page's "Prepare a game against", its Lichess source ticked (with lichess-api= before it).
+            const bool online = w[7] == '-';
+            auto spec         = w.substr(w.find('=') + 1);
+            std::string tab;
+            if (const auto at = spec.rfind('@'); at != std::string::npos) {
+                tab  = spec.substr(at + 1);
+                spec = spec.substr(0, at);
+            }
+            page_ = online ? Page::Lichess : Page::Databases;
+            study::DossierSubject subject;
+            subject.name = spec;
+            if (online) subject.lichess = spec;
+            openDossier(std::move(subject), online);
+            if (dossier_) dossier_->tab = tab == "openings" ? 1 : tab == "rating" ? 2 : tab == "lichess" ? 3 : 0;
         } else if (w.rfind("fide-server=http://127.0.0.1:", 0) == 0) {
             // fide-server=http://127.0.0.1:PORT[,WORD]: a test's server in place of ratings.fide.com (#88), on this
             // machine only; then WORD, another of these.
@@ -602,10 +620,14 @@ void App::frame() {
             lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};
             if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
         } else if (w.rfind("lichess-playing=", 0) == 0) {
-            // lichess-playing=live|correspondence[@FILE[@PLY]]: a game of the user's in progress, as Lichess would
-            // list it (#48): live, or by correspondence at the position of the Board page's game at PLY (where it
-            // is, without PLY); FILE (.txt, .fen) read on the board first.
-            const auto spec = w.substr(16);
+            // lichess-playing=live|correspondence[@FILE[@PLY]][,WORD]: a game of the user's in progress, as Lichess
+            // would list it (#48): live, or by correspondence at the position of the Board page's game at PLY (where
+            // it is, without PLY); FILE (.txt, .fen) read on the board first; then WORD, another of these.
+            auto spec = w.substr(16);
+            if (const auto comma = spec.find(','); comma != std::string::npos) {
+                focus_next_ = spec.substr(comma + 1);
+                spec        = spec.substr(0, comma);
+            }
             const auto at   = spec.find('@');
             int ply         = -1;
             if (at != std::string::npos) {

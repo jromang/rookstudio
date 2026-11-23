@@ -1070,11 +1070,19 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             add(TR("Lichess's evaluations offline: download and prepare…"), "Lichess", show);
         }
     }
-    // A game prepared against an opponent (#52).
+    // A game prepared against an opponent (#52): their dossier, its Lichess source ticked (#90).
     add(TR("Prepare a game against…"), "Lichess", [this, go = page(Page::Lichess)] {
         go();
         prep_focus_ = true;
     });
+    // A player's dossier (#90): the players whose names have the words typed, found in the background.
+    lookForDossierNames(palette_query_);
+    for (const auto& n : dossier_names_)
+        add(trf("Dossier: {}", n.name), TR("Databases"), [this, name = n.name] {
+            study::DossierSubject subject;
+            subject.name = name;
+            openDossier(std::move(subject));
+        });
     // The tournament on the user's own Lichess broadcast (#51).
     if (run_->running() && !setup_.broadcast_lichess)
         add(TR("Broadcast on Lichess…"), TR("Tournament"), [this] {

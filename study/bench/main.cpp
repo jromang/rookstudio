@@ -35,6 +35,10 @@
 //   fcg-study-bench compact <database>             (the database compacted in place: work on a copy)
 //   fcg-study-bench fide <players_list.zip> <list.bin>   (FIDE's rating list read into RookStudio's file, timed)
 //   fcg-study-bench fide-names <database> <list.bin>     (the database's players matched with the list, timed)
+//   fcg-study-bench dossier <database> [--threads N] [--openings FILE]   (the dossiers of the players with the most
+//                                                 games, timed: their spellings, their games, what they tell; only
+//                                                 their numbers printed, never a name. FILE: the named openings'
+//                                                 table, commentary/data/openings.tsv by default)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -55,7 +59,9 @@
 #include <chess.hpp>
 #include <tour/chess_text.hpp>
 
+#include <study/background.hpp>
 #include <study/chessbase.hpp>
+#include <study/dossier.hpp>
 #include <study/duplicates.hpp>
 #include <study/evals_index.hpp>
 #include <study/fide_list.hpp>
@@ -146,6 +152,7 @@ struct Args {
     std::size_t memory   = 2048;  // MB
     int min_men             = 0;
     std::size_t run_entries = std::size_t{1} << 23;
+    std::string openings    = "commentary/data/openings.tsv";
 };
 
 Args parse(int argc, char** argv) {
@@ -173,6 +180,8 @@ Args parse(int argc, char** argv) {
             a.min_men = std::stoi(value());
         } else if (word == "--run-entries") {
             a.run_entries = std::stoul(value());
+        } else if (word == "--openings") {
+            a.openings = value();
         } else if (word == "--keep-duplicates") {
             a.keep_duplicates = true;
         } else if (word == "--quiet") {
@@ -2080,6 +2089,91 @@ int runFideNames(const Args& a) {
     return 0;
 }
 
+// The dossiers of the players with the most games (#90), timed as the program makes them: in the background (the
+// lowest priority), their spellings found in the names, every game read for its players, theirs replayed, then their
+// figures. Only numbers are printed: the database's players may be real people.
+int runDossier(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    enterBackground();
+    const auto db   = Database::openReadOnly(a.words[1]);
+    const auto snap = db->snapshot();
+    std::string table;
+    {
+        std::FILE* f = std::fopen(a.openings.c_str(), "rb");
+        if (!f) {
+            std::fprintf(stderr, "cannot read %s (--openings)\n", a.openings.c_str());
+            return 1;
+        }
+        char buffer[65536];
+        std::size_t n = 0;
+        while ((n = std::fread(buffer, 1, sizeof buffer, f)) > 0) table.append(buffer, n);
+        std::fclose(f);
+    }
+    auto t = Clock::now();
+    const OpeningNames openings(table);
+    std::printf("dossier %s: %llu games, %u names; %zu named openings read in %.0f ms\n", a.words[1].c_str(),
+                static_cast<unsigned long long>(snap->games()), snap->names(), openings.size(), ms(t));
+    // The players with the most games, counted once over the White and Black columns.
+    t = Clock::now();
+    std::vector<uint32_t> games(snap->names() + 1, 0);
+    for (GameId id = 0; id < snap->games(); ++id) {
+        if (snap->deleted(id)) continue;
+        const auto ids = snap->rowIds(id);
+        if (ids.white < games.size()) ++games[ids.white];
+        if (ids.black < games.size()) ++games[ids.black];
+    }
+    std::vector<uint32_t> order(games.size());
+    for (uint32_t i = 0; i < order.size(); ++i) order[i] = i;
+    std::partial_sort(order.begin(), order.begin() + std::min<std::size_t>(order.size(), 2000), order.end(),
+                      [&](uint32_t x, uint32_t y) { return games[x] > games[y]; });
+    std::printf("the players counted in %.0f ms\n", ms(t));
+    // A structure of the pawns as cheap as the assistant's facts: an isolated d-pawn.
+    const StructureNamer structures = [](uint64_t white, uint64_t black, std::vector<std::pair<int, int>>& out) {
+        constexpr uint64_t c = 0x0404040404040404ull, d = 0x0808080808080808ull, e = 0x1010101010101010ull;
+        for (int side = 0; side < 2; ++side) {
+            const auto pawns = side == 0 ? white : black;
+            if ((pawns & d) && !(pawns & (c | e))) out.emplace_back(1, side);
+        }
+    };
+    const int threads_list[] = {a.threads > 0 ? a.threads : static_cast<int>(std::thread::hardware_concurrency()), 4,
+                                1};
+    for (const std::size_t rank : {std::size_t{1}, std::size_t{10}, std::size_t{100}, std::size_t{1000}}) {
+        if (rank > order.size() || anonymousName(snap->name(order[rank - 1]))) continue;
+        DossierSubject subject;
+        subject.name = std::string(snap->name(order[rank - 1]));
+        for (const int threads : threads_list) {
+            auto t0           = Clock::now();
+            const auto source = findSubject("database", snap, subject);
+            const auto found  = ms(t0);
+            DossierOptions options;
+            options.openings = &openings;
+            options.threads  = threads;
+            options.user     = [](std::string_view name) { return name == "Tester, Sam"; };
+            DossierProgress progress;
+            std::atomic<bool> cancel{false};
+            t0                 = Clock::now();
+            const auto dossier = makeDossier({source}, subject, options, progress, cancel);
+            const auto made    = ms(t0);
+            t0                 = Clock::now();
+            const auto f       = dossierFigures(dossier, DossierParts::Board, structures);
+            ScanBoard start;
+            start.setFen(chess::constants::STARTPOS, false);
+            const auto white = dossier.at(start.key(), true, DossierParts::Board);
+            const auto black = dossierFamilies(dossier, DossierParts::Board, false, -1, openings);
+            const auto told  = ms(t0);
+            std::printf(
+                "rank %4zu, %2d threads: a player with %u games (%zu spelling%s): spellings %.0f ms, games %.0f ms, "
+                "figures %.1f ms; %zu lines with White, %zu with Black, %zu years, %zu structures, %zu tree positions, "
+                "%zu families; %.1f MB held\n",
+                rank, threads, f.games, source.spellings.size(), source.spellings.size() == 1 ? "" : "s", found, made,
+                told, f.lines_white.size(), f.lines_black.size(), f.years.size(), f.structures.size(),
+                dossier.reach[0].size() + dossier.reach[1].size(), black.size(), heldMb().first);
+            (void)white;
+        }
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2109,6 +2203,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "compact") rc = runCompact(a);
         if (a.words[0] == "fide") rc = runFide(a);
         if (a.words[0] == "fide-names") rc = runFideNames(a);
+        if (a.words[0] == "dossier") rc = runDossier(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

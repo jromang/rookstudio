@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -33,6 +34,8 @@ struct Player {
     int born     = 0;  // year
     int standard = 0, rapid = 0, blitz = 0;
     std::string list;  // the list's month, "2026-11"
+    // Their Lichess account, linked to them by the user from their dossier (#90); empty when none.
+    std::string lichess;
 };
 
 class PlayerTable {
@@ -49,10 +52,11 @@ class PlayerTable {
     [[nodiscard]] const Player* of(uint32_t name_id) const;
     [[nodiscard]] bool empty() const noexcept { return players_.empty() && apart_.empty(); }
 
-    // As kept in the database's folder (players-NNNNNN.bin): "RSPLAYR1", then the pairs kept apart and the players,
-    // each its numbers, its names and its spellings; quick to write and read with hundreds of thousands of players.
+    // As kept in the database's folder (players-NNNNNN.bin): "RSPLAYR1" and its version, then the pairs kept apart and
+    // the players, each its numbers, its names (its Lichess account from the second version) and its spellings; quick
+    // to write and read with hundreds of thousands of players. Written in the second version.
     [[nodiscard]] std::string bytes() const;
-    // Throws std::runtime_error when the bytes are not a table.
+    // Reads both versions. Throws std::runtime_error when the bytes are not a table.
     [[nodiscard]] static PlayerTable fromBytes(std::string_view bytes);
 
    private:
@@ -62,6 +66,12 @@ class PlayerTable {
     std::vector<std::pair<GameId, GameId>> apart_;
     std::unordered_map<uint32_t, uint32_t> by_name_;  // name id -> player
 };
+
+// The table with the spellings `spellings` in one player, `change` applied to it: the player of the first of them that
+// has one (in the order given), else a new one named `name`; the others taken from the players they were in (a player
+// left with no spelling goes).
+[[nodiscard]] PlayerTable withPlayer(const PlayerTable& before, const std::vector<uint32_t>& spellings,
+                                     const std::string& name, const std::function<void(Player&)>& change);
 
 // A player's name read for matching, as "Surname, Given" (PGN, FIDE), "Surname,G", "Surname G." or "Given Surname"
 // write it: folded (lower case, the accents of Latin letters off), the surname's letters only.

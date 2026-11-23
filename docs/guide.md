@@ -366,6 +366,9 @@ them.
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A game list | Go through the list, open the game |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | The Databases page | The search panel |
 | <kbd>Escape</kbd> | The Databases page | Close the search panel, then the list |
+| <kbd>Ctrl</kbd>+<kbd>Page Down</kbd>, <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> | A player's dossier | The next tab, the previous one |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | A player's dossier | Choose among namesakes, keep the choice; undo it |
+| <kbd>Escape</kbd> | A player's dossier | Back to the page it was opened from |
 | <kbd>←</kbd> <kbd>→</kbd> | The big screen | The previous or next game |
 | <kbd>+</kbd> <kbd>-</kbd> | The big screen | Larger or smaller text |
 | <kbd>Escape</kbd> | The big screen | Leave it |
@@ -1266,12 +1269,59 @@ on the Board page. Millions of games scroll and sort at once.
 ### FIDE cards
 
 A player's **FIDE card** (title, federation, birth year, FIDE id, standard, rapid and blitz ratings) is asked of
-Lichess, which keeps FIDE's list, without an account and only when you ask: a right click on a name of the game list,
-or *FIDE card of …* in the game's preview. A game that gives the player's FIDE id (*WhiteFideId*, as Lichess's
-broadcasts do) sends that id; otherwise the name is sent, and when several players of FIDE's list are called that way,
-you choose which one it is. The card is kept in your profile for that name: it then shows under the mouse over the
-name, and in the preview. *On lichess.org* opens the player's page there. A player matched with FIDE's rating list in
-the database's table of names shows the list's card instead, without asking Lichess.
+Lichess, which keeps FIDE's list, without an account and only when you ask: *FIDE card of …*, in the menu of the right
+click on a name of the game list or in the game's preview. A game that gives the player's FIDE id (*WhiteFideId*, as
+Lichess's broadcasts do) sends that id; otherwise the name is sent, and when several players of FIDE's list are called
+that way, you choose which one it is. The card is kept in your profile for that name: it then shows under the mouse
+over the name, and in the preview. *On lichess.org* opens the player's page there, *Dossier of …* their dossier (see
+[A player's dossier](#a-players-dossier)). A player matched with FIDE's rating list in the database's table of names
+shows the list's card instead, without asking Lichess.
+
+### A player's dossier
+
+A player's **dossier** gathers what your databases know of them. It opens from their name: *Dossier of …* in the menu
+of the right click on a name of the game list, in a game's preview or on a FIDE card; Ctrl+K, *Dossier: Duval*; the
+Lichess page's *Prepare a game against* (see [Preparing a game](#preparing-a-game)). It shows in place of the page, Esc
+going back. It is made again each time it opens, from your databases as they are, in the background at a low priority
+with its progress and *Cancel* (a few seconds at most, even for a player with thousands of games in millions); nothing
+of it is kept.
+
+Its games are found through each database's table of names (see [Players' names](#players-names)): all of a player's
+spellings together, in every database of yours but those of Lichess players' games (*Lichess · name*: their account's is
+the Lichess source). A player matched with FIDE's rating list is told from their namesakes
+by the FIDE id the games give, and the games played before they could play are left out. When FIDE's list has several
+players of that name, the dossier asks which one, the one whose rating fits their games proposed first: ↑ ↓ choose,
+Enter keeps the choice in the tables of names, and the dossier then takes only that player's games (Ctrl+Z undoes;
+*Not now* shows every game of that name).
+
+At its top: the player's title, federation, birth year and FIDE ratings when they are matched with the list, and what
+it is made of: your databases, with their games and years, and Lichess when its source is ticked. *Their games in the
+list* shows them on the Databases page. Then four tabs (Ctrl+Page Down and Ctrl+Page Up go from one to the next):
+
+- **Overview**: their first moves with White and their score, their answers with Black to the first moves they meet
+  most, their rating over the years, their results against stronger and weaker players, their pawn structures, and
+  your games against them (your names are those of *Settings › Your names*); then their last games. A click opens one
+  on the Board page with the dossier as its list: Ctrl+← and Ctrl+→ go through their games, and *Back to the dossier*
+  returns;
+- **Openings**: their lines with White and with Black, by ECO code, each with its games, its wins, draws and losses,
+  their score and the last year they played it. A click opens the line on the Board page, its Tree tab on their games
+  alone, from their side (*Duval, Anne with White*). Below, the gaps of your repertoires against them: the lines they
+  play three times or more that your repertoires leave without an answer, the most frequent first;
+- **Rating and structures**: their rating year by year, the mean of the Elo their classical games give in each year
+  (no curve under three years), their highest and what FIDE's list says; their pawn structures at move 20, as the
+  assistant's facts name them (none under five games), a click showing those games in the list with the Structure
+  search starting from their pawns; and when you reviewed games of theirs (Alt+G), their accuracy in each phase and
+  where their clear mistakes fall;
+- **Lichess**, with its source: what they play over the board and online side by side, their level online, your games
+  against them on both, and your repertoires' gaps over both sources.
+
+*+ Lichess…* links their Lichess account to them, the link kept in the tables of names, and ticks the source: their
+games of the last year come as for a game prepared against them; a click on the source's chip takes it out, or puts
+it back. Under twenty games, the dossier says that it gives hints rather than trends. A player with no game in your
+databases is told so, with *From a source…* and *+ Lichess…* to bring some. Nothing leaves the machine, except, with the
+Lichess source ticked, what preparing a game sends: their name with the filters of their games, and their public
+profile. Offline, the source shows the games of its last sync, dated. While you play them on Lichess, the dossier shows
+nothing of them.
 
 ### Searching
 
@@ -1492,8 +1542,8 @@ are never merged without your click. The reports of the sources (*From a source�
 
 One player is often written several ways: "Lindqvist, Erik", "Lindqvist,E", "Erik Lindqvist". *Players' names* brings
 a player's spellings together in the database's table of names. The games are not changed, but the game list shows the
-player's name, and its quick filter, its search and its sorts, the opening tree's reference games and the reports of
-the sources read it. Three counts say what can be done:
+player's name, and its quick filter, its search and its sorts, the opening tree's reference games, the reports of the
+sources and the players' dossiers read it. Three counts say what can be done:
 
 - brought together at once: the games give the player's FIDE id (Lichess's broadcasts do), or FIDE's rating list has a
   single player of that name, or of that name as another alphabet writes it ("Kowalenko" for "Kovalenko") with ratings
@@ -2220,13 +2270,14 @@ game, staying on it or going on to the channel's next game, keeping it, and goin
 
 ### Preparing a game
 
-The Lichess page's *Prepare a game against* card takes a Lichess name. Their games of the last year, blitz, rapid and
-classical, come into a database of their own, *Lichess · name*, synced again the next time, and their public profile
-gives their level. Then, from that database's tree: their games and years, your games against them (your account
-linked), what they play with White, and with Black against the first moves they meet most, and the lines they play
-often that your repertoires do not answer, the most frequent first. A click on one opens it on the Board, its Tree tab
-on their games. Only their name and those filters go to Lichess. While a game of yours against them is played on
-Lichess, the card shows nothing of them.
+The Lichess page's *Prepare a game against* card takes a Lichess name and opens their dossier (see
+[A player's dossier](#a-players-dossier)) with its Lichess source ticked. Their games of the last year, blitz, rapid
+and classical, come into a database of their own, *Lichess · name*, synced again the next time, and their public
+profile gives their level. The dossier then shows what they play online beside what your databases have of them (the
+player whose Lichess account it is, once linked), your games against them (your account linked), and the lines they
+play often that your repertoires do not answer, over both sources, the most frequent first; a click on one opens it on
+the Board, its Tree tab on their games. Only their name and those filters go to Lichess. While a game of yours against
+them is played on Lichess, the dossier shows nothing of them.
 
 ### Lichess's evaluations, offline
 

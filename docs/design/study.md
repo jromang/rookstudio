@@ -354,6 +354,45 @@ game along the repertoire comes to each gap, by which the gaps are listed.
 Measured on the reference database's tree: a White repertoire of 84 positions, covering 57.9 % of the games along it,
 42 gaps, in 137 ms the first time (the tree's pages read from the disk) and 0.4 ms after.
 
+## A player's dossier (#90)
+
+`makeDossier` (`dossier.hpp`) gathers a player's games from several databases at once, made again each time it is
+opened: nothing of it is kept. `findSubject` finds their name ids in a snapshot through its table of names: the
+spellings of the player with their FIDE id, of the players and the names written as their name (case and accents
+aside); a player of that name with another FIDE id is a namesake, whose games count only when they give the subject's
+FIDE id. Every game of each snapshot is then read for its two name ids (a byte a name id says whether it is theirs, on
+the machine's threads, 16 384 games at a time), and each of theirs is replayed once, up to its 60th ply: a game that
+gives another FIDE id for their side is a namesake's, one played before they were five is too; its opening is the last
+named position of its first 40 plies (Lichess's chess-openings, keyed by Polyglot keys: `OpeningNames`), its pawns at
+the 40th ply are its structure, and each position of its first 60 plies where it first comes, with the move it played
+there, goes into the dossier's own tree, a vector sorted by key for each colour: the Tree tab's source of their games
+alone, and the moves the repertoires' coverage reads (`Dossier::moves`), with no database tree needed. What they say
+(`dossierFigures`): lines by ECO code, each named by the code's shortest line; results against stronger and weaker
+opponents (both Elo known); the mean of their Elo in each year, their classical games when the year has some; the
+structures their caller names (the GUI passes the assistant's formations), whose and with which colour. A Lichess
+account's database is a source of its own (`online`), each figure of one part or of both.
+
+The window's side (`gui/src/dossier.hpp`) finds who the player is (the tables' FIDE identity, else FIDE's rating list:
+one player of that name is theirs, several are a question, the nearest to their games' ratings first), writes a choice
+kept in the tables (`withPlayer`: a namesake chosen, a Lichess account linked, the table's second version keeping the
+account), reads the reviews the profile keeps for their games (each game's review key made from its codes, without its
+PGN) and measures the user's repertoires against them, as #52 did.
+
+Measured on 2026-11-23 on the reference database (11.7 M games, 561 343 names), at the lowest priority beside other work
+that kept about 28 of the 32 threads busy (`fcg-study-bench dossier`), for the players with the most games, by rank:
+
+| Player | Games | Their spellings | Their games, 32 threads | 4 threads | 1 thread | Figures |
+|---|---|---|---|---|---|---|
+| rank 1 | 11 552 | 14 ms | 116 ms | 45 ms | 84 ms | 0.3 ms |
+| rank 10 | 6 482 | 12 ms | 86 ms | 60 ms | 160 ms | 1.4 ms |
+| rank 100 | 4 014 | 13 ms | 36 ms | 44 ms | 114 ms | 1.1 ms |
+| rank 1 000 | 1 740 | 13 ms | 20 ms | 31 ms | 104 ms | 0.6 ms |
+
+The scan of every game's players takes most of it (about 80 ms on one thread for 11.7 M games), the replay of theirs
+the rest; the threads help little on a busy machine. The tree of their games holds up to 374 205 positions (the player
+of rank 10, 6 482 games); the bench's process held 76 MB after its twelve dossiers. The mockup expected a few seconds:
+a tenth of a second, the reviews and the repertoires' gaps added in the program (a few milliseconds more each).
+
 ## Beside the tournaments
 
 A thread that calls `enterBackground()` runs at the lowest priority (a niceness of 19 on Linux, the lowest thread
@@ -443,6 +482,10 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
   (3.6 times). A search cancelled after 300 ms stopped in 0.6 ms, 1.3 M games kept; the rest, resumed, in 2.2 s.
   In the program, on a test database of 10.4 M games (the month of Lichess games, its players renamed with invented
   names, imported many times over), the knight fork took 2.6 s while an import into the same database went on.
+- A player's dossier (#90), measured on 2026-11-23 on the reference database at the lowest priority beside other
+  work (`fcg-study-bench dossier`): a player with 11 552 games in 116 ms on 32 threads (84 ms on one), one with 6 482
+  games in 86 ms (160 ms), one with 1 740 in 20 ms (104 ms); their spellings found among the 561 343 names in 14 ms,
+  the figures in 1.4 ms at most (see [A player's dossier](#a-players-dossier-90)).
 - Lichess's evaluations kept offline (#58), measured on 2026-11-20 on Lichess's file of 1 November 2026 (22.5 GB,
   417 862 375 positions): read and made into the index from the disk in 7 min 37 s, with other work beside; the index
   3.83 GB (9.16 bytes a position), 1.57 GB for the openings only; a lookup 118 µs cold, 0.39 µs warm (median). The

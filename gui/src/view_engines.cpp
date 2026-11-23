@@ -1401,6 +1401,8 @@ void App::drawEngines() {
 
     // On Lichess, as a bot (#85, mockup M12, board 6).
     drawBotPart(e);
+    // Lichess TV's Bots and Computer channels, this engine beside them (#86, mockup M12, board 7).
+    drawTvEngineLine(e);
 
     ImGui::Separator();
     if (!e.id_name.empty()) {

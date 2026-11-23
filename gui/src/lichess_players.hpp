@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -50,11 +51,16 @@ struct PlayerStatus {
 // in SAN, with the mover's clock. True when it was added, or when the PGN had it already (the position is the
 // event's); false when it does not follow (the game is asked whole again then).
 bool addStreamMove(std::string& pgn, const nlohmann::json& event);
+// A move of a game's stream as it comes. Lichess sends the game again from its first move when the stream opens, then
+// each move (#86, seen on lichess.org on 2026-11-23): `known` counts the plies of `pgn` the stream has gone through
+// (0 when it opens). True when the move is the next of them, or follows from the PGN's last position (added); false
+// when it fits neither (the game is asked whole again then).
+bool takeStreamMove(std::string& pgn, std::size_t& known, const nlohmann::json& event);
 // Whether a line of a game's stream says the game ended (its status, sent again when it ends).
 [[nodiscard]] bool streamEnded(const nlohmann::json& event);
 
 // The games followed, on threads of their own: watch() says which, a game that ends stays until another takes its
-// place.
+// place. The followed players' games (#50), and Lichess TV's (#86, lichess_tv.hpp): one follower each.
 class PlayersFollower {
    public:
     explicit PlayersFollower(std::size_t most = MOST_GAME_STREAMS);
@@ -62,12 +68,20 @@ class PlayersFollower {
     PlayersFollower(const PlayersFollower&)            = delete;
     PlayersFollower& operator=(const PlayersFollower&) = delete;
 
-    // The games to follow (ids), `most` at most, the first ones first; the others stop.
-    void watch(std::vector<std::string> ids);
+    // The games to follow (ids), the first ones first, `most` of them followed at once (the constructor's by default,
+    // none with 0): the others wait for a place, and those no longer wanted stop. A game that ended takes no place.
+    void watch(std::vector<std::string> ids, std::size_t most = SIZE_MAX);
     // The games, in the order they came: their PGN as it goes on, "*" until they end.
     [[nodiscard]] std::vector<BroadcastGame> games() const;
     [[nodiscard]] uint64_t changes() const noexcept { return changes_; }
     [[nodiscard]] std::string error() const;  // why a game could not be read, last
+    // The games' threads still running: a stream each, open or about to be; one that stops closes its stream within a
+    // quarter of a second, and counts until then.
+    [[nodiscard]] std::size_t open() const;
+    // The games whose thread ended: the game ended, or could not be read (three tries).
+    [[nodiscard]] std::set<std::string> over() const;
+    // A game that could not be read asked again, from the start, while it is wanted.
+    void again(const std::string& id);
 
    private:
     struct Game {
@@ -82,6 +96,7 @@ class PlayersFollower {
     void publish(Game& g, std::string pgn);
 
     std::size_t most_;
+    std::size_t wanted_most_ = SIZE_MAX;  // watch()'s `most`; SIZE_MAX for most_
     std::atomic<bool> stop_{false};
     std::atomic<uint64_t> changes_{0};
     mutable std::mutex mutex_;

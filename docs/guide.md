@@ -325,7 +325,7 @@ them.
 | <kbd>G</kbd> | The Board page | Analyse the game, pass after pass; again: stop |
 | <kbd>X</kbd> | The Board page | Show or hide the threat |
 | <kbd>N</kbd>, <kbd>Shift</kbd>+<kbd>N</kbd> | The Board page | The next, the previous move the analysis marked |
-| <kbd>Escape</kbd> | The Board page | The game back after a line was shown; put down the piece picked up |
+| <kbd>Escape</kbd> | The Board page | The game back after a line was shown; put down the piece picked up; a game followed from a mosaic: back to the mosaic |
 | <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | A view for study | Open a PGN file on the Board page; a new game there |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> | A view for study | The recent games; letting Ctrl go opens the one chosen |
 | <kbd>Enter</kbd> | The Home page | Resume the game on the board |
@@ -1922,7 +1922,7 @@ the evaluation bar, and the score and line of the engine chosen in *Analysed by*
 its last moves, *Follow on the board* and *Copy the PGN*, then the round. The games are analysed on your machine, with
 your engine, as many at once as the cores the tournaments leave allow, the game chosen first, and only while the
 mosaic shows. On the board, the game moves on with each move received; going back to analyse it lets it move on
-behind, and *Back to live* brings it back.
+behind, and *Back to live* brings it back; *Back to the mosaic* (Escape) returns to the round.
 
 Lichess lets four rounds be followed at once without an account, eight with one. Since August 2026, it slows down
 heavily a broadcast followed without an account allowed to read broadcasts: the first time, RookStudio asks for that
@@ -1983,7 +1983,8 @@ A banner on the Board page says which game locks what. The Home page's Lichess c
 those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*, or *On the
 Board* once RookStudio may play your games (see [A game on Lichess](#a-game-on-lichess)). Your Lichess bot's games are
 not yours and lock nothing; during your own live game, the bot's search is not shown (see [A Lichess
-bot](#a-lichess-bot)).
+bot](#a-lichess-bot)). Lichess TV never shows your own games, even featured, and the mosaic's engines rest during your
+live game (see [Lichess TV](#lichess-tv)).
 
 Your games in progress are asked for with your account's token when the Home page shows, every half-minute while a
 live game lasts and every ten minutes while a correspondence game does. The Lichess page offers once to hear them start
@@ -2011,9 +2012,40 @@ name, each with a dot: red while they play, with the game's time control, green 
 asked every fifteen seconds while the card or their mosaic shows, without an account.
 
 *Their games in the mosaic* shows the games they are playing in the broadcasts' mosaic, each analysed by your engine,
-eight at most, as Lichess allows; Lichess shows their moves three moves late, to anyone. A game that ends stays with its
-result until another takes its place. Reading whom your account follows needs one more permission, asked the first
-time; *Without it*, the players added by name are followed. Your own account and your own games never come there.
+eight at most, as Lichess allows an address, the rounds you follow and Lichess TV's games counted with them; Lichess
+shows their moves three moves late, to anyone. A game that ends stays with its result until another takes its place.
+Reading whom your account follows needs one more permission, asked the first time; *Without it*, the players added by
+name are followed. Your own account and your own games never come there.
+
+### Lichess TV
+
+The Lichess page's *Lichess TV* card lists the channels of standard chess: *Top rated*, *Bullet*, *Blitz*, *Rapid*,
+*Classical*, *UltraBullet*, *Bots* and *Computer* (players against Lichess's AI); the variants' channels are not shown.
+Each gives the game Lichess features on it, its two players with their ratings, and its clock. The list is read again
+when the card shows, every 30 seconds at most.
+
+*The mosaic* shows the channel's games in progress in the broadcasts' mosaic, its third source: the line at its top goes
+from one to another (*Broadcasts*, *Followed players*, *Lichess TV*), and the channels are chips under it. The same
+tiles, an engine of yours for each game, the game chosen on the right with *Follow on the board*. Lichess lists up to 30
+games a channel, and lets an address follow 8 games at once, the rounds you follow (one each) and the followed players'
+games counted with them: the mosaic shows what is left, the featured game first. A finished game shows its result a
+few seconds, then gives its place to another of the channel. Lichess shows the moves three moves late to anyone
+watching, and the mosaic says so.
+
+*The Board* (or a double click on a tile) opens the game on the Board, which follows it; the card over its column says
+what it is: *Lichess TV · Blitz · the featured game, 3+0*. When it ends, the Board goes on to the channel's next
+featured game by itself, the game left a Ctrl+Tab away; *Stay on this game* keeps the board on it. *Keep this game…*
+puts it, at its end, into a database of your choice: *Lichess TV*, made when missing, or another of yours; until then
+it waits in your profile, even if RookStudio closes. *Back to the mosaic* (Escape) returns to the channel's mosaic.
+
+On the Engines page, an engine's card has *Lichess TV: Bots, Computer*: Lichess's best bots, or players against its AI,
+in the mosaic, that engine analysing each game.
+
+Your own games never show, even featured: those of your linked account and of your Lichess bot (see [A Lichess
+bot](#a-lichess-bot)). While one of your live games lasts, the mosaic's engines rest (see [Fair play](#fair-play)).
+What leaves the machine: the channel asked and the games followed, without an account; nothing is kept by itself.
+Ctrl+K has *Lichess TV*, each channel in the mosaic (and on the Board once the card was read), and, for the Board's
+game, *Stay on this game*, *Keep this game…* and *Back to the mosaic*.
 
 ### Preparing a game
 

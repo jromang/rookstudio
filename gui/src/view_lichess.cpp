@@ -127,6 +127,7 @@ void App::pollLichess() {
         lichess_broadcasts_      = lichess_broadcasts_job_.get();
         lichess_broadcasts_time_ = std::chrono::steady_clock::now();
     }
+    pollLichessTv();        // Lichess TV: its card, a channel's games, the Board's game, those kept (#86)
     pollBroadcastBoards();  // the mosaic's games, their engines, the game the board follows
 }
 
@@ -912,6 +913,8 @@ void App::drawLichessPage() {
             ImGui::Dummy(ImVec2(0, px(8)));
         }
     }
+    drawLichessTvCard();  // Lichess TV's channels (#86)
+    ImGui::Dummy(ImVec2(0, px(8)));
     drawFollowedPlayers();  // the players followed live (#50)
     ImGui::Dummy(ImVec2(0, px(8)));
     {

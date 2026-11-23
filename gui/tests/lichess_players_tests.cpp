@@ -112,6 +112,39 @@ TEST_CASE("Lichess players: a move of a game's stream added to its PGN") {
     CHECK_FALSE(streamEnded(nlohmann::json::parse(R"({"fen": "8/8/8/8/8/8/8/8", "lm": "e2e4"})")));
 }
 
+TEST_CASE("Lichess players: a game's stream that sends the game again from its start") {
+    // Lichess sends the game again from its first move when the stream opens, then each move (#86).
+    const auto event  = [](const char* json) { return nlohmann::json::parse(json); };
+    std::string pgn   = ONGOING;  // 1. e4 e5, as the export gave it
+    std::size_t known = 0;
+    const auto before = pgn;
+    CHECK(takeStreamMove(pgn, known,
+                         event(R"({"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "wc": 180,
+                                   "bc": 180})")));
+    CHECK(known == 0);
+    CHECK(takeStreamMove(
+        pgn, known, event(R"({"fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "lm": "e2e4"})")));
+    CHECK(known == 1);
+    CHECK(takeStreamMove(
+        pgn, known, event(R"({"fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "lm": "e7e5"})")));
+    CHECK(known == 2);
+    CHECK(pgn == before);  // known already: nothing changes
+    // Then the moves played since: added.
+    CHECK(takeStreamMove(pgn, known, event(R"({"fen": "rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2",
+                                   "lm": "d1h5", "wc": 170, "bc": 178})")));
+    CHECK(known == 3);
+    CHECK(pgn.find("2. Qh5 { [%clk 0:02:50] } *") != std::string::npos);
+    // Neither a position of the game nor one that follows: out of step.
+    CHECK_FALSE(takeStreamMove(pgn, known, event(R"({"fen": "8/8/8/8/8/8/8/8 w - - 0 1", "lm": "e2e4"})")));
+    // A stream that starts where the PGN ends: its moves follow.
+    std::string other = ONGOING;
+    std::size_t from  = 0;
+    CHECK(takeStreamMove(other, from, event(R"({"fen": "rnbqkbnr/pppp1ppp/8/4p2Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2",
+                                   "lm": "d1h5"})")));
+    CHECK(from == 3);
+    CHECK(other.find("2. Qh5") != std::string::npos);
+}
+
 TEST_CASE("Lichess players: a game followed from its start to its end") {
     std::atomic<int> exports{0};
     const auto port = freePort();

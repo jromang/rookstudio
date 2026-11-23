@@ -350,6 +350,64 @@ bool ScanBoard::attacked(int square, int by, uint64_t occupied, uint64_t removed
 
 bool ScanBoard::inCheck() const noexcept { return attacked(king_[stm_], stm_ ^ 1, occupied()); }
 
+uint64_t ScanBoard::attackers(int square, int by) const noexcept {
+    const uint64_t occ = occupied();
+    return (pawnAttacks(by ^ 1, square) & bb_[by][PAWN]) | (knightAttacks(square) & bb_[by][KNIGHT]) |
+           (kingAttacks(square) & bb_[by][KING]) | (bishopAttacks(square, occ) & (bb_[by][BISHOP] | bb_[by][QUEEN])) |
+           (rookAttacks(square, occ) & (bb_[by][ROOK] | bb_[by][QUEEN]));
+}
+
+bool ScanBoard::hasLegalMove() const noexcept {
+    const int side     = stm_;
+    const uint64_t own = occ_[side], enemy = occ_[side ^ 1], occ = own | enemy;
+    const auto any = [&](int from, uint64_t targets, uint8_t flags = 0) {
+        for (; targets; targets &= targets - 1) {
+            CodedMove move;
+            move.from  = static_cast<uint8_t>(from);
+            move.to    = static_cast<uint8_t>(lowest(targets));
+            move.flags = flags;
+            if (legal(move)) return true;
+        }
+        return false;
+    };
+    for (uint64_t men = own; men; men &= men - 1) {
+        const int from   = lowest(men);
+        uint64_t targets = 0;
+        switch (kindOf(board_[from])) {
+            case PAWN: {
+                const int forward = side == WHITE_SIDE ? 8 : -8;
+                const int one     = from + forward;
+                if (one >= 0 && one < 64 && !(occ & bit(one))) {
+                    targets |= bit(one);
+                    const int two = one + forward;
+                    if (rankOf(from) == (side == WHITE_SIDE ? 1 : 6) && !(occ & bit(two))) targets |= bit(two);
+                }
+                targets |= pawnAttacks(side, from) & enemy;
+                if (ep_ >= 0 && (pawnAttacks(side, from) & bit(ep_)) && any(from, bit(ep_), MOVE_EN_PASSANT))
+                    return true;
+                break;
+            }
+            case KNIGHT:
+                targets = knightAttacks(from) & ~own;
+                break;
+            case BISHOP:
+                targets = bishopAttacks(from, occ) & ~own;
+                break;
+            case ROOK:
+                targets = rookAttacks(from, occ) & ~own;
+                break;
+            case QUEEN:
+                targets = (bishopAttacks(from, occ) | rookAttacks(from, occ)) & ~own;
+                break;
+            default:
+                targets = kingAttacks(from) & ~own;
+                break;
+        }
+        if (any(from, targets)) return true;
+    }
+    return castlingLegal(true) || castlingLegal(false);
+}
+
 bool ScanBoard::legal(const CodedMove& move) const noexcept {
     uint64_t occupied = (this->occupied() & ~bit(move.from)) | bit(move.to);
     uint64_t removed  = bit(move.to);

@@ -9,12 +9,14 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <thread>
 
 #include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
 
+#include <study/background.hpp>
 #include <study/import.hpp>
 #include <tour/files.hpp>
 
@@ -940,6 +942,7 @@ void App::openListedGame(std::size_t row) {
     origin.linked = entry.source.has_value();
     origin.view   = db_view_;
     origin.filter = db_filter_.data();
+    if (const auto* job = foundJob(); job && !job->hits->empty()) origin.found = job->hits;
     board_origin_ = std::move(origin);
     openListRow(row);
 }
@@ -963,6 +966,15 @@ void App::openListRow(std::size_t row) {
                 trf("{}, game {}", origin.name, ui::exactCount(id + 1)));
     board_origin_ = std::move(origin);
     page_         = Page::Board;
+    // At the position its search found it at.
+    if (const auto& found = board_origin_->found) {
+        const auto it = std::lower_bound(found->begin(), found->end(), id,
+                                         [](const study::SearchHit& h, study::GameId g) { return h.id < g; });
+        if (it != found->end() && it->id == id && it->ply <= board_.game.moves.size()) {
+            board_.ply = static_cast<int>(it->ply);
+            return;
+        }
+    }
     if (keep) {
         auto board = boardAt(board_.game, board_.chess960, 0);
         for (int ply = 0; ply <= static_cast<int>(board_.game.moves.size()); ++ply) {
@@ -1022,7 +1034,8 @@ void App::drawGameList() {
     const auto snapshot = db->snapshot();
 
     // Where it is: Databases › Name · N games.
-    const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup);
+    const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup) &&
+                        !pattern_text_active_;  // Esc leaves the pattern's text first
     if (escape && db_search_open_) {
         db_search_open_ = false;  // the panel first, then the list
     } else if (ui::iconButton("db_back", ui::Icon::Back, TR("Databases")) || escape) {
@@ -1070,8 +1083,12 @@ void App::drawGameList() {
     if (p.position) narrowing_jobs.push_back(&db_position_job_);
     if (!db_material_job_.of.empty()) narrowing_jobs.push_back(&db_material_job_);
     if (!db_pattern_job_.of.empty()) narrowing_jobs.push_back(&db_pattern_job_);
+    if (!db_route_job_.of.empty()) narrowing_jobs.push_back(&db_route_job_);
+    if (p.structure.set && !db_structure_job_.of.empty()) narrowing_jobs.push_back(&db_structure_job_);
+    // A search still going narrows the list to the games it found so far (R18): the list follows as they come.
     std::string narrowing;
-    for (const auto* job : narrowing_jobs) narrowing += job->of + (job->ready ? "+" : "-");
+    for (const auto* job : narrowing_jobs)
+        narrowing += job->of + (job->ready ? "+" : "-" + std::to_string(job->ids.size()));
     const auto of = fmt::format(
         "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}", s.entries()[index].folder.string(), snapshot->generation(),
         db_filter_.data(), static_cast<int>(db_sort_), db_descending_, p.player.data(), p.opponent.data(),
@@ -1085,11 +1102,10 @@ void App::drawGameList() {
         job.cancel        = std::make_shared<std::atomic<bool>>(false);
         job.started       = std::chrono::steady_clock::now();
         const auto filter = listFilter();
-        // The games the searches found, those of all of them: the others left out of the view; and those the
-        // maintenance shows, when it shows some.
+        // The games the searches found, those of all of them (so far, for a search still going): the others left
+        // out of the view; and those the maintenance shows, when it shows some.
         std::optional<std::vector<study::GameId>> through = db_only_;
         for (const auto* job : narrowing_jobs) {
-            if (!job->ready) continue;
             if (!through) {
                 through = job->ids;
                 continue;
@@ -1103,10 +1119,15 @@ void App::drawGameList() {
         job.done     = std::async(std::launch::async, [snapshot, filter, sort = db_sort_, down = db_descending_,
                                                        cancel = job.cancel, through = std::move(through)] {
             auto view = study::makeView(snapshot, filter, sort, down, 0, cancel.get());
-            if (through)
+            if (through) {
+                // A bit a game: millions of games found are told apart at once.
+                std::vector<uint64_t> found((snapshot->games() + 64) / 64, 0);
+                for (const auto id : *through)
+                    if (id / 64 < found.size()) found[id / 64] |= uint64_t{1} << (id % 64);
                 std::erase_if(view.ids, [&](study::GameId id) {
-                    return !std::binary_search(through->begin(), through->end(), id);
+                    return id / 64 >= found.size() || !(found[id / 64] >> (id % 64) & 1);
                 });
+            }
             return view;
         });
         db_view_job_ = std::move(job);
@@ -1147,13 +1168,20 @@ void App::drawGameList() {
     if (!ids.empty()) db_row_ = std::min(db_row_, ids.size() - 1);
 
     // The list and, beside it, the game chosen.
-    const float preview_w = db_search_open_ ? std::min(px(420), ImGui::GetContentRegionAvail().x * 0.42f)
-                                            : std::min(px(300), ImGui::GetContentRegionAvail().x * 0.3f);
+    // The panel wider for the tabs of the advanced searches: their builder, their board and their results.
+    const bool wide       = db_search_open_ && search_tab_ >= TabPattern;
+    const float preview_w = wide              ? std::min(px(600), ImGui::GetContentRegionAvail().x * 0.5f)
+                            : db_search_open_ ? std::min(px(420), ImGui::GetContentRegionAvail().x * 0.42f)
+                                              : std::min(px(300), ImGui::GetContentRegionAvail().x * 0.3f);
+    // Each game at the position its search found it at (the most precise search set): a column says the move.
+    const auto* found_job = foundJob();
+    const auto found      = found_job && !found_job->hits->empty() ? found_job->hits : nullptr;
     constexpr auto flags  = ImGuiTableFlags_Sortable | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
                             ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
                             ImGuiTableFlags_SizingFixedFit;
     bool open             = false;
-    if (ImGui::BeginTable("##db_games", 10, flags, ImVec2(ImGui::GetContentRegionAvail().x - preview_w - px(14), 0))) {
+    if (ImGui::BeginTable(found ? "##db_games_found" : "##db_games", found ? 11 : 10, flags,
+                          ImVec2(ImGui::GetContentRegionAvail().x - preview_w - px(14), 0))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         const auto column = [](const char* name, study::SortBy sort, float width, bool stretch = false) {
             ImGui::TableSetupColumn(name,
@@ -1166,6 +1194,9 @@ void App::drawGameList() {
         column(TR("Black"), study::SortBy::Black, px(130));
         column(TR("Elo##black"), study::SortBy::BlackElo, px(44));
         column(TR("Result"), study::SortBy::Result, px(48));
+        if (found)
+            ImGui::TableSetupColumn(TR("Found at"), ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort,
+                                    px(76));
         column(TR("ECO"), study::SortBy::Eco, px(40));
         column(TR("Moves"), study::SortBy::Plies, px(48));
         column(TR("Date"), study::SortBy::Date, px(82));
@@ -1188,10 +1219,12 @@ void App::drawGameList() {
                 ImGui::SetKeyOwner(key, owner);
         }
         if (!ids.empty() && list_keys) {
+            // (Ctrl+Page Down and Ctrl+Page Up are the search panel's: from tab to tab.)
+            const bool ctrl = ImGui::GetIO().KeyCtrl;
             if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) db_row_ = std::min(db_row_ + 1, ids.size() - 1);
             if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && db_row_ > 0) --db_row_;
-            if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) db_row_ = std::min(db_row_ + 20, ids.size() - 1);
-            if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) db_row_ = db_row_ > 20 ? db_row_ - 20 : 0;
+            if (!ctrl && ImGui::IsKeyPressed(ImGuiKey_PageDown)) db_row_ = std::min(db_row_ + 20, ids.size() - 1);
+            if (!ctrl && ImGui::IsKeyPressed(ImGuiKey_PageUp)) db_row_ = db_row_ > 20 ? db_row_ - 20 : 0;
             if (!linkCardTakesKeys() && ImGui::IsKeyPressed(ImGuiKey_Enter, false)) open = true;
         }
         ImGuiListClipper clipper;
@@ -1275,6 +1308,29 @@ void App::drawGameList() {
                                        : row.result == '0' ? "0-1"
                                        : row.result == '=' ? "½-½"
                                                            : "*");
+                if (found) {
+                    ImGui::TableNextColumn();
+                    const auto it =
+                        std::lower_bound(found->begin(), found->end(), id,
+                                         [](const study::SearchHit& h, study::GameId g) { return h.id < g; });
+                    if (it != found->end() && it->id == id) {
+                        // A move wider than its cell ends in "…", whole under the mouse.
+                        const auto move   = foundMove(db_view_->snapshot, id, it->ply);
+                        const float room  = ImGui::GetContentRegionAvail().x;
+                        std::string shown = move;
+                        while (!shown.empty() && ImGui::CalcTextSize((shown + "…").c_str()).x > room &&
+                               ImGui::CalcTextSize(move.c_str()).x > room) {
+                            while (!shown.empty() && (static_cast<unsigned char>(shown.back()) & 0xC0) == 0x80)
+                                shown.pop_back();
+                            if (!shown.empty()) shown.pop_back();
+                        }
+                        if (shown != move) shown += "…";
+                        ImGui::TextUnformatted(shown.c_str());
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlappedByItem))
+                            ImGui::SetTooltip("%s\n%s", move.c_str(),
+                                              TR("The position found: the game opens at this move."));
+                    }
+                }
                 ImGui::TableNextColumn();
                 if (row.eco) ImGui::TextUnformatted(study::ecoText(row.eco).c_str());
                 ImGui::TableNextColumn();
@@ -1421,13 +1477,6 @@ std::optional<std::pair<int, int>> readRange(std::string text) {
     return std::pair{*low, *high};
 }
 
-constexpr chess::PieceType kKinds[] = {chess::PieceType::PAWN, chess::PieceType::KNIGHT, chess::PieceType::BISHOP,
-                                       chess::PieceType::ROOK, chess::PieceType::QUEEN,  chess::PieceType::KING};
-
-chess::Piece patternPiece(int man) {
-    return chess::Piece(kKinds[man % 6], man < 6 ? chess::Color::WHITE : chess::Color::BLACK);
-}
-
 std::string searchTime(double ms) {
     return ms < 1000 ? fmt::format("{} ms", static_cast<int>(std::lround(ms))) : fmt::format("{:.1f} s", ms / 1000);
 }
@@ -1465,28 +1514,57 @@ std::optional<study::PatternQuery> App::patternQuery() const {
     return any ? std::optional(q) : std::nullopt;
 }
 
+std::unique_ptr<study::Search> App::startSearch(std::shared_ptr<const study::Snapshot> snapshot,
+                                                study::SearchQuery query, const study::Search* resume) {
+    // Started from a thread in the background: its threads run at the lowest priority, beside the tournaments (R6).
+    std::unique_ptr<study::Search> search;
+    std::thread([&] {
+        study::enterBackground();
+        search = std::make_unique<study::Search>(std::move(snapshot), std::move(query), 0, resume);
+    }).join();
+    return search;
+}
+
 void App::pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, const std::string& folder) {
-    const auto poll = [&](SearchJob& job, std::string of, std::optional<study::SearchQuery> query) {
+    const double now = ImGui::GetTime();
+    const auto poll  = [&](SearchJob& job, std::string of, std::optional<study::SearchQuery> query) {
         if (of != job.of) {
             job.search.reset();  // cancelled, its threads joined
+            job.cancelled.reset();
             job.ready = false;
             job.ids.clear();
-            job.of = std::move(of);
-            if (query && !job.of.empty()) job.search = std::make_unique<study::Search>(snapshot, std::move(*query));
+            job.hits       = std::make_shared<std::vector<study::SearchHit>>();  // a board's list keeps the old ones
+            job.next_part  = 0;
+            job.stats      = {};
+            job.searched   = 0;
+            job.broad_kept = false;
+            job.of         = std::move(of);
+            if (query && !job.of.empty()) job.search = startSearch(snapshot, std::move(*query));
         }
-        if (job.search && !job.ready && job.search->done()) {
-            for (const auto& hit : job.search->hits()) job.ids.push_back(hit.id);
-            std::sort(job.ids.begin(), job.ids.end());
-            job.ids.erase(std::unique(job.ids.begin(), job.ids.end()), job.ids.end());
+        if (!job.search || job.ready) return;
+        // Its games as they come, a few times a second: the first ones in the list already (R18).
+        const bool done = job.search->done();
+        if (!done && now - job.read_at < 0.3) return;
+        job.read_at       = now;
+        const auto before = job.hits->size();
+        job.search->hitsFrom(job.next_part, *job.hits);
+        for (std::size_t i = before; i < job.hits->size(); ++i) job.ids.push_back((*job.hits)[i].id);
+        job.stats = job.search->stats();
+        if (done && !job.search->cancelled()) {
             job.ms    = job.search->elapsedMs();
             job.ready = true;
         }
     };
-    const auto base = fmt::format("{}|{}", folder, snapshot->generation());
+    // While the database is imported into, a search keeps the games of when it started, made again at the end.
+    auto& shelf_ = shelf();
+    const bool importing =
+        shelf_.import() && db_selected_ >= 0 && shelf_.import()->index == static_cast<std::size_t>(db_selected_);
+    const auto base =
+        fmt::format("{}|{}", folder, importing ? std::string("importing") : std::to_string(snapshot->generation()));
     // The Board page's position: shown by its tab, or in the filter.
     std::optional<study::SearchQuery> position;
     std::string position_of;
-    if (db_search_.position || (db_search_open_ && search_tab_ == 1)) {
+    if (db_search_.position || (db_search_open_ && search_tab_ == TabPosition)) {
         study::ScanBoard board;
         const auto fen = db_search_.position_fen.empty() ? boardFen() : db_search_.position_fen;
         if (board.setFen(fen, board_.chess960)) {
@@ -1502,13 +1580,43 @@ void App::pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, c
         for (std::size_t i = 0; i < 10; ++i) material_of += fmt::format("{}-{},", material->low[i], material->high[i]);
     }
     poll(db_material_job_, material_of, material ? std::optional<study::SearchQuery>(*material) : std::nullopt);
+    // The pattern: the language's when it says more than the men on squares, else the men alone (preview 1's search);
+    // nothing when two of its conditions cannot both hold.
     std::string pattern_of;
-    const auto pattern = patternQuery();
-    if (pattern) {
-        pattern_of = base + fmt::format("|{}{}|", db_search_.only_pawns[0], db_search_.only_pawns[1]);
-        for (const auto v : db_search_.pattern) pattern_of += fmt::format("{},", v);
+    std::optional<study::SearchQuery> pattern;
+    const auto full     = fullPattern(db_search_);
+    const auto& l       = db_search_.language;
+    const bool language = !(l.variables.empty() && l.conditions.empty() && l.line.empty());
+    if (!study::contradiction(full)) {
+        if (language) {
+            pattern_of = base + "|L|" + study::writePattern(full);
+            if (pattern_of != db_pattern_job_.of) pattern = languageQuery();  // its matcher made once
+        } else if (const auto men = patternQuery()) {
+            pattern    = *men;
+            pattern_of = base + fmt::format("|M|{}{}|", db_search_.only_pawns[0], db_search_.only_pawns[1]);
+            for (const auto v : db_search_.pattern) pattern_of += fmt::format("{},", v);
+        }
     }
-    poll(db_pattern_job_, pattern_of, pattern ? std::optional<study::SearchQuery>(*pattern) : std::nullopt);
+    poll(db_pattern_job_, pattern_of, std::move(pattern));
+    // A man's route, once it has a move.
+    std::string route_of;
+    const auto route = routeQuery();
+    if (route) {
+        const auto& r = db_search_.route;
+        route_of      = base + fmt::format("|R|{}{}|{}{}{}|", r.side, r.kind, r.others_between, r.same_man, r.within);
+        for (const auto sq : r.squares) route_of += fmt::format("{},", sq);
+        if (r.from_board) route_of += "|" + (r.board_fen.empty() ? boardFen() : r.board_fen);
+    }
+    poll(db_route_job_, route_of, route ? std::optional<study::SearchQuery>(*route) : std::nullopt);
+    // The structure, when its tab shows or the filter has it.
+    std::string structure_of;
+    std::optional<study::StructureQuery> structure;
+    if (db_search_.structure.set || (db_search_open_ && search_tab_ == TabStructure)) structure = structureQuery();
+    if (structure)
+        structure_of = base + fmt::format("|S|{:x},{:x}|{}{}{}{}|{}", structure->pawns[0], structure->pawns[1],
+                                          structure->distance, structure->both_sides, structure->side,
+                                          structure->reversed, structure->plies);
+    poll(db_structure_job_, structure_of, structure ? std::optional<study::SearchQuery>(*structure) : std::nullopt);
 }
 
 void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot) {
@@ -1564,15 +1672,27 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
             saveKeptSearches();
         }
     }
-    // The tabs of the mockup: the headers, the Board page's position, a material, a pattern.
-    const char* tabs[] = {TR("Headers"), TR("Position"), TR("Material"), TR("Pattern")};
+    // The tabs of the mockups: the headers, the Board page's position, a material, a pattern (M1), a man's route and
+    // a pawn structure (M13, board 2). Ctrl+Page Down and Ctrl+Page Up go from one to the next; Alt+T shows the
+    // pattern's text.
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_PageDown)) search_select_ = (search_tab_ + 1) % SearchTabs;
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_PageUp))
+        search_select_ = (search_tab_ + SearchTabs - 1) % SearchTabs;
+    if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_T)) {
+        pattern_text_open_ = search_tab_ != TabPattern || !pattern_text_open_;
+        search_select_     = TabPattern;
+    }
+    const char* tabs[] = {TR("Headers"), TR("Position"),  TR("Material"),
+                          TR("Pattern"), TR("Manoeuvre"), TR("Structure")};
     if (ImGui::BeginTabBar("##search_tabs")) {
-        for (int i = 0; i < 4; ++i) {
-            if (ImGui::BeginTabItem(tabs[i])) {
+        for (int i = 0; i < SearchTabs; ++i) {
+            const auto flags = search_select_ == i ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabItem(tabs[i], nullptr, flags)) {
                 search_tab_ = i;
                 ImGui::EndTabItem();
             }
         }
+        search_select_ = -1;
         ImGui::EndTabBar();
     }
     const float label_w = px(96);
@@ -1750,98 +1870,33 @@ void App::drawSearchPanel(const std::shared_ptr<const study::Snapshot>& snapshot
         ImGui::TextDisabled("%s", TR("plies at least"));
         ImGui::TextDisabled("%s", TR("An exchange under way is not a material balance. A count: 2, or 0-2."));
         status(db_material_job_, TR("Any material: a preset, or the counts typed."), "");
+    } else if (search_tab_ == TabPattern) {
+        ui::TopicRegion topic(guide::topics::Patterns);
+        drawPatternTab();
+    } else if (search_tab_ == TabRoute) {
+        ui::TopicRegion topic(guide::topics::Manoeuvres);
+        drawRouteTab();
     } else {
-        // A pattern: men put on a board, empty squares, the rest anything.
-        const float size = std::min(px(220), ImGui::GetContentRegionAvail().x * 0.6f);
-        std::array<chess::Piece, 64> pieces;
-        pieces.fill(chess::Piece(chess::Piece::NONE));
-        BoardDecor decor;
-        decor.eval_white = -1.0f;
-        for (int sq = 0; sq < 64; ++sq) {
-            const int v = p.pattern[static_cast<std::size_t>(sq)];
-            if (v >= 0 && v < kEmptySquare) pieces[static_cast<std::size_t>(sq)] = patternPiece(v);
-            if (v == kEmptySquare) decor.tints.push_back({chess::Square(sq), IM_COL32(236, 140, 80, 150)});
-        }
-        const ImVec2 top = ImGui::GetCursorScreenPos();
-        drawBoard(atlas_, pieces, size, decor);
-        if (ImGui::IsItemHovered()) {
-            const bool left  = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-            const bool right = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-            if (left || right) {
-                if (const auto square = boardSquareAt(ImGui::GetMousePos(), top, size, decor)) {
-                    auto& at          = p.pattern[static_cast<std::size_t>(square->index())];
-                    const int8_t want = ImGui::GetIO().KeyShift ? kEmptySquare : static_cast<int8_t>(pattern_brush_);
-                    at                = right || at == want ? int8_t{-1} : want;
-                }
-            }
-        }
-        ImGui::SameLine(0, px(10));
-        ImGui::BeginGroup();
-        // The men a click puts: white then black.
-        const float button = px(26);
-        for (int side = 0; side < 2; ++side) {
-            for (int kind = 5; kind >= 0; --kind) {
-                const int man = side * 6 + kind;
-                ImVec2 uv0, uv1;
-                atlas_.uv(patternPiece(man), uv0, uv1);
-                ImGui::PushID(man);
-                const bool chosen = pattern_brush_ == man;
-                if (chosen) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-                if (ImGui::ImageButton("##man", atlas_.texture(button), ImVec2(button, button), uv0, uv1))
-                    pattern_brush_ = man;
-                if (chosen) ImGui::PopStyleColor();
-                ImGui::PopID();
-                if (kind > 0 && kind % 3 != 0) ImGui::SameLine(0, px(2));
-            }
-        }
-        ImGui::PushTextWrapPos();
-        ImGui::TextDisabled("%s", TR("A click puts the man chosen (again: takes it away); Shift and a click: an empty "
-                                     "square; the rest: anything."));
-        ImGui::PopTextWrapPos();
-        ImGui::EndGroup();
-        ImGui::Checkbox(TR("White has only these pawns"), &p.only_pawns[0]);
-        ImGui::Checkbox(TR("Black has only these pawns"), &p.only_pawns[1]);
-        struct Preset {
-            const char* name;
-            std::vector<std::pair<int, int>> men;  // square, man
-        };
-        const auto sq          = [](const char* name) { return (name[1] - '1') * 8 + (name[0] - 'a'); };
-        const Preset presets[] = {
-            {TR("Short castling, pawns intact"),
-             {{sq("g1"), 5},
-              {sq("f1"), 3},
-              {sq("f2"), 0},
-              {sq("g2"), 0},
-              {sq("h2"), 0},
-              {sq("f3"), kEmptySquare},
-              {sq("g3"), kEmptySquare},
-              {sq("h3"), kEmptySquare}}},
-            {TR("Maroczy bind"), {{sq("c4"), 0}, {sq("e4"), 0}, {sq("d6"), 6}}},
-            {TR("King's fianchetto"), {{sq("g1"), 5}, {sq("g2"), 2}, {sq("f2"), 0}, {sq("g3"), 0}, {sq("h2"), 0}}},
-        };
-        for (std::size_t i = 0; i < std::size(presets); ++i) {
-            if (i > 0) flow(presets[i].name);
-            if (ImGui::SmallButton(presets[i].name)) {
-                p.pattern.fill(-1);
-                p.only_pawns = {};
-                for (const auto& [square, man] : presets[i].men)
-                    p.pattern[static_cast<std::size_t>(square)] = static_cast<int8_t>(man);
-            }
-        }
-        status(db_pattern_job_, TR("Put men on the board: the games where they stand so."),
-               TR(" (each game replayed up to the pattern)"));
+        ui::TopicRegion topic(guide::topics::PawnStructures);
+        drawStructureTab();
     }
 
     ImGui::Separator();
     if (ImGui::Button(TR("See in the list")) ||
-        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::GetIO().WantTextInput))
+        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::GetIO().WantTextInput)) {
+        // The structure shown goes into the filter, as the route and the pattern are.
+        if (search_tab_ == TabStructure) p.structure.set = true;
         db_search_open_ = false;
+    }
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("%s", TR("Enter"));
     ImGui::SameLine();
     if (ImGui::Button(TR("Clear everything"))) {
         p = SearchFields{};
         db_filter_.fill(0);
+        pattern_text_.clear();
+        pattern_error_.reset();
+        step_by_board_ = false;
     }
     ImGui::SameLine();
     if (ImGui::Button(TR("Keep this search…"))) {

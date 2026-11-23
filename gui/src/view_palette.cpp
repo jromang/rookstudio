@@ -1081,20 +1081,41 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             page_ = Page::Tournament;
             openCastSheet();
         });
-    // The kept searches (M1, board 6): on the database chosen, else the first of the user's.
+    // The presets of the patterns (#89, M13, board 2): on the database chosen, else the first of the user's.
+    for (std::size_t i = 0; i < study::patternPresets().size(); ++i) {
+        const char* name = presetName(study::patternPresets()[i].key);
+        if (std::any_of(kept_searches_.begin(), kept_searches_.end(),
+                        [&](const KeptSearch& k) { return k.name == name; }))
+            continue;  // kept under that name: the kept search's entry
+        add(trf("Pattern: {}", name), TR("Databases"), [this, i] { applyPatternPreset(i); });
+    }
+    // From the Board page: the man under the mouse and its route in the game; the games at its pawn structure.
+    if (chessBoard() && !liveGameOn()) {
+        add(TR("This manoeuvre"), TR("Board"), [this] { searchThisManoeuvre(); });
+        add(TR("Games at this structure"), TR("Board"), [this] { searchThisStructure(); });
+    }
+    // The kept searches (M1, board 6): on the database chosen, else the first of the user's; a pattern alone said so.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
-        add(trf("Search: {}", kept_searches_[i].name), TR("Databases"), [this, i] {
-            page_               = Page::Databases;
-            const auto& entries = shelf().entries();
-            if (db_selected_ < 0 || static_cast<std::size_t>(db_selected_) >= entries.size()) {
-                for (std::size_t e = 0; e < entries.size(); ++e)
-                    if (!entries[e].source) {
-                        db_selected_ = static_cast<int>(e);
-                        break;
-                    }
-            }
-            if (db_selected_ >= 0) applyKeptSearch(i);
-        });
+        const auto& f    = kept_searches_[i].fields;
+        const bool heads = f.player[0] || f.opponent[0] || f.event[0] || f.year_from[0] || f.year_to[0] ||
+                           f.eco_from[0] || f.eco_to[0] || f.elo_min[0] || f.result || f.damaged || f.position ||
+                           std::any_of(f.material.begin(), f.material.end(), [](const auto& m) { return m[0] != 0; }) ||
+                           f.route.squares.size() >= 2 || f.structure.set;
+        const bool pattern_alone = !heads && (!f.language.empty() || std::any_of(f.pattern.begin(), f.pattern.end(),
+                                                                                 [](int8_t v) { return v >= 0; }));
+        add(pattern_alone ? trf("Pattern: {}", kept_searches_[i].name) : trf("Search: {}", kept_searches_[i].name),
+            TR("Databases"), [this, i] {
+                page_               = Page::Databases;
+                const auto& entries = shelf().entries();
+                if (db_selected_ < 0 || static_cast<std::size_t>(db_selected_) >= entries.size()) {
+                    for (std::size_t e = 0; e < entries.size(); ++e)
+                        if (!entries[e].source) {
+                            db_selected_ = static_cast<int>(e);
+                            break;
+                        }
+                }
+                if (db_selected_ >= 0) applyKeptSearch(i);
+            });
     }
     const auto ratings_tab = [&](const char* label, int index) {
         add(shown(label), TR("Ratings"), [this, index, go = page(Page::Ratings)] {
@@ -1257,6 +1278,7 @@ void App::drawPalette() {
     if (ctrl_k && !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
         palette_query_.clear();
         palette_request_ = true;
+        palette_square_  = board_hover_;  // "This manoeuvre": the man under the mouse
     }
     if (palette_request_) {
         palette_request_   = false;

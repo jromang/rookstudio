@@ -625,6 +625,8 @@ class App {
         std::string name;
         bool linked = false;  // a tournament's or a file's: not written
         std::shared_ptr<study::View> view;  // none for a game kept from the session before: its list is not kept
+        // The positions its search found its games at (sorted by game): a game opened there.
+        std::shared_ptr<const std::vector<study::SearchHit>> found;
         std::size_t row  = 0;
         study::GameId id = 0;  // its number in the database: Ctrl+S puts it back there
         std::string filter;  // the quick filter it was made with
@@ -722,6 +724,31 @@ class App {
         std::array<bool, 2> only_pawns{};
         bool damaged = false;      // only the games a move of which could not be read
         std::string position_fen;  // the position a kept search brought; empty: the Board page's
+        // The Pattern tab beyond the men on squares (#89, mockup M13, board 2): the language's conditions, names and
+        // line (study/patterns.hpp), the men of `pattern` and `only_pawns` left out of it.
+        study::Pattern language;
+        // The Manoeuvre tab: a man's route, from anywhere or from the Board page's position.
+        struct Route {
+            int side = 0, kind = 1;        // a white knight
+            std::vector<uint8_t> squares;  // where it starts, then each square it goes to
+            bool others_between = true;
+            bool same_man       = true;
+            int within          = 15;     // moves of its side at most
+            bool from_board     = false;  // from the Board page's position, else from anywhere
+            std::string board_fen;        // that position
+        } route;
+        // The Structure tab: pawns, exactly or one or two pawns away.
+        struct Structure {
+            bool set   = false;  // in the filter
+            bool taken = false;  // its pawns were taken (else the Board page's, once the tab shows)
+            std::array<uint64_t, 2> pawns{};
+            int distance    = 0;
+            bool both_sides = true;
+            int side        = 0;  // the side compared when not both
+            bool reversed   = false;
+            int plies       = 6;  // held that long at least
+            std::string said;     // where it was taken: "after 10…Nf8"
+        } structure;
     };
     // The searches kept (M1, board 6): their criteria, for every database, in the profile's searches.json.
     struct KeptSearch {
@@ -741,22 +768,75 @@ class App {
     [[nodiscard]] static KeptSearch keptSearchFrom(const nlohmann::json& json);
     static constexpr int8_t kEmptySquare = 12;
     SearchFields db_search_;
-    int search_tab_    = 0;  // Headers, Position, Material, Pattern
+    enum SearchTab { TabHeaders, TabPosition, TabMaterial, TabPattern, TabRoute, TabStructure, SearchTabs };
+    int search_tab_    = 0;   // a SearchTab
+    int search_select_ = -1;  // a tab to select at the next frame (Ctrl+PageDown, a command)
     int pattern_brush_ = 5;  // the man a click puts on the pattern: a white king
-    // A search of the database in the background (study::Search): the games it found, once it is done.
+    // A search of the database in the background (study::Search): the games it found as it goes, all of them once it
+    // is done; a search cancelled kept for its resumption.
     struct SearchJob {
         std::string of;  // what it searches: the database, its snapshot, the query; empty for nothing
         std::unique_ptr<study::Search> search;
+        std::unique_ptr<study::Search> cancelled;  // the search cancelled, its parts kept for "Resume"
         double ms  = 0;  // how long it took
         bool ready = false;
-        std::vector<study::GameId> ids;  // sorted
+        std::vector<study::GameId> ids;  // sorted: those found so far, all once ready
+        std::shared_ptr<std::vector<study::SearchHit>> hits = std::make_shared<std::vector<study::SearchHit>>();
+        std::size_t next_part                               = 0;  // the search's parts read into `hits`
+        double read_at = 0;  // when they were last read (ImGui's time): a few times a second
+        study::SearchStats stats;
+        uint64_t searched = 0;      // games looked at, when cancelled
+        bool broad_kept   = false;  // "Keep it as it is": the broad search no longer said
     };
-    SearchJob db_position_job_, db_material_job_, db_pattern_job_;
-    // The three searches made again when what they search changed: the position when the panel shows it or the
-    // filter has it, the material and the pattern when they ask for something.
+    SearchJob db_position_job_, db_material_job_, db_pattern_job_, db_route_job_, db_structure_job_;
+    // The searches made again when what they search changed: the position when the panel shows it or the filter has
+    // it, the material and the pattern when they ask for something, the route once it has a move, the structure when
+    // its tab shows or the filter has it. While the database is imported into, a search keeps the games of when it
+    // started and is made again at the end.
     void pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, const std::string& folder);
+    // A search started at the lowest priority (its threads in the background), resuming `resume` when given.
+    [[nodiscard]] static std::unique_ptr<study::Search> startSearch(std::shared_ptr<const study::Snapshot> snapshot,
+                                                                    study::SearchQuery query,
+                                                                    const study::Search* resume = nullptr);
     [[nodiscard]] std::optional<study::MaterialQuery> materialQuery() const;
     [[nodiscard]] std::optional<study::PatternQuery> patternQuery() const;
+    // The advanced searches (#89, mockup M13, board 2; view_search_advanced.cpp).
+    [[nodiscard]] static study::Pattern fullPattern(const SearchFields& fields);  // the men and the language together
+    static void setPattern(SearchFields& fields, const study::Pattern& pattern);  // into the men and the language
+    [[nodiscard]] std::optional<study::SearchQuery> languageQuery() const;        // the language's, beyond the men
+    [[nodiscard]] std::optional<study::ManoeuvreQuery> routeQuery();
+    [[nodiscard]] std::optional<study::StructureQuery> structureQuery() const;
+    void patternChanged();    // the builder or the small board changed it: the text written again
+    void drawPatternTab();    // the men on squares (preview 1), the builder, the line, the presets, the text
+    void drawRouteTab();      // a man and its route clicked on the board
+    void drawStructureTab();  // the pawns, exactly or near
+    // A search's state below its tab: its progress and Cancel, its games and time, the broad search, the search
+    // cancelled and its resumption, no game, the import going on.
+    void drawSearchState(SearchJob& job, const char* nothing, const char* how);
+    void drawFoundGame(const SearchJob& job, float size);  // one of the games found, at the position found
+    void applyPatternPreset(std::size_t index, bool open_panel = true);
+    [[nodiscard]] static const char* presetName(std::string_view key);
+    void searchThisManoeuvre();  // Ctrl+K on the Board page: the man under the mouse and its moves in the game
+    void searchThisStructure();  // Ctrl+K on the Board page: the games at its pawn structure
+    void openSearchOn(int tab);  // the Databases page, the list of the database chosen (or the board's), its panel
+    [[nodiscard]] const SearchJob* foundJob() const;    // the search whose positions the list shows: the most precise
+    std::string pattern_text_;                          // the text under the builder, as typed
+    std::optional<study::PatternError> pattern_error_;  // why it does not read; the builder keeps the last that did
+    bool pattern_text_open_   = false;                  // Alt+T
+    bool pattern_text_active_ = false;                  // typed in: Esc leaves the text, not the panel
+    double pattern_typed_at_  = 0;                      // when it was last typed in, not read yet
+    int pattern_gap_          = 3;                      // "within N plies"
+    bool step_by_board_       = false;                  // the next step played on the small board
+    int step_from_            = -1;                     // its first click
+    bool route_editing_       = true;                   // clicks on the Manoeuvre tab's board set the route
+    bool structure_editing_   = false;                  // clicks on the Structure tab's board set its pawns
+    std::optional<chess::Square> board_hover_;          // the Board page's square under the mouse, this frame
+    std::optional<chess::Square> palette_square_;       // that square when Ctrl+K was pressed
+    // The list's "Found at": each game's move at the position found, by the search it was found by.
+    std::map<study::GameId, std::string> found_moves_;
+    std::string found_moves_of_;
+    [[nodiscard]] std::string foundMove(const std::shared_ptr<const study::Snapshot>& snapshot, study::GameId id,
+                                        uint32_t ply);
     void drawOpeningsPage();  // the repertoires (the tournament's Openings tab is drawOpenings)
     // The repertoires (repertoires.hpp): the star of the Board page's tree, the Openings page (view_openings.cpp).
     RepertoireShelf& repertoires();

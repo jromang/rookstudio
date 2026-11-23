@@ -384,6 +384,56 @@ void App::frame() {
             db_search_open_     = true;
             db_search_.position = w == "databases-search-position";
             std::snprintf(db_search_.year_from.data(), db_search_.year_from.size(), "2020");
+        } else if (w.rfind("databases-search-pattern", 0) == 0 || w.rfind("databases-search-text", 0) == 0) {
+            // databases-search-pattern[=PRESET][,WORD], databases-search-text[=PRESET][,WORD]: the first database's
+            // search panel on its Pattern tab (#89), a preset set (its key: knight-fork, h7-sacrifice…), its text
+            // shown; then WORD, another of these (databases-import-into=FILE: an import going on).
+            const auto comma = w.find(',');
+            if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
+            const auto word = w.substr(0, comma);
+            page_           = Page::Databases;
+            db_selected_    = 0;
+            if (const auto eq = word.find('='); eq != std::string::npos) {
+                const auto key = word.substr(eq + 1);
+                for (std::size_t i = 0; i < study::patternPresets().size(); ++i)
+                    if (study::patternPresets()[i].key == key) applyPatternPreset(i);
+            }
+            openSearchOn(TabPattern);
+            db_selected_       = 0;
+            pattern_text_open_ = word.rfind("databases-search-text", 0) == 0;
+        } else if (w.rfind("databases-search-route", 0) == 0) {
+            // databases-search-route[=b1,d2,f1,g3]: the Manoeuvre tab, the man of the first square on the Board page's
+            // position going along that route.
+            page_        = Page::Databases;
+            db_selected_ = 0;
+            openSearchOn(TabRoute);
+            db_selected_ = 0;
+            if (const auto eq = w.find('='); eq != std::string::npos) {
+                auto& r = db_search_.route;
+                r.squares.clear();
+                for (std::size_t at = eq + 1; at + 1 < w.size() + 1;) {
+                    const auto comma = w.find(',', at);
+                    const auto item  = w.substr(at, comma == std::string::npos ? std::string::npos : comma - at);
+                    if (item.size() == 2 && item[0] >= 'a' && item[0] <= 'h' && item[1] >= '1' && item[1] <= '8')
+                        r.squares.push_back(static_cast<uint8_t>((item[1] - '1') * 8 + (item[0] - 'a')));
+                    if (comma == std::string::npos) break;
+                    at = comma + 1;
+                }
+                const auto board = boardAt(board_.game, board_.chess960, board_.ply);
+                if (!r.squares.empty()) {
+                    const auto piece = board.at(chess::Square(r.squares[0]));
+                    if (piece != chess::Piece::NONE) {
+                        r.side = piece.color() == chess::Color::WHITE ? 0 : 1;
+                        r.kind = static_cast<int>(piece.type());
+                    }
+                }
+            }
+        } else if (w == "databases-search-structure") {
+            // The Structure tab: the Board page's pawns, searched.
+            page_        = Page::Databases;
+            db_selected_ = 0;
+            openSearchOn(TabStructure);
+            db_selected_ = 0;
         } else if (w == "databases-care" || w.rfind("databases-care=", 0) == 0) {
             // databases-care[=names|checks|check|pair]: the first database's maintenance (#88), at that part; check:
             // its check started; pair: its first group of duplicates compared.
@@ -485,8 +535,7 @@ void App::frame() {
             page_            = Page::Engines;
             const auto start = w.find('=') == std::string::npos ? std::string() : w.substr(w.find('=') + 1);
             if (!machines_.empty()) openRemotePicker(RemotePicker::Purpose::AddEngine, machines_.front().id, {}, {}, start);
-        }
-        else if (w == "engines-card") {
+        } else if (w == "engines-card") {
             page_            = Page::Engines;
             selected_engine_ = engines_.empty() ? -1 : 0;
         } else if (w.rfind("board-analysis", 0) == 0) {

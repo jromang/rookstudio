@@ -1275,8 +1275,8 @@ the database's table of names shows the list's card instead, without asking Lich
 
 ### Searching
 
-*Search* (Ctrl+F) opens the search panel beside the list, in four tabs; the list follows each criterion as it is
-typed:
+*Search* (Ctrl+F) opens the search panel beside the list, in six tabs (Ctrl+Page Down and Ctrl+Page Up go from one to
+the next); the list follows each criterion as it is typed:
 
 - **Headers**: a player and their colour, the opponent, the event, the years, the ECO codes, the Elo of both players
   at least, the result; *Damaged games only*;
@@ -1285,14 +1285,102 @@ typed:
 - **Material**: a preset (rook endings, no queens, the bishop pair against bishop and knight, a queen against two
   rooks) or the men of each side counted (`2`, or `0-2`), for so many plies at least;
 - **Pattern**: men put on the board with the mouse (a click puts the man chosen, a click again takes it away; Shift
-  and a click, an empty square; the other squares, anything), *White has only these pawns*, and three examples.
+  and a click, an empty square; the other squares, anything), *White has only these pawns*, three examples, and
+  conditions beyond them: what attacks, defends or pins what, a line of moves (see [Patterns](#patterns));
+- **Manoeuvre**: a man's route, such as a knight going b1, d2, f1, g3 (see [Manoeuvres](#manoeuvres));
+- **Structure**: the pawns of the Board page, exactly or one or two pawns away (see [Pawn structures](#pawn-structures)).
 
 Each search gives its games and its time; *Add to the filter* and *Take out of the filter* combine them, *See in the
-list* (Enter) shows the result, *Clear everything* starts again.
+list* (Enter) shows the result, *Clear everything* starts again. The searches set add up: a pattern, and a material,
+and headers. A search that replays the games (a pattern, a route, a structure) goes on in the background with its
+progress and *Cancel*; the first games it finds are in the list already, and a search cancelled keeps them, *Resume
+(the rest only)* searching the games it had not reached. While the database is being imported into, a search covers
+the games already committed, and is made again by itself at the end.
 
-*Keep this search…* names it after its criteria. Its criteria are kept, not its games, for any database (its new
-games are found next time); the kept searches show at the top of the panel, where a click sets their criteria and the
-right button renames or deletes one, and in Ctrl+K (*Search: …*).
+The list then shows each game at the position found, in a column *Found at* (the move that led there): Enter or a
+double click opens the game at that move, and so does the next or previous game of the list from the Board page.
+
+*Keep this search…* names it after its criteria (a pattern by its preset's name). Its criteria are kept, not its
+games, for any database (its new games are found next time); the kept searches show at the top of the panel, where a
+click sets their criteria and the right button renames or deletes one, and in Ctrl+K (*Search: …*, or *Pattern: …*
+for a pattern alone).
+
+### Patterns
+
+The **Pattern** tab says what holds in one position: the men on the small board first, then conditions, one per row,
+all true at once. A click on a word of a row changes it: the men (a white knight, the black queen or a black rook,
+any black man, on squares or anywhere), the verb (*is on*, *attacks*, *defends*, *pins … on …*, *is en prise*, *is
+passed*, and their contrary), the side to move, check, mate. *+ A condition* adds one, × takes it away. *The same
+man as in row 1*, in the men's menu, makes two rows speak of one man: a knight that attacks the king, and the same
+knight that attacks the queen or a rook, is a fork.
+
+The presets set a whole pattern: *Knight fork*, *Pin on the king*, *Back-rank mate*, *Queen's double attack*,
+*Sacrifice on h7*, *Protected passed pawn*; they are in Ctrl+K too (*Pattern: Knight fork*), on the database chosen.
+
+*Then… (a line)* adds a line of positions after the first: each step a move ("the white bishop takes on h7 with
+check") or a position, at the next ply or within so many plies (*each step at the next ply*, *within 3 plies*). A
+move can also be played on the small board (*+ A step*, *a move played on the small board*: a click on the man, then
+on its square). In each game, the position found is the first of the pattern.
+
+What can never be found is said before searching, and nothing is started: a knight on c7 and c7 empty, White and
+Black to move, a pawn on its first rank; a click takes one of the two conditions away. A search that finds more than
+half of the games says so (*Very broad*): *Add a condition*, or *Keep it as it is*.
+
+### The pattern language
+
+The same pattern is a text under the builder (*Text*, or Alt+T): changing one changes the other, and a kept search
+keeps its text, which can be copied and shared. Its words are CQL's, the language of chess queries:
+
+```
+; Knight fork                       a comment (// also)
+piece $n in N                       $n: one white knight, the same in every line
+$n attacks k                        one condition a line, all true in the same position
+$n attacks [qr]
+btm
+
+Bd3 Nf3 Qd1 Pe5 kg8 ph7 _f6         men on squares, side by side
+line --> move from B to h7 capture check
+     --> move from k to h7 capture
+     --> .{0,2} --> move from N to g5 check
+```
+
+- Men in FEN letters: K Q R B N P for White, k q r b n p for Black, A and a for any white or black man, `_` for an
+  empty square, `[qr]` for one of several; squares after the letter (`Nf3`, `R[a1,h1]`, `p[a-h7]`), or alone where
+  a word wants squares (`move to [g5,h5]`).
+- `attacks`, `defends`, `pin from … through … to …`, `en prise`, `passed`, `check`, `mate`, `stalemate`, `wtm` and
+  `btm` (the side to move), `not`, `or`, `only P` (White has no other pawns than those named on their squares).
+- `line -->` then a step after each arrow, at the next ply: `move from … to … capture … promote …` and what holds
+  after the move, or a position; `.{0,2}` before a step lets two plies of anything come first.
+- Two names (`$n`, `$q`) are always two men; a name follows its man through the moves of a line.
+
+A line that does not read is named, with the word it looks like ("Line 2: “atacks” is not a known word —
+“attacks”?"); the rest of CQL is told as not read. The builder keeps the last version that read, and nothing is
+searched until the text reads again.
+
+### Manoeuvres
+
+The **Manoeuvre** tab looks for a man's route: a click on a man of the small board (the Board page's position), then
+a click on each square it goes to (b1, d2, f1, g3); Backspace takes the last square off. *Other moves between* lets
+the side play other moves meanwhile; *The same man all along* asks for one man, else any man of its kind on each
+square in turn; *In 15 moves at most* counts the side's moves from the first of the route to its last. *From
+anywhere*, or *From the Board page's position*: the route once a game reaches that position.
+
+The results say where the same man went next (on f5 in 31 % of the games), and the neighbouring routes, which part
+from it after its first move (b1–d2–b3); a click sets one. The grey arrow on the board is the most played
+continuation, not a condition. From the Board page, Ctrl+K *This manoeuvre* takes the man under the mouse and its
+moves in the game.
+
+### Pawn structures
+
+The **Structure** tab looks for the pawns of the Board page alone, the pieces left aside: *Exactly*, *One pawn away*
+or *Two pawns away* (a pawn more, fewer or on another square, on either side, is one pawn), *Both sides* or one,
+*The colours reversed too*, held so many plies at least. *Take the Board page's again* takes its pawns anew; *Set up
+the pawns…* changes them square by square. Its name shows when the assistant's facts know it (Carlsbad, Maroczy,
+hedgehog, Stonewall, the pawn chains, Benoni, isolated queen's pawn).
+
+The results give the games held exactly and those near, the openings that reach it most, and the variants one pawn
+away with their games and White's score ("the white b-pawn on b4", "without the black a-pawn"); a click sets one.
+From the Board page, Ctrl+K *Games at this structure* searches its pawns at once.
 
 ### Tournaments and PGN files
 

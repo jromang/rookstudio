@@ -6,6 +6,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include "position.hpp"
 
@@ -20,5 +21,9 @@ struct OpeningCode {
     std::string name;
 };
 [[nodiscard]] std::optional<OpeningCode> openingCode(std::span<const Move> moves);
+
+// The name an ECO code goes by ("D36": "Queen's Gambit Declined: Exchange Variation"): the name of its shortest line,
+// empty for a code the table does not have.
+[[nodiscard]] std::string ecoName(std::string_view eco);
 
 }  // namespace fcg::commentary

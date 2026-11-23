@@ -6,6 +6,7 @@
 #include <string>
 
 #include <json.hpp>
+#include <study/patterns.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -48,7 +49,28 @@ nlohmann::json App::keptSearchJson(const KeptSearch& k) {
             {"material_plies", f.material_plies},
             {"pattern", f.pattern},
             {"only_pawns", f.only_pawns},
-            {"damaged", f.damaged}};
+            {"damaged", f.damaged},
+            // The advanced searches (#89): the pattern's text (its men included), the route, the structure.
+            {"pattern_text",
+             f.language.empty() && f.language.title.empty() ? std::string() : study::writePattern(fullPattern(f))},
+            {"route",
+             {{"side", f.route.side},
+              {"kind", f.route.kind},
+              {"squares", f.route.squares},
+              {"others_between", f.route.others_between},
+              {"same_man", f.route.same_man},
+              {"within", f.route.within},
+              {"from_board", f.route.from_board},
+              {"board_fen", f.route.board_fen}}},
+            {"structure",
+             {{"set", f.structure.set},
+              {"pawns", {f.structure.pawns[0], f.structure.pawns[1]}},
+              {"distance", f.structure.distance},
+              {"both_sides", f.structure.both_sides},
+              {"side", f.structure.side},
+              {"reversed", f.structure.reversed},
+              {"plies", f.structure.plies},
+              {"said", f.structure.said}}}};
 }
 
 App::KeptSearch App::keptSearchFrom(const nlohmann::json& j) {
@@ -78,6 +100,36 @@ App::KeptSearch App::keptSearchFrom(const nlohmann::json& j) {
     if (const auto o = j.find("only_pawns"); o != j.end() && o->is_array() && o->size() == 2)
         f.only_pawns = {(*o)[0].get<bool>(), (*o)[1].get<bool>()};
     f.damaged = j.value("damaged", false);
+    // A pattern in the language: its text holds the men too (a search kept by preview 1 has the men alone).
+    if (const auto text = s("pattern_text"); !text.empty())
+        if (const auto read = study::readPattern(text); read.pattern) setPattern(f, *read.pattern);
+    if (const auto r = j.find("route"); r != j.end() && r->is_object()) {
+        f.route.side           = std::clamp(r->value("side", 0), 0, 1);
+        f.route.kind           = std::clamp(r->value("kind", 1), 0, 5);
+        f.route.others_between = r->value("others_between", true);
+        f.route.same_man       = r->value("same_man", true);
+        f.route.within         = std::clamp(r->value("within", 15), 1, 200);
+        f.route.from_board     = r->value("from_board", false);
+        f.route.board_fen      = r->value("board_fen", std::string());
+        if (const auto q = r->find("squares"); q != r->end() && q->is_array())
+            for (const auto& v : *q)
+                if (v.is_number_integer() && v.get<int>() >= 0 && v.get<int>() < 64)
+                    f.route.squares.push_back(static_cast<uint8_t>(v.get<int>()));
+    }
+    if (const auto t = j.find("structure"); t != j.end() && t->is_object()) {
+        f.structure.set        = t->value("set", false);
+        f.structure.distance   = std::clamp(t->value("distance", 0), 0, 2);
+        f.structure.both_sides = t->value("both_sides", true);
+        f.structure.side       = std::clamp(t->value("side", 0), 0, 1);
+        f.structure.reversed   = t->value("reversed", false);
+        f.structure.plies      = std::clamp(t->value("plies", 6), 1, 200);
+        f.structure.said       = t->value("said", std::string());
+        if (const auto q = t->find("pawns"); q != t->end() && q->is_array() && q->size() == 2 &&
+                                             (*q)[0].is_number_unsigned() && (*q)[1].is_number_unsigned()) {
+            f.structure.pawns = {(*q)[0].get<uint64_t>(), (*q)[1].get<uint64_t>()};
+            f.structure.taken = true;
+        }
+    }
     return k;
 }
 
@@ -116,7 +168,20 @@ std::string App::keptSearchName(const SearchFields& f) const {
     if (f.position) add(TR("the position"));
     if (std::any_of(f.material.begin(), f.material.end(), [](const auto& m) { return m[0] != 0; }))
         add(TR("a material balance"));
-    if (std::any_of(f.pattern.begin(), f.pattern.end(), [](int8_t v) { return v >= 0; })) add(TR("a pattern"));
+    // A pattern by its title (a preset's name), a route by its squares, a structure by where it was taken.
+    if (!f.language.title.empty())
+        add(f.language.title.front());
+    else if (!f.language.empty() || std::any_of(f.pattern.begin(), f.pattern.end(), [](int8_t v) { return v >= 0; }))
+        add(TR("a pattern"));
+    if (f.route.squares.size() >= 2) {
+        std::string route = std::string(1, "PNBRQK"[std::clamp(f.route.kind, 0, 5)]);
+        for (std::size_t i = 0; i < f.route.squares.size(); ++i)
+            route += (i ? "–" : "") + std::string{static_cast<char>('a' + f.route.squares[i] % 8),
+                                                  static_cast<char>('1' + f.route.squares[i] / 8)};
+        add(trf("manoeuvre {}", route));
+    }
+    if (f.structure.set)
+        add(f.structure.said.empty() ? std::string(TR("a pawn structure")) : trf("structure {}", f.structure.said));
     if (f.damaged) add(TR("damaged games"));
     return name.empty() ? std::string(TR("A search")) : name;
 }
@@ -133,10 +198,20 @@ void App::applyKeptSearch(std::size_t index) {
     const auto& f    = db_search_;
     const bool heads = f.player[0] || f.opponent[0] || f.event[0] || f.year_from[0] || f.year_to[0] || f.eco_from[0] ||
                        f.eco_to[0] || f.elo_min[0] || f.result || f.damaged;
-    search_tab_      = heads                                                                                        ? 0
-                       : f.position                                                                                 ? 1
-                       : std::any_of(f.material.begin(), f.material.end(), [](const auto& m) { return m[0] != 0; }) ? 2
-                                                                                                                    : 3;
+    const bool material = std::any_of(f.material.begin(), f.material.end(), [](const auto& m) { return m[0] != 0; });
+    const bool pattern  = !f.language.empty() ||
+                          std::any_of(f.pattern.begin(), f.pattern.end(), [](int8_t v) { return v >= 0; }) ||
+                          f.only_pawns[0] || f.only_pawns[1];
+    search_tab_         = heads                         ? TabHeaders
+                          : f.position                  ? TabPosition
+                          : material                    ? TabMaterial
+                          : pattern                     ? TabPattern
+                          : f.route.squares.size() >= 2 ? TabRoute
+                          : f.structure.set             ? TabStructure
+                                                        : TabPattern;
+    search_select_      = search_tab_;
+    pattern_text_       = study::writePattern(fullPattern(db_search_));
+    pattern_error_.reset();
 }
 
 }  // namespace fcg

@@ -4,6 +4,7 @@
 #include <functional>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include "text.hpp"
 
@@ -104,6 +105,35 @@ std::optional<OpeningCode> openingCode(std::span<const Move> moves) {
     }
     if (!found) return std::nullopt;
     return OpeningCode{std::string(found->eco), std::string(found->name)};
+}
+
+std::string ecoName(std::string_view eco) {
+    // Each code's shortest line: its moves the fewest, its name the most general.
+    static const auto table = [] {
+        std::unordered_map<std::string, std::pair<std::size_t, std::string>> out;
+        const std::string_view all(reinterpret_cast<const char*>(assets::lichess_openings),
+                                   assets::lichess_openings_size);
+        bool header = true;
+        for (std::size_t at = 0; at < all.size();) {
+            auto end = all.find('\n', at);
+            if (end == std::string_view::npos) end = all.size();
+            auto line = all.substr(at, end - at);
+            at        = end + 1;
+            if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+            if (std::exchange(header, false)) continue;
+            const auto first  = line.find('\t');
+            const auto second = first == std::string_view::npos ? first : line.find('\t', first + 1);
+            if (second == std::string_view::npos) continue;
+            const std::string code(line.substr(0, first));
+            const auto name  = line.substr(first + 1, second - first - 1);
+            const auto moves = text::splitWhitespace(line.substr(second + 1)).size();
+            const auto it    = out.find(code);
+            if (it == out.end() || moves < it->second.first) out[code] = {moves, std::string(name)};
+        }
+        return out;
+    }();
+    const auto it = table.find(std::string(eco));
+    return it == table.end() ? std::string() : it->second.second;
 }
 
 std::optional<std::string> openingName(std::span<const Move> moves) {

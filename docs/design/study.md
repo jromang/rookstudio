@@ -219,13 +219,58 @@ are searched by replaying them whole.
 ## Searches
 
 `Search` looks through a snapshot's games on every core, a thread taking 4 096 games at a time, its hits in the order
-of the games as they come; a cancel stops it between two games. Three queries:
+of the games as they come; a cancel stops it between two games. The first three queries:
 
 - a position exactly (men, side to move, castling rights, en passant): the signature's plies, then a replay up to them;
 - material: counts within bounds, for a number of plies in a row (an exchange under way is not a material);
 - a pattern: men on squares, empty squares, and a side's pawns exactly those given.
 
 The tests compare each with a replay of every ply of every game, signatures unused.
+
+### Patterns of the language, routes and structures (#89)
+
+The search panel's advanced searches are queries of the same `Search`, each game replayed when its signature cannot
+leave it out:
+
+- a pattern of the language (`patterns.hpp`, `RelationQuery`): its first position's conditions, then a line of steps;
+- a man's route (`ManoeuvreQuery`): a man of a kind going from its first square to the next, then on to each in turn,
+  the same man or any of its kind, other moves of its side between or not, within so many moves, from anywhere or once
+  a game reaches a position (the position search first);
+- a pawn structure (`StructureQuery`): the pawns of both sides or of one, exactly or one or two pawns away, the colours
+  reversed too, held so many plies in a row.
+
+**The language** is our own with CQL's words, read from a text and written back to it (`readPattern`, `writePattern`):
+men in FEN letters with squares (`Nf3`, `[qr]`, `p[a-h7]`, `_f6`), `attacks`, `defends`, `pin from … through … to`,
+`en prise`, `passed`, `check`, `mate`, `stalemate`, `wtm`, `btm`, `not`, `or`, `only P`, `piece $n in N` for a name
+(two names, two men), `line -->` for steps a ply after another (`move from … to … capture … promote …` and what holds
+after it, or a position; `.{m,n}` for plies of anything before a step). A text that does not read gives its first
+error with its line, the word it stops at and the word of the language it looks like (Damerau–Levenshtein, one letter
+off for a short word, two for a longer); a word of CQL that the language does not read is told as such. A pattern read
+is put in the order it is written in (`canonicalize`), so that reading what was written gives the same pattern: the
+search panel's builder edits a `Pattern` and writes its text, the text read gives the builder its rows.
+`contradiction()` finds two conditions of the first position that cannot both hold (a man on a square and the square
+empty, both sides to move, mate and not check), told before any search.
+
+`PatternMatcher` evaluates on the `ScanBoard` of each ply: the conditions without names first, the cheapest first (the
+side to move, men on squares, then attacks, pins, en prise; mate and stalemate only at a game's last position, where
+`ScanBoard::hasLegalMove()` tells them), then every binding of the names to their men. A line keeps the first
+positions that fit with their bindings and the game's moves, then follows each in order, the names' men followed
+through the moves (taken: gone). The men a pattern needs on their squares give the signature window of the men's
+patterns (`patternWindow`). A route follows the men that set off along it; it gathers where the man went next and the
+routes that part from it after its first move, each once a game. A structure is a distance a side (the larger of the
+pawns missing and the pawns added: a pawn on another square is one), summed for both sides, the reversed colours the
+board turned and the sides swapped; the signature bounds it at each ply from below (a pawn of the structure on its
+starting square gone, a starting square it leaves empty still held, the end's pawns), so that only the plies it can
+hold are replayed. Its statistics: the games held exactly, the ECO codes, the variants one pawn away with their
+results.
+
+A search gathers these numbers part by part (`SearchStats`), gives its hits as they come, in order (`hitsFrom`: the
+list shows the first games found while the search goes on), and a search cancelled is resumed from the parts it
+searched whole (`Search(…, resume)`). The tests compare every search, the statistics too, with a brute force written
+apart, square by square on chess.hpp's boards and legal moves, signatures unused, over random games and games of our
+own that hold each pattern; and a search cancelled then resumed with a whole one. The reader's tests read every word
+and every error, and 20 000 texts mutated at random: none breaks it, and each one that reads is written and read back
+the same.
 
 ## Files and tournaments as databases
 
@@ -329,6 +374,7 @@ build/fcg-study-bench decode <database>                        # every game repl
 build/fcg-study-bench crash <games> <database> [--kills N]     # imports killed (SIGKILL) at random moments
 build/fcg-study-bench tree <database> [--plies N] [--memory MB] # the opening tree built, then asked
 build/fcg-study-bench search <database>                        # positions, material, patterns, a cancel
+build/fcg-study-bench advanced <database>                      # patterns of the language, lines, routes, structures
 build/fcg-study-bench evals <lichess_db_eval.jsonl.zst> <folder> [--min-men N]  # Lichess's evaluations kept offline
 build/fcg-study-bench evals-lookup <folder>                    # their lookups again, cold then warm
 build/fcg-study-bench maintenance <database>                   # its check, duplicates and players' names, timed
@@ -357,6 +403,7 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 | Material and pattern search | ≤ 4 s | material 0.3 to 0.7 s, patterns 0.25 to 1.34 s (every game replayed whole); on 8 threads 0.6 to 3.5 s |
 | A search cancelled | ≤ 50 ms | 0.2 ms |
 | A tournament beside an import | no loss on time | with the import's place among the tasks (#13) |
+| Pattern of the language, sequence, route, structure (#89) | — | see below: 0.5 to 5.3 s on 32 threads, 1.7 to 13.4 s on 8 |
 
 - On disk, the 11.7 M games take 2.16 GB (184 bytes a game); the commercial program's own files take 12.15 GB.
 - Memory, opened: the list of all games holds 124 MB of the process's own memory, at most 359 MB after a sort; the
@@ -368,6 +415,34 @@ games is January 2013 (CC0, `lichess_db_standard_rated_2013-01.pgn.zst`, 121 332
 - The opening tree keeps 15.01 M positions of the 11.7 M games (60 plies): 5.1 M that games share by the same moves
   (1.55 M of them by several orders), 9.9 M that only games' own moves share. Followed to 40 plies it keeps 14.77 M,
   to 80 plies 15.05 M; what grows is the work of the build (258 M, 446 M, 578 M positions of single games' moves).
+- The advanced searches (#89), measured on 2026-11-23 on the reference database (11.7 M games, its signatures) at the
+  lowest priority, beside other work that kept about 22 of the 32 threads busy (`fcg-study-bench advanced`): each
+  search to its end, every game that its signature does not leave out replayed.
+
+  | Search | Games | 32 threads | 8 threads |
+  |---|---|---|---|
+  | Knight fork (a name, two attacks, Black to move) | 582 105 | 2.8 s | 7.0 s |
+  | Pin on the king | 4 537 020 | 2.3 s | 6.2 s |
+  | Back-rank mate | 102 063 | 1.8 s | 4.9 s |
+  | Queen's double attack (two names, a defence denied) | 771 422 | 4.9 s | 13.2 s |
+  | Sacrifice on h7 (seven men on squares, then three moves) | 2 048 | 1.6 s | 4.1 s |
+  | Protected passed pawn | 2 204 424 | 3.3 s | 9.0 s |
+  | A line: a bishop takes and is taken (every ply a first position) | 7 168 631 | 5.3 s | 13.4 s |
+  | A line: a check, then mate within 3 plies | 495 410 | 2.5 s | 7.1 s |
+  | Route Nb1-d2-f1-g3, in 15 moves | 164 003 | 1.8 s | 5.0 s |
+  | Route Ra1-a3-h3 | 5 523 | 1.8 s | 5.0 s |
+  | Carlsbad structure, exactly, 6 plies | 58 253 | 0.55 s | 1.7 s |
+  | Carlsbad structure, one pawn away | 213 043 | 0.80 s | 2.2 s |
+  | Carlsbad structure, two pawns away | 1 012 437 | 1.0 s | 3.0 s |
+  | Carlsbad structure, one pawn away, reversed too | 381 691 | 1.1 s | 3.0 s |
+
+  The mockup expected 4.1 s for a fork, 6.8 s for a sequence, 3.2 s for a route and 2.1 s for a structure on 1.28 M
+  games: here 2.8, 1.6, 1.8 and 0.55 s on 11.7 M games and 32 busy threads, about a ninth of that on 1.28 M games. The
+  same games are found without the signatures (the database of the first format): the fork as fast (its men can be
+  anywhere), the sacrifice on h7 in 2.3 s instead of 1.6, the Carlsbad structure exactly in 2.0 s instead of 0.55
+  (3.6 times). A search cancelled after 300 ms stopped in 0.6 ms, 1.3 M games kept; the rest, resumed, in 2.2 s.
+  In the program, on a test database of 10.4 M games (the month of Lichess games, its players renamed with invented
+  names, imported many times over), the knight fork took 2.6 s while an import into the same database went on.
 - Lichess's evaluations kept offline (#58), measured on 2026-11-20 on Lichess's file of 1 November 2026 (22.5 GB,
   417 862 375 positions): read and made into the index from the disk in 7 min 37 s, with other work beside; the index
   3.83 GB (9.16 bytes a position), 1.57 GB for the openings only; a lookup 118 µs cold, 0.39 µs warm (median). The

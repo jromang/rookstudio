@@ -7,6 +7,8 @@
 //   fcg-study-bench crash <games> <database> [--kills N]          (not on Windows)
 //   fcg-study-bench tree <database> [--threads N] [--plies N] [--memory MB]
 //   fcg-study-bench search <database> [--threads N]
+//   fcg-study-bench advanced <database> [--threads N]   (patterns of the language, lines of moves, routes and pawn
+//                                                 structures; the database opened read-only)
 //   fcg-study-bench repertoire <database> <repertoire.pgn> white|black   (the database's tree built before)
 //   fcg-study-bench chessbase <file> [--quiet]   (a ChessBase database or archive, every game read, nothing written)
 //   fcg-study-bench chessbase-dump <file.2cbh> <record>...   (a few records' bytes in hex: header, moves, annotations)
@@ -60,6 +62,7 @@
 #include <study/import.hpp>
 #include <study/mapped_file.hpp>
 #include <study/names.hpp>
+#include <study/patterns.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/puzzles.hpp>
 #include <study/query.hpp>
@@ -1176,6 +1179,111 @@ int runSearch(const Args& a) {
     return 0;
 }
 
+// The advanced searches (#89, mockup M13, board 2): patterns of the language, a line of moves, a man's route, a pawn
+// structure, each to its end on the threads asked; the database opened read-only.
+int runAdvanced(const Args& a) {
+    if (a.words.size() != 2) return 2;
+    auto db           = Database::openReadOnly(a.words[1]);
+    const auto snap   = db->snapshot();
+    const int threads = a.threads > 0 ? a.threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    bool signatures   = snap->games() > 0 && snap->signature(0).has_value();
+    std::printf("advanced %s: %llu games, %d threads, %s\n", a.words[1].c_str(),
+                static_cast<unsigned long long>(snap->games()), threads,
+                signatures ? "with signatures" : "without signatures");
+    const auto run = [&](const char* name, const SearchQuery& query) {
+        const auto t = Clock::now();
+        Search search(snap, query, threads);
+        search.wait();
+        const double took     = ms(t);
+        const auto hits       = search.hits();
+        const auto stats      = search.stats();
+        const uint64_t scored = stats.results[0] + stats.results[1] + stats.results[2];
+        std::printf("%-46s %9zu games in %7.0f ms; White %.0f %%", name, hits.size(), took,
+                    scored ? 100.0 * (stats.results[0] + 0.5 * stats.results[1]) / static_cast<double>(scored) : 0.0);
+        if (std::holds_alternative<StructureQuery>(query))
+            std::printf("; exactly %llu", static_cast<unsigned long long>(stats.exact));
+        if (std::holds_alternative<ManoeuvreQuery>(query)) {
+            std::printf("; set off %llu", static_cast<unsigned long long>(stats.started));
+            int best = -1;
+            for (int s = 0; s < 64; ++s)
+                if (stats.next[static_cast<std::size_t>(s)] &&
+                    (best < 0 || stats.next[static_cast<std::size_t>(s)] > stats.next[static_cast<std::size_t>(best)]))
+                    best = s;
+            if (best >= 0) std::printf("; next mostly %c%c", 'a' + best % 8, '1' + best / 8);
+        }
+        std::printf("\n");
+        return took;
+    };
+    const auto pattern = [](std::string_view text) {
+        const auto r = readPattern(text);
+        if (!r.pattern) {
+            std::fprintf(stderr, "a pattern that does not read: line %d, %s\n", r.error->line, r.error->word.c_str());
+            std::exit(2);
+        }
+        return SearchQuery{RelationQuery{std::make_shared<const PatternMatcher>(*r.pattern)}};
+    };
+    for (const auto& preset : patternPresets()) run(std::string(preset.key).c_str(), pattern(preset.text));
+    run("knight attacks queen (one condition)", pattern("N attacks q"));
+    run("line: a bishop takes and is taken",
+        pattern("piece $b in B\nline --> move from $b capture --> move capture $b"));
+    run("line: a check, then mate within 3 plies", pattern("check\nline --> .{0,2} --> mate"));
+    const auto square = [](const char* n) { return static_cast<uint8_t>((n[1] - '1') * 8 + (n[0] - 'a')); };
+    ManoeuvreQuery route;
+    route.route = {square("b1"), square("d2"), square("f1"), square("g3")};
+    run("route Nb1-d2-f1-g3, 15 moves", route);
+    auto strict           = route;
+    strict.others_between = false;
+    run("route Nb1-d2-f1-g3, no other move between", strict);
+    ManoeuvreQuery lift;
+    lift.kind  = ROOK;
+    lift.route = {square("a1"), square("a3"), square("h3")};
+    run("route Ra1-a3-h3", lift);
+    // The Carlsbad structure (the Queen's Gambit Declined's exchange line).
+    StructureQuery carlsbad;
+    carlsbad.pawns = {(uint64_t{1} << square("a2")) | (uint64_t{1} << square("b2")) | (uint64_t{1} << square("d4")) |
+                          (uint64_t{1} << square("e3")) | (uint64_t{1} << square("f2")) |
+                          (uint64_t{1} << square("g2")) | (uint64_t{1} << square("h2")),
+                      (uint64_t{1} << square("a7")) | (uint64_t{1} << square("b7")) | (uint64_t{1} << square("c6")) |
+                          (uint64_t{1} << square("d5")) | (uint64_t{1} << square("f7")) |
+                          (uint64_t{1} << square("g7")) | (uint64_t{1} << square("h7"))};
+    carlsbad.plies = 6;
+    for (const int distance : {0, 1, 2}) {
+        auto q     = carlsbad;
+        q.distance = distance;
+        run(distance == 0   ? "structure Carlsbad, exactly, 6 plies"
+            : distance == 1 ? "structure Carlsbad, one pawn away"
+                            : "structure Carlsbad, two pawns away",
+            q);
+    }
+    auto both     = carlsbad;
+    both.distance = 1;
+    both.reversed = true;
+    run("structure Carlsbad, one pawn away, reversed too", both);
+    auto white       = carlsbad;
+    white.both_sides = false;
+    white.distance   = 1;
+    run("structure Carlsbad, White's pawns, one pawn away", white);
+    // A cancel and its resumption.
+    {
+        const auto q = pattern(patternPresets()[0].text);
+        Search first(snap, q, threads);
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        const auto t = Clock::now();
+        first.cancel();
+        first.wait();
+        const double stopped = ms(t);
+        const auto kept      = first.searched();
+        const auto t2        = Clock::now();
+        Search rest(snap, q, threads, &first);
+        rest.wait();
+        std::printf(
+            "knight fork cancelled after 300 ms: stopped in %.2f ms, %llu games kept; the rest in %.0f ms (%zu "
+            "games)\n",
+            stopped, static_cast<unsigned long long>(kept), ms(t2), rest.hits().size());
+    }
+    return 0;
+}
+
 // A repertoire's coverage of the database's games, from its tree: the time it takes, and its gaps.
 int runRepertoire(const Args& a) {
     if (a.words.size() != 4 || (a.words[3] != "white" && a.words[3] != "black")) return 2;
@@ -1987,6 +2095,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "decode") rc = runDecode(a);
         if (a.words[0] == "tree") rc = runTree(a);
         if (a.words[0] == "search") rc = runSearch(a);
+        if (a.words[0] == "advanced") rc = runAdvanced(a);
         if (a.words[0] == "repertoire") rc = runRepertoire(a);
         if (a.words[0] == "chessbase") rc = runChessBase(a);
         if (a.words[0] == "chessbase-dump") rc = runChessBaseDump(a);

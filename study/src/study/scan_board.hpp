@@ -63,6 +63,10 @@ class ScanBoard {
     // A move written in SAN ("Nbd7", "exd6", "e8=Q+", "O-O", "0-0-0", "--"): the legal move it names, if one.
     [[nodiscard]] std::optional<CodedMove> parseSan(std::string_view san) const;
     [[nodiscard]] bool inCheck() const noexcept;
+    // The men of side `by` that attack `square` (a pin left aside): those that defend a man there, or threaten it.
+    [[nodiscard]] uint64_t attackers(int square, int by) const noexcept;
+    // Whether the side to move has a legal move: none is mate when in check, stalemate otherwise.
+    [[nodiscard]] bool hasLegalMove() const noexcept;
 
    private:
     [[nodiscard]] int codeSize(int square) const noexcept;

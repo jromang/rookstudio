@@ -2212,6 +2212,7 @@ void App::drawBoardColumn(float size) {
     if (appearance::current().board3d.on && board3d_.available()) {
         board3d_.setMarks(chessBoard() ? Board3d::Marks::A : Board3d::Marks::Off);
         const auto input = board3d_.draw(shown, size, decor);
+        board_hover_     = line_board ? std::nullopt : input.hovered;  // Ctrl+K "This manoeuvre"
         if (chessBoard() && !line_board) {
             b.mark_from  = input.marking;
             b.mark_hover = input.hovered;
@@ -2227,6 +2228,7 @@ void App::drawBoardColumn(float size) {
         if (!appearance::current().board3d.on) board3d_.release();
         drawBoard(atlas_, shown, size, decor);
         const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
+        board_hover_     = line_board || !ImGui::IsItemHovered() ? std::nullopt : hover;  // Ctrl+K "This manoeuvre"
         const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
                    right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
         // The right button: a square's mark where it is released on the square it pressed, an arrow elsewhere.

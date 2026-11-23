@@ -13765,9 +13765,6 @@ msgstr "已掌握，稍后复习"
 msgid "later"
 msgstr "稍后"
 
-msgid "later: your studies, playing online (the next previews)."
-msgstr "以后：你的研究、在线对弈（后续预览版）。"
-
 msgid "length unknown"
 msgstr "时长未知"
 
@@ -14898,6 +14895,9 @@ msgstr "你的等级分：{}"
 
 msgid "your repertoire “{}”"
 msgstr "你的开局体系“{}”"
+
+msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
+msgstr ""
 
 msgid "{:+.2f}  (DrawElo {:.0f})"
 msgstr "{:+.2f}  (DrawElo {:.0f})"

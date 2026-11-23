@@ -13961,9 +13961,6 @@ msgstr "известны, повторить позже"
 msgid "later"
 msgstr "позже"
 
-msgid "later: your studies, playing online (the next previews)."
-msgstr "позже: ваши исследования, игру онлайн (в следующих предварительных версиях)."
-
 msgid "length unknown"
 msgstr "длительность неизвестна"
 
@@ -15124,6 +15121,9 @@ msgstr "ваш рейтинг: {}"
 
 msgid "your repertoire “{}”"
 msgstr "ваш репертуар «{}»"
+
+msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
+msgstr ""
 
 msgid "{:+.2f}  (DrawElo {:.0f})"
 msgstr "{:+.2f}  (DrawElo {:.0f})"

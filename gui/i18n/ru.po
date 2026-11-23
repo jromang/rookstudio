@@ -1452,7 +1452,7 @@ msgid "Asked again in this session, then on its day."
 msgstr "Вопрос повторится в этом сеансе, затем в свой день."
 
 msgid "Asked of Lichess without an account: the channels, and the games you follow. Nothing is kept unless you keep it."
-msgstr ""
+msgstr "Запрашивается у Lichess без учётной записи: каналы и партии, за которыми вы следите. Сохраняется только то, что сохраните вы."
 
 msgid "Asked of Lichess: their name with a year of blitz, rapid and classical games, and their public profile. Nothing of yours."
 msgstr "Запрос к Lichess: имя соперника с его партиями в блиц, рапид и классику за год и его публичный профиль. Ничего вашего."
@@ -1671,10 +1671,10 @@ msgid "Back to the list"
 msgstr "Назад к списку"
 
 msgid "Back to the mosaic"
-msgstr ""
+msgstr "Вернуться к мозаике"
 
 msgid "Back to the mosaic · Esc"
-msgstr ""
+msgstr "Вернуться к мозаике · Esc"
 
 msgid "Back to the result as played ({})"
 msgstr "Вернуть сыгранный результат ({})"
@@ -2568,7 +2568,7 @@ msgid "Comparing {} here and on {}…"
 msgstr "Сравнение {} здесь и на {}…"
 
 msgid "Computer"
-msgstr ""
+msgstr "Компьютер"
 
 msgid "Computing…"
 msgstr "Вычисление…"
@@ -4242,7 +4242,7 @@ msgid "Hash {} MB"
 msgstr "Хеш {} МБ"
 
 msgid "Have a good game!"
-msgstr ""
+msgstr "Хорошей игры!"
 
 msgid "Have the position played out"
 msgstr "Разыграть позицию"
@@ -4584,10 +4584,10 @@ msgid "Into a database"
 msgstr "В базу"
 
 msgid "Into a database of your choice, at its end."
-msgstr ""
+msgstr "В базу на ваш выбор, по её окончании."
 
 msgid "Into a database of your choice, now."
-msgstr ""
+msgstr "В базу на ваш выбор, сейчас."
 
 msgid "Into a database, its PGN file or another: a menu · Ctrl+S"
 msgstr "В базу, в исходный файл PGN или в другой: меню · Ctrl+S"
@@ -4653,16 +4653,16 @@ msgid "It could not go into “{}”: {}."
 msgstr "Не удалось поместить её в «{}»: {}."
 
 msgid "It ended: {}. The board stays on it."
-msgstr ""
+msgstr "Партия окончена: {}. Доска остаётся на ней."
 
 msgid "It ended: {}. The channel has no other game for now."
-msgstr ""
+msgstr "Партия окончена: {}. Других партий на канале пока нет."
 
 msgid "It ended: {}. The channel's next game comes in a moment."
-msgstr ""
+msgstr "Партия окончена: {}. Следующая партия канала скоро появится."
 
 msgid "It ended: {}. The channel's next game comes…"
-msgstr ""
+msgstr "Партия окончена: {}. Загружается следующая партия канала…"
 
 msgid "It expected"
 msgstr "Ожидал"
@@ -5010,7 +5010,7 @@ msgid "Keep the engine log of every game"
 msgstr "Сохранять журнал движков для каждой партии"
 
 msgid "Keep the game, at its end, in"
-msgstr ""
+msgstr "Сохранить партию по её окончании в"
 
 msgid "Keep the king boxed in with the queen a knight's jump away, bring your own king, and mind the stalemate."
 msgstr "Держите короля в «коробке» ферзём на расстоянии хода коня, подведите своего короля и берегитесь пата."
@@ -5034,7 +5034,7 @@ msgid "Keep them running and quit"
 msgstr "Оставить играть и выйти"
 
 msgid "Keep this game…"
-msgstr ""
+msgstr "Сохранить эту партию…"
 
 msgid "Keep this search…"
 msgstr "Сохранить этот поиск…"
@@ -5052,10 +5052,10 @@ msgid "Kept in the profile only, never in a tournament's files or the log."
 msgstr "Хранится только в профиле, никогда — в файлах турнира или в журнале."
 
 msgid "Kept in “{}”"
-msgstr ""
+msgstr "Сохранена в «{}»"
 
 msgid "Kept in “{}” at its end"
-msgstr ""
+msgstr "Сохранится в «{}» по окончании"
 
 msgid "Kept searches"
 msgstr "Сохранённые поиски"
@@ -5190,46 +5190,46 @@ msgid "Lichess"
 msgstr "Lichess"
 
 msgid "Lichess AI, level {}"
-msgstr ""
+msgstr "ИИ Lichess уровня {}"
 
 msgid "Lichess TV"
-msgstr ""
+msgstr "Lichess TV"
 
 msgid "Lichess TV · {}"
-msgstr ""
+msgstr "Lichess TV · {}"
 
 msgid "Lichess TV · {} · the featured game"
-msgstr ""
+msgstr "Lichess TV · {} · главная партия"
 
 msgid "Lichess TV · {} · the featured game, {}"
-msgstr ""
+msgstr "Lichess TV · {} · главная партия, {}"
 
 msgid "Lichess TV · {} · {}"
-msgstr ""
+msgstr "Lichess TV · {} · {}"
 
 msgid "Lichess TV: go on to the channel's next game"
-msgstr ""
+msgstr "Lichess TV: перейти к следующей партии канала"
 
 msgid "Lichess TV: keep this game…"
-msgstr ""
+msgstr "Lichess TV: сохранить эту партию…"
 
 msgid "Lichess TV: stay on this game"
-msgstr ""
+msgstr "Lichess TV: остаться на этой партии"
 
 msgid "Lichess TV: {} could not be kept: {}"
-msgstr ""
+msgstr "Lichess TV: не удалось сохранить партию {}: {}"
 
 msgid "Lichess TV: {} in the mosaic"
-msgstr ""
+msgstr "Lichess TV: {} в мозаике"
 
 msgid "Lichess TV: {} kept in “{}”."
-msgstr ""
+msgstr "Lichess TV: партия {} сохранена в «{}»."
 
 msgid "Lichess TV: {} on the Board"
-msgstr ""
+msgstr "Lichess TV: {} на доске"
 
 msgid "Lichess TV: “{}” could not be written: {} was not kept."
-msgstr ""
+msgstr "Lichess TV: не удалось записать «{}»: партия {} не сохранена."
 
 msgid "Lichess allows an opening book and a database there: the tree of your databases stays open. The engine, the cloud, the tables and the assistant look at no position of this game, before the one it has reached or after it."
 msgstr "Lichess разрешает там дебютную книгу и базу: дерево ваших баз остаётся открытым. Движок, облако, таблицы и ассистент не смотрят ни на одну позицию этой партии — ни до достигнутой, ни после неё."
@@ -5340,7 +5340,7 @@ msgid "Lichess lets an account make {} studies a day: send it into one of yours,
 msgstr "Lichess позволяет учётной записи создавать не больше {} исследований в день: отправьте партию в одно из ваших исследований или завтра."
 
 msgid "Lichess lets an address follow {} games at once: the rounds and the players followed take them all now."
-msgstr ""
+msgstr "Lichess позволяет одному адресу следить одновременно за {} партиями: сейчас их все занимают туры и игроки, за которыми вы следите."
 
 msgid "Lichess lets {} rounds be followed at once: stop one first."
 msgstr "Lichess позволяет следить одновременно не более чем за {} турами: сначала остановите один."
@@ -5403,7 +5403,7 @@ msgid "Lichess sends the browser back to 127.0.0.1, on a port only RookStudio li
 msgstr "Lichess возвращает браузер на 127.0.0.1, на порт, который слушает только RookStudio на время привязки. Если ответа нет 5 минут, привязка прекращается сама."
 
 msgid "Lichess shows its moves three moves late, to anyone."
-msgstr ""
+msgstr "Lichess показывает её ходы с отставанием на три хода, всем."
 
 msgid "Lichess studies"
 msgstr "Исследования Lichess"
@@ -5451,7 +5451,7 @@ msgid "Lichess's analysis"
 msgstr "Анализ Lichess"
 
 msgid "Lichess's best bots, this engine analysing beside them"
-msgstr ""
+msgstr "лучшие боты Lichess, а рядом с ними анализирует этот движок"
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Трансляции Lichess распространяются по лицензии CC BY-SA 4.0: их партии сохраняют источник — страницу трансляции в теге Site; то, чем вы из них делитесь, распространяется на тех же условиях."
@@ -5559,13 +5559,13 @@ msgid "Lichess's page opens to link your account, with the permission to write i
 msgstr "Откроется страница Lichess, чтобы привязать вашу учётную запись с разрешением писать в ваши исследования (study:write)."
 
 msgid "Lichess's page opens: log in with the bot's account, not yours (a private window avoids logging you out). The permission asked: play as a bot (bot:play)."
-msgstr "Откроется страница Lichess: войдите под учётной записью бота, а не под своей (приватное окно избавит от выхода из вашей). Запрашиваемое разрешение: «Играть партии с API ботов» (bot:play)."
+msgstr "Откроется страница Lichess: войдите под учётной записью бота, а не под своей (приватное окно избавит от выхода из вашей). Запрашиваемое разрешение: играть как бот (bot:play)."
 
 msgid "Lichess's page opens; your account stays linked meanwhile, and the token it replaces is revoked. The same permission serves the lock and the challenges received."
 msgstr "Открывается страница Lichess; учётная запись тем временем остаётся привязанной, а заменяемый токен отзывается. Это же разрешение служит для блокировки и для полученных вызовов."
 
 msgid "Lichess's page, logged in with the bot's account, the permission to play as a bot (bot:play) ticked."
-msgstr ""
+msgstr "Страница Lichess, вход под учётной записью бота, отмечено разрешение играть как бот (bot:play)."
 
 msgid "Lichess's players' games; the right button chooses their speeds and ratings"
 msgstr "Партии игроков Lichess; правая кнопка выбирает контроль времени и рейтинги"
@@ -5646,7 +5646,7 @@ msgid "Lichess: {}"
 msgstr "Lichess: {}"
 
 msgid "Lichess: {}. The list shown was read earlier."
-msgstr ""
+msgstr "Lichess: {}. Показан список, полученный ранее."
 
 msgid "Lichess: “{}” could not be made: {}"
 msgstr "Lichess: не удалось создать «{}»: {}"
@@ -5883,7 +5883,7 @@ msgid "Make it first"
 msgstr "Сделать первым"
 
 msgid "Make one with the permission to play as a bot (bot:play), logged in with the bot's account, then paste it."
-msgstr ""
+msgstr "Создайте токен с разрешением играть как бот (bot:play), войдя под учётной записью бота, затем вставьте его."
 
 msgid "Make one, or import a PGN file: a new database takes its name."
 msgstr "Создайте базу или импортируйте файл PGN: новая база получит его имя."
@@ -6399,7 +6399,7 @@ msgid "No game matches."
 msgstr "Подходящих партий нет."
 
 msgid "No game of the channel has come yet: they appear as Lichess lists them, three moves late."
-msgstr ""
+msgstr "Партий канала пока нет: они появляются по мере того, как их перечисляет Lichess, с отставанием на три хода."
 
 msgid "No game of the database reached this position (the position search says so)."
 msgstr "Ни одна партия базы не доходила до этой позиции (так говорит поиск по позиции)."
@@ -6573,7 +6573,7 @@ msgid "No results yet."
 msgstr "Результатов пока нет."
 
 msgid "No round followed: the Lichess page lists the broadcasts."
-msgstr ""
+msgstr "Вы не следите ни за одним туром: трансляции перечислены на странице Lichess."
 
 msgid "No round yet."
 msgstr "Туров пока нет."
@@ -6714,7 +6714,7 @@ msgid "Not an https link."
 msgstr "Это не https-ссылка."
 
 msgid "Not any more"
-msgstr ""
+msgstr "Не сохранять"
 
 msgid "Not checked"
 msgstr "Не проверен"
@@ -6924,7 +6924,7 @@ msgid "On the board"
 msgstr "На доску"
 
 msgid "On the board, the game moves on with each move received, and the board goes on to the channel's next game when it ends; going back to analyse it lets it move on behind, “Back to live” brings it back."
-msgstr ""
+msgstr "На доске партия продвигается с каждым полученным ходом, а когда она заканчивается, доска переходит к следующей партии канала; если вернуться назад для анализа, партия продолжится в фоне, а «Вернуться к эфиру» вернёт её."
 
 msgid "On the board, the game moves on with each move received; going back to analyse it lets it move on behind, “Back to live” brings it back."
 msgstr "На доске партия продвигается с каждым полученным ходом; если вернуться назад для анализа, она продолжится в фоне, а «Вернуться к эфиру» вернёт её."
@@ -9213,7 +9213,7 @@ msgid "Statistics are given from A's point of view."
 msgstr "Статистика приводится с точки зрения A."
 
 msgid "Stay on this game"
-msgstr ""
+msgstr "Остаться на этой партии"
 
 msgid "Stay · Esc"
 msgstr "Остаться · Esc"
@@ -9621,7 +9621,7 @@ msgid "The 50-move counter, the material and the pieces left, under every board 
 msgstr "Счётчик 50 ходов, материал и оставшиеся фигуры под каждой доской мозаики."
 
 msgid "The Board"
-msgstr ""
+msgstr "Доска"
 
 msgid "The Board page's Tree tab, on this book: its moves at the position shown, green ones first."
 msgstr "Вкладка «Дерево» страницы «Доска» по этой книге: её ходы в показанной позиции, зелёные первыми."
@@ -9912,10 +9912,10 @@ msgid "The change was undone."
 msgstr "Изменение отменено."
 
 msgid "The channel's games"
-msgstr ""
+msgstr "Партии канала"
 
 msgid "The channel's games in progress in the mosaic, each analysed by your engine: {} at most from this address."
-msgstr ""
+msgstr "Идущие партии канала в мозаике, каждую анализирует ваш движок: не больше {} с этого адреса."
 
 msgid "The chapter"
 msgstr "Глава"
@@ -10191,7 +10191,7 @@ msgid "The far passed pawn draws the king away; your king takes what it leaves."
 msgstr "Отдалённая проходная отвлекает короля; ваш король забирает то, что тот оставил."
 
 msgid "The featured game on the Board, which follows it; when it ends, the channel goes on to the next one."
-msgstr ""
+msgstr "Главная партия на доске, которая следит за ней; когда партия закончится, канал перейдёт к следующей."
 
 msgid "The file cannot be read: {}."
 msgstr "Не удаётся прочитать файл: {}."
@@ -10434,13 +10434,13 @@ msgid "The games in progress are lost; each tournament resumes exactly where it 
 msgstr "Текущие партии будут потеряны; каждый турнир продолжится ровно с того места, где остановился."
 
 msgid "The games of Lichess TV's Bots channel in the mosaic, each analysed by {} on your machine; no account needed."
-msgstr ""
+msgstr "Партии канала «Боты» Lichess TV в мозаике, каждую анализирует {} на вашем компьютере; учётная запись не нужна."
 
 msgid "The games of Lichess TV's Computer channel, players against Lichess's AI, in the mosaic, each analysed by {} on your machine; no account needed."
-msgstr ""
+msgstr "Партии канала «Компьютер» Lichess TV (игроки против ИИ Lichess) в мозаике, каждую анализирует {} на вашем компьютере; учётная запись не нужна."
 
 msgid "The games of a channel of Lichess TV."
-msgstr ""
+msgstr "Партии канала Lichess TV."
 
 msgid "The games of its rounds."
 msgstr "Партии его туров."
@@ -10449,7 +10449,7 @@ msgid "The games of the clipboard (a PGN text) imported into it."
 msgstr "Партии из буфера обмена (текст PGN) импортируются в неё."
 
 msgid "The games of the players you follow."
-msgstr ""
+msgstr "Партии отслеживаемых вами игроков."
 
 msgid "The games opened on the board come here."
 msgstr "Сюда попадают партии, открытые на доске."
@@ -10707,7 +10707,7 @@ msgid "The moves come from Lichess, three moves behind, as it shows them to anyo
 msgstr "Ходы приходят с Lichess с отставанием на три хода, как он показывает их всем; анализ делается на вашем компьютере вашими движками. Закончившаяся партия остаётся здесь, пока её место не займёт другая."
 
 msgid "The moves come three moves late: Lichess's rule for spectators. A finished game gives its place to another of the channel; a double click follows a game on the board. The analysis is made on your machine, with your engines; nothing is kept unless you keep it."
-msgstr ""
+msgstr "Ходы приходят с отставанием на три хода: таково правило Lichess для зрителей. Закончившаяся партия уступает место другой партии канала; двойной щелчок — следить за партией на доске. Анализ выполняется на вашем компьютере вашими движками; сохраняется только то, что сохраните вы."
 
 msgid "The moves missed"
 msgstr "Ходы с ошибками"
@@ -11103,7 +11103,7 @@ msgid "The rounds"
 msgstr "Туры"
 
 msgid "The rounds you follow."
-msgstr ""
+msgstr "Туры, за которыми вы следите."
 
 msgid "The rule of the square"
 msgstr "Правило квадрата"
@@ -11385,7 +11385,7 @@ msgid "The variance of a game when the games are counted in pairs, over the vari
 msgstr "Дисперсия партии при подсчёте по парам, делённая на дисперсию отдельных партий: если она меньше 1, парам нужно во столько же раз меньше партий для той же точности."
 
 msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
-msgstr ""
+msgstr "Каналы вариантов шахмат (Крейзихаус, Атомные шахматы…) не показываются. Список перечитывается при показе карточки, не чаще раза в 30 с."
 
 msgid "The version and the system, for a bug report."
 msgstr "Версия и система — для сообщения об ошибке."
@@ -11745,7 +11745,7 @@ msgid "Too slow for me"
 msgstr "Слишком медленно для меня"
 
 msgid "Top rated"
-msgstr ""
+msgstr "Сильнейшие"
 
 msgid "Total"
 msgstr "Итого"
@@ -12009,7 +12009,7 @@ msgid "Unticked, it takes its share of the analysis's threads; ticked, the threa
 msgstr "Без отметки он получает свою долю потоков анализа; с отметкой — потоки, заданные здесь, и доля остальных их не включает."
 
 msgid "Unticked, the board goes on to the channel's next featured game when this one ends; the game left stays a Ctrl+Tab away."
-msgstr ""
+msgstr "Без отметки доска переходит к следующей главной партии канала, когда эта закончится; оставленная партия остаётся доступной по Ctrl+Tab."
 
 msgid "Unticked: the move played most, a book's main move first, every time. A book or a repertoire offers each of its moves; your databases and a player's games those played at least {} times."
 msgstr "Без отметки: каждый раз самый частый ход, у книги — сначала её главный ход. Книга или репертуар предлагают каждый свой ход; ваши базы и партии игрока — ходы, сыгранные не меньше {} раз."
@@ -12339,10 +12339,10 @@ msgid "What's new"
 msgstr "Что нового"
 
 msgid "When it ends, the board stays on it."
-msgstr ""
+msgstr "Когда партия закончится, доска останется на ней."
 
 msgid "When it ends, the channel goes on to the next one, by itself."
-msgstr ""
+msgstr "Когда партия закончится, канал сам перейдёт к следующей."
 
 msgid "When it settled on the move it played, on average: a decision long before the end of the time spent says the time was not used well."
 msgstr "Когда в среднем он останавливался на сыгранном ходе: решение задолго до конца затраченного времени говорит о том, что время использовалось неэффективно."
@@ -12975,7 +12975,7 @@ msgid "Your own folder…"
 msgstr "Ваша папка…"
 
 msgid "Your own game: it is never shown here (fair play)."
-msgstr ""
+msgstr "Ваша собственная партия: здесь она никогда не показывается (честная игра)."
 
 msgid "Your public studies only: RookStudio may not read the others."
 msgstr "Только ваши публичные исследования: RookStudio не может читать остальные."
@@ -13089,10 +13089,10 @@ msgid "a bot already ✓"
 msgstr "уже бот ✓"
 
 msgid "a bot since today, {}"
-msgstr ""
+msgstr "бот с {} сегодня"
 
 msgid "a bot since {}"
-msgstr "стала ботом: {}"
+msgstr "бот с {}"
 
 msgid "a click shows the position, the tree beside it"
 msgstr "щелчок показывает позицию, а рядом — дерево"
@@ -13764,10 +13764,10 @@ msgid "import of {}: {} %"
 msgstr "импорт {}: {} %"
 
 msgid "in a database of your choice"
-msgstr ""
+msgstr "в базу на ваш выбор"
 
 msgid "in a database of your choice, at its end"
-msgstr ""
+msgstr "в базу на ваш выбор, по её окончании"
 
 msgid "in a game"
 msgstr "играет"
@@ -14517,7 +14517,7 @@ msgid "resign {}/{} cp, both engines"
 msgstr "сдача {}/{} cp, оба движка"
 
 msgid "resting during your game on Lichess"
-msgstr ""
+msgstr "движок отдыхает во время вашей партии на Lichess"
 
 msgid "reviewed: its marks are in the notation"
 msgstr "разобрана: пометки разбора — в нотации"
@@ -14658,7 +14658,7 @@ msgid "the engine offered by default"
 msgstr "движок, предлагаемый по умолчанию"
 
 msgid "the engines rest during your game on Lichess"
-msgstr ""
+msgstr "движки отдыхают во время вашей партии на Lichess"
 
 msgid "the facts of the positions its lines lead to"
 msgstr "факты о позициях, к которым ведут его варианты"
@@ -15015,7 +15015,7 @@ msgid "what Ctrl+S does"
 msgstr "то, что делает Ctrl+S"
 
 msgid "where you kept the last one"
-msgstr ""
+msgstr "куда вы сохранили предыдущую"
 
 msgid "where you saved last time"
 msgstr "куда вы сохраняли в прошлый раз"
@@ -15111,7 +15111,7 @@ msgid "your names first"
 msgstr "сначала ваши имена"
 
 msgid "your own game: not shown"
-msgstr ""
+msgstr "ваша собственная партия: не показывается"
 
 msgid "your rating {}{}"
 msgstr "ваш рейтинг {}{}"
@@ -15642,7 +15642,7 @@ msgid "{} free where its folder {} is."
 msgstr "{} свободно там, где находится его папка {}."
 
 msgid "{} from the start"
-msgstr ""
+msgstr "{} с самого начала"
 
 msgid "{} game"
 msgid_plural "{} games"
@@ -15724,9 +15724,9 @@ msgstr[2] "{} партий из неравных дебютов"
 
 msgid "{} game in progress"
 msgid_plural "{} games in progress"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgstr[0] "идёт {} партия"
+msgstr[1] "идут {} партии"
+msgstr[2] "идёт {} партий"
 
 msgid "{} game in {}"
 msgid_plural "{} games in {}"
@@ -16095,7 +16095,7 @@ msgid "{} is twice in the list of participants."
 msgstr "{} дважды указан в списке участников."
 
 msgid "{} kept in “{}”"
-msgstr ""
+msgstr "Партия {} сохранена в «{}»"
 
 msgid "{} left the game."
 msgstr "{} покинул партию."
@@ -17370,7 +17370,7 @@ msgid "{}: kept, judged when the tables answer."
 msgstr "{}: сохранён, будет оценён, когда ответят таблицы."
 
 msgid "{}: never"
-msgstr ""
+msgstr "{}: никогда"
 
 msgid "{}: no Syzygy file in {}: the adjudication does without them; push them from Settings > Machines > Books and tablebases."
 msgstr "{}: нет файлов Syzygy в {}: присуждение обойдётся без них; отправьте их в разделе Параметры > Машины > Книги и эндшпильные таблицы."
@@ -17553,7 +17553,7 @@ msgid "· draws %.1f %%"
 msgstr "· ничьи %.1f %%"
 
 msgid "· each channel's featured game"
-msgstr ""
+msgstr "· главная партия каждого канала"
 
 msgid "· end of book ·"
 msgstr "· конец книги ·"
@@ -17583,7 +17583,7 @@ msgid "· the token lasts until {}"
 msgstr "· токен действует до {}"
 
 msgid "· unrated while you test it, as Lichess asks; tick it afterwards"
-msgstr ""
+msgstr "· только товарищеские, пока вы его проверяете, как просит Lichess; потом отметьте"
 
 msgid "· waiting for challenges"
 msgstr "· ожидание вызовов"
@@ -17697,7 +17697,7 @@ msgid "“{}” taken out of the theory; the file stays where it is."
 msgstr "Из теории убрано: «{}»; файл остаётся на месте."
 
 msgid "“{}”, a new database"
-msgstr ""
+msgstr "«{}», новая база"
 
 msgid "“{}”, from line {}"
 msgstr "«{}», со строки {}"

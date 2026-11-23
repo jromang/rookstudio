@@ -349,7 +349,7 @@ bleiben die Bretter flach, und die *Darstellung* sagt, warum. Die Figuren sind c
 der MIT-Lizenz; die *Darstellung* verlinkt sie.
 
 ## Tastenkürzel
-<!-- en: keyboard-shortcuts 65140e2d -->
+<!-- en: keyboard-shortcuts e7a7fc57 -->
 
 | Tasten | Wo | Was sie tun |
 |---|---|---|
@@ -372,7 +372,7 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>G</kbd> | Die Seite Brett | Die Partie analysieren, Durchgang um Durchgang; noch einmal: anhalten |
 | <kbd>X</kbd> | Die Seite Brett | Die Drohung zeigen oder ausblenden |
 | <kbd>N</kbd>, <kbd>Umschalt</kbd>+<kbd>N</kbd> | Die Seite Brett | Der nächste, der vorherige von der Analyse markierte Zug |
-| <kbd>Esc</kbd> | Die Seite Brett | Die Partie zurückholen, nachdem eine Linie gezeigt wurde; die aufgenommene Figur wieder ablegen |
+| <kbd>Esc</kbd> | Die Seite Brett | Die Partie zurückholen, nachdem eine Linie gezeigt wurde; die aufgenommene Figur wieder ablegen; eine aus einem Mosaik verfolgte Partie: zurück zum Mosaik |
 | <kbd>Strg</kbd>+<kbd>O</kbd>, <kbd>Strg</kbd>+<kbd>N</kbd> | Eine Ansicht fürs Studium | Eine PGN-Datei auf der Seite Brett öffnen; dort eine neue Partie |
 | <kbd>Strg</kbd>+<kbd>Tab</kbd>, <kbd>Strg</kbd>+<kbd>Umschalt</kbd>+<kbd>Tab</kbd> | Eine Ansicht fürs Studium | Die letzten Partien; Loslassen von Strg öffnet die gewählte |
 | <kbd>Enter</kbd> | Die Startseite | Die Partie auf dem Brett fortsetzen |
@@ -699,7 +699,7 @@ WinBoard-Engines.
 - `FCG_WB2UCI_LOG=FILE` in der Umgebung schreibt jede mit WinBoard-Engines ausgetauschte Zeile in `FILE`.
 
 ### Ein Lichess-Bot
-<!-- en: a-lichess-bot c8e717b7 -->
+<!-- en: a-lichess-bot 5ae494c4 -->
 
 Die Karte einer Engine hat eine Zeile **Auf Lichess, als Bot**: *Zum Lichess-Bot machen…* richtet die Engine so ein,
 dass sie auf Lichess unter einem Bot-Konto spielt, über die Bot-API von Lichess (wo Engines erlaubt sind), und die
@@ -738,13 +738,13 @@ durch die folgenden Schritte führt.
 - **Sein Spiel**: die Engine mit ihren Optionen der Bibliothek (ihre `Threads` und ihr `Hash` zählen zum Kernbudget der
   Maschine, solange sie spielt), ein Polyglot-Buch deiner Bibliothek, gespielt, solange es einen Zug hat, die Tablebases
   der Turniere (`SyzygyPath`, für eine Engine, die die Option und keinen eigenen Pfad hat) und kein Nachdenken in der
-  Zeit des Gegners. Seine Uhr kommt bei jedem Zug von Lichess, abzüglich einer Reserve für das Netz (ein Zehntel davon,
-  von 0,2 bis 1 Sekunde); bevor beide Seiten gezogen haben, spielt er innerhalb der Zeit, die Lichess für den ersten Zug
-  gibt; im Fernschach denkt er 15 Sekunden pro Zug. Er nimmt ein angebotenes Remis an, wenn die Engine klar schlechter
-  steht oder spät in der Partie nicht besser, lehnt eine Zugrücknahme ab und beansprucht den Sieg, wenn sein Gegner
-  lange genug weg ist. Seine Worte, im Chat der Spieler zu Beginn und am Ende gesagt, wählst du (leer: nichts gesagt).
-  Eine Engine, die nicht startet oder stehen bleibt, gibt die Partie auf (bricht sie ab, bevor beide Seiten gezogen
-  haben), und die Karte sagt, warum.
+  Zeit des Gegners. Seine Uhr kommt bei jedem Zug von Lichess, abzüglich einer Reserve für das Netz (ein Zehntel seiner
+  verbleibenden Zeit, von 0,2 bis 1 Sekunde); bevor beide Seiten gezogen haben, spielt er innerhalb der Zeit, die
+  Lichess für den ersten Zug gibt; im Fernschach denkt er 15 Sekunden pro Zug. Er nimmt ein angebotenes Remis an, wenn
+  die Engine klar schlechter steht oder spät in der Partie nicht besser, lehnt eine Zugrücknahme ab und beansprucht den
+  Sieg, wenn sein Gegner lange genug weg ist. Seine Worte, im Chat der Spieler zu Beginn und am Ende gesagt, wählst du
+  (leer: nichts gesagt). Eine Engine, die nicht startet oder stehen bleibt, gibt die Partie auf (bricht sie ab, bevor
+  beide Seiten gezogen haben), und die Karte sagt, warum.
 - **Online schalten** (Enter) öffnet den eigenen Ereignisstrom des Bots (Lichess hält einen pro Token): Die
   Herausforderungen kommen und werden sofort nach seinen Regeln beantwortet. Online zeigt die Karte den Tag des Bots
   (gewonnene, remis gespielte und verlorene Partien, abgelehnte Herausforderungen), seine Partie auf einem kleinen Brett
@@ -2217,16 +2217,16 @@ sendet seine Änderungen genauso.
 Die Grenzen von Lichess: 64 Kapitel pro Studie, 30 neue Studien pro Tag.
 
 ### Offizielle Übertragungen
-<!-- en: official-broadcasts a02f4c35 -->
+<!-- en: official-broadcasts 9c582d92 -->
 
 Die laufenden offiziellen Übertragungen, die bekanntesten zuerst (*Alle laufenden Übertragungen* für die anderen), und
 die nächsten. *Folgen* öffnet eine Runde in einem Mosaik auf der Seite Lichess: die Karte jeder Partie mit den Namen,
 den Uhren, dem letzten Zug, der Bewertungsleiste sowie der Bewertung und der Variante der unter *Analysiert von*
-gewählten Engine; rechts die gewählte Partie mit ihren letzten Zügen, *Auf dem Brett verfolgen* und *PGN kopieren*,
-dann die Runde. Die Partien werden auf deinem Computer analysiert, mit deiner Engine, so viele gleichzeitig, wie es die
-von den Turnieren übrig gelassenen Kerne erlauben, die gewählte Partie zuerst, und nur solange das Mosaik zu sehen ist.
-Auf dem Brett geht die Partie mit jedem empfangenen Zug weiter; gehst du zum Analysieren zurück, läuft sie im
-Hintergrund weiter, und *Zurück zu Live* holt sie zurück.
+gewählten Engine; rechts die gewählte Partie mit ihren letzten Zügen, *Auf dem Brett verfolgen* und *PGN kopieren*, dann
+die Runde. Die Partien werden auf deinem Computer analysiert, mit deiner Engine, so viele gleichzeitig, wie es die von
+den Turnieren übrig gelassenen Kerne erlauben, die gewählte Partie zuerst, und nur solange das Mosaik zu sehen ist. Auf
+dem Brett geht die Partie mit jedem empfangenen Zug weiter; gehst du zum Analysieren zurück, läuft sie im Hintergrund
+weiter, und *Zurück zu Live* holt sie zurück; *Zurück zum Mosaik* (Esc) führt zur Runde zurück.
 
 Lichess lässt ohne Konto vier Runden gleichzeitig verfolgen, mit Konto acht. Seit August 2026 bremst es eine
 Übertragung stark aus, die ohne ein Konto verfolgt wird, das Übertragungen lesen darf: Beim ersten Mal fragt
@@ -2277,7 +2277,7 @@ deinem Token; Übertragungen mit einem Konto, das sie lesen darf, einmal angefra
 Lesezeichen brauchen ein verknüpftes Konto.
 
 ### Fairplay
-<!-- en: fair-play d8b24b4b -->
+<!-- en: fair-play 62d0ad7a -->
 
 Lichess verbietet jede Hilfe während einer Partie. Mit verknüpftem Konto hält sich RookStudio daran, wo immer du
 spielst, im Browser oder auf einem Telefon:
@@ -2296,7 +2296,9 @@ Ein Banner auf der Seite Brett sagt, welche Partie was sperrt. Die Karte Lichess
 Partien auf, die, in denen du am Zug bist, zuerst, jede mit ihrer Uhr oder der verbleibenden Zeit für den Zug, und *Auf
 lichess.org öffnen* oder *Aufs Brett*, sobald RookStudio deine Partien spielen darf (siehe [Eine Partie auf
 Lichess](#eine-partie-auf-lichess)). Die Partien deines Lichess-Bots sind nicht deine und sperren nichts; während deiner
-eigenen Live-Partie wird die Suche des Bots nicht gezeigt (siehe [Ein Lichess-Bot](#ein-lichess-bot)).
+eigenen Live-Partie wird die Suche des Bots nicht gezeigt (siehe [Ein Lichess-Bot](#ein-lichess-bot)). Lichess TV zeigt
+deine eigenen Partien nie, auch nicht hervorgehoben, und die Engines des Mosaiks pausieren während deiner Live-Partie
+(siehe [Lichess TV](#lichess-tv)).
 
 Deine laufenden Partien werden mit dem Token deines Kontos abgefragt, wenn die Startseite erscheint, alle halbe Minute,
 solange eine Live-Partie dauert, und alle zehn Minuten, solange eine Fernpartie läuft. Die Seite Lichess bietet einmal
@@ -2320,7 +2322,7 @@ sofort auswerten* auf der Seite Lichess startet die Auswertung von selbst, auße
 ungespeicherten Änderungen oder laufende Arbeit; dann bietet das Banner sie an.
 
 ### Verfolgte Spieler
-<!-- en: followed-players 72df1253 -->
+<!-- en: followed-players 9a60f4cb -->
 
 Die Karte *Verfolgte Spieler* der Seite Lichess listet die Spieler auf, denen dein Konto auf Lichess folgt, und die, die
 du über ihren Namen hinzufügst, jeden mit einem Punkt: rot, solange er spielt, mit der Bedenkzeit der Partie, grün, wenn
@@ -2328,10 +2330,45 @@ er online ist. Ihr Status wird alle fünfzehn Sekunden abgefragt, solange die Ka
 Konto.
 
 *Ihre Partien im Mosaik* zeigt die Partien, die sie gerade spielen, im Mosaik der Übertragungen, jede von deiner Engine
-analysiert, höchstens acht, wie Lichess es erlaubt; Lichess zeigt ihre Züge drei Züge verzögert, für alle. Eine beendete
-Partie bleibt mit ihrem Ergebnis, bis eine andere ihren Platz einnimmt. Um zu lesen, wem dein Konto folgt, braucht es
-eine weitere Berechtigung, beim ersten Mal angefragt; *Ohne sie* werden die über ihren Namen hinzugefügten Spieler
-verfolgt. Dein eigenes Konto und deine eigenen Partien erscheinen dort nie.
+analysiert, höchstens acht, so viele, wie Lichess einer Adresse erlaubt, die Runden, die du verfolgst, und die Partien
+von Lichess TV mitgezählt; Lichess zeigt ihre Züge drei Züge verzögert, für alle. Eine beendete Partie bleibt mit ihrem
+Ergebnis, bis eine andere ihren Platz einnimmt. Um zu lesen, wem dein Konto folgt, braucht es eine weitere Berechtigung,
+beim ersten Mal angefragt; *Ohne sie* werden die über ihren Namen hinzugefügten Spieler verfolgt. Dein eigenes Konto und
+deine eigenen Partien erscheinen dort nie.
+
+### Lichess TV
+<!-- en: lichess-tv 07af67f5 -->
+
+Die Karte *Lichess TV* der Seite Lichess listet die Kanäle des Standardschachs auf: *Höchste Wertung*, *Bullet*,
+*Blitz*, *Schnellschach*, *Klassisch*, *UltraBullet*, *Bots* und *Computer* (Spieler gegen die KI von Lichess); die
+Kanäle der Varianten werden nicht gezeigt. Jeder gibt die Partie an, die Lichess auf ihm hervorhebt, ihre beiden Spieler
+mit ihren Wertungen und ihre Bedenkzeit. Die Liste wird neu abgerufen, wenn die Karte erscheint, höchstens einmal alle
+30 Sekunden.
+
+*Mosaik* zeigt die laufenden Partien des Kanals im Mosaik der Übertragungen, seiner dritten Quelle: Die Zeile oben darin
+wechselt von einer zur anderen (*Übertragungen*, *Verfolgte Spieler*, *Lichess TV*), und die Kanäle sind Chips darunter.
+Dieselben Kacheln, eine Engine von dir für jede Partie, die gewählte Partie rechts mit *Auf dem Brett verfolgen*.
+Lichess listet bis zu 30 Partien pro Kanal auf und lässt eine Adresse 8 Partien gleichzeitig verfolgen, die Runden, die
+du verfolgst (je eine), und die Partien der verfolgten Spieler mitgezählt: Das Mosaik zeigt, was übrig bleibt, die
+hervorgehobene Partie zuerst. Eine beendete Partie zeigt ein paar Sekunden lang ihr Ergebnis und macht dann einer
+anderen des Kanals Platz. Lichess zeigt die Züge jedem Zuschauer drei Züge verzögert, und das Mosaik sagt es.
+
+*Brett* (oder ein Doppelklick auf eine Kachel) öffnet die Partie auf dem Brett, das ihr folgt; die Karte über seiner
+Spalte sagt, was sie ist: *Lichess TV · Blitz · die hervorgehobene Partie, 3+0*. Wenn sie endet, geht das Brett von
+selbst zur nächsten hervorgehobenen Partie des Kanals über, die verlassene Partie mit Strg+Tab erreichbar; *Bei dieser
+Partie bleiben* hält das Brett bei ihr. *Diese Partie behalten…* speichert sie an ihrem Ende in einer Datenbank deiner
+Wahl: *Lichess TV*, die angelegt wird, wenn sie fehlt, oder einer anderen von dir; bis dahin wartet sie in deinem
+Profil, auch wenn RookStudio geschlossen wird. *Zurück zum Mosaik* (Esc) führt zum Mosaik des Kanals zurück.
+
+Auf der Seite Engines hat die Karte einer Engine *Lichess TV: Bots, Computer*: die besten Bots von Lichess oder Spieler
+gegen seine KI im Mosaik, jede Partie von dieser Engine analysiert.
+
+Deine eigenen Partien erscheinen nie, auch nicht hervorgehoben: die deines verknüpften Kontos und die deines
+Lichess-Bots (siehe [Ein Lichess-Bot](#ein-lichess-bot)). Solange eine deiner Live-Partien dauert, pausieren die Engines
+des Mosaiks (siehe [Fairplay](#fairplay)). Was den Computer verlässt: der abgefragte Kanal und die verfolgten Partien,
+ohne Konto; nichts wird von selbst gespeichert. Strg+K hat *Lichess TV*, jeden Kanal im Mosaik (und auf dem Brett,
+sobald die Karte abgerufen wurde) und für die Partie des Bretts *Bei dieser Partie bleiben*, *Diese Partie behalten…*
+und *Zurück zum Mosaik*.
 
 ### Eine Partie vorbereiten
 <!-- en: preparing-a-game 5bf402fc -->

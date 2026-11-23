@@ -340,7 +340,7 @@ piatte e *Aspetto* dice perché. I pezzi sono gli Staunton-Pieces di clarkerubbe
 collegamento.
 
 ## Scorciatoie da tastiera
-<!-- en: keyboard-shortcuts 65140e2d -->
+<!-- en: keyboard-shortcuts e7a7fc57 -->
 
 | Tasti | Dove | Cosa fanno |
 |---|---|---|
@@ -363,7 +363,7 @@ collegamento.
 | <kbd>G</kbd> | La pagina Scacchiera | Analizza la partita, passaggio dopo passaggio; di nuovo: la ferma |
 | <kbd>X</kbd> | La pagina Scacchiera | Mostra o nasconde la minaccia |
 | <kbd>N</kbd>, <kbd>Maiusc</kbd>+<kbd>N</kbd> | La pagina Scacchiera | La mossa successiva, la precedente segnata dall'analisi |
-| <kbd>Esc</kbd> | La pagina Scacchiera | Riporta la partita dopo che è stata mostrata una linea; posa il pezzo preso |
+| <kbd>Esc</kbd> | La pagina Scacchiera | Riporta la partita dopo che è stata mostrata una linea; posa il pezzo preso; una partita seguita da un mosaico: torna al mosaico |
 | <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | Una vista per lo studio | Apre un file PGN nella pagina Scacchiera; lì una nuova partita |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>Tab</kbd> | Una vista per lo studio | Le partite recenti; rilasciando Ctrl si apre quella scelta |
 | <kbd>Invio</kbd> | La pagina Home | Riprende la partita sulla scacchiera |
@@ -677,7 +677,7 @@ pensiero, abbandono. I motori marcati ↔ nell'elenco sono motori WinBoard.
 - `FCG_WB2UCI_LOG=FILE` nell'ambiente scrive in `FILE` ogni riga scambiata con i motori WinBoard.
 
 ### Un bot Lichess
-<!-- en: a-lichess-bot c8e717b7 -->
+<!-- en: a-lichess-bot 5ae494c4 -->
 
 La scheda di un motore ha una riga **Su Lichess, come bot**: *Rendilo un bot Lichess…* prepara il motore a giocare su
 Lichess con un account bot, tramite la Bot API di Lichess (dove i motori sono ammessi), accettando le sfide che scegli
@@ -712,13 +712,13 @@ mentre RookStudio è aperto. La riga diventa una parte della scheda, che guida a
 - **Il suo gioco**: il motore con le sue opzioni della libreria (i suoi `Threads` e `Hash` contati nel budget dei core
   della macchina mentre gioca), un libro Polyglot della tua libreria giocato finché ha una mossa, le tablebase dei
   tornei (`SyzygyPath`, per un motore che ha l'opzione e nessun percorso proprio), e niente riflessione sul tempo
-  dell'avversario. Il suo orologio arriva da Lichess a ogni mossa, meno un margine per la rete (un decimo, da 0,2 a 1
-  secondo); prima che entrambi i lati abbiano mosso, gioca entro il tempo che Lichess concede per la prima mossa; per
-  corrispondenza, pensa 15 secondi per mossa. Accetta una patta proposta quando il motore sta chiaramente peggio, o
-  non meglio a partita inoltrata, rifiuta il ritiro di una mossa, e rivendica la vittoria quando il suo avversario se
-  n'è andato da abbastanza tempo. Le sue parole, dette nella chat dei giocatori all'inizio e alla fine, le scegli tu
-  (vuote: non dice niente). Un motore che non parte o che si ferma abbandona la partita (la annulla prima che entrambi
-  i lati abbiano mosso), e la scheda dice perché.
+  dell'avversario. Il suo orologio arriva da Lichess a ogni mossa, meno un margine per la rete (un decimo del tempo che
+  gli resta, da 0,2 a 1 secondo); prima che entrambi i lati abbiano mosso, gioca entro il tempo che Lichess concede per
+  la prima mossa; per corrispondenza, pensa 15 secondi per mossa. Accetta una patta proposta quando il motore sta
+  chiaramente peggio, o non meglio a partita inoltrata, rifiuta il ritiro di una mossa, e rivendica la vittoria quando
+  il suo avversario se n'è andato da abbastanza tempo. Le sue parole, dette nella chat dei giocatori all'inizio e alla
+  fine, le scegli tu (vuote: non dice niente). Un motore che non parte o che si ferma abbandona la partita (la annulla
+  prima che entrambi i lati abbiano mosso), e la scheda dice perché.
 - **Metti online** (Invio) apre il flusso di eventi proprio del bot (Lichess ne tiene uno per token): le sfide arrivano,
   e ricevono subito risposta secondo le sue regole. Online, la scheda mostra la giornata del bot (partite vinte, patte e
   perse, sfide rifiutate), la sua partita su una piccola scacchiera con la valutazione del motore, *Sulla Scacchiera*,
@@ -2158,7 +2158,7 @@ le sue modifiche allo stesso modo.
 Limiti di Lichess: 64 capitoli per studio, 30 nuovi studi al giorno.
 
 ### Trasmissioni ufficiali
-<!-- en: official-broadcasts a02f4c35 -->
+<!-- en: official-broadcasts 9c582d92 -->
 
 Le trasmissioni ufficiali in diretta, prima le più note (*Tutte le trasmissioni in diretta* per le altre), e le
 prossime. *Segui* apre un turno in un mosaico nella pagina Lichess: la scheda di ogni partita con i nomi, gli orologi,
@@ -2167,7 +2167,7 @@ partita scelta con le sue ultime mosse, *Segui sulla scacchiera* e *Copia il PGN
 analizzate sulla tua macchina, con il tuo motore, tante insieme quante lo permettono i core lasciati liberi dai tornei,
 prima la partita scelta, e solo mentre il mosaico è visibile. Sulla scacchiera la partita avanza a ogni mossa ricevuta;
 tornare indietro per analizzarla la lascia avanzare dietro le quinte, e *Torna alla diretta* la riporta al punto
-attuale.
+attuale; *Torna al mosaico* (Esc) riporta al turno.
 
 Lichess permette di seguire quattro turni contemporaneamente senza account, otto con un account. Da agosto 2026 rallenta
 molto una trasmissione seguita senza un account autorizzato a leggere le trasmissioni: la prima volta, RookStudio chiede
@@ -2215,7 +2215,7 @@ trasmissioni con un account autorizzato a leggerle, permesso chiesto una volta, 
 preferiti richiedono un account collegato.
 
 ### Fair play
-<!-- en: fair-play d8b24b4b -->
+<!-- en: fair-play 62d0ad7a -->
 
 Lichess vieta qualsiasi aiuto durante una partita. Con il tuo account collegato, RookStudio rispetta questa regola
 ovunque tu giochi, nel browser o su un telefono:
@@ -2234,7 +2234,9 @@ Un banner nella pagina Scacchiera dice quale partita blocca cosa. La scheda Lich
 partite in corso, prima quelle in cui tocca a te, ciascuna con il suo orologio o il tempo rimasto per muovere, e *Apri
 su lichess.org*, o *Sulla Scacchiera* una volta che RookStudio può giocare le tue partite (vedi [Una partita su
 Lichess](#una-partita-su-lichess)). Le partite del tuo bot Lichess non sono tue e non bloccano niente; durante una tua
-partita in diretta, la ricerca del bot non viene mostrata (vedi [Un bot Lichess](#un-bot-lichess)).
+partita in diretta, la ricerca del bot non viene mostrata (vedi [Un bot Lichess](#un-bot-lichess)). Lichess TV non
+mostra mai le tue partite, nemmeno in evidenza, e i motori del mosaico restano a riposo durante la tua partita in
+diretta (vedi [Lichess TV](#lichess-tv)).
 
 Le tue partite in corso vengono chieste con il token del tuo account quando compare la pagina Home, ogni mezzo minuto
 finché dura una partita in diretta e ogni dieci minuti finché dura una partita per corrispondenza. La pagina Lichess
@@ -2258,17 +2260,50 @@ le mie partite finite* della pagina Lichess avvia il resoconto da solo, a meno c
 partita con modifiche non salvate o un lavoro in corso; in quel caso lo propone il banner.
 
 ### Giocatori seguiti
-<!-- en: followed-players 72df1253 -->
+<!-- en: followed-players 9a60f4cb -->
 
 La scheda *Giocatori seguiti* della pagina Lichess elenca i giocatori che il tuo account segue su Lichess e quelli che
 aggiungi per nome, ciascuno con un punto: rosso mentre gioca, con la cadenza della partita, verde quando è online. Il
 loro stato viene chiesto ogni quindici secondi mentre la scheda o il loro mosaico sono visibili, senza account.
 
 *Le loro partite nel mosaico* mostra le partite che stanno giocando nel mosaico delle trasmissioni, ciascuna analizzata
-dal tuo motore, otto al massimo, come permette Lichess; Lichess mostra le loro mosse con tre mosse di ritardo, a
-chiunque. Una partita che finisce resta con il suo risultato finché un'altra non ne prende il posto. Leggere chi segue
-il tuo account richiede un permesso in più, chiesto la prima volta; *Senza permesso*, vengono seguiti i giocatori
-aggiunti per nome. Il tuo account e le tue partite non compaiono mai lì.
+dal tuo motore, otto al massimo, quante Lichess ne permette a un indirizzo, contando con esse i turni che segui e le
+partite di Lichess TV; Lichess mostra le loro mosse con tre mosse di ritardo, a chiunque. Una partita che finisce resta
+con il suo risultato finché un'altra non ne prende il posto. Leggere chi segue il tuo account richiede un permesso in
+più, chiesto la prima volta; *Senza permesso*, vengono seguiti i giocatori aggiunti per nome. Il tuo account e le tue
+partite non compaiono mai lì.
+
+### Lichess TV
+<!-- en: lichess-tv 07af67f5 -->
+
+La scheda *Lichess TV* della pagina Lichess elenca i canali degli scacchi standard: *I più forti*, *Bullet*, *Blitz*,
+*Rapida*, *Classica*, *UltraBullet*, *Bot* e *Computer* (giocatori contro l'IA di Lichess); i canali delle varianti non
+vengono mostrati. Ognuno dà la partita che Lichess vi mette in evidenza, i suoi due giocatori con i loro rating, e la
+sua cadenza. L'elenco viene riletto quando compare la scheda, al massimo ogni 30 secondi.
+
+*Il mosaico* mostra le partite in corso del canale nel mosaico delle trasmissioni, la sua terza fonte: la riga in alto
+passa dall'una all'altra (*Trasmissioni*, *Giocatori seguiti*, *Lichess TV*), e i canali sono dei chip sotto di essa.
+Gli stessi riquadri, un tuo motore per ogni partita, la partita scelta a destra con *Segui sulla scacchiera*. Lichess
+elenca fino a 30 partite per canale, e permette a un indirizzo di seguire 8 partite alla volta, contando con esse i
+turni che segui (uno ciascuno) e le partite dei giocatori seguiti: il mosaico mostra ciò che resta, prima la partita in
+evidenza. Una partita finita mostra il suo risultato per qualche secondo, poi lascia il posto a un'altra del canale.
+Lichess mostra le mosse con tre mosse di ritardo a chiunque guardi, e il mosaico lo dice.
+
+*La Scacchiera* (o un doppio clic su un riquadro) apre la partita sulla Scacchiera, che la segue; la scheda sopra la sua
+colonna dice cos'è: *Lichess TV · Blitz · la partita in evidenza, 3+0*. Quando finisce, la Scacchiera passa da sola alla
+prossima partita in evidenza del canale, e la partita lasciata resta a un Ctrl+Tab di distanza; *Resta su questa
+partita* tiene la scacchiera su di essa. *Conserva questa partita…* la mette, alla fine, in un database a tua scelta:
+*Lichess TV*, creato se manca, o un altro dei tuoi; fino ad allora aspetta nel tuo profilo, anche se RookStudio si
+chiude. *Torna al mosaico* (Esc) riporta al mosaico del canale.
+
+Nella pagina Motori, la scheda di un motore ha *Lichess TV: Bot, Computer*: i migliori bot di Lichess, o giocatori
+contro la sua IA, nel mosaico, con quel motore che analizza ogni partita.
+
+Le tue partite non compaiono mai, nemmeno in evidenza: quelle del tuo account collegato e del tuo bot Lichess (vedi [Un
+bot Lichess](#un-bot-lichess)). Finché dura una delle tue partite in diretta, i motori del mosaico restano a riposo
+(vedi [Fair play](#fair-play)). Cosa esce dalla macchina: il canale chiesto e le partite seguite, senza account; niente
+viene conservato da solo. Ctrl+K ha *Lichess TV*, ogni canale nel mosaico (e sulla Scacchiera una volta letta la
+scheda), e, per la partita della Scacchiera, *Resta su questa partita*, *Conserva questa partita…* e *Torna al mosaico*.
 
 ### Preparare una partita
 <!-- en: preparing-a-game 5bf402fc -->

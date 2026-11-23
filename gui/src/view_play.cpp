@@ -90,16 +90,20 @@ void wrapped(const std::string& text, bool grey = false) {
     if (grey) ImGui::PopStyleColor();
 }
 
-// "· Against an engine": the part shown underlined.
-void partLink(const char* label, bool shown) {
+// "· Against an engine · On Lichess": the part shown underlined; true when another is clicked.
+bool partLink(const char* label, bool shown) {
     const auto at   = ImGui::GetCursorScreenPos();
     const auto size = ImGui::CalcTextSize(label);
-    ImGui::Dummy(ImVec2(size.x, ImGui::GetFrameHeight()));
+    const bool clicked =
+        ImGui::InvisibleButton(fmt::format("##part_{}", label).c_str(), ImVec2(size.x, ImGui::GetFrameHeight()));
+    const bool hovered = ImGui::IsItemHovered();
+    if (hovered && !shown) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
     auto* dl      = ImGui::GetWindowDrawList();
     const float y = at.y + (ImGui::GetFrameHeight() - size.y) * 0.5f;
-    dl->AddText(ImVec2(at.x, y), ImGui::GetColorU32(shown ? ImGuiCol_Text : ImGuiCol_TextDisabled), label);
+    dl->AddText(ImVec2(at.x, y), ImGui::GetColorU32(shown || hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled), label);
     if (shown)
         dl->AddLine(ImVec2(at.x, y + size.y + px(2)), ImVec2(at.x + size.x, y + size.y + px(2)), ui::ACCENT, px(2));
+    return clicked && !shown;
 }
 
 // A chip: a colour, a handicap; filled when chosen.
@@ -382,6 +386,7 @@ void App::takeBoardFor(const BoardMatchSetup& setup, bool remember) {
     auto& b = board_;
     // The game shown gives way to the one played: among the recent games, with its list and its changes.
     if (remember) rememberBoardGame();
+    if (online_game_) online_game_->shown = false;  // a game on Lichess goes on meanwhile (#84)
     board_origin_.reset();
     b.undo.clear();
     b.redo.clear();
@@ -1219,13 +1224,26 @@ void App::drawEngineGameBanner() {
 
 void App::drawPlay() {
     ui::pageTitle(TR("Play"), guide::topics::PlayPage);
-    ImGui::SameLine(0, px(14));
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("·");
-    ImGui::SameLine(0, px(8));
-    partLink(TR("Against an engine"), true);
+    // Its parts (M12, boards 4 and 5): against an engine, on Lichess (#84); the one shown last kept.
+    if (play_part_ < 0) play_part_ = std::clamp(playSettings().part, 0, 1);
+    const auto part = [&](const char* label, int which) {
+        ImGui::SameLine(0, which == 0 ? px(14) : px(8));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("·");
+        ImGui::SameLine(0, px(8));
+        if (partLink(label, play_part_ == which)) {
+            play_part_          = which;
+            playSettings().part = which;
+            savePlaySettings();
+        }
+    };
+    part(TR("Against an engine"), 0);
+    part(TR("On Lichess"), 1);
     ImGui::BeginChild("##play_page", ImVec2(0, 0), ImGuiChildFlags_None);
-    drawPlayEngine();
+    if (play_part_ == 1)
+        drawPlayLichess();
+    else
+        drawPlayEngine();
     ImGui::EndChild();
 }
 

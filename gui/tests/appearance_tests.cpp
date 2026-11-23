@@ -219,10 +219,13 @@ TEST_CASE("appearance: a folder of pieces, and what is wrong with it said by fil
 TEST_CASE("sound: the move and capture sounds, made the same each time, without clicks") {
     const auto move    = sound::synthesize(sound::Kind::Move);
     const auto capture = sound::synthesize(sound::Kind::Capture);
+    const auto notify  = sound::synthesize(sound::Kind::Notify);  // a challenge received (#84)
     CHECK(move.size() == static_cast<std::size_t>(sound::RATE / 10));
     CHECK(capture.size() > move.size());
     CHECK(move == sound::synthesize(sound::Kind::Move));
-    for (const auto* samples : {&move, &capture}) {
+    CHECK(notify == sound::synthesize(sound::Kind::Notify));
+    CHECK(notify.size() < static_cast<std::size_t>(sound::RATE));
+    for (const auto* samples : {&move, &capture, &notify}) {
         float peak = 0.0f;
         for (const float v : *samples) peak = std::max(peak, std::abs(v));
         CHECK(peak == doctest::Approx(0.9f).epsilon(0.001));

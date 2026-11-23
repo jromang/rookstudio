@@ -20,7 +20,7 @@ namespace {
 SDL_AudioStream* g_stream = nullptr;
 bool g_tried              = false;  // the device was asked for since sounds were switched on
 int g_volume              = 70;
-std::array<std::vector<float>, 2> g_sounds;  // by Kind, made once
+std::array<std::vector<float>, 3> g_sounds;  // by Kind, made once
 
 // A wooden piece put down: a click of noise for the contact, a short ring for the wood, a low thump for the board.
 void knock(std::vector<float>& out, int rate, double at, double ring_hz, double thump_hz, double gain, uint32_t& seed) {
@@ -38,13 +38,28 @@ void knock(std::vector<float>& out, int rate, double at, double ring_hz, double 
     }
 }
 
+// A soft bell: a tone and its octave, struck at `at` and dying away.
+void bell(std::vector<float>& out, int rate, double at, double hz, double gain) {
+    const auto first = static_cast<std::size_t>(at * rate);
+    for (std::size_t i = first; i < out.size(); ++i) {
+        const double t    = static_cast<double>(i - first) / rate;
+        const double tone = std::sin(2 * std::numbers::pi * hz * t) + 0.3 * std::sin(2 * std::numbers::pi * 2 * hz * t);
+        out[i] += static_cast<float>(gain * tone * std::exp(-t / 0.12) * std::min(1.0, t / 0.004));
+    }
+}
+
 }  // namespace
 
 std::vector<float> synthesize(Kind kind, int rate) {
     const bool capture = kind == Kind::Capture;
-    std::vector<float> out(static_cast<std::size_t>(rate * (capture ? 0.17 : 0.1)), 0.0f);
+    const double length = kind == Kind::Notify ? 0.6 : capture ? 0.17 : 0.1;
+    std::vector<float> out(static_cast<std::size_t>(rate * length), 0.0f);
     uint32_t seed = 0x2545F491u;
-    if (capture) {
+    if (kind == Kind::Notify) {
+        // Two tones a fourth apart, rising: something waits for an answer.
+        bell(out, rate, 0.0, 880.0, 1.0);
+        bell(out, rate, 0.16, 1174.7, 0.9);
+    } else if (capture) {
         // Heavier and lower, then the piece taken knocked aside.
         knock(out, rate, 0.0, 780.0, 130.0, 1.0, seed);
         knock(out, rate, 0.055, 1250.0, 210.0, 0.55, seed);
@@ -87,6 +102,7 @@ void configure(bool on, int volume) {
     if (g_sounds[0].empty()) {
         g_sounds[0] = synthesize(Kind::Move);
         g_sounds[1] = synthesize(Kind::Capture);
+        g_sounds[2] = synthesize(Kind::Notify);
     }
 }
 
@@ -96,7 +112,7 @@ void play(Kind kind) {
     if (!g_stream || g_volume == 0) return;
     // The loudness heard grows about as the square of the amplitude.
     const float gain = static_cast<float>(g_volume * g_volume) / 10000.0f;
-    auto samples     = g_sounds[kind == Kind::Capture ? 1 : 0];
+    auto samples     = g_sounds[kind == Kind::Notify ? 2 : kind == Kind::Capture ? 1 : 0];
     for (auto& v : samples) v *= gain;
     SDL_ClearAudioStream(g_stream);
     SDL_PutAudioStreamData(g_stream, samples.data(), static_cast<int>(samples.size() * sizeof(float)));

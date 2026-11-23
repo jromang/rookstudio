@@ -143,6 +143,8 @@ const std::vector<const char*>& allTopics() {
                                               PlayEngine,
                                               EngineGame,
                                               AfterGame,
+                                              PlayLichess,
+                                              LichessGame,
                                               LichessPage,
                                               LichessLink,
                                               LichessGames,

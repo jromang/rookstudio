@@ -701,6 +701,57 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             closeEngineGame();
             startEngineGame(white ? chess::Color::BLACK : chess::Color::WHITE);
         });
+    // Playing on Lichess (#84): the page's part, a seek with the last clock, a challenge; the challenges received; the
+    // game's commands while it lasts.
+    const auto lichess_part = [this] {
+        play_part_          = 1;
+        playSettings().part = 1;
+        savePlaySettings();
+        page_ = Page::Play;
+    };
+    add(TR("Play on Lichess"), where(Page::Play), lichess_part);
+    if (onlineScope()) {
+        const auto clock = onlineSettings().seekClock();
+        if (!online_seek_ && lichess::seekAllowed(clock) && !liveGameOn())
+            add(trf("Seek a game on Lichess · {}", lichess::clockText(clock)), TR("Play"), [this, lichess_part] {
+                lichess_part();
+                startSeek();
+            });
+        if (online_seek_) add(TR("Call the seek back"), TR("Play"), [this] { cancelSeek(); });
+        add(TR("Challenge a player on Lichess…"), TR("Play"), [this, lichess_part] {
+            lichess_part();
+            online_user_focus_ = true;
+        });
+        if (online_challenge_) add(TR("Call the challenge back"), TR("Play"), [this] { cancelChallenge(); });
+        for (const auto& c : online_incoming_) {
+            const auto id = c.id;
+            if (c.board && !liveGameOn())
+                add(trf("Accept the challenge of {}", c.challenger), TR("Play"),
+                    [this, id] { answerChallenge(id, true); });
+            add(trf("Decline the challenge of {}", c.challenger), TR("Play"),
+                [this, id] { answerChallenge(id, false, "generic"); });
+        }
+    } else if (lichess_account_) {
+        add(TR("Allow RookStudio to play your Lichess games…"), TR("Play"), [this, lichess_part] {
+            lichess_part();
+            askOnlineScope();
+        });
+    }
+    if (online_game_ && !online_game_->ended && !online_game_->state.over()) {
+        add(TR("Back to the game on Lichess"), TR("Play"), [this] { backToOnlineGame(); });
+        add(TR("Offer a draw on Lichess"), TR("Play"), [this] { onlineAction("draw/yes"); });
+        add(TR("Resign the game on Lichess…"), TR("Play"), [this] {
+            backToOnlineGame();
+            onlineResign();  // armed: Enter, or a second click, resigns
+        });
+        add(TR("Ask for a takeback on Lichess"), TR("Play"), [this] { onlineAction("takeback/yes"); });
+        if (online_game_->state.moves.size() < 2)
+            add(TR("Abort the game on Lichess"), TR("Play"), [this] { onlineAction("abort"); });
+        if (online_game_->state.opponent_gone)
+            add(TR("Claim the victory on Lichess"), TR("Play"), [this] { onlineAction("claim-victory"); });
+        add(TR("Open the game on lichess.org"), "Lichess",
+            [this] { SDL_OpenURL(fmt::format("https://lichess.org/{}", online_game_->id).c_str()); });
+    }
     // The Training page (#80): the page, the day's review, each theme's puzzles, Lichess's database, the batch online.
     add(TR("Training"), where(Page::Training), [this, go = page(Page::Training)] {
         go();
@@ -886,8 +937,10 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             go();
             startLichessLink();
         });
-    // Fair play (#48): hearing the user's games start and end, offered again after "Not now".
-    if (lichess_account_ && !lichess_account_->has(lichess::SCOPE_CHALLENGE_READ))
+    // Fair play (#48): hearing the user's games start and end, offered again after "Not now"; the right to play
+    // opens the same stream (#84).
+    if (lichess_account_ && !lichess_account_->has(lichess::SCOPE_CHALLENGE_READ) &&
+        !lichess_account_->has(lichess::SCOPE_BOARD_PLAY))
         add(TR("Know when my Lichess games start and end…"), "Lichess", [this, go = page(Page::Lichess)] {
             go();
             lichess_.listen_declined = false;

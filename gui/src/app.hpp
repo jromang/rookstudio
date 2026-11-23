@@ -55,6 +55,7 @@
 #include "https.hpp"
 #include "layout.hpp"
 #include "lichess_account.hpp"
+#include "lichess_board.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_evals.hpp"
 #include "lichess_games.hpp"
@@ -1134,6 +1135,101 @@ class App {
     void answerPlayOffer(bool add);
     void drawPlayOffer();
 
+    // Playing on Lichess (#84, mockup M12, board 5; lichess_board.hpp, view_play_lichess.cpp), through Lichess's Board
+    // API once the token may play (board:play, asked at the first use): the Play page's "On Lichess" part (a seek in
+    // the lobby, a challenge sent, the challenges received, the games in progress); the game played on the Board, its
+    // moves sent as they are played (by correspondence on Enter), a move made during the opponent's turn waiting for
+    // the user's; its stream opened again after a cut; the fair play's lock of #48 on it as on any game of the user's.
+    // The event stream is the one of #48, shared: it tells the games' starts and the challenges.
+    std::optional<lichess::OnlinePlaySettings> online_settings_;
+    lichess::OnlinePlaySettings& onlineSettings();
+    void saveOnlineSettings();
+    int play_part_ = -1;  // the Play page's part: 0 against an engine, 1 on Lichess; -1 not read from play.json yet
+    std::unique_ptr<lichess::Seek> online_seek_;
+    std::string online_seek_said_;  // what became of the last seek
+    std::unique_ptr<lichess::ChallengeOut> online_challenge_;
+    std::optional<lichess::Challenge> online_declined_;  // the last challenge declined: another clock offered
+    std::string online_challenge_said_;
+    std::vector<lichess::Challenge> online_incoming_;  // received, not answered yet
+    std::vector<std::string> online_noticed_;          // those the corner's notice said, or put aside
+    std::vector<std::string> online_accepted_;         // accepted here: their game opens on the Board as it starts
+    struct OnlineCall {
+        std::string what;  // what it asks, as said if it fails
+        std::future<lichess::Reply> reply;
+    };
+    std::vector<OnlineCall> online_calls_;  // under way
+    std::string play_online_error_;         // the last request refused, said where the user plays
+    std::array<char, 32> online_user_{};    // "Challenge a player": the name typed
+    bool online_user_focus_     = false;    // the field takes the keys at the next frame (Ctrl+K)
+    bool online_resume_checked_ = false;    // the game kept from the last session looked for among those in progress
+    bool quit_online_open_      = false;    // closing during a live game: asked first
+    bool quit_online_said_      = false;    // the user closes anyway
+    struct OnlineGame {
+        std::string id;
+        bool white = true;  // the user's side
+        std::unique_ptr<lichess::GameStream> stream;
+        lichess::BoardState state;
+        uint64_t version = 0;
+        bool shown       = true;          // the Board follows it; another game opened there meanwhile: not
+        bool flipped     = false;         // turned to the user's side once
+        bool board_dirty = true;          // the Board to follow it again: its state, or the move sent or held, changed
+        std::optional<chess::Move> sent;  // the user's move gone to Lichess, shown until its stream has it
+        std::size_t sent_at = 0;          // the moves then
+        std::future<lichess::Reply> move_job;
+        std::optional<chess::Move> premove;  // live: played at the user's turn when it is legal then
+        std::optional<chess::Move> held;     // by correspondence: sent on Enter, taken back on Escape
+        bool offer_draw  = false;            // the draw offered goes with the next move
+        double resign_at = -100;             // "Resign…" armed: Enter, or a second click, within a few seconds
+        bool chat_open   = false;
+        std::array<char, 141> chat_text{};
+        std::size_t chat_seen = 0;     // the lines of the players' chat read
+        lichess::PlayingGame playing;  // as the lock (#48) holds it among the games in progress
+        bool ended        = false;     // its end handled: the lock let go, the game brought in (#49)
+        int rating_diff   = 0;         // the user's, once a rated game ended (the event stream's)
+        bool rating_known = false;
+    };
+    std::unique_ptr<OnlineGame> online_game_;
+    [[nodiscard]] bool onlineScope() const;  // the token may play
+    void askOnlineScope();
+    void pollOnlinePlay();
+    void onlineEvent(const lichess::GameEvent& e);  // from the event stream
+    void startSeek();
+    void cancelSeek();
+    void sendChallenge(const lichess::ChallengeAsk& ask);
+    void cancelChallenge();
+    void answerChallenge(const std::string& id, bool accept, const std::string& reason = "generic");
+    void onlineCall(std::string what, std::function<lichess::Reply(const std::string& token)> call);
+    void openOnlineGame(const std::string& id, bool white);
+    [[nodiscard]] bool onlineShown() const;  // the Board shows the online game, being played
+    [[nodiscard]] bool onlineMyTurn() const;
+    void showOnlineGame();  // the Board follows its state, the move sent or held
+    void backToOnlineGame();
+    void onlineMoveAsked(chess::Move move);  // a move made on the board or typed during the game
+    void sendOnlineMove(chess::Move move);
+    void onlineAction(const std::string& action);  // "resign", "abort", "draw/yes"...
+    void onlineResign();
+    bool onlineGameKeys();  // true when the keys were the game's
+    void closeOnlineGame();
+    void finishOnlineGame();  // its end: the lock let go, the game brought in (#49), kept no more
+    // The position whose pieces the user may pick: during the opponent's turn in a live game, as if it were theirs (a
+    // move made then waits for their turn).
+    [[nodiscard]] chess::Board boardForPicking(const chess::Board& shown) const;
+    // In the players' strips: a side's clock, running for the side to move, or the time left to move by correspondence.
+    [[nodiscard]] std::optional<std::string> onlineStripClock(chess::Color side) const;
+    [[nodiscard]] std::string onlineOpponent() const;  // "Partner_3 (1836)"
+    void drawPlayLichess();
+    void drawOnlineScopeCard();
+    void drawSeekCard(bool& enter);
+    void drawChallengeCard();
+    void drawIncomingChallenges(bool compact);
+    void drawOnlineGamesList();
+    void drawOnlineGameCard();
+    void drawOnlineGameEnd();
+    void drawOnlineChat();
+    void drawOnlineHome();    // the Home page's "In progress": the game being played, the challenges received
+    void drawOnlineNotice();  // a challenge received, at the window's corner, wherever the user is
+    void drawQuitOnline();    // closing RookStudio during a live game
+
     // Theory studies (#77, mockup M11, board 2; theory_shelf.hpp, view_theory.cpp): annotated PGN files read where they
     // are, Lichess studies' PGN, the repertoires' comments. The Openings page's Theory part, the Tree tab's Theory
     // column and "What your studies say" under its moves, the Notation tab's "Theory · N".
@@ -1557,7 +1653,8 @@ class App {
     std::chrono::steady_clock::time_point lichess_playing_asked_{};
     bool lichess_playing_ask_now_   = false;  // the Home page showed: looked at again if it was a while ago
     int lichess_playing_home_frame_ = -10;    // the frame that drew the Home page's list last
-    std::unique_ptr<lichess::EventListener> lichess_events_;  // with the right to read challenges
+    std::unique_ptr<lichess::EventListener> lichess_events_;  // with the right to read challenges, or to play (#84)
+    std::chrono::steady_clock::time_point lichess_events_opened_{};  // when it opened last
     std::string lichess_playing_token_;                       // the token the games were asked with
     void pollLichessPlaying();
     [[nodiscard]] const lichess::PlayingGame* liveGameOn() const;
@@ -1710,7 +1807,7 @@ class App {
     [[nodiscard]] bool boardFree() const;  // nothing unsaved nor under way on the Board: a game may replace its own
     void drawFinishedBanner(bool home);
     [[nodiscard]] bool finishedCardTakesKeys() const {
-        if (page_ != Page::Board) return false;
+        if (page_ != Page::Board || onlineShown()) return false;
         for (const auto& f : lichess_finished_)
             if (!f.done && f.got && !f.got->pgn.empty() && !f.again.valid()) return true;
         return false;

@@ -155,19 +155,24 @@ void App::pollLichessPlaying() {
         lichess_playing_asked_ = {};
         lichess_playing_fresh_ = true;
     }
-    // Heard as they start and end, when the token may read challenges; Lichess sends the games in progress each time
-    // the stream opens, so the list starts again then.
-    const bool may_listen = lichess_account_->has(lichess::SCOPE_CHALLENGE_READ);
+    // Heard as they start and end, when the token may read challenges or play (#84: one stream per token, the same
+    // for the games played here and the challenges); Lichess sends the games in progress each time the stream opens,
+    // so the list starts again then.
+    const bool may_listen =
+        lichess_account_->has(lichess::SCOPE_CHALLENGE_READ) || lichess_account_->has(lichess::SCOPE_BOARD_PLAY);
     if (lichess_events_ && (!may_listen || lichess_events_->token() != lichess_account_->token))
         lichess_events_.reset();
     if (may_listen && !lichess_events_)
         lichess_events_ = std::make_unique<lichess::EventListener>(lichess_account_->token);
     if (lichess_events_) {
         for (auto& e : lichess_events_->take()) {
+            onlineEvent(e);  // the challenges, the games played here (#84)
             if (e.kind == lichess::GameEvent::Kind::Opened) {
                 lichess_playing_.clear();
+                lichess_events_opened_ = std::chrono::steady_clock::now();
                 continue;
             }
+            if (e.kind != lichess::GameEvent::Kind::Started && e.kind != lichess::GameEvent::Kind::Finished) continue;
             std::erase_if(lichess_playing_, [&](const auto& g) { return g.id == e.game.id; });
             if (e.kind == lichess::GameEvent::Kind::Started)
                 lichess_playing_.push_back(std::move(e.game));
@@ -206,6 +211,10 @@ void App::pollLichessPlaying() {
 const lichess::PlayingGame* App::liveGameOn() const {
     for (const auto& g : lichess_playing_)
         if (g.live()) return &g;
+    // A live game played here (#84), even while the event stream lists the games anew.
+    if (online_game_ && !online_game_->ended && online_game_->state.full && !online_game_->state.over() &&
+        online_game_->state.live())
+        return &online_game_->playing;
     return nullptr;
 }
 
@@ -336,7 +345,8 @@ void App::drawPlayingGames() {
         ImGui::TextDisabled("%s", what.c_str());
         // On the right: the clock, or the time left to move; the game on lichess.org, where it is played.
         const auto time   = g.live() || g.my_turn ? timeText(g) : std::string();
-        const char* open  = TR("Open on lichess.org");
+        const bool here   = onlineScope() && lichess::playableHere(g);  // played on the Board (#84)
+        const char* open  = here ? TR("On the Board") : TR("Open on lichess.org");
         const float right = (time.empty() ? 0.0f : ImGui::CalcTextSize(time.c_str()).x + style.ItemSpacing.x) +
                             ImGui::CalcTextSize(open).x + style.FramePadding.x * 2;
         ImGui::SameLine();
@@ -348,14 +358,22 @@ void App::drawPlayingGames() {
             ImGui::TextDisabled("%s", time.c_str());
             ImGui::SameLine();
         }
-        if (ImGui::SmallButton(open)) SDL_OpenURL(fmt::format("https://lichess.org/{}", g.full_id).c_str());
+        // Played on the Board once the token may play (#84); else, or what the Board API cannot play, on lichess.org.
+        if (ImGui::SmallButton(open)) {
+            if (here)
+                openOnlineGame(g.id, g.white);
+            else
+                SDL_OpenURL(fmt::format("https://lichess.org/{}", g.full_id).c_str());
+        }
         ImGui::PopID();
     }
     ImGui::Dummy(ImVec2(0, px(4)));
 }
 
 void App::drawListenOffer() {
-    if (!lichess_account_ || lichess_account_->has(lichess::SCOPE_CHALLENGE_READ) || lichess_.listen_declined) return;
+    if (!lichess_account_ || lichess_account_->has(lichess::SCOPE_CHALLENGE_READ) ||
+        lichess_account_->has(lichess::SCOPE_BOARD_PLAY) || lichess_.listen_declined)
+        return;
     const ui::TopicRegion topic(guide::topics::FairPlay);
     ui::beginCard("lichess_listen");
     ImGui::PushTextWrapPos();
@@ -474,6 +492,8 @@ void App::openFinishedGame(FinishedGame& f, const std::string& pgn) {
 }
 
 void App::drawFinishedBanner(bool home) {
+    // On the Board, a game being played on Lichess comes first: the one that ended waits (its Enter would replace it).
+    if (!home && onlineShown()) return;
     FinishedGame* shown = nullptr;
     for (auto& f : lichess_finished_)
         if (!f.done) shown = &f;

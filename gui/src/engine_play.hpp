@@ -66,10 +66,11 @@ struct PlaySettings {
     bool takebacks    = true;   // taking a move back allowed (counted)
     bool hints        = false;  // HINTS a game
     std::string games_folder;   // the database the games go into ("My games against engines"), made at the first
+    int part = 0;               // the page's part shown last: 0 against an engine, 1 on Lichess (#84)
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(PlaySettings, engine, elo, nodes, full, openings, database, repertoire,
                                                 player, book, vary, colour, clock, same_clock, engine_clock, from_board,
-                                                handicap, takebacks, hints, games_folder)
+                                                handicap, takebacks, hints, games_folder, part)
 
 inline constexpr int HINTS              = 3;  // a game, when hints are allowed
 inline constexpr uint64_t OPENING_LEAST = 5;  // a database's move played fewer times is left to the engine

@@ -1437,6 +1437,9 @@ msgstr ""
 msgid "Asked again in this session, then on its day."
 msgstr ""
 
+msgid "Asked of Lichess without an account: the channels, and the games you follow. Nothing is kept unless you keep it."
+msgstr ""
+
 msgid "Asked of Lichess: their name with a year of blitz, rapid and classical games, and their public profile. Nothing of yours."
 msgstr ""
 
@@ -1651,6 +1654,12 @@ msgid "Back to the game on Lichess"
 msgstr ""
 
 msgid "Back to the list"
+msgstr ""
+
+msgid "Back to the mosaic"
+msgstr ""
+
+msgid "Back to the mosaic · Esc"
 msgstr ""
 
 msgid "Back to the result as played ({})"
@@ -2541,6 +2550,9 @@ msgid "Compares the SHA-256 of each engine's program there with this computer's.
 msgstr ""
 
 msgid "Comparing {} here and on {}…"
+msgstr ""
+
+msgid "Computer"
 msgstr ""
 
 msgid "Computing…"
@@ -4543,6 +4555,12 @@ msgstr ""
 msgid "Into a database"
 msgstr ""
 
+msgid "Into a database of your choice, at its end."
+msgstr ""
+
+msgid "Into a database of your choice, now."
+msgstr ""
+
 msgid "Into a database, its PGN file or another: a menu · Ctrl+S"
 msgstr ""
 
@@ -4603,6 +4621,18 @@ msgid "It continues exactly where it stopped: no game is lost or played twice."
 msgstr ""
 
 msgid "It could not go into “{}”: {}."
+msgstr ""
+
+msgid "It ended: {}. The board stays on it."
+msgstr ""
+
+msgid "It ended: {}. The channel has no other game for now."
+msgstr ""
+
+msgid "It ended: {}. The channel's next game comes in a moment."
+msgstr ""
+
+msgid "It ended: {}. The channel's next game comes…"
 msgstr ""
 
 msgid "It expected"
@@ -4950,6 +4980,9 @@ msgstr ""
 msgid "Keep the engine log of every game"
 msgstr ""
 
+msgid "Keep the game, at its end, in"
+msgstr ""
+
 msgid "Keep the king boxed in with the queen a knight's jump away, bring your own king, and mind the stalemate."
 msgstr ""
 
@@ -4971,6 +5004,9 @@ msgstr ""
 msgid "Keep them running and quit"
 msgstr ""
 
+msgid "Keep this game…"
+msgstr ""
+
 msgid "Keep this search…"
 msgstr ""
 
@@ -4984,6 +5020,12 @@ msgid "Kept in the library, but out of the engine pickers (setup, suites, quick 
 msgstr ""
 
 msgid "Kept in the profile only, never in a tournament's files or the log."
+msgstr ""
+
+msgid "Kept in “{}”"
+msgstr ""
+
+msgid "Kept in “{}” at its end"
 msgstr ""
 
 msgid "Kept searches"
@@ -5118,6 +5160,48 @@ msgstr ""
 msgid "Lichess"
 msgstr ""
 
+msgid "Lichess AI, level {}"
+msgstr ""
+
+msgid "Lichess TV"
+msgstr ""
+
+msgid "Lichess TV · {}"
+msgstr ""
+
+msgid "Lichess TV · {} · the featured game"
+msgstr ""
+
+msgid "Lichess TV · {} · the featured game, {}"
+msgstr ""
+
+msgid "Lichess TV · {} · {}"
+msgstr ""
+
+msgid "Lichess TV: go on to the channel's next game"
+msgstr ""
+
+msgid "Lichess TV: keep this game…"
+msgstr ""
+
+msgid "Lichess TV: stay on this game"
+msgstr ""
+
+msgid "Lichess TV: {} could not be kept: {}"
+msgstr ""
+
+msgid "Lichess TV: {} in the mosaic"
+msgstr ""
+
+msgid "Lichess TV: {} kept in “{}”."
+msgstr ""
+
+msgid "Lichess TV: {} on the Board"
+msgstr ""
+
+msgid "Lichess TV: “{}” could not be written: {} was not kept."
+msgstr ""
+
 msgid "Lichess allows an opening book and a database there: the tree of your databases stays open. The engine, the cloud, the tables and the assistant look at no position of this game, before the one it has reached or after it."
 msgstr ""
 
@@ -5226,6 +5310,9 @@ msgstr ""
 msgid "Lichess lets an account make {} studies a day: send it into one of yours, or tomorrow."
 msgstr ""
 
+msgid "Lichess lets an address follow {} games at once: the rounds and the players followed take them all now."
+msgstr ""
+
 msgid "Lichess lets {} rounds be followed at once: stop one first."
 msgstr ""
 
@@ -5285,6 +5372,9 @@ msgstr ""
 msgid "Lichess sends the browser back to 127.0.0.1, on a port only RookStudio listens on while it links. Without an answer in 5 minutes, the link stops by itself."
 msgstr ""
 
+msgid "Lichess shows its moves three moves late, to anyone."
+msgstr ""
+
 msgid "Lichess studies"
 msgstr ""
 
@@ -5328,6 +5418,9 @@ msgid "Lichess's Board API is made for people: rapid, classical and corresponden
 msgstr ""
 
 msgid "Lichess's analysis"
+msgstr ""
+
+msgid "Lichess's best bots, this engine analysing beside them"
 msgstr ""
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
@@ -5519,6 +5612,9 @@ msgid "Lichess: your game against {}: {}"
 msgstr ""
 
 msgid "Lichess: {}"
+msgstr ""
+
+msgid "Lichess: {}. The list shown was read earlier."
 msgstr ""
 
 msgid "Lichess: “{}” could not be made: {}"
@@ -6265,6 +6361,9 @@ msgstr ""
 msgid "No game matches."
 msgstr ""
 
+msgid "No game of the channel has come yet: they appear as Lichess lists them, three moves late."
+msgstr ""
+
 msgid "No game of the database reached this position (the position search says so)."
 msgstr ""
 
@@ -6435,6 +6534,9 @@ msgstr ""
 msgid "No results yet."
 msgstr ""
 
+msgid "No round followed: the Lichess page lists the broadcasts."
+msgstr ""
+
 msgid "No round yet."
 msgstr ""
 
@@ -6570,6 +6672,9 @@ msgid "Not a value the new build takes: fastchess would play without it."
 msgstr ""
 
 msgid "Not an https link."
+msgstr ""
+
+msgid "Not any more"
 msgstr ""
 
 msgid "Not checked"
@@ -6776,6 +6881,9 @@ msgid "On the Board: your moves are played there."
 msgstr ""
 
 msgid "On the board"
+msgstr ""
+
+msgid "On the board, the game moves on with each move received, and the board goes on to the channel's next game when it ends; going back to analyse it lets it move on behind, “Back to live” brings it back."
 msgstr ""
 
 msgid "On the board, the game moves on with each move received; going back to analyse it lets it move on behind, “Back to live” brings it back."
@@ -9043,6 +9151,9 @@ msgstr ""
 msgid "Statistics are given from A's point of view."
 msgstr ""
 
+msgid "Stay on this game"
+msgstr ""
+
 msgid "Stay · Esc"
 msgstr ""
 
@@ -9440,6 +9551,9 @@ msgstr ""
 msgid "The 50-move counter, the material and the pieces left, under every board of the mosaic."
 msgstr ""
 
+msgid "The Board"
+msgstr ""
+
 msgid "The Board page's Tree tab, on this book: its moves at the position shown, green ones first."
 msgstr ""
 
@@ -9725,6 +9839,12 @@ msgstr ""
 msgid "The change was undone."
 msgstr ""
 
+msgid "The channel's games"
+msgstr ""
+
+msgid "The channel's games in progress in the mosaic, each analysed by your engine: {} at most from this address."
+msgstr ""
+
 msgid "The chapter"
 msgstr ""
 
@@ -9997,6 +10117,9 @@ msgstr ""
 msgid "The far passed pawn draws the king away; your king takes what it leaves."
 msgstr ""
 
+msgid "The featured game on the Board, which follows it; when it ends, the channel goes on to the next one."
+msgstr ""
+
 msgid "The file cannot be read: {}."
 msgstr ""
 
@@ -10237,10 +10360,22 @@ msgstr ""
 msgid "The games in progress are lost; each tournament resumes exactly where it stopped."
 msgstr ""
 
+msgid "The games of Lichess TV's Bots channel in the mosaic, each analysed by {} on your machine; no account needed."
+msgstr ""
+
+msgid "The games of Lichess TV's Computer channel, players against Lichess's AI, in the mosaic, each analysed by {} on your machine; no account needed."
+msgstr ""
+
+msgid "The games of a channel of Lichess TV."
+msgstr ""
+
 msgid "The games of its rounds."
 msgstr ""
 
 msgid "The games of the clipboard (a PGN text) imported into it."
+msgstr ""
+
+msgid "The games of the players you follow."
 msgstr ""
 
 msgid "The games opened on the board come here."
@@ -10496,6 +10631,9 @@ msgid "The moves come from Lichess's stream, opened again by itself after a brea
 msgstr ""
 
 msgid "The moves come from Lichess, three moves behind, as it shows them to anyone; the analysis is made on your machine, with your engines. A game that ends stays here until another takes its place."
+msgstr ""
+
+msgid "The moves come three moves late: Lichess's rule for spectators. A finished game gives its place to another of the channel; a double click follows a game on the board. The analysis is made on your machine, with your engines; nothing is kept unless you keep it."
 msgstr ""
 
 msgid "The moves missed"
@@ -10889,6 +11027,9 @@ msgstr ""
 msgid "The rounds"
 msgstr ""
 
+msgid "The rounds you follow."
+msgstr ""
+
 msgid "The rule of the square"
 msgstr ""
 
@@ -11165,6 +11306,9 @@ msgid "The tournaments' setting (Settings › Adjudication): {}."
 msgstr ""
 
 msgid "The variance of a game when the games are counted in pairs, over the variance of single games: below 1, the pairs need that much fewer games for the same precision."
+msgstr ""
+
+msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
 msgstr ""
 
 msgid "The version and the system, for a bug report."
@@ -11522,6 +11666,9 @@ msgstr ""
 msgid "Too slow for me"
 msgstr ""
 
+msgid "Top rated"
+msgstr ""
+
 msgid "Total"
 msgstr ""
 
@@ -11778,6 +11925,9 @@ msgid "Untick it to give the engine a clock of its own: unequal time, a handicap
 msgstr ""
 
 msgid "Unticked, it takes its share of the analysis's threads; ticked, the threads set here, which the others' share leaves aside."
+msgstr ""
+
+msgid "Unticked, the board goes on to the channel's next featured game when this one ends; the game left stays a Ctrl+Tab away."
 msgstr ""
 
 msgid "Unticked: the move played most, a book's main move first, every time. A book or a repertoire offers each of its moves; your databases and a player's games those played at least {} times."
@@ -12103,6 +12253,12 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "What's new"
+msgstr ""
+
+msgid "When it ends, the board stays on it."
+msgstr ""
+
+msgid "When it ends, the channel goes on to the next one, by itself."
 msgstr ""
 
 msgid "When it settled on the move it played, on average: a decision long before the end of the time spent says the time was not used well."
@@ -12730,6 +12886,9 @@ msgid "Your own folder"
 msgstr ""
 
 msgid "Your own folder…"
+msgstr ""
+
+msgid "Your own game: it is never shown here (fair play)."
 msgstr ""
 
 msgid "Your public studies only: RookStudio may not read the others."
@@ -13508,6 +13667,12 @@ msgstr ""
 msgid "import of {}: {} %"
 msgstr ""
 
+msgid "in a database of your choice"
+msgstr ""
+
+msgid "in a database of your choice, at its end"
+msgstr ""
+
 msgid "in a game"
 msgstr ""
 
@@ -14243,6 +14408,9 @@ msgstr ""
 msgid "resign {}/{} cp, both engines"
 msgstr ""
 
+msgid "resting during your game on Lichess"
+msgstr ""
+
 msgid "reviewed: its marks are in the notation"
 msgstr ""
 
@@ -14377,6 +14545,9 @@ msgid "the endgame tables"
 msgstr ""
 
 msgid "the engine offered by default"
+msgstr ""
+
+msgid "the engines rest during your game on Lichess"
 msgstr ""
 
 msgid "the facts of the positions its lines lead to"
@@ -14730,6 +14901,9 @@ msgstr ""
 msgid "what Ctrl+S does"
 msgstr ""
 
+msgid "where you kept the last one"
+msgstr ""
+
 msgid "where you saved last time"
 msgstr ""
 
@@ -14821,6 +14995,9 @@ msgid "your linked account tells them"
 msgstr ""
 
 msgid "your names first"
+msgstr ""
+
+msgid "your own game: not shown"
 msgstr ""
 
 msgid "your rating {}{}"
@@ -15382,6 +15559,11 @@ msgid_plural "{} games from an unbalanced opening"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "{} game in progress"
+msgid_plural "{} games in progress"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{} game in {}"
 msgid_plural "{} games in {}"
 msgstr[0] ""
@@ -15721,6 +15903,9 @@ msgid "{} is the tournament's own PGN file: choose another one."
 msgstr ""
 
 msgid "{} is twice in the list of participants."
+msgstr ""
+
+msgid "{} kept in “{}”"
 msgstr ""
 
 msgid "{} left the game."
@@ -17071,6 +17256,9 @@ msgstr ""
 msgid "· draws %.1f %%"
 msgstr ""
 
+msgid "· each channel's featured game"
+msgstr ""
+
 msgid "· end of book ·"
 msgstr ""
 
@@ -17208,6 +17396,9 @@ msgid "“{}” prepares the engine's colour: it plays from the first move."
 msgstr ""
 
 msgid "“{}” taken out of the theory; the file stays where it is."
+msgstr ""
+
+msgid "“{}”, a new database"
 msgstr ""
 
 msgid "“{}”, from line {}"

@@ -1423,6 +1423,9 @@ msgstr "本组中会再问一次，然后明天再问。"
 msgid "Asked again in this session, then on its day."
 msgstr "本次训练中会再问一次，之后在其到期日再问。"
 
+msgid "Asked of Lichess without an account: the channels, and the games you follow. Nothing is kept unless you keep it."
+msgstr ""
+
 msgid "Asked of Lichess: their name with a year of blitz, rapid and classical games, and their public profile. Nothing of yours."
 msgstr "向 Lichess 请求的内容：其名称（用于获取一年内的超快棋、快棋和慢棋对局）及其公开资料。不涉及你的任何内容。"
 
@@ -1638,6 +1641,12 @@ msgstr "回到 Lichess 上的对局"
 
 msgid "Back to the list"
 msgstr "返回列表"
+
+msgid "Back to the mosaic"
+msgstr ""
+
+msgid "Back to the mosaic · Esc"
+msgstr ""
 
 msgid "Back to the result as played ({})"
 msgstr "恢复实际下出的结果（{}）"
@@ -2527,6 +2536,9 @@ msgstr "将每个引擎在那里的程序的 SHA-256 与本机的进行比较。
 
 msgid "Comparing {} here and on {}…"
 msgstr "正在比较{}（本机与 {}）…"
+
+msgid "Computer"
+msgstr ""
 
 msgid "Computing…"
 msgstr "计算中…"
@@ -4515,6 +4527,12 @@ msgstr "存入 PGN 文件…"
 msgid "Into a database"
 msgstr "存入数据库"
 
+msgid "Into a database of your choice, at its end."
+msgstr ""
+
+msgid "Into a database of your choice, now."
+msgstr ""
+
 msgid "Into a database, its PGN file or another: a menu · Ctrl+S"
 msgstr "存入数据库、其 PGN 文件或其他文件：弹出菜单 · Ctrl+S"
 
@@ -4575,6 +4593,18 @@ msgstr "它会从中断处准确继续：不会丢失对局，也不会重复下
 
 msgid "It could not go into “{}”: {}."
 msgstr "无法存入“{}”：{}。"
+
+msgid "It ended: {}. The board stays on it."
+msgstr ""
+
+msgid "It ended: {}. The channel has no other game for now."
+msgstr ""
+
+msgid "It ended: {}. The channel's next game comes in a moment."
+msgstr ""
+
+msgid "It ended: {}. The channel's next game comes…"
+msgstr ""
 
 msgid "It expected"
 msgstr "预期"
@@ -4921,6 +4951,9 @@ msgstr "保留我的所有值：{}"
 msgid "Keep the engine log of every game"
 msgstr "保存每局对局的引擎日志"
 
+msgid "Keep the game, at its end, in"
+msgstr ""
+
 msgid "Keep the king boxed in with the queen a knight's jump away, bring your own king, and mind the stalemate."
 msgstr "用后在相隔一个马步的位置把王困住，把你的王调上来，并当心逼和。"
 
@@ -4942,6 +4975,9 @@ msgstr "保留"
 msgid "Keep them running and quit"
 msgstr "让它们继续并退出"
 
+msgid "Keep this game…"
+msgstr ""
+
 msgid "Keep this search…"
 msgstr "保存此搜索…"
 
@@ -4956,6 +4992,12 @@ msgstr "保留在库中，但不出现在引擎选择列表（配置、测试集
 
 msgid "Kept in the profile only, never in a tournament's files or the log."
 msgstr "只保存在配置文件中，绝不写入锦标赛文件或日志。"
+
+msgid "Kept in “{}”"
+msgstr ""
+
+msgid "Kept in “{}” at its end"
+msgstr ""
 
 msgid "Kept searches"
 msgstr "已保存的搜索"
@@ -5089,6 +5131,48 @@ msgstr "库引擎"
 msgid "Lichess"
 msgstr "Lichess"
 
+msgid "Lichess AI, level {}"
+msgstr ""
+
+msgid "Lichess TV"
+msgstr ""
+
+msgid "Lichess TV · {}"
+msgstr ""
+
+msgid "Lichess TV · {} · the featured game"
+msgstr ""
+
+msgid "Lichess TV · {} · the featured game, {}"
+msgstr ""
+
+msgid "Lichess TV · {} · {}"
+msgstr ""
+
+msgid "Lichess TV: go on to the channel's next game"
+msgstr ""
+
+msgid "Lichess TV: keep this game…"
+msgstr ""
+
+msgid "Lichess TV: stay on this game"
+msgstr ""
+
+msgid "Lichess TV: {} could not be kept: {}"
+msgstr ""
+
+msgid "Lichess TV: {} in the mosaic"
+msgstr ""
+
+msgid "Lichess TV: {} kept in “{}”."
+msgstr ""
+
+msgid "Lichess TV: {} on the Board"
+msgstr ""
+
+msgid "Lichess TV: “{}” could not be written: {} was not kept."
+msgstr ""
+
 msgid "Lichess allows an opening book and a database there: the tree of your databases stays open. The engine, the cloud, the tables and the assistant look at no position of this game, before the one it has reached or after it."
 msgstr "Lichess 允许在通信棋中使用开局库和数据库：你的数据库的开局树保持可用。引擎、云端、残局库和助手不会查看这局对局的任何局面，无论是在当前局面之前还是之后。"
 
@@ -5197,6 +5281,9 @@ msgstr "Lichess 允许每个账户每天创建 {} 个研究（过去一天内从
 msgid "Lichess lets an account make {} studies a day: send it into one of yours, or tomorrow."
 msgstr "Lichess 允许每个账户每天创建 {} 个研究：请发送到你已有的研究中，或明天再试。"
 
+msgid "Lichess lets an address follow {} games at once: the rounds and the players followed take them all now."
+msgstr ""
+
 msgid "Lichess lets {} rounds be followed at once: stop one first."
 msgstr "Lichess 只允许同时跟随 {} 轮：请先停止跟随其中一轮。"
 
@@ -5255,6 +5342,9 @@ msgstr "Lichess 拒绝：{}"
 msgid "Lichess sends the browser back to 127.0.0.1, on a port only RookStudio listens on while it links. Without an answer in 5 minutes, the link stops by itself."
 msgstr "Lichess 会将浏览器重定向回 127.0.0.1 上的一个端口，关联期间只有 RookStudio 在该端口监听。5 分钟内没有回应，关联会自动停止。"
 
+msgid "Lichess shows its moves three moves late, to anyone."
+msgstr ""
+
 msgid "Lichess studies"
 msgstr "Lichess 研究"
 
@@ -5299,6 +5389,9 @@ msgstr "Lichess 的 Board API 是为人类棋手设计的：快棋、慢棋和�
 
 msgid "Lichess's analysis"
 msgstr "Lichess 的分析"
+
+msgid "Lichess's best bots, this engine analysing beside them"
+msgstr ""
 
 msgid "Lichess's broadcasts are under CC BY-SA 4.0: their games keep their source, the broadcast's page in their Site tag; what you share of them is shared alike."
 msgstr "Lichess 的直播采用 CC BY-SA 4.0 许可：其对局保留来源，即 Site 标签中的直播页面；你分享其中的内容时须以相同方式共享。"
@@ -5489,6 +5582,9 @@ msgstr "Lichess：你对阵 {} 的对局：{}"
 
 msgid "Lichess: {}"
 msgstr "Lichess：{}"
+
+msgid "Lichess: {}. The list shown was read earlier."
+msgstr ""
 
 msgid "Lichess: “{}” could not be made: {}"
 msgstr "Lichess：无法创建“{}”：{}"
@@ -6228,6 +6324,9 @@ msgstr "没有足够长的对局符合筛选条件。"
 msgid "No game matches."
 msgstr "没有匹配的对局。"
 
+msgid "No game of the channel has come yet: they appear as Lichess lists them, three moves late."
+msgstr ""
+
 msgid "No game of the database reached this position (the position search says so)."
 msgstr "数据库中没有对局到达过此局面（局面搜索的结果）。"
 
@@ -6397,6 +6496,9 @@ msgstr "还没有开局体系：在“开局树”标签页中点星标即可创
 msgid "No results yet."
 msgstr "还没有成绩。"
 
+msgid "No round followed: the Lichess page lists the broadcasts."
+msgstr ""
+
 msgid "No round yet."
 msgstr "还没有轮次。"
 
@@ -6532,6 +6634,9 @@ msgstr "新版本不接受此值：fastchess 会不带它进行对局。"
 
 msgid "Not an https link."
 msgstr "不是 https 链接。"
+
+msgid "Not any more"
+msgstr ""
 
 msgid "Not checked"
 msgstr "未检查"
@@ -6737,6 +6842,9 @@ msgstr "在棋盘上：你的着法在那里走出。"
 
 msgid "On the board"
 msgstr "在棋盘上"
+
+msgid "On the board, the game moves on with each move received, and the board goes on to the channel's next game when it ends; going back to analyse it lets it move on behind, “Back to live” brings it back."
+msgstr ""
 
 msgid "On the board, the game moves on with each move received; going back to analyse it lets it move on behind, “Back to live” brings it back."
 msgstr "在棋盘上，对局会随收到的每步棋推进；退回去分析时，对局在后台继续推进，“回到直播”可回到最新局面。"
@@ -8982,6 +9090,9 @@ msgstr "统计"
 msgid "Statistics are given from A's point of view."
 msgstr "统计数据以 A 的角度给出。"
 
+msgid "Stay on this game"
+msgstr ""
+
 msgid "Stay · Esc"
 msgstr "留下 · Esc"
 
@@ -9371,6 +9482,9 @@ msgstr "3D 棋子："
 msgid "The 50-move counter, the material and the pieces left, under every board of the mosaic."
 msgstr "50 步计数、子力以及剩余棋子，显示在平铺视图的每个棋盘下方。"
 
+msgid "The Board"
+msgstr ""
+
 msgid "The Board page's Tree tab, on this book: its moves at the position shown, green ones first."
 msgstr "棋盘页面的“开局树”标签页，以此开局库为来源：所显示局面下它的着法，绿色的在前。"
 
@@ -9653,6 +9767,12 @@ msgstr "它接受的挑战"
 msgid "The change was undone."
 msgstr "修改已撤销。"
 
+msgid "The channel's games"
+msgstr ""
+
+msgid "The channel's games in progress in the mosaic, each analysed by your engine: {} at most from this address."
+msgstr ""
+
 msgid "The chapter"
 msgstr "章节"
 
@@ -9924,6 +10044,9 @@ msgstr "恢复初始的曝光、质量、清漆和光泽；布光保持不变。
 msgid "The far passed pawn draws the king away; your king takes what it leaves."
 msgstr "远方的通路兵把对方的王引开；你的王吃掉它留下的兵。"
 
+msgid "The featured game on the Board, which follows it; when it ends, the channel goes on to the next one."
+msgstr ""
+
 msgid "The file cannot be read: {}."
 msgstr "无法读取文件：{}。"
 
@@ -10164,11 +10287,23 @@ msgstr "计入的对局，以只含头信息的 PGN 输出，可供 Ordo 和 Bay
 msgid "The games in progress are lost; each tournament resumes exactly where it stopped."
 msgstr "进行中的对局会丢失；每个锦标赛都会从停止处准确继续。"
 
+msgid "The games of Lichess TV's Bots channel in the mosaic, each analysed by {} on your machine; no account needed."
+msgstr ""
+
+msgid "The games of Lichess TV's Computer channel, players against Lichess's AI, in the mosaic, each analysed by {} on your machine; no account needed."
+msgstr ""
+
+msgid "The games of a channel of Lichess TV."
+msgstr ""
+
 msgid "The games of its rounds."
 msgstr "其各轮的对局。"
 
 msgid "The games of the clipboard (a PGN text) imported into it."
 msgstr "将剪贴板中的对局（PGN 文本）导入其中。"
+
+msgid "The games of the players you follow."
+msgstr ""
 
 msgid "The games opened on the board come here."
 msgstr "在棋盘上打开过的对局会显示在这里。"
@@ -10424,6 +10559,9 @@ msgstr "着法来自 Lichess 的数据流，中断后会自动重新连接；分
 
 msgid "The moves come from Lichess, three moves behind, as it shows them to anyone; the analysis is made on your machine, with your engines. A game that ends stays here until another takes its place."
 msgstr "着法来自 Lichess，落后三步，与 Lichess 向所有人显示的一致；分析在你的机器上用你的引擎进行。结束的对局会留在这里，直到被另一局取代。"
+
+msgid "The moves come three moves late: Lichess's rule for spectators. A finished game gives its place to another of the channel; a double click follows a game on the board. The analysis is made on your machine, with your engines; nothing is kept unless you keep it."
+msgstr ""
 
 msgid "The moves missed"
 msgstr "答错的着法"
@@ -10814,6 +10952,9 @@ msgstr "无法将本轮保存到“{}”：{}"
 msgid "The rounds"
 msgstr "轮次"
 
+msgid "The rounds you follow."
+msgstr ""
+
 msgid "The rule of the square"
 msgstr "正方形法则"
 
@@ -11090,6 +11231,9 @@ msgstr "锦标赛的设置（设置 › 裁定）：{}。"
 
 msgid "The variance of a game when the games are counted in pairs, over the variance of single games: below 1, the pairs need that much fewer games for the same precision."
 msgstr "按对局对计算时单局的方差与单独计算时单局方差之比：低于 1 时，成对对局只需相应更少的对局即可达到同样精度。"
+
+msgid "The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again when the card shows, every 30 s at most."
+msgstr ""
 
 msgid "The version and the system, for a bug report."
 msgstr "版本和系统信息，用于错误报告。"
@@ -11444,6 +11588,9 @@ msgstr "请求过多：一分钟后会自动重新发送；你的答案会保留
 msgid "Too slow for me"
 msgstr "对我来说太慢"
 
+msgid "Top rated"
+msgstr ""
+
 msgid "Total"
 msgstr "合计"
 
@@ -11698,6 +11845,9 @@ msgstr "取消勾选即可给引擎单独设置棋钟：时间不等，也是一
 
 msgid "Unticked, it takes its share of the analysis's threads; ticked, the threads set here, which the others' share leaves aside."
 msgstr "不勾选时，它分得分析线程中的一份；勾选时，使用此处设置的线程数，其他引擎分配线程时会把这些线程排除在外。"
+
+msgid "Unticked, the board goes on to the channel's next featured game when this one ends; the game left stays a Ctrl+Tab away."
+msgstr ""
 
 msgid "Unticked: the move played most, a book's main move first, every time. A book or a repertoire offers each of its moves; your databases and a player's games those played at least {} times."
 msgstr "不勾选时：每次都走下得最多的着法，开局库的主着法优先。开局库或开局体系提供其每个着法；你的数据库和棋手的对局则提供至少下过 {} 次的着法。"
@@ -12021,6 +12171,12 @@ msgstr[0] "你的研究对此局面怎么说：{} 条注解，位于“开局树
 
 msgid "What's new"
 msgstr "新功能"
+
+msgid "When it ends, the board stays on it."
+msgstr ""
+
+msgid "When it ends, the channel goes on to the next one, by itself."
+msgstr ""
 
 msgid "When it settled on the move it played, on average: a decision long before the end of the time spent says the time was not used well."
 msgstr "它平均何时确定最终走出的着法：如果远早于所用时间结束就已确定，说明时间没有用好。"
@@ -12645,6 +12801,9 @@ msgstr "自己的文件夹"
 
 msgid "Your own folder…"
 msgstr "自己的文件夹…"
+
+msgid "Your own game: it is never shown here (fair play)."
+msgstr ""
 
 msgid "Your public studies only: RookStudio may not read the others."
 msgstr "仅限你的公开研究：RookStudio 无权读取其他研究。"
@@ -13412,6 +13571,12 @@ msgstr "非法局面"
 msgid "import of {}: {} %"
 msgstr "导入 {}：{} %"
 
+msgid "in a database of your choice"
+msgstr ""
+
+msgid "in a database of your choice, at its end"
+msgstr ""
+
 msgid "in a game"
 msgstr "对局中"
 
@@ -14135,6 +14300,9 @@ msgstr "认输 {}/{} cp"
 msgid "resign {}/{} cp, both engines"
 msgstr "认输 {}/{} cp，双方引擎"
 
+msgid "resting during your game on Lichess"
+msgstr ""
+
 msgid "reviewed: its marks are in the notation"
 msgstr "已复盘：其标记已在棋谱中"
 
@@ -14268,6 +14436,9 @@ msgstr "残局库"
 
 msgid "the engine offered by default"
 msgstr "默认推荐的引擎"
+
+msgid "the engines rest during your game on Lichess"
+msgstr ""
 
 msgid "the facts of the positions its lines lead to"
 msgstr "其变化通向的局面的各项事实"
@@ -14617,6 +14788,9 @@ msgstr "按得分加权"
 msgid "what Ctrl+S does"
 msgstr "即 Ctrl+S 的操作"
 
+msgid "where you kept the last one"
+msgstr ""
+
 msgid "where you saved last time"
 msgstr "上次保存的位置"
 
@@ -14709,6 +14883,9 @@ msgstr "关联账户后才能得知"
 
 msgid "your names first"
 msgstr "请先设置你的名称"
+
+msgid "your own game: not shown"
+msgstr ""
 
 msgid "your rating {}{}"
 msgstr "你的等级分 {}{}"
@@ -15219,6 +15396,10 @@ msgid "{} game from an unbalanced opening"
 msgid_plural "{} games from an unbalanced opening"
 msgstr[0] "{} 局来自失衡的开局"
 
+msgid "{} game in progress"
+msgid_plural "{} games in progress"
+msgstr[0] ""
+
 msgid "{} game in {}"
 msgid_plural "{} games in {}"
 msgstr[0] "{} 局对局，来自 {}"
@@ -15534,6 +15715,9 @@ msgstr "{} 是锦标赛自己的 PGN 文件：请另选一个。"
 
 msgid "{} is twice in the list of participants."
 msgstr "{} 在参赛者列表中出现了两次。"
+
+msgid "{} kept in “{}”"
+msgstr ""
 
 msgid "{} left the game."
 msgstr "{} 离开了对局。"
@@ -16776,6 +16960,9 @@ msgstr "· 深度 {} · 其服务器已计算过"
 msgid "· draws %.1f %%"
 msgstr "· 和棋 %.1f %%"
 
+msgid "· each channel's featured game"
+msgstr ""
+
 msgid "· end of book ·"
 msgstr "· 开局库结束 ·"
 
@@ -16912,6 +17099,9 @@ msgstr "“{}”是为引擎一方准备的：引擎从第一步起自己下。"
 
 msgid "“{}” taken out of the theory; the file stays where it is."
 msgstr "“{}”已从理论中移除；文件保留在原处。"
+
+msgid "“{}”, a new database"
+msgstr ""
 
 msgid "“{}”, from line {}"
 msgstr "“{}”，从第 {} 行起"

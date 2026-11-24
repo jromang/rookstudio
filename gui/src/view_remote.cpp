@@ -92,6 +92,18 @@ void App::syncEngineHub() {
         signature += r->machine + '\n' + r->program + '\n' + e.args + '\n' + r->dir + '\n';
         remote.push_back(std::move(*r));
     }
+    // An engine offered to lichess.org that computes on another machine than its own (#96).
+    if (offers_) {
+        for (const auto& o : *offers_) {
+            if (o.machine.empty()) continue;
+            std::string error;
+            const auto run = serviceEngine(o, error);
+            auto r         = run ? remoteEngine(*run) : std::nullopt;
+            if (!r) continue;
+            signature += r->machine + '\n' + r->program + '\n' + run->args + '\n' + r->dir + '\n';
+            remote.push_back(std::move(*r));
+        }
+    }
     if (remote.empty() && !hub_) return;
     if (!hub_) {
         EngineHub::Options options;

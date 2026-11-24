@@ -806,6 +806,26 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
                 saveBotSettings();
             });
     }
+    // The engines offered to lichess.org's analysis board (#96): stop or resume each; the engine shown's offer.
+    {
+        std::vector<std::string> serving, stopped;
+        for (const auto& [name, s] : services_) serving.push_back(name);
+        for (const auto& o : offers())
+            if (!o.id.empty() && !services_.count(o.engine) && engineIndex(o.engine) >= 0) stopped.push_back(o.engine);
+        for (const auto& name : serving)
+            add(trf("Stop the service of {} on lichess.org", name), "Lichess", [this, name] { stopService(name); });
+        for (const auto& name : stopped)
+            add(trf("Resume the service of {} on lichess.org", name), "Lichess", [this, name] { startService(name); });
+        if (page_ == Page::Engines && selected_engine_ >= 0 && selected_engine_ < static_cast<int>(engines_.size())) {
+            const auto& e = engines_[static_cast<std::size_t>(selected_engine_)];
+            const auto* o = offerOf(e.name);
+            if ((!o || o->id.empty()) && knowsChess960(e))
+                add(trf("Offer {} to lichess.org…", e.name), TR("Engines"), [this, name = e.name] {
+                    const int i = engineIndex(name);
+                    if (i >= 0) openOfferForm(engines_[static_cast<std::size_t>(i)]);
+                });
+        }
+    }
     // The Training page (#80): the page, the day's review, each theme's puzzles, Lichess's database, the batch online.
     add(TR("Training"), where(Page::Training), [this, go = page(Page::Training)] {
         go();

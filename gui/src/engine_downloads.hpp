@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -65,9 +66,16 @@ struct Installed {
     std::string id_name;  // what it answered to uci
     std::string id_author;
     int64_t installed = 0;  // when, seconds since 1970
+    // What became of it (#65, engine_versions.hpp): when an update replaced it in the library (0: never), when its
+    // folder was deleted and how much that freed (0: on the disk). A deleted version stays listed, to be downloaded
+    // again if a tournament asks for it.
+    int64_t retired     = 0;
+    int64_t deleted     = 0;
+    uint64_t freed      = 0;
+    std::string held_by = {};  // retired, the last tournament seen playing it: the one whose end freed it
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Installed, id, version, tag, asset, sha256, licence, program, id_name,
-                                                id_author, installed)
+                                                id_author, installed, retired, deleted, freed, held_by)
 
 // <profile>/engines, and the folder of one version: <profile>/engines/<id>/<version>.
 [[nodiscard]] std::filesystem::path enginesFolder(const std::filesystem::path& profile);
@@ -76,6 +84,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Installed, id, version, tag, ass
 
 // The engines installed from the catalogue; none when the list cannot be read.
 [[nodiscard]] std::vector<Installed> loadInstalled(const std::filesystem::path& profile);
+// Held while installed.json is read, changed and written back (an install, an old version deleted, #65): one at a time.
+[[nodiscard]] std::mutex& installedMutex();
 // Writes the list, safely; false, with why in `error`, when it cannot.
 bool saveInstalled(const std::filesystem::path& profile, const std::vector<Installed>& installed,
                    std::string* error = nullptr);

@@ -174,13 +174,16 @@ class Connection {
     Connection& operator=(const Connection&) = delete;
 
     // An error message, empty once connected (and the server's certificate checked). Through `proxy`, when given.
-    std::string open(const Url& url, const std::optional<Proxy>& proxy, int timeout_ms) {
+    // `cancel`, when given, ends the wait for the connection ("cancelled").
+    std::string open(const Url& url, const std::optional<Proxy>& proxy, int timeout_ms,
+                     const std::atomic<bool>* cancel = nullptr) {
         timeout_ms_ = static_cast<uint32_t>(timeout_ms);
         // Our own connect, which gives up in time (mbedtls_net_connect waits as long as the system does), and whose
         // socket the engines started meanwhile do not inherit. Mbed TLS keeps sockets as int, on Windows too.
         std::string error;
         const auto fd = net::connectHost(proxy ? proxy->host : url.host, proxy ? proxy->port : url.port,
-                                         std::min(timeout_ms, CONNECT_TIMEOUT_MS), error);
+                                         std::min(timeout_ms, CONNECT_TIMEOUT_MS), error, cancel);
+        if (cancel && cancel->load()) return "cancelled";
         if (!fd) return proxy ? fmt::format("{} (the proxy of {})", error, proxy->variable) : error;
         net_.fd = static_cast<int>(*fd);
         if (proxy) {
@@ -512,7 +515,7 @@ HttpResult streamOnce(const HttpRequest& request, const Url& url, const HttpStre
         return result;
     }
     Connection connection;
-    if (auto error = connection.open(url, proxy, request.timeout_s * 1000); !error.empty()) {
+    if (auto error = connection.open(url, proxy, request.timeout_s * 1000, stream.cancel); !error.empty()) {
         result.error = std::move(error);
         return result;
     }
@@ -691,6 +694,113 @@ HttpResult httpStream(const HttpRequest& request, const HttpStream& stream) {
         current.url = location;
         url         = next;
     }
+}
+
+HttpResult httpUpload(const HttpRequest& request, const HttpUpload& upload, bool* whole) {
+    if (whole) *whole = false;
+    HttpResult result;
+    const auto url = parseUrl(request.url);
+    if (!url) {
+        result.error = "not an http or https URL: " + request.url;
+        return result;
+    }
+    const auto proxy = url->tls ? proxyFor(url->host) : std::nullopt;
+    if (proxy && !proxy->error.empty()) {
+        result.error = proxy->error;
+        return result;
+    }
+    Connection connection;
+    if (auto error = connection.open(*url, proxy, request.timeout_s * 1000, upload.cancel); !error.empty()) {
+        result.error = std::move(error);
+        return result;
+    }
+    std::string head = fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url->path,
+                                   url->host, USER_AGENT);
+    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
+    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
+    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
+    head += "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+    if (!connection.send(head)) {
+        result.error = "the request could not be sent to " + url->host;
+        return result;
+    }
+    const auto stopped = [&] { return upload.cancel && upload.cancel->load(std::memory_order_relaxed); };
+    std::vector<unsigned char> buffer(std::size_t{1} << 14);
+    std::string answer;       // what the server sent
+    bool closed     = false;  // and whether it closed the connection
+    const auto look = [&](uint32_t wait_ms) {
+        const int n = connection.receiveSome(buffer.data(), buffer.size(), wait_ms);
+        if (n > 0)
+            answer.append(reinterpret_cast<const char*>(buffer.data()), static_cast<std::size_t>(n));
+        else if (n == 0 || n == -2)
+            closed = true;
+        return n;
+    };
+    // The body, a chunk at a time, while the server says nothing.
+    bool sent_whole = false;
+    for (;;) {
+        if (stopped()) {
+            result.error = "cancelled";
+            return result;
+        }
+        (void)look(1);  // 0 would wait for ever on a plain connection (mbedtls_net_recv_timeout)
+        if (!answer.empty() || closed) break;
+        const auto piece = upload.next ? upload.next(std::chrono::milliseconds(50)) : std::nullopt;
+        if (!piece) {
+            sent_whole = connection.send("0\r\n\r\n");
+            if (whole) *whole = sent_whole;
+            break;
+        }
+        if (piece->empty()) continue;
+        if (!connection.send(fmt::format("{:x}\r\n", piece->size()) + *piece + "\r\n")) break;
+    }
+    // The answer: its head alone when it came before the body's end (what follows does not matter: the body was cut);
+    // else up to the end of its length, of its last chunk, or of the connection.
+    auto last = std::chrono::steady_clock::now();
+    for (;;) {
+        if (stopped()) {
+            result.error = "cancelled";
+            return result;
+        }
+        if (const auto end = answer.find("\r\n\r\n"); end != std::string::npos) {
+            if (!sent_whole) break;
+            const auto head_in = std::string_view(answer).substr(0, end);
+            if (const auto length = httpHeader(head_in, "Content-Length")) {
+                std::size_t n = 0;
+                if (std::from_chars(length->data(), length->data() + length->size(), n).ec == std::errc() &&
+                    answer.size() >= end + 4 + n)
+                    break;
+            } else if (const auto encoding = httpHeader(head_in, "Transfer-Encoding");
+                       encoding && lower(*encoding).find("chunked") != std::string::npos) {
+                ChunkDecoder chunks;
+                (void)chunks.feed(std::string_view(answer).substr(end + 4), [](std::string_view) { return true; });
+                if (chunks.done() || chunks.failed()) break;
+            }
+        }
+        if (closed) break;
+        const int n = look(250);
+        if (n > 0) {
+            last = std::chrono::steady_clock::now();
+        } else if (n < 0 && !closed && std::chrono::steady_clock::now() - last > std::chrono::seconds(upload.idle_s)) {
+            result.error = "no answer from " + url->host + " in time";
+            return result;
+        }
+    }
+    const auto headers_end = answer.find("\r\n\r\n");
+    const auto space       = answer.find(' ');
+    if (answer.rfind("HTTP/", 0) != 0 || headers_end == std::string::npos || space == std::string::npos ||
+        std::from_chars(answer.data() + space + 1, answer.data() + answer.size(), result.status).ec != std::errc()) {
+        result.status = 0;
+        result.error =
+            answer.empty() ? "the connection to " + url->host + " was closed" : "not an HTTP answer from " + url->host;
+        return result;
+    }
+    result.head = answer.substr(0, headers_end);
+    result.body = answer.substr(headers_end + 4);
+    if (const auto encoding = httpHeader(result.head, "Transfer-Encoding");
+        encoding && lower(*encoding).find("chunked") != std::string::npos)
+        result.body = unchunk(result.body);
+    return result;
 }
 
 bool ChunkDecoder::feed(std::string_view in, const std::function<bool(std::string_view)>& out) {

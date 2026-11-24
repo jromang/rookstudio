@@ -1287,12 +1287,15 @@ void App::drawBotRules(const EngineEntry& e) {
     if (!bot_online_error_.empty()) coloured(bot_online_error_, ui::WARN);
     const bool missing = e.program_state == ProgramState::Missing || e.program_state == ProgramState::MissingDir;
     if (missing) coloured(trf("{}'s program is missing: locate it above first.", e.name), ui::WARN);
+    // Enter is the Lichess analysis part's when it shows a button of its own (#96).
     const bool go =
         primaryButton(TR("Put online"), !missing) ||
-        (!missing && !ImGui::GetIO().WantTextInput && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-         ImGui::IsKeyPressed(ImGuiKey_Enter, false));
-    ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("%s", TR("Enter"));
+        (!missing && !lichess_engine_enter_ && !ImGui::GetIO().WantTextInput &&
+         ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::IsKeyPressed(ImGuiKey_Enter, false));
+    if (!lichess_engine_enter_) {
+        ImGui::SameLine(0, px(4));
+        ImGui::TextDisabled("%s", TR("Enter"));
+    }
     if (go) setBotOnline(true);
     ImGui::SameLine(0, px(24));
     if (ImGui::SmallButton(bot_unlink_asked_ ? TR("Unlink the bot: click again") : TR("Unlink the bot…"))) {

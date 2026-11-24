@@ -156,6 +156,8 @@ const std::vector<const char*>& allTopics() {
                                               LichessGame,
                                               PlayTournaments,
                                               LichessBot,
+                                              LichessEngine,
+                                              EngineVersions,
                                               LichessPage,
                                               LichessLink,
                                               LichessGames,

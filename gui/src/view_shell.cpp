@@ -297,6 +297,7 @@ void App::drawShell() {
     ImGui::End();
     drawOnlineNotice();  // a challenge received on Lichess, at the window's corner, wherever the user is (#84)
     drawSwissNotice();   // a Swiss's next round, two minutes before it, there too (#95)
+    drawVersionNotice();  // an engine's old version deleted once its tournaments are over (#65)
 }
 
 int App::gamesPlaying(bool all) const {

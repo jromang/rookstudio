@@ -79,7 +79,8 @@ void App::drawHome() {
         drawNeedsAction();
         drawRunCards();
     }
-    drawBotRunning(false);  // the Lichess bot online, its game (#85)
+    drawBotRunning(false);            // the Lichess bot online, its game (#85)
+    drawLichessEngineRunning(false);  // the engines offered to lichess.org, in service (#96)
     {
         ui::TopicRegion topic(guide::topics::Queue);
         drawQueue();
@@ -346,6 +347,14 @@ std::vector<home::ResourceBar> App::resourceBars() {
             {fmt::format("{} · {}", TR("Lichess bot"), bot),
              trn("The Lichess bot: {} core for its game", "The Lichess bot: {} cores for its game", bot, bot),
              double(bot), ui::MUTED});
+    }
+    // The requests of the engines offered to lichess.org (#96).
+    if (const int service = lichessServiceThreads(); service > 0) {
+        cores.shares.push_back(
+            {fmt::format("{} · {}", TR("Lichess analysis"), service),
+             trn("Your engines on lichess.org: {} core for a request of your analysis board",
+                 "Your engines on lichess.org: {} cores for a request of your analysis board", service, service),
+             double(service), ui::MUTED});
     }
     // In use: every tournament's games, and the window's engines.
     double in_use = 0;

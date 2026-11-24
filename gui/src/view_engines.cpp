@@ -1399,10 +1399,20 @@ void App::drawEngines() {
     ImGui::EndDisabled();
     if (in_use) ImGui::TextDisabled("%s", TR("Engine used by the running match: changes are locked."));
 
+    // Enter: the button of the part below when it shows one (Offer to Lichess…, Resume), not the bot's Put online.
+    {
+        const auto* offer = offerOf(e.name);
+        lichess_engine_enter_ =
+            (offer_form_ && offer_form_->engine == e.name) || (offer && !offer->id.empty() && !services_.count(e.name));
+    }
     // On Lichess, as a bot (#85, mockup M12, board 6).
     drawBotPart(e);
     // Lichess TV's Bots and Computer channels, this engine beside them (#86, mockup M12, board 7).
     drawTvEngineLine(e);
+    // On lichess.org, for the analysis (#96, mockup M13, board 9).
+    drawLichessEnginePart(e);
+    // Its versions on the disk, for an engine taken from the picker (#65).
+    drawEngineVersions(e);
 
     ImGui::Separator();
     if (!e.id_name.empty()) {

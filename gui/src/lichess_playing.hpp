@@ -7,6 +7,7 @@
 // is the App's: a live game locks every aid, a correspondence game the positions of that game. The same stream brings
 // the challenges sent to the user and the fate of those they send (#84).
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <deque>
@@ -21,6 +22,10 @@
 
 #include "lichess_api.hpp"
 #include "lichess_share.hpp"
+
+namespace chess {
+class Board;
+}
 
 namespace fcg::study {
 class Database;
@@ -58,6 +63,17 @@ struct PlayingGame {
     // correspondence such a game locks that position alone, and the positions of its line from its first move on.
     [[nodiscard]] bool atStart() const;
 };
+
+// A position's men and side to move, without its castling rights and en passant square, which FENs write differently:
+// what tells a game's position apart, for the fair play's lock (#48) and the engine offered to Lichess (#96).
+struct Men {
+    std::array<uint64_t, 12> bb{};  // pawns to kings, White then Black
+    bool white                        = true;
+    bool operator==(const Men&) const = default;
+};
+[[nodiscard]] Men menOf(const chess::Board& board);
+// The men of a FEN as Lichess writes it; none when it cannot be read (a variant's pockets end the placement).
+[[nodiscard]] std::optional<Men> menOf(std::string_view fen);
 
 // Whether RookStudio can play the game on its Board (#84): the Board API can (compat.board when the stream told it;
 // else, as Lichess decides it, a rapid, classical or correspondence game, or a blitz one from a challenge), and its

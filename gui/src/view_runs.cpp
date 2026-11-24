@@ -271,6 +271,8 @@ void App::onBackgroundRunFinished(std::size_t index) {
     unfinished_        = unfinishedMatch(storage_.runsDir());
 
     const bool completed = error.empty() && !run.stoppedByUser() && !run.abnormal();
+    // The old versions of the engines it played, freed by its end (#65).
+    checkVersions(completed && t && t->finished() ? name : std::string());
     if (completed && !queue_.empty() && !quit_pending_) startFromQueue(true);
 }
 
@@ -394,7 +396,9 @@ int App::localThreads() const {
         if (r.run->remote() || !r.run->running() || !t) continue;
         threads += r.run->runningGames() * tour::largestGame(t->spec()).threads;
     }
-    return threads + analysisThreads() + botThreads();  // the Lichess bot's game too (#85)
+    // The Lichess bot's game too (#85). Not the requests of the engines offered to lichess.org (#96): they take only
+    // what the tournaments and these leave, and yield it to them at once.
+    return threads + analysisThreads() + botThreads();
 }
 
 namespace {

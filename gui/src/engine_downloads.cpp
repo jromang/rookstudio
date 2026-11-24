@@ -321,6 +321,11 @@ fs::path versionFolder(const fs::path& profile, std::string_view id, std::string
     return enginesFolder(profile) / tour::fileNameOf(std::string(id)) / tour::fileNameOf(std::string(version));
 }
 
+std::mutex& installedMutex() {
+    static std::mutex m;
+    return m;
+}
+
 std::vector<Installed> loadInstalled(const fs::path& profile) {
     std::vector<Installed> out;
     std::ifstream in(enginesFolder(profile) / "installed.json", std::ios::binary);
@@ -445,6 +450,7 @@ InstallResult installEngine(const fs::path& profile, const Engine& engine, const
         }
         Installed installed{engine.id,      choice.version, choice.tag,    choice.asset.name, choice.asset.sha256,
                             choice.licence, entry.cmd,      probe.id_name, probe.id_author,   nowSeconds()};
+        const std::lock_guard lock(installedMutex());
         auto list = loadInstalled(profile);
         list.erase(std::remove_if(list.begin(), list.end(),
                                   [&](const Installed& i) { return i.id == engine.id && i.version == choice.version; }),

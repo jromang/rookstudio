@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include <fmt/include/fmt/format.h>
+#include <chess.hpp>
 #include <study/import.hpp>
 #include <study/store.hpp>
 
@@ -39,6 +40,47 @@ std::string variantOf(const nlohmann::json& j) {
 }
 
 }  // namespace
+
+Men menOf(const chess::Board& board) {
+    Men m;
+    m.white       = board.sideToMove() == chess::Color::WHITE;
+    std::size_t i = 0;
+    for (const auto type : {chess::PieceType::PAWN, chess::PieceType::KNIGHT, chess::PieceType::BISHOP,
+                            chess::PieceType::ROOK, chess::PieceType::QUEEN, chess::PieceType::KING}) {
+        m.bb[i++] = board.pieces(type, chess::Color::WHITE).getBits();
+        m.bb[i++] = board.pieces(type, chess::Color::BLACK).getBits();
+    }
+    return m;
+}
+
+std::optional<Men> menOf(std::string_view fen) {
+    Men m;
+    int rank = 7, file = 0;
+    std::size_t at = 0;
+    for (; at < fen.size() && fen[at] != ' ' && fen[at] != '['; ++at) {
+        const char c = fen[at];
+        if (c == '/') {
+            if (file != 8 || rank == 0) return std::nullopt;
+            --rank;
+            file = 0;
+        } else if (c >= '1' && c <= '8') {
+            file += c - '0';
+        } else {
+            static constexpr std::string_view LETTERS = "PNBRQKpnbrqk";
+            const auto k                              = LETTERS.find(c);
+            if (k == std::string_view::npos || file > 7) return std::nullopt;
+            const std::size_t type = k % 6, black = k / 6;
+            m.bb[type * 2 + black] |= uint64_t{1} << (rank * 8 + file);
+            ++file;
+        }
+        if (file > 8) return std::nullopt;
+    }
+    if (rank != 0 || file != 8) return std::nullopt;
+    while (at < fen.size() && fen[at] != ' ') ++at;
+    if (at + 1 >= fen.size()) return std::nullopt;
+    m.white = fen[at + 1] != 'b';
+    return m;
+}
 
 std::optional<PlayingGame> readPlayingGame(const nlohmann::json& j) {
     if (!j.is_object()) return std::nullopt;

@@ -117,6 +117,27 @@ bool messageBox(const char* id, ui::Icon icon, ImU32 tone, const std::string& ti
     return pressed;
 }
 
+// A calm box of the card (a tournament playing, the bot's game): light grey, its title in the text's colour, as the
+// mockup's.
+void calmBox(const char* id, ui::Icon icon, const std::string& title, const std::string& text) {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(
+                                                mix(ui::CARD_BG, ImGui::GetColorU32(ImGuiCol_TextDisabled), 0.06f)));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::CARD_BD));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(16), px(12)));
+    ImGui::BeginChild(id, ImVec2(0, 0),
+                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
+    const auto ink = ImGui::GetColorU32(ImGuiCol_Text);
+    ui::inlineIcon(icon, ink);
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::PushTextWrapPos();
+    coloured(title, ink);
+    if (!text.empty()) wrapped(text, true);
+    ImGui::PopTextWrapPos();
+    ImGui::EndGroup();
+    endTinted();
+}
+
 // A key's hint beside the one button it presses.
 void keyHint(const char* key) {
     ImGui::SameLine(0, px(4));
@@ -515,7 +536,7 @@ void App::pollLichessEngines() {
         }
         s.service->setGuards(g);
         (void)s.service->status(s.status, s.version);
-        if (const auto counts = s.service->takeCounts(); counts.requests > 0 && o) {
+        if (const auto counts = s.service->takeCounts(); (counts.requests > 0 || counts.ms > 0) && o) {
             lichess::countRequest(*o, counts.requests, counts.ms, today());
             offers_dirty_ = true;
         }
@@ -866,22 +887,20 @@ void App::drawLichessEngineService(const EngineEntry& e, lichess::OfferedEngine&
                 tournament = r.run->tournament()->spec().name;
         if (!tournament.empty()) {
             if (paused && st.pause == lichess::ServicePause::Tournament)
-                (void)messageBox(
-                    "##service_tournament", ui::Icon::Engine, ImGui::GetColorU32(ImGuiCol_Text),
+                calmBox(
+                    "##service_tournament", ui::Icon::Engine,
                     trf("The tournament “{}” is playing and leaves no thread free: the service is paused", tournament),
                     TR("It resumes by itself once threads are free again; Lichess waits. The tournament "
                        "first, as for the bot."));
             else
-                (void)messageBox(
-                    "##service_tournament", ui::Icon::Engine, ImGui::GetColorU32(ImGuiCol_Text),
-                    trf("The tournament “{}” is playing: the service takes the threads it leaves free", tournament),
-                    TR("If none is left, it pauses and says so here; Lichess waits. The tournament first, "
-                       "as for the bot."));
+                calmBox("##service_tournament", ui::Icon::Engine,
+                        trf("The tournament “{}” is playing: the service takes the threads it leaves free", tournament),
+                        TR("If none is left, it pauses and says so here; Lichess waits. The tournament first, "
+                           "as for the bot."));
         }
         if (botPlaying() && service->second.engine.machine.empty())
-            (void)messageBox("##service_bot", ui::Icon::Bot, ImGui::GetColorU32(ImGuiCol_Text),
-                             TR("Your Lichess bot is playing a game"),
-                             TR("Its threads first; the service makes do with the rest."));
+            calmBox("##service_bot", ui::Icon::Bot, TR("Your Lichess bot is playing a game"),
+                    TR("Its threads first; the service makes do with the rest."));
         if (std::any_of(lichess_playing_.begin(), lichess_playing_.end(),
                         [](const lichess::PlayingGame& g) { return !g.live(); }))
             (void)messageBox("##service_correspondence", ui::Icon::Lock, ui::ACCENT,
@@ -889,8 +908,8 @@ void App::drawLichessEngineService(const EngineEntry& e, lichess::OfferedEngine&
                              TR("A request on one of them (compared by the men and the side to move, as the fair "
                                 "play's lock does) gets an empty answer."));
         ImGui::Spacing();
-        wrapped(TR("Lichess's page, its services column: “Your engines on lichess.org”. The Home page shows it under "
-                   "“In progress”."),
+        wrapped(TR("Also on the Lichess page, under “Your engines on lichess.org”, and on the Home page, under “In "
+                   "progress”."),
                 true);
         return;
     }

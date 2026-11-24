@@ -158,7 +158,8 @@ struct OfferedEngine {
     std::string user;      // the account it was registered for (Lichess's userId)
     std::string secret;    // the provider's: never shown, never logged
     bool serving = false;  // in service when RookStudio closed: resumed at the next start
-    // Today's (the day as YYYY-MM-DD, local): the requests answered and the milliseconds of analysis.
+    // Today's (the day as YYYY-MM-DD, local): the requests received (the one being answered too) and the
+    // milliseconds of analysis.
     std::string day;
     int requests                                = 0;
     int64_t analysis_ms                         = 0;
@@ -171,7 +172,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OfferedEngine, engine, name, mac
 // False, with why in `error`, when it cannot be written.
 bool saveOffers(const std::filesystem::path& profile, const std::vector<OfferedEngine>& offers,
                 std::string* error = nullptr);
-// Today's counts: a request answered, its milliseconds (the day turned: they start again).
+// Today's counts: requests received, milliseconds of analysis (the day turned: they start again).
 void countRequest(OfferedEngine& offer, int requests, int64_t ms, const std::string& today);
 // The registrations to serve again at the start: those in service when RookStudio closed, their engine in the library.
 [[nodiscard]] std::vector<std::string> offersToResume(const std::vector<OfferedEngine>& offers,
@@ -250,7 +251,8 @@ class EngineService {
     void setGuards(const ServiceGuards& guards);
     [[nodiscard]] ServiceStatus status() const;
     [[nodiscard]] bool status(ServiceStatus& out, uint64_t& version) const;  // copied when it changed since `version`
-    // The requests answered and their milliseconds of analysis since the last call.
+    // The requests received (counted as they come) and the milliseconds of analysis of those answered, since the
+    // last call.
     struct Counts {
         int requests = 0;
         int64_t ms   = 0;

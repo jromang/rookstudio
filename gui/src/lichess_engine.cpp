@@ -359,7 +359,7 @@ std::optional<EngineWork> readEngineWork(std::string_view json, std::string* err
     else if (number("nodes", 1, INT64_MAX, v))
         w.nodes = v;
     else
-        return fail("a job without its limit: movetime, depth or nodes");
+        return fail("a job without its limit (movetime, depth or nodes)");
     return w;
 }
 
@@ -765,6 +765,7 @@ void EngineService::answer(const EngineWork& w) {
         s.state       = ServiceState::Busy;
         s.job         = job;
         s.threads_now = empty ? 0 : job.threads;
+        counts_.requests += 1;  // counted as it comes, with its state: today's requests hold the one being answered
     });
     HttpRequest request;
     request.url          = setup_.host + "/api/external-engine/work/" + urlEncode(w.id);
@@ -775,12 +776,8 @@ void EngineService::answer(const EngineWork& w) {
         last_job_ = Clock::now();
         const auto ms =
             counted ? std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count() : 0;
-        {
-            std::lock_guard lock(mutex_);
-            counts_.requests += 1;
-            counts_.ms += ms;
-        }
         update([&](ServiceStatus& s) {
+            counts_.ms += ms;
             if (s.state == ServiceState::Busy) s.state = ServiceState::Waiting;
             s.last = job;
             s.job.reset();

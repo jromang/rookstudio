@@ -227,6 +227,8 @@ const lichess::PlayingGame* App::liveGameOn() const {
     if (online_game_ && !online_game_->ended && online_game_->state.full && !online_game_->state.over() &&
         online_game_->state.live())
         return &online_game_->playing;
+    // In an arena from here: its aids stay locked between two games, until Pause (#95, point 18).
+    if (arenaHoldsAids()) return &arena_play_->waiting;
     return nullptr;
 }
 
@@ -310,7 +312,15 @@ void App::drawFairPlayBanner(bool whole_game) {
     ImGui::SameLine();
     ImGui::BeginGroup();
     ImGui::PushTextWrapPos(0.0f);
-    if (g->live()) {
+    if (arena_play_ && !g->tournament.empty() && g->tournament == arena_play_->id) {
+        // An arena's game, or the arena between two (#95): the reports too, Pause gives them back.
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tone), "%s",
+                           g->id.empty() ? TR("In the arena: the aids stay locked between two games")
+                                         : TR("Arena game live: the aids are locked"));
+        ImGui::TextDisabled("%s", TR("The engine, the tree, the cloud, the tables, the assistant and the reports. "
+                                     "Between two games too, while you are in the arena: “Pause” gives them back."));
+        if (arena_play_->seat.in() && ImGui::SmallButton(TR("Pause · Alt+P##fair_play"))) pauseArena();
+    } else if (g->live()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tone), "%s",
                            TR("One of your games is being played on Lichess: the aids are locked"));
         ImGui::TextDisabled("%s",
@@ -446,6 +456,10 @@ void App::finishLichessGame(const lichess::PlayingGame& game) {
     FinishedGame f;
     f.game = game;
     f.base = name;
+    // An arena's game played from here (#95): kept now, its review offered at the arena's end.
+    if (arena_play_ && game.tournament.empty() && online_game_ && online_game_->id == game.id)
+        f.game.tournament = online_game_->state.tournament;  // the stream named it, the list did not
+    f.held = arena_play_ && !f.game.tournament.empty() && f.game.tournament == arena_play_->id;
     std::shared_ptr<study::Database> db;
     try {
         if (!index) index = s.create(name);
@@ -475,7 +489,7 @@ void App::pollLichessFinished() {
             // An aborted game is not worth a word; a finished one's review at once, when chosen, no live game going
             // on and the Board holding nothing that would be lost.
             if (!f.got->pgn.empty() && f.got->plies < 2) f.done = true;
-            if (!f.done && !f.got->pgn.empty() && lichess_.review_finished && !liveGameOn() && boardFree()) {
+            if (!f.done && !f.held && !f.got->pgn.empty() && lichess_.review_finished && !liveGameOn() && boardFree()) {
                 f.automatic = true;
                 reviewFinishedGame(f);
             }
@@ -522,7 +536,7 @@ void App::drawFinishedBanner(bool home) {
     if (!home && onlineShown()) return;
     FinishedGame* shown = nullptr;
     for (auto& f : lichess_finished_)
-        if (!f.done) shown = &f;
+        if (!f.done && !f.held) shown = &f;  // an arena's: at the arena's end (#95)
     if (!shown) return;
     auto& f = *shown;
     const ui::TopicRegion topic(guide::topics::FinishedGames);

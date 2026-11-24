@@ -70,6 +70,8 @@ std::optional<PlayingGame> readPlayingGame(const nlohmann::json& j) {
         g.status = it->is_object() ? textOf(*it, "name") : it->is_string() ? it->get<std::string>() : std::string();
     g.winner      = textOf(j, "winner");
     g.rating_diff = intOf(j, "ratingDiff");
+    g.tournament  = textOf(j, "tournamentId");
+    g.swiss       = textOf(j, "swissId");
     return g;
 }
 

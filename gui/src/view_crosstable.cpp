@@ -1060,6 +1060,18 @@ void App::drawStudyCrosstable() {
     ImGui::SameLine();
     ui::guideLink("crosstable_help", guide::topics::Crosstables);
     ui::pageTitle(c.title.c_str());
+    // Fair play (R17): in an arena from here, no report until Pause (#95).
+    if (arenaHoldsAids()) {
+        ui::beginCard("crosstable_arena");
+        ui::inlineIcon(ui::Icon::Lock, ui::ACCENT);
+        ImGui::SameLine();
+        ImGui::PushTextWrapPos();
+        ImGui::TextUnformatted(TR("Locked while you are in an arena on Lichess, between two games too."));
+        ImGui::TextDisabled("%s", TR("The reports come back with Pause (Alt+P), or at the arena's end."));
+        ImGui::PopTextWrapPos();
+        ui::endCard();
+        return;
+    }
     if (!c.input) {
         ImGui::TextDisabled("%s", TR("Reading its games…"));
         return;

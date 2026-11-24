@@ -189,9 +189,11 @@ bool App::initGraphics() {
 }
 
 void App::requestQuit() {
-    // A live game being played on Lichess goes on there, the clock running: asked first (#84, M12 board 5).
-    if (!quit_online_said_ && online_game_ && !online_game_->ended && online_game_->state.full &&
-        !online_game_->state.over() && online_game_->state.live()) {
+    // A live game being played on Lichess goes on there, the clock running: asked first (#84, M12 board 5); so is an
+    // arena the user is in from here, "Pause and close" or "Stay" (#95).
+    if (!quit_online_said_ && ((online_game_ && !online_game_->ended && online_game_->state.full &&
+                                !online_game_->state.over() && online_game_->state.live()) ||
+                               arenaHoldsAids())) {
         quit_online_open_ = true;
         return;
     }
@@ -826,6 +828,36 @@ void App::frame() {
         } else if (w == "lichess-tv") {  // the Lichess page, its card of Lichess TV's channels (#86)
             page_ = Page::Lichess;
             broadcast_round_.clear();
+        } else if (w == "lichess-tournaments") {  // the Lichess page scrolled to its card of tournaments (#95)
+            page_ = Page::Lichess;
+            broadcast_round_.clear();
+            arena_card_y_ = -2;
+        } else if (w.rfind("arena-mosaic=", 0) == 0 || w.rfind("swiss-mosaic=", 0) == 0 ||
+                   w.rfind("play-arena=", 0) == 0 || w.rfind("play-swiss=", 0) == 0) {
+            // arena-mosaic=ID[@NAME], swiss-mosaic=ID[@NAME]: a tournament followed in the mosaic;
+            // play-arena=ID[@NAME], play-swiss=ID[@NAME]: the Play page's Tournaments part on it (#95), with
+            // lichess-api= before them.
+            const auto eq   = w.find('=');
+            const auto kind = w.substr(0, eq);
+            const auto spec = w.substr(eq + 1);
+            const auto at   = spec.find('@');
+            const auto id   = spec.substr(0, at);
+            const auto name = at == std::string::npos ? std::string() : spec.substr(at + 1);
+            if (kind == "arena-mosaic" || kind == "swiss-mosaic") {
+                followTournament(id, name, kind == "swiss-mosaic");
+            } else if (kind == "play-arena") {
+                chooseArena(id, name);
+            } else {
+                lichess::SwissInfo s;
+                s.id   = id;
+                s.name = name;
+                chooseSwiss(s);
+                swiss_play_->info = {};  // asked of Lichess
+            }
+        } else if (w == "play-tournaments") {  // the Play page's "On Lichess › Tournaments" part (#95)
+            page_        = Page::Play;
+            play_part_   = 1;
+            online_part_ = 1;
         } else if (w.rfind("tv-mosaic=", 0) == 0) {  // tv-mosaic=CHANNEL: a channel of Lichess TV in the mosaic (#86)
             openTvMosaic(w.substr(10));
         } else if (w.rfind("tv-board=", 0) == 0) {

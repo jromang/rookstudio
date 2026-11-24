@@ -320,9 +320,12 @@ void App::onlineEvent(const lichess::GameEvent& e) {
             // The live game RookStudio closed during, still being played.
             const bool resumed =
                 !online_resume_checked_ && !onlineSettings().playing.empty() && onlineSettings().playing == g.id;
+            // A game of the arena or the Swiss the user is in from here (#95): it opens by itself.
+            const bool tournament = (arena_play_ && !g.tournament.empty() && g.tournament == arena_play_->id) ||
+                                    (swiss_play_ && !g.swiss.empty() && g.swiss == swiss_play_->id);
             // It takes the Board, unless a live game is being played there (Lichess pairs one at a time); a
             // correspondence game shown there gives way, still among the games in progress.
-            if ((accepted || challenged || sought || resumed) && lichess::playableHere(g)) {
+            if ((accepted || challenged || sought || resumed || tournament) && lichess::playableHere(g)) {
                 const auto& o = online_game_;
                 if (!o || o->ended || o->id == g.id || o->state.over() || !o->state.live())
                     openOnlineGame(g.id, g.white);
@@ -453,6 +456,8 @@ void App::pollOnlinePlay() {
             p.variant        = og.state.variant;
             p.rated          = og.state.rated;
             p.my_turn        = whiteToMove(og.state) == og.white;
+            p.tournament      = og.state.tournament;
+            p.swiss           = og.state.swiss;
             const auto& them = og.white ? og.state.black : og.state.white;
             p.opponent       = them.name;
             p.opponent_rating = them.rating;
@@ -896,6 +901,47 @@ void App::drawPlayLichess() {
                     line +=
                         " · " + trf("{} {}", speedName(r.key), ui::exactCount(r.rating) + (r.provisional ? "?" : ""));
         ImGui::TextDisabled("%s", line.c_str());
+    }
+    // Its parts (#95): the games (a seek, a challenge, those in progress), the tournaments; the one shown last kept.
+    if (online_part_ < 0) online_part_ = std::clamp(onlineSettings().part, 0, 1);
+    {
+        const auto part = [&](const char* label, int which) {
+            const auto size    = ImGui::CalcTextSize(label);
+            const auto at      = ImGui::GetCursorScreenPos();
+            const bool shown   = online_part_ == which;
+            const bool clicked = ImGui::InvisibleButton(fmt::format("##online_part{}", which).c_str(),
+                                                        ImVec2(size.x, ImGui::GetFrameHeight()));
+            const bool hovered = ImGui::IsItemHovered();
+            if (hovered && !shown) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            auto* dl      = ImGui::GetWindowDrawList();
+            const float y = at.y + (ImGui::GetFrameHeight() - size.y) * 0.5f;
+            dl->AddText(ImVec2(at.x, y), ImGui::GetColorU32(shown || hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled),
+                        label);
+            if (shown)
+                dl->AddLine(ImVec2(at.x, y + size.y + px(2)), ImVec2(at.x + size.x, y + size.y + px(2)), ui::ACCENT,
+                            px(2));
+            if (clicked && !shown) {
+                online_part_          = which;
+                onlineSettings().part = which;
+                saveOnlineSettings();
+            }
+        };
+        part(TR("Games"), 0);
+        ImGui::SameLine(0, px(8));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("·");
+        ImGui::SameLine(0, px(8));
+        part(TR("Tournaments"), 1);
+        if (arena_play_ && arena_play_->seat.in() && online_part_ == 0) {
+            ImGui::SameLine(0, px(10));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", TR("· in an arena"));
+        }
+    }
+    if (online_part_ == 1) {
+        drawIncomingChallenges(false);
+        drawPlayTournaments();
+        return;
     }
     // Enter: a challenge received taken first, else the seek.
     const auto& io = ImGui::GetIO();
@@ -1404,6 +1450,13 @@ void App::drawOnlineGameCard() {
         wrapped(TR("Your game on Lichess"));
     }
     ImGui::PopFont();
+    // A tournament's game (#95): the arena's line (rank, points, the streak, the time left, Pause); a Swiss's round.
+    const bool arena = arena_play_ && !s.tournament.empty() && s.tournament == arena_play_->id;
+    if (arena) drawArenaLine(true);
+    if (!s.swiss.empty() && swiss_play_ && s.swiss == swiss_play_->id && swiss_play_->info.value)
+        ImGui::TextDisabled("%s", trf("{} · round {} of {}", swiss_play_->name, swiss_play_->info.value->round,
+                                      swiss_play_->info.value->rounds)
+                                      .c_str());
     // The connection cut: the clock runs on Lichess meanwhile; tried again by itself.
     if (!s.connected) {
         ImGui::PopTextWrapPos();
@@ -1452,7 +1505,11 @@ void App::drawOnlineGameCard() {
             0, (s.first_move_ms -
                 std::chrono::duration_cast<std::chrono::milliseconds>(SteadyClock::now() - s.told).count()) /
                    1000);
-        coloured(trf("Play your first move within {} s, or Lichess aborts the game.", left), ui::WARN);
+        // A tournament's game is lost, not aborted (#95).
+        coloured(lichess::tournamentGame(s)
+                     ? trf("Play your first move within {} s, or the game is lost.", left)
+                     : trf("Play your first move within {} s, or Lichess aborts the game.", left),
+                 ui::WARN);
     }
     // What the opponent offers, what the user offered.
     if (they_draw) {
@@ -1511,6 +1568,22 @@ void App::drawOnlineGameCard() {
     if (og.premove) {
         ImGui::TextDisabled("%s", TR("A move made in advance waits for your turn (the dashed arrow): played then if it "
                                      "is legal. Esc takes it back."));
+    }
+    // Berserk in an arena that allows it (#95): before the user's first move only.
+    if ((og.white ? s.black_berserk : s.white_berserk) && arena)
+        ImGui::TextDisabled("%s", trf("{} went berserk: half their clock.", them.name).c_str());
+    if (arena && arena_play_->state.value && arena_play_->state.value->info.berserkable) {
+        const bool done   = og.white ? s.white_berserk : s.black_berserk;
+        const bool can    = lichess::berserkAllowed(true, s, og.white);
+        const char* label = done  ? TR("Berserk: half your clock, a point more if you win")
+                            : can ? TR("Berserk")
+                                  : TR("Berserk · no longer possible after your first move");
+        ImGui::BeginDisabled(!can);
+        if (ImGui::Button(fmt::format("{}###online_berserk", label).c_str()))
+            onlineCall(TR("Berserk"), [id = og.id](const std::string& token) { return lichess::berserk(token, id); });
+        ImGui::EndDisabled();
+        tip(TR("Half your clock, a point more if you win: before your first move only."));
+        ImGui::SameLine();
     }
     // What can be done.
     ImGui::BeginDisabled(i_draw || og.offer_draw || !s.full);
@@ -1578,6 +1651,8 @@ void App::drawOnlineGameCard() {
     ImGui::TextDisabled("%s", TR("Closing RookStudio does not end the game: it comes back at the next launch."));
     ImGui::PopTextWrapPos();
     endTinted();
+    // The arena's game before, at its end (#95).
+    if (arena && !arena_play_->last_game.empty() && arena_play_->last_game != og.id) drawArenaGameBefore();
 }
 
 void App::drawOnlineChat() {
@@ -1633,10 +1708,24 @@ void App::drawOnlineGameEnd() {
     const auto& them = og.white ? s.black : s.white;
     const bool won   = !s.winner.empty() && (s.winner == "white") == og.white;
     const bool lost  = !s.winner.empty() && !won;
+    // An arena's game (#95): its line, the game before at its end; the next one comes by itself.
+    if (arena_play_ && !s.tournament.empty() && s.tournament == arena_play_->id) {
+        drawArenaLine(true);
+        drawArenaGameBefore();
+        if (arena_play_ && arena_play_->seat.isOver())
+            drawArenaOver(false);  // its end: rank, points, the games and their review
+        else if (arena_play_ && !arena_play_->seat.in() && ImGui::SmallButton(TR("Close##arena_game")))
+            closeOnlineGame();
+        return;
+    }
     std::string title;
     const auto& st = s.status;
     if (st == "aborted")
         title = TR("Game aborted");
+    else if (st == "noStart" && won)  // a tournament's game, lost by the one who did not start it (#95)
+        title = trf("You won: {} did not play their first move in time", them.name);
+    else if (st == "noStart" && lost)
+        title = TR("You lost: your first move did not come in time");
     else if (st == "noStart")
         title = TR("Game aborted: a first move did not come in time");
     else if (st == "mate")
@@ -1668,9 +1757,22 @@ void App::drawOnlineGameEnd() {
     if (og.rating_known && s.rated && st != "aborted" && st != "noStart")
         sub += " · " + trf("your rating {}{}", og.rating_diff >= 0 ? "+" : "", og.rating_diff);
     wrapped(sub, true);
-    // Another game, the same seek.
+    // A tournament's game (#95): back to it; else another game, the same seek.
     const auto clock = onlineSettings().seekClock();
-    if (lichess::seekAllowed(clock) && clock.days == 0) {
+    if (lichess::tournamentGame(s)) {
+        if (primaryButton(TR("The tournament##online_end"))) {
+            if (swiss_play_ && s.swiss == swiss_play_->id && swiss_play_->info.value)
+                chooseSwiss(*swiss_play_->info.value);
+            else if (arena_play_)
+                chooseArena(arena_play_->id, arena_play_->name);
+            else
+                page_ = Page::Play;
+            ImGui::PopTextWrapPos();
+            endTinted();
+            return;
+        }
+        ImGui::SameLine();
+    } else if (lichess::seekAllowed(clock) && clock.days == 0) {
         if (primaryButton(trf("Another game · {}", lichess::clockText(clock)).c_str(),
                           !online_seek_ && !liveGameOn())) {
             closeOnlineGame();
@@ -1797,12 +1899,25 @@ void App::drawQuitOnline() {
                                        .c_str());
             ImGui::TextDisabled("%s", TR("At the next launch, a game still being played comes back on the Board."));
         }
+        // In an arena from here (#95): closed, RookStudio joins no more.
+        if (arenaHoldsAids())
+            ImGui::TextUnformatted(trf("You are in the arena “{}”: closed, RookStudio no longer joins you again and "
+                                       "Lichess pairs you no more; your points stay.",
+                                       arena_play_->name)
+                                       .c_str());
         ImGui::PopTextWrapPos();
     }
     ImGui::Spacing();
     if (primaryButton(TR("Stay · Esc")) || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
     ImGui::SameLine();
-    if (ImGui::Button(TR("Close anyway"))) {
+    if (arenaHoldsAids()) {
+        if (ImGui::Button(TR("Pause and close"))) {
+            pauseArena();  // RookStudio closes once Lichess took the pause, or after a few seconds
+            arena_play_->quit_after = true;
+            arena_play_->quit_asked = ImGui::GetTime();
+            ImGui::CloseCurrentPopup();
+        }
+    } else if (ImGui::Button(TR("Close anyway"))) {
         quit_online_said_ = true;
         ImGui::CloseCurrentPopup();
         requestQuit();

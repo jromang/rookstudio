@@ -49,6 +49,7 @@ struct PlayingGame {
     std::string status;                             // "mate", "resign", "outoftime"... once it ended
     std::string winner;                             // "white", "black", empty for none
     int rating_diff                           = 0;  // the user's, once a rated game ended
+    std::string tournament, swiss;                  // the arena's id, the Swiss's id, for a tournament's game (#95)
     bool operator==(const PlayingGame&) const = default;
 
     [[nodiscard]] bool live() const { return speed != "correspondence"; }

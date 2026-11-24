@@ -363,6 +363,8 @@ them.
 | <kbd>Enter</kbd> | A game against an engine | Confirm *Resign…*; resume a game kept when RookStudio closed; once it is over, review it |
 | <kbd>Enter</kbd>, <kbd>Escape</kbd> | The Play page, on Lichess | Accept the challenge received, else seek a game; call the seek or the challenge back |
 | <kbd>Enter</kbd>, <kbd>Escape</kbd> | A game on Lichess | Send the correspondence move waiting, confirm *Resign…*; take back the move waiting or made in advance |
+| <kbd>Enter</kbd> | The Play page, Lichess's tournaments | Join the arena or the Swiss tournament shown (the first time: allow it on Lichess) |
+| <kbd>Alt</kbd>+<kbd>P</kbd> | Everywhere, in an arena on Lichess | Pause in the arena, the aids back; again: back in the arena |
 | A letter, then a figure | The coordinates, *Where is…?* | Name a square |
 | <kbd>Shift</kbd> held, <kbd>F2</kbd> | Blindfold | The pieces shown 2 seconds, three times a game; *Where is…?* |
 | <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | A line read in your head | The piece as FEN writes it (a white knight, a black one), or none |
@@ -403,6 +405,9 @@ them.
 
 A view's **Home** page gathers the view's pages in cards, what runs first:
 
+- **The arena** you are in from RookStudio, at the top: its name, your rank and points, the time left, *Back to it*
+  and *Pause* (Alt+P); a Swiss tournament you joined, its round (see [Arenas and Swiss
+  tournaments](#arenas-and-swiss-tournaments)).
 - **Resume where you were**, when the view holds the Board: the game on the board at its move, on a small board, where
   it comes from (its database and number, its place in a filter, or its file), its comments, and whether it has
   changes not saved yet. *Resume* (Enter) goes back to it; Ctrl+Tab lists the recent games.
@@ -2256,8 +2261,9 @@ Ten lines a series.
 ## The Play page
 
 The **Play** page has two parts: *Against an engine*, a game against an engine of your library played on the Board
-page, and *On Lichess*, your Lichess games played from RookStudio (see [On Lichess](#on-lichess)); the part shown last
-comes back. It is in the rail after the Training page, in the views *Study* and *Everything*. A view you made before it
+page, and *On Lichess*, your Lichess games played from RookStudio (see [On Lichess](#on-lichess)) and Lichess's arenas
+and Swiss tournaments (see [Arenas and Swiss tournaments](#arenas-and-swiss-tournaments)); the part shown last comes
+back. It is in the rail after the Training page, in the views *Study* and *Everything*. A view you made before it
 does not change by itself: the Home page offers once to add it to the view shown (*Add it to …*, or *Not now*), and
 Ctrl+K *Play against an engine* (or *Play on Lichess*) leads there meanwhile, as do *Play against an engine* on the
 Home page and *The Play page* in the Board page's card *Play a game…*. Against an engine, nothing leaves the machine:
@@ -2340,11 +2346,13 @@ is chosen there or on the Play page: nothing goes up by itself. Each game is als
 ### On Lichess
 
 The Play page's **On Lichess** part plays your Lichess games from RookStudio, through Lichess's Board API, which is made
-for people. It needs your account linked (see [Linking your account](#linking-your-account)); the first time, Lichess
-asks for one more permission, *Playing your games* (`board:play`): *Allow on Lichess…* (Enter) opens Lichess's page,
-your account stays linked meanwhile, and the token it replaces is revoked. RookStudio never plays a move you did not
-play. What leaves the machine: your seeks and challenges, your moves, your chat messages, draws and resignations, with
-your account's token; the choices are kept in the profile's `play/lichess.json`.
+for people. It has two halves, *Games*, described here, and *Tournaments* (see [Arenas and Swiss
+tournaments](#arenas-and-swiss-tournaments)); the one shown last comes back. It needs your account linked (see [Linking
+your account](#linking-your-account)); the first time, Lichess asks for one more permission, *Playing your games*
+(`board:play`): *Allow on Lichess…* (Enter) opens Lichess's page, your account stays linked meanwhile, and the token it
+replaces is revoked. RookStudio never plays a move you did not play. What leaves the machine: your seeks and challenges,
+your moves, your chat messages, draws and resignations, with your account's token; the choices are kept in the profile's
+`play/lichess.json`.
 
 - **Seek a game**: rapid (10+0, 10+5, 15+10), classical (30+0, 30+20) or correspondence (1 to 14 days a move), rated
   or not, against opponents of any rating or of a rating around yours in that speed (±). Lichess keeps blitz and
@@ -2398,6 +2406,52 @@ both sides have moved), *Chat* (the players' chat), *Open on lichess.org*.
 - At the end, the card says how the game ended and what it did to your rating; the game comes into your Lichess
   database, with Lichess's analysis when there is one, its review a click away, as your other finished games do (see
   [Your finished games](#your-finished-games)). *Another game* seeks again with the same clock.
+
+### Arenas and Swiss tournaments
+
+The *Tournaments* half of the Play page's **On Lichess** part joins a Lichess arena, or a Swiss tournament of one of
+your teams, and plays its games from RookStudio. The Lichess page's card *Lichess tournaments* leads there too, *Join*
+on an arena's line (see [Lichess tournaments](#lichess-tournaments)).
+
+- **What Lichess allows.** Its Board API plays rapid, classical and correspondence games only, never blitz or bullet in
+  a tournament: those arenas are followed in the mosaic and played on lichess.org, and their line says so, with the
+  link. The part lists the rapid and classical arenas you can play.
+- **The first time**, Lichess asks for one more permission, `tournament:write` (to join, pause and leave a
+  tournament); `board:play`, to play, is given already. *Allow on Lichess…* (Enter) opens Lichess's page; your account
+  stays linked meanwhile, and the token it replaces is revoked.
+- **Joining an arena**: its conditions as Lichess judges them, each with your figures (*At least 20 rated games in
+  Rapid (you: 312)*), a condition missing said before you join; its rules in one line each, and *The full rules on
+  lichess.org*; *Join* (Enter). A refusal is said in Lichess's words: for an arena reserved to a team's members, *Open
+  the team on lichess.org*, as RookStudio does not manage teams.
+- **Waiting for a game**: Lichess pairs a player away from the arena's page for a minute only, so RookStudio joins you
+  again each minute while you wait; closed, it no longer does, and you are paired no more, your points staying. The
+  next game opens on the Board page by itself.
+- **The arena's line**, over the part and over the game's card: your rank of so many, your points, the streak (*the
+  next win counts double*), the time left, and *Pause* (Alt+P), which takes you out after the game being played, your
+  points staying; *Back in the arena* (Alt+P) joins again. The arena's page is asked every 15 seconds; after a 429 (too
+  many requests), its standing waits a minute and says so, your games going on.
+- **Playing**: as any game on Lichess (see [A game on Lichess](#a-game-on-lichess)), with *Berserk* where the arena
+  allows it, before your first move only (half your clock, a point more if you win). A tournament's game whose first
+  move you do not play in time is lost, not aborted, and the card says so. Under the card, the game before at its end:
+  *Won in 34 moves · +2 points · the streak starts*.
+- **The aids** stay locked while you are in the arena once it has started, between two games too, since the next one
+  comes within seconds: the engine, the tree, the cloud, the tables, the assistant and the reports (a player's dossier,
+  an opening report, a crosstable). *Pause* gives them back (see [Fair play](#fair-play)).
+- **Its end**: your rank and your points; each game is in *Lichess · your name*, as your finished games are (see
+  [Your finished games](#your-finished-games)), their review offered then: *Review the last game*, *Its games in the
+  list*. Closing RookStudio during an arena asks first: *Pause and close*, or *Stay* (Escape).
+- **A Swiss tournament**, for its team's members: its round of so many, the standing after its last round (points,
+  tie-break, performance), your games round by round, and the next round's time. Two minutes before it, a notice at
+  the window's corner says so wherever you are; your game opens on the Board page by itself, and a game whose first
+  move you do not play in time is lost. *Its games in the mosaic* shows the round's games of its first eight. Once it is
+  over, *Keep it in a database…* takes its games, each with its round, and its standing (its TRF file) into *Lichess
+  tournaments* or another database of yours: the database's crosstable then reads it, byes and late joins included
+  (see [Tournaments and crosstables](#tournaments-and-crosstables)), a click away with *Open its crosstable*.
+
+What leaves the machine: following, the tournament asked and its games, without an account; joining, with your token,
+the join, the pause and your moves. One request at a time, a minute after a 429. Ctrl+K has *Play an arena or a Swiss
+tournament on Lichess*, *Join the arena: …*, *Pause in the arena*, *Back to the arena*, *Berserk* and *Keep the Swiss
+in a database…*.
 
 ## The Lichess page
 
@@ -2524,6 +2578,8 @@ browser or on a phone:
   through its position, from the first move to what follows it, a position of that game shown from a variation included;
   Lichess allows a book and a database there, so the tree of your databases and their reference games stay open. Before
   its first move, it locks the start position alone: every game passes through it. On any other game, everything works.
+- while you are in an arena from RookStudio, every aid stays locked between two games too, the reports with them,
+  until *Pause* (Alt+P) or the arena's end (see [Arenas and Swiss tournaments](#arenas-and-swiss-tournaments)).
 
 A banner on the Board page says which game locks what. The Home page's Lichess card lists your games in progress,
 those where it is your turn first, each with its clock or the time left to move, and *Open on lichess.org*, or *On the
@@ -2549,7 +2605,7 @@ been asked for since, opens the game and starts its review. *Not now* (Escape) p
 Lichess's analysis then shows beside your engine's: its curve on the graph, and each analysis's accuracy under the
 two sides' figures in the Review tab, the same formula for both. The Lichess page's *Review my finished games at
 once* starts the review by itself, unless the Board holds a game with unsaved changes or work under way; the banner
-offers it then.
+offers it then. An arena's games come in the same way, their review offered at the arena's end.
 
 ### Followed players
 
@@ -2571,7 +2627,8 @@ Each gives the game Lichess features on it, its two players with their ratings, 
 when the card shows, at most once every 30 seconds.
 
 *The mosaic* shows the channel's games in progress in the broadcasts' mosaic, its third source: the line at its top goes
-from one to another (*Broadcasts*, *Followed players*, *Lichess TV*), and the channels are chips under it. The same
+from one to another (*Broadcasts*, *Followed players*, *Lichess TV*, *Lichess tournaments*), and the channels are chips
+under it. The same
 tiles, an engine of yours for each game, the game chosen on the right with *Follow on the board*. Lichess lists up to 30
 games a channel, and lets an address follow 8 games at once, the rounds you follow (one each) and the followed players'
 games counted with them: the mosaic shows what is left, the featured game first. A finished game shows its result a
@@ -2592,6 +2649,29 @@ bot](#a-lichess-bot)). While one of your live games lasts, the mosaic's engines 
 What leaves the machine: the channel asked and the games followed, without an account; nothing is kept by itself.
 Ctrl+K has *Lichess TV*, each channel in the mosaic (and on the Board once the card was read), and, for the Board's
 game, staying on it or going on to the channel's next game, keeping it, and going back to the mosaic.
+
+### Lichess tournaments
+
+The Lichess page's card *Lichess tournaments* lists Lichess's arenas in progress and to come, read without an account:
+*Rapid*, *Classical* or *All*, each line with its name, its time control, when (*in progress · 38 min*, *in 40 min*),
+its players, *Follow*, and *Join* or why not: *Blitz: on lichess.org* (a click opens it), *condition not met* (under
+the mouse, which one, with your figures). The variants' arenas are not shown; the list is read again when the card
+shows, at most once a minute.
+
+*Your teams' Swiss tournaments*, under it, lists those of the teams you are a member of: reading your teams needs one
+more permission, `team:read`, asked once (*Read my teams…*). Each line gives its rounds, its time control, when, its
+players, and *Join*; *Follow* while it runs; *Keep it in a database…* once it is over.
+
+*Follow* shows the tournament in the broadcasts' mosaic, its fourth source beside *Broadcasts*, *Followed players* and
+*Lichess TV*: the games of its first eight in progress, as the tournament gives them, a finished game leaving its place
+to the next; Lichess shows their moves three moves late, and lets an address follow eight games at once, the rounds and
+the players you follow counted with them; each analysed by your engine, as the mosaic does. On the right, its standing,
+asked every 15 seconds: each player's rank, rating, sheet (each game's points, the newest first, a streak's doubled
+points in orange) and score; a Swiss's after its last round. A click chooses a game, a double click opens it on the
+Board page; your own game never shows. A Swiss does not list its games in progress: they are found by player, its
+first eight's, at each round. Without an account; nothing is kept by itself. Ctrl+K has *Lichess tournaments: arenas
+and Swiss tournaments*, *Follow the arena: …* (once the card has read the list) and the tournament followed in the
+mosaic.
 
 ### Preparing a game
 

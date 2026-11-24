@@ -128,6 +128,7 @@ inline constexpr const char* PlayersNames       = "players-names";
 inline constexpr const char* Dossier            = "a-players-dossier";
 inline constexpr const char* Crosstables        = "tournaments-and-crosstables";
 inline constexpr const char* OpeningReport      = "the-opening-report";
+inline constexpr const char* Export             = "exporting-and-printing";
 inline constexpr const char* Tiebreaks          = "tie-breaks-performance-and-rating-change";
 inline constexpr const char* FideList           = "fides-rating-list";
 inline constexpr const char* CheckCompact       = "checking-and-compacting";

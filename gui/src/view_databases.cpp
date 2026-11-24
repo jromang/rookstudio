@@ -1189,6 +1189,19 @@ void App::drawGameList() {
                                           ui::exactCount(db_view_->ids.size())),
                                       static_cast<int>(db_view_ms_))
                                       .c_str());
+    // The chosen game, or the filter's games, as a page to replay, a GIF, a PDF or PGN (#93).
+    if (export_when_listed_ >= 0 && !db_view_job_ && !db_view_->ids.empty()) {  // --focus export-db=…
+        openDatabaseExport(export_listed_all_, std::exchange(export_when_listed_, -1));
+        return;
+    }
+    if (!db_view_job_ && !db_view_->ids.empty()) {
+        ImGui::SameLine(0, px(12));
+        if (ui::iconButton("db_export", ui::Icon::Share, TR("Export…"))) openDatabaseExport(false);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s",
+                              TR("The chosen game, or the filter's games, as a page to replay, an animated GIF, a "
+                                 "PDF or PGN."));
+    }
 
     const auto& ids  = db_view_->ids;
     const auto* snap = db_view_->snapshot.get();

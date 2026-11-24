@@ -141,7 +141,14 @@ enum class Icon {
     WifiOff,      // a download cut short
     Merge,        // duplicate games merged (#88)
     Users,        // the players' names brought together (#88)
-    User          // a player's dossier (#90)
+    User,         // a player's dossier (#90)
+    Share,        // exported (#93)
+    FileCode,     // a page of HTML
+    Image,        // a diagram
+    Film,         // an animated GIF
+    Printer,      // printed: a PDF
+    FileText,     // a text file: PGN
+    Table         // a crosstable
 };
 
 // The icon of a view, by the name views.hpp gives it ("flask", "cap"…).
@@ -169,6 +176,9 @@ void setGuideFonts(ImFont* italic, ImFont* mono);
 // loadRequestedFonts(), called between frames.
 void requestCjkFont();
 void loadRequestedFonts(float size);
+// The system's font of Chinese characters the window merges in: its file and its face in a collection; none when the
+// system has none of those RookStudio knows. A PDF embeds the same (#93).
+[[nodiscard]] std::optional<std::pair<std::string, int>> cjkFontFile();
 
 // A button with a small drawn icon, so no icon font is needed.
 bool iconButton(const char* id, Icon icon, const char* label, bool enabled = true);

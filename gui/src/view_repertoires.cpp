@@ -133,6 +133,9 @@ void App::drawOpeningsPage() {
     const auto& e    = r.entries()[index];
     ui::pageTitle(e.name.c_str());
     if (ui::iconButton("rep_open", ui::Icon::Board, TR("Open its file on the board"))) openBoardPgn(e.file);
+    ImGui::SameLine();
+    // Printed (#93): each line under the one it leaves, a diagram at each branching, its coverage as an annex.
+    if (ui::iconButton("rep_print", ui::Icon::Printer, TR("Print…"))) openRepertoirePrint(index);
     ImGui::SameLine(0, px(12));
     ImGui::TextDisabled(
         "%s", trf("{} · active · {}", e.side == chess::Color::WHITE ? TR("White") : TR("Black"),

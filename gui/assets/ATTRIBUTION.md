@@ -176,6 +176,10 @@ The move sounds are made by the program as it runs (`gui/src/sound.cpp`): no sou
 
 A system font (DejaVu Sans or Segoe UI Symbol) is merged in when present, for the few signs Inter lacks.
 
+The PDFs RookStudio makes (Export, Print…) embed the glyphs of Inter they use, as its license allows, and those of the
+system's Chinese font (the one the window shows Chinese with) when a page has Chinese characters; the diagrams, GIFs and
+pages of HTML draw the piece set in use and carry its notice.
+
 ## Libraries fetched at build time
 
 | Library | License |
@@ -184,7 +188,7 @@ A system font (DejaVu Sans or Segoe UI Symbol) is merged in when present, for th
 | Dear ImGui 1.92.9 (docking) | MIT |
 | ImPlot 1.0 | MIT |
 | nanosvg | zlib |
-| stb_image (PNG and JPEG reading, for the engines' logos), stb_image_write | MIT / public domain |
+| stb_image (PNG and JPEG reading, for the engines' logos), stb_image_write (PNG writing, and the deflate of the PDFs' streams), stb_truetype (the outlines and widths of the fonts of the diagrams, GIFs and PDFs RookStudio makes) | MIT / public domain |
 | libssh2 (master, e75fa9a), modified for the tunnel's memory (see cmake/patch_libssh2.cmake in the sources), with a cryptography backend for Mbed TLS 4 written for fastchess-gui | BSD-3-Clause, below |
 | Mbed TLS 4.1.1 (TLS for lichess, cryptography for the tunnel) | Apache-2.0: [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt) |
 | QR Code generator 1.8.0 by Project Nayuki | MIT, below |

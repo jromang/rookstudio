@@ -1508,6 +1508,8 @@ void App::drawBoardPage() {
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
         if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) boardSave();
         if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S)) boardSaveMenu(true);
+        // The position's diagram into the clipboard, from anywhere on the page (#93).
+        if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_C)) copyDiagram();
         if (chessBoard()) boardEditKeys();
     }
     if (keys && boardKey()) setBoardAnalysis(!b.analysing);
@@ -1649,6 +1651,7 @@ void App::pollBoardPgn() {
         openOpeningReport(Page::Board);
         if (opening_report_) opening_report_->tab = tab;
     }
+    if (export_when_read_ >= 0) openBoardExport(std::exchange(export_when_read_, -1));  // --focus export=… (#93)
     if (review_when_read_) {
         review_when_read_ = false;
         board_.open_tab   = 0;
@@ -2314,6 +2317,17 @@ void App::drawBoardColumn(float size) {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", board.getFen().c_str());
     ImGui::SameLine();
     drawToLichessMenu();  // the position, the game, to lichess.org (#54)
+    // The study Board's game as a page to replay, a diagram, a GIF or a PDF (#93).
+    if (chessBoard()) {
+        const char* label = TR("Export…");
+        ui::sameLineOrWrap(ImGui::GetFrameHeight() * 0.42f + ImGui::CalcTextSize(label).x +
+                           ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().ItemInnerSpacing.x);
+        if (ui::iconButton("board_export", ui::Icon::Share, label)) openBoardExport();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s",
+                              TR("The game as a page to replay, a diagram, an animated GIF or a PDF. Ctrl+Shift+C "
+                                 "copies the diagram of the position."));
+    }
     if (b.line >= 0) {
         ImGui::SameLine();
         if (ImGui::Button(TR("Back to the game"))) showBoardLine(-1, boardMainPly());

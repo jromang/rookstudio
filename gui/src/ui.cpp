@@ -439,6 +439,20 @@ const char* glyph(Icon icon) {
             return "\uE1A4";  // users
         case Icon::User:
             return "\uE19F";  // user
+        case Icon::Share:
+            return "\uE155";  // share
+        case Icon::FileCode:
+            return "\uE0C3";  // file-code
+        case Icon::Image:
+            return "\uE0F6";  // image
+        case Icon::Film:
+            return "\uE0D0";  // film
+        case Icon::Printer:
+            return "\uE141";  // printer
+        case Icon::FileText:
+            return "\uE0CC";  // file-text
+        case Icon::Table:
+            return "\uE17D";  // table
     }
     return "";
 }
@@ -467,12 +481,7 @@ bool g_cjk_loaded    = false;
 
 void requestCjkFont() { g_cjk_requested = true; }
 
-void loadRequestedFonts(float size) {
-    if (!g_cjk_requested || g_cjk_loaded) return;
-    g_cjk_loaded = true;
-
-    // A system font with the Chinese characters, read once and merged into the text, title and guide fonts: some
-    // 20 MB, so only when Chinese is shown. Its glyphs are made when first drawn.
+std::optional<std::pair<std::string, int>> cjkFontFile() {
     struct Candidate {
         const char* path;
         int face;  // in a collection: Noto Sans CJK has JP, KR, SC (2), TC...
@@ -493,22 +502,35 @@ void loadRequestedFonts(float size) {
                                     {"/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0},
                                     {"/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc", 0}};
 #endif
-    static std::vector<unsigned char> data;  // the atlas reads from it for as long as the program runs
     for (const auto& c : candidates) {
-        std::ifstream in(c.path, std::ios::binary);
-        if (!in) continue;
-        data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-        if (data.empty()) continue;
-        for (ImFont* font : {ImGui::GetIO().FontDefault, g_title_font, g_italic_font, g_mono_font}) {
-            if (!font) continue;
-            ImFontConfig config;
-            config.MergeMode            = true;
-            config.DstFont              = font;
-            config.FontNo               = static_cast<ImU32>(c.face);
-            config.FontDataOwnedByAtlas = false;
-            ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data.data(), static_cast<int>(data.size()), size, &config);
-        }
-        return;
+        std::error_code ec;
+        if (std::filesystem::is_regular_file(c.path, ec) && std::filesystem::file_size(c.path, ec) > 0)
+            return std::make_pair(std::string(c.path), c.face);
+    }
+    return std::nullopt;
+}
+
+void loadRequestedFonts(float size) {
+    if (!g_cjk_requested || g_cjk_loaded) return;
+    g_cjk_loaded = true;
+
+    // A system font with the Chinese characters, read once and merged into the text, title and guide fonts: some
+    // 20 MB, so only when Chinese is shown. Its glyphs are made when first drawn.
+    static std::vector<unsigned char> data;  // the atlas reads from it for as long as the program runs
+    const auto file = cjkFontFile();
+    if (!file) return;
+    std::ifstream in(file->first, std::ios::binary);
+    if (!in) return;
+    data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    if (data.empty()) return;
+    for (ImFont* font : {ImGui::GetIO().FontDefault, g_title_font, g_italic_font, g_mono_font}) {
+        if (!font) continue;
+        ImFontConfig config;
+        config.MergeMode            = true;
+        config.DstFont              = font;
+        config.FontNo               = static_cast<ImU32>(file->second);
+        config.FontDataOwnedByAtlas = false;
+        ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data.data(), static_cast<int>(data.size()), size, &config);
     }
 }
 

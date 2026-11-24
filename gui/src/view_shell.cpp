@@ -217,13 +217,16 @@ void App::drawShell() {
     } else {
         drawPageInNoView();
     }
-    // A player's dossier in place of the page it was opened from (#90); an opening report (#91).
-    const bool dossier = !views_sheet_.open && dossier_ && dossier_->shown && dossier_->over == page_;
+    // The Export sheet in place of the page it was opened from, over a dossier or a report too (#93); a player's
+    // dossier (#90); an opening report (#91).
+    const bool exporting = !views_sheet_.open && export_ && export_->over == page_;
+    if (exporting) drawExport();
+    const bool dossier = !views_sheet_.open && !exporting && dossier_ && dossier_->shown && dossier_->over == page_;
     if (dossier) drawDossier();
-    const bool report =
-        !views_sheet_.open && !dossier && opening_report_ && opening_report_->shown && opening_report_->over == page_;
+    const bool report = !views_sheet_.open && !exporting && !dossier && opening_report_ && opening_report_->shown &&
+                        opening_report_->over == page_;
     if (report) drawOpeningReport();
-    switch (views_sheet_.open || dossier || report ? Page::Count : page_) {
+    switch (views_sheet_.open || exporting || dossier || report ? Page::Count : page_) {
         case Page::Home:
             drawHome();
             break;

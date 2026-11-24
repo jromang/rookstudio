@@ -23,6 +23,7 @@
 #include "app.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "publish_reports.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -443,6 +444,12 @@ void App::drawDossier() {
 
     const auto* r  = d.report ? &*d.report : nullptr;
     const auto* id = r && r->identity ? &*r->identity : nullptr;
+    if (export_when_made_.first == 0 && r && r->board.games > 0) {  // --focus export-dossier=… (#93)
+        const int format  = export_when_made_.second;
+        export_when_made_ = {-1, -1};
+        openDossierExport(format == static_cast<int>(ExportFormat::Html));
+        return;
+    }
 
     // Who: their name, and FIDE's card when they are matched with the list.
     ImGui::Dummy(ImVec2(0, px(4)));
@@ -470,8 +477,21 @@ void App::drawDossier() {
     // Their games in the game list: of the database, or chosen among them.
     if (r && r->board.games > 0) {
         const char* in_list = TR("Their games in the list");
-        const float w       = ImGui::CalcTextSize(in_list).x + ImGui::GetStyle().FramePadding.x * 2;
+        const char* print   = TR("Print…");
+        const char* html    = TR("HTML page");
+        const auto& style   = ImGui::GetStyle();
+        const float w = ImGui::CalcTextSize(in_list).x + ImGui::CalcTextSize(print).x + ImGui::CalcTextSize(html).x +
+                        style.FramePadding.x * 6 + style.ItemSpacing.x * 2;
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(12), ImGui::GetContentRegionMax().x - w));
+        // Printed, and as a page of HTML (#93).
+        if (ImGui::Button(print)) openDossierExport(false);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("The dossier as a PDF of a few pages, made by RookStudio"));
+        ImGui::SameLine();
+        if (ImGui::Button(html)) openDossierExport(true);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("The dossier as a page of its own, their lines replayable"));
+        ImGui::SameLine();
         if (ImGui::Button(in_list)) {
             std::vector<std::size_t> with;
             for (std::size_t s = 0; s < r->board.sources.size(); ++s)
@@ -779,14 +799,13 @@ void App::drawDossier() {
     ImGui::EndChild();
 }
 
-void App::drawDossierOverview() {
-    auto& d             = *dossier_;
-    const auto& r       = *d.report;
+DossierCards dossierCards(const DossierReport& r, bool user_names) {
     const auto& b       = r.board;
     const auto& dossier = *r.dossier;
     const auto& names   = dossierOpenings();
-    // The six cards.
-    std::array<std::string, 6> big, text;
+    DossierCards cards;
+    auto& big  = cards.big;
+    auto& text = cards.text;
     {
         const auto& p = r.board_play;
         if (!p.with_white.empty())
@@ -868,16 +887,26 @@ void App::drawDossierOverview() {
         }
     } else {
         big[5]  = TR("No game between you");
-        text[5] = player_names_.empty() ? TR("Your names (Settings › Your names) tell your games against them.")
-                                        : TR("None in your databases (Settings › Your names).");
+        text[5] = !user_names ? TR("Your names (Settings › Your names) tell your games against them.")
+                              : TR("None in your databases (Settings › Your names).");
     }
-    const char* titles[] = {TR("With White"),    TR("With Black"),       TR("Their rating"),
-                            TR("Their results"), TR("Their structures"), TR("You against them")};
+    cards.titles = {TR("With White"),    TR("With Black"),       TR("Their rating"),
+                    TR("Their results"), TR("Their structures"), TR("You against them")};
+    return cards;
+}
+
+void App::drawDossierOverview() {
+    auto& d             = *dossier_;
+    const auto& r       = *d.report;
+    const auto& dossier = *r.dossier;
+    const auto& names   = dossierOpenings();
+    // The six cards.
+    const auto cards = dossierCards(r, !player_names_.empty());
     if (ImGui::BeginTable("##dossier_cards", 3, ImGuiTableFlags_SizingStretchSame)) {
         for (int i = 0; i < 6; ++i) {
             ImGui::TableNextColumn();
-            card(fmt::format("dossier_card{}", i).c_str(), titles[i], big[static_cast<std::size_t>(i)],
-                 text[static_cast<std::size_t>(i)]);
+            card(fmt::format("dossier_card{}", i).c_str(), cards.titles[static_cast<std::size_t>(i)].c_str(),
+                 cards.big[static_cast<std::size_t>(i)], cards.text[static_cast<std::size_t>(i)]);
         }
         ImGui::EndTable();
     }
@@ -1327,6 +1356,184 @@ void App::drawDossierOnline() {
     ImGui::TextDisabled("%s", TR("Asked of Lichess: their name with a year of blitz, rapid and classical games, and "
                                  "their public profile. Nothing of yours."));
     ImGui::PopTextWrapPos();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Printed, and as a page of HTML (#93)
+
+publish::Document dossierDocument(const DossierReport& r, const std::string& name,
+                                  const std::vector<std::string>& sources, bool user_names, bool letter,
+                                  const publish::DocumentLook& look) {
+    using publish::Block;
+    using publish::Cell;
+    publish::Document d;
+    d.title   = trf("Dossier: {}", name);
+    d.header  = d.title;
+    d.letter  = letter;
+    d.pieces  = look.pieces;
+    d.notice  = look.notice;
+    d.colours = look.colours;
+    d.lang    = look.lang;
+    d.blocks.push_back(publish::title(name));
+    if (const auto* id = r.identity ? &*r.identity : nullptr) {
+        std::vector<std::string> parts;
+        if (!id->title.empty()) parts.push_back(id->title);
+        if (!id->federation.empty()) parts.push_back(id->federation);
+        if (id->born) parts.push_back(trf("born {}", id->born));
+        if (id->standard) parts.push_back(trf("standard {}", id->standard));
+        if (id->rapid) parts.push_back(trf("rapid {}", id->rapid));
+        if (id->blitz) parts.push_back(trf("blitz {}", id->blitz));
+        if (!id->list.empty()) parts.push_back(trf("FIDE's list of {}", fide::monthText(id->list)));
+        std::string line;
+        for (const auto& p : parts) line = line.empty() ? p : trf("{} · {}", line, p);
+        if (!line.empty()) d.blocks.push_back(publish::subtitle(line));
+    }
+    const auto& b = r.board;
+    if (!r.dossier || b.games == 0) {
+        d.blocks.push_back(publish::paragraph(TR("No game of theirs in your databases.")));
+        return d;
+    }
+    const auto& dossier = *r.dossier;
+    const auto& names   = dossierOpenings();
+    {
+        std::vector<std::string> made;
+        for (std::size_t s = 0; s < b.sources.size() && s < sources.size(); ++s) {
+            const auto& src = b.sources[s];
+            if (src.games == 0) continue;
+            const auto when = years(src.first_year, src.last_year);
+            const auto n    = trn("{} game", "{} games", src.games, ui::exactCount(src.games));
+            made.push_back(when.empty() ? trf("{} · {}", sources[s], n) : trf("{} · {} · {}", sources[s], n, when));
+        }
+        d.blocks.push_back(publish::note(trf("Made of: {}", listed(made))));
+    }
+    // The six cards.
+    const auto cards = dossierCards(r, user_names);
+    d.blocks.push_back(publish::heading(TR("Overview")));
+    for (std::size_t i = 0; i < 6; ++i) {
+        Block p;
+        p.spans.emplace_back(cards.titles[i] + " · ", publish::FontId::Regular, publish::MUTED_COLOUR);
+        p.spans.emplace_back(cards.big[i].empty() ? std::string("–") : cards.big[i], publish::FontId::SemiBold);
+        if (!cards.text[i].empty())
+            p.spans.emplace_back(" " + cards.text[i], publish::FontId::Regular, publish::MUTED_COLOUR);
+        d.blocks.push_back(std::move(p));
+    }
+    // Their last games.
+    {
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Their last games"), TR("Event"), TR("Result"), TR("Opening")};
+        t.table.align = {0, 0, 2, 0};
+        int shown     = 0;
+        for (std::size_t i = 0; i < dossier.games.size() && shown < 12; ++i) {
+            const auto& g = dossier.games[i];
+            if (g.online) continue;
+            ++shown;
+            const auto& snap = *dossier.sources[g.source].snapshot;
+            const auto row   = snap.row(g.id);
+            const auto ids   = snap.rowIds(g.id);
+            const std::string event(row.event), round(row.round);
+            std::string opening;
+            if (g.opening >= 0)
+                opening = fmt::format("{} {}", names[static_cast<std::size_t>(g.opening)].eco,
+                                      names[static_cast<std::size_t>(g.opening)].name);
+            else if (row.eco)
+                opening = study::ecoText(row.eco);
+            t.table.rows.push_back(
+                {{fmt::format("{}  {} – {}", g.numbers.date ? study::dateText(g.numbers.date) : std::string("?"),
+                              snap.shownName(ids.white), snap.shownName(ids.black))},
+                 {round.empty() || round == "?" || round == "-" ? event : trf("{}, round {}", event, round)},
+                 {row.result == '1'   ? "1-0"
+                  : row.result == '0' ? "0-1"
+                  : row.result == '=' ? "½-½"
+                                      : "*"},
+                 {opening, publish::FontId::Regular, publish::MUTED_COLOUR}});
+        }
+        d.blocks.push_back(std::move(t));
+    }
+    // Their lines with each colour, the first of each to replay on the page.
+    for (const bool white : {true, false}) {
+        const auto& lines = white ? b.lines_white : b.lines_black;
+        const auto n      = white ? b.white.games : b.black.games;
+        d.blocks.push_back(
+            publish::heading(white ? trn("With White · {} game", "With White · {} games", n, ui::exactCount(n))
+                                   : trn("With Black · {} game", "With Black · {} games", n, ui::exactCount(n))));
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Line"), TR("Games"), "+ = −", TR("Score"), TR("Last")};
+        t.table.align = {0, 1, 2, 1, 1};
+        for (std::size_t i = 0; i < lines.size() && i < 15; ++i) {
+            const auto& l = lines[i];
+            t.table.rows.push_back(
+                {{fmt::format("{} {}", l.eco, l.opening ? names[*l.opening].name : std::string())},
+                 {ui::exactCount(l.score.games)},
+                 {fmt::format("{} {} {}", l.score.won, l.score.drawn, l.score.lost)},
+                 {l.score.decided() > 0 ? fmt::format("{} %", percent(l.score.share())) : std::string()},
+                 {l.last ? fmt::format("{}", l.last >> 9) : std::string(), publish::FontId::Regular,
+                  publish::MUTED_COLOUR}});
+        }
+        d.blocks.push_back(std::move(t));
+        for (std::size_t i = 0; i < lines.size() && i < 6; ++i) {
+            const auto& l = lines[i];
+            if (!l.opening) continue;
+            const auto& moves = names[*l.opening].moves;
+            const auto game   = publish::lineGame(moves);
+            if (!game || moves.empty()) continue;
+            Block p;
+            p.spans.emplace_back(fmt::format("{} {}: ", l.eco, names[*l.opening].name), publish::FontId::SemiBold);
+            for (auto& s : publish::lineSpans(moves, static_cast<int>(d.games.size()))) p.spans.push_back(std::move(s));
+            d.games.push_back(*game);
+            d.blocks.push_back(std::move(p));
+        }
+    }
+    // Their rating, year by year.
+    if (b.years.size() >= 2) {
+        d.blocks.push_back(publish::heading(TR("Their rating")));
+        int low = b.years.front().elo, high = low;
+        for (const auto& y : b.years) {
+            low  = std::min(low, y.elo);
+            high = std::max(high, y.elo);
+        }
+        Block bars;
+        bars.kind = Block::Kind::Bars;
+        for (const auto& y : b.years)
+            bars.bars.push_back(
+                {fmt::format("{}", y.year), fmt::format("{}", y.elo),
+                 high > low ? 0.25f + 0.75f * static_cast<float>(y.elo - low) / static_cast<float>(high - low) : 1.0f});
+        d.blocks.push_back(std::move(bars));
+    }
+    // Their structures.
+    if (b.games >= 5 && !b.structures.empty()) {
+        d.blocks.push_back(publish::heading(TR("Their structures, from the assistant's facts at move 20")));
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Structure"), TR("Games"), TR("Score")};
+        t.table.align = {0, 1, 1};
+        for (std::size_t i = 0; i < b.structures.size() && i < 8; ++i) {
+            const auto& st = b.structures[i];
+            t.table.rows.push_back(
+                {{structureLabel(st)},
+                 {ui::exactCount(st.score.games)},
+                 {st.score.decided() > 0 ? fmt::format("{} %", percent(st.score.share())) : std::string()}});
+        }
+        d.blocks.push_back(std::move(t));
+    }
+    // The gaps of the user's repertoires against them.
+    if (!r.gaps.empty()) {
+        d.blocks.push_back(publish::heading(TR("The gaps of your repertoires against them")));
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Repertoire"), TR("The line"), TR("Missing"), TR("Games")};
+        t.table.align = {0, 0, 0, 1};
+        for (std::size_t i = 0; i < r.gaps.size() && i < 20; ++i) {
+            const auto& g = r.gaps[i];
+            t.table.rows.push_back({{g.repertoire},
+                                    {movesText(g.gap.line)},
+                                    {g.gap.move.empty() ? std::string(TR("no move of yours here")) : "→ " + g.gap.move},
+                                    {ui::exactCount(g.gap.games)}});
+        }
+        d.blocks.push_back(std::move(t));
+    }
+    return d;
 }
 
 }  // namespace fcg

@@ -1119,6 +1119,36 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             toStudyBoard();
             openOpeningReport(Page::Board);
         });
+    // Publishing (#93): the study Board's game exported, its diagram copied; the reports shown printed or made pages;
+    // a repertoire printed.
+    if (chessBoard()) {
+        add(TR("Export…"), TR("Board"), [this] {
+            toStudyBoard();
+            openBoardExport();
+        });
+        add(TR("Copy the diagram"), "Ctrl+Shift+C", [this] { copyDiagram(); });
+    }
+    if (dossier_ && dossier_->shown && dossier_->report && dossier_->report->board.games > 0) {
+        add(trf("Print the dossier of {}…", dossier_->subject.name), TR("Dossier"),
+            [this] { openDossierExport(false); });
+        add(trf("The dossier of {} as an HTML page…", dossier_->subject.name), TR("Dossier"),
+            [this] { openDossierExport(true); });
+    }
+    if (opening_report_ && opening_report_->shown && opening_report_->report) {
+        add(TR("Print the opening report…"), TR("Board"), [this] { openReportExport(false); });
+        add(TR("The opening report as an HTML page…"), TR("Board"), [this] { openReportExport(true); });
+    }
+    if (crosstable_ && crosstable_->input) {
+        add(trf("Print the crosstable of {}…", crosstable_->title), TR("Databases"),
+            [this] { openCrosstableExport(false); });
+        add(trf("The crosstable of {} as an HTML page…", crosstable_->title), TR("Databases"),
+            [this] { openCrosstableExport(true); });
+    }
+    for (std::size_t i = 0; i < repertoires().entries().size(); ++i)
+        add(trf("Print the repertoire “{}”…", repertoires().entries()[i].name), TR("Openings"), [this, i] {
+            page_ = Page::Openings;
+            openRepertoirePrint(i);
+        });
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's; a pattern alone said so.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         const auto& f    = kept_searches_[i].fields;

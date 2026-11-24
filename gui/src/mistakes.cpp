@@ -120,6 +120,7 @@ nlohmann::json exerciseJson(const MistakeExercise& e) {
                         {"comment_lang", e.comment_lang},
                         {"card", cardJson(e.card)},
                         {"since", e.since}};
+    if (e.visit) j["visit"] = true;
     if (e.score) j["score"] = scoreJson(*e.score);
     if (e.wdl) j["wdl"] = *e.wdl;
     if (e.after) j["after"] = scoreJson(*e.after);
@@ -165,6 +166,7 @@ std::optional<MistakeExercise> exerciseOf(uint64_t key, const nlohmann::json& j)
     if (const auto it = j.find("after_wdl"); it != j.end()) e.after_wdl = wdlOf(*it);
     if (const auto it = j.find("card"); it != j.end()) e.card = cardOf(*it);
     e.since = j.value("since", int64_t{0});
+    e.visit = j.value("visit", false);
     // An exercise must play: its position and its best move.
     try {
         const auto b = e.board();
@@ -731,8 +733,14 @@ MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::v
             out.record.kept.erase(key);
         }
     }
+    // A guided visit's cards are no game's exercises: they stay (#94).
     for (const auto& [key, e] : before.exercises)
-        if (!out.record.exercises.contains(key)) out.record.keep(e);
+        if (!out.record.exercises.contains(key)) {
+            if (e.visit)
+                out.record.exercises.emplace(key, e);
+            else
+                out.record.keep(e);
+        }
     // The latest games without a review.
     std::vector<const Found*> latest;
     for (const auto& f : found) latest.push_back(&f);

@@ -90,6 +90,8 @@ struct MistakeExercise {
     // Its card.
     study::fsrs::Card card;
     int64_t since = 0;  // its first answer, seconds since the epoch; 0 before
+    // A key moment of a game's guided visit answered wrong (#94): kept whatever the scans of the user's games find.
+    bool visit = false;
 
     [[nodiscard]] chess::Board board() const;         // the position
     [[nodiscard]] chess::Color side() const;          // the user's: the side to move there

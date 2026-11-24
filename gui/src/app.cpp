@@ -862,6 +862,12 @@ void App::frame() {
             review_when_read_     = true;
             explain_after_review_ = true;
             dropFile(w.substr(14));
+        } else if (w.rfind("board-visit=", 0) == 0) {
+            // board-visit=FILE: its first game on the study Board, its guided visit started once its review is read
+            // (#94).
+            toStudyBoard();
+            visit_when_read_ = true;
+            dropFile(w.substr(12));
         } else if (w.rfind("board-tab=", 0) == 0) {
             // The Board page's moves card on a tab: moves, table, review, explained (#94).
             const auto tab  = w.substr(10);

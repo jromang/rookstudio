@@ -957,11 +957,16 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         board_side_tab_ = 4;
         question_focus_ = true;
     });
-    if (board_.ply > 0)
+    if (board_.ply > 0) {
         add(TR("Comment this move"), "Alt+C", [this] {
             toStudyBoard();
             commentBoardMove();
         });
+        add(TR("Why not? The move tried against the game's"), "Alt+Q", [this] {
+            toStudyBoard();
+            whyNotHere();
+        });
+    }
     if (!board_.reviews.empty()) {
         add(TR("Comment the key moments"), TR("Board"), [this] {
             toStudyBoard();
@@ -974,6 +979,10 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(TR("Explain every move"), TR("Board"), [this] {
             toStudyBoard();
             explainEveryMove();
+        });
+        add(TR("Guided visit of the key moments"), TR("Board"), [this] {
+            toStudyBoard();
+            startVisit();
         });
         // The story of the game (#62): written again by the model, told otherwise; copied as it is shown.
         if (!review_story_.empty()) {

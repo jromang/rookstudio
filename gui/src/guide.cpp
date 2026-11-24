@@ -124,6 +124,7 @@ const std::vector<const char*>& allTopics() {
                                               EndgamesTab,
                                               GameReview,
                                               ExplainedMoves,
+                                              GuidedVisit,
                                               Databases,
                                               ImportingGames,
                                               GameList,

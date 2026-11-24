@@ -582,6 +582,21 @@ void App::drawSideEngineCard(std::size_t index, const std::vector<SideEngine>& l
                 for (const auto& m : legalPrefix(board, l.pv, static_cast<std::size_t>(ev.clicked) + 1)) boardPlay(m);
                 b.preview.reset();
             }
+            // The right button: "Why not?" its first move, against the game's (#94).
+            if (ev.right_clicked >= 0 && !l.pv.empty()) {
+                why_not_move_ = l.pv.front();
+                ImGui::OpenPopup("##why_not_line");
+            }
+            if (ImGui::BeginPopup("##why_not_line")) {
+                const auto moves = legalPrefix(board, {why_not_move_}, 1);
+                if (!moves.empty() &&
+                    ImGui::MenuItem(
+                        trf("Why not {}?", numbered(board, boardSan(chess::uci::moveToSan(board, moves.front()))))
+                            .c_str(),
+                        "Alt+Q"))
+                    whyNot(b.ply, why_not_move_, whyNotReference(board, why_not_move_));
+                ImGui::EndPopup();
+            }
         };
         if (!lines.front().pv.empty()) line(lines.front(), "##best", 2);
         // Its other lines, folded into one: a click shows them.

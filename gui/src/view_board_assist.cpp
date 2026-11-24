@@ -647,7 +647,7 @@ void App::drawReviewAssistant() {
             ImGui::Spacing();
         }
     }
-    // The assistant's two gestures on the game.
+    // The assistant's gestures on the game.
     ImGui::BeginDisabled(comment_job_.has_value() || !review->report.complete);
     if (ui::iconButton("comment_key_moments", ui::Icon::Comment, TR("Comment the key moments"))) commentKeyMoments();
     ImGui::EndDisabled();
@@ -664,14 +664,21 @@ void App::drawReviewAssistant() {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", TR("The evaluations, the symbols and the better lines written into the notation; "
                                    "Ctrl+Z takes them back"));
-    // Every move explained (#94), in the Explained tab beside the moves.
-    ImGui::SameLine();
+    // Every move explained (#94), in the Explained tab beside the moves; the guided visit of the key moments.
+    ui::sameLineOrWrap(ImGui::CalcTextSize(TR("Explain every move")).x + ImGui::GetStyle().FramePadding.x * 2);
     ImGui::BeginDisabled(explain_job_.has_value() || !review->report.complete);
     if (ImGui::Button(TR("Explain every move"))) explainEveryMove();
     ImGui::EndDisabled();
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", TR("A line for each move, beside the moves, kept with the review: theory grouped, the "
                                    "moves too simple said in a word, the others by the assistant, held to the facts"));
+    ui::sameLineOrWrap(ImGui::CalcTextSize(TR("Guided visit")).x + ImGui::GetStyle().FramePadding.x * 2);
+    ImGui::BeginDisabled(!review->report.complete);
+    if (ImGui::Button(TR("Guided visit"))) startVisit();
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", TR("Each key moment of the review: what would you have played? Then the engine's move "
+                                   "and why; a wrong answer becomes a card of today's review"));
     // What the last gesture did, said here too: the notation that shows it is in the other tab.
     if (!b.toast.empty() && ImGui::GetTime() - b.toast_time < 4.0) {
         ImGui::PushTextWrapPos();

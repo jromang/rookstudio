@@ -341,6 +341,8 @@ them.
 | <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers (a hint during a game against an engine) |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>6</kbd> | The study Board | The Notation, Analysis, Tree, References, Questions and Endgames tabs |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
+| <kbd>Alt</kbd>+<kbd>Q</kbd> | The study Board | Why not? The move tried against the game's, or the game's move against the review's best |
+| <kbd>Space</kbd>, <kbd>Enter</kbd>, <kbd>Alt</kbd>+<kbd>Q</kbd>, <kbd>Escape</kbd> | The guided visit | "I don't know", the next moment, why not another move, stop |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G, N and Shift+N do on the engines' Board (on the study Board, the letters type moves) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | The Tree tab | Choose a move, play it, mark it in the active repertoire |
 | <kbd>Enter</kbd> | The Openings page | Start the training of the repertoire shown |
@@ -1384,6 +1386,30 @@ review, beside the moves, never in the game: *Write them into the game* makes th
 its own in the PGN, beside the comment a move has already, which is never replaced; Ctrl+Z takes them all back. Nothing
 leaves the machine. Locked while one of your games is played on Lichess, hidden during a game against an engine until
 its end.
+
+### The guided visit and “Why not?”
+
+*Guided visit*, in the *Review* tab (or Ctrl+K), takes you through the review's key moments one after the other (its
+marked moves when it has none): the board shows the position before the game's move, and asks *Before seeing why: what
+would you have played?* Play the move on the board or type it; nothing is shown before your answer, neither the
+evaluation nor an arrow nor the game's notation, and Space says *I don't know*. Then your answer is judged as *Guessing
+the moves* judges a guess (see [Guessing the moves](#guessing-the-moves)): the engine's move 3 points, a move as good
+2, a playable one 1, else 0, by the analysis's engine, a second for each; the board shows your move in blue, the
+engine's in green and the game's in orange, with an explanation held to the review's facts and what it rests on (the
+review's engine and its line, the facts of the positions). Enter goes to the next moment, *See the line* plays the
+engine's line on the board, Escape stops. A wrong answer, no point or *I don't know*, becomes a card of today's review,
+as your mistakes do (see [Your mistakes as exercises](#your-mistakes-as-exercises)): the position, the engine's move to
+find.
+
+**Why not?** (Alt+Q) asks the assistant's *Compare* (see [Questions](#questions)) with one key, wherever a move shows:
+after a move tried on the board (a variation, as always), it sets the move against the game's; on the game's own move,
+the review's best against it; the right button on an engine's line in the Analysis tab, or on a move of the Tree tab,
+offers *Why not …?*; in the guided visit, *Why not another move?* sets your answer, or the game's move, against the
+engine's. The answer comes in the Questions tab (in the visit, under it): the engine after each of the two moves (one
+thread, 300,000 nodes a position), the facts of both positions, your databases' games and score, the continuation;
+*Add to the notation* writes it in, as for any question. No free conversation: the assistant answers what the engine,
+your databases and the facts establish. Both are locked while one of your games is played on Lichess, and hidden during
+a game against an engine until its end.
 
 ### Exporting and printing
 

@@ -726,6 +726,7 @@ void App::boardPlayAsked(chess::Move move) {
     if (guess_) return guessAnswer(move);
     if (endgame_) return endgameAnswer(move);  // to the endgame's, the vision's (#82)
     if (vision_) return visionAnswer(move);
+    if (visit_) return visitAnswer(move);             // the answer to the guided visit's question (#94)
     if (onlineShown()) return onlineMoveAsked(move);  // a game on Lichess: sent, waiting for Enter or its turn (#84)
     if (botShown()) {                                 // the Lichess bot's game: its engine plays it (#85)
         boardToast(TR("The bot plays this game: its moves are its engine's"));
@@ -1028,6 +1029,7 @@ void App::boardEditKeys() {
         boardComment(io.KeyShift);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) boardUndo(false);
     if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_C)) commentBoardMove();  // M5, board 3
+    if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_Q)) whyNotHere();        // #94
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) ||
         ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z))
         boardUndo(true);
@@ -1368,6 +1370,7 @@ void App::drawBoardPage() {
     if (puzzle_) return drawPuzzlePage();      // a series of puzzles: the column is the puzzle's (#80)
     if (mistake_) return drawMistakePage();    // a session of exercises, a game guessed (#81)
     if (guess_) return drawGuessPage();
+    if (visit_) return drawVisitPage();      // the guided visit of the key moments (#94)
     if (endgame_) return drawEndgamePage();  // an endgame against the tables, a vision exercise (#82)
     if (vision_) return drawVisionPage();
     auto& b = board_;

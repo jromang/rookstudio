@@ -70,6 +70,7 @@ inline constexpr const char* ReferenceGames     = "reference-games";
 inline constexpr const char* EndgamesTab        = "the-endgames-tab";
 inline constexpr const char* GameReview         = "the-review-of-a-game";
 inline constexpr const char* ExplainedMoves     = "every-move-explained";
+inline constexpr const char* GuidedVisit        = "the-guided-visit-and-why-not";
 inline constexpr const char* Databases          = "databases";
 inline constexpr const char* ImportingGames     = "importing-games";
 inline constexpr const char* GameList           = "the-game-list";

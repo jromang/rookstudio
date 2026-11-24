@@ -113,6 +113,7 @@
 #include "ui.hpp"
 #include "views.hpp"
 #include "vision.hpp"
+#include "visit.hpp"
 
 #include <tour/book_scan.hpp>
 #include <tour/by_opening.hpp>
@@ -2853,7 +2854,8 @@ class App {
     void drawAssistantFirstUse();
     // `text` as the user reads it; `asked`, when not empty, what the assistant is given (a suggestion, in its own
     // language).
-    void askQuestion(const std::string& text, const std::string& asked = {});
+    // `at_ply`: a position of the line shown other than the board's, where the question is asked.
+    void askQuestion(const std::string& text, const std::string& asked = {}, std::optional<int> at_ply = std::nullopt);
     // The tables a question or a comment is answered with (#42): the board's position and the one before it, of seven
     // pieces or fewer, taught by the disk's tables or by the answers Lichess gave that the profile kept (nothing is
     // asked); none when they know neither.
@@ -2947,6 +2949,9 @@ class App {
         std::optional<QuestionResult> done;
     };
     std::vector<QuestionAsked> questions_;                     // this game's, the oldest first
+    // A question's card: the question, its answer, the comparison of two moves, what it rests on, its gestures;
+    // `remove` set when "Remove" was clicked.
+    void drawQuestionCard(std::size_t index, std::optional<std::size_t>& remove);
     std::vector<std::future<QuestionResult>> questions_left_;  // those of a game left, still being answered
     std::array<char, 512> question_text_{};
     bool question_focus_ = false;  // the question's field takes the keys at its next drawing
@@ -2998,6 +3003,57 @@ class App {
     std::string explained_of_;           // the game and language the explanations were read for
     int explained_filter_      = 0;      // 0 every move, 1 the moves that matter, 2 the key moments
     bool explain_after_review_ = false;  // asked before the review: made once it is done
+    // "Why not?" (#94, mockup M13, board 7, point 16): the Questions' Compare action asked with one key, wherever a
+    // move is shown (Alt+Q after a variation tried, the right click on an engine's line or a move of the Tree tab, the
+    // guided visit): `asked` against `reference`, both UCI moves of the position `at_ply` of the line shown.
+    void whyNot(int at_ply, const std::string& asked, const std::string& reference);
+    // The move a move is set against at a position: the game's move there, else the engine's best, else its second.
+    [[nodiscard]] std::string whyNotReference(const chess::Board& before, const std::string& asked);
+    void whyNotHere();  // Alt+Q: the variation's move against the game's, or the game's move against the review's best
+    std::string why_not_move_;  // the engine's line right-clicked: its first move
+    // The guided visit (#94, point 16, visit.hpp): the key moments of the review, "what would you have played?", the
+    // answer judged as Guess the moves judges it, the engine's move and why; a wrong answer a card of the day's queue.
+    struct VisitRun {
+        using Phase = VisitPhase;
+        std::vector<std::size_t> moments;  // the plies of the moves visited, in the game's order
+        std::size_t current = 0;
+        Phase phase         = Phase::Asking;
+        std::shared_ptr<const CommentaryReview> review;
+        GameReview analysis;  // the review's analysis it was made from
+        std::string best;     // the engine's move at the moment (UCI)
+        chess::Move answer{};
+        bool answered = false, dont_know = false;
+        Analyser engine;  // the analysis's, one thread, a second a move: the engine's move and the answer
+        AnalysisPosition best_position, answer_position;
+        std::optional<fastchess::Score> best_score, answer_score;  // the other side's, to move after each
+        bool answer_asked = false;
+        VisitVerdict verdict;
+        bool card = false;  // the answer became a card of the day's queue
+        std::string explanation;
+        struct Result {
+            std::size_t ply = 0;
+            std::string answer;  // UCI, empty for "I don't know"
+            int points = 0;
+            bool card  = false;
+        };
+        std::vector<Result> results;
+        std::optional<std::size_t> question;  // its "Why not?" question, in questions_
+        int line = -1, ply = 0;               // the board as it was
+        uint64_t game = 0;                    // board_game_serial_
+    };
+    std::unique_ptr<VisitRun> visit_;
+    bool visit_when_read_ = false;  // --focus board-visit=FILE: started once the game's review is read
+    void startVisit();
+    void visitShowMoment();
+    void visitAnswer(chess::Move move);
+    void visitDontKnow();
+    void visitJudged();
+    void visitNext();
+    void stopVisit();
+    void pollVisit();
+    void visitWhyNot();
+    void drawVisitPage();
+    void drawVisitColumn();              // the moments, the question, the answer and why
     void explainEveryMove();             // "Explain every move" (the review first when there is none)
     void startExplaining(bool rest);     // `rest`: the lines not written yet of those kept
     void pollExplained();

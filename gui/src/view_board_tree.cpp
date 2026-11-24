@@ -1032,6 +1032,13 @@ void App::drawBoardTree() {
                                   ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
                 play = row.move;
             if (ImGui::IsItemHovered()) hovered = row.move;
+            // The right button: "Why not?" the move, against the game's (#94).
+            if (ImGui::BeginPopupContextItem("##tree_why_not")) {
+                const auto uci = chess::uci::moveToUci(row.move, b.chess960);
+                if (ImGui::MenuItem(trf("Why not {}?", row.san).c_str(), "Alt+Q"))
+                    whyNot(b.ply, uci, whyNotReference(here, uci));
+                ImGui::EndPopup();
+            }
             if (tree_row_ == static_cast<int>(r) && tree_scroll_) {
                 ImGui::SetScrollHereY();
                 tree_scroll_ = false;

@@ -3,7 +3,8 @@
 // A database: a folder whose games are kept in immutable segments, each written whole, synced, then named in the
 // manifest, whose replacement by a rename is the only commit. After a crash a database opens as it was at its last
 // commit, the leftovers of the commit cut short removed. Readers hold a Snapshot: the segments it maps stay valid
-// while later commits add others.
+// while later commits add others. A segment damaged while the database was closed does not keep it from opening: its
+// games keep their numbers, the others read (Snapshot::unreadable()).
 //
 //   Name.fcgdb/
 //     manifest.json   the segments, in order, with their games and new names
@@ -94,13 +95,27 @@ struct GameState {
     bool deleted = false;
 };
 
+// A segment that cannot be read: its games' number, why, the file it was imported from.
+struct BadSegment {
+    std::string name;
+    GameId first   = 0;  // its first game's number; for a segment of versions, 0
+    uint64_t games = 0;
+    bool versions  = false;
+    std::string error;
+    std::string source;
+    // Its names.bin still reads (or it brought no name): the names it brought, which later games may use, are kept.
+    bool names_kept = true;
+};
+
 class Snapshot {
    public:
     [[nodiscard]] uint64_t games() const noexcept { return games_; }
     [[nodiscard]] uint64_t generation() const noexcept { return generation_; }
     // The generation of the last commit that replaced or deleted games (0: none): what was built from the games
-    // before, an opening tree, may no longer hold.
-    [[nodiscard]] uint64_t editsGeneration() const noexcept { return edits_generation_; }
+    // before, an opening tree, may no longer hold. While segments cannot be read, a number of its own for them.
+    [[nodiscard]] uint64_t editsGeneration() const noexcept {
+        return unreadable_edits_ ? unreadable_edits_ : edits_generation_;
+    }
     [[nodiscard]] HeaderRow row(GameId id) const;
     [[nodiscard]] HeaderNumbers numbers(GameId id) const;
     [[nodiscard]] GameMoves gameMoves(GameId id) const;
@@ -112,11 +127,32 @@ class Snapshot {
     [[nodiscard]] std::span<const uint8_t> moves(GameId id) const;
     // What its moves tell the searches (signature.hpp): none in a segment of the first format.
     [[nodiscard]] std::optional<GameSignature> signature(GameId id) const;
-    // A game deleted keeps its number, its game shown or not as the list asks; searches and the tree leave it out.
+    // A game deleted keeps its number, its game shown or not as the list asks; searches and the tree leave it out. So
+    // are the games of the segments that cannot be read (unreadable()).
     [[nodiscard]] bool deleted(GameId id) const noexcept {
-        return id / 64 < deleted_.size() && (deleted_[id / 64] >> (id % 64) & 1);
+        return (id / 64 < deleted_.size() && (deleted_[id / 64] >> (id % 64) & 1)) ||
+               (id / 64 < unreadable_.size() && (unreadable_[id / 64] >> (id % 64) & 1));
     }
-    [[nodiscard]] uint64_t deletedCount() const noexcept { return deleted_count_; }
+    [[nodiscard]] uint64_t deletedCount() const noexcept { return deleted_count_ + unreadable_count_; }
+
+    // The segments that could not be read when the database was opened (a file of theirs cut short, missing, or not
+    // a segment's): their games keep their numbers but read as empty games and count as deleted, so that the list,
+    // the tree and the searches work on the others; the names they brought read from their names.bin when it still
+    // reads, else as "?" (nameKnown()). Database::keepReadable() writes them again.
+    [[nodiscard]] const std::vector<BadSegment>& unreadable() const noexcept { return unreadable_segments_; }
+    // The games of those segments, those deleted before left out: the games that cannot be read, and their numbers.
+    [[nodiscard]] uint64_t unreadableGames() const noexcept { return unreadable_count_; }
+    [[nodiscard]] std::vector<GameId> unreadableIds() const;
+    [[nodiscard]] bool readable(GameId id) const noexcept {
+        return !(id / 64 < unreadable_.size() && (unreadable_[id / 64] >> (id % 64) & 1));
+    }
+    // Whether a name reads as it was written: false for a name brought by a segment whose names.bin could not be read
+    // (it reads "?").
+    [[nodiscard]] bool nameKnown(uint32_t id) const noexcept {
+        for (const auto& [from, to] : unknown_names_)
+            if (id >= from && id < to) return false;
+        return true;
+    }
 
     // A game replaced: where its new version is (a segment of versions, and its place there).
     struct Version {
@@ -161,6 +197,16 @@ class Snapshot {
     friend class Database;
     [[nodiscard]] std::pair<const Segment*, std::size_t> locate(GameId id) const;
     [[nodiscard]] std::size_t segmentOf(GameId id) const;  // the segment that added it (an index in segments_)
+    // Deleted by an edit, the games that cannot be read left out: what the edits write and undo.
+    [[nodiscard]] bool deletedByEdit(GameId id) const noexcept {
+        return id / 64 < deleted_.size() && (deleted_[id / 64] >> (id % 64) & 1);
+    }
+    // What the segments that cannot be read make of the snapshot, made again after each change: their games, the
+    // names not known, the edits generation of their own.
+    void settle();
+    // The name of a game without names, for the empty games of the segments that cannot be read: "" when the database
+    // has that name, else "?"; none when it has neither.
+    [[nodiscard]] std::optional<uint32_t> blankName() const;
 
     std::vector<std::shared_ptr<const Segment>> segments_;  // all of them, those of versions included
     std::vector<std::size_t> logical_;                      // the segments that add games, in order
@@ -169,7 +215,12 @@ class Snapshot {
     std::vector<Version> replaced_;                         // by id
     std::vector<uint64_t> deleted_;                         // a bit a game
     uint64_t deleted_count_    = 0;
-    uint64_t edits_generation_ = 0;
+    uint64_t edits_generation_ = 0;  // the manifest's
+    std::vector<BadSegment> unreadable_segments_;
+    std::vector<uint64_t> unreadable_;  // a bit a game of theirs, its version in them (none when all read)
+    uint64_t unreadable_count_ = 0;     // of those not deleted
+    std::vector<std::pair<uint32_t, uint32_t>> unknown_names_;  // the names not known, from and to
+    uint64_t unreadable_edits_ = 0;  // while segments cannot be read: the edits generation made of theirs (else 0)
     uint64_t games_      = 0;
     uint32_t names_      = 0;
     uint64_t generation_ = 0;
@@ -189,15 +240,8 @@ struct CheckProgress {
 // replayed, its signature and its key (a hash of its headers and moves) made again and compared with the stored ones.
 struct CheckReport {
     uint64_t games = 0;  // the games checked: those the database reads (not deleted), in their last versions
-    // A segment that cannot be read again: its games' number, why, the file it was imported from.
-    struct BadSegment {
-        std::string name;
-        GameId first   = 0;
-        uint64_t games = 0;
-        bool versions  = false;
-        std::string error;
-        std::string source;
-    };
+    // The segments that cannot be read again.
+    using BadSegment = fcg::study::BadSegment;
     std::vector<BadSegment> segments;
     // The games read differently from how they were written, by number (those of the segments above included),
     // sorted, with the file each was imported from.
@@ -208,6 +252,11 @@ struct CheckReport {
     bool cancelled  = false;
     double seconds  = 0;
 };
+
+// What the database found when it was opened, as a check says it: the segments that could not be read
+// (Snapshot::unreadable()) and their games, damaged, with the files they were imported from; nothing when every
+// segment read. Nothing is read again.
+[[nodiscard]] CheckReport unreadableReport(const Snapshot& snapshot);
 
 // What compacting would give back: the games deleted, the versions replaced, and the bytes they hold.
 struct CompactPlan {
@@ -299,7 +348,19 @@ class Database {
     // Whether undoCompaction() can put the files before the compaction back: nothing committed since.
     [[nodiscard]] bool compactionUndoable() const;
     bool undoCompaction();
-    // The files a compaction left (those it replaced): removed when the database is closed.
+
+    // The segments that cannot be read (Snapshot::unreadable()) written again, in one commit, as games set aside: each
+    // game keeps its number, deleted and emptied; the names a segment brought are kept when its names.bin reads, else
+    // they stay unknown (read as "?"). The games `damaged` (a check's, in segments that read) are set aside in the
+    // same commit. The damaged files are kept until the database is closed: undoKeepReadable() puts them back while
+    // nothing else was committed. Gives the games set aside. Throws std::runtime_error when read-only, or when the
+    // disk refuses (nothing changed then).
+    uint64_t keepReadable(std::span<const GameId> damaged = {});
+    [[nodiscard]] bool keepReadableUndoable() const;
+    bool undoKeepReadable();
+
+    // The files a compaction left (those it replaced), and those keepReadable() did: removed when the database is
+    // closed.
     ~Database();
     Database(const Database&)            = delete;
     Database& operator=(const Database&) = delete;
@@ -308,7 +369,9 @@ class Database {
     Database(const std::filesystem::path& dir, bool read_only);  // use openReadOnly()
 
    private:
-    void load(bool clean = true);  // `clean`: what a commit cut short left removed (and what a compaction left)
+    // `clean`: what a commit cut short left removed (and what a compaction left). `tries`: read-only, the times it
+    // reads again a manifest the other program replaced as a segment it named could not be read.
+    void load(bool clean = true, int tries = 4);
     uint32_t nameId(const std::string& name, std::vector<std::string>& added);
     // Writes `games` in new segments (of versions when `versions`) and commits them with the edits `replaced` and
     // `deleted` (the snapshot's own when null) and the table of names `players` (the snapshot's when null), in one
@@ -316,7 +379,7 @@ class Database {
     void commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
                 const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
                 const PlayerTable* players = nullptr, const std::string& source = {});
-    void dropCompactionLeftovers();
+    void dropLeftovers();  // a compaction's files and keepReadable()'s, at closing
 
     std::filesystem::path dir_;
     std::optional<tour::FolderLock> lock_;  // none when read-only
@@ -339,6 +402,8 @@ class Database {
         std::vector<std::string> new_files;  // those it wrote, removed when it is undone
     };
     std::optional<Leftovers> leftovers_;
+    std::optional<Leftovers> kept_;     // keepReadable()'s, as a compaction's
+    std::vector<std::string> dropped_;  // the files of a keepReadable() before it, no longer undone: removed at closing
 };
 
 struct DatabaseImport {

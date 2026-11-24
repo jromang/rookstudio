@@ -44,7 +44,27 @@ struct DatabaseFacts {
     bool read_only = false;  // another program writes to it: read as it commits, nothing written here
     std::time_t changed = 0;      // its last commit (an import, a game saved), from its manifest; 0 when not known
     std::string error;            // why it could not be opened
+    // The games of its segments that could not be read when it was opened (#97): left out of `games`, its
+    // maintenance's check says what to do with them.
+    uint64_t unreadable = 0;
 };
+
+// What the maintenance's check says of a database's damage (mockup M13, board 1): the segments that cannot be read,
+// by their numbers; how many damaged games they hold, and the segments that read; the files they were imported from,
+// those still there to be imported again.
+struct DamageSummary {
+    struct Segment {
+        std::string number;       // "7" for seg-000007
+        std::string why;          // the store's reason, without the database's folder
+        bool names_lost = false;  // the names it brought read "?"
+    };
+    std::vector<Segment> segments;
+    uint64_t in_segments = 0;                               // the damaged games of those segments
+    uint64_t elsewhere   = 0;                               // those of the segments that read
+    std::vector<std::pair<std::string, uint64_t>> sources;  // a file (empty: not known) and its damaged games
+    std::vector<std::filesystem::path> files;               // those files still there
+};
+[[nodiscard]] DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot);
 
 // The quick filter of a game list, its words typed freely: a year (2024), an ECO code or its start (B90, B9, B), a
 // result (1-0, 0-1, 1/2 or ½) are told apart, the other words are looked for in the players, the event and the site.

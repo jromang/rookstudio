@@ -336,12 +336,36 @@ void App::startCareRestore(std::size_t index, Care::Undo undo, bool crosstable) 
     job->started    = std::chrono::steady_clock::now();
     job->said       = trf("Undone: {}.", undo.what);
     job->crosstable = crosstable;
+    job->kept       = undo.kept;
     CareJob* j      = job.get();
-    j->done      = std::async(std::launch::async, [db, j, undo = std::move(undo)]() mutable {
+    // Keep what can be read is undone while nothing else was written to the database (#97).
+    std::string refused = undo.kept ? TR("something was written to the database since") : "";
+    j->done   = std::async(std::launch::async, [db, j, undo = std::move(undo), refused = std::move(refused)]() mutable {
         study::enterBackground();
         try {
+            if (undo.kept && !db->undoKeepReadable()) j->error = refused;
             if (!undo.states.empty()) db->restore(undo.states);
             if (undo.players) db->setPlayers(std::move(*undo.players));
+        } catch (const std::exception& e) {
+            j->error = e.what();
+        }
+    });
+    care_job_ = std::move(job);
+}
+
+void App::startCareKeep(std::size_t index, std::vector<study::GameId> damaged) {
+    if (care_job_) return;
+    const auto db = shelf().open(index);
+    if (!db || db->readOnly()) return;
+    auto job     = std::make_unique<CareJob>();
+    job->kind    = CareJob::Kind::Keep;
+    job->folder  = shelf().entries()[index].folder;
+    job->started = std::chrono::steady_clock::now();
+    CareJob* j   = job.get();
+    j->done      = std::async(std::launch::async, [db, j, damaged = std::move(damaged)] {
+        study::enterBackground();
+        try {
+            j->set_aside = db->keepReadable(damaged);
         } catch (const std::exception& e) {
             j->error = e.what();
         }
@@ -378,6 +402,25 @@ void App::pollCare() {
                 care_->check   = std::move(job->check);
                 care_->checked = std::time(nullptr);
             }
+            break;
+        case CareJob::Kind::Keep:
+            if (here) {
+                if (!job->error.empty()) {
+                    care_->error = trf("Not done: {}.", job->error);
+                    break;
+                }
+                Care::Undo undo;
+                undo.what = trn("{} damaged game set aside", "{} damaged games set aside", job->set_aside,
+                                ui::exactCount(job->set_aside));
+                undo.kept = true;
+                care_->undo.push_back(std::move(undo));
+                care_->said = trn("{} damaged game set aside, its number kept. Ctrl+Z undoes.",
+                                  "{} damaged games set aside, their numbers kept. Ctrl+Z undoes.", job->set_aside,
+                                  ui::exactCount(job->set_aside));
+                care_->error.clear();
+                care_->check.reset();
+            }
+            if (job->error.empty() && index < shelf().entries().size()) shelf().rebuildTree(index);
             break;
         case CareJob::Kind::Compact:
             if (here) {
@@ -419,6 +462,7 @@ void App::pollCare() {
                 if (job->undo) care_->undo.push_back(std::move(*job->undo));
                 care_->said = job->said;
                 care_->error.clear();
+                if (job->kept) care_->check.reset();  // the damaged segments back: said again as when opened
             }
             // Merges and undoings change games: the opening tree is built again; the table of names changes none.
             if (job->kind != CareJob::Kind::Players && index < shelf().entries().size()) shelf().rebuildTree(index);
@@ -1409,6 +1453,12 @@ void App::drawCareChecks(std::size_t index) {
                         TR("Every segment read again from the disk, every game replayed, its signature and its key "
                            "made again and compared; the opening tree compared with the games. In the "
                            "background, the database readable all along."));
+    // A segment that could not be read when the database was opened (M13, board 1, #97): said at once, as a check
+    // would say it.
+    if (!c.check && !snap->unreadable().empty()) {
+        c.check   = study::unreadableReport(*snap);
+        c.checked = std::time(nullptr);
+    }
     if (c.check) {
         const auto& r = *c.check;
         char when[16] = {};
@@ -1436,39 +1486,57 @@ void App::drawCareChecks(std::size_t index) {
             }
         } else {
             // A segment that cannot be read again, damaged games (M13, board 1, errors).
-            for (const auto& bad : r.segments) {
+            const auto summary = damageSummary(r, *snap);
+            for (const auto& bad : summary.segments) {
                 ui::inlineIcon(ui::Icon::Alert, ui::WARN);
                 ImGui::SameLine();
                 ImGui::TextColored(
                     ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                    trf("Segment {} cannot be read again: a block changed on the disk.", bad.name).c_str());
-                if (ImGui::IsItemHovered()) {
-                    // The reason as the store gives it, without the folder's path.
-                    const auto colon = bad.error.rfind(": ");
-                    ImGui::SetTooltip(
-                        "%s", colon == std::string::npos ? bad.error.c_str() : bad.error.substr(colon + 2).c_str());
-                }
+                    trf("Segment {} cannot be read again: a block changed on the disk.", bad.number).c_str());
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", bad.why.c_str());  // the store's reason
+                if (bad.names_lost)
+                    ImGui::TextDisabled("%s", TR("The players, events and sites first imported with it are lost too: "
+                                                 "other games show “?” in their place."));
             }
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trn("{} game reads differently from how it was written.",
-                                   "{} games read differently from how they were written.", r.damaged.size(),
-                                   ui::exactCount(r.damaged.size()))
-                                   .c_str());
-            ImGui::TextDisabled("%s", trf("The other games are sound. Checked at {}.", when).c_str());
-            std::vector<std::string> files;
-            for (const auto& [source, n] : r.damaged_sources) {
+            if (!summary.segments.empty() && summary.elsewhere == 0) {
+                // The board's message: the other segments work.
+                if (summary.in_segments > 0)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                                       trn("The other segments work. {} game cannot be read.",
+                                           "The other segments work. {} games cannot be read.", summary.in_segments,
+                                           ui::exactCount(summary.in_segments))
+                                           .c_str());
+            } else {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                                   trn("{} game reads differently from how it was written.",
+                                       "{} games read differently from how they were written.", r.damaged.size(),
+                                       ui::exactCount(r.damaged.size()))
+                                       .c_str());
+                ImGui::TextDisabled("%s", trf("The other games are sound. Checked at {}.", when).c_str());
+            }
+            for (const auto& [source, n] : summary.sources) {
+                const std::filesystem::path file(std::u8string(source.begin(), source.end()));
+                const auto name = file.filename().u8string();
                 ImGui::BulletText(
                     "%s", (source.empty() ? trn("{} game of a source not known", "{} games of a source not known", n,
                                                 ui::exactCount(n))
                                           : trn("{} game imported from {}", "{} games imported from {}", n,
-                                                ui::exactCount(n), std::filesystem::path(source).filename().string()))
+                                                ui::exactCount(n), std::string(name.begin(), name.end())))
                               .c_str());
-                std::error_code ec;
-                if (!source.empty() && std::filesystem::is_regular_file(std::filesystem::path(source), ec))
-                    files.push_back(source);
             }
+            // A segment that cannot be read is written again (#97); damaged games of the others are set aside alone.
+            const bool rewrite = !snap->unreadable().empty();
             ImGui::BeginDisabled(!idle);
-            if (ImGui::Button(TR("Keep what can be read"))) {
+            const bool keep = ImGui::Button(TR("Keep what can be read"));
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", rewrite ? TR("The games that cannot be read set aside (deleted), their numbers "
+                                                     "kept, and their segment written again; undone until RookStudio "
+                                                     "closes.")
+                                                : TR("The damaged games deleted, the others kept; Ctrl+Z brings them "
+                                                     "back."));
+            if (keep && rewrite) {
+                startCareKeep(index, r.damaged);  // in the background: it writes the segment again
+            } else if (keep) {
                 // The damaged games set aside, deleted (Ctrl+Z brings them back); a compaction writes their segments
                 // again.
                 Care::Undo undo;
@@ -1491,10 +1559,9 @@ void App::drawCareChecks(std::size_t index) {
                 ImGui::EndChild();
                 return;
             }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("%s", TR("The damaged games deleted, the others kept; Ctrl+Z brings them back."));
-            for (const auto& file : files) {
-                const auto label = trf("Import their file again ({})", std::filesystem::path(file).filename().string());
+            for (const auto& file : summary.files) {
+                const auto name  = file.filename().u8string();
+                const auto label = trf("Import their file again ({})", std::string(name.begin(), name.end()));
                 ui::sameLineOrWrap(label.c_str());
                 if (ImGui::Button(label.c_str())) {
                     std::vector<uint64_t> keys;
@@ -1502,7 +1569,7 @@ void App::drawCareChecks(std::size_t index) {
                     std::sort(keys.begin(), keys.end());
                     db_selected_ = static_cast<int>(index);
                     care_.reset();
-                    importIntoDatabase(static_cast<int>(index), std::filesystem::path(file), false, std::move(keys));
+                    importIntoDatabase(static_cast<int>(index), file, false, std::move(keys));
                     ImGui::EndDisabled();
                     ImGui::PopTextWrapPos();
                     ImGui::EndChild();
@@ -1511,6 +1578,26 @@ void App::drawCareChecks(std::size_t index) {
             }
             ImGui::EndDisabled();
         }
+    }
+    // Keep what can be read of a segment that could not be read (#97): undone until RookStudio closes, as long as
+    // nothing else is written to the database.
+    if (db->keepReadableUndoable()) {
+        ImGui::TextUnformatted(
+            TR("What could be read is kept. The damaged files stay until RookStudio closes: until "
+               "then, “Undo” puts them back."));
+        ImGui::BeginDisabled(!idle);
+        if (ImGui::Button(TR("Undo"))) {
+            if (db->undoKeepReadable()) {
+                const auto games = db->snapshot()->unreadableGames();
+                c.said = trf("Undone: {}.", trn("{} damaged game set aside", "{} damaged games set aside", games,
+                                                ui::exactCount(games)));
+                std::erase_if(c.undo, [](const Care::Undo& u) { return u.kept; });
+                c.check.reset();  // said again as when the database was opened
+                c.error.clear();
+                s.rebuildTree(index);
+            }
+        }
+        ImGui::EndDisabled();
     }
     ImGui::BeginDisabled(!idle);
     const bool keys  = !ImGui::GetIO().WantTextInput && idle;
@@ -1553,7 +1640,11 @@ void App::drawCareChecks(std::size_t index) {
         }));
     }
     const auto plan = c.plan.value_or(study::CompactPlan{});
-    if (db->compactionUndoable()) {
+    if (!snap->unreadable().empty()) {
+        // Its segments are copied: one that cannot be read is dealt with first (#97).
+        ImGui::TextDisabled("%s", TR("Compacting waits until the segment that cannot be read is dealt with: “Keep "
+                                     "what can be read” first."));
+    } else if (db->compactionUndoable()) {
         ImGui::TextUnformatted(
             TR("Compacted: the old files are kept until RookStudio closes, the room given back "
                "then."));
@@ -1683,6 +1774,22 @@ void App::drawCareHomeNotice() {
             ImGui::SameLine();
             if (ImGui::SmallButton(TR("See them##damaged"))) openCare(static_cast<int>(index), CarePart::Checks);
         }
+    }
+    // The games of a segment that could not be read when a database was opened (#97), told as those of a check.
+    auto& s = shelf();
+    for (std::size_t i = 0; i < s.entries().size(); ++i) {
+        if (s.entries()[i].source || (care_ && care_->check && care_->folder == s.entries()[i].folder)) continue;
+        const auto facts = s.facts(i);
+        if (facts.unreadable == 0) continue;
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           trn("“{}”: {} damaged game", "“{}”: {} damaged games", facts.unreadable, s.entries()[i].name,
+                               ui::exactCount(facts.unreadable))
+                               .c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("See them##damaged"))) openCare(static_cast<int>(i), CarePart::Checks);
+        ImGui::PopID();
     }
 }
 

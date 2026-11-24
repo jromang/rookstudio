@@ -186,7 +186,9 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
 
     std::vector<std::vector<GameId>> parts(static_cast<std::size_t>(threads));
     const bool hide_deleted = !filter.with_deleted && snapshot->deletedCount() > 0;
-    const bool everything   = filter.empty() && !hide_deleted;
+    // The games of a segment that cannot be read are no game to show, the deleted ones shown or not.
+    const bool unreadable = !snapshot->unreadable().empty();
+    const bool everything = filter.empty() && !hide_deleted && !unreadable;
     parallel(n, threads, [&](std::size_t from, std::size_t to, std::size_t part) {
         auto& out = parts[part];
         if (everything) {
@@ -197,6 +199,7 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
         for (std::size_t id = from; id < to; ++id) {
             if ((id & 0xFFFF) == 0 && cancel && cancel->load(std::memory_order_relaxed)) return;
             if (hide_deleted && snapshot->deleted(id)) continue;
+            if (unreadable && !snapshot->readable(id)) continue;
             const auto row = snapshot->numbers(id);
             if (filter.result && row.result != filter.result) continue;
             if (filter.annotated && !(row.flags & GAME_ANNOTATED)) continue;

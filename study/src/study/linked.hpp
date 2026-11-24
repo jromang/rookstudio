@@ -33,8 +33,9 @@ struct LinkedRefresh {
 
 class LinkedDatabase {
    public:
-    // The database of `source` in `cache` (a folder of the program's), made when it is not there yet; refresh() fills
-    // it. Throws std::runtime_error when the cache cannot hold it, tour::FolderBusy when another program writes it.
+    // The database of `source` in `cache` (a folder of the program's), made when it is not there yet, or again when a
+    // segment of it no longer reads; refresh() fills it. Throws std::runtime_error when the cache cannot hold it,
+    // tour::FolderBusy when another program writes it.
     static std::shared_ptr<LinkedDatabase> open(const std::filesystem::path& cache, const LinkedSource& source);
 
     // Brings the database up to date with its source, as above. A cancel keeps what was committed; a refusal of the

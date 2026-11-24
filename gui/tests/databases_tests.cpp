@@ -1,5 +1,6 @@
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -223,4 +224,104 @@ TEST_CASE("databases: an archive's wrong password, a file that is no text: nothi
     CHECK(report->added == 0);
     CHECK(report->read.games == 0);
     CHECK(report->read.error == "games.pgn is not a PGN file: its bytes are not text");
+}
+
+namespace {
+
+// `count` games numbered from `from`, each its own, in `file`.
+fs::path numberedGames(const fs::path& file, int from, int count) {
+    std::ofstream out(file, std::ios::binary);
+    const char* replies[] = {"e5", "c5", "e6", "c6", "d6", "g6", "Nf6", "d5"};
+    for (int i = from; i < from + count; ++i) {
+        out << "[Event \"Club\"]\n[Round \"" << i << "\"]\n[White \"A" << i << "\"]\n[Black \"B" << i
+            << "\"]\n[Result \"1-0\"]\n\n1. e4 " << replies[i % 8] << " 2. Nf3 1-0\n\n";
+    }
+    return file;
+}
+
+}  // namespace
+
+TEST_CASE("databases: a database whose segment no longer reads opens with the others; what its maintenance says") {
+    const auto profile = freshDir("shelf-damaged");
+    const auto second  = numberedGames(profile / "second.pgn", 10, 10);
+    fs::path folder;
+    std::string segment;
+    {
+        DatabaseShelf shelf(profile);
+        const auto index = shelf.create("Club 2026");  // a folder whose name holds a space
+        for (const auto& file :
+             {numberedGames(profile / "first.pgn", 0, 10), second, numberedGames(profile / "third.pgn", 20, 10)}) {
+            REQUIRE(shelf.startImport(index, file));
+            const auto report = imported(shelf);
+            REQUIRE(report);
+            REQUIRE(report->added == 10);
+        }
+        folder        = shelf.entries()[index].folder;
+        const auto db = shelf.open(index);
+        REQUIRE(db->snapshot()->segmentInfos().size() == 3);
+        segment = db->snapshot()->segmentInfos()[1].name;
+    }
+    // Damaged while RookStudio was closed: it opens with its other segments, the damaged games told apart.
+    REQUIRE(fs::remove(folder / segment / "moves.bin"));
+    DatabaseShelf shelf(profile);
+    auto facts = shelf.facts(0);
+    CHECK(facts.error.empty());
+    CHECK(facts.games == 20);
+    CHECK(facts.unreadable == 10);
+    CHECK_FALSE(facts.read_only);
+    const auto db = shelf.open(0);
+    REQUIRE(db);
+    // Its opening tree held the damaged games: built again without them, in the background.
+    REQUIRE(shelf.treeSource(0));
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    while (!shelf.pollTreeJob() && std::chrono::steady_clock::now() < give_up)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(shelf.facts(0).tree);
+
+    // What the maintenance's check says at once: segment 2, its ten games and their file, still there.
+    const auto snap    = db->snapshot();
+    const auto report  = study::unreadableReport(*snap);
+    const auto summary = damageSummary(report, *snap);
+    REQUIRE(summary.segments.size() == 1);
+    CHECK(summary.segments[0].number == "2");
+    CHECK(summary.segments[0].why == "cannot open moves.bin");
+    CHECK_FALSE(summary.segments[0].names_lost);
+    CHECK(summary.in_segments == 10);
+    CHECK(summary.elsewhere == 0);
+    REQUIRE(summary.sources.size() == 1);
+    CHECK(summary.sources[0].second == 10);
+    REQUIRE(summary.files.size() == 1);
+    CHECK(fs::equivalent(summary.files[0], second));
+
+    // Import their file again: they come back; Keep what can be read: the database sound, nothing more to say.
+    std::vector<uint64_t> forget;
+    for (const auto id : report.damaged) forget.push_back(snap->key(id));
+    std::sort(forget.begin(), forget.end());
+    REQUIRE(shelf.startImport(0, summary.files[0], {}, forget));
+    const auto again = imported(shelf);
+    REQUIRE(again);
+    CHECK(again->added == 10);
+    CHECK(shelf.facts(0).games == 30);
+    CHECK(db->keepReadable(report.damaged) == 10);
+    facts = shelf.facts(0);
+    CHECK(facts.unreadable == 0);
+    CHECK(facts.games == 30);
+    CHECK(damageSummary(study::unreadableReport(*db->snapshot()), *db->snapshot()).segments.empty());
+
+    // A check's report: a segment whose names are lost, and a damaged game of a segment that reads.
+    study::CheckReport checked;
+    checked.segments.push_back({"seg-000012", 10, 10, false, "/a/b c.fcgdb/seg-000012: damaged names", "", false});
+    checked.segments.push_back(
+        {"seg-000013", 0, 1, true, "cannot open C:\\Bases\\Club 2026.fcgdb\\seg-000013\\sig.bin", "", true});
+    checked.damaged  = {12, 25};
+    const auto mixed = damageSummary(checked, *db->snapshot());
+    REQUIRE(mixed.segments.size() == 2);
+    CHECK(mixed.segments[0].number == "12");
+    CHECK(mixed.segments[0].why == "damaged names");
+    CHECK(mixed.segments[0].names_lost);
+    CHECK(mixed.segments[1].number == "13");
+    CHECK(mixed.segments[1].why == "cannot open sig.bin");
+    CHECK_FALSE(mixed.segments[1].names_lost);
+    CHECK(mixed.in_segments == 1);
+    CHECK(mixed.elsewhere == 1);
 }

@@ -113,6 +113,7 @@ const std::vector<const char*>& allTopics() {
                                               FirstStart,
                                               StudyBoard,
                                               SideBySide,
+                                              PracticalMoves,
                                               Notation,
                                               Marks,
                                               Headers,

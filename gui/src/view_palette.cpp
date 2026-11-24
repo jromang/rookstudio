@@ -938,6 +938,14 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
     }
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
+    // The practical moves against a human of a level (#94), in the Analysis tab.
+    add(board_.settings.practical ? TR("Practical moves: off") : TR("Practical moves against a human of a level"),
+        TR("Board"), [this] {
+            toStudyBoard();
+            board_side_tab_           = 1;
+            board_.settings.practical = !board_.settings.practical;
+            saveBoardSettings();
+        });
     // The tables' verdict and each move by its outcome (#42).
     add(TR("Endgames: what the tables say of the position"), "Alt+6", [this] {
         toStudyBoard();

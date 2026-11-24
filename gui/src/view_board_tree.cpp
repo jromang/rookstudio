@@ -563,6 +563,7 @@ void App::drawChessTabs() {
         case 1: {
             drawBoardOnline();  // Lichess's tables and cloud, when the user has chosen them (M4, board 5)
             drawSideBySide();   // up to four engines side by side (#78, M11 board 3)
+            drawPractical();    // the practical moves against a human of a level (#94)
             const float graph = boardGraphHeight();
             drawBoardGraph(std::max(graph, ImGui::GetContentRegionAvail().y));
             break;

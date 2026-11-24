@@ -88,6 +88,7 @@
 #include "opening_suite.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
+#include "practical.hpp"
 #include "profiles.hpp"
 #include "publish_game.hpp"
 #include "publish_gif.hpp"
@@ -1717,6 +1718,44 @@ class App {
     // Several engines side by side in the study Board's Analysis tab (#78, mockup M11, board 3;
     // view_board_engines.cpp): each a card with its colour, its arrow on the board, the threads shared between them.
     void drawSideBySide();
+    // Practical moves (#94, mockup M13, board 7, point 17), under the engines in the Analysis tab: "Against a human of
+    // 1500, rapid" (practical.hpp). The level's games at the positions asked (the board's, then along the practical
+    // move's line), by "FEN|level|speed|source": Lichess's explorer with a linked account, else the databases filtered
+    // by rating, one question at a time; an engine of its own (one thread) counts the opponent's replies after each
+    // candidate when no games are known, and judges the level's most played reply.
+    struct PracticalState {
+        std::map<std::string, std::vector<LevelMove>> level;
+        std::set<std::string> level_failed;
+        std::future<std::vector<LevelMove>> db_job;
+        std::future<lichess::Answer<lichess::Explorer>> explorer_job;
+        std::string job_key;
+        std::string error;  // why the explorer gave nothing
+        std::unique_ptr<Analyser> engine;
+        std::string engine_name;
+        std::string
+            task;  // what the engine searches now: "replies|FEN after the candidate", "judge|FEN after the reply"
+        std::map<std::string, std::pair<int, int>>
+            holding;  // by the FEN after a candidate: replies holding, of how many
+        struct Judged {
+            std::string best;  // the engine's answer to the reply (UCI)
+            int score_cp = 0;  // the position after the reply, for the side that answers
+        };
+        std::map<std::string, Judged> judged;  // by the FEN after the level's reply
+        std::string seen;                      // the board's position, and since when: stepping through asks nothing
+        double since = 0;
+    };
+    PracticalState practical_;
+    // The arrows of the practical moves, while their card shows (a frame ago at most): the engine's best and the
+    // practical move, on the position they are for.
+    struct PracticalArrows {
+        uint64_t position = 0;
+        int frame         = 0;
+        std::string best, practical;
+    };
+    std::optional<PracticalArrows> practical_arrows_;
+    void drawPractical();
+    // The level's games at `board` for the practical moves: kept, or asked (one question at a time) once `ask`.
+    [[nodiscard]] const std::vector<LevelMove>* practicalLevelAt(const chess::Board& board, bool ask);
     struct SideGesture {  // asked of an engine's card, done once the cards are drawn
         std::optional<std::pair<std::size_t, std::size_t>> move;  // from, to (made first: to 0)
         std::optional<std::size_t> remove;

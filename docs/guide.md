@@ -1079,6 +1079,26 @@ While one of your games is played on Lichess, every engine stops at once, and th
 processes. Every gesture of the tab is in the command palette (Ctrl+K): an engine added, made first or removed, its
 settings, the analysis's threads.
 
+### Practical moves
+
+Under the engines, *Against a human of 1500, rapid* (the level and the speed kept from one time to the next) looks for
+the practical move: among the moves the first engine puts within 0.3 pawn of its best (or, once the tables know the
+position, those that keep their verdict), the one that scores best against a player of that level, in the games of that
+level. With a linked Lichess account, the games are those of Lichess's explorer at the level's rating group and speed
+(*Lichess 1400–1600, rapid*); without one, those of your databases whose players' average rating is in the level's band,
+whatever their speed. A move's score counts from 200 games at the level; outside known games, the practical move is the
+one that leaves the opponent the fewest good replies, by the engine: an engine of its own, on one thread, searches each
+candidate's replies, and the table says how many hold (*2 of 31*). Never a losing move.
+
+The table gives each candidate, its evaluation by the engine (White's), its score against that level and its games
+there, the engine's best marked *best* and the practical move *practical*; on the board, the practical move is the blue
+arrow, the engine's best the grey one. A sentence sums it up, held to the figures: *The practical move: 4.Ng5 — 0.13
+from the engine's best, and 58 % expected at this level.* When the games show it, it goes on with the level's most
+played reply along the line and what punishes it, the engine's answer to it: *After 4…d5 5.exd5, the most played reply
+at 1500 is 5…Nxd5? (46 % for Black), which 6.Nxf7 punishes.* The practical moves need the analysis running (Alt+A).
+What leaves the machine: with a linked account, the position and the level, to Lichess's explorer; without one,
+nothing. Locked with the Analysis tab while one of your games is played on Lichess.
+
 ### Notation
 
 The notation is written in place, without a dialog:

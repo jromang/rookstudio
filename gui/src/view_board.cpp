@@ -2117,7 +2117,17 @@ void App::drawBoardColumn(float size) {
             }
         }
     }
-    if (side_by_side && b.settings.arrows) {
+    // The practical moves while their card shows (#94): the engine's best in grey, the practical move in blue, in place
+    // of the engines' arrows.
+    const bool practical = aids && chessBoard() && practical_arrows_ && practical_arrows_->position == board.hash() &&
+                           practical_arrows_->frame >= ImGui::GetFrameCount() - 1;
+    if (practical) {
+        const auto best = legalPrefix(board, {practical_arrows_->best}, 1);
+        const auto move = legalPrefix(board, {practical_arrows_->practical}, 1);
+        if (!best.empty() && practical_arrows_->best != practical_arrows_->practical)
+            decor.arrows.push_back({best.front(), IM_COL32(110, 116, 128, 180)});
+        if (!move.empty()) decor.arrows.push_back({move.front(), IM_COL32(47, 111, 222, 210)});
+    } else if (side_by_side && b.settings.arrows) {
         decor.arrows.insert(decor.arrows.end(), side_arrows.begin(), side_arrows.end());
     } else if (fresh && b.settings.arrows) {
         // The first move of each line, the best on top.

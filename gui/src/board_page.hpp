@@ -78,11 +78,15 @@ struct BoardSettings {
     // Beside each move of a tournament's game in the study Board's notation (#87, mockup M12, board 8): 0 its engine's
     // evaluation and depth, 1 and its time, 2 nothing (EngineTags).
     int engine_tags = 0;
+    // The Analysis tab's practical moves (#94): on, against a human of this level (practical.hpp), at this speed.
+    bool practical              = false;
+    int practical_level         = 1500;
+    std::string practical_speed = "rapid";
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BoardSettings, analysis, first_threads, side_engines, arrows,
                                                 review_ceiling_ms, game_first, game_second, first_clock, second_clock,
                                                 same_clock, game_pair, game_human, graph, ask_new_move, save_database,
-                                                engine_tags)
+                                                engine_tags, practical, practical_level, practical_speed)
 
 // The analysis's engines in their order (#78): the first from `analysis` (none while it names no engine) and
 // first_threads, then side_engines; each engine once, MAX_SIDE_ENGINES at most.

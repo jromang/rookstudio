@@ -206,6 +206,23 @@ std::vector<Span> roundSpans(uint32_t players, std::span<const CrossGame> games)
     return spans;
 }
 
+// The games a Swiss of `rounds` rounds expects: in each round, half its players between their first game and their
+// last, less those a result set by hand puts alone in that round (a bye, a late join, an absence).
+uint32_t swissExpected(uint32_t players, std::span<const CrossGame> games, int rounds,
+                       const std::set<std::pair<uint32_t, int>>& alone = {}) {
+    const auto spans  = roundSpans(players, games);
+    uint32_t expected = 0;
+    for (int r = 1; r <= rounds; ++r) {
+        uint32_t active = 0;
+        for (uint32_t p = 0; p < players; ++p) {
+            const auto& sp = spans[p];
+            if (sp.first > 0 && sp.first <= r && r <= sp.last && !alone.contains({p, r})) ++active;
+        }
+        expected += active / 2;
+    }
+    return expected;
+}
+
 }  // namespace
 
 TournamentShape tournamentShape(uint32_t players, std::span<const CrossGame> games, const CrossOptions& options) {
@@ -291,18 +308,10 @@ TournamentShape tournamentShape(uint32_t players, std::span<const CrossGame> gam
     if (s.system.system == TournamentSystem::RoundRobin) {
         s.expected = static_cast<uint32_t>(static_cast<uint64_t>(s.system.cycles) * pairs);
     } else if (s.system.system == TournamentSystem::Swiss) {
-        if (s.rounds == 0) {
+        if (s.rounds == 0)
             s.expected = s.games;
-        } else {
-            const auto spans = roundSpans(players, games);
-            for (int r = 1; r <= s.rounds; ++r) {
-                uint32_t active = 0;
-                for (const auto& sp : spans)
-                    if (sp.first > 0 && sp.first <= r && r <= sp.last) ++active;
-                s.expected += active / 2;
-            }
-            s.expected = std::max(s.expected, s.games);
-        }
+        else
+            s.expected = std::max(swissExpected(players, games, s.rounds), s.games);
     }
     return s;
 }
@@ -489,7 +498,13 @@ Crosstable makeCrosstable(std::vector<CrossPlayer> players, std::vector<CrossGam
         }
     }
 
-    t.shape  = tournamentShape(n, t.games, options);
+    t.shape = tournamentShape(n, t.games, options);
+    // A Swiss's player alone in a round by a result set by hand (a bye, an absence) leaves no game to expect there.
+    if (t.shape.system.system == TournamentSystem::Swiss && t.shape.rounds > 0 && !alone_points.empty()) {
+        std::set<std::pair<uint32_t, int>> alone;
+        for (const auto& [key, points] : alone_points) alone.insert(key);
+        t.shape.expected = std::max(swissExpected(n, t.games, t.shape.rounds, alone), t.shape.games);
+    }
     t.chosen = options.system.has_value();
     t.system = options.system.value_or(t.shape.system);
     if (t.system.cycles < 1) t.system.cycles = 1;

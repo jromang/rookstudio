@@ -454,7 +454,8 @@ void App::drawTournamentList(std::size_t database) {
                 ImGui::TableNextColumn();
                 if (e.mean_elo > 0) ImGui::Text("%d", e.mean_elo);
                 ImGui::TableNextColumn();
-                if (e.shape.expected > e.shape.games) {
+                // A Swiss kept from Lichess (#95): its rounds without a game are its TRF file's, none missing.
+                if (e.shape.expected > e.shape.games && settings.hand_from != "lichess-trf") {
                     ImGui::TextColored(
                         ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                         trf("{} of {}", ui::exactCount(e.shape.games), ui::exactCount(e.shape.expected)).c_str());
@@ -822,6 +823,8 @@ App::CrossClicks App::drawCrossTable(const study::Crosstable& table, bool all, b
         if (accent && e.opponent != study::NO_PLAYER && shown.count(e.opponent)) return ui::ACCENT;
         return std::nullopt;
     };
+    // The results set by hand of a Swiss kept from Lichess come from its TRF file (#95).
+    const bool from_trf = !live && crosstable_ && crosstable_->settings.hand_from == "lichess-trf";
     const auto entryTip = [&](const study::CrossRow& row, const study::CrossEntry& e) {
         using K          = study::CellKind;
         const auto round = e.round > 0 ? trf("Round {}", e.round) : std::string(TR("Round not known"));
@@ -838,7 +841,7 @@ App::CrossClicks App::drawCrossTable(const study::Crosstable& table, bool all, b
                                      e.points > 0.75   ? TR("won")
                                      : e.points > 0.25 ? TR("a draw")
                                                        : TR("lost"));
-                if (e.hand) text = trf("{} (set by hand)", text);
+                if (e.hand) text = from_trf ? trf("{} (from Lichess's TRF file)", text) : trf("{} (set by hand)", text);
                 break;
             case K::Forfeit:
                 text = e.points > 0.5 ? trf("{}: won by forfeit against {} (in the points, not in the performance nor "
@@ -857,8 +860,9 @@ App::CrossClicks App::drawCrossTable(const study::Crosstable& table, bool all, b
                 text = e.unsure ? trf("{}: no game in the database (a game missing whose pairing is not known, or a "
                                       "bye); a click sets its points by hand",
                                       round)
-                       : e.hand ? trf("{}: no game, its points set by hand", round)
-                                : trf("{}: no game (a bye asked for, or not playing)", round);
+                       : e.hand && from_trf ? trf("{}: no game, its points from Lichess's TRF file", round)
+                       : e.hand             ? trf("{}: no game, its points set by hand", round)
+                                            : trf("{}: no game (a bye asked for, or not playing)", round);
                 break;
             case K::Live:
                 text = trf("{}: being played against {}; a click follows it on the board", round, who);
@@ -1295,7 +1299,22 @@ void App::drawStudyCrosstable() {
                     changed = true;
                 }
             }
-            if (changed) keepCrosstableSettings();
+            if (changed) {
+                c.settings.hand_from.clear();  // the user's now, whatever came from a file
+                keepCrosstableSettings();
+            }
+        }
+    } else if (!c.settings.hand.empty() && c.settings.hand_from == "lichess-trf") {
+        // A Swiss kept from Lichess (#95): its rounds without a game, as its TRF file gives them.
+        issueLine(ui::Icon::Pencil, ImGui::GetColorU32(ImGuiCol_Text),
+                  trn("{} result from Lichess's TRF file", "{} results from Lichess's TRF file", c.settings.hand.size(),
+                      c.settings.hand.size()),
+                  TR("Its rounds without a game (byes, late joins, absences), kept with this tournament in your "
+                     "profile; the database is unchanged."));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("Clear them"))) {
+            c.settings.hand.clear();
+            keepCrosstableSettings();
         }
     } else if (!c.settings.hand.empty()) {
         issueLine(

@@ -716,8 +716,9 @@ void App::pollLichessArenas() {
             // The rounds without a game, set by hand for the tournament's crosstable (#92).
             if (kept.error.empty() && !kept.key.empty() && !kept.hand.empty()) {
                 const auto place = crosstablePlace(s.kept_folder, kept.key);
-                auto settings    = crosstableStore().get(place);
-                settings.hand    = kept.hand;
+                auto settings      = crosstableStore().get(place);
+                settings.hand      = kept.hand;
+                settings.hand_from = "lichess-trf";  // the crosstable says where they come from
                 crosstableStore().set(place, settings);
             }
             if (kept.error.empty() && kept.index < shelf().entries().size()) shelf().rebuildTree(kept.index);
@@ -837,6 +838,7 @@ void App::drawLichessArenasCard() {
                             why += (why.empty() ? "" : "\n") + conditionText(c, a->speed) +
                                    (figure.empty() ? "" : " " + figure);
                         }
+                        if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
                         tip(why);
                         if (ImGui::IsItemClicked()) chooseArena(a->id, a->name);
                         break;
@@ -1052,38 +1054,43 @@ void App::drawTourStanding() {
                 cutText(who, ImGui::GetContentRegionAvail().x);
                 if (p.paused && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("Paused"));
                 ImGui::TableNextColumn();
-                // The sheet, the newest game first as Lichess writes it: a streak's doubled points in orange.
-                const auto sheet = lichess::readSheet(p.sheet, a.streaks);
-                ImGui::PushFont(ui::monoFont(), ImGui::GetStyle().FontSizeBase * 0.92f);
-                const float room = ImGui::GetContentRegionAvail().x;
-                float used       = 0;
-                bool first = true, cut = false;
+                // The sheet as lichess.org shows it, the oldest game first, a streak's doubled points in orange; cut
+                // on its left, its newest games kept.
+                const auto sheet  = lichess::readSheet(p.sheet, a.streaks);
+                const float room  = ImGui::GetContentRegionAvail().x;
+                const float dots  = ImGui::CalcTextSize("…").x;  // the monospaced font has no "…"
+                const float small = ImGui::GetStyle().FontSizeBase * 0.92f;
+                ImGui::PushFont(ui::monoFont(), small);
+                const float digit_w = ImGui::CalcTextSize("0").x;
+                ImGui::PopFont();
+                std::size_t from = 0;
+                if (static_cast<float>(sheet.size()) * digit_w > room) {
+                    const auto fit = static_cast<std::size_t>(std::max(0.0f, (room - dots) / digit_w));
+                    from           = sheet.size() - std::min(fit, sheet.size());
+                }
+                const bool cut = from > 0;
                 ImGui::BeginGroup();
-                for (auto it = sheet.rbegin(); it != sheet.rend(); ++it) {
-                    const auto digit = std::to_string(it->points);
-                    const float w    = ImGui::CalcTextSize(digit.c_str()).x;
-                    if (used + w > room - ImGui::CalcTextSize("…").x) {
-                        ImGui::PopFont();  // the monospaced font has no "…"
-                        ImGui::SameLine(0, 0);
-                        ImGui::TextDisabled("…");
-                        ImGui::PushFont(ui::monoFont(), ImGui::GetStyle().FontSizeBase * 0.92f);
-                        cut = true;
-                        break;
-                    }
-                    if (!first) ImGui::SameLine(0, 0);
-                    first = false;
-                    if (it->doubled)
+                if (cut) {
+                    ImGui::TextDisabled("…");
+                    ImGui::SameLine(0, 0);
+                }
+                ImGui::PushFont(ui::monoFont(), small);
+                for (std::size_t k = from; k < sheet.size(); ++k) {
+                    const auto digit = std::to_string(sheet[k].points);
+                    if (k > from) ImGui::SameLine(0, 0);
+                    if (sheet[k].doubled)
                         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", digit.c_str());
                     else
                         ImGui::TextUnformatted(digit.c_str());
-                    used += w;
                 }
+                ImGui::PopFont();
                 if (sheet.empty()) ImGui::TextDisabled("–");
                 ImGui::EndGroup();
-                ImGui::PopFont();
                 // The whole sheet when it is cut; the streak.
                 if ((cut || p.fire) && ImGui::IsItemHovered()) {
-                    std::string text = cut ? p.sheet : std::string();
+                    std::string text;
+                    if (cut)
+                        for (const auto& s : sheet) text += std::to_string(s.points);
                     if (p.fire)
                         text +=
                             (text.empty() ? "" : "\n") + std::string(TR("On a streak: the next win counts double."));
@@ -1261,11 +1268,20 @@ void App::drawPlayTournaments() {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", fmt::format("· {} · {}", clockOf(a.limit_s, a.increment_s), whenText(a)).c_str());
             ImGui::SameLine();
-            const auto offer = lichess::joinOffer(a, profile);
-            if (offer == lichess::JoinOffer::ConditionNotMet)
+            // Join, or the condition missing as the card says it: which one under the mouse, its page a click away.
+            if (lichess::joinOffer(a, profile) == lichess::JoinOffer::ConditionNotMet) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", TR("condition not met"));
-            if (offer == lichess::JoinOffer::ConditionNotMet) ImGui::SameLine();
-            if (primaryButton(TR("Join##arena_list"))) chooseArena(a.id, a.name);
+                std::string why;
+                for (const auto& c : a.conditions) {
+                    const auto figure = figureOf(c, a.speed, profile);
+                    why += (why.empty() ? "" : "\n") + conditionText(c, a.speed) + (figure.empty() ? "" : " " + figure);
+                }
+                if (ImGui::IsItemHovered()) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                tip(why);
+                if (ImGui::IsItemClicked()) chooseArena(a.id, a.name);
+            } else if (primaryButton(TR("Join##arena_list"))) {
+                chooseArena(a.id, a.name);
+            }
             ImGui::PopID();
         }
         if (shown == 0)
@@ -1444,8 +1460,11 @@ void App::drawArenaPart() {
             if (primaryButton(TR("Join##arena_play"), can && !a.join_job.valid()) ||
                 (enter && keys && can && !a.join_job.valid()))
                 joinArenaHere();
-            ImGui::SameLine();
-            ImGui::TextDisabled("%s", a.join_job.valid() ? TR("Joining…") : TR("Enter"));
+            // Enter asks for the permission first, while it is missing (its card says so).
+            if (a.join_job.valid() || keys) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", a.join_job.valid() ? TR("Joining…") : TR("Enter"));
+            }
             if (!a.error.empty()) {
                 coloured(trf("Lichess refuses: “{}”", a.error), ui::WARN);
                 if (team) {
@@ -1598,7 +1617,7 @@ void App::drawArenaGameBefore() {
         else if (a.last_doubled)
             title += " · " + std::string(TR("doubled by the streak"));
     } else if (!a.seat.isOver()) {  // the arena over, its standing is not read again
-        title += " · " + std::string(TR("its points counted…"));
+        title += " · " + std::string(TR("its points: asking Lichess…"));
     }
     coloured(title, a.last_result == "won" ? ui::GOOD : a.last_result == "draw" ? ui::ACCENT : ui::WARN);
     const auto base = lichess_account_ ? "Lichess · " + lichess_account_->username : std::string("Lichess");
@@ -1899,8 +1918,10 @@ void App::drawSwissPart() {
                 if (primaryButton(TR("Join##swiss_play"), !s.join_job.valid()) ||
                     (enter && scoped && !s.join_job.valid()))
                     joinSwissHere();
-                ImGui::SameLine();
-                ImGui::TextDisabled("%s", s.join_job.valid() ? TR("Joining…") : TR("Enter"));
+                if (s.join_job.valid() || scoped) {  // else Enter asks for the permission first
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s", s.join_job.valid() ? TR("Joining…") : TR("Enter"));
+                }
             } else {
                 ImGui::TextUnformatted(TR("You are in it."));
                 ImGui::SameLine();

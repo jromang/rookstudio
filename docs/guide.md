@@ -2431,8 +2431,9 @@ on an arena's line (see [Lichess tournaments](#lichess-tournaments)).
   points staying; *Back in the arena* (Alt+P) joins again. The arena's page is asked every 15 seconds; after a 429 (too
   many requests), its standing waits a minute and says so, your games going on.
 - **Playing**: as any game on Lichess (see [A game on Lichess](#a-game-on-lichess)), with *Berserk* where the arena
-  allows it, before your first move only (half your clock, a point more if you win). A tournament's game whose first
-  move you do not play in time is lost, not aborted, and the card says so. Under the card, the game before at its end:
+  allows it, before your first move only (half your clock, a point more if you win); Lichess allows no takeback in a
+  tournament's game, nor aborting it. A tournament's game whose first move you do not play in time is lost, not
+  aborted, and the card says so. Under the card, the game before at its end:
   *Won in 34 moves · +2 points · the streak starts*.
 - **The aids** stay locked while you are in the arena once it has started, between two games too, since the next one
   comes within seconds: the engine, the tree, the cloud, the tables, the assistant and the reports (a player's dossier,
@@ -2653,7 +2654,7 @@ game, staying on it or going on to the channel's next game, keeping it, and goin
 ### Lichess tournaments
 
 The Lichess page's card *Lichess tournaments* lists Lichess's arenas in progress and to come, read without an account:
-*Rapid*, *Classical* or *All*, each line with its name, its time control, when (*in progress · 38 min*, *in 40 min*),
+*Rapid*, *Classical* or *All*, each line with its name, its time control, when (*38 min left*, *in 40 min*),
 its players, *Follow*, and *Join* or why not: *Blitz: on lichess.org* (a click opens it), *condition not met* (under
 the mouse, which one, with your figures). The variants' arenas are not shown; the list is read again when the card
 shows, at most once a minute.
@@ -2666,8 +2667,8 @@ players, and *Join*; *Follow* while it runs; *Keep it in a database…* once it 
 *Lichess TV*: the games of its first eight in progress, as the tournament gives them, a finished game leaving its place
 to the next; Lichess shows their moves three moves late, and lets an address follow eight games at once, the rounds and
 the players you follow counted with them; each analysed by your engine, as the mosaic does. On the right, its standing,
-asked every 15 seconds: each player's rank, rating, sheet (each game's points, the newest first, a streak's doubled
-points in orange) and score; a Swiss's after its last round. A click chooses a game, a double click opens it on the
+asked every 15 seconds: each player's rank, rating, sheet (each game's points, the newest last as on lichess.org, a
+streak's doubled points in orange) and score; a Swiss's after its last round. A click chooses a game, a double click opens it on the
 Board page; your own game never shows. A Swiss does not list its games in progress: they are found by player, its
 first eight's, at each round. Without an account; nothing is kept by itself. Ctrl+K has *Lichess tournaments: arenas
 and Swiss tournaments*, *Follow the arena: …* (once the card has read the list) and the tournament followed in the

@@ -2753,19 +2753,19 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
     const bool online = online_game_ && online_game_->shown && online_game_->state.full;
     if (online) {
         const auto& player = side == chess::Color::WHITE ? online_game_->state.white : online_game_->state.black;
-        if (player.rating > 0) name += " · " + ui::exactCount(player.rating) + (player.provisional ? "?" : "");
+        if (player.rating > 0) name += " · " + std::to_string(player.rating) + (player.provisional ? "?" : "");
     }
     // The Lichess bot's game (#85): the same.
     const bool bot = !online && botShown() && bot_state_.game.full;
     if (bot) {
         const auto& player = side == chess::Color::WHITE ? bot_state_.game.white : bot_state_.game.black;
-        if (player.rating > 0) name += " · " + ui::exactCount(player.rating) + (player.provisional ? "?" : "");
+        if (player.rating > 0) name += " · " + std::to_string(player.rating) + (player.provisional ? "?" : "");
     }
     // A game followed from Lichess's TV or the followed players (#86): the ratings its PGN gives, Lichess's AI named.
     if (!online && !bot && board_broadcast_ && (board_tv_ || board_broadcast_->round == lichess::PLAYERS_MOSAIC)) {
         const auto said = tvName(name);
         const auto elo  = std::atoi(g.header(side == chess::Color::WHITE ? "WhiteElo" : "BlackElo").c_str());
-        name            = said != name || elo <= 0 ? said : name + " · " + ui::exactCount(elo);
+        name            = said != name || elo <= 0 ? said : name + " · " + std::to_string(elo);
     }
     dl->AddText(ImVec2(x, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
     dl->AddText(ImVec2(x + 0.6f, ty), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());

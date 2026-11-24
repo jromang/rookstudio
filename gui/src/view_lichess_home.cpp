@@ -129,7 +129,7 @@ void App::drawLichessAccountPanel() {
         // The rating, large; "?" while Lichess is not sure of it.
         const auto rating = s.games == 0
                                 ? std::string("—")
-                                : ui::exactCount(s.rating) + (s.provisional ? std::string("?") : std::string());
+                                : std::to_string(s.rating) + (s.provisional ? std::string("?") : std::string());
         ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.45f);
         dl->AddText(ImVec2(at.x + pad, at.y + px(24)), ImGui::GetColorU32(ImGuiCol_Text), rating.c_str());
         ImGui::PopFont();

@@ -899,7 +899,7 @@ void App::drawPlayLichess() {
             for (const auto& r : lichess_profile_->speeds)
                 if ((r.key == "rapid" || r.key == "classical" || r.key == "correspondence") && r.games > 0)
                     line +=
-                        " · " + trf("{} {}", speedName(r.key), ui::exactCount(r.rating) + (r.provisional ? "?" : ""));
+                        " · " + trf("{} {}", speedName(r.key), std::to_string(r.rating) + (r.provisional ? "?" : ""));
         ImGui::TextDisabled("%s", line.c_str());
     }
     // Its parts (#95): the games (a seek, a challenge, those in progress), the tournaments; the one shown last kept.
@@ -1103,8 +1103,7 @@ void App::drawSeekCard(bool& enter) {
         ImGui::AlignTextToFramePadding();
         if (s.seek_range > 0)
             ImGui::TextUnformatted(trf("Opponent rated from {} to {} (your rating ± {})",
-                                       ui::exactCount(std::max(600, *rating - s.seek_range)),
-                                       ui::exactCount(*rating + s.seek_range), s.seek_range)
+                                       std::max(600, *rating - s.seek_range), *rating + s.seek_range, s.seek_range)
                                        .c_str());
         else
             ImGui::TextDisabled("%s", TR("Opponents of any rating: paired fastest"));
@@ -1313,11 +1312,10 @@ void App::drawIncomingChallenges(bool compact) {
         ImGui::PushID(c.id.c_str());
         const bool playable =
             c.board && (c.variant == "standard" || c.variant == "chess960" || c.variant == "fromPosition");
-        const auto name =
-            c.challenger_rating > 0
-                ? fmt::format("{}{} ({}{})", c.challenger_title.empty() ? "" : c.challenger_title + " ", c.challenger,
-                              ui::exactCount(c.challenger_rating), c.challenger_provisional ? "?" : "")
-                : c.challenger;
+        const auto name  = c.challenger_rating > 0
+                               ? fmt::format("{}{} ({}{})", c.challenger_title.empty() ? "" : c.challenger_title + " ",
+                                             c.challenger, c.challenger_rating, c.challenger_provisional ? "?" : "")
+                               : c.challenger;
         const auto white = c.userWhite();
         const char* side = !white ? TR("colour at random") : *white ? TR("you: White") : TR("you: Black");
         const auto what  = fmt::format("{} · {}", kindText(c.rated, c.speed, c.clock, c.unlimited), side);
@@ -1601,12 +1599,16 @@ void App::drawOnlineGameCard() {
     if (armed) ImGui::PushStyleColor(ImGuiCol_Text, ui::WARN);
     if (ImGui::Button(fmt::format("{}###online_resign", resign).c_str())) onlineResign();
     if (armed) ImGui::PopStyleColor();
-    ui::sameLineOrWrap(TR("Ask for a takeback"));
-    ImGui::BeginDisabled(i_back || s.moves.empty());
-    if (ImGui::Button(TR("Ask for a takeback"))) onlineAction("takeback/yes");
-    ImGui::EndDisabled();
-    tip(TR("Your opponent takes it or not, as their Lichess preferences allow."));
-    if (s.moves.size() < 2) {
+    // A tournament's game takes no takeback and cannot be aborted: Lichess's rule (#95).
+    const bool tournament = lichess::tournamentGame(s);
+    if (!tournament) {
+        ui::sameLineOrWrap(TR("Ask for a takeback"));
+        ImGui::BeginDisabled(i_back || s.moves.empty());
+        if (ImGui::Button(TR("Ask for a takeback"))) onlineAction("takeback/yes");
+        ImGui::EndDisabled();
+        tip(TR("Your opponent takes it or not, as their Lichess preferences allow."));
+    }
+    if (s.moves.size() < 2 && !tournament) {
         ui::sameLineOrWrap(TR("Abort"));
         if (ImGui::Button(TR("Abort"))) onlineAction("abort");
         tip(TR("Before both sides have moved, the game ends without a result."));
@@ -1848,9 +1850,8 @@ void App::drawOnlineNotice() {
         ImGui::PushTextWrapPos(px(400));
         ui::inlineIcon(ui::Icon::Swords, ui::ACCENT);
         ImGui::SameLine();
-        const auto name = c.challenger_rating > 0
-                              ? fmt::format("{} ({})", c.challenger, ui::exactCount(c.challenger_rating))
-                              : c.challenger;
+        const auto name =
+            c.challenger_rating > 0 ? fmt::format("{} ({})", c.challenger, c.challenger_rating) : c.challenger;
         heading(trf("{} challenges you on Lichess", name).c_str());
         const auto white = c.userWhite();
         ImGui::TextDisabled("%s", fmt::format("{} · {}", kindText(c.rated, c.speed, c.clock, c.unlimited),

@@ -1144,6 +1144,41 @@ TEST_CASE("crosstable: every figure against a count made apart: a forfeit, a mis
     }
 }
 
+TEST_CASE("crosstable: a Swiss's rounds without a game, set by hand, are no games missing") {
+    std::vector<CrossPlayer> players;
+    for (const auto* name :
+         {"Player_A", "Player_B", "Player_C", "Player_D", "Player_E", "Player_F", "Player_G", "Player_H"}) {
+        CrossPlayer p;
+        p.name = name;
+        p.elo  = 2000 - static_cast<int>(players.size()) * 25;
+        players.push_back(p);
+    }
+    const auto game = [](uint32_t w, uint32_t b, int round, char result) {
+        CrossGame g;
+        g.white       = w;
+        g.black       = b;
+        g.round.round = round;
+        g.result      = result;
+        g.plies       = 60;
+        return g;
+    };
+    // Round 2: Player_F has a bye, Player_H is absent, as a Swiss kept from Lichess has them from its TRF file (#95).
+    const std::vector<CrossGame> games{game(0, 1, 1, '1'), game(2, 3, 1, '='), game(4, 5, 1, '0'), game(6, 7, 1, '1'),
+                                       game(2, 0, 2, '0'), game(1, 3, 2, '1'), game(4, 6, 2, '='), game(0, 4, 3, '='),
+                                       game(5, 1, 3, '1'), game(2, 6, 3, '1'), game(3, 7, 3, '0')};
+    auto t = makeCrosstable(players, games, {});
+    REQUIRE(t.system.system == TournamentSystem::Swiss);
+    CHECK(t.shape.games == 11);
+    CHECK(t.shape.expected == 12);  // the two players without a game in round 2 look like a game missing
+    CrossOptions options;
+    options.hand.push_back(HandResult{"Player_F", "", 2, '*', 1.0});
+    options.hand.push_back(HandResult{"Player_H", "", 2, '*', 0.0});
+    t = makeCrosstable(players, games, options);
+    CHECK(t.shape.games == 11);
+    CHECK(t.shape.expected == 11);
+    CHECK(row(t, "Player_F").points == 3);  // the bye's point with its two wins
+}
+
 TEST_CASE("crosstable: results set by hand, a broadcast being played, the system its organisers name, FIDE's K") {
     // A round robin of five with one game missing: its result set by hand.
     auto games = roundRobinOfFive();

@@ -57,6 +57,7 @@ nlohmann::json settingsJson(const CrosstableSettings& s) {
             list.push_back(std::move(item));
         }
         j["hand"] = std::move(list);
+        if (!s.hand_from.empty()) j["hand_from"] = s.hand_from;
     }
     return j;
 }
@@ -96,6 +97,8 @@ CrosstableSettings settingsFrom(const nlohmann::json& j) {
             if (h.white.empty()) continue;
             s.hand.push_back(std::move(h));
         }
+        if (const auto from = j.find("hand_from"); !s.hand.empty() && from != j.end() && from->is_string())
+            s.hand_from = from->get<std::string>();
     }
     return s;
 }

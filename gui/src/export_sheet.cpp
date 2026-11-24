@@ -9,6 +9,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "i18n.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -89,8 +90,8 @@ bool openInSystem(const fs::path& file) {
 }
 
 std::string fileWeight(uint64_t bytes) {
-    if (bytes < 1000 * 1000) return fmt::format("{} KB", std::max<uint64_t>(1, (bytes + 500) / 1000));
-    return fmt::format("{:.1f} MB", static_cast<double>(bytes) / 1e6);
+    if (bytes < 1000 * 1000) return trf("{} KB", std::max<uint64_t>(1, (bytes + 500) / 1000));
+    return trf("{:.1f} MB", static_cast<double>(bytes) / 1e6);
 }
 
 }  // namespace fcg

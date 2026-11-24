@@ -1321,10 +1321,10 @@ lichess.org is *lichess.org…*'s, see [Positions and games to Lichess](#positio
   it, in a variation too, with the arrows and squares drawn at that move; <kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd>
   <kbd>End</kbd> go through the moves and <kbd>F</kbd> turns the board over. What it holds is ticked: the comments,
   the variations, the arrows and squares, the assistant's comments (marked as its own), the evaluations and their
-  curve, the clocks. Its weight is estimated before it is saved. From the Databases page, the page holds the chosen
-  game or the filter's games, chosen in a list at its top (<kbd>Page Up</kbd>, <kbd>Page Down</kbd>); beyond 200 games
-  it would be too heavy to open, and the sheet asks: a page per game in a folder, with their list (`index.html`), or
-  the first 200.
+  curve, the clocks. Its weight is estimated before it is saved. From the Databases page, or from the Board page when
+  its game was opened from a database's list, the page holds this game or the filter's games, chosen in a list at its
+  top (<kbd>Page Up</kbd>, <kbd>Page Down</kbd>); beyond 200 games it would be too heavy to open, and the sheet asks: a
+  page per game in a folder, with their list (`index.html`), or the first 200.
 - **Diagram, PNG or SVG**: the position shown, with the arrows and squares drawn at that move (the right button), the
   coordinates, a dot beside the edge of the side to move, Black below when it is Black's move (if ticked), the last move
   (if ticked) and a caption under the board, which starts as *White to play* and is written as you like (*White to play

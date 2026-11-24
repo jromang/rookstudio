@@ -40,20 +40,25 @@ std::string pgnWithNames(std::string_view pgn, const std::optional<WrittenName>&
             at = line_end + 1;
             continue;
         }
-        if (line.size() < 4 || line.front() != '[' || line.back() != ']') break;
+        if (line.empty() || line.front() != '[') break;  // the tags end
+        // A tag alone on its line, [Name "Value"]: a line of another shape there, the game stays as it was read.
         const auto space = line.find(' ');
         const auto quote = line.find('"');
-        if (space == std::string_view::npos || quote == std::string_view::npos || quote < space) break;
+        if (line.size() < 4 || line.back() != ']' || space == std::string_view::npos ||
+            quote == std::string_view::npos || quote < space)
+            return std::string(pgn);
         std::string name(line.substr(1, space - 1));
         std::string value;
-        for (std::size_t i = quote + 1; i + 1 < line.size(); ++i) {
-            if (line[i] == '\\' && i + 2 < line.size()) {
+        std::size_t i = quote + 1;
+        for (; i < line.size(); ++i) {
+            if (line[i] == '\\' && i + 1 < line.size()) {
                 value += line[++i];
                 continue;
             }
             if (line[i] == '"') break;
             value += line[i];
         }
+        if (i + 2 != line.size()) return std::string(pgn);  // "]" right after the value's closing quote
         tags.emplace_back(std::move(name), std::move(value));
         at = line_end + 1;
     }

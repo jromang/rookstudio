@@ -2172,7 +2172,9 @@ class App {
         std::vector<study::GameId> ids;
         study::GameId chosen = 0;
         bool all             = false;  // the filter's games, not the chosen one
-        int repertoire       = -1;
+        // With the filter's games (the page, PGN): what the sheet says of them, their file's name, the page's title.
+        std::string all_text, all_stem, all_title;
+        int repertoire = -1;
         std::optional<publish::Document> document;  // a report's, made at the opening
         std::array<char, 160> caption{};
         int gif_from = 0, gif_to = -1;
@@ -2232,6 +2234,7 @@ class App {
     [[nodiscard]] publish::GifOptions exportGifOptions() const;
     [[nodiscard]] publish::Document exportDocument();  // the PDF's: the game's, or the report's
     [[nodiscard]] std::string exportFileName(ExportFormat format) const;
+    [[nodiscard]] bool exportAll() const;  // the filter's games, for the format chosen (the page, PGN)
     [[nodiscard]] std::vector<publish::HtmlGame> exportGames(std::size_t most) const;  // a database's, read
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {

@@ -218,12 +218,14 @@ TEST_CASE("publish: a crosstable printed on landscape pages, and as a page of HT
     CHECK(text.find("2½") != std::string::npos);  // Ansel's points
     CHECK(text.find("SB") != std::string::npos);
     CHECK(text.find("Sonneborn-Berger") != std::string::npos);
+    CHECK(text.find("Cburnett") == std::string::npos);  // no piece drawn: no pieces' notice
     checkPdf(pages, doc.title);
     const auto html = documentHtml(doc);
     CHECK(html.find("<table>") != std::string::npos);
     CHECK(html.find("Duarte, Luis") != std::string::npos);
     CHECK(html.find("http") == std::string::npos);
     CHECK(html.find("<script") == std::string::npos);  // no line to replay: no board
+    CHECK(html.find("Cburnett") == std::string::npos);
 }
 
 TEST_CASE("publish: a player's dossier printed, and as a page whose lines replay") {

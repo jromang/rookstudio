@@ -149,13 +149,13 @@ int drawSpans(const std::vector<publish::Span>& spans, float width, int first, i
         std::string text;
         ImU32 colour;
         bool bold, on;
+        bool joined;  // glued to the word before it ("12." and "g5"): no space between them, nor a row
         float w;
     };
-    std::vector<std::vector<Word>> rows(1);
-    float x          = 0;
-    int node_row     = -1;
+    // The words, those glued together in a group that goes to the next row as one.
+    std::vector<std::vector<Word>> groups;
     const float sp   = ImGui::CalcTextSize(" ").x;
-    bool after_space = true;  // the text so far ends with a space: the next word may go to the next row
+    bool after_space = true;  // the text so far ends with a space: the next word starts a group
     for (const auto& s : spans) {
         std::size_t at = 0;
         bool glued     = !s.text.empty() && s.text.front() != ' ' && !after_space;
@@ -166,20 +166,31 @@ int drawSpans(const std::vector<publish::Span>& spans, float width, int first, i
             if (!word.empty()) {
                 ImFont* font    = s.font == publish::FontId::SemiBold ? pageFont(s.font) : ImGui::GetFont();
                 const float w   = font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0, word.c_str()).x;
-                const bool join = glued && !rows.back().empty();
-                if (!join && x + w > width && !rows.back().empty()) {
-                    rows.emplace_back();
-                    x = 0;
-                }
-                if (!join && !rows.back().empty()) x += sp;
-                const bool on = s.node == node && node >= 0;
-                if (on) node_row = static_cast<int>(rows.size()) - 1;
-                rows.back().push_back({word, imColour(s.colour), s.font == publish::FontId::SemiBold, on, w});
-                x += w;
+                const bool join = glued && !groups.empty();
+                if (!join) groups.emplace_back();
+                groups.back().push_back({word, imColour(s.colour), s.font == publish::FontId::SemiBold,
+                                         s.node == node && node >= 0, join, w});
             }
             glued = false;
             at    = end + 1;
         }
+    }
+    std::vector<std::vector<Word>> rows(1);
+    float x      = 0;
+    int node_row = -1;
+    for (const auto& g : groups) {
+        float gw = 0;
+        for (const auto& w : g) gw += w.w;
+        if (!rows.back().empty() && x + sp + gw > width) {
+            rows.emplace_back();
+            x = 0;
+        }
+        if (!rows.back().empty()) x += sp;
+        for (const auto& w : g) {
+            if (w.on) node_row = static_cast<int>(rows.size()) - 1;
+            rows.back().push_back(w);
+        }
+        x += gw;
     }
     auto* dl           = ImGui::GetWindowDrawList();
     const ImVec2 start = ImGui::GetCursorScreenPos();
@@ -189,13 +200,14 @@ int drawSpans(const std::vector<publish::Span>& spans, float width, int first, i
         float wx = start.x;
         for (std::size_t i = 0; i < rows[static_cast<std::size_t>(r)].size(); ++i) {
             const auto& w = rows[static_cast<std::size_t>(r)][i];
+            if (i > 0 && !w.joined) wx += sp;
             if (w.on)
                 dl->AddRectFilled(ImVec2(wx - px(2), start.y + drawn * h),
                                   ImVec2(wx + w.w + px(2), start.y + drawn * h + h - px(2)),
                                   (ui::ACCENT & 0x00ffffff) | 0x40000000, px(3));
             dl->AddText(w.bold ? pageFont(publish::FontId::SemiBold) : ImGui::GetFont(), ImGui::GetFontSize(),
                         ImVec2(wx, start.y + drawn * h), w.colour, w.text.c_str());
-            wx += w.w + sp;
+            wx += w.w;
         }
     }
     ImGui::Dummy(ImVec2(width, h * static_cast<float>(drawn)));
@@ -324,6 +336,17 @@ void App::openBoardExport(int format) {
             }
         }
     }
+    // The games of the list it was opened from, too: the page holds this game or the filter's games.
+    if (board_origin_ && board_origin_->view && board_origin_->view->snapshot && board_origin_->view->ids.size() > 1) {
+        s.snapshot = board_origin_->view->snapshot;
+        s.ids      = board_origin_->view->ids;
+        s.chosen   = board_origin_->id;
+        s.all_text =
+            trn("the {} game of the filter", "the {} games of the filter", s.ids.size(), ui::exactCount(s.ids.size()));
+        s.all_title = board_origin_->name;
+        s.all_stem  = publish::fileStem(board_origin_->name);
+        if (s.all_stem.empty()) s.all_stem = "games";
+    }
     // Its key moments: the review's mistakes and blunders.
     for (std::size_t i = 0; i < b.judged.size(); ++i)
         if (b.judged[i].judgement == Judgement::Mistake || b.judged[i].judgement == Judgement::Blunder)
@@ -385,14 +408,16 @@ void App::openDatabaseExport(bool all, int format) {
     e.game.white   = std::string(snap.shownName(ids.white));
     e.game.black   = std::string(snap.shownName(ids.black));
     e.game.ply     = 0;
-    e.subject_text = e.all ? trn("the {} game of the filter", "the {} games of the filter", e.ids.size(),
-                                 ui::exactCount(e.ids.size()))
-                           : publish::gameTitle(e.game);
-    e.stem         = e.all ? publish::fileStem(s.entries()[index].name)
-                           : publish::fileStem(fmt::format("{} {} {}", e.game.white.substr(0, e.game.white.find(',')),
-                                                           e.game.black.substr(0, e.game.black.find(',')),
-                                                           e.game.tree.main.header("Date").substr(0, 4)));
-    if (e.stem.empty()) e.stem = "games";
+    e.subject_text = publish::gameTitle(e.game);
+    e.stem         = publish::fileStem(fmt::format("{} {} {}", e.game.white.substr(0, e.game.white.find(',')),
+                                                   e.game.black.substr(0, e.game.black.find(',')),
+                                                   e.game.tree.main.header("Date").substr(0, 4)));
+    if (e.stem.empty()) e.stem = "game";
+    e.all_text =
+        trn("the {} game of the filter", "the {} games of the filter", e.ids.size(), ui::exactCount(e.ids.size()));
+    e.all_title = s.entries()[index].name;
+    e.all_stem  = publish::fileStem(s.entries()[index].name);
+    if (e.all_stem.empty()) e.all_stem = "games";
     e.formats = {ExportFormat::Html, ExportFormat::Gif, ExportFormat::Pdf, ExportFormat::Pgn};
     showExport(std::move(e), format);
 }
@@ -542,7 +567,15 @@ publish::Document App::exportDocument() {
 
 std::string App::exportFileName(ExportFormat format) const {
     if (!export_) return {};
-    return export_->stem + extensionOf(format, export_settings_.svg);
+    const bool all =
+        export_->all && !export_->document && (format == ExportFormat::Html || format == ExportFormat::Pgn);
+    return (all ? export_->all_stem : export_->stem) + extensionOf(format, export_settings_.svg);
+}
+
+bool App::exportAll() const {
+    if (!export_ || !export_->all || export_->document) return false;
+    const auto format = static_cast<ExportFormat>(export_settings_.format);
+    return format == ExportFormat::Html || format == ExportFormat::Pgn;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -563,6 +596,9 @@ void App::exportSave() {
             return;
         }
     }
+    // Past MAX_GAMES_PER_PAGE games, the page waits for its choice (a page per game, or the first ones): Enter too.
+    if (format == ExportFormat::Html && exportAll() && e.ids.size() > publish::MAX_GAMES_PER_PAGE && e.split == 0)
+        return;
     std::vector<std::pair<std::string, std::string>> filters;
     switch (format) {
         case ExportFormat::Html:
@@ -634,7 +670,7 @@ void App::exportTo(const fs::path& chosen) {
             l.pieces         = look.pieces;
             l.pieces_notice  = look.notice.line;
             l.pieces_license = look.notice.license;
-            if (e.subject == ExportSheet::Subject::Board || !e.all) {
+            if (!e.all || !e.snapshot) {
                 done(writeFile(path, publish::gamesHtml({e.game}, o, l, publish::gameTitle(e.game))), path);
                 break;
             }
@@ -649,7 +685,7 @@ void App::exportTo(const fs::path& chosen) {
             std::vector<study::GameId> ids(e.ids.begin(), e.ids.begin() + static_cast<std::ptrdiff_t>(most));
             e.job = std::async(std::launch::async,
                                [snap = e.snapshot, ids, o, l, split, target = e.saving, cancel = e.cancel,
-                                count = e.done, title = e.subject_text]() -> std::string {
+                                count = e.done, title = e.all_title]() -> std::string {
                                    const auto read = [&](std::size_t i) -> std::optional<publish::HtmlGame> {
                                        auto r = study::readPgnGame(study::exportedPgn(*snap, ids[i], false));
                                        if (!r.tree) return std::nullopt;
@@ -871,7 +907,7 @@ void App::drawExport() {
     ImGui::PopFont();
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("· %s", e.subject_text.c_str());
+    ImGui::TextDisabled("· %s", (exportAll() ? e.all_text : e.subject_text).c_str());
     {
         const char* back = TR("Esc goes back");
         const float w    = ImGui::CalcTextSize(back).x + ImGui::GetFrameHeight() + px(8);
@@ -1221,7 +1257,7 @@ void App::drawExportOptions() {
                 break;
             }
             ImGui::TextUnformatted(TR("What it holds"));
-            if (e.subject == ExportSheet::Subject::Database && e.ids.size() > 1) {
+            if (e.snapshot && e.ids.size() > 1) {
                 int all = e.all ? 1 : 0;
                 if (choice("html_what", all,
                            {TR("This game"), trn("The {} game of the filter", "The {} games of the filter",
@@ -1358,7 +1394,7 @@ void App::drawExportOptions() {
             ImGui::TextUnformatted(TR("A move:"));
             ImGui::SameLine();
             int speed = st.gif_delay <= 500 ? 0 : st.gif_delay <= 1000 ? 1 : 2;
-            if (choice("gif_speed", speed, {"½ s", "1 s", "2 s"})) {
+            if (choice("gif_speed", speed, {trf("{} s", "½"), trf("{} s", 1), trf("{} s", 2)})) {
                 st.gif_delay = speed == 0 ? 500 : speed == 1 ? 1000 : 2000;
                 keepExportSettings();
             }
@@ -1366,7 +1402,7 @@ void App::drawExportOptions() {
             ImGui::TextUnformatted(TR("the last:"));
             ImGui::SameLine();
             int last = st.gif_last <= 1000 ? 0 : st.gif_last <= 3000 ? 1 : 2;
-            if (choice("gif_last", last, {"1 s", "3 s", "5 s"})) {
+            if (choice("gif_last", last, {trf("{} s", 1), trf("{} s", 3), trf("{} s", 5)})) {
                 st.gif_last = last == 0 ? 1000 : last == 1 ? 3000 : 5000;
                 keepExportSettings();
             }

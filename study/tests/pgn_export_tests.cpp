@@ -81,4 +81,10 @@ TEST_CASE("pgn export: the games as they were read, or with the table's names, F
 
     // Written twice, the same: the tags already there are replaced, not added again.
     CHECK(pgnWithNames(named, tableName(*table, table->rowIds(0).white), std::nullopt) == named);
+    // Tags of another shape (two on a line, a value not closed): the game as it was read, nothing lost.
+    const WrittenName anne{"Duval, Anne", 90000011, "WIM"};
+    const std::string two = "[Event \"Open\"] [White \"Duval,A\"]\n[Black \"Ito, Ken\"]\n\n1. e4 e5 *\n";
+    CHECK(pgnWithNames(two, anne, std::nullopt) == two);
+    const std::string open = "[Event \"Open]\n[White \"Duval,A\"]\n\n1. e4 e5 *\n";
+    CHECK(pgnWithNames(open, anne, std::nullopt) == open);
 }

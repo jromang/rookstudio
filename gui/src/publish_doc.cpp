@@ -479,7 +479,8 @@ std::vector<Page> layOut(const Document& document) {
     Layout l(document);
     for (std::size_t i = 0; i < document.blocks.size(); ++i)
         l.block(document.blocks[i], i + 1 < document.blocks.size() ? &document.blocks[i + 1] : nullptr);
-    l.notice();
+    // The pieces' notice where pieces are drawn: not under a crosstable, nor a repertoire without a branching.
+    if (std::any_of(l.pages.begin(), l.pages.end(), [](const Page& p) { return !p.diagrams.empty(); })) l.notice();
     // The pages' numbers.
     const auto count = l.pages.size();
     for (std::size_t i = 0; i < count; ++i) {
@@ -608,9 +609,15 @@ std::string documentHtml(const Document& doc) {
     out += "</div>";
     if (board) out += "<div class=\"side\">" + boardWidget(false) + "</div>";
     out += "</main>\n";
+    // The pieces' notice where pieces are drawn: a board to replay lines on, or a diagram.
+    const bool drawn = board || (doc.pieces && std::any_of(doc.blocks.begin(), doc.blocks.end(), [](const Block& b) {
+                                     return b.kind == Block::Kind::Diagram;
+                                 }));
     HtmlLook look;
-    look.pieces_notice  = doc.notice.line;
-    look.pieces_license = doc.notice.license;
+    if (drawn) {
+        look.pieces_notice  = doc.notice.line;
+        look.pieces_license = doc.notice.license;
+    }
     out += noticeHtml(look);
     if (doc.pieces && board) out += pieceSymbols(*doc.pieces);
     if (board) {

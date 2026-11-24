@@ -397,6 +397,7 @@ them.
 | <kbd>Ctrl</kbd>+click, <kbd>Shift</kbd>+click | Lists | Select several |
 | <kbd>Delete</kbd> | The Engines page | Remove the engine selected (after a confirmation) |
 | <kbd>Enter</kbd> | An engine's card, its Lichess bot ready | Put the bot online |
+| <kbd>Enter</kbd> | An engine's card, *On lichess.org, for the analysis* open | Offer it to Lichess (the first time: allow it on Lichess); *Resume* the service stopped |
 | <kbd>Enter</kbd>, <kbd>Escape</kbd> | Making an account a Lichess bot, its name typed | Make it a bot; cancel |
 | <kbd>Enter</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | An engine's console | Send the line; bring the earlier lines back |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | The headless mode | Stop after the games being played |
@@ -420,7 +421,8 @@ A view's **Home** page gathers the view's pages in cards, what runs first:
 - **Lichess**: the account, a player's games with *Sync*, the new games counted if you chose it, the broadcasts
   live (see [The Lichess page](#the-lichess-page)).
 - **In progress**: a game on Lichess played from RookStudio (*Back to the game*) and the challenges received (see [On
-  Lichess](#on-lichess)), your Lichess bot online and its game (see [A Lichess bot](#a-lichess-bot)), the game's
+  Lichess](#on-lichess)), your Lichess bot online and its game (see [A Lichess bot](#a-lichess-bot)), your engines
+  serving lichess.org's analysis board (see [Your engine on lichess.org](#your-engine-on-lichessorg)), the game's
   analysis, the position's, an import, the assistant (its download, its model
   loaded, *Unload*), a series of puzzles, a session of exercises, a game guessed, an endgame or a vision exercise under
   way, and what the day's review has
@@ -440,7 +442,8 @@ The **Tournaments** page is a control room: what runs and what needs you come fi
   all**, which resumes them and lets the queue go on, at once if a tournament ended meanwhile.
 - **Cores**: the machine's hardware threads, and those the games being played take, the rest free. A game takes
   the `Threads` of its engine that has the most, since the two engines think in turn; the bar shows each tournament's
-  name and its count (the Board page's engines and the Lichess bot's game too), the cursor the details.
+  name and its count (the Board page's engines, the Lichess bot's game and the requests of your engines on lichess.org
+  too), the cursor the details.
 - **Needs action**, when something does, each with its fix in place: an engine that cannot start (see [An engine
   that cannot start](#an-engine-that-cannot-start): *Try again*, *Withdraw…*, *Replace…*, *Engine log*); the
   tournament an error or an engine stopped, with what stopped it, *Open the engine*, *Open the log*, *Resume*, *Open*
@@ -456,6 +459,8 @@ The **Tournaments** page is a control room: what runs and what needs you come fi
   once](#several-tournaments-at-once) for the weights and the cores of each.
 - **Your Lichess bot**, while it is online: its engine, its game in progress with *On the Board*, *Its card* and *Put
   offline*; it declines challenges *later* while the tournaments need the cores (see [A Lichess bot](#a-lichess-bot)).
+- **Your engines on lichess.org**, while they serve: each with its state, *Its card* and *Stop the service*; they take
+  only the threads the tournaments leave free (see [Your engine on lichess.org](#your-engine-on-lichessorg)).
 - **Queue**: the tournaments waiting, each with its length and when it starts, and when everything ends (see
   [Queue and relaunch](#queue-and-relaunch)).
 - **Last finished**: the last five tournaments finished, with their result: a match's score, the SPRT's decision,
@@ -546,11 +551,33 @@ engine (kept a day), and the file chosen; only while the page is open or an engi
 An engine added this way follows its new versions: they are looked for once a day when the Engines page opens (or
 only when *Popular engines…* opens, in *Settings*), and shown above the list with *Update*. The new version goes in a
 folder of its own and the engine takes it once it has answered `uci`; *Keep … too* keeps the version before as an
-engine of its own, for a match between them. A tournament that is not over keeps the files it started with.
+engine of its own, for a match between them. A tournament that is not over keeps the files it started with; the
+version before is deleted once the tournaments that play it are over (see [An engine's
+versions](#an-engines-versions)).
 
 Where an engine is first needed (the Board page's analysis, its questions and its review) and the library has none,
 a card offers Gaia, downloaded with a click (or Enter) and made the engine of the analysis and of the assistant; the
 other popular engines and an engine from the disk are a click away there too.
+
+### An engine's versions
+
+Each version of an engine taken from *Popular engines…* stays in a folder of its own in the profile's `engines` folder.
+Once an update has replaced a version in the library, its folder is deleted when no tournament that is not over
+(playing, paused or stopped) plays it: at once when none does, else at the end of the last one, as RookStudio looks
+again at the end of each tournament. A notice at the window's corner says so: *Gaia 4.4.3 deleted: “Night Gaia” is over
+· 118 MB freed*, with *Its card*.
+
+When the engine has more than its library's version on the disk, its card lists them under *Its versions on the disk*,
+each with its state:
+
+- the library's: the one the analysis, new tournaments, the bot and the service for Lichess take;
+- one a tournament not over plays, with that tournament and where it is (*playing, game 212 of 400*), deleted at its end
+  when an update replaced it; *Keep … too* keeps it for good, as an engine of its own;
+- one kept on purpose (*Keep … too*, here or in the update), never deleted; *Stop keeping it* (a second click) takes its
+  engine out of the library, and its folder goes once no tournament that is not over plays it;
+- one left from before, never replaced by an update since: kept until *Delete it* (a second click);
+- one deleted that a tournament not over asks for again (resumed from a folder RookStudio did not look in): *Download
+  it again* takes it from its release on GitHub, checked against the hash it had, at the same place.
 
 ### Starting engines
 
@@ -696,6 +723,58 @@ RookStudio is open. The line becomes a part of the card, which leads through the
 
 The command palette has *Put the Lichess bot online*, *Put the Lichess bot offline*, *The Lichess bot's game on the
 Board* and *The Lichess bot's card*, and on the Engines page *Make … a Lichess bot…*.
+
+### Your engine on lichess.org
+
+An engine's card has a line **On lichess.org, for the analysis**: *Offer to Lichess…* offers the engine to lichess.org's
+analysis board, through Lichess's external engine API. It computes here, on your machine, and its lines show there, for
+your account only, in the analysis board's engine menu, while RookStudio is open. Lichess's API for it is still in
+alpha.
+
+- **What it is offered as**: its name at Lichess (3 to 200 characters; *Gaia 4.4.4 (RookStudio)* by default), the
+  machine (this computer, or a remote machine of Settings > Machines where the engine has its path, by SSH, with its own
+  threads), the threads at most (Lichess asks for 1 to that many for each request) and the memory at most. Lichess runs
+  such an engine in the Chess960 mode (`UCI_Chess960`) for every game: an engine without it cannot be offered, and its
+  line says so instead of *Offer to Lichess…*.
+- **The first time**, Lichess asks for two more permissions, `engine:read` and `engine:write` (to register an engine for
+  your account, read it, withdraw it): *Allow on Lichess…* (Enter) opens Lichess's page; your account stays linked, and
+  the token it replaces is revoked. Without a linked account, the card says so, with *Link the account…*.
+- **Then, without asking anything more**, RookStudio registers the engine with your account (one request, with your
+  token) and a secret drawn here, which Lichess never shows again; RookStudio keeps it in the profile's
+  `lichess-engines.json`, readable by you alone, and never shows nor logs it. It then waits for work at
+  engine.lichess.ovh with that secret alone, without your token: a long wait, renewed while the service runs. When your
+  analysis board asks, a request comes with the position (a starting position and moves), the threads, the memory, 1 to
+  5 lines and a time, a depth or nodes: the engine is set (the Chess960 mode, `UCI_AnalyseMode` when it has it, its
+  options of the library), and its lines (depth, multipv, score, nodes, time, pv) go to Lichess as it finds them, then
+  its best move. When you move on, Lichess closes the request, and the engine stops.
+- **In service**, the card shows the request being answered (its lines, threads, memory, depth and speed), today's
+  requests and minutes of analysis, the position asked with the engine's best move, *Open Lichess's analysis board* and
+  **Stop the service**. The Lichess page lists the engines offered (*Your engines on lichess.org*); the Home page (under
+  *In progress*) and the Tournaments page show those in service, and the cores' bar their threads.
+- **The tournament first**: the service takes only the threads the tournaments playing on its machine leave free (the
+  cores of Settings), the Lichess bot's game first too (see [A Lichess bot](#a-lichess-bot)); with none left, it pauses
+  and says so, Lichess's requests waiting. A request under way when a tournament needs its threads is stopped there.
+- **Fair play**: during your own live game on Lichess, the service pauses until the game ends (the requests stay
+  unanswered), then resumes by itself. The positions of your correspondence games are never analysed: a request on one
+  of them, on a line through it or one move before it (compared by the men and the side to move, as the lock of [Fair
+  play](#fair-play) does) gets an empty answer. Lichess itself offers an external engine on its analysis pages only,
+  never during a game.
+- **Stop the service**: RookStudio no longer waits for work; the engine stays registered at Lichess, without answering;
+  *Resume* (Enter) serves it again. *Change…* registers it again with another name, machine or limits. **Withdraw from
+  Lichess** deletes the registration (one request), and its secret is no longer used; *Offer to Lichess…* makes it
+  again. RookStudio closed, the engine stays in Lichess's list without answering; at the next start, the service resumes
+  if it was in service when you closed.
+- **When something goes wrong**: Lichess refusing the secret (401: the registration was withdrawn on lichess.org, or the
+  secret changed) stops the service, with *Register again (a new secret)*; an answer of Lichess that RookStudio does not
+  read (the API is in alpha) stops it rather than answer wrongly, and says so, with *See whether a version of RookStudio
+  follows it*; offline, the service waits for the network and resumes by itself (after too many requests, Lichess's
+  minute).
+- What leaves the machine: at the registration, the name, the limits and the secret, with your token; then the engine's
+  lines for the positions Lichess sends. Those positions come from your own browser, through Lichess, which sees the
+  lines. Nothing else of your machine.
+
+The command palette has *Offer … to lichess.org…* on the Engines page, *Stop the service of … on lichess.org* and
+*Resume the service of … on lichess.org*.
 
 ## Books
 
@@ -2457,7 +2536,10 @@ in a database…*.
 ## The Lichess page
 
 Everything here is optional: RookStudio works without an account and without the Internet, and what goes to Lichess
-is said where you decide it.
+is said where you decide it. Its right-hand column holds the services: the broadcasts, Lichess's tournaments, Lichess
+TV, the followed players, the evaluations kept offline, *Your engines on lichess.org* once one of your engines is
+offered to lichess.org's analysis board (see [Your engine on lichess.org](#your-engine-on-lichessorg)), and what the
+analysis may ask online.
 
 ### Linking your account
 
@@ -2587,7 +2669,9 @@ those where it is your turn first, each with its clock or the time left to move,
 Board* once RookStudio may play your games (see [A game on Lichess](#a-game-on-lichess)). Your Lichess bot's games are
 not yours and lock nothing; during your own live game, the bot's search is not shown (see [A Lichess
 bot](#a-lichess-bot)). Lichess TV never shows your own games, even featured, and the mosaic's engines rest during your
-live game (see [Lichess TV](#lichess-tv)).
+live game (see [Lichess TV](#lichess-tv)). Your engine offered to lichess.org's analysis board pauses during your live
+game, and never analyses the positions of your correspondence games (see [Your engine on
+lichess.org](#your-engine-on-lichessorg)).
 
 Your games in progress are asked for with your account's token when the Home page shows, every half-minute while a
 live game lasts and every ten minutes while a correspondence game does. The Lichess page offers once to hear them start

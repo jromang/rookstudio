@@ -269,12 +269,15 @@ void App::drawChessHome() {
     const bool online =
         (online_game_ && !online_game_->ended && !online_game_->state.over()) || !online_incoming_.empty();
     const bool bot = bot_account_ && (bot_online_ || botPlaying());  // the Lichess bot online, its game (#85)
-    if (b.reviewing() || b.analysing || importing || !assistant.empty() || training || online || bot) {
+    const bool engine_offered = !services_.empty();  // an engine of the user's serving lichess.org (#96)
+    if (b.reviewing() || b.analysing || importing || !assistant.empty() || training || online || bot ||
+        engine_offered) {
         ImGui::Dummy(ImVec2(0, px(6)));
         ui::beginCard("chess_running");
         ImGui::TextUnformatted(TR("In progress"));
         if (online) drawOnlineHome();
         if (bot) drawBotRunning(true);
+        if (engine_offered) drawLichessEngineRunning(true);
         if (training) drawTrainingHome();
         for (const auto& task : b.review_tasks) {
             const auto& done  = task.state.done;

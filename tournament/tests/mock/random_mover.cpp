@@ -22,9 +22,15 @@
 // nodes" do the same, then give it at once. Its score is the material of the side to move, minus its opponent's, and
 // half of the best piece it can take; with FCG_MOCK_HASH=1, plus the searches made since the last ucinewgame, as a
 // hash table that remembers them changes what a search finds.
+//
+// With FCG_MOCK_CHESS960=1 it also has UCI_Chess960 and UCI_AnalyseMode, and reads castling as the king taking its rook
+// once UCI_Chess960 is set: an engine Lichess's external engine API takes (#96). With FCG_MOCK_MOVETIME=1, "go
+// movetime" of the analysis takes its time before the bestmove, which a "stop" gives at once: a search that can be cut.
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <mutex>
 #include <random>
 #include <thread>
 
@@ -40,6 +46,9 @@ int warm        = 0;  // searches since the last ucinewgame (FCG_MOCK_HASH)
 bool show_wdl   = false;
 bool searching  = false;  // an infinite search, waiting for "stop"
 Move infinite_best;
+bool chess960 = false;  // UCI_Chess960 set (FCG_MOCK_CHESS960)
+std::mutex out_mutex;   // the output, shared with a timed search's thread (FCG_MOCK_MOVETIME)
+std::atomic<int> search_id{0};
 
 void initialize_rng(int argc, char *argv[]) {
     if (argc > 1) {
@@ -75,6 +84,7 @@ void uci_line(Board &board, const std::string &line) {
         // parse position
         if (tokens[1] == "startpos") {
             board = Board();
+            board.set960(chess960);
             if (tokens.size() > 2 && tokens[2] == "moves") {
                 for (int i = 3; i < tokens.size(); i++) {
                     board.makeMove(uci::uciToMove(board, std::string(tokens[i])));
@@ -92,6 +102,7 @@ void uci_line(Board &board, const std::string &line) {
                 fen += std::string(tokens[i]) + " ";
             }
 
+            board.set960(chess960);
             board.setFen(fen);
 
             for (; i < tokens.size(); i++) {
@@ -110,6 +121,10 @@ void uci_line(Board &board, const std::string &line) {
             std::cout << "option name Threads type spin default 1 min 1 max 1024" << std::endl;
             std::cout << "option name MultiPV type spin default 1 min 1 max 256" << std::endl;
             std::cout << "option name UCI_ShowWDL type check default false" << std::endl;
+            if (std::getenv("FCG_MOCK_CHESS960")) {
+                std::cout << "option name UCI_Chess960 type check default false" << std::endl;
+                std::cout << "option name UCI_AnalyseMode type check default false" << std::endl;
+            }
         }
         if (const char *slow = std::getenv("FCG_MOCK_SLOW_UCIOK"))
             std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(slow)));
@@ -124,10 +139,12 @@ void uci_line(Board &board, const std::string &line) {
     } else if (tokens[0] == "setoption" && tokens.size() >= 5 && tokens[1] == "name") {
         if (tokens[2] == "MultiPV") multipv = std::max(1, std::atoi(std::string(tokens[4]).c_str()));
         if (tokens[2] == "UCI_ShowWDL") show_wdl = tokens[4] == "true";
+        if (tokens[2] == "UCI_Chess960") chess960 = tokens[4] == "true";
     } else if (tokens[0] == "stop") {
+        std::lock_guard lock(out_mutex);
         if (searching) {
             searching = false;
-            std::cout << "bestmove " << uci::moveToUci(infinite_best) << std::endl;
+            std::cout << "bestmove " << uci::moveToUci(infinite_best, chess960) << std::endl;
         }
     } else if (tokens[0] == "go" && analysis_mode() && tokens.size() > 1 &&
                (tokens[1] == "infinite" || tokens[1] == "movetime" || tokens[1] == "depth" || tokens[1] == "nodes")) {
@@ -167,8 +184,8 @@ void uci_line(Board &board, const std::string &line) {
                           << " score cp " << material + 40 - 15 * i + depth;
                 if (show_wdl) std::cout << " wdl " << 300 - 20 * i << " 600 " << 100 + 20 * i;
                 std::cout << " nodes " << 1000 * depth << " nps 500000 time " << 2 * depth << " pv "
-                          << uci::moveToUci(moves[i]);
-                if (!replies.empty()) std::cout << " " << uci::moveToUci(replies[0]);
+                          << uci::moveToUci(moves[i], chess960);
+                if (!replies.empty()) std::cout << " " << uci::moveToUci(replies[0], chess960);
                 std::cout << "\n";
             }
         }
@@ -178,7 +195,22 @@ void uci_line(Board &board, const std::string &line) {
             searching = true;
             return;
         }
-        std::cout << "bestmove " << uci::moveToUci(infinite_best) << std::endl;
+        if (tokens[1] == "movetime" && tokens.size() > 2 && std::getenv("FCG_MOCK_MOVETIME")) {
+            // Its time taken, then its move, unless a "stop" came first.
+            std::lock_guard lock(out_mutex);
+            searching    = true;
+            const int id = ++search_id;
+            const int ms = std::atoi(std::string(tokens[2]).c_str());
+            std::thread([id, ms] {
+                std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+                std::lock_guard lock(out_mutex);
+                if (!searching || search_id != id) return;
+                searching = false;
+                std::cout << "bestmove " << uci::moveToUci(infinite_best, chess960) << std::endl;
+            }).detach();
+            return;
+        }
+        std::cout << "bestmove " << uci::moveToUci(infinite_best, chess960) << std::endl;
     } else if (tokens[0] == "go") {
         if (const char *crash = std::getenv("FCG_MOCK_STDERR_CRASH")) {
             std::cout << "info string crashing" << std::endl;

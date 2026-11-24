@@ -942,6 +942,10 @@ void App::drawLichessPage() {
         drawLichessOfflineEvals();  // Lichess's evaluations kept offline (#58)
     }
     ImGui::Dummy(ImVec2(0, px(8)));
+    if (std::any_of(offers().begin(), offers().end(), [](const lichess::OfferedEngine& o) { return !o.id.empty(); })) {
+        drawLichessEnginesCard();  // the engines offered to lichess.org's analysis board (#96)
+        ImGui::Dummy(ImVec2(0, px(8)));
+    }
     {
         ui::TopicRegion topic(guide::topics::LichessOnline);
         drawLichessOnline();

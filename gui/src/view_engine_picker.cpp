@@ -306,6 +306,18 @@ void App::pickerInstalled(PickerEngine& e, catalogue::InstallResult r) {
     }
     storage_.saveEngines(engines_);
     startProbe(index);
+    // The version replaced, not kept as an engine of its own: deleted once no tournament that is not over plays it
+    // (#65).
+    if (!before.empty() && before != r.engine.version && !e.keep_old) {
+        {
+            const std::lock_guard lock(catalogue::installedMutex());
+            auto installed = catalogue::loadInstalled(storage_.root());
+            catalogue::retireVersion(installed, e.id, before, static_cast<int64_t>(std::time(nullptr)));
+            (void)catalogue::saveInstalled(storage_.root(), installed);
+        }
+        picker_.installed_read = false;
+        checkVersions({}, r.engine.version);
+    }
     const auto& name = engines_[static_cast<std::size_t>(index)].name;
     e.result_error   = false;
     e.result = before.empty() || before == r.engine.version

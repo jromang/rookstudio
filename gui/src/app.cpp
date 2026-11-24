@@ -49,7 +49,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     if (const auto& w = options_.focus_window; w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
         const auto comma   = w.find(',');
         const auto base    = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
-        lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};
+        lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
     }
     software_at_launch_  = storage_.softwareRendering();
     engines_             = storage_.loadEngines();
@@ -167,6 +167,10 @@ App::~App() {
     for (auto& f : abandoned_scans_) f.wait();
     storage_.saveSetup(setup_);
     storage_.saveEngines(engines_);
+    // The engines offered to Lichess: today's counts written, their services ended (they stay registered, and serve
+    // again at the next start if they served now, #96).
+    if (offers_dirty_) saveOffers();
+    services_.clear();
     keepEngineGame(true);  // a game against an engine being played, for the next launch (#83)
     saveRecentGames();     // the board's game and the recent ones, for the next session
     saveLichessToken();  // a token still being typed when the program quits
@@ -336,9 +340,11 @@ void App::frame() {
     pollEngineGame();       // a game against an engine: kept at each move, its end, a hint (#83)
     pollOnlinePlay();       // playing on Lichess: a seek, the challenges, the game on the Board (#84)
     pollBot();              // a Lichess bot for an engine: its account, its challenges, its game (#85)
+    pollLichessEngines();   // the engines offered to lichess.org: their registrations, guards, requests (#96)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
     pollEnginePicker();
+    pollEngineVersions();  // an engine's old versions deleted once the tournaments that play them are over (#65)
     pollQuestions();  // the answers, the assistant's download, its model unloaded when unused
 
     // --shot and --focus: show the requested page or tab once the first frames are drawn.
@@ -780,10 +786,11 @@ void App::frame() {
             lichess_finished_.push_back(std::move(f));
         } else if (w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
             // lichess-api=http://127.0.0.1:PORT[,WORD]: a test's server in place of lichess.org's API, explorer
-            // (under /explorer) and tablebase (under /tb), on this machine only; then WORD, another of these.
+            // (under /explorer), tablebase (under /tb) and external engines' work host (under /engine), on this
+            // machine only; then WORD, another of these.
             const auto comma   = w.find(',');
             const auto base    = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
-            lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};
+            lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
             if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
         } else if (w.rfind("lichess-playing=", 0) == 0) {
             // lichess-playing=live|correspondence[@FILE[@PLY]][,WORD]: a game of the user's in progress, as Lichess
@@ -1886,6 +1893,8 @@ void App::onRunFinished() {
 
     // The queue goes on after a tournament that ended by itself, not after a stop or an error.
     const bool completed = error.empty() && !run_->stoppedByUser() && !abnormal;
+    // The old versions of the engines it played, freed by its end (#65).
+    if (const auto* t = run_->tournament()) checkVersions(completed && t->finished() ? info.name : std::string());
     if (completed && !queue_.empty() && !quit_pending_) {
         // Held by Pause all: Resume all starts it.
         if (queue_held_) {

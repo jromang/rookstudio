@@ -87,6 +87,21 @@ struct HttpStream {
 // A header's value in the head of an answer, its name matched whatever its case; none when it is not there.
 [[nodiscard]] std::optional<std::string> httpHeader(std::string_view head, std::string_view name);
 
+// A request whose body is sent as it is made (Transfer-Encoding: chunked): an engine's lines streamed to Lichess as it
+// computes them (#96).
+struct HttpUpload {
+    // The next piece of the body, waited for `wait` at most: empty when none came meanwhile, nullopt once the body is
+    // whole.
+    std::function<std::optional<std::string>(std::chrono::milliseconds wait)> next;
+    const std::atomic<bool>* cancel = nullptr;  // set: stops at once
+    int idle_s                      = 30;       // once the body is whole, the answer awaited for so long
+};
+
+// The request, its body given by `upload`. The server may answer, or close the connection, before the body is whole
+// (Lichess's work host does when the one who asked went away): the body stops there, and `whole` is false. The
+// answer's status, head and body otherwise; its error says why there is none ("cancelled" when `cancel` stopped it).
+[[nodiscard]] HttpResult httpUpload(const HttpRequest& request, const HttpUpload& upload, bool* whole = nullptr);
+
 // A chunked body (Transfer-Encoding: chunked) decoded a piece at a time, as it comes.
 class ChunkDecoder {
    public:

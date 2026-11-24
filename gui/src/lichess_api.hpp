@@ -18,6 +18,7 @@ struct Servers {
     std::string api       = "https://lichess.org";
     std::string tablebase = "https://tablebase.lichess.ovh";
     std::string explorer  = "https://explorer.lichess.ovh";
+    std::string engine    = "https://engine.lichess.ovh";  // the external engines' work (#96)
 };
 [[nodiscard]] Servers& servers();
 

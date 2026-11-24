@@ -54,6 +54,7 @@
 #include "engine_import.hpp"
 #include "engine_notes.hpp"
 #include "engine_play.hpp"
+#include "engine_versions.hpp"
 #include "engines.hpp"
 #include "explained.hpp"
 #include "export_sheet.hpp"
@@ -69,6 +70,7 @@
 #include "lichess_board.hpp"
 #include "lichess_bot.hpp"
 #include "lichess_broadcasts.hpp"
+#include "lichess_engine.hpp"
 #include "lichess_evals.hpp"
 #include "lichess_games.hpp"
 #include "lichess_links.hpp"
@@ -2598,6 +2600,71 @@ class App {
     void drawBotGameCard();          // over the Board's column, while it follows the bot's game
     void drawBotRunning(bool home);  // the Home page's "In progress", the Tournaments page's card
     void drawQuitBot();
+    // One of the user's engines offered to lichess.org's analysis board (#96, mockup M13, board 9; lichess_engine.hpp,
+    // view_lichess_engine.cpp). On an engine's card, "On lichess.org, for the analysis": its name at Lichess, the
+    // machine (this one, or one of Settings > Machines), its threads and memory at most; engine:read and engine:write
+    // asked the first time (#45's way); then the engine registered (one request with the token, a secret drawn here and
+    // kept in lichess-engines.json, readable by its owner alone) and served while RookStudio is open: the work host
+    // asked with the secret alone, each request answered by the engine, its lines streamed. Each frame its guards: a
+    // tournament's threads first, the bot's game's, the user's live game (paused), their correspondence games'
+    // positions (answered empty). The Lichess page lists them ("Your engines on lichess.org"), the Home page and the
+    // Tournaments page show them while they serve; the service resumes at the start if it served when RookStudio
+    // closed.
+    std::optional<std::vector<lichess::OfferedEngine>> offers_;
+    std::vector<lichess::OfferedEngine>& offers();  // read once
+    lichess::OfferedEngine* offerOf(const std::string& engine);
+    void saveOffers();
+    struct OfferForm {  // the card's fields while they are open
+        std::string engine;
+        std::array<char, 256> name{};
+        std::string machine;
+        int threads = 1, hash_mb = 256;
+        bool asked = false;  // "Offer to Lichess…" pressed: the permissions asked, or the registration made
+    };
+    std::optional<OfferForm> offer_form_;
+    std::string offer_after_link_;  // the engine registered once the account is linked with the permissions
+    struct OfferCall {              // a request about a registration, under way
+        std::string engine;
+        enum class Kind { Register, Update, Withdraw } kind = Kind::Register;
+        std::future<lichess::Answer<lichess::ExternalEngine>> result;
+        std::future<std::string> withdrawn;
+        lichess::OfferedEngine offer;  // what it registers, its secret drawn
+    };
+    std::vector<OfferCall> offer_calls_;
+    std::map<std::string, std::string> offer_errors_;  // by engine: why the last request about it gave nothing
+    struct LichessService {
+        std::unique_ptr<lichess::EngineService> service;
+        lichess::ServiceStatus status;
+        uint64_t version = 0;
+        EngineEntry engine;  // as it runs: here, or on its machine
+    };
+    std::map<std::string, LichessService> services_;               // by engine, those in service
+    std::vector<std::future<void>> retired_services_;              // stopped, their threads ending
+    std::map<std::string, lichess::ServiceStatus> service_ended_;  // why a service ended by itself, by engine
+    bool offers_resumed_ = false;                                  // those in service at the last close, started
+    bool offers_dirty_   = false;                                  // today's counts to write
+    std::chrono::steady_clock::time_point offers_written_{};
+    bool lichess_engine_enter_ = false;  // the card's form takes Enter this frame (not the bot's Put online)
+    std::string service_stop_;           // "Stop the service" pressed while a card drew it: stopped at the next frame
+    void pollLichessEngines();
+    void openOfferForm(const EngineEntry& e);
+    void offerEngine(const std::string& engine);  // the form's "Offer to Lichess…": the permissions, then the request
+    void startService(const std::string& engine);
+    void stopService(const std::string& engine);  // "Stop the service": not serving at the next start either
+    void withdrawOffer(const std::string& engine);
+    void registerAgain(const std::string& engine);    // a new secret, after Lichess refused the last one (401)
+    [[nodiscard]] bool engineScopes() const;          // the linked account's token may register engines
+    [[nodiscard]] int lichessServiceThreads() const;  // the threads its requests take now here, in the core budget
+    // The engine as the service runs it: the library's, or its copy on the machine chosen (an empty error then).
+    [[nodiscard]] std::optional<EngineEntry> serviceEngine(const lichess::OfferedEngine& o, std::string& error) const;
+    [[nodiscard]] static bool knowsChess960(const EngineEntry& e);            // false only once its options say so
+    [[nodiscard]] std::string serviceState(const std::string& engine) const;  // in a few words, for the lists
+    void drawLichessEnginePart(const EngineEntry& e);                         // on the engine's card
+    void drawLichessEngineLine(const EngineEntry& e);
+    void drawLichessEngineForm(const EngineEntry& e);
+    void drawLichessEngineService(const EngineEntry& e, lichess::OfferedEngine& o);
+    void drawLichessEnginesCard();             // the Lichess page's "Your engines on lichess.org"
+    void drawLichessEngineRunning(bool home);  // the Home page's "In progress", the Tournaments page's card
     // From the Board to lichess.org (#54, mockup M8, board "Lien"): the position opened on the analysis board, the
     // game shared, the position played out (an open challenge), a game of Lichess bookmarked; what each sends said
     // beside it, and nothing on the line of a game being played (R17).
@@ -3067,6 +3134,56 @@ class App {
     void askReleases(PickerEngine& e);  // queued; the profile's copy of the last day, else GitHub
     void openEnginePicker();
     void pollEnginePicker();  // every frame: the catalogue, the answers, the installs
+    // An engine's old versions (#65, decided in M9, point 5; engine_versions.hpp, view_engine_versions.cpp): once an
+    // update retired one, its folder is deleted when no tournament that is not over plays it, checked again at the end
+    // of each tournament; "Keep … too" keeps one for good. The card lists the versions on the disk; a notice at the
+    // window's corner says each one deleted.
+    struct VersionCheck {
+        std::future<std::vector<catalogue::Deleted>> result;
+        std::string ended;     // the tournament whose end asked for it
+        std::string replaced;  // the version an update brought, when an update asked for it
+    };
+    std::optional<VersionCheck> version_check_;
+    bool version_check_again_ = false;  // asked while one ran: what it says next
+    std::string version_check_ended_, version_check_replaced_;
+    std::shared_ptr<tour::SummaryCache> version_summaries_ = std::make_shared<tour::SummaryCache>();
+    struct VersionNotice {
+        std::string text;
+        bool warning = false;
+        std::string engine;  // the library's engine whose card it opens
+        std::chrono::steady_clock::time_point since;
+    };
+    std::vector<VersionNotice> version_notices_;
+    struct VersionsShown {
+        std::string id;
+        std::vector<catalogue::DiskVersion> versions;
+        std::chrono::steady_clock::time_point at;
+    };
+    std::optional<VersionsShown> versions_shown_;  // the card's list, read again every few seconds
+    std::string version_armed_;                    // "Stop keeping it" or "Delete it" pressed once: its folder
+    // A button of the card pressed: done at the next frame's start, the library changing (the card holds an engine of
+    // it by reference while it draws).
+    struct VersionAction {
+        bool keep = true;  // "Keep … too"; else "Stop keeping it" or "Delete it"
+        catalogue::DiskVersion version;
+    };
+    std::optional<VersionAction> version_action_;
+    struct VersionDownload {
+        std::string id, version;
+        std::shared_ptr<DownloadProgress> progress = std::make_shared<DownloadProgress>();
+        std::shared_ptr<std::atomic<bool>> cancel  = std::make_shared<std::atomic<bool>>(false);
+        std::future<catalogue::InstallResult> result;
+    };
+    std::optional<VersionDownload> version_download_;
+    std::string version_download_error_;
+    bool versions_checked_ = false;  // once at the start
+    void checkVersions(std::string ended = {}, std::string replaced = {});
+    void pollEngineVersions();
+    [[nodiscard]] std::vector<catalogue::ProgramUser> programUsers() const;  // the tournaments not over
+    void drawEngineVersions(const EngineEntry& e);      // on the card of an engine taken from the picker
+    void drawVersionNotice();                           // a version deleted, at the window's corner
+    void keepVersion(const catalogue::DiskVersion& v);  // "Keep … too": an engine of its own in the library
+    void dropVersion(const catalogue::DiskVersion& v);  // "Stop keeping it", "Delete it"
     void drawEnginePicker();  // in place of the Engines page while open
     void installPicked(PickerEngine& e, bool keep_old = false);
     void pickerInstalled(PickerEngine& e, catalogue::InstallResult result);

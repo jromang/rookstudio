@@ -1762,7 +1762,7 @@ void App::drawOnlineGameEnd() {
     // A tournament's game (#95): back to it; else another game, the same seek.
     const auto clock = onlineSettings().seekClock();
     if (lichess::tournamentGame(s)) {
-        if (primaryButton(TR("The tournament##online_end"))) {
+        if (primaryButton(TR("Back to the tournament##online_end"))) {
             if (swiss_play_ && s.swiss == swiss_play_->id && swiss_play_->info.value)
                 chooseSwiss(*swiss_play_->info.value);
             else if (arena_play_)

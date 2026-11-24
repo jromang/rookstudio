@@ -432,7 +432,7 @@ void App::drawTournamentList(std::size_t database) {
                 std::string said    = systemName(system);
                 if (system.system == study::TournamentSystem::Team ||
                     system.system == study::TournamentSystem::Knockout)
-                    said = trf("{}: later", said);
+                    said = trf("{}: in a later version", said);
                 else if (e.shape.uncertain && !settings.system)
                     said += " ?";
                 const bool later = system.system == study::TournamentSystem::Team ||
@@ -643,17 +643,17 @@ bool App::crossTiebreakMenu(std::vector<study::Tiebreak>& order, int index, cons
         ImGui::TextDisabled("%s", tiebreakHelp(order[static_cast<std::size_t>(index)]));
         ImGui::PopTextWrapPos();
         ImGui::Separator();
-        if (index > 0 && ImGui::MenuItem(TR("First"))) {
+        if (index > 0 && ImGui::MenuItem(TR("Move first"))) {
             const auto t = order[static_cast<std::size_t>(index)];
             order.erase(order.begin() + index);
             order.insert(order.begin(), t);
             changed = true;
         }
-        if (index > 0 && ImGui::MenuItem(TR("Earlier"))) {
+        if (index > 0 && ImGui::MenuItem(TR("Move up"))) {
             std::swap(order[static_cast<std::size_t>(index)], order[static_cast<std::size_t>(index - 1)]);
             changed = true;
         }
-        if (index + 1 < n && ImGui::MenuItem(TR("Later"))) {
+        if (index + 1 < n && ImGui::MenuItem(TR("Move down"))) {
             std::swap(order[static_cast<std::size_t>(index)], order[static_cast<std::size_t>(index + 1)]);
             changed = true;
         }

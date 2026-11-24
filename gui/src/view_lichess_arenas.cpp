@@ -805,7 +805,7 @@ void App::drawLichessArenasCard() {
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
                 ImGui::TextUnformatted(a->state == lichess::TourState::Created
-                                           ? trf("{} joined", ui::exactCount(a->players)).c_str()
+                                           ? trn("{} joined", "{} joined", a->players, ui::exactCount(a->players)).c_str()
                                            : ui::exactCount(a->players).c_str());
                 ImGui::TableNextColumn();
                 if (ImGui::SmallButton(TR("Follow"))) followTournament(a->id, a->name, false);
@@ -915,7 +915,7 @@ void App::drawLichessSwissList() {
         ImGui::PopFont();
         std::string more = trn("{} round", "{} rounds", s.rounds, s.rounds) + " · " + clockOf(s.limit_s, s.increment_s);
         if (s.state == lichess::TourState::Created)
-            more += " · " + startText(s.starts_at) + " · " + trf("{} joined", ui::exactCount(s.players));
+            more += " · " + startText(s.starts_at) + " · " + trn("{} joined", "{} joined", s.players, ui::exactCount(s.players));
         else if (s.state == lichess::TourState::Started)
             more += " · " + trf("round {} of {}", s.round, s.rounds) + " · " +
                     trn("{} player", "{} players", s.players, ui::exactCount(s.players));
@@ -2017,7 +2017,7 @@ void App::drawSwissKeepMenu() {
     }
     if (!ImGui::BeginPopup(kId)) return;
     auto& sh               = shelf();
-    const std::string name = "Lichess tournaments";
+    const std::string name = TR("Lichess tournaments");  // as the Broadcasts database is named
     ImGui::TextDisabled("%s", TR("Keep the Swiss in"));
     std::vector<std::size_t> order;
     for (std::size_t i = 0; i < sh.entries().size(); ++i)
@@ -2064,7 +2064,7 @@ void App::drawArenaHome() {
         if (const auto left = arenaTimeLeft(); !left.empty()) line += " · " + trf("{} left", left);
         ImGui::TextUnformatted(line.c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton(arenaGameOn() ? TR("Back to the game##home_arena") : TR("Back to it##home_arena"))) {
+        if (ImGui::SmallButton(arenaGameOn() ? TR("Back to the game##home_arena") : TR("Back to the arena##home_arena"))) {
             if (arenaGameOn())
                 backToOnlineGame();
             else

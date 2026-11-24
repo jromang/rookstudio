@@ -198,7 +198,7 @@ std::string afterMoveWords(const lichess::TablebaseMove& move, chess::Color move
 }
 
 std::string tablesSource(bool online, int pieces, int disk_pieces) {
-    if (!online) return trf("your tables on the disk (Syzygy, up to {} pieces)", disk_pieces);
+    if (!online) return trf("Your tables on the disk (Syzygy, up to {} pieces)", disk_pieces);
     if (pieces > 7) return TR("Lichess's 8-piece tables (op1)");
     if (disk_pieces <= 0) return TR("Lichess's 7-piece tables (none on your disk)");
     return trf("Lichess's 7-piece tables (yours on the disk go up to {} pieces)", disk_pieces);

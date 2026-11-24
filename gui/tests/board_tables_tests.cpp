@@ -220,7 +220,7 @@ TEST_CASE("endgames tab: the words of each distance and verdict") {
     CHECK(tablesGroupTitle(TablesGroup::Draw, TablesGroup::Win) == "Throw the win away: a draw");
     CHECK(tablesGroupTitle(TablesGroup::Win, TablesGroup::Win) == "Keep the win");
     CHECK(tablesGroupTitle(TablesGroup::Loss, TablesGroup::Loss) == "Lose: the longest resistance first");
-    CHECK(tablesSource(false, 4, 5) == "your tables on the disk (Syzygy, up to 5 pieces)");
+    CHECK(tablesSource(false, 4, 5) == "Your tables on the disk (Syzygy, up to 5 pieces)");
     CHECK(tablesSource(true, 7, 5) == "Lichess's 7-piece tables (yours on the disk go up to 5 pieces)");
     CHECK(tablesSource(true, 7, 0) == "Lichess's 7-piece tables (none on your disk)");
     CHECK(tablesSource(true, 8, 5) == "Lichess's 8-piece tables (op1)");

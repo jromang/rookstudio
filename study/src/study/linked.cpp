@@ -145,6 +145,8 @@ std::shared_ptr<LinkedDatabase> LinkedDatabase::open(const fs::path& cache, cons
     fs::create_directories(cache, ec);
     const auto dir = cache / (linked->key_ + ".fcgdb");
     linked->db_    = fs::exists(dir / "manifest.json", ec) ? Database::open(dir) : Database::create(dir);
+    // A copy with a segment that no longer reads: made again from its source, which has the games.
+    if (!linked->db_->snapshot()->unreadable().empty()) linked->rebuild();
     return linked;
 }
 

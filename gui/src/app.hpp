@@ -566,7 +566,8 @@ class App {
         std::size_t confirm = 0;           // the proposal answered with ↑ ↓ Enter
         std::map<std::size_t, int> picks;  // a proposal's candidate chosen; -1: none of them, another player
         std::set<std::size_t> answered;    // the proposals confirmed or set aside this time
-        // The check and the compaction.
+        // The check and the compaction. A segment that could not be read when the database was opened (#97) makes a
+        // report at once, as a check's.
         std::optional<study::CheckReport> check;
         std::time_t checked = 0;
         std::optional<study::Compacted> compacted;
@@ -582,12 +583,14 @@ class App {
             std::string what;
             std::vector<study::GameState> states;       // the games put back
             std::optional<study::PlayerTable> players;  // the table of names put back
+            bool kept = false;                          // the damaged segments put back: Database::undoKeepReadable()
         };
         std::vector<Undo> undo;
     };
     std::optional<Care> care_;
     struct CareJob {
-        enum class Kind { Duplicates, Names, Check, Compact, Merge, Players, Restore };
+        // Keep: the segments that cannot be read written again, their games set aside (#97).
+        enum class Kind { Duplicates, Names, Check, Compact, Merge, Players, Restore, Keep };
         Kind kind = Kind::Duplicates;
         std::filesystem::path folder;
         std::atomic<bool> cancel{false};
@@ -609,6 +612,8 @@ class App {
         std::optional<Care::Undo> undo;  // a change's, pushed when it is done
         std::string said, error;
         std::size_t merged = 0;
+        uint64_t set_aside = 0;      // Keep: the games set aside
+        bool kept          = false;  // Restore: Keep what can be read undone, the damaged segments back
         bool crosstable    = false;  // asked from a tournament's crosstable (#92): its undo there
     };
     std::unique_ptr<CareJob> care_job_;
@@ -620,6 +625,9 @@ class App {
                           bool crosstable = false);
     // A change undone: the games and the table of names put back.
     void startCareRestore(std::size_t index, Care::Undo undo, bool crosstable);
+    // "Keep what can be read" of a database with segments that cannot be read (#97): written again in the background,
+    // their games and `damaged` set aside; undone until RookStudio closes.
+    void startCareKeep(std::size_t index, std::vector<study::GameId> damaged);
     // FIDE's rating list (fide_rating_list.hpp): kept in the profile, read when needed, offered each month.
     [[nodiscard]] const fide::Kept* fideKept();
     [[nodiscard]] std::shared_ptr<const study::FideList> fideList();

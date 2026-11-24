@@ -88,6 +88,52 @@ study::Filter quickFilter(std::string_view text) {
     return filter;
 }
 
+DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot) {
+    DamageSummary out;
+    for (const auto& bad : report.segments) {
+        DamageSummary::Segment s;
+        // seg-000007: 7.
+        auto digits = bad.name.substr(std::min(bad.name.find_first_of("0123456789"), bad.name.size()));
+        while (digits.size() > 1 && digits.front() == '0') digits.erase(0, 1);
+        s.number = digits.empty() ? bad.name : digits;
+        // "/…/seg-000007: damaged games" → "damaged games"; "cannot open /…/seg-000007/moves.bin" → "cannot open
+        // moves.bin" (the folders' names may hold spaces, a drive's letter its colon).
+        s.why = bad.error;
+        if (const auto colon = s.why.rfind(": "); colon != std::string::npos) {
+            s.why = s.why.substr(colon + 2);
+        } else if (auto start = s.why.find_first_of("/\\"); start != std::string::npos) {
+            if (start >= 2 && s.why[start - 1] == ':') start -= 2;
+            s.why = s.why.substr(0, start) + s.why.substr(s.why.find_last_of("/\\") + 1);
+        }
+        s.names_lost = !bad.names_kept;
+        s.missing    = bad.missing;
+        out.segments.push_back(std::move(s));
+    }
+    // A damaged game of those segments: one they add, or one whose last version they hold (it cannot be read since
+    // the database was opened). The ids are sorted: the games a segment adds are counted by halving, said each frame.
+    std::vector<std::pair<study::GameId, study::GameId>> ranges;
+    for (const auto& bad : report.segments)
+        if (!bad.versions && bad.games > 0) ranges.emplace_back(bad.first, bad.first + bad.games);
+    std::sort(ranges.begin(), ranges.end());
+    auto at = report.damaged.begin();
+    for (const auto& [from, to] : ranges) {
+        for (const auto first = std::lower_bound(at, report.damaged.end(), from); at != first; ++at)
+            ++(*at < snapshot.games() && !snapshot.readable(*at) ? out.in_segments : out.elsewhere);
+        const auto last = std::lower_bound(at, report.damaged.end(), to);
+        out.in_segments += static_cast<uint64_t>(last - at);
+        at = last;
+    }
+    for (; at != report.damaged.end(); ++at)
+        ++(*at < snapshot.games() && !snapshot.readable(*at) ? out.in_segments : out.elsewhere);
+    for (const auto& [source, n] : report.damaged_sources) {
+        out.sources.emplace_back(source, n);
+        const fs::path file(std::u8string(source.begin(), source.end()));  // kept in UTF-8
+        std::error_code ec;
+        if (!source.empty() && fs::is_regular_file(file, ec)) out.files.push_back(file);
+    }
+    return out;
+}
+
 DatabaseShelf::DatabaseShelf(fs::path profile) : profile_(std::move(profile)) {
     std::ifstream in(listFile(profile_), std::ios::binary);
     if (in) {
@@ -305,8 +351,9 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
     const auto snapshot = db->snapshot();
     auto& cached        = facts_[index];
     if (cached.generation == snapshot->generation() && cached.facts.read_only == db->readOnly()) return cached.facts;
-    out.read_only = db->readOnly();
-    out.games     = snapshot->games() - snapshot->deletedCount();
+    out.read_only  = db->readOnly();
+    out.games      = snapshot->games() - snapshot->deletedCount();
+    out.unreadable = snapshot->unreadableGames();
     out.names = snapshot->names();
     out.bytes = folderBytes(entries_[index].folder);
     std::error_code ec;

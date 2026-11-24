@@ -206,9 +206,15 @@ std::string segmentName(uint64_t number) {
 
 class Segment {
    public:
-    Segment(const fs::path& dir, uint32_t expected_games, uint32_t expected_names)
-        : cols_(dir / "cols.bin"), moves_(dir / "moves.bin"), annex_(dir / "annex.bin"), names_(dir / "names.bin") {
+    // `names_known`: false for names written as "?" in place of names lost (Database::keepReadable()).
+    Segment(const fs::path& dir, uint32_t expected_games, uint32_t expected_names, bool names_known = true)
+        : cols_(dir / "cols.bin"),
+          moves_(dir / "moves.bin"),
+          annex_(dir / "annex.bin"),
+          names_(dir / "names.bin"),
+          names_known_(names_known) {
         const auto* c = cols_.data();
+        cols_data_    = c;
         if (cols_.size() < HEADER_SIZE || std::memcmp(c, MAGIC.data(), MAGIC.size()) != 0)
             throw std::runtime_error(dir.string() + ": not a segment");
         version_ = readAt<uint32_t>(c, 8, 0);
@@ -236,15 +242,54 @@ class Segment {
         }
     }
 
+    // A segment that cannot be read, in its place (Database::load()): the games and names the manifest gives it, its
+    // records read as one empty game (record 0, `blank_name` its names), its names those of its names.bin when that
+    // still reads with the manifest's count, else "?".
+    struct Unreadable {};
+    Segment(Unreadable, const fs::path& dir, uint32_t games, uint32_t names, uint32_t blank_name, bool names_known)
+        : version_(VERSION), games_(games), name_count_(names), unreadable_(true) {
+        at_ = layout(1);
+        blank_.assign(at_[COLUMNS], 0);
+        for (int c = 0; c < NAME_COLUMNS; ++c)
+            std::memcpy(blank_.data() + at_[static_cast<std::size_t>(c)], &blank_name, sizeof blank_name);
+        blank_[at_[RESULT]] = static_cast<uint8_t>('*');
+        cols_data_          = blank_.data();
+        names_known_        = names_known && readNames(dir / "names.bin", names, names_, name_offsets_);
+    }
+
+    // Whether `file` holds `count` names, one a line: their offsets then, and the file mapped.
+    static bool readNames(const fs::path& file, uint32_t count, MappedFile& names, std::vector<uint32_t>& offsets) {
+        try {
+            names = MappedFile(file);
+        } catch (const std::exception&) {
+            return false;
+        }
+        offsets.clear();
+        offsets.reserve(std::size_t{count} + 1);
+        offsets.push_back(0);
+        for (std::size_t i = 0; i < names.size(); ++i)
+            if (names.data()[i] == '\n') offsets.push_back(static_cast<uint32_t>(i + 1));
+        if (offsets.size() == std::size_t{count} + 1 && (names.size() == 0 || names.data()[names.size() - 1] == '\n'))
+            return true;
+        names = MappedFile();
+        offsets.clear();
+        return false;
+    }
+
     [[nodiscard]] uint32_t games() const noexcept { return games_; }
     [[nodiscard]] uint32_t nameCount() const noexcept { return name_count_; }
     [[nodiscard]] std::string_view name(uint32_t local) const {
+        if (name_offsets_.empty()) return "?";  // lost with a segment that cannot be read
         const auto from = name_offsets_[local], to = name_offsets_[local + 1] - 1;
         return {reinterpret_cast<const char*>(names_.data()) + from, to - from};
     }
+    // Whether its names read as they were written ("?" in place of names lost otherwise).
+    [[nodiscard]] bool namesKnown() const noexcept { return names_known_; }
+    // A segment that could not be read: its records are one empty game.
+    [[nodiscard]] bool unreadable() const noexcept { return unreadable_; }
     template <typename T>
     [[nodiscard]] T value(Column column, std::size_t i) const {
-        return readAt<T>(cols_.data(), at_[column], i);
+        return readAt<T>(cols_data_, at_[column], i);
     }
     [[nodiscard]] std::span<const uint8_t> moves(std::size_t i) const {
         const auto from = value<uint64_t>(MOVES, i), to = value<uint64_t>(MOVES, i + 1);
@@ -290,9 +335,13 @@ class Segment {
 
    private:
     MappedFile cols_, moves_, annex_, names_, sig_;
+    const uint8_t* cols_data_ = nullptr;  // the columns: cols.bin's, or the empty game's of a segment not read
+    std::vector<uint8_t> blank_;          // that empty game's columns
     uint32_t version_    = 0;
     uint32_t games_      = 0;
     uint32_t name_count_ = 0;
+    bool names_known_    = true;
+    bool unreadable_     = false;
     std::array<std::size_t, COLUMNS + 1> at_{};
     std::vector<uint32_t> name_offsets_;
 };
@@ -409,14 +458,18 @@ uint64_t duplicateKey(const ImportedGame& game) {
 
 std::pair<const Segment*, std::size_t> Snapshot::locate(GameId id) const {
     if (id >= games_) throw std::out_of_range("no such game");
+    // A segment that cannot be read gives its one empty game for each of its own.
+    const auto at = [](const Segment* segment, std::size_t i) {
+        return std::pair<const Segment*, std::size_t>{segment, segment->unreadable() ? 0 : i};
+    };
     if (!replaced_.empty()) {
         const auto v = std::lower_bound(replaced_.begin(), replaced_.end(), id,
                                         [](const Version& r, GameId x) { return r.id < x; });
-        if (v != replaced_.end() && v->id == id) return {segments_[v->segment].get(), v->local};
+        if (v != replaced_.end() && v->id == id) return at(segments_[v->segment].get(), v->local);
     }
     const auto it = std::upper_bound(first_game_.begin(), first_game_.end(), id);
     const auto s  = static_cast<std::size_t>(it - first_game_.begin()) - 1;
-    return {segments_[logical_[s]].get(), static_cast<std::size_t>(id - first_game_[s])};
+    return at(segments_[logical_[s]].get(), static_cast<std::size_t>(id - first_game_[s]));
 }
 
 std::string_view Snapshot::name(uint32_t id) const {
@@ -624,8 +677,70 @@ GameState Snapshot::state(GameId id) const {
     const auto v =
         std::lower_bound(replaced_.begin(), replaced_.end(), id, [](const Version& r, GameId x) { return r.id < x; });
     if (v != replaced_.end() && v->id == id) out.version = std::pair{v->segment, v->local};
-    out.deleted = deleted(id);
+    out.deleted = deletedByEdit(id);
     return out;
+}
+
+std::vector<GameId> Snapshot::unreadableIds() const {
+    std::vector<GameId> out;
+    out.reserve(static_cast<std::size_t>(unreadable_count_));
+    for (std::size_t w = 0; w < unreadable_.size(); ++w) {
+        auto bits = unreadable_[w] & ~(w < deleted_.size() ? deleted_[w] : uint64_t{0});
+        for (; bits; bits &= bits - 1) out.push_back(w * 64 + static_cast<GameId>(std::countr_zero(bits)));
+    }
+    return out;
+}
+
+void Snapshot::settle() {
+    unknown_names_.clear();
+    for (std::size_t s = 0; s < segments_.size(); ++s)
+        if (!segments_[s]->namesKnown() && segments_[s]->nameCount() > 0)
+            unknown_names_.emplace_back(first_name_[s], first_name_[s] + segments_[s]->nameCount());
+    unreadable_.clear();
+    unreadable_count_ = 0;
+    unreadable_edits_ = 0;
+    if (unreadable_segments_.empty()) return;
+    // Their games: those a segment that adds games holds, but those replaced (their versions read), and those whose
+    // version is in a segment of versions that cannot be read.
+    unreadable_.assign(static_cast<std::size_t>((games_ + 63) / 64), 0);
+    const auto set      = [&](GameId id) { unreadable_[id / 64] |= uint64_t{1} << (id % 64); };
+    const auto replaced = [&](GameId id) {
+        const auto v = std::lower_bound(replaced_.begin(), replaced_.end(), id,
+                                        [](const Version& r, GameId x) { return r.id < x; });
+        return v != replaced_.end() && v->id == id;
+    };
+    // The tree built before they could no longer be read holds their games: not that of these edits.
+    uint64_t mix = 0xcbf29ce484222325ULL;
+    for (const unsigned char c : std::to_string(edits_generation_)) mix = (mix ^ c) * 0x100000001b3ULL;
+    for (const auto& bad : unreadable_segments_) {
+        for (const unsigned char c : bad.name) mix = (mix ^ c) * 0x100000001b3ULL;
+        if (bad.versions) continue;
+        for (GameId id = bad.first; id < bad.first + bad.games; ++id)
+            if (!replaced(id)) set(id);
+    }
+    for (const auto& v : replaced_)
+        if (segments_[v.segment]->unreadable()) set(v.id);
+    for (std::size_t w = 0; w < unreadable_.size(); ++w)
+        unreadable_count_ +=
+            static_cast<uint64_t>(std::popcount(unreadable_[w] & ~(w < deleted_.size() ? deleted_[w] : uint64_t{0})));
+    unreadable_edits_ = uint64_t{1} << 63 | mix >> 1;  // never a generation's
+}
+
+std::optional<uint32_t> Snapshot::blankName() const {
+    for (const std::string_view wanted : {std::string_view(), std::string_view("?")})
+        for (std::size_t s = 0; s < segments_.size(); ++s)
+            for (uint32_t local = 0; local < segments_[s]->nameCount(); ++local)
+                if (segments_[s]->name(local) == wanted) return first_name_[s] + local;
+    return std::nullopt;
+}
+
+CheckReport unreadableReport(const Snapshot& snapshot) {
+    CheckReport report;
+    report.games    = snapshot.games() - snapshot.deletedCount();
+    report.segments = snapshot.unreadable();
+    report.damaged  = snapshot.unreadableIds();
+    for (const auto id : report.damaged) ++report.damaged_sources[snapshot.source(id)];
+    return report;
 }
 
 std::vector<Snapshot::SegmentInfo> Snapshot::segmentInfos() const {
@@ -709,7 +824,7 @@ bool Database::refresh() {
     return true;
 }
 
-void Database::load(bool clean) {
+void Database::load(bool clean, int tries) {
     nlohmann::json manifest;
     try {
         std::ifstream in(dir_ / MANIFEST, std::ios::binary);
@@ -725,12 +840,39 @@ void Database::load(bool clean) {
     auto snap         = std::make_shared<Snapshot>();
     snap->generation_ = manifest.value("generation", uint64_t{0});
     std::vector<std::string> named;
+    // A segment that cannot be read (a file of it cut short, missing, or not a segment's: damaged while the database
+    // was closed) keeps its place, its games and names counted as the manifest gives them (#97).
+    struct Unread {
+        std::size_t index = 0;
+        BadSegment bad;
+        bool names_known = true;
+    };
+    std::vector<Unread> unread;
     for (const auto& s : manifest.at("segments")) {
-        const auto name     = s.at("name").get<std::string>();
-        const auto games    = s.at("games").get<uint32_t>();
-        const auto names    = s.at("names").get<uint32_t>();
-        const bool versions = s.value("versions", false);
-        auto segment        = std::make_shared<const Segment>(dir_ / name, games, names);
+        const auto name       = s.at("name").get<std::string>();
+        const auto games      = s.at("games").get<uint32_t>();
+        const auto names      = s.at("names").get<uint32_t>();
+        const bool versions   = s.value("versions", false);
+        const bool names_lost = s.value("unknown_names", false);  // written as "?" by keepReadable()
+        std::shared_ptr<const Segment> segment;
+        try {
+            segment = std::make_shared<const Segment>(dir_ / name, games, names, !names_lost);
+        } catch (const std::exception& e) {
+            segment = std::make_shared<const Segment>(Segment::Unreadable{}, dir_ / name, games, names, 0, !names_lost);
+            unread.push_back({snap->segments_.size(),
+                              {name, versions ? GameId{0} : snap->games_, games, versions, e.what(),
+                               s.value("source", std::string()), names == 0 || segment->namesKnown()},
+                              !names_lost});
+            // A file missing, or one changed: said apart (sig.bin only where its format has one, as the error says).
+            const std::string why = e.what();
+            std::error_code ec;
+            bool missing = !fs::is_directory(dir_ / name, ec);
+            for (const char* file : {"cols.bin", "moves.bin", "annex.bin", "names.bin", "sig.bin"}) {
+                if (std::string_view(file) == "sig.bin" && why.find("sig.bin") == std::string::npos) continue;
+                missing = missing || !fs::exists(dir_ / name / file, ec);
+            }
+            unread.back().bad.missing = missing;
+        }
         if (!versions) {
             snap->logical_.push_back(snap->segments_.size());
             snap->first_game_.push_back(snap->games_);
@@ -746,6 +888,17 @@ void Database::load(bool clean) {
         unsigned long long number = 0;
         std::sscanf(name.c_str(), "seg-%llu", &number);
         next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
+    }
+    // Read-only, a segment that the other program removed as it committed (a compaction's, an undoing's) is no damage:
+    // read again once its manifest has settled.
+    if (!lock_ && !unread.empty() && tries > 0) {
+        uint64_t now = snap->generation_ + 1;  // a manifest being replaced as it is read has changed too
+        try {
+            std::ifstream in(dir_ / MANIFEST, std::ios::binary);
+            now = nlohmann::json::parse(in).value("generation", uint64_t{0});
+        } catch (const std::exception&) {
+        }
+        if (now != snap->generation_) return load(clean, tries - 1);
     }
     // The edits it names: the games replaced and those deleted.
     const auto edits        = manifest.value("edits", std::string());
@@ -786,6 +939,18 @@ void Database::load(bool clean) {
         snap->players_      = std::make_shared<const PlayerTable>(PlayerTable::fromBytes(text));
         snap->players_file_ = players;
     }
+    // The segments that cannot be read: their one empty game named as games without names are.
+    if (!unread.empty()) {
+        const auto blank = snap->blankName().value_or(0);
+        for (auto& u : unread) {
+            const auto& entry        = manifest.at("segments")[u.index];
+            snap->segments_[u.index] = std::make_shared<const Segment>(
+                Segment::Unreadable{}, dir_ / u.bad.name, static_cast<uint32_t>(u.bad.games),
+                entry.at("names").get<uint32_t>(), blank, u.names_known);
+            snap->unreadable_segments_.push_back(std::move(u.bad));
+        }
+    }
+    snap->settle();
     // What a commit cut short left: segments the manifest does not name, and the new manifest not yet renamed over
     // the old one (a killed program leaves it); edits it does not name. A number such a leftover segment holds is not
     // used again, should it not go.
@@ -828,7 +993,9 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
                       const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
                       const PlayerTable* players, const std::string& source) {
     if (!names_indexed_) {
-        for (uint32_t id = 0; id < current_->names_; ++id) name_ids_.emplace(std::string(current_->name(id)), id);
+        // A name lost with a segment that cannot be read is no game's to come: it reads "?" for its own.
+        for (uint32_t id = 0; id < current_->names_; ++id)
+            if (current_->nameKnown(id)) name_ids_.emplace(std::string(current_->name(id)), id);
         names_indexed_ = true;
     }
     std::vector<std::string> added;                     // the names this append adds, all segments
@@ -1049,6 +1216,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         snap->deleted_count_ = 0;
         for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
     }
+    snap->settle();
     // The files before, unless a compaction keeps them for its undoing: read by nobody, they are in memory.
     const auto kept = [&](const std::string& name) {
         return leftovers_ &&
@@ -1326,7 +1494,12 @@ bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
                 if (((stored[21] & SIG_PROMOTED) != 0) != again.promoted) return false;
             }
         }
-        return duplicateKey(game) == segment.value<uint64_t>(KEY, i);
+        // A name lost with a segment that cannot be read reads "?": the key made of it cannot be made again.
+        const bool known =
+            snap.nameKnown(segment.value<uint32_t>(WHITE, i)) && snap.nameKnown(segment.value<uint32_t>(BLACK, i)) &&
+            snap.nameKnown(segment.value<uint32_t>(EVENT, i)) && snap.nameKnown(segment.value<uint32_t>(SITE, i)) &&
+            snap.nameKnown(segment.value<uint32_t>(ROUND, i));
+        return !known || duplicateKey(game) == segment.value<uint64_t>(KEY, i);
     } catch (const std::exception&) {
         return false;
     }
@@ -1370,12 +1543,18 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
             return id;
         };
         std::shared_ptr<const Segment> segment;
+        const auto names = snap->segments_[s]->nameCount();
         try {
-            segment = std::make_shared<const Segment>(dir_ / info.name, info.games, snap->segments_[s]->nameCount());
+            segment = std::make_shared<const Segment>(dir_ / info.name, info.games, names);
         } catch (const std::exception& e) {
-            report.segments.push_back({info.name, info.first, info.games, info.versions, e.what(), info.source});
+            MappedFile file;
+            std::vector<uint32_t> offsets;
+            const bool names_kept =
+                names == 0 || Segment::readNames(dir_ / info.name / "names.bin", names, file, offsets);
+            report.segments.push_back(
+                {info.name, info.first, info.games, info.versions, e.what(), info.source, names_kept});
             for (std::size_t i = 0; i < info.games; ++i)
-                if (const auto id = gameOf(i); id && !snap->deleted(*id)) damaged.push_back(*id);
+                if (const auto id = gameOf(i); id && !snap->deletedByEdit(*id)) damaged.push_back(*id);
             progress.done += info.games;
             continue;
         }
@@ -1441,6 +1620,7 @@ bool staleSegment(const Snapshot& snap, const Snapshot::SegmentInfo& info) {
 CompactPlan Database::compactPlan() const {
     const auto snap = snapshot();
     CompactPlan plan;
+    if (!snap->unreadable().empty()) return plan;  // keepReadable() first: those segments cannot be copied
     const auto infos = snap->segmentInfos();
     // What the segments written again take now, and what their new files will take.
     uint64_t before = 0, after = 0;
@@ -1477,7 +1657,8 @@ CompactPlan Database::compactPlan() const {
 namespace {
 
 // A segment's files written in folder `tmp`: `n` records, each copied from (segment, record) or emptied when deleted,
-// its names those of `names`.
+// its names those of `names`. A record without a segment is a game set aside whose record could not be read: no
+// headers, its names `blank_name`.
 struct RecordSource {
     const Segment* segment = nullptr;
     std::size_t index      = 0;
@@ -1485,7 +1666,8 @@ struct RecordSource {
 };
 
 void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records, std::string_view names,
-                  uint32_t name_count, const std::atomic<bool>& cancel, std::atomic<uint64_t>& done) {
+                  uint32_t name_count, const std::atomic<bool>& cancel, std::atomic<uint64_t>& done,
+                  uint32_t blank_name = 0) {
     const auto n  = records.size();
     const auto at = layout(n);
     std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
@@ -1499,7 +1681,15 @@ void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records,
     put32(16, name_count);
     for (std::size_t k = 0; k < n; ++k) {
         if ((k & 0xFFF) == 0 && cancel.load(std::memory_order_relaxed)) throw std::runtime_error("cancelled");
-        const auto& r   = records[k];
+        const auto& r = records[k];
+        if (!r.segment) {  // set aside: nothing kept of it but its number
+            for (int c = 0; c < NAME_COLUMNS; ++c) put(static_cast<Column>(c), k, blank_name);
+            put(RESULT, k, static_cast<uint8_t>('*'));
+            put(MOVES, k, static_cast<uint64_t>(moves.size()));
+            put(ANNEX, k, static_cast<uint64_t>(annex.size()));
+            ++done;
+            continue;
+        }
         const auto& seg = *r.segment;
         for (int c = 0; c < NAME_COLUMNS; ++c)
             put(static_cast<Column>(c), k, seg.value<uint32_t>(static_cast<Column>(c), r.index));
@@ -1572,7 +1762,11 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
     // One compaction at a time. The segments are written without the writers' lock, from the snapshot of when it
     // starts: games added meanwhile are kept; a game replaced or deleted meanwhile stops it (compact again).
     std::lock_guard compacting(compact_mutex_);
-    auto snap        = snapshot();
+    auto snap = snapshot();
+    if (!snap->unreadable().empty()) {
+        out.error = "a segment cannot be read: keep what can be read first";
+        return out;
+    }
     const auto infos = snap->segmentInfos();
     const auto plan  = compactPlan();
     std::vector<std::string> unremoved;  // one segment at a time: old files still mapped, removed at the end
@@ -1795,16 +1989,161 @@ bool Database::undoCompaction() {
     return true;
 }
 
-void Database::dropCompactionLeftovers() {
-    if (!leftovers_ || !lock_) return;
+// ---------------------------------------------------------------------------------------------------------------------
+// The segments that cannot be read, written again (#97).
+
+uint64_t Database::keepReadable(std::span<const GameId> damaged) {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard compacting(compact_mutex_);
+    std::lock_guard writing(write_mutex_);
+    const auto snap = snapshot();
+    // What is set aside: the games that cannot be read, and the damaged ones given.
+    auto deleted       = snap->deleted_;
+    uint64_t set_aside = 0;
+    const auto aside   = [&](GameId id) {
+        if (id >= snap->games_ || (id / 64 < deleted.size() && (deleted[id / 64] >> (id % 64) & 1))) return;
+        setBit(deleted, id, true);
+        ++set_aside;
+    };
+    for (const auto id : snap->unreadableIds()) aside(id);
+    for (const auto id : damaged) aside(id);
+    if (snap->unreadable_segments_.empty() && set_aside == 0) return 0;
+
+    std::string manifest_text;
+    {
+        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
+        manifest_text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    auto manifest             = nlohmann::json::parse(manifest_text);
+    const auto old_edits      = manifest.value("edits", std::string());
+    const uint64_t generation = snap->generation_ + 1;
+    const auto blank          = snap->blankName();
+    const uint32_t blank_name = blank.value_or(snap->names_);  // none: a name "" added after the others
+    std::vector<std::string> written, old_files;
+    std::string tmp_now, edits_written;
+    try {
+        const auto made = [&](std::vector<RecordSource> records, std::string_view names, uint32_t count) {
+            std::string name;
+            {
+                std::lock_guard lock(mutex_);  // the numbers the appends take too
+                name = segmentName(next_segment_++);
+            }
+            tmp_now = name + ".tmp";
+            std::atomic<bool> go_on{false};
+            std::atomic<uint64_t> done{0};
+            writeSegment(dir_ / tmp_now, records, names, count, go_on, done, blank_name);
+            step("rename segment");
+            std::error_code ec;
+            fs::rename(dir_ / tmp_now, dir_ / name, ec);
+            if (ec) throw std::runtime_error("cannot rename " + (dir_ / tmp_now).string() + ": " + ec.message());
+            tmp_now.clear();
+            written.push_back(name);
+            return name;
+        };
+        for (std::size_t s = 0; s < snap->segments_.size(); ++s) {
+            const auto& segment = *snap->segments_[s];
+            if (!segment.unreadable()) continue;
+            // Its names as they read, or "?" for each when they cannot: the later games' ids of names hold.
+            std::string names;
+            if (segment.namesKnown()) {
+                names = segment.namesText();
+            } else {
+                names.reserve(std::size_t{segment.nameCount()} * 2);
+                for (uint32_t k = 0; k < segment.nameCount(); ++k) names += "?\n";
+            }
+            auto& entry = manifest["segments"][s];
+            old_files.push_back(entry.at("name").get<std::string>());
+            entry["name"] = made(std::vector<RecordSource>(segment.games()), names, segment.nameCount());
+            if (!segment.namesKnown() && segment.nameCount() > 0) entry["unknown_names"] = true;
+        }
+        if (!blank && !snap->unreadable_segments_.empty())  // a segment of names only, as a compaction leaves them
+            manifest["segments"].push_back(
+                {{"name", made({}, "\n", 1)}, {"games", 0}, {"names", 1}, {"versions", true}});
+        syncFolder(dir_);
+        edits_written = editsName(generation);
+        writeFile(dir_ / edits_written, editsBytes(snap->replaced_, deleted));
+        manifest["edits"]            = edits_written;
+        manifest["edits_generation"] = generation;
+        manifest["generation"]       = generation;
+        step("write manifest");
+        tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    } catch (const std::exception&) {
+        // Nothing committed: what it wrote goes, the database as before.
+        std::error_code ec;
+        for (const auto& name : written) fs::remove_all(dir_ / name, ec);
+        if (!tmp_now.empty()) fs::remove_all(dir_ / tmp_now, ec);
+        if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
+        throw;
+    }
+    // Committed: read again, the damaged files kept until the database is closed (or the commit undone).
+    step("manifest written");
+    load(false);
+    keys_indexed_  = false;
+    names_indexed_ = false;
+    name_ids_.clear();
+    if (!old_edits.empty() && old_edits != edits_written) old_files.push_back(old_edits);
+    Leftovers left;
+    left.manifest   = manifest_text;
+    left.generation = generation;
+    left.files      = std::move(old_files);
+    left.new_files  = std::move(written);
+    left.new_files.push_back(edits_written);
+    std::lock_guard lock(mutex_);
+    if (kept_)  // an earlier one's, no longer undone: its files go at closing all the same
+        dropped_.insert(dropped_.end(), kept_->files.begin(), kept_->files.end());
+    kept_ = std::move(left);
+    return set_aside;
+}
+
+bool Database::keepReadableUndoable() const {
+    std::lock_guard lock(mutex_);
+    return kept_ && !kept_->manifest.empty() && current_->generation_ == kept_->generation;
+}
+
+bool Database::undoKeepReadable() {
+    std::lock_guard compacting(compact_mutex_);
+    std::lock_guard writing(write_mutex_);
+    nlohmann::json manifest;
+    std::vector<std::string> made;
+    {
+        std::lock_guard lock(mutex_);
+        if (!kept_ || kept_->manifest.empty() || current_->generation_ != kept_->generation) return false;
+        manifest               = nlohmann::json::parse(kept_->manifest);
+        manifest["generation"] = current_->generation_ + 1;  // readers see a commit
+    }
+    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    {
+        std::lock_guard lock(mutex_);
+        made = kept_->new_files;
+        kept_.reset();
+    }
+    load(true);                      // the files it wrote, no longer named, go; those it set aside are named again
+    for (const auto& name : made) {  // again, once their snapshot is let go (Windows removes no mapped file)
+        std::error_code ec;
+        fs::remove_all(dir_ / name, ec);
+    }
+    keys_indexed_  = false;
+    names_indexed_ = false;
+    name_ids_.clear();
+    return true;
+}
+
+void Database::dropLeftovers() {
+    if (!lock_) return;
     std::error_code ec;
-    for (const auto& name : leftovers_->files) fs::remove_all(dir_ / name, ec);
+    if (leftovers_)
+        for (const auto& name : leftovers_->files) fs::remove_all(dir_ / name, ec);
+    if (kept_)
+        for (const auto& name : kept_->files) fs::remove_all(dir_ / name, ec);
+    for (const auto& name : dropped_) fs::remove_all(dir_ / name, ec);
     leftovers_.reset();
+    kept_.reset();
+    dropped_.clear();
 }
 
 Database::~Database() {
     try {
-        dropCompactionLeftovers();
+        dropLeftovers();
     } catch (...) {
     }
 }

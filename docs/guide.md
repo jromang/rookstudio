@@ -1920,7 +1920,7 @@ task runs in the background at a low priority, with its progress and *Cancel*, t
 tournament beside it loses no time. Ctrl+Z undoes the last merge, the last players brought together, or the damaged
 games set aside. A database another program writes to is open read-only: its maintenance waits until that program
 lets it go. The Home page speaks of the maintenance only when it finds something: duplicates after an import, damaged
-games found by a check.
+games found by a check or when a database opens.
 
 ### Duplicate games
 
@@ -1982,6 +1982,17 @@ every game: its signature and its key (a hash of its headers and moves) are made
 and a game that reads otherwise than it was written is damaged. It says *Sound*, or the damaged games and the files they
 were imported from: *Keep what can be read* sets them aside (deleted; Ctrl+Z brings them back), and *Import their file
 again* brings them back from their file when it is still there. The opening tree is compared with the games too.
+
+A segment whose files no longer read when the database opens (cut short, missing or changed while RookStudio was
+closed: a disk error, a copy left half done, a sync tool) does not keep the database from opening. Its other segments
+work: the list, the opening tree and the searches read their games, and the damaged segment's games keep their numbers.
+The Home page and the Databases page tell it, with *See them*, and *Check and compact* says it at once: the segment, how
+many games cannot be read, and the files they were imported from. *Keep what can be read* writes that segment again,
+its games set aside (deleted, their numbers kept). The players, events and sites first imported with it are kept when
+its list of names still reads; otherwise the other games that use them show "?" in their place. Its damaged files stay
+until RookStudio closes: until then, *Undo* (or Ctrl+Z) puts them back, as long as nothing else is written to the
+database. *Import their file again* brings its games back from their file when it is still there. Compacting waits
+until such a segment is dealt with, and a database open read-only is never changed.
 
 Games deleted or replaced, merges included, keep their room in the files. *Compact* writes the segments that hold them
 again without them: each game keeps its number (a deleted game its headers only), and the opening tree stays valid. The

@@ -827,6 +827,20 @@ void App::drawDatabases() {
         ImGui::Dummy(ImVec2(0, px(6)));
     }
 
+    // A segment that could not be read when it was opened (#97): told as the Home page tells it, its maintenance says
+    // what to do.
+    if (!linked && facts.unreadable > 0) {
+        ui::beginCard("db_damaged");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           trn("“{}”: {} damaged game", "“{}”: {} damaged games", facts.unreadable, entries[index].name,
+                               ui::exactCount(facts.unreadable))
+                               .c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(TR("See them##damaged"))) openCare(static_cast<int>(index), CarePart::Checks);
+        ui::endCard();
+        ImGui::Dummy(ImVec2(0, px(6)));
+    }
+
     // The last import's outcome; or, a database of its own with no game, what to put in it (M1, board 4).
     if (db_outcome_ && db_outcome_->folder == entries[index].folder) {
         drawImportOutcome(index);

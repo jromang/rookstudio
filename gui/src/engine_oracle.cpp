@@ -92,19 +92,23 @@ std::optional<commentary::Searched> EngineOracle::search(const commentary::Posit
         for (const auto& m : only) go += " " + commentary::uci(m);
     }
     process_->send(go);
-    // The last line of the first principal variation: its score and its moves.
+    // The last line of the first principal variation: its score, its depth and its moves.
     std::optional<commentary::Score> score;
     std::vector<std::string> pv;
-    const auto seen = [&](const std::string& line) {
+    uint32_t reached = 0;
+    const auto seen  = [&](const std::string& line) {
         if (line.rfind("info ", 0) != 0) return;
         std::istringstream in(line);
         std::string word;
-        int multipv = 1;
+        int multipv    = 1;
+        uint32_t depth = 0;
         std::optional<commentary::Score> s;
         std::vector<std::string> moves;
         while (in >> word) {
             if (word == "multipv") {
                 in >> multipv;
+            } else if (word == "depth") {
+                in >> depth;
             } else if (word == "score") {
                 std::string kind;
                 int value = 0;
@@ -115,8 +119,9 @@ std::optional<commentary::Searched> EngineOracle::search(const commentary::Posit
             }
         }
         if (multipv != 1 || !s || moves.empty()) return;
-        score = s;
-        pv    = std::move(moves);
+        score   = s;
+        pv      = std::move(moves);
+        reached = depth;
     };
     if (!waitFor(*process_, "bestmove", std::chrono::seconds(60), seen)) {
         error_ = fmt::format("{} did not end its search", engine_.name);
@@ -130,6 +135,7 @@ std::optional<commentary::Searched> EngineOracle::search(const commentary::Posit
     }
     commentary::Searched out;
     out.score = *score;
+    out.depth = reached;
     auto at   = pos;
     for (const auto& u : pv) {
         const auto m = at.parseUci(u);

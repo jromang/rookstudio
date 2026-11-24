@@ -217,10 +217,13 @@ void App::drawShell() {
     } else {
         drawPageInNoView();
     }
-    // A player's dossier in place of the page it was opened from (#90).
+    // A player's dossier in place of the page it was opened from (#90); an opening report (#91).
     const bool dossier = !views_sheet_.open && dossier_ && dossier_->shown && dossier_->over == page_;
     if (dossier) drawDossier();
-    switch (views_sheet_.open || dossier ? Page::Count : page_) {
+    const bool report =
+        !views_sheet_.open && !dossier && opening_report_ && opening_report_->shown && opening_report_->over == page_;
+    if (report) drawOpeningReport();
+    switch (views_sheet_.open || dossier || report ? Page::Count : page_) {
         case Page::Home:
             drawHome();
             break;

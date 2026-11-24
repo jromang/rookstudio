@@ -187,6 +187,7 @@ const std::vector<const char*>& allTopics() {
                                               CheckCompact,
                                               Crosstables,
                                               Tiebreaks,
+                                              OpeningReport,
                                               LichessStudies,
                                               Training};
     return all;

@@ -1644,6 +1644,11 @@ void App::pollBoardPgn() {
     showPgnSource(std::move(source));
     if (ply_when_read_ >= 0)
         board_.ply = std::clamp(std::exchange(ply_when_read_, -1), 0, static_cast<int>(board_.game.moves.size()));
+    if (report_when_read_ >= 0) {  // --focus opening-report=FILE@PLY@TAB (#91)
+        const int tab = std::exchange(report_when_read_, -1);
+        openOpeningReport(Page::Board);
+        if (opening_report_) opening_report_->tab = tab;
+    }
     if (review_when_read_) {
         review_when_read_ = false;
         board_.open_tab   = 0;
@@ -2324,8 +2329,10 @@ void App::drawBoardColumn(float size) {
     } else if (board_back_ && !board_tv_) {
         const bool dossier    = board_back_->dossier && dossier_;
         const bool crosstable = board_back_->crosstable && crosstable_;  // #92
+        const bool report     = board_back_->report && opening_report_;  // #91
         const char* back      = dossier                                 ? TR("Back to the dossier")
                                 : crosstable                            ? TR("Back to the crosstable")
+                                : report                                ? TR("Back to the report")
                                 : board_back_->page == Page::Tournament ? TR("Back to the tournament")
                                 : board_back_->page == Page::Books      ? TR("Back to the books")
                                                                         : TR("Back");
@@ -2336,6 +2343,10 @@ void App::drawBoardColumn(float size) {
             if (dossier) {  // the player's dossier again, over the page it was opened from (#90)
                 dossier_->shown = true;
                 dossier_->over  = page_;
+            }
+            if (report) {  // the opening report again, over the Board page (#91)
+                opening_report_->shown = true;
+                opening_report_->over  = page_;
             }
             board_back_.reset();
         }

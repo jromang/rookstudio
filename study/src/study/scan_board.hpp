@@ -43,6 +43,8 @@ class ScanBoard {
     // The position of a chess.hpp board (FEN, Chess960 and castling rights read there). False for none.
     bool set(const chess::Board& board);
     bool setFen(std::string_view fen, bool chess960);
+    // The position in FEN: castling rights in KQkq for rooks on their first files, by the rook's file otherwise.
+    [[nodiscard]] std::string fen() const;
 
     [[nodiscard]] uint64_t key() const noexcept { return key_; }  // Polyglot's
     [[nodiscard]] int sideToMove() const noexcept { return stm_; }

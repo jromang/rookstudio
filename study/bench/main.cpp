@@ -43,6 +43,9 @@
 //                                                 them, on the machine's threads, 4 and 1; then the crosstables of its
 //                                                 largest Swiss and round robin: their games found, read and computed;
 //                                                 only numbers printed, never a name)
+//   fcg-study-bench opening-report <database> [--threads N]   (the opening reports of a few positions, popular and
+//                                                 rare, timed section by section as the program makes them in the
+//                                                 background; only counts and times printed, never a name)
 //
 // <games>: PGN, .pgn.zst, .pgn.gz or .zip. A database that does not exist is made.
 
@@ -55,6 +58,7 @@
 #include <functional>
 #include <map>
 #include <random>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -73,6 +77,7 @@
 #include <study/import.hpp>
 #include <study/mapped_file.hpp>
 #include <study/names.hpp>
+#include <study/opening_report.hpp>
 #include <study/patterns.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/puzzles.hpp>
@@ -2251,6 +2256,113 @@ int runCrosstables(const Args& a) {
     return 0;
 }
 
+// The opening reports of a few positions (#91), timed as the program makes them: in the background (the lowest
+// priority), section by section, on the machine's threads, then 4 and 1. The structures named as cheaply as the
+// assistant's facts (an isolated d-pawn, a Carlsbad's pawns), the plans' pushes by their file. Only numbers printed.
+int runOpeningReport(const Args& a) {
+    if (a.words.size() < 2) return 2;
+    enterBackground();
+    const auto db   = Database::openReadOnly(a.words[1]);
+    const auto snap = db->snapshot();
+    const auto tree = Tree::open(a.words[1]);
+    if (!tree || tree->stale(*snap)) {
+        std::fprintf(stderr, "%s has no opening tree that covers its games\n", a.words[1].c_str());
+        return 1;
+    }
+    std::printf("opening-report %s: %llu games, its tree of %llu positions, %u plies; %.1f MB held\n",
+                a.words[1].c_str(), static_cast<unsigned long long>(snap->games()),
+                static_cast<unsigned long long>(tree->positions()), tree->plies(), heldMb().first);
+    const StructureNamer structures = [](uint64_t white, uint64_t black, std::vector<std::pair<int, int>>& out) {
+        constexpr uint64_t c = 0x0404040404040404ull, d = 0x0808080808080808ull, e = 0x1010101010101010ull;
+        const auto on = [](uint64_t pawns, int sq) { return (pawns >> sq & 1) != 0; };
+        if (on(white, 27) && on(black, 35) && on(black, 42) && !(white & c) && !(black & e)) out.emplace_back(0, 0);
+        for (int side = 0; side < 2; ++side) {
+            const auto pawns = side == 0 ? white : black;
+            if ((pawns & d) && !(pawns & (c | e))) out.emplace_back(1, side);
+        }
+    };
+    const PlanNamer plans = [](const ScanBoard&, const CodedMove& push) { return push.to % 8 == 1 ? 1 : 0; };
+    const std::vector<ReportSource> sources{{"reference", snap, tree}};
+    struct Asked {
+        const char* what;
+        const char* line;
+    };
+    const Asked positions[] = {
+        {"1.e4", "e4"},
+        {"a Ruy Lopez, closed", "e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7"},
+        {"a Najdorf", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6"},
+        {"the exchange QGD after 10...Nf8",
+         "d4 d5 c4 e6 Nc3 Nf6 cxd5 exd5 Bg5 c6 e3 Be7 Bd3 Nbd7 Qc2 O-O Nf3 Re8 O-O Nf8"},
+        {"a rare line", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3 e5 Nb3 Be6 f3 Be7 Qd2 O-O O-O-O Nbd7 g4 b5 g5 b4"},
+    };
+    const int machine = a.threads > 0 ? a.threads : static_cast<int>(std::thread::hardware_concurrency());
+    // What confirms the user's game that left the databases: a search of the position in every game.
+    {
+        chess::Board board;
+        std::istringstream in(positions[3].line);
+        for (std::string san; in >> san;) board.makeMove(chess::uci::parseSan(board, san));
+        board.makeMove(chess::uci::parseSan(board, "h3"));
+        ScanBoard position;
+        position.set(board);
+        for (const int threads : {machine, 4, 1}) {
+            const auto t    = Clock::now();
+            const auto hits = searchAll(snap, PositionQuery{position}, threads);
+            std::printf("  a position search after 11.h3 of the exchange QGD, %2d threads: %zu games in %.0f ms\n",
+                        threads, hits.size(), ms(t));
+        }
+    }
+    for (const auto& asked : positions) {
+        chess::Board board;
+        std::istringstream in(asked.line);
+        for (std::string san; in >> san;) board.makeMove(chess::uci::parseSan(board, san));
+        ScanBoard position;
+        position.set(board);
+        // The rare line: followed by its most played moves until fewer than 50 games reach it.
+        if (std::string_view(asked.what) == "a rare line") {
+            for (int guard = 0; guard < 40; ++guard) {
+                const auto here = report_detail::movesAt(sources, position);
+                if (here.total.games < 50 || here.moves.empty()) break;
+                position.play(position.decode(here.moves.front().code));
+            }
+        }
+        for (const int threads : {machine, 4, 1}) {
+            ReportOptions options;
+            options.structures  = structures;
+            options.plans_named = plans;
+            options.threads     = threads;
+            ReportProgress progress;
+            std::atomic<bool> cancel{false};
+            std::vector<std::pair<ReportSection, double>> sections;
+            const auto t      = Clock::now();
+            const auto report = makeOpeningReport(sources, position, options, progress, cancel,
+                                                  [&](const OpeningReport& r) { sections.push_back({r.made, ms(t)}); });
+            const double whole = ms(t);
+            std::printf(
+                "  %s, %2d threads: %llu games, %zu moves, %zu lines, %llu replayed (%llu at the structure's ply), "
+                "%zu structures, %zu plans, %zu key games, %zu novelties%s: moves and lines %.0f ms, structures and "
+                "plans %.0f ms, novelties %.0f ms, %.0f ms in all; %.1f MB held\n",
+                asked.what, threads, static_cast<unsigned long long>(report.moves.total.games),
+                report.moves.moves.size(), report.lines.size(), static_cast<unsigned long long>(report.shapes.replayed),
+                static_cast<unsigned long long>(report.shapes.counted), report.shapes.structures.size(),
+                report.shapes.plans.size(), report.key_games.size(), report.novelties.moves.size(),
+                report.moves.searched ? " (searched)" : "", sections.size() > 0 ? sections[0].second : 0.0,
+                sections.size() > 1 ? sections[1].second - sections[0].second : 0.0,
+                sections.size() > 2 ? sections[2].second - sections[1].second : 0.0, whole, heldMb().first);
+            if (threads == machine)
+                for (const auto& p : report.shapes.plans)
+                    std::printf(
+                        "      plan of %s, %s, %zu squares%s: %llu games (%.0f %%)\n", p.side == 0 ? "White" : "Black",
+                        p.kind == ReportPlan::Kind::Route    ? "a route"
+                        : p.kind == ReportPlan::Kind::Pushes ? "two pushes"
+                                                             : "a push",
+                        p.squares.size(), p.named ? ", named" : "", static_cast<unsigned long long>(p.stats.games),
+                        100.0 * static_cast<double>(p.stats.games) /
+                            static_cast<double>(std::max<uint64_t>(1, report.shapes.replayed)));
+        }
+    }
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -2282,6 +2394,7 @@ int main(int argc, char** argv) {
         if (a.words[0] == "fide-names") rc = runFideNames(a);
         if (a.words[0] == "dossier") rc = runDossier(a);
         if (a.words[0] == "crosstables") rc = runCrosstables(a);
+        if (a.words[0] == "opening-report") rc = runOpeningReport(a);
 #ifndef _WIN32
         if (a.words[0] == "crash") {
             // posix_spawn takes a path: the program's own, wherever it was started from.

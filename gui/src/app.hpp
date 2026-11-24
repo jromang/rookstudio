@@ -83,6 +83,7 @@
 #include "model.hpp"
 #include "notice.hpp"
 #include "offline_evals.hpp"
+#include "opening_report.hpp"
 #include "opening_suite.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
@@ -2068,6 +2069,83 @@ class App {
     void lookForCrosstableNames(const std::string& query);
     // "Games | Tournaments" above a database's list: true when changed.
     bool drawListSwitch();
+    // The opening report of a position (#91, mockup M13, board 4; view_opening_report.cpp, opening_report.hpp), in
+    // place of the page it is opened from (the Board page's Tree tab, a line of the Openings page, Ctrl+K), Esc going
+    // back to the position. Made again in the background at each opening from the Tree tab's databases, section by
+    // section: its moves and main lines, structures and plans, key games and novelties; then its moves' evaluations
+    // (Lichess's kept offline, the analysis' engine) and its summary (the assistant's model held to the figures, the
+    // templates otherwise). Lichess's sources are asked as the Tree tab asks them, when ticked.
+    struct OpeningReportState {
+        Page over  = Page::Board;
+        bool shown = true;
+        int tab = 0, tab_shown = -1;
+        chess::Board board;             // its position
+        std::vector<chess::Move> path;  // the moves from the start that lead there, when it comes from the start
+        std::string fen;
+        std::string opening;             // "D36 Queen's Gambit Declined: Exchange Variation", empty when not named
+        std::vector<ReportBase> bases;   // the databases whose opening tree covers their games
+        std::vector<std::size_t> stale;  // the user's databases whose tree does not (shelf indexes)
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<study::ReportProgress> progress;
+        std::shared_ptr<ReportShared> shared;
+        std::future<void> job;
+        uint64_t serial = 0;
+        std::optional<study::OpeningReport> report;
+        bool cancelled = false;
+        // Lichess's sources, ticked: the masters, Lichess's players (the Tree tab's speeds and ratings).
+        bool masters = false, players = false;
+        std::array<std::optional<lichess::Explorer>, 2> lichess;  // their answers, when they came
+        std::array<int64_t, 2> lichess_when{};                    // an answer kept from before (offline): its date
+        std::array<std::string, 2> lichess_error;                 // why Lichess did not answer
+        // The moves as shown: the databases', with Lichess's sources ticked.
+        std::vector<ReportRow> rows;
+        std::string rows_of;
+        // The evaluations of the moves shown.
+        std::shared_ptr<std::atomic<bool>> evals_cancel;
+        std::shared_ptr<std::atomic<int>> evals_done;
+        std::future<std::vector<std::optional<ReportEval>>> evals_job;
+        std::string evals_of, evals_error, evals_engine;
+        int evals_total = 0;
+        std::vector<std::optional<ReportEval>> evals;
+        bool evals_offline = false;  // Lichess's evaluations kept offline answered some
+        // The summary.
+        std::shared_ptr<std::atomic<bool>> summary_cancel;
+        std::shared_ptr<std::atomic<int>> summary_done;
+        std::future<ReportSummary> summary_job;
+        std::optional<ReportSummary> summary;
+        std::string summary_of;
+        int summary_total    = 0;
+        uint32_t round       = 0;
+        bool templates_shown = false;
+        // ↑ ↓ and Enter on the moves, as in the Tree tab.
+        int row     = -1;
+        bool scroll = false;
+        // "To the repertoire": what was added, and Ctrl+Z.
+        std::string said;
+        std::optional<std::pair<std::size_t, GameTree>> undo;
+        bool locked      = false;  // stopped by a live game on Lichess: made again at its end (R17)
+        bool engine_card = false;  // the first-need card for an engine, opened from the state that lacks one
+        bool drawn       = false;  // drawn since it was shown: the keyboard cursor of the page before hidden first
+    };
+    std::optional<OpeningReportState> opening_report_;
+    int tree_online_source_ = -1;  // the Tree tab's Lichess source shown (0 the masters, 1 Lichess's players), -1 none
+    // The report of the Board page's position, in place of `over`.
+    void openOpeningReport(Page over);
+    void startOpeningReport();
+    void pollOpeningReport();  // each frame: the sections made, the evaluations, the summary, Lichess's answers
+    void drawOpeningReport();
+    void drawReportLines();
+    void drawReportShapes();
+    void drawReportKeyGames();
+    void drawReportNovelties();
+    void drawReportSummary();
+    void drawReportStates();  // what the report lacks, and what fixes it
+    // The report's Lichess source (0 the masters, 1 Lichess's players): its answer asked as the Tree tab asks it.
+    void askReportLichess(int source);
+    void reportToRepertoire();
+    // Games of the report: on the Board page (one, at the report's position) or in the list of their database.
+    void openReportGame(const study::ReportGame& game);
+    void reportGamesInList(const std::vector<study::ReportGame>& games, std::string said);
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;
@@ -2776,6 +2854,14 @@ class App {
         std::future<std::pair<std::vector<commentary::StoryPassage>, std::string>> story;
     };
     std::optional<StoryJob> story_job_;
+    // An opening report's jobs let go (a report made again, another opened), cancelled and kept until they end: the
+    // summary's uses the assistant, which goes after them (#91).
+    struct ReportLeftover {
+        std::shared_ptr<void> hold;
+        std::function<bool()> ready;
+    };
+    std::vector<ReportLeftover> report_leftovers_;
+    void leaveReportJobs();  // the opening report's running jobs cancelled and kept until they end
     std::vector<commentary::StoryPassage> model_story_;
     std::string model_story_of_;      // the review it was written for
     std::string model_story_error_;   // why the model gave no answer
@@ -3657,12 +3743,14 @@ class App {
         std::optional<Tab> tab;
         bool dossier    = false;  // opened from a player's dossier: back to it (#90)
         bool crosstable = false;  // from a tournament's crosstable: back to it (#92)
+        bool report     = false;  // from an opening report: back to it (#91)
     };
     std::optional<BoardBack> board_back_;
     bool board_key_taken_  = false;  // key A served a board this frame
     bool review_when_read_ = false;  // --focus board-review: the game analysed once its file is read
     int review_ply_        = -1;     // --focus board-review-PLY: the board at that ply then
     int ply_when_read_     = -1;     // --focus board-analysis=FILE@PLY: the board at that ply once FILE is read
+    int report_when_read_  = -1;     // --focus opening-report=FILE@PLY@TAB: its report then, at that tab (#91)
 
     // Console view.
     std::vector<Console::Line> console_lines_;

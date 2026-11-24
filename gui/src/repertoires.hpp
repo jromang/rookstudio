@@ -47,6 +47,9 @@ class RepertoireShelf {
     bool toggle(std::size_t index, std::span<const chess::Move> path, chess::Move move);
     // The repertoire's lines put back (an undo), the file written.
     void restore(std::size_t index, GameTree lines);
+    // The moves of `line`, played one after the other from the position after `path`, added where the lines do not
+    // have them yet (study::addMove), the file written once: the opening report's main moves (#91). The moves added.
+    std::size_t addLine(std::size_t index, std::span<const chess::Move> path, std::span<const chess::Move> line);
 
    private:
     void save(std::size_t index) const;

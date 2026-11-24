@@ -71,6 +71,9 @@ const char* App::guideSection() const {
         case Page::Books:
             return Books;
         case Page::Board:
+            // The opening report in place of the page (#91).
+            if (opening_report_ && opening_report_->shown && opening_report_->over == Page::Board)
+                return guide::topics::OpeningReport;
             // A game against an engine (#83).
             if (engine_game_) return guide::topics::EngineGame;
             if (training_) return Training;  // a session of the repertoire's training (#76)
@@ -1110,6 +1113,12 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(TR("This manoeuvre"), TR("Board"), [this] { searchThisManoeuvre(); });
         add(TR("Games at this structure"), TR("Board"), [this] { searchThisStructure(); });
     }
+    // The opening report of the Board page's position (#91), in place of the page; locked during a live game (R17).
+    if (chessBoard() && !board_.chess960)
+        add(TR("Opening report"), TR("Board"), [this] {
+            toStudyBoard();
+            openOpeningReport(Page::Board);
+        });
     // The kept searches (M1, board 6): on the database chosen, else the first of the user's; a pattern alone said so.
     for (std::size_t i = 0; i < kept_searches_.size(); ++i) {
         const auto& f    = kept_searches_[i].fields;

@@ -13,10 +13,10 @@
 namespace fcg::commentary {
 
 std::string debug(const Refusal& refusal) {
-    static constexpr const char* NAMES[] = {"Notation",     "Motif",  "Colour",  "Piece",      "Unsupported",
-                                            "TooManyMoves", "Aside",  "Verdict", "Evaluation", "Elision",
-                                            "Grammar",      "Empty",  "Name",    "Number",     "Board",
-                                            "Material",     "Reason", "Wording", "Figure",     "Advice"};
+    static constexpr const char* NAMES[] = {
+        "Notation", "Motif",      "Colour",  "Piece",   "Unsupported", "TooManyMoves", "Aside",
+        "Verdict",  "Evaluation", "Elision", "Grammar", "Empty",       "Name",         "Number",
+        "Board",    "Material",   "Reason",  "Wording", "Figure",      "Advice",       "Unanchored"};
     const auto* name                     = NAMES[static_cast<int>(refusal.kind)];
     switch (refusal.kind) {
         case Refusal::Kind::TooManyMoves:

@@ -61,6 +61,9 @@ struct Refusal {
         // The opening report's summary (opening_summary.hpp):
         Figure,  // a figure the report does not give, or gives of something else: "52%" for a plan of 47%
         Advice,  // what to play, where the report gives frequencies: "White should push b4"
+        // A sentence that names nothing of the report to read it against, no figure, move, plan or structure: "White's
+        // position goes from lost to balanced".
+        Unanchored,
     };
     Kind kind = Kind::Empty;
     // The words refused: the move, the motif, the piece, the name; empty for TooManyMoves, Grammar and Empty.

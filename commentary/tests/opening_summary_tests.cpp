@@ -246,6 +246,13 @@ TEST_CASE("opening summary: the checker refuses false sentences, each with why")
     CHECK(refused(evals, "After 11.Rab1, the evaluation is +0.31, close to level.") == "held");
     CHECK(refused(evals, "After 11.Rab1, White has the advantage at +0.31.") == "Evaluation(\"advantage\")");
     CHECK(refused(evals, "After 11.Rab1, White is clearly better at +0.31.") == "Evaluation(\"clearly\")");
+    // A score said as a share, a share as a score.
+    CHECK(refused(moves, "11.Rab1 is played in 1,902 games, which gives White 55% of the position.") ==
+          "Figure(\"55%\")");
+    CHECK(refused(plans, "With the minority attack, b4 then b5, White scores 47%.") == "Figure(\"47%\")");
+    // A sentence that names nothing of the report: nothing to read it against.
+    CHECK(refused(evals, "After 11.Rab1, the evaluation is +0.31. White's position goes from lost to balanced.") ==
+          "Unanchored(\"White's position goes from lost to balanced.\")");
     // Words the grammar does not allow.
     CHECK(refused(moves, "11.Rab1 is the most played move!!") == "Grammar");
     // French: its figures with their narrow spaces.
@@ -255,6 +262,7 @@ TEST_CASE("opening summary: the checker refuses false sentences, each with why")
           "held");
     CHECK(refused(fr_plans, "Les Blancs jouent surtout l'attaque de minorité, b4 puis b5 : 48 % des parties.") ==
           "Figure(\"48 %\")");
+    CHECK(refused(fr_plans, "Avec l'attaque de minorité, b4 puis b5, les Blancs marquent 47 %.") == "Figure(\"47 %\")");
 }
 
 TEST_CASE("opening summary: a passage refused twice gives way to the template's, which says why") {

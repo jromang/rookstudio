@@ -274,6 +274,12 @@ bool sideWord(const std::string& w, Color& c) {
     return false;
 }
 
+// A verb that makes the figure after it a score: "White scores 55%", « les Blancs marquent 55 % ».
+bool scoreWord(std::string_view w) {
+    return w == "scores" || w == "score" || w == "scoring" || w == "scored" || w == "marquent" || w == "marque" ||
+           w == "marquant";
+}
+
 // Advice where the report gives frequencies: "should", "must", « il faut », « devrait ».
 std::optional<Refusal> checkAdvice(std::string_view sentence) {
     static constexpr std::string_view ADVICE[] = {
@@ -843,6 +849,15 @@ std::optional<Refusal> SummaryBrief::check(std::string_view whole) const {
     for (const auto sentence : sentenceTexts(whole)) {
         if (auto r = checkAdvice(sentence)) return r;
         const auto words = wordsWithPlaces(sentence);
+        // Something to read it against: a figure, a move or a square, a plan or a structure it names (whether the
+        // report has them is told below).
+        {
+            bool anchored = !summary_detail::figuresIn(sentence).empty();
+            for (const auto& w : words) anchored = anchored || looksLikeMove(w.raw);
+            for (const auto& w : wordsOf(sentence))
+                for (const auto& n : namedWords()) anchored = anchored || n.word == w;
+            if (!anchored) return Refusal{Refusal::Kind::Unanchored, std::string(sentence)};
+        }
         // Each figure: one the passage gives, of what the sentence names nearest to it, of the side said beside it.
         for (const auto& [at, text] : summary_detail::figuresIn(sentence)) {
             std::vector<const Figure*> candidates;
@@ -891,6 +906,18 @@ std::optional<Refusal> SummaryBrief::check(std::string_view whole) const {
             if (said && std::none_of(fitting.begin(), fitting.end(),
                                      [&](const Figure* c) { return !c->side || *c->side == *said; }))
                 return Refusal{Refusal::Kind::Figure, text};
+            // A score said as a share ("56% of the position") or a share as a score ("White scores 47%"): the words
+            // around the figure say which it is, and a figure only of the other kind is refused.
+            std::size_t after = index;
+            while (after < words.size() && words[after].at < at + text.size()) ++after;
+            const auto next     = after < words.size() ? std::string_view(words[after].lower) : std::string_view();
+            const bool as_share = lang_ == Lang::Fr ? next == "des" || next == "de" : next == "of";
+            bool as_score       = false;
+            for (std::size_t k = index >= 2 ? index - 2 : 0; k < index && k < words.size(); ++k)
+                as_score = as_score || scoreWord(words[k].lower);
+            const bool scores = std::all_of(fitting.begin(), fitting.end(), [](const Figure* c) { return c->side; });
+            const bool shares = std::none_of(fitting.begin(), fitting.end(), [](const Figure* c) { return c->side; });
+            if ((as_share && scores) || (as_score && shares)) return Refusal{Refusal::Kind::Figure, text};
         }
         // Each move: one of the position or of the report's lines; a square written as a move is one too.
         for (const auto& w : words)

@@ -236,6 +236,8 @@ std::string refusalWords(const commentary::Refusal& r) {
             return trf("it named “{}”, which the report does not have, or not for that side", r.what);
         case K::Advice:
             return trf("it gave advice (“{}”) where the report gives frequencies", r.what);
+        case K::Unanchored:
+            return trf("it wrote “{}”, which names no figure, move, plan or structure of the report", r.what);
         case K::Evaluation:
             return trf("it said “{}”, which the evaluations contradict", r.what);
         case K::Name:

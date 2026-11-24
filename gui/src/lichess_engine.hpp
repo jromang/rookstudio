@@ -123,6 +123,10 @@ struct EngineWork {
 // The position asked, after its moves, as a FEN; empty when its moves are not legal there.
 [[nodiscard]] std::string workFen(const EngineWork& w);
 
+// A move as UCI writes it (e2e4, e7e8q; castling as e1h1 or e1g1): what a job's moves and an engine's lines must be
+// before a board or an engine reads them.
+[[nodiscard]] bool uciMoveText(std::string_view move);
+
 // An engine's line as the work host takes it: an info line with a depth, a score and a pv (multipv 1 added when it has
 // none, as the engine's time since its go when it tells none, and nodes when it tells none), or its bestmove; nullopt
 // for the other lines (info string, currmove, a refutation…).

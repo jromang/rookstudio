@@ -396,8 +396,9 @@ int App::localThreads() const {
         if (r.run->remote() || !r.run->running() || !t) continue;
         threads += r.run->runningGames() * tour::largestGame(t->spec()).threads;
     }
-    // The Lichess bot's game too (#85), and the requests of the engines offered to lichess.org (#96).
-    return threads + analysisThreads() + botThreads() + lichessServiceThreads();
+    // The Lichess bot's game too (#85). Not the requests of the engines offered to lichess.org (#96): they take only
+    // what the tournaments and these leave, and yield it to them at once.
+    return threads + analysisThreads() + botThreads();
 }
 
 namespace {

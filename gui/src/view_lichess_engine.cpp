@@ -484,13 +484,15 @@ void App::pollLichessEngines() {
     for (const auto& r : runs_) {
         const auto* t = r.run->tournament();
         if (!t || !r.run->running()) continue;
-        const int need = std::max(1, t->spec().conditions.concurrency) * tour::largestGame(t->spec()).threads;
+        // Paused, its games in progress only, then nothing: its cores are taken back as soon as it resumes.
+        const int games = r.run->paused() ? r.run->runningGames() : std::max(1, t->spec().conditions.concurrency);
+        const int need  = games * tour::largestGame(t->spec()).threads;
         if (!r.machine_id.empty())
-            machine_tournaments[r.machine_id] += r.run->paused() ? 0 : need;
+            machine_tournaments[r.machine_id] += need;
         else if (r.run->remote())
             local_tournaments += need;
     }
-    const int local_others = localThreads() - lichessServiceThreads();
+    const int local_others = localThreads();  // the window's engines and the bot's game, not the services'
     for (auto it = services_.begin(); it != services_.end();) {
         auto& [name, s] = *it;
         auto* o         = offerOf(name);
@@ -531,6 +533,23 @@ void App::pollLichessEngines() {
             continue;
         }
         ++it;
+    }
+    // A service whose engine changed in the library (an update, another program, its options): started again with it
+    // once its request is answered, and the version it played freed.
+    std::vector<std::string> restart;
+    for (const auto& [name, s] : services_) {
+        const int index = engineIndex(name);
+        const auto* o   = offerOf(name);
+        if (index < 0 || !o || s.status.state == lichess::ServiceState::Busy) continue;
+        const auto& e = engines_[static_cast<std::size_t>(index)];
+        if (!o->machine.empty() && o->machine != e.machine) continue;  // its copy on another machine: its path there
+        if (e.cmd != s.engine.cmd || e.args != s.engine.args || e.dir != s.engine.dir || e.options != s.engine.options)
+            restart.push_back(name);
+    }
+    for (const auto& name : restart) {
+        stopService(name);
+        startService(name);
+        checkVersions();
     }
     if (offers_dirty_ && now - offers_written_ > std::chrono::seconds(10)) saveOffers();
 }
@@ -772,7 +791,8 @@ void App::drawLichessEngineService(const EngineEntry& e, lichess::OfferedEngine&
             BoardDecor decor;
             decor.eval_white  = -1.0f;
             decor.coordinates = false;
-            if (job->best.size() >= 4) {
+            // The engine's first move, as UCI writes it (the board reads nothing else).
+            if (lichess::uciMoveText(job->best)) {
                 try {
                     decor.arrows.push_back({chess::uci::uciToMove(board, job->best), ui::ACCENT});
                 } catch (...) {

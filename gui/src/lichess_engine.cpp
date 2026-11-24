@@ -22,6 +22,14 @@
 
 namespace fcg::lichess {
 
+bool uciMoveText(std::string_view m) {
+    if (m.size() != 4 && m.size() != 5) return false;
+    const auto file = [](char c) { return c >= 'a' && c <= 'h'; };
+    const auto rank = [](char c) { return c >= '1' && c <= '8'; };
+    if (!file(m[0]) || !rank(m[1]) || !file(m[2]) || !rank(m[3])) return false;
+    return m.size() == 4 || std::string_view("nbrq").find(m[4]) != std::string_view::npos;
+}
+
 namespace {
 
 namespace fs = std::filesystem;
@@ -110,9 +118,32 @@ std::vector<std::string> words(std::string_view line) {
     return out;
 }
 
+// A FEN the board and the engine may be given: its placement whole (8 ranks of 8 squares), its side, and fields of the
+// characters FENs use, nothing else (a line break would make the engine read another command).
+bool fenText(std::string_view fen) {
+    for (const unsigned char c : fen)
+        if (c < 0x20 || c > 0x7e) return false;
+    if (!menOf(fen)) return false;
+    const auto w = words(fen);
+    if (w.size() < 2 || w.size() > 6 || (w[1] != "w" && w[1] != "b")) return false;
+    const auto all = [](const std::string& text, std::string_view allowed) {
+        return !text.empty() && text.find_first_not_of(allowed) == std::string::npos;
+    };
+    if (w.size() > 2 && !all(w[2], "-KQkqABCDEFGHabcdefgh")) return false;
+    if (w.size() > 3 && w[3] != "-" &&
+        !(w[3].size() == 2 && w[3][0] >= 'a' && w[3][0] <= 'h' && (w[3][1] == '3' || w[3][1] == '6')))
+        return false;
+    for (std::size_t i = 4; i < w.size(); ++i)
+        if (!all(w[i], "0123456789") || w[i].size() > 4) return false;
+    return true;
+}
+
 // A board in UCI_Chess960's convention (castling as the king taking its rook), as Lichess sends the moves; a move
 // written the usual way (e1g1) is read too. False when the FEN or a move cannot be read.
 bool replay(const EngineWork& w, const std::function<void(const chess::Board&)>& each, chess::Board* end = nullptr) {
+    if (!fenText(w.initial_fen)) return false;
+    for (const auto& uci : w.moves)
+        if (!uciMoveText(uci)) return false;
     chess::Board board;
     board.set960(true);
     try {
@@ -504,16 +535,16 @@ std::optional<std::string> nextLine(EngineService::Engine& e, std::chrono::milli
     }
 }
 
-// Waits for a line that starts with `word` within `wait`, passing the others to `each`; false on the deadline or the
-// engine's end.
+// Waits for a line that starts with `word` within `wait`, passing the others to `each`; false on the deadline, the
+// engine's end, or `stop` (the service stops: RookStudio closes, the service is stopped).
 bool waitWord(EngineService::Engine& e, std::string_view word, std::chrono::milliseconds wait,
-              const std::function<void(const std::string&)>& each = {}) {
+              const std::atomic<bool>& stop, const std::function<void(const std::string&)>& each = {}) {
     const auto deadline = Clock::now() + wait;
     for (;;) {
         const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
-        if (left.count() <= 0) return false;
+        if (left.count() <= 0 || stop) return false;
         bool ended      = false;
-        const auto line = nextLine(e, left, &ended);
+        const auto line = nextLine(e, std::min(left, std::chrono::milliseconds(250)), &ended);
         if (ended) return false;
         if (!line) continue;
         if (line->rfind(word, 0) == 0 && (line->size() == word.size() || (*line)[word.size()] == ' ')) return true;
@@ -598,11 +629,12 @@ void EngineService::run() {
                 s.pause       = g.live_game ? ServicePause::LiveGame : ServicePause::Tournament;
                 s.threads_now = 0;
             });
-            if (engine_ && Clock::now() - last_job_ > setup_.idle_quit) engine_.reset();
+            if (engine_ && (Clock::now() - last_job_ > setup_.idle_quit || !engine_->process.running()))
+                engine_.reset();
             (void)rest(std::chrono::milliseconds(500));
             continue;
         }
-        if (engine_ && Clock::now() - last_job_ > setup_.idle_quit) engine_.reset();
+        if (engine_ && (Clock::now() - last_job_ > setup_.idle_quit || !engine_->process.running())) engine_.reset();
         update([&](ServiceStatus& s) {
             if (s.state == ServiceState::Paused || s.state == ServiceState::Busy) s.state = ServiceState::Waiting;
             s.pause = ServicePause::None;
@@ -637,12 +669,14 @@ void EngineService::run() {
             body.append(data);
             return body.size() < (std::size_t{1} << 20);
         };
-        stream.cancel = &poll_cancel_;
-        stream.idle_s = setup_.poll_idle_s;
-        const auto r  = httpStream(request, stream);
+        stream.cancel    = &poll_cancel_;
+        stream.idle_s    = setup_.poll_idle_s;
+        stream.redirects = 0;  // its body holds the secret: to the work host alone
+        const auto r     = httpStream(request, stream);
         if (stop_ || quit_) break;
         if (r.error == "cancelled") continue;  // a guard paused it
-        if (r.status == 204 || r.status == 200) {
+        const bool whole = r.error.empty();    // an answer cut short is the network's doing, not the API's
+        if (whole && (r.status == 204 || r.status == 200)) {
             failures = 0;
             update([](ServiceStatus& s) {
                 if (s.state != ServiceState::Offline) return;
@@ -650,8 +684,8 @@ void EngineService::run() {
                 s.error.clear();
             });
         }
-        if (r.status == 204) continue;
-        if (r.status == 200) {
+        if (whole && r.status == 204) continue;
+        if (whole && r.status == 200) {
             std::string why;
             const auto work = readEngineWork(body, &why);
             if (!work) {
@@ -680,7 +714,7 @@ void EngineService::run() {
             });
             continue;
         }
-        if (r.status != 0 && r.status < 500) {
+        if (whole && r.status != 0 && r.status < 500) {
             // 400, 404, 405…: the work host no longer takes the request as this program makes it.
             update([&](ServiceStatus& s) {
                 s.state = ServiceState::ApiChanged;
@@ -694,7 +728,7 @@ void EngineService::run() {
         ++failures;
         update([&](ServiceStatus& s) {
             s.state    = ServiceState::Offline;
-            s.error    = r.status == 0 ? r.error : fmt::format("the work host answered {}", r.status);
+            s.error    = r.status == 0 || !whole ? r.error : fmt::format("the work host answered {}", r.status);
             s.retry_at = Clock::now() + wait;
         });
         const auto until = Clock::now() + wait;
@@ -723,8 +757,10 @@ void EngineService::answer(const EngineWork& w) {
     job.limit_nodes = w.nodes;
     job.since       = start;
     job.locked      = workLocked(w, g.locked, g.start_locked);
-    const bool empty =
-        job.locked || w.variant != "chess" || (!setup_.engine_id.empty() && w.engine_id != setup_.engine_id);
+    // Answered empty: a correspondence game's position, a position that cannot be read (its FEN or a move: nothing of
+    // it reaches the engine), a variant it does not serve.
+    const bool empty = job.locked || job.fen.empty() || w.variant != "chess" ||
+                       (!setup_.engine_id.empty() && w.engine_id != setup_.engine_id);
     update([&](ServiceStatus& s) {
         s.state       = ServiceState::Busy;
         s.job         = job;
@@ -768,56 +804,80 @@ void EngineService::answer(const EngineWork& w) {
         finish(false);
         return;
     }
-    // The engine: started at the first request, kept between them.
+    // The engine: started at the first request, kept between them; started once more when it ended meanwhile (between
+    // two requests, or before its readyok: a crash, the system, a machine's connection).
     std::string failed;
-    if (!engine_) {
+    const auto start_engine = [&]() -> std::string {
         auto e = std::make_unique<Engine>();
         std::string why;
-        if (!e->process.start(engineLaunch(setup_.engine), why)) {
-            failed = fmt::format("{} could not start: {}", setup_.engine.name, why);
-        } else {
-            const auto send = [&](const std::string& line) {
-                (void)e->process.send(line);
-                if (setup_.sent) setup_.sent(line);
-            };
-            const auto timeout = setup_.engine.start_timeout > 0
-                                     ? std::chrono::milliseconds(setup_.engine.start_timeout * 1000LL)
-                                     : ENGINE_STARTUP_TIME;
-            send("uci");
-            std::vector<UciOptionInfo> options;
-            if (!waitWord(*e, "uciok", timeout, [&](const std::string& line) {
-                    if (auto o = parseUciOption(line)) options.push_back(std::move(*o));
-                })) {
-                failed = fmt::format("{} does not answer uci", setup_.engine.name);
-            } else {
-                for (const auto& o : options)
-                    if (o.type != "button") e->options.push_back(o.name);
-                if (!e->has("UCI_Chess960")) {
-                    failed =
-                        fmt::format("{} does not know the Chess960 mode, which Lichess asks for", setup_.engine.name);
-                } else {
-                    // The library's values, but what the service sets itself.
-                    static constexpr std::string_view OWN[] = {"Threads",         "Hash",  "MultiPV", "UCI_Chess960",
-                                                               "UCI_AnalyseMode", "Ponder"};
-                    for (const auto& [name, value] : tour::forEngine(setup_.engine.options)) {
-                        if (!e->has(name) || std::find(std::begin(OWN), std::end(OWN), name) != std::end(OWN)) continue;
-                        send("setoption name " + name + " value " + value);
-                    }
-                    send("setoption name UCI_Chess960 value true");
-                    if (e->has("UCI_AnalyseMode")) send("setoption name UCI_AnalyseMode value true");
-                    if (e->has("Ponder")) send("setoption name Ponder value false");
-                    send("isready");
-                    if (!waitWord(*e, "readyok", timeout))
-                        failed = fmt::format("{} does not answer isready", setup_.engine.name);
-                }
-            }
+        if (!e->process.start(engineLaunch(setup_.engine), why))
+            return fmt::format("{} could not start: {}", setup_.engine.name, why);
+        const auto send = [&](const std::string& line) {
+            (void)e->process.send(line);
+            if (setup_.sent) setup_.sent(line);
+        };
+        const auto timeout = setup_.engine.start_timeout > 0
+                                 ? std::chrono::milliseconds(setup_.engine.start_timeout * 1000LL)
+                                 : ENGINE_STARTUP_TIME;
+        send("uci");
+        std::vector<UciOptionInfo> options;
+        if (!waitWord(*e, "uciok", timeout, stop_, [&](const std::string& line) {
+                if (auto o = parseUciOption(line)) options.push_back(std::move(*o));
+            }))
+            return fmt::format("{} does not answer uci", setup_.engine.name);
+        for (const auto& o : options)
+            if (o.type != "button") e->options.push_back(o.name);
+        if (!e->has("UCI_Chess960"))
+            return fmt::format("{} does not know the Chess960 mode, which Lichess asks for", setup_.engine.name);
+        // The library's values, but what the service sets itself.
+        static constexpr std::string_view OWN[] = {"Threads",         "Hash",  "MultiPV", "UCI_Chess960",
+                                                   "UCI_AnalyseMode", "Ponder"};
+        for (const auto& [name, value] : tour::forEngine(setup_.engine.options)) {
+            if (!e->has(name) || std::find(std::begin(OWN), std::end(OWN), name) != std::end(OWN)) continue;
+            send("setoption name " + name + " value " + value);
         }
-        if (failed.empty()) {
-            engine_ = std::move(e);
-            session_.clear();
+        send("setoption name UCI_Chess960 value true");
+        if (e->has("UCI_AnalyseMode")) send("setoption name UCI_AnalyseMode value true");
+        if (e->has("Ponder")) send("setoption name Ponder value false");
+        send("isready");
+        if (!waitWord(*e, "readyok", timeout, stop_))
+            return fmt::format("{} does not answer isready", setup_.engine.name);
+        engine_ = std::move(e);
+        session_.clear();
+        return {};
+    };
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        if (engine_ && !engine_->process.running()) engine_.reset();
+        if (!engine_) failed = start_engine();
+        if (stop_) return;  // RookStudio closes, or the service was stopped, while the engine started
+        if (!failed.empty()) break;
+        // This request's settings.
+        auto& e         = *engine_;
+        const auto send = [&](const std::string& line) {
+            (void)e.process.send(line);
+            if (setup_.sent) setup_.sent(line);
+        };
+        if (w.session != session_) {
+            session_ = w.session;
+            send("ucinewgame");
         }
+        if (e.has("Threads") && e.threads != job.threads)
+            send(fmt::format("setoption name Threads value {}", job.threads));
+        if (e.has("Hash") && e.hash != job.hash) send(fmt::format("setoption name Hash value {}", job.hash));
+        if (e.has("MultiPV") && e.multipv != job.multipv)
+            send(fmt::format("setoption name MultiPV value {}", job.multipv));
+        e.threads = job.threads;
+        e.hash    = job.hash;
+        e.multipv = job.multipv;
+        send("isready");
+        if (waitWord(e, "readyok", std::chrono::seconds(60), stop_)) break;
+        if (stop_) return;
+        // Ended meanwhile, or hung: ended, and started once more.
+        engine_.reset();
+        if (attempt == 1) failed = fmt::format("{} does not answer isready", setup_.engine.name);
     }
     if (!failed.empty()) {
+        engine_.reset();
         answerEmpty();
         finish(false);
         update([&](ServiceStatus& s) {
@@ -832,28 +892,6 @@ void EngineService::answer(const EngineWork& w) {
         (void)e.process.send(line);
         if (setup_.sent) setup_.sent(line);
     };
-    if (w.session != session_) {
-        session_ = w.session;
-        send("ucinewgame");
-    }
-    if (e.has("Threads") && e.threads != job.threads) send(fmt::format("setoption name Threads value {}", job.threads));
-    if (e.has("Hash") && e.hash != job.hash) send(fmt::format("setoption name Hash value {}", job.hash));
-    if (e.has("MultiPV") && e.multipv != job.multipv) send(fmt::format("setoption name MultiPV value {}", job.multipv));
-    e.threads = job.threads;
-    e.hash    = job.hash;
-    e.multipv = job.multipv;
-    send("isready");
-    if (!waitWord(e, "readyok", std::chrono::seconds(60))) {
-        engine_.reset();
-        answerEmpty();
-        finish(false);
-        update([&](ServiceStatus& s) {
-            s.state = ServiceState::EngineFailed;
-            s.error = fmt::format("{} does not answer isready", setup_.engine.name);
-        });
-        quit_ = true;
-        return;
-    }
     e.lines.clear();
     send(workPosition(w));
     send(workGo(w));
@@ -931,7 +969,7 @@ void EngineService::answer(const EngineWork& w) {
         // Lichess closed the answer: the one who asked went away. The engine stops, its bestmove read.
         job.cut = true;
         send("stop");
-        if (!waitWord(e, "bestmove", setup_.stop_grace)) died = true;
+        if (!waitWord(e, "bestmove", setup_.stop_grace, stop_)) died = true;
     }
     if (died) engine_.reset();
     finish(true);

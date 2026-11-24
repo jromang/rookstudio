@@ -26,6 +26,7 @@
 // With FCG_MOCK_CHESS960=1 it also has UCI_Chess960 and UCI_AnalyseMode, and reads castling as the king taking its rook
 // once UCI_Chess960 is set: an engine Lichess's external engine API takes (#96). With FCG_MOCK_MOVETIME=1, "go
 // movetime" of the analysis takes its time before the bestmove, which a "stop" gives at once: a search that can be cut.
+// With FCG_MOCK_QUIT_AFTER=N it ends after the Nth move of its analysis: an engine that dies between two searches.
 
 #include <atomic>
 #include <chrono>
@@ -49,6 +50,15 @@ Move infinite_best;
 bool chess960 = false;  // UCI_Chess960 set (FCG_MOCK_CHESS960)
 std::mutex out_mutex;   // the output, shared with a timed search's thread (FCG_MOCK_MOVETIME)
 std::atomic<int> search_id{0};
+int searches_done = 0;  // FCG_MOCK_QUIT_AFTER
+
+// An analysis's move given: the end of the program after so many, with FCG_MOCK_QUIT_AFTER.
+void searched() {
+    const char* quit = std::getenv("FCG_MOCK_QUIT_AFTER");
+    if (!quit || ++searches_done < std::atoi(quit)) return;
+    std::cout << std::flush;
+    std::_Exit(0);
+}
 
 void initialize_rng(int argc, char *argv[]) {
     if (argc > 1) {
@@ -211,6 +221,7 @@ void uci_line(Board &board, const std::string &line) {
             return;
         }
         std::cout << "bestmove " << uci::moveToUci(infinite_best, chess960) << std::endl;
+        searched();
     } else if (tokens[0] == "go") {
         if (const char *crash = std::getenv("FCG_MOCK_STDERR_CRASH")) {
             std::cout << "info string crashing" << std::endl;

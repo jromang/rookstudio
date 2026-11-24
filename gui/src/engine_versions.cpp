@@ -5,6 +5,7 @@
 #include <system_error>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/files.hpp>
 
 #include "lichess_api.hpp"
 
@@ -50,7 +51,7 @@ std::vector<DiskVersion> diskVersions(const fs::path& profile, const std::vector
                                       const std::vector<ProgramUser>& tournaments) {
     std::vector<DiskVersion> out;
     for (const auto& i : installed) {
-        if (i.id != id) continue;
+        if (i.id != id || i.id.empty() || i.version.empty()) continue;
         DiskVersion v;
         v.installed = i;
         v.folder    = versionFolder(profile, i.id, i.version);
@@ -103,6 +104,14 @@ void reviveVersion(std::vector<Installed>& installed, std::string_view id, std::
 }
 
 bool deleteVersion(std::vector<Installed>& installed, const DiskVersion& v, int64_t when, std::string* error) {
+    // A version's own folder only, <profile>/engines/<id>/<version>: never the engines' folder whole.
+    const auto version_name = tour::fileNameOf(v.installed.version), id_name = tour::fileNameOf(v.installed.id);
+    if (v.installed.id.empty() || v.installed.version.empty() || version_name.empty() || id_name.empty() ||
+        v.folder.filename() != version_name || v.folder.parent_path().filename() != id_name ||
+        v.folder.parent_path().parent_path().filename() != "engines") {
+        if (error) *error = "not a version's folder";
+        return false;
+    }
     std::error_code ec;
     fs::remove_all(v.folder, ec);
     if (ec || fs::exists(v.folder)) {
@@ -130,10 +139,14 @@ std::vector<Deleted> deleteRetired(const fs::path& profile, std::vector<Installe
     for (const auto& id : ids) {
         for (const auto& v : diskVersions(profile, installed, id, library, tournaments)) {
             if (v.state == VersionState::Held && v.installed.retired > 0) {
-                // Its holder noted, to name it once its end frees the version.
-                for (auto& i : installed)
-                    if (i.id == v.installed.id && i.version == v.installed.version)
-                        i.held_by = v.tournaments.front().name;
+                // Its holder noted (a tournament: what holds a version and has no name is not one), to name it once
+                // its end frees the version.
+                for (const auto& u : v.tournaments) {
+                    if (u.name.empty()) continue;
+                    for (auto& i : installed)
+                        if (i.id == v.installed.id && i.version == v.installed.version) i.held_by = u.name;
+                    break;
+                }
                 continue;
             }
             if (v.state != VersionState::Retired) continue;

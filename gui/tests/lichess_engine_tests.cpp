@@ -769,6 +769,54 @@ TEST_CASE("external engine: the secret refused (401), a changed API, an engine w
     }
 }
 
+TEST_CASE("external engine: what a job holds is checked before the engine reads it, an ended engine started again") {
+    // A move as UCI writes it, nothing else.
+    CHECK(uciMoveText("e2e4"));
+    CHECK(uciMoveText("e7e8q"));
+    CHECK(uciMoveText("e1h1"));
+    CHECK_FALSE(uciMoveText("a0b1"));  // a square that is not one
+    CHECK_FALSE(uciMoveText("0000"));
+    CHECK_FALSE(uciMoveText("e7e8k"));
+    CHECK_FALSE(uciMoveText("e2e4 "));
+    CHECK_FALSE(uciMoveText(""));
+    ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");
+    ScopedEnv chess960("FCG_MOCK_CHESS960", "1");
+    ScopedEnv quit("FCG_MOCK_QUIT_AFTER", "1");  // the engine ends after each search
+    FakeLichess lichess;
+    // A line break in its FEN would give the engine another command; a move that is not one: answered empty, nothing of
+    // either sent to the engine.
+    auto injected     = work(START + "\nsetoption name Debug Log File value sample.log", {});
+    injected["depth"] = 3;
+    lichess.push(200, jobJson("job0008", "eei_Sample000001", injected));
+    auto bad_move     = work(START, {"e2e4", "a0b1"});
+    bad_move["depth"] = 3;
+    lichess.push(200, jobJson("job0009", "eei_Sample000001", bad_move));
+    // Two requests: the engine ends after the first, and is started again for the second.
+    for (const char* id : {"job0010", "job0011"}) {
+        auto good     = work(START, {"e2e4"});
+        good["depth"] = 3;
+        lichess.push(200, jobJson(id, "eei_Sample000001", good));
+    }
+    std::vector<std::string> sent;
+    std::mutex sent_mutex;
+    EngineService service(setupFor(lichess, &sent, &sent_mutex));
+    REQUIRE(waitUntil([&] { return lichess.answered().size() == 4; }));
+    const auto answers = lichess.answered();
+    CHECK(answers[0].lines == std::vector<std::string>{"bestmove (none)"});
+    CHECK(answers[1].lines == std::vector<std::string>{"bestmove (none)"});
+    for (std::size_t i = 2; i < 4; ++i) {
+        REQUIRE_FALSE(answers[i].lines.empty());
+        CHECK(answers[i].lines.back().rfind("bestmove ", 0) == 0);
+        CHECK(answers[i].lines.back() != "bestmove (none)");
+    }
+    CHECK_FALSE(service.ended());
+    std::lock_guard lock(sent_mutex);
+    CHECK(std::count(sent.begin(), sent.end(), "uci") == 2);
+    CHECK(std::none_of(sent.begin(), sent.end(), [](const std::string& l) {
+        return l.find("Debug Log File") != std::string::npos || l.find("a0b1") != std::string::npos;
+    }));
+}
+
 TEST_CASE("external engine: offline, it waits for the network and resumes by itself") {
     ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");
     const auto port = freePort();

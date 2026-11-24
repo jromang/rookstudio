@@ -127,6 +127,12 @@ void App::checkVersions(std::string ended, std::string replaced) {
         for (const auto& p : t->spec().participants) u.programs.push_back(p.engine.cmd);
         open.push_back(std::move(u));
     }
+    // The engines serving lichess.org (#96) hold theirs too, without a name, until they start again with the new
+    // version.
+    catalogue::ProgramUser engines;
+    for (const auto& [name, s] : services_)
+        if (s.engine.machine.empty()) engines.programs.push_back(s.engine.cmd);
+    if (!engines.programs.empty()) open.push_back(std::move(engines));
     VersionCheck c;
     c.ended    = std::exchange(version_check_ended_, std::string());
     c.replaced = std::exchange(version_check_replaced_, std::string());

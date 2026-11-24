@@ -719,6 +719,7 @@ void App::drawBoardTree() {
     const auto fen            = boardFen();
     const bool dossier_source = dossier && tree_source_ >= dossier_at;
     const bool online         = tree_source_ >= lichess_at && !dossier_source;
+    tree_online_source_       = online ? tree_source_ - lichess_at : -1;  // what the opening report ticks (#91)
     if (online && !lichessTreeRows(tree_source_ - lichess_at, fen)) {
         drawTreeTheory(ImGui::GetContentRegionAvail().y);  // the studies' notes, whatever the source (#77)
         return;                                            // the card it needs instead
@@ -900,9 +901,28 @@ void App::drawBoardTree() {
             }
         }
     }
-    ImGui::PushTextWrapPos();  // a message from Lichess can be long
-    ImGui::TextUnformatted(tree_summary_.c_str());
-    ImGui::PopTextWrapPos();
+    // The opening report of the position (#91, mockup M13, board 4), at the right of the summary.
+    if (!b.chess960) {
+        const char* report = TR("Report on this position");
+        const float w      = ImGui::CalcTextSize(report).x + ImGui::GetStyle().FramePadding.x * 2 + px(20);
+        const float room   = ImGui::GetContentRegionAvail().x;
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + std::max(px(120), room - w - px(8)));
+        ImGui::TextUnformatted(tree_summary_.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(8), ImGui::GetContentRegionMax().x - w));
+        if (ui::iconButton("tree_report", ui::Icon::File, report)) {
+            openOpeningReport(Page::Board);
+            return;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("Its moves and lines with their figures, its structures and plans, key games, "
+                                       "novelties and the assistant's summary, in place of the page (Ctrl+K: Opening "
+                                       "report)"));
+    } else {
+        ImGui::PushTextWrapPos();  // a message from Lichess can be long
+        ImGui::TextUnformatted(tree_summary_.c_str());
+        ImGui::PopTextWrapPos();
+    }
     if (tree_db_ >= 0) drawTreeNovelty(static_cast<std::size_t>(tree_db_));
     // Lichess's players: each move's games month by month, when asked for (#56).
     const bool lichess_players = online && tree_source_ - lichess_at == 1;

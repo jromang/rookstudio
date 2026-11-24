@@ -435,6 +435,57 @@ ms; its largest round robin, a double one of 22 players, 462 games: 78 ms, 0.2 m
 kept its names' keys of its own; both done once now. The mockup expected a few milliseconds ("it is a sort"): so they
 are for a database of a few thousand games, a large one's list is made in the background with its progress (R18).
 
+## An opening report (#91)
+
+`makeOpeningReport` (`opening_report.hpp`) makes a position's report from the databases' opening trees and their games,
+section by section, each told to the caller once made. The moves: each tree's answer at the position, added move by move
+(a position fewer than two games of a database reach, or one past its tree's plies, searched for in its games, as the
+reference games do). The main lines: the most played moves, each followed by the most played move after it while that
+keeps a fifth of the line's first move's games and ten games, up to the trees' plies. Then the position's games, read in
+one pass through the trees' runs (`Tree::visitAt`, without their moves read nor all of them held): each one's rating and
+date for the key games (the strongest by the players' mean rating, the most recent of 2500 and more), its players for
+the user's games (Settings › Your names), and an even sample of at most 20 000 replayed on the machine's threads: its pawns
+twenty plies after a position of move 10 (move 20; ten moves on for a later one) named by the caller (the assistant's
+formations), each side's pawn pushes and its pieces' routes (a man followed from its square as the Manoeuvre search
+follows it, castling and a capture ending a route) in the thirty plies after it. A side's plans: a push, or two in a row
+when most of its games play both, a route of one move, or of two when most of its games go on, played in a tenth of the
+games or more; three for each side, a man or a square in one plan only; a pawn plan named by the caller (the assistant's
+facts: the minority attack, a lever's break, the pawn storm, space) when more than half of an even sample of 64 of its
+games get that name for their pushes. Nothing of this from fewer than 50 games. The novelties: along the main lines, the
+moves played two to 20 000 times whose games (those that reach the position after them, by any move order, through the
+trees) begin in the last five years of the position's games; a novelty near the trees' horizon (twelve plies or less
+from it) is searched for in every game, a game four plies late having reached it before; and the user's latest games
+through the position followed until a move no other game of the trees plays after it, confirmed by a search of the
+position as the Tree tab confirms a novelty. The first game of the novelty repeated most is a key game.
+
+Measured on 2026-11-24 on the reference database (11.7 M games, its tree of 15.0 M positions over 60 plies), at the
+lowest priority beside other work that kept about 27 of the 32 threads busy (`fcg-study-bench opening-report`):
+
+| Position | Games | 32 threads | 4 threads | 1 thread |
+|---|---|---|---|---|
+| After 1.e4 | 5 873 528 | 0.83 s | 0.80 s | 0.86 s |
+| A Ruy Lopez, closed (9…Be7) | 107 404 | 44 ms | 53 ms | 81 ms |
+| A Najdorf (5…a6) | 291 273 | 98 ms | 108 ms | 117 ms |
+| The exchange QGD after 10…Nf8 (the mockup's) | 10 404 | 14 ms | 19 ms | 37 ms |
+
+Each line: the moves and the main lines in under 1 ms once the tree is read from the disk (117 ms the first time), the
+structures and plans (20 000 games replayed, 10 404 for the mockup's position) in 11 to 87 ms, the reading of the
+5 873 528 games of 1.e4 taking the rest of its 0.8 s, the novelties in 2 to 45 ms. A rare position, followed down a
+Najdorf's main line until fewer than 50 games reach it, has its moves and games without structures nor plans (see the
+bench's log). A position search of the database, what confirms the user's game that left the databases, takes 1.7 s on
+32 threads, 9.2 s on 4 and 35 s on one: the first measure confirmed every novelty so and took 1.7 s, 9.2 s and 35 s for
+each position whatever its size; the trees hold every game that reaches a position within their 60 plies, so a novelty's
+first year is now taken from them, the search kept for the user's game and the positions near the horizon. The mockup
+expected a few seconds.
+
+The summary written by the assistant's model on this machine's processor (an AMD Ryzen 9 9950X busy with other work,
+the lowest priority, the model `commentary-v11-Q4_K_M.gguf` on the CPU, a database of 60 000 games of a Lichess month
+with invented names, the Italian after 3…Bc5): the model loaded in 1.0 s, a summary of four passages in 40 s, six
+requests of 6.7 s each (two passages written twice, one refused twice and the templates' standing); written again
+(*Rewrite*), 40 s. The checker refused numbers in words ("three", "sixty-four") and a figure told of another plan; it
+first refused a true sentence whose figure came before the plan it was of ("in 78% the knight goes from g8 to f6"): the
+figure is now read with its clause. The templates' version takes under a millisecond.
+
 ## Beside the tournaments
 
 A thread that calls `enterBackground()` runs at the lowest priority (a niceness of 19 on Linux, the lowest thread

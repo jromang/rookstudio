@@ -371,6 +371,9 @@ them.
 | <kbd>Escape</kbd> | A player's dossier | Back to the page it was opened from |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | A database's tournaments | Choose a tournament, open its crosstable |
 | <kbd>Escape</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | A tournament's crosstable | Back to the tournaments; undo its last change to the database |
+| <kbd>Ctrl</kbd>+<kbd>Page Down</kbd>, <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> | An opening report | The next section, the previous one |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | An opening report's moves | Choose a move, play it on the Board page |
+| <kbd>Escape</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | An opening report | Back to the position; take out the moves added to the repertoire |
 | <kbd>←</kbd> <kbd>→</kbd> | The big screen | The previous or next game |
 | <kbd>+</kbd> <kbd>-</kbd> | The big screen | Larger or smaller text |
 | <kbd>Escape</kbd> | The big screen | Leave it |
@@ -1163,7 +1166,8 @@ leaves the database, the tab says at which move, and whether that move is a **no
 confirms (*See the last known position*). A database's tree is built after each import, and again in the background
 after a game is saved into it, its progress shown with *Cancel*. Your theory studies' notes come with the moves,
 whatever the source: a *Theory* column, and *What your studies say* under the moves (see [Theory
-studies](#theory-studies)).
+studies](#theory-studies)). *Report on this position*, at the right of the games, opens its opening report (see [The
+opening report](#the-opening-report)).
 
 ### Reference games
 
@@ -1182,6 +1186,68 @@ With the *Lichess* source (all its players), *Each move month by month* asks Lic
 by month: a line of its last two years in the *By month* column, green when it is played more lately, red when less;
 under the mouse, its games in the last six months against the six before. The summary says the same of the position.
 It costs a request a move, so it stays off until asked for; the masters' explorer has no months.
+
+### The opening report
+
+The **opening report** of a position puts together what your databases know of it. It opens from the Tree tab's
+*Report on this position*, from a line of the Openings page (the right button on a gap: *Opening report*) and from
+Ctrl+K, *Opening report*; it shows in place of the Board page, Esc going back to the position. It is made again each
+time it opens, in the background at a low priority, section by section with its progress and *Cancel*: a fraction of a
+second for most positions, about a second for one of millions of games.
+
+At its top: the position, its opening (Lichess's named openings) and the moves that lead there; then its sources, those
+of the Tree tab: your databases whose opening tree is built (those *My databases* adds together), with their games;
+**Masters (Lichess)** and **Lichess** with the Tree tab's speeds and ratings, ticked when the Tree tab shows them, or by
+a click (they ask Lichess's explorer for the position, as the Tree tab does, and need a linked account); and where the
+evaluations come from. *To the repertoire* adds the first main line to the active repertoire (Ctrl+Z takes it out).
+Five sections follow (Ctrl+Page Down and Ctrl+Page Up go from one to the next):
+
+- **Lines**: the moves played from the position with the Tree tab's figures (games, White's wins, draws and Black's
+  wins, score, average Elo, performance, last year) and an evaluation: Lichess's, kept offline (see [Lichess's
+  evaluations offline](#lichesss-evaluations-offline)), else the analysis' engine's (a million nodes on one thread, for
+  the first five moves without one); its source and depth at the cursor. A click, or ↑ ↓ and Enter, plays the move on
+  the Board page. Then the **main lines**: the most played continuations, as long as they keep a fifth of their first
+  move's games, with the games that reach their end and White's score; a click shows one on the Board page;
+- **Plans and structures**: the pawn structures at move 20 (ten moves on for a later position) in the position's games,
+  as the assistant's facts name them, *kept* when the position has one already; and what the players do in the next
+  fifteen moves: the pawn pushes (one, or two in a row: *b4 then b5*) and the pieces' routes (as the Manoeuvre search
+  follows a piece) played in a tenth of the games or more, three for each side, with their share and White's score.
+  A plan the assistant's facts know is named (*The minority attack: b4 then b5*). These are frequencies, not advice;
+  they need 50 games, and a position of more than 20,000 games is counted in an even sample of them. A click shows those
+  games in the list;
+- **Key games**: the strongest (the players' highest mean rating), the most recent of 2500 and more on average, and the
+  first game of a novelty repeated since, each with why and the plan it plays; *Open* shows it on the Board page at the
+  position (*Back to the report* returns);
+- **Novelties**: along the main lines, the moves first played in the last five years of your databases and repeated
+  since, with their first year, how often they were repeated and their score; and your own game that left your
+  databases there (your names are those of *Settings › Your names*). A move's first year comes from the trees, which
+  hold every game that reaches its position in their first 60 plies; your game is confirmed by a search of the position, as
+  the Tree tab confirms a novelty;
+- **Summary**: the assistant's summary of the report, written by its model from the report's figures and facts alone
+  (see [The report's summary](#the-reports-summary)).
+
+A position fewer than 50 games reach gives its moves and games, without plans nor structures (*Add Lichess's players as
+a source*). Without a database whose tree covers its games, the report is made of Lichess's masters, with *Rebuild the
+tree of …* and *Import a database*. Offline, your databases and the evaluations kept offline answer, and Lichess's
+sources show the last figures the report kept for the position, dated. With neither an engine nor Lichess's
+evaluations kept offline, the evaluations stay empty and the summary says nothing of them (*Download Gaia…*). While one
+of your games is played live on Lichess, the report is locked, and comes back by itself at its end; on the position of a
+correspondence game, the lines and figures of your databases stay (Lichess allows a book and a database), the
+evaluations, Lichess's explorer and the summary wait. Nothing leaves the machine but what the Tree tab sends: the
+Lichess sources ticked. Printing the report and its HTML page are for later.
+
+### The report's summary
+
+The summary is written in passages: the pawn structure, each side's plans, the moves played, the main line, the
+evaluations. The assistant's model writes each one from that passage's figures alone, held by a grammar that lets it
+name only the position's moves, the report's lines, their squares and figures; then the checker reads each sentence: a
+figure must be one the report gives of what the sentence names, a move one of the position or of its lines, a plan or
+a structure one the report has and of the side it says, and it gives no advice. A passage refused is written again
+once; refused twice, the templates' passage stands, and the cursor over it says why. *What it rests on* lists the
+figures, facts and evaluations used; a card says what the checker refused. *The templates' version* shows the
+templates' summary, *Rewrite* has the model write it otherwise, *Copy* copies it. Without the model (not downloaded,
+another GGUF file, or while a tournament on this machine has the processor), the templates write it from the same
+figures, in English or French. On the processor, a summary takes a few seconds a passage.
 
 ### The review of a game
 
@@ -1675,7 +1741,8 @@ The active repertoire's **coverage** is measured on your databases whose opening
 for each, a click takes it out or back), in the background: the share of the games along the repertoire that find an
 answer to the end of its lines, or up to move 10 or 15. Its **gaps** follow, the most often met first: an opponent's
 move played often enough without your answer, or a line ending on an opponent's move. A click shows the position,
-with the tree beside it.
+with the tree beside it; the right button also offers its opening report (see [The opening
+report](#the-opening-report)).
 
 ### Training a repertoire
 

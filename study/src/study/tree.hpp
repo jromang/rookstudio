@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -95,6 +96,10 @@ class Tree {
     [[nodiscard]] std::optional<TreeAnswer> at(const Snapshot& snapshot, uint64_t key) const;
     // Those games, in the order of their moves.
     [[nodiscard]] std::vector<TreeGame> gamesAt(const Snapshot& snapshot, uint64_t key) const;
+    // The same games, each given to `visit` with the ply it reaches the position at, without their moves read nor all
+    // of them held: what the opening report reads of millions (#91). False when fewer than two games reach it.
+    bool visitAt(const Snapshot& snapshot, uint64_t key,
+                 const std::function<void(GameId id, uint32_t ply)>& visit) const;
     // Those that played `code` from the position (TreeMove::END: those that end there): found by halving, the games
     // of a move order being in the order of their next moves, so a move from the start costs little.
     [[nodiscard]] std::vector<TreeGame> gamesWith(const Snapshot& snapshot, uint64_t key, int code) const;

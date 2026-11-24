@@ -33,6 +33,7 @@ struct Score {
 struct Searched {
     std::vector<Move> moves;
     Score score;
+    uint32_t depth                         = 0;  // the depth it reached, 0 when not known (an answer kept)
     bool operator==(const Searched&) const = default;
 };
 

@@ -137,6 +137,23 @@ bool RepertoireShelf::toggle(std::size_t index, std::span<const chess::Move> pat
     return has(index, path, move);
 }
 
+std::size_t RepertoireShelf::addLine(std::size_t index, std::span<const chess::Move> path,
+                                     std::span<const chess::Move> line) {
+    if (index >= entries_.size()) return 0;
+    std::vector<chess::Move> at(path.begin(), path.end());
+    std::size_t added = 0;
+    for (const auto move : line) {
+        if (!has(index, at, move)) {
+            if (!study::addMove(entries_[index].lines, false, at, move)) break;
+            maps_[index].reset();  // has() reads the lines as they now are
+            ++added;
+        }
+        at.push_back(move);
+    }
+    if (added) changed(index);
+    return added;
+}
+
 void RepertoireShelf::restore(std::size_t index, GameTree lines) {
     if (index >= entries_.size()) return;
     entries_[index].lines = std::move(lines);

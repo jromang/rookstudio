@@ -921,6 +921,16 @@ std::vector<TreeGame> Tree::gamesAt(const Snapshot& snapshot, uint64_t key) cons
     return out;
 }
 
+bool Tree::visitAt(const Snapshot& snapshot, uint64_t key,
+                   const std::function<void(GameId id, uint32_t ply)>& visit) const {
+    const auto r = record(key);
+    if (!r || stale(snapshot)) return false;
+    for (const auto& run : r->runs)
+        for (uint64_t j = run.start; j < run.start + run.count; ++j)
+            visit(load<uint32_t>(order_.data() + HEADER + j * 4), run.depth);
+    return true;
+}
+
 std::vector<TreeGame> Tree::gamesWith(const Snapshot& snapshot, uint64_t key, int code) const {
     std::vector<TreeGame> out;
     const auto r = record(key);

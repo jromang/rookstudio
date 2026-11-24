@@ -145,6 +145,7 @@ App::~App() {
     *lichess_count_cancel_ = true;
     if (review_tables_job_) *review_tables_job_->cancel = true;  // the tables of a review, within a quarter of a second
     if (story_job_) *story_job_->cancel = true;                  // the story by the model, at its next passage (#62)
+    leaveReportJobs();  // an opening report's: waited for while the assistant is still there (#91)
     if (mistake_scan_job_) *mistake_scan_job_->cancel = true;    // the user's games looked for, at the next game (#81)
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once, and the window goes away first rather than freeze while it does.
@@ -318,6 +319,7 @@ void App::frame() {
     pollCast();             // a tournament on the user's own Lichess broadcast, once allowed (#51)
     pollPrep();             // a game prepared against an opponent: their games (#52)
     pollDossier();          // a player's dossier: the job that ended, their Lichess games that came (#90)
+    pollOpeningReport();    // an opening report: its sections, evaluations, summary, Lichess's answers (#91)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
     pollOfflineEvals();     // Lichess's evaluations kept offline: a preparation's runs, its end (#58)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
@@ -629,6 +631,33 @@ void App::frame() {
                     file           = file.substr(0, at);
                 }
                 dropFile(file);
+            }
+        } else if (w == "opening-report" || w.rfind("opening-report=", 0) == 0) {
+            // opening-report[=FILE@PLY[@TAB]]: the report of the Board page's position (#91); FILE on the board first,
+            // at PLY once read, the report then at TAB (lines, plans, games, novelties, summary).
+            toStudyBoard();
+            if (const auto eq = w.find('='); eq != std::string::npos) {
+                auto spec         = w.substr(eq + 1);
+                int tab           = 0;
+                const auto tab_at = spec.rfind('@');
+                if (tab_at != std::string::npos && tab_at + 1 < spec.size() &&
+                    !std::isdigit(static_cast<unsigned char>(spec[tab_at + 1]))) {
+                    const auto name = spec.substr(tab_at + 1);
+                    tab             = name == "plans"       ? 1
+                                      : name == "games"     ? 2
+                                      : name == "novelties" ? 3
+                                      : name == "summary"   ? 4
+                                                            : 0;
+                    spec            = spec.substr(0, tab_at);
+                }
+                if (const auto at = spec.rfind('@'); at != std::string::npos && at > 1) {
+                    ply_when_read_ = std::atoi(spec.c_str() + at + 1);
+                    spec           = spec.substr(0, at);
+                }
+                report_when_read_ = tab;
+                dropFile(spec);
+            } else {
+                openOpeningReport(Page::Board);
             }
         } else if (w == "board" || w == "board-analyse") {  // the Board page; its analysis started
             page_ = Page::Board;

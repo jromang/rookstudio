@@ -58,6 +58,9 @@ struct Refusal {
                    // where 30.Bxh7 wins one
         Wording,   // words that say something else than what is meant: « la partie se termine » for the opening,
                    // « donne le roi », « parier » for « parer »
+        // The opening report's summary (opening_summary.hpp):
+        Figure,  // a figure the report does not give, or gives of something else: "52%" for a plan of 47%
+        Advice,  // what to play, where the report gives frequencies: "White should push b4"
     };
     Kind kind = Kind::Empty;
     // The words refused: the move, the motif, the piece, the name; empty for TooManyMoves, Grammar and Empty.

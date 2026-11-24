@@ -236,9 +236,19 @@ void App::drawOpeningsPage() {
         if (ImGui::Selectable(label.c_str())) showLineOnBoard(g.line, e.name);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s",
-                              trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(g.games, 1000000000)),
-                                  ui::exactCount(g.games))
+                              trf("{} · the right button: its opening report",
+                                  trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(g.games, 1000000000)),
+                                      ui::exactCount(g.games)))
                                   .c_str());
+        // The opening report of the line's position (#91), in place of the page, Esc going back to the position.
+        if (ImGui::BeginPopupContextItem("##gap_menu")) {
+            if (ImGui::MenuItem(TR("Show it on the board"))) showLineOnBoard(g.line, e.name);
+            if (ImGui::MenuItem(TR("Opening report"))) {
+                showLineOnBoard(g.line, e.name);
+                openOpeningReport(Page::Board);
+            }
+            ImGui::EndPopup();
+        }
         ImGui::PopID();
     }
     if (c.gaps.empty()) ImGui::TextDisabled("%s", TR("None: every move played often enough has its answer."));

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdlib>
+#include <utility>
 
 #include <tour/chess_text.hpp>
 
@@ -151,6 +152,45 @@ bool ScanBoard::set(const chess::Board& board) {
     key_ ^= castlingKey() ^ epKey();
     if (stm_ == WHITE_SIDE) key_ ^= zobrist::whiteToMove();
     return true;
+}
+
+std::string ScanBoard::fen() const {
+    static constexpr char LETTERS[] = "PNBRQKpnbrqk";
+    std::string out;
+    for (int rank = 7; rank >= 0; --rank) {
+        int empty = 0;
+        for (int file = 0; file < 8; ++file) {
+            const auto piece = board_[rank * 8 + file];
+            if (piece == 0) {
+                ++empty;
+                continue;
+            }
+            if (empty) out += static_cast<char>('0' + std::exchange(empty, 0));
+            out += LETTERS[piece - 1];
+        }
+        if (empty) out += static_cast<char>('0' + empty);
+        if (rank > 0) out += '/';
+    }
+    out += stm_ == WHITE_SIDE ? " w " : " b ";
+    std::string castling;
+    for (int side = 0; side < 2; ++side)
+        for (int s = 0; s < 2; ++s) {
+            if (rook_[side][s] < 0) continue;
+            const int file = rook_[side][s] % 8;
+            char c         = (s == 0 && file == 7) ? 'K' : (s == 1 && file == 0) ? 'Q' : static_cast<char>('A' + file);
+            if (side == BLACK_SIDE) c = static_cast<char>(c - 'A' + 'a');
+            castling += c;
+        }
+    out += castling.empty() ? "-" : castling;
+    out += ' ';
+    if (ep_ >= 0) {
+        out += static_cast<char>('a' + ep_ % 8);
+        out += static_cast<char>('1' + ep_ / 8);
+    } else {
+        out += '-';
+    }
+    out += ' ' + std::to_string(halfmove_) + ' ' + std::to_string(fullmove_);
+    return out;
 }
 
 void ScanBoard::put(int square, int side, int kind) noexcept {

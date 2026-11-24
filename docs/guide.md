@@ -1380,12 +1380,11 @@ and *Explain the rest* finishes them later.
 Each line says where it comes from: theory, the model, a template, a word, the review. *Every move*, *The moves that
 matter* (the marked moves, the only moves, the turning points, the novelty) and *The key moments* choose which show; a
 click goes to the move. The summary counts them and gives the time a move takes, the facts gathered and the model's
-sentence checked: about a quarter of a second for the sentence on a GPU, some 5 seconds a move on a processor shared with
-other work (32 moves explained in a minute and a half). They are kept with the
-review, beside the moves, never in the game: *Write them into the game* makes them the assistant's comments, marked as
-its own in the PGN, beside the comment a move has already, which is never replaced; Ctrl+Z takes them all back. Nothing
-leaves the machine. Locked while one of your games is played on Lichess, hidden during a game against an engine until
-its end.
+sentence checked: about a quarter of a second for the sentence on a GPU, some 5 seconds a move on a processor shared
+with other work (32 moves explained in a minute and a half). They are kept with the review, beside the moves, never in
+the game: *Write them into the game* makes them the assistant's comments, marked as its own in the PGN, beside the
+comment a move has already, which is never replaced; Ctrl+Z takes them all back. Nothing leaves the machine. Locked
+while one of your games is played on Lichess, hidden during a game against an engine until its end.
 
 ### The guided visit and “Why not?”
 

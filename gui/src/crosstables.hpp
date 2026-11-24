@@ -29,6 +29,9 @@ struct CrosstableSettings {
     std::optional<study::SystemChoice> system;
     std::optional<std::vector<study::Tiebreak>> order;
     std::vector<study::HandResult> hand;
+    // Where those results come from: "lichess-trf", the TRF file of a Swiss kept from Lichess (#95: its byes, late
+    // joins and absences); empty: the user.
+    std::string hand_from;
     [[nodiscard]] bool empty() const { return !system && !order && hand.empty(); }
     bool operator==(const CrosstableSettings&) const = default;
 };

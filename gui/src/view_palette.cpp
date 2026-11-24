@@ -1057,6 +1057,59 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         });
     }
     if (boardBackToMosaic()) add(TR("Back to the mosaic"), TR("Board"), [this] { backToMosaic(); });
+    // Lichess's tournaments (#95): the card; an arena of its list followed or joined; the Play page's part; in an
+    // arena, the pause and berserk; the user's teams' Swiss tournaments; a finished Swiss kept.
+    add(TR("Lichess tournaments: arenas and Swiss tournaments"), where(Page::Lichess), [this] {
+        broadcast_round_.clear();  // the page itself, where its card is
+        page_         = Page::Lichess;
+        arena_card_y_ = -2;
+    });
+    add(TR("Play an arena or a Swiss tournament on Lichess"), where(Page::Play), [this] {
+        play_part_            = 1;
+        playSettings().part   = 1;
+        online_part_          = 1;
+        onlineSettings().part = 1;
+        savePlaySettings();
+        saveOnlineSettings();
+        page_ = Page::Play;
+    });
+    if (arena_card_.list.value)
+        for (const auto& a : *arena_card_.list.value) {
+            add(trf("Follow the arena: {}", a.name), "Lichess",
+                [this, id = a.id, name = a.name] { followTournament(id, name, false); });
+            if (lichess::playableHere(a) && lichess_account_)
+                add(trf("Join the arena: {}", a.name), TR("Play"),
+                    [this, id = a.id, name = a.name] { chooseArena(id, name); });
+        }
+    if (tour_follow_)
+        add(trf("The tournament followed in the mosaic: {}", tour_follow_->name), "Lichess",
+            [this] { openBroadcastMosaic(tour_follow_->key); });
+    if (arena_play_ && (arena_play_->seat.in() || arena_play_->seat.paused())) {
+        add(arena_play_->seat.in() ? TR("Pause in the arena") : TR("Back in the arena"), "Alt+P",
+            [this] { toggleArenaPause(); });
+        add(TR("Back to the arena"), TR("Play"), [this] { chooseArena(arena_play_->id, arena_play_->name); });
+    }
+    if (online_game_ && arena_play_ && online_game_->state.tournament == arena_play_->id && arena_play_->state.value &&
+        arena_play_->state.value->info.berserkable &&
+        lichess::berserkAllowed(true, online_game_->state, online_game_->white))
+        add(TR("Berserk"), TR("Play"), [this] {
+            onlineCall(TR("Berserk"),
+                       [id = online_game_->id](const std::string& token) { return lichess::berserk(token, id); });
+        });
+    if (lichess_account_ && !lichess_account_->has(lichess::SCOPE_TEAM_READ))
+        add(TR("Read my teams' Swiss tournaments…"), "Lichess", [this] {
+            broadcast_round_.clear();
+            page_ = Page::Lichess;
+            LichessScopeAsk ask;
+            ask.scope          = lichess::SCOPE_TEAM_READ;
+            lichess_scope_ask_ = ask;
+        });
+    if (swiss_play_ && swiss_play_->info.value && swiss_play_->info.value->state == lichess::TourState::Finished &&
+        swiss_play_->kept_in.empty() && !swiss_play_->keep_job.valid())
+        add(TR("Keep the Swiss in a database…"), TR("Play"), [this] {
+            chooseSwiss(*swiss_play_->info.value);
+            swiss_play_->keep_menu = true;
+        });
     // To lichess.org, from the Board (#54).
     if (page_ == Page::Board) {
         if (!toLichessLock(false)) {

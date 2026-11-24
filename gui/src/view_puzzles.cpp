@@ -593,7 +593,7 @@ void App::drawPuzzlePage() {
         const auto start = ImGui::GetCursorPosX();
         std::string what = p.title;
         if (p.phase != PuzzlePhase::End && p.current < p.puzzles.size())
-            what += " · " + trf("puzzle rated {}", ui::exactCount(static_cast<uint64_t>(p.puzzles[p.current].rating)));
+            what += " · " + trf("puzzle rated {}", p.puzzles[p.current].rating);
         ImGui::TextDisabled("%s", what.c_str());
         std::string where;
         if (p.phase != PuzzlePhase::End) {
@@ -940,8 +940,7 @@ void App::drawPuzzleEnd() {
             const auto play    = puzzlePlay(puzzle);
             if (!play) continue;
             const auto question = boardOf(*play, 0);
-            const auto label    = fmt::format("{} · {}", mainTheme(puzzle.themes, p.title),
-                                              ui::exactCount(static_cast<uint64_t>(puzzle.rating)));
+            const auto label    = fmt::format("{} · {}", mainTheme(puzzle.themes, p.title), puzzle.rating);
             std::string yours   = localSan(o->played);
             try {
                 if (const auto m = chess::uci::parseSan(question, o->played); m != chess::Move::NO_MOVE)

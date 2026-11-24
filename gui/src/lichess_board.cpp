@@ -143,7 +143,10 @@ void applyState(const nlohmann::json& j, BoardState& s) {
     s.black_draw     = boolOf(j, "bdraw");
     s.white_takeback = boolOf(j, "wtakeback");
     s.black_takeback = boolOf(j, "btakeback");
-    s.first_move_ms  = -1;
+    // Berserk, once gone, stays (Lichess writes it only when true).
+    s.white_berserk = s.white_berserk || boolOf(j, "wberserk");
+    s.black_berserk = s.black_berserk || boolOf(j, "bberserk");
+    s.first_move_ms = -1;
     if (const auto it = j.find("expiration"); it != j.end() && it->is_object())
         s.first_move_ms = std::max<int64_t>(0, intOf(*it, "millisToMove") - intOf(*it, "idleMillis"));
 }
@@ -205,6 +208,12 @@ std::optional<chess::Move> legalUci(const chess::Board& board, std::string_view 
 
 // ---------------------------------------------------------------------------
 // One request each
+
+Reply lichessPost(const std::string& path, const std::string& token,
+                  const std::vector<std::pair<std::string, std::string>>& fields, const std::atomic<bool>* cancel,
+                  int timeout_s) {
+    return post(path, token, fields, cancel, timeout_s);
+}
 
 Reply boardMove(const std::string& token, const std::string& game, const std::string& uci, bool offer_draw,
                 const std::atomic<bool>* cancel, PlayApi api) {
@@ -504,7 +513,9 @@ bool readBoardLine(std::string_view line, BoardState& s) {
             s.clock_ms     = intOf(*it, "initial", -1);
             s.increment_ms = intOf(*it, "increment");
         }
-        s.days = static_cast<int>(intOf(j, "daysPerTurn"));
+        s.days       = static_cast<int>(intOf(j, "daysPerTurn"));
+        s.tournament = textOf(j, "tournamentId");
+        s.swiss      = textOf(j, "swissId");
         if (const auto it = j.find("state"); it != j.end()) applyState(*it, s);
     } else if (type == "gameState") {
         applyState(j, s);

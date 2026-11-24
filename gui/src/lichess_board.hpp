@@ -65,6 +65,11 @@ struct Reply {
     int status = 0;  // HTTP's, 0 without an answer (a cut)
     std::string error;
 };
+// A POST of the API (`path`, from "/api/"), its form `fields` (none: no body), with the token: Lichess's answer, its
+// own words when it refused. The tournaments' requests go through it too (#95).
+[[nodiscard]] Reply lichessPost(const std::string& path, const std::string& token,
+                                const std::vector<std::pair<std::string, std::string>>& fields = {},
+                                const std::atomic<bool>* cancel = nullptr, int timeout_s = 15);
 // A move (UCI) in a game of the user's (of the bot's), a draw offered (or taken) with it.
 [[nodiscard]] Reply boardMove(const std::string& token, const std::string& game, const std::string& uci,
                               bool offer_draw = false, const std::atomic<bool>* cancel = nullptr,
@@ -232,6 +237,9 @@ struct BoardState {
     int64_t claim_in_s    = -1;  // the opponent gone: the seconds before a win (or a draw) can be claimed
     std::chrono::steady_clock::time_point gone_told{};
     std::vector<ChatLine> chat;
+    // A tournament's game (#95): its arena, or its Swiss, as gameFull names them; a side gone berserk (half its clock).
+    std::string tournament, swiss;
+    bool white_berserk = false, black_berserk = false;
     // The stream.
     bool connected = false;
     int tries      = 0;  // since it broke, the next try counted
@@ -298,6 +306,9 @@ struct OnlinePlaySettings {
     int challenge_colour = 2;
     bool scope_declined  = false;  // "Not now" said to board:play
     std::string playing;           // the live game being played here when RookStudio closed: back at the next launch
+    // The tournaments (#95): the part shown last (0 the games, 1 the tournaments); "Not now" said to tournament:write.
+    int part                 = 0;
+    bool tournament_declined = false;
 
     [[nodiscard]] ChallengeClock seekClock() const { return {seek_minutes, seek_increment, seek_days}; }
     [[nodiscard]] ChallengeClock challengeClock() const {
@@ -307,7 +318,7 @@ struct OnlinePlaySettings {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(OnlinePlaySettings, seek_minutes, seek_increment, seek_days, seek_rated,
                                                 seek_range, opponent, challenge_minutes, challenge_increment,
                                                 challenge_days, challenge_rated, challenge_colour, scope_declined,
-                                                playing)
+                                                playing, part, tournament_declined)
 
 [[nodiscard]] OnlinePlaySettings readOnlinePlay(const std::filesystem::path& folder);
 bool writeOnlinePlay(const std::filesystem::path& folder, const OnlinePlaySettings& settings);

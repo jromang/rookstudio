@@ -39,11 +39,16 @@ struct LichessSettings {
     // Lichess TV (#86): its mosaic's channel shown last; the database (its folder) a game was kept into last.
     std::string tv_channel = "best";
     std::string tv_keep_base;
+    // Lichess's tournaments (#95): the card's speeds (0 rapid, 1 classical, 2 all); "Not now" said to reading the
+    // user's teams; the database (its folder) a Swiss was kept into last.
+    int arena_speeds   = 2;
+    bool team_declined = false;
+    std::string swiss_keep_base;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessSettings, cloud, tablebase, explorer, count_new, player,
                                                 explorer_speeds, explorer_ratings, broadcast_engine, broadcast_threads,
                                                 sync_speeds, sync_since, sync_date, listen_declined, review_finished,
                                                 followed, follow_declined, prep_player, explorer_months, tv_channel,
-                                                tv_keep_base)
+                                                tv_keep_base, arena_speeds, team_declined, swiss_keep_base)
 
 }  // namespace fcg

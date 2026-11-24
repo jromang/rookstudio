@@ -84,8 +84,16 @@ TEST_CASE("crosstables: each tournament's system, tie-breaks and results set by 
     CHECK(s.hand[1].white == "Haddad, Lena");
     CHECK(s.hand[1].black.empty());
     CHECK(s.hand[1].points == 0.5);
+    CHECK(s.hand_from.empty());  // the user's
     REQUIRE(again.get(broadcastPlace("abcd1234")).order);
     CHECK(again.get(broadcastPlace("abcd1234")).order->empty());
+    // A Swiss kept from Lichess: its rounds without a game come from its TRF file, and say so (#95).
+    const auto kept = crosstablePlace(profile / "databases" / "Lichess tournaments.fcgdb", "rook club swiss|2026");
+    CrosstableSettings swiss;
+    swiss.hand.push_back(study::HandResult{"Player_F", "", 2, '*', 1.0});
+    swiss.hand_from = "lichess-trf";
+    again.set(kept, swiss);
+    CHECK(CrosstableStore(profile).get(kept).hand_from == "lichess-trf");
     // Settings back to FIDE's and as guessed: gone from the file.
     again.set(place, CrosstableSettings{});
     CHECK(CrosstableStore(profile).get(place).empty());

@@ -425,6 +425,19 @@ void App::drawDossier() {
     ImGui::SameLine();
     ui::guideLink("dossier_help", guide::topics::Dossier);
 
+    // Fair play (R17): in an arena from here, no report until Pause (#95).
+    if (arenaHoldsAids()) {
+        ImGui::Dummy(ImVec2(0, px(8)));
+        ui::beginCard("dossier_arena");
+        ui::inlineIcon(ui::Icon::Lock, ui::ACCENT);
+        ImGui::SameLine();
+        ImGui::PushTextWrapPos();
+        ImGui::TextUnformatted(TR("Locked while you are in an arena on Lichess, between two games too."));
+        ImGui::TextDisabled("%s", TR("The reports come back with Pause (Alt+P), or at the arena's end."));
+        ImGui::PopTextWrapPos();
+        ui::endCard();
+        return;
+    }
     // Fair play (R17): while the user plays them on Lichess, nothing of them.
     if (!d.subject.lichess.empty() && std::any_of(lichess_playing_.begin(), lichess_playing_.end(), [&](const auto& g) {
             return lower(g.opponent) == lower(d.subject.lichess);

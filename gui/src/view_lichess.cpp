@@ -128,6 +128,7 @@ void App::pollLichess() {
         lichess_broadcasts_time_ = std::chrono::steady_clock::now();
     }
     pollLichessTv();        // Lichess TV: its card, a channel's games, the Board's game, those kept (#86)
+    pollLichessArenas();    // Lichess's tournaments: the card, one followed, one played, a Swiss (#95)
     pollBroadcastBoards();  // the mosaic's games, their engines, the game the board follows
 }
 
@@ -311,6 +312,13 @@ void App::drawLichessScopeAsk() {
         ImGui::TextDisabled("%s", TR("The permission lets RookStudio read your studies and the broadcasts; it writes "
                                      "nothing. Lichess's page opens for it; your account stays linked meanwhile, and "
                                      "the token it replaces is revoked."));
+    } else if (ask.scope == lichess::SCOPE_TEAM_READ) {  // the user's teams' Swiss tournaments (#95)
+        ImGui::TextUnformatted(
+            TR("To list your teams' Swiss tournaments, RookStudio must be allowed to read your "
+               "teams."));
+        ImGui::TextDisabled("%s", TR("The permission lets RookStudio read the teams you are a member of; it writes "
+                                     "nothing. Lichess's page opens for it; your account stays linked meanwhile, and "
+                                     "the token it replaces is revoked."));
     } else if (ask.scope == lichess::SCOPE_FOLLOW_READ) {  // the followed players' mosaic (#50)
         ImGui::TextUnformatted(
             TR("To show the games of the players your account follows, RookStudio must be allowed "
@@ -367,6 +375,10 @@ void App::drawLichessScopeAsk() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Not now"))) {
             broadcast_search_after_link_ = false;
+            if (ask.scope == lichess::SCOPE_TEAM_READ) {
+                lichess_.team_declined = true;
+                saveLichessSettings();
+            }
             lichess_scope_ask_.reset();
             ImGui::PopTextWrapPos();
             ui::endCard();
@@ -919,6 +931,8 @@ void App::drawLichessPage() {
             ImGui::Dummy(ImVec2(0, px(8)));
         }
     }
+    drawLichessArenasCard();  // Lichess's arenas and the user's teams' Swiss tournaments (#95)
+    ImGui::Dummy(ImVec2(0, px(8)));
     drawLichessTvCard();  // Lichess TV's channels (#86)
     ImGui::Dummy(ImVec2(0, px(8)));
     drawFollowedPlayers();  // the players followed live (#50)
@@ -937,6 +951,11 @@ void App::drawLichessPage() {
     if (offline_evals_y_ >= 0) {
         ImGui::SetScrollFromPosY(offline_evals_y_ - ImGui::GetWindowPos().y, 0.0f);
         offline_evals_y_ = -1;
+    }
+    // So the tournaments' card (#95).
+    if (arena_card_y_ >= 0) {
+        ImGui::SetScrollFromPosY(arena_card_y_ - ImGui::GetWindowPos().y, 0.0f);
+        arena_card_y_ = -1;
     }
 }
 

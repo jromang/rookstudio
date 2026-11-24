@@ -146,6 +146,7 @@ bool App::boardBackToMosaic() const {
     const auto& key = board_broadcast_->round;
     if (isTvMosaic(key)) return lichess::isTvChannel(key.substr(lichess::TV_MOSAIC.size()));
     if (key == lichess::PLAYERS_MOSAIC) return true;
+    if (isTourMosaic(key)) return tour_follow_ && tour_follow_->key == key;  // a tournament followed (#95)
     return std::any_of(followed_rounds_.begin(), followed_rounds_.end(), [&](const auto& f) { return f.key() == key; });
 }
 
@@ -374,8 +375,11 @@ void App::pollLichessTv() {
     const bool players            = broadcast_round_ == lichess::PLAYERS_MOSAIC;
     const std::size_t players_has = players_follower_ ? players_follower_->open() : 0;
     const std::size_t tv_has      = tv_follower_ ? tv_follower_->open() : 0;
-    tv_quota_           = std::min(channel.empty() ? held : total, total > players_has ? total - players_has : 0);
-    players_quota_      = std::min(players ? total - held : 0, total > tv_has ? total - tv_has : 0);
+    // A tournament's games followed (#95) take theirs too.
+    const std::size_t tour_has = tour_follow_ && tour_follow_->follower ? tour_follow_->follower->open() : 0;
+    tv_quota_ =
+        std::min(channel.empty() ? held : total, total > players_has + tour_has ? total - players_has - tour_has : 0);
+    players_quota_ = std::min(players ? total - held : 0, total > tv_has + tour_has ? total - tv_has - tour_has : 0);
     std::size_t outside = 0;  // of the fixed ones, those not in the mosaic's places
     for (const auto& id : fixed)
         if (std::find(tv_places_.begin(), tv_places_.end(), id) == tv_places_.end()) ++outside;

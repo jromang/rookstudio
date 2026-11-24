@@ -61,6 +61,8 @@ void App::drawChessHome() {
     // The Training page offered once to a view made before it (#80); then the Play page (#83).
     drawTrainingOffer();
     drawPlayOffer();
+    // The arena or the Swiss the user is in from here, first (R3, #95).
+    drawArenaHome();
 
     // Where the user was (mockup M0): the Board page's game at its move, where it comes from, what it holds.
     const bool has_game = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();

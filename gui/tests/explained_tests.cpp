@@ -10,6 +10,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -315,4 +316,32 @@ TEST_CASE("every move explained: kept with the review and read back, written int
     boardChanged(b, std::move(before));
     CHECK(placeAssistantComments(b.tree, false, targets, texts).empty());
     fs::remove_all(dir);
+}
+
+TEST_CASE("every move explained: a forced recapture takes back what the captures took, not a trade one may decline") {
+    // 5...exd4 6.Qxd4 Qxd4 7.Nxd4: 6...Qxd4, the only way to take on d4, is a queen trade Black may decline (the
+    // captures on d4 have left it no worse off); 7.Nxd4 takes the queen back, the only way.
+    auto pos = commentary::Position::fromFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    REQUIRE(pos);
+    const commentary::Position start = *pos;
+    std::vector<commentary::Move> moves;
+    for (const char* san :
+         {"e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Bxc6", "dxc6", "d4", "exd4", "Qxd4", "Qxd4", "Nxd4"}) {
+        const auto m = pos->parseSan(san);
+        REQUIRE_MESSAGE(m, san);
+        moves.push_back(*m);
+        pos->playUnchecked(*m);
+    }
+    const commentary::MainLine line(start, moves);
+    const auto word = [&](std::size_t ply) {
+        return simpleMoveWord(line.positions()[ply - 1], line.moveTo(ply - 1), line.moves()[ply - 1],
+                              behindSinceTheCaptures(line, ply), commentary::Lang::En);
+    };
+    CHECK(behindSinceTheCaptures(line, 8));   // 4...dxc6: a bishop down since 4.Bxc6
+    CHECK(word(8) == std::nullopt);           // but two ways to take back (b7 and d7)
+    CHECK(behindSinceTheCaptures(line, 11));  // 6.Qxd4: a pawn down since 5...exd4
+    CHECK_FALSE(behindSinceTheCaptures(line, 12));
+    CHECK(word(12) == std::nullopt);
+    CHECK(behindSinceTheCaptures(line, 13));
+    CHECK(word(13) == std::optional<std::string>("Forced recapture."));
 }

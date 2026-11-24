@@ -1043,8 +1043,9 @@ plays any of them, and `0-0` is castling too. The same field takes the moves of 
 puzzles, your mistakes, guessing the moves, the endgames) and of the games of the Play page. The interface writes the
 moves in the same letters (the notation when *Figurines in the notation* is off, the engines' lines, the review); the
 PGN keeps English SAN, as every program reads it, and the assistant's comments keep the letters of their own language.
-The letters of the engines' Board are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis, Alt+X shows the threat, Alt+G
-analyses the game, Alt+N and Alt+Shift+N go to the next and the previous move the analysis marked.
+The letters of the engines' Board are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis,
+Alt+X shows the threat, Alt+G analyses the game, Alt+N and Alt+Shift+N go to the next and the previous move the
+analysis marked.
 
 ### Several engines side by side
 
@@ -1221,8 +1222,8 @@ lists them in the database.
 The sixth tab of the study Board, Alt+6, says what the endgame tables say of the position shown, once seven pieces or
 fewer are left, or eight with a pawn of each side on one file (Lichess's op1 tables); dimmed beyond, it says so when
 chosen. At the top, the verdict (*White wins*, *Draw*, *Won for White, but drawn by the fifty-move rule*), where it
-comes from and how far the end is: the moves to mate up to six pieces (DTM, other programs say), at seven the moves to a
-capture or a pawn move (DTZ), at eight the moves to the next capture, promotion or mate (DTC). Then the moves, grouped by
+comes from and how far the end is: the moves to mate up to six pieces (DTM, as other programs call it), at seven the
+moves to a capture or a pawn move (DTZ), at eight the moves to the next capture, promotion or mate (DTC). Then the moves, grouped by
 the outcome they leave the side that plays them, the best first: *Keep the win*, *Keep the draw*, *Throw the win away: a
 draw*, *Lose*… A move that spoils the result is said with why: the answer that refutes it and what the tables then say
 (*→ 52…Kxh7 · Black wins: mate in 19 moves*). A move hovered shows its main line on the board; a click plays it, a

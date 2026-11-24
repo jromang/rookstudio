@@ -59,11 +59,17 @@ struct Explained {
                                                      const commentary::GameReport& report, commentary::Lang lang,
                                                      const std::function<uint64_t(const commentary::Position&)>& games);
 
-// The word a move too simple for more gets, in the assistant's language: a forced recapture, the only legal move; none
-// for another move.
+// The word a move too simple for more gets, in the assistant's language: the only legal move; a forced recapture, the
+// only way to take back material the captures on that square left the side to move without (`behind`: not a trade it
+// may decline, such as 13.Qxf6+ after 12.Bxf6+ Qxf6); none for another move.
 [[nodiscard]] std::optional<std::string> simpleMoveWord(const commentary::Position& before,
                                                         const std::optional<commentary::Move>& previous,
-                                                        const commentary::Move& played, commentary::Lang lang);
+                                                        const commentary::Move& played, bool behind,
+                                                        commentary::Lang lang);
+
+// Whether the captures on the square of the move before `ply` (1-based), from the first of them, left the side to move
+// at `ply` with less material than it had before them.
+[[nodiscard]] bool behindSinceTheCaptures(const commentary::MainLine& line, std::size_t ply);
 
 // One move written: the model's comment when the checker lets it through (commentary::ATTEMPTS tries), else the
 // template's, held to the boards, with what the checker refused of the model's last try; without a model, or nothing

@@ -6,6 +6,7 @@
 #include <json.hpp>
 
 #include <commentary/comment.hpp>
+#include <commentary/material.hpp>
 #include <commentary/notation.hpp>
 #include <commentary/writing.hpp>
 #include <tour/files.hpp>
@@ -48,12 +49,24 @@ std::string explainedReview(const std::string& engine, int passes, std::size_t p
 
 std::optional<std::string> simpleMoveWord(const commentary::Position& before,
                                           const std::optional<commentary::Move>& previous,
-                                          const commentary::Move& played, commentary::Lang lang) {
+                                          const commentary::Move& played, bool behind, commentary::Lang lang) {
     const bool fr = lang == commentary::Lang::Fr;
     if (before.legalMoves().size() == 1) return std::string(fr ? "Seul coup légal." : "The only legal move.");
-    if (commentary::takesBackTheOnlyWay(before, previous, played))
+    if (behind && commentary::takesBackTheOnlyWay(before, previous, played))
         return std::string(fr ? "Reprise forcée." : "Forced recapture.");
     return std::nullopt;
+}
+
+bool behindSinceTheCaptures(const commentary::MainLine& line, std::size_t ply) {
+    const auto& moves     = line.moves();
+    const auto& positions = line.positions();
+    if (ply < 2 || ply > moves.size()) return false;
+    const auto square = moves[ply - 2].to();
+    std::size_t first = ply - 1;  // the first capture on that square, 1-based
+    while (first > 1 && moves[first - 2].isCapture() && moves[first - 2].to() == square) --first;
+    const auto side = positions[ply - 1].turn();
+    return commentary::balance(positions[ply - 1].board(), side) <
+           commentary::balance(positions[first - 1].board(), side);
 }
 
 std::vector<ExplainedLine> explainPlan(const commentary::MainLine& line, const commentary::GameReport& report,
@@ -107,8 +120,8 @@ std::vector<ExplainedLine> explainPlan(const commentary::MainLine& line, const c
             l.key     = m->key;
         }
         if (!l.matters)
-            if (const auto word =
-                    simpleMoveWord(positions[ply - 1], line.moveTo(ply - 1), line.moves()[ply - 1], lang)) {
+            if (const auto word = simpleMoveWord(positions[ply - 1], line.moveTo(ply - 1), line.moves()[ply - 1],
+                                                 behindSinceTheCaptures(line, ply), lang)) {
                 l.text    = *word;
                 l.source  = ExplainedLine::Source::Simple;
                 l.written = true;
@@ -151,7 +164,7 @@ WrittenLine writeExplainedLine(commentary::Model* model, const commentary::MoveC
     if (ctx.report && ctx.report->played_best) {
         w.text = fr ? "Le premier choix du moteur." : "The engine's first choice.";
     } else if (ctx.best && !ctx.best->moves.empty() && ctx.before) {
-        const auto best = commentary::san(*ctx.before, ctx.best->moves.front(), letters);
+        const auto best = commentary::moveText(*ctx.before, ctx.best->moves.front(), letters);  // "5…a6"
         w.text = fr ? fmt::format("Le moteur préférait {}.", best) : fmt::format("The engine preferred {}.", best);
     } else {
         w.text = fr ? "Un coup sans histoire." : "A quiet move.";

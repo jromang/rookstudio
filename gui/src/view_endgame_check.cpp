@@ -274,8 +274,8 @@ void App::drawEndgameCheck() {
             parts.push_back(trn("{} answer kept in your profile", "{} answers kept in your profile", c.from_profile,
                                 c.from_profile));
         if (c.from_lichess > 0)
-            parts.push_back(
-                trn("{} asked to Lichess's tables", "{} asked to Lichess's tables", c.from_lichess, c.from_lichess));
+            parts.push_back(trn("{} position looked up in Lichess's tables",
+                                "{} positions looked up in Lichess's tables", c.from_lichess, c.from_lichess));
         std::string out;
         for (const auto& p : parts) out += (out.empty() ? "" : " · ") + p;
         return out;

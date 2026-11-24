@@ -1711,12 +1711,12 @@ void App::drawStructureTab() {
         ImGui::TextDisabled("%s", TR("A click on a square: a white pawn, a black pawn, nothing."));
         ImGui::PopTextWrapPos();
     }
-    const char* near[] = {TR("Exactly"), TR("One pawn away"), TR("Two pawns away")};
+    const char* distances[] = {TR("Exactly"), TR("One pawn away"), TR("Two pawns away")};
     for (int i = 0; i < 3; ++i) {
         if (i) ImGui::SameLine(0, px(2));
         const bool on = s.distance == i;
         if (on) ImGui::PushStyleColor(ImGuiCol_Button, (ui::ACCENT & 0x00ffffff) | 0x70000000);
-        if (ImGui::SmallButton(near[i])) {
+        if (ImGui::SmallButton(distances[i])) {
             s.distance = i;
             s.set      = true;
         }
@@ -1752,9 +1752,9 @@ void App::drawStructureTab() {
         const auto& st = job.stats;
         ImGui::PushTextWrapPos();
         if (s.distance > 0)
-            ImGui::TextUnformatted(
-                trf("Exactly: {} · {}: {}", ui::exactCount(st.exact), near[s.distance], ui::exactCount(job.ids.size()))
-                    .c_str());
+            ImGui::TextUnformatted(trf("Exactly: {} · {}: {}", ui::exactCount(st.exact), distances[s.distance],
+                                       ui::exactCount(job.ids.size()))
+                                       .c_str());
         // The openings it is reached by most.
         std::vector<std::pair<uint64_t, uint16_t>> ecos;
         for (const auto& [eco, n] : st.ecos)

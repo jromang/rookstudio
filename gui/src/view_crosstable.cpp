@@ -25,6 +25,7 @@
 #include "fide_rating_list.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "publish_reports.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -1065,6 +1066,12 @@ void App::drawStudyCrosstable() {
     }
     const auto& t    = c.table;
     const bool swiss = t.system.system == study::TournamentSystem::Swiss;
+    if (export_when_made_.first == 2) {  // --focus export-crosstable=… (#93)
+        const int format  = export_when_made_.second;
+        export_when_made_ = {-1, -1};
+        openCrosstableExport(format == static_cast<int>(ExportFormat::Html));
+        return;
+    }
     // What it is.
     {
         std::vector<std::string> parts;
@@ -1090,6 +1097,19 @@ void App::drawStudyCrosstable() {
             if (ImGui::SmallButton(c.all ? TR("The first ten") : trf("All players ({})", t.rows.size()).c_str()))
                 c.all = !c.all;
         }
+        // Printed, and as a page of HTML (#93), at the right.
+        const char* print = TR("Print…");
+        const char* html  = TR("HTML page");
+        const auto& style = ImGui::GetStyle();
+        const float w =
+            ImGui::CalcTextSize(print).x + ImGui::CalcTextSize(html).x + style.FramePadding.x * 4 + style.ItemSpacing.x;
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(12), ImGui::GetContentRegionMax().x - w));
+        if (ImGui::SmallButton(print)) openCrosstableExport(false);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", TR("The crosstable as a PDF on landscape pages, made by RookStudio"));
+        ImGui::SameLine();
+        if (ImGui::SmallButton(html)) openCrosstableExport(true);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("The crosstable as a page of its own"));
     }
     if (!c.said.empty()) {
         ImGui::PushTextWrapPos();
@@ -1716,6 +1736,154 @@ void App::lookForCrosstableNames(const std::string& query) {
     if (of == crosstable_names_of_) return;
     crosstable_names_of_ = of;
     crosstable_names_    = crosstableNames(lists, words, 8);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Printed, and as a page of HTML (#93)
+
+publish::Document crosstableDocument(const study::Crosstable& table, const std::string& title, uint32_t games,
+                                     bool letter, const publish::DocumentLook& look) {
+    using publish::Cell;
+    publish::Document d;
+    d.title          = title;
+    d.header         = title;
+    d.letter         = letter;
+    d.landscape      = true;
+    d.size           = 9;
+    d.pieces         = look.pieces;
+    d.colours        = look.colours;
+    d.lang           = look.lang;
+    const bool swiss = table.system.system != study::TournamentSystem::RoundRobin;
+    std::vector<std::string> parts;
+    parts.push_back(systemName(table.system));
+    parts.push_back(trn("{} player", "{} players", table.players.size(), table.players.size()));
+    if (table.rounds > 0) parts.push_back(trn("{} round", "{} rounds", table.rounds, table.rounds));
+    if (table.mean_elo > 0) parts.push_back(trf("mean Elo {}", table.mean_elo));
+    if (table.shape.expected > games)
+        parts.push_back(trf("{} of {} games", ui::exactCount(games), ui::exactCount(table.shape.expected)));
+    else
+        parts.push_back(trn("{} game", "{} games", games, ui::exactCount(games)));
+    std::string line;
+    for (const auto& p : parts) line = line.empty() ? p : trf("{} · {}", line, p);
+    d.blocks.push_back(publish::title(title));
+    d.blocks.push_back(publish::subtitle(line));
+
+    const int middle = swiss ? std::max(table.rounds, 1) : static_cast<int>(table.rows.size());
+    const int tbs    = static_cast<int>(table.tiebreaks.size());
+    std::vector<bool> decimals(static_cast<std::size_t>(tbs), false);
+    for (const auto& row : table.rows)
+        for (std::size_t k = 0; k < decimals.size() && k < row.tiebreaks.size(); ++k)
+            if (row.states[k] != study::TiebreakState::None) {
+                const double twice = row.tiebreaks[k] * 2;
+                if (std::abs(twice - std::round(twice)) > 1e-9) decimals[k] = true;
+            }
+    const bool wins = !swiss && std::find(table.tiebreaks.begin(), table.tiebreaks.end(), study::Tiebreak::Wins) ==
+                                    table.tiebreaks.end();
+    publish::Block b;
+    b.kind  = publish::Block::Kind::Table;
+    auto& t = b.table;
+    t.size  = middle > 14 ? 6.5f : middle > 9 ? 7.5f : 8.5f;
+    t.head.push_back(TR("Pl."));
+    t.align.push_back(1);
+    if (swiss) {
+        t.head.push_back(TR("No."));
+        t.align.push_back(1);
+    }
+    t.head.push_back(TR("Player"));
+    t.align.push_back(0);
+    t.head.push_back(TR("Elo"));
+    t.align.push_back(1);
+    for (int k = 0; k < middle; ++k) {
+        t.head.push_back(swiss ? trf("R{}", k + 1) : std::to_string(k + 1));
+        t.align.push_back(2);
+    }
+    t.head.push_back(TR("Pts"));
+    t.align.push_back(1);
+    for (const auto tb : table.tiebreaks) {
+        t.head.push_back(tiebreakHeading(tb));
+        t.align.push_back(1);
+    }
+    if (wins) {
+        t.head.push_back(TR("Wins"));
+        t.align.push_back(1);
+    }
+    t.head.push_back(TR("Perf."));
+    t.align.push_back(1);
+    t.head.push_back(TR("Elo ±"));
+    t.align.push_back(1);
+    constexpr publish::Rgba own{232, 235, 239, 255}, warn{178, 93, 16, 255};
+    for (const auto& row : table.rows) {
+        const auto& player = table.players[row.player];
+        std::vector<Cell> cells;
+        cells.emplace_back(row.place_from == row.place_to ? std::to_string(row.place_from)
+                                                          : fmt::format("{}–{}", row.place_from, row.place_to),
+                           publish::FontId::Regular, publish::MUTED_COLOUR);
+        if (swiss) cells.emplace_back(std::to_string(row.start), publish::FontId::Regular, publish::MUTED_COLOUR);
+        std::string name = player.name;
+        if (!player.title.empty()) name = trf("{} {}", player.title, name);
+        if (!player.federation.empty()) name = trf("{} ({})", name, player.federation);
+        cells.emplace_back(name);
+        cells.emplace_back(player.elo > 0 ? std::to_string(player.elo) : std::string());
+        for (int k = 0; k < middle; ++k) {
+            std::string text;
+            bool missing = false;
+            if (swiss) {
+                for (const auto& e : row.entries)
+                    if (e.round == k + 1) {
+                        text += (text.empty() ? "" : " ") + crossCellText(table, e, true);
+                        missing = missing || e.kind == study::CellKind::Missing;
+                    }
+            } else {
+                const auto other = table.rows[static_cast<std::size_t>(k)].player;
+                if (other == row.player) {
+                    Cell c;
+                    c.fill = own;
+                    cells.push_back(c);
+                    continue;
+                }
+                for (const auto& e : row.entries)
+                    if (e.opponent == other) {
+                        text += (text.empty() ? "" : " ") + crossCellText(table, e, false);
+                        missing = missing || e.kind == study::CellKind::Missing;
+                    }
+            }
+            cells.emplace_back(text, publish::FontId::Regular, missing ? warn : publish::TEXT_COLOUR);
+        }
+        cells.emplace_back(pointsText(row.points, row.unknown), publish::FontId::SemiBold,
+                           row.unknown > 0 ? warn : publish::TEXT_COLOUR);
+        for (int k = 0; k < tbs; ++k) {
+            const auto state = row.states[static_cast<std::size_t>(k)];
+            if (state == study::TiebreakState::None) {
+                cells.emplace_back("");
+                continue;
+            }
+            auto text =
+                tiebreakValue(table.tiebreaks[static_cast<std::size_t>(k)], row.tiebreaks[static_cast<std::size_t>(k)],
+                              decimals[static_cast<std::size_t>(k)]);
+            if (state == study::TiebreakState::Unsure) text += "?";
+            cells.emplace_back(text);
+        }
+        if (wins) {
+            int won = 0;
+            for (const auto& e : row.entries) won += e.known && e.points > 0.75 && e.kind != study::CellKind::Live;
+            cells.emplace_back(std::to_string(won));
+        }
+        cells.emplace_back(row.performance ? std::to_string(*row.performance) : std::string());
+        cells.emplace_back(row.change ? changeText(*row.change) + (row.unknown > 0 ? "?" : "") : std::string());
+        t.rows.push_back(std::move(cells));
+    }
+    d.blocks.push_back(std::move(b));
+    // The tie-breaks named, in their order.
+    std::vector<std::string> named;
+    for (const auto tb : table.tiebreaks) named.push_back(trf("{}: {}", tiebreakHeading(tb), tiebreakName(tb)));
+    std::string tie;
+    for (const auto& n : named) tie = tie.empty() ? n : trf("{} · {}", tie, n);
+    if (!tie.empty()) d.blocks.push_back(publish::note(trf("Tie-breaks, in their order: {}.", tie)));
+    if (!table.missing.empty())
+        d.blocks.push_back(publish::note(trn("{} game is missing from the database: its result is counted “?”.",
+                                             "{} games are missing from the database: their results are counted “?”.",
+                                             table.missing.size(), table.missing.size())));
+    return d;
 }
 
 }  // namespace fcg

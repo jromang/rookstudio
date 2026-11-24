@@ -27,6 +27,7 @@
 #include "fide_rating_list.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "publish_reports.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -702,6 +703,14 @@ void App::drawOpeningReport() {
     if (!std::exchange(r.drawn, true)) ImGui::SetNavCursorVisible(false);
     const bool typing = ImGui::GetIO().WantTextInput;
     const bool popup  = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup);
+    // --focus export-report=… (#93): the sheet once the report is made, its summary written when it is asked.
+    if (export_when_made_.first == 1 && r.report && r.report->made >= study::ReportSection::Novelties &&
+        !r.summary_job.valid() && !r.evals_job.valid()) {
+        const int format  = export_when_made_.second;
+        export_when_made_ = {-1, -1};
+        openReportExport(format == static_cast<int>(ExportFormat::Html));
+        return;
+    }
 
     // Where it is, and the way back to the position.
     const bool escape = !typing && !popup && ImGui::IsKeyPressed(ImGuiKey_Escape, false);
@@ -763,10 +772,24 @@ void App::drawOpeningReport() {
             where           = white ? trf("after {}, White to move", last) : trf("after {}, Black to move", last);
         }
         ImGui::TextDisabled("· %s", where.c_str());
-        // To the repertoire, at the right.
-        const char* to = TR("To the repertoire");
-        const float w  = ImGui::CalcTextSize(to).x + ImGui::GetStyle().FramePadding.x * 2;
+        // Printed, as a page of HTML (#93), and to the repertoire, at the right.
+        const char* to    = TR("To the repertoire");
+        const char* print = TR("Print…");
+        const char* html  = TR("HTML page");
+        const auto& style = ImGui::GetStyle();
+        const float w     = ImGui::CalcTextSize(to).x + ImGui::CalcTextSize(print).x + ImGui::CalcTextSize(html).x +
+                            style.FramePadding.x * 6 + style.ItemSpacing.x * 2;
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(12), ImGui::GetContentRegionMax().x - w));
+        ImGui::BeginDisabled(!r.report || r.report->made < study::ReportSection::Novelties);
+        if (ImGui::Button(print)) openReportExport(false);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", TR("The report as a PDF of a few pages, made by RookStudio"));
+        ImGui::SameLine();
+        if (ImGui::Button(html)) openReportExport(true);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", TR("The report as a page of its own, its lines replayable"));
+        ImGui::EndDisabled();
+        ImGui::SameLine();
         ImGui::BeginDisabled(!r.report || r.report->lines.empty());
         if (ImGui::Button(to)) reportToRepertoire();
         ImGui::EndDisabled();
@@ -1596,6 +1619,199 @@ void App::drawReportSummary() {
     if (model) note += " " + trf("Written in {} s.", fmt::format("{:.1f}", r.summary->seconds));
     ImGui::TextDisabled("%s", note.c_str());
     ImGui::PopTextWrapPos();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Printed, and as a page of HTML (#93)
+
+publish::Document openingReportDocument(const ReportView& view, const std::vector<ReportBase>& bases,
+                                        const ReportSummary* summary, bool letter, const publish::DocumentLook& look) {
+    using publish::Block;
+    using publish::Cell;
+    publish::Document d;
+    d.title   = view.opening.empty() ? std::string(TR("Opening report")) : trf("Opening report: {}", view.opening);
+    d.header  = d.title;
+    d.letter  = letter;
+    d.pieces  = look.pieces;
+    d.notice  = look.notice;
+    d.colours = look.colours;
+    d.lang    = look.lang;
+    const auto& board = view.board;
+    d.blocks.push_back(publish::title(view.opening.empty() ? std::string(TR("Opening report")) : view.opening));
+    if (!view.path.empty()) d.blocks.push_back(publish::subtitle(lineText(chess::Board(), view.path)));
+    {
+        Block b;
+        b.kind = Block::Kind::Diagram;
+        for (int i = 0; i < 64; ++i) b.diagram.pieces[static_cast<std::size_t>(i)] = board.at(chess::Square(i));
+        b.diagram.side     = board.sideToMove();
+        b.diagram.colours  = look.colours;
+        b.diagram.side_dot = true;
+        if (!view.path.empty()) b.diagram.last_move = view.path.back();
+        b.diagram_size = 160;
+        b.caption      = board.sideToMove() == chess::Color::WHITE ? TR("White to play") : TR("Black to play");
+        d.blocks.push_back(std::move(b));
+    }
+    std::vector<std::string> made;
+    for (const auto& base : bases) made.push_back(base.name);
+    if (!made.empty()) d.blocks.push_back(publish::note(trf("Sources: {}", listed(made))));
+    const auto* report = view.report;
+    if (!report) return d;
+    // The moves.
+    if (view.rows && !view.rows->empty()) {
+        d.blocks.push_back(publish::heading(TR("The moves")));
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Move"), TR("Games"), TR("White · draws · Black"), TR("Score"), TR("Avg. Elo"), TR("Perf."),
+                         TR("Last"), TR("Eval.")};
+        t.table.align = {0, 1, 0, 1, 1, 1, 1, 1};
+        for (std::size_t i = 0; i < view.rows->size(); ++i) {
+            const auto& row = (*view.rows)[i];
+            std::string eval;
+            if (view.evals && i < view.evals->size() && (*view.evals)[i]) eval = evalText(*(*view.evals)[i]);
+            t.table.rows.push_back({{numbered(board, row.move), publish::FontId::SemiBold},
+                                    {ui::exactCount(row.games)},
+                                    {trf("{} % · {} % · {} %", std::lround(100 * row.white),
+                                         std::lround(100 * row.draws), std::lround(100 * row.black))},
+                                    {row.score >= 0 ? fmt::format("{} %", row.score) : std::string()},
+                                    {row.elo > 0 ? std::to_string(row.elo) : std::string()},
+                                    {row.perf > 0 ? std::to_string(row.perf) : std::string()},
+                                    {row.last > 0 ? std::to_string(row.last) : std::string(), publish::FontId::Regular,
+                                     publish::MUTED_COLOUR},
+                                    {eval}});
+        }
+        d.blocks.push_back(std::move(t));
+    }
+    // The main lines, each to replay on the page.
+    if (!report->lines.empty()) {
+        d.blocks.push_back(publish::heading(TR("The main lines")));
+        for (const auto& line : report->lines) {
+            const auto moves = movesOfCodes(board, line.codes);
+            publish::HtmlGame game;
+            game.tree.main.start_fen = board.getFen();
+            game.tree.main.result    = "*";
+            auto b                   = board;
+            std::vector<std::string> sans;
+            for (const auto& m : moves) {
+                ReplayMove rm;
+                rm.san   = chess::uci::moveToSan(b, m);
+                rm.move  = m;
+                rm.mover = b.sideToMove();
+                sans.push_back(rm.san);
+                game.tree.main.moves.push_back(rm);
+                b.makeMove(m);
+            }
+            Block p;
+            for (auto& s : publish::lineSpans(sans, static_cast<int>(d.games.size()), 0,
+                                              board.sideToMove() == chess::Color::BLACK, board.fullMoveNumber()))
+                p.spans.push_back(std::move(s));
+            const int score = whiteScore(line.stats);
+            const auto games =
+                trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(line.stats.games, 1000000000)),
+                    ui::exactCount(line.stats.games));
+            p.spans.emplace_back("  " + (score >= 0 ? trf("{} · White {} %", games, score) : games),
+                                 publish::FontId::Regular, publish::MUTED_COLOUR);
+            d.games.push_back(std::move(game));
+            d.blocks.push_back(std::move(p));
+        }
+    }
+    // The structures and the plans.
+    const auto& sh = report->shapes;
+    if (report->made >= study::ReportSection::Novelties && sh.enough) {
+        d.blocks.push_back(publish::heading(TR("Plans and structures")));
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Structure"), TR("In")};
+        t.table.align = {0, 1};
+        for (const auto& st : sh.structures)
+            if (percent(st.stats.games, sh.counted) >= 1)
+                t.table.rows.push_back(
+                    {{structureLabel(st)}, {fmt::format("{} %", percent(st.stats.games, sh.counted))}});
+        if (!t.table.rows.empty()) d.blocks.push_back(std::move(t));
+        if (!sh.plans.empty()) {
+            Block plans;
+            plans.kind        = Block::Kind::Table;
+            plans.table.head  = {TR("What the players do in the next 15 moves"), TR("In"), TR("White's score")};
+            plans.table.align = {0, 1, 1};
+            for (const auto& p : sh.plans) {
+                const int score = whiteScore(p.stats);
+                plans.table.rows.push_back(
+                    {{planLabel(p) + " " + (p.side == 0 ? std::string(TR("(White)")) : std::string(TR("(Black)")))},
+                     {fmt::format("{} %", percent(p.stats.games, sh.replayed))},
+                     {score >= 0 ? fmt::format("{} %", score) : std::string()}});
+            }
+            d.blocks.push_back(std::move(plans));
+        }
+        d.blocks.push_back(
+            publish::note(TR("Frequencies, not advice: the pawn pushes and the pieces' routes counted in "
+                             "the position's games.")));
+    }
+    // The key games.
+    if (!report->key_games.empty()) {
+        d.blocks.push_back(publish::heading(TR("Key games")));
+        Block t;
+        t.kind        = Block::Kind::Table;
+        t.table.head  = {TR("Game"), TR("Event"), TR("Result"), TR("Why")};
+        t.table.align = {0, 0, 2, 0};
+        for (const auto& k : report->key_games) {
+            if (k.game.source >= bases.size() || !bases[k.game.source].snapshot) continue;
+            const auto& snap = *bases[k.game.source].snapshot;
+            const auto row   = snap.row(k.game.id);
+            const auto ids   = snap.rowIds(k.game.id);
+            const int mean   = k.numbers.white_elo && k.numbers.black_elo
+                                   ? (k.numbers.white_elo + k.numbers.black_elo) / 2
+                                   : std::max(k.numbers.white_elo, k.numbers.black_elo);
+            std::string why;
+            switch (k.why) {
+                case study::ReportKeyGame::Why::Strongest:
+                    why = trf("The strongest: {} on average.", mean);
+                    break;
+                case study::ReportKeyGame::Why::Recent:
+                    why = trf("The most recent of 2500 and more on average ({}).", mean);
+                    break;
+                case study::ReportKeyGame::Why::Novelty:
+                    why = TR("The first game of a novelty repeated since.");
+                    break;
+            }
+            const std::string event(row.event);
+            t.table.rows.push_back({{fmt::format("{} – {}", snap.shownName(ids.white), snap.shownName(ids.black))},
+                                    {event == "?" ? std::string() : event},
+                                    {resultText(row.result)},
+                                    {why, publish::FontId::Regular, publish::MUTED_COLOUR}});
+        }
+        d.blocks.push_back(std::move(t));
+    }
+    // The novelties.
+    if (!report->novelties.moves.empty()) {
+        d.blocks.push_back(publish::heading(TR("Novelties")));
+        for (const auto& n : report->novelties.moves) {
+            const auto moves = movesOfCodes(board, n.codes);
+            if (moves.empty()) continue;
+            const auto year = n.first >> 9;
+            const auto text = n.yours ? trf("{}: your game left your databases here.", lineText(board, moves))
+                                      : trn("{}: first played in {}, {} game since.",
+                                            "{}: first played in {}, {} games since.", static_cast<int>(n.stats.games),
+                                            lineText(board, moves), year, ui::exactCount(n.stats.games));
+            d.blocks.push_back(publish::paragraph(text));
+        }
+    }
+    // The assistant's summary, marked as its own.
+    if (summary && !summary->passages.empty()) {
+        d.blocks.push_back(publish::heading(TR("The assistant's summary")));
+        Block p;
+        p.spans.emplace_back(std::string(TR("Assistant:")) + " ", publish::FontId::SemiBold, publish::ASSISTANT_COLOUR);
+        p.spans.back().cls = "as";
+        for (const auto& passage : summary->passages) {
+            p.spans.emplace_back(passage.text + " ", publish::FontId::Italic, publish::ASSISTANT_COLOUR);
+            p.spans.back().cls = "as";
+        }
+        d.blocks.push_back(std::move(p));
+        d.blocks.push_back(publish::note(summary->by_model
+                                             ? TR("Written by the assistant's model, each sentence read "
+                                                  "against the report's figures by its checker.")
+                                             : TR("Written by the assistant's templates, from the report's "
+                                                  "figures.")));
+    }
+    return d;
 }
 
 }  // namespace fcg

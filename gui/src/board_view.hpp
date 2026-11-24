@@ -58,6 +58,15 @@ struct BoardArrow {
     std::string count = {};  // a disc of its colour beside its start, with this in it: the engines that play it (#78)
 };
 
+// An arrow's polygons as the board draws them, from the centre `a` of its first square to the centre `b` of its
+// second, on squares `square` wide: its shaft (a quad, or one per dash) and its head; nullopt when the two centres are
+// less than a unit apart. The exports draw their arrows with them too (publish_draw.hpp).
+struct ArrowPolygons {
+    std::vector<std::array<ImVec2, 4>> shaft;
+    std::array<ImVec2, 3> head{};
+};
+[[nodiscard]] std::optional<ArrowPolygons> arrowPolygons(ImVec2 a, ImVec2 b, float square, bool dashed);
+
 // Where an arrow's count goes: beside its start square's centre `from`, off the shaft going to `to`, `square` the
 // size of a square.
 [[nodiscard]] ImVec2 arrowCountCentre(ImVec2 from, ImVec2 to, float square);

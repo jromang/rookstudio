@@ -53,6 +53,7 @@
 #include "engine_notes.hpp"
 #include "engine_play.hpp"
 #include "engines.hpp"
+#include "export_sheet.hpp"
 #include "fide_cards.hpp"
 #include "fide_rating_list.hpp"
 #include "game_graph.hpp"
@@ -88,6 +89,8 @@
 #include "pgn_store.hpp"
 #include "portable.hpp"
 #include "profiles.hpp"
+#include "publish_game.hpp"
+#include "publish_gif.hpp"
 #include "puzzles.hpp"
 #include "qr.hpp"
 #include "remote_run.hpp"
@@ -2146,6 +2149,90 @@ class App {
     // Games of the report: on the Board page (one, at the report's position) or in the list of their database.
     void openReportGame(const study::ReportGame& game);
     void reportGamesInList(const std::vector<study::ReportGame>& games, std::string said);
+    // The Export sheet (#93, mockup M13, board 6; view_export.cpp, export_sheet.hpp, publish_*.hpp), in place of the
+    // page it is opened from (over a dossier or a report too), Esc going back and Enter saving: the preview on its left
+    // as the file will be, the format chosen last time, each format's settings kept (export.json). The Board page's
+    // game as a replayable HTML page, a diagram of its position (PNG or SVG; Ctrl+Shift+C copies it from anywhere on
+    // the page), an animated GIF, a PDF; a database's game or its filter's games as a page or as PGN, the table's names
+    // written in them on request; a repertoire, a dossier, an opening report or a crosstable printed, or as a page.
+    // Nothing leaves the machine.
+    struct ExportSheet {
+        enum class Subject { Board, Database, Repertoire, Dossier, Report, Crosstable };
+        Subject subject = Subject::Board;
+        Page over       = Page::Board;
+        std::string subject_text;  // "Moreau – Lindqvist, Autumn Open 2026, round 9"
+        std::string stem;          // the files' name: "moreau-lindqvist-2026"
+        std::vector<ExportFormat> formats;
+        // A game: the Board page's, or the database's chosen one; the position the diagram and the GIF show.
+        publish::HtmlGame game;
+        std::vector<int> key_plies;
+        // A database's games: its filter's, and the one chosen.
+        std::filesystem::path folder;
+        std::shared_ptr<const study::Snapshot> snapshot;
+        std::vector<study::GameId> ids;
+        study::GameId chosen = 0;
+        bool all             = false;  // the filter's games, not the chosen one
+        int repertoire       = -1;
+        std::optional<publish::Document> document;  // a report's, made at the opening
+        std::array<char, 160> caption{};
+        int gif_from = 0, gif_to = -1;
+        // The previews, made again when what they show changes.
+        ImTextureID texture = ImTextureID_Invalid;
+        int texture_w = 0, texture_h = 0;
+        std::string texture_of;
+        std::vector<publish::Page> pages;
+        std::string pages_of;
+        int page = 0;
+        std::string text_preview, text_of;
+        uint64_t estimate = 0;  // the file's weight, estimated
+        std::string estimate_of, estimating;
+        std::string gif_key;  // what the GIF's estimate is of
+        std::future<uint64_t> estimate_job;
+        // Saving in the background: a GIF, a page of many games or a folder of them, the PGN of many games.
+        std::shared_ptr<std::atomic<bool>> cancel;
+        std::shared_ptr<std::atomic<int>> done, total;
+        std::future<std::string> job;  // its error, empty when written
+        std::filesystem::path saving;
+        enum class Problem { None, Folder, Empty, NoReader };
+        Problem problem = Problem::None;
+        std::string said, error;
+        std::filesystem::path saved, problem_path;  // the last file or folder written; the folder refused
+        int split        = 0;      // past MAX_GAMES_PER_PAGE games: 0 not chosen, 1 a page per game, 2 the first ones
+        bool focus_range = false;  // "Only from … to …": the GIF's first move chosen
+    };
+    std::optional<ExportSheet> export_;
+    std::vector<ImTextureID> export_old_textures_;  // freed at the next frame, its drawing done
+    ExportSettings export_settings_;
+    bool export_settings_loaded_ = false;
+    std::shared_ptr<const publish::PieceShapes> export_pieces_;  // the pieces in use as shapes, made at their first use
+    std::string export_pieces_of_;
+    FileOpener open_file_ = openInSystem;  // a file in the system's program for it: the tests replace it
+    ExportSettings& exportSettings();
+    void keepExportSettings();
+    std::shared_ptr<const publish::PieceShapes> exportPieces();
+    publish::DocumentLook exportLook();
+    void openBoardExport(int format = -1);
+    void openDatabaseExport(bool all, int format = -1);  // the Databases page's chosen game, or its filter's games
+    void openRepertoirePrint(std::size_t index);
+    void openDossierExport(bool html);
+    void openReportExport(bool html);
+    void openCrosstableExport(bool html);
+    void showExport(ExportSheet sheet, int format);
+    void closeExport();
+    void drawExport();
+    void drawExportPreview(float width);
+    void drawExportOptions();
+    void drawExportProblems();
+    void pollExport();
+    void exportSave();  // Enter, "Save…": the system's dialog, then exportTo()
+    void exportTo(const std::filesystem::path& path);
+    void exportPrint();  // "Open to print": the PDF in the profile, opened in the system's reader
+    void copyDiagram();  // Ctrl+Shift+C: the Board page's position as an image in the clipboard
+    [[nodiscard]] publish::DiagramSpec exportDiagramSpec() const;
+    [[nodiscard]] publish::GifOptions exportGifOptions() const;
+    [[nodiscard]] publish::Document exportDocument();  // the PDF's: the game's, or the report's
+    [[nodiscard]] std::string exportFileName(ExportFormat format) const;
+    [[nodiscard]] std::vector<publish::HtmlGame> exportGames(std::size_t most) const;  // a database's, read
     // A Lichess link pasted (#47, mockup M8, board "Lien"): its card, then its games coming into a database.
     struct LinkCard {
         lichess::Link link;
@@ -3751,6 +3838,14 @@ class App {
     int review_ply_        = -1;     // --focus board-review-PLY: the board at that ply then
     int ply_when_read_     = -1;     // --focus board-analysis=FILE@PLY: the board at that ply once FILE is read
     int report_when_read_  = -1;     // --focus opening-report=FILE@PLY@TAB: its report then, at that tab (#91)
+    // --focus export…=: the Export sheet on a format once its subject is there (#93): the board's file read
+    // (export_when_read_), the first database's list made (export_when_listed_, its filter's games when `all`), a
+    // report made (export_when_made_: 0 a dossier, 1 an opening report, 2 a crosstable; and the format).
+    int export_when_read_   = -1;
+    int export_when_listed_ = -1;
+    bool export_listed_all_ = false;
+    std::pair<int, int> export_when_made_{-1, -1};
+    std::string export_action_;  // then, once shown: "print" (Open to print), "save:PATH" (saved there, no dialog)
 
     // Console view.
     std::vector<Console::Line> console_lines_;

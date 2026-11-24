@@ -68,7 +68,8 @@ class Dialogs {
         MachineEngineBuild,  // an engine's build for a remote machine's system, copied there
         ImportGames,         // a PGN (.pgn, .zst, .gz, .zip) imported into a database
         AddDatabase,         // a database folder made elsewhere, added to the list
-        FideList             // FIDE's rating list downloaded before (#88)
+        FideList,            // FIDE's rating list downloaded before (#88)
+        Export               // where the Export sheet's file goes (#93)
     };
 
     struct Answer {

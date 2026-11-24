@@ -248,33 +248,12 @@ void drawBoard(const PieceAtlas& atlas, const std::array<chess::Piece, 64>& piec
 
     // The arrows: a shaft from the centre of the first square, a head whose tip stops short of the second's centre.
     for (const auto& arrow : decor.arrows) {
-        const ImVec2 a = squareCentre(arrow.move.from(), origin, size, decor.flipped);
-        const ImVec2 b = squareCentre(displayedTarget(arrow.move), origin, size, decor.flipped);
-        const float dx = b.x - a.x, dy = b.y - a.y;
-        const float length = std::sqrt(dx * dx + dy * dy);
-        if (length < 1.0f) continue;
-        const ImVec2 u(dx / length, dy / length);  // along the arrow
-        const ImVec2 n(-u.y, u.x);                 // across it
-        const float shaft = sq * 0.09f, head = sq * 0.24f, head_len = sq * 0.42f, stop = sq * 0.12f;
-        const ImVec2 tip(b.x - u.x * stop, b.y - u.y * stop);
-        const ImVec2 base(tip.x - u.x * head_len, tip.y - u.y * head_len);
-        const auto segment = [&](ImVec2 p, ImVec2 q) {
-            dl->AddQuadFilled(ImVec2(p.x + n.x * shaft, p.y + n.y * shaft),
-                              ImVec2(q.x + n.x * shaft, q.y + n.y * shaft),
-                              ImVec2(q.x - n.x * shaft, q.y - n.y * shaft),
-                              ImVec2(p.x - n.x * shaft, p.y - n.y * shaft), arrow.colour);
-        };
-        if (arrow.dashed) {
-            const float shaft_len = std::max(0.0f, length - stop - head_len), dash = sq * 0.22f, gap = sq * 0.14f;
-            for (float t = 0; t < shaft_len; t += dash + gap) {
-                const float e = std::min(shaft_len, t + dash);
-                segment(ImVec2(a.x + u.x * t, a.y + u.y * t), ImVec2(a.x + u.x * e, a.y + u.y * e));
-            }
-        } else {
-            segment(a, base);
-        }
-        dl->AddTriangleFilled(tip, ImVec2(base.x + n.x * head, base.y + n.y * head),
-                              ImVec2(base.x - n.x * head, base.y - n.y * head), arrow.colour);
+        const ImVec2 a      = squareCentre(arrow.move.from(), origin, size, decor.flipped);
+        const ImVec2 b      = squareCentre(displayedTarget(arrow.move), origin, size, decor.flipped);
+        const auto polygons = arrowPolygons(a, b, sq, arrow.dashed);
+        if (!polygons) continue;
+        for (const auto& q : polygons->shaft) dl->AddQuadFilled(q[0], q[1], q[2], q[3], arrow.colour);
+        dl->AddTriangleFilled(polygons->head[0], polygons->head[1], polygons->head[2], arrow.colour);
     }
     // The engines that agree on an arrow's move, counted beside its start (#78), over every arrow.
     for (const auto& arrow : decor.arrows) {
@@ -328,6 +307,35 @@ void drawDraggedPiece(const PieceAtlas& atlas, chess::Piece piece, float size) {
     ImGui::GetForegroundDrawList()->AddImage(atlas.texture(sq * ImGui::GetIO().DisplayFramebufferScale.x),
                                              ImVec2(at.x - sq / 2, at.y - sq / 2), ImVec2(at.x + sq / 2, at.y + sq / 2),
                                              uv0, uv1);
+}
+
+std::optional<ArrowPolygons> arrowPolygons(ImVec2 a, ImVec2 b, float sq, bool dashed) {
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const float length = std::sqrt(dx * dx + dy * dy);
+    if (length < 1.0f) return std::nullopt;
+    const ImVec2 u(dx / length, dy / length);  // along the arrow
+    const ImVec2 n(-u.y, u.x);                 // across it
+    const float shaft = sq * 0.09f, head = sq * 0.24f, head_len = sq * 0.42f, stop = sq * 0.12f;
+    const ImVec2 tip(b.x - u.x * stop, b.y - u.y * stop);
+    const ImVec2 base(tip.x - u.x * head_len, tip.y - u.y * head_len);
+    ArrowPolygons out;
+    const auto segment = [&](ImVec2 p, ImVec2 q) {
+        out.shaft.push_back({ImVec2(p.x + n.x * shaft, p.y + n.y * shaft), ImVec2(q.x + n.x * shaft, q.y + n.y * shaft),
+                             ImVec2(q.x - n.x * shaft, q.y - n.y * shaft),
+                             ImVec2(p.x - n.x * shaft, p.y - n.y * shaft)});
+    };
+    if (dashed) {
+        const float shaft_len = std::max(0.0f, length - stop - head_len), dash = sq * 0.22f, gap = sq * 0.14f;
+        for (float t = 0; t < shaft_len; t += dash + gap) {
+            const float e = std::min(shaft_len, t + dash);
+            segment(ImVec2(a.x + u.x * t, a.y + u.y * t), ImVec2(a.x + u.x * e, a.y + u.y * e));
+        }
+    } else {
+        segment(a, base);
+    }
+    out.head = {tip, ImVec2(base.x + n.x * head, base.y + n.y * head),
+                ImVec2(base.x - n.x * head, base.y - n.y * head)};
+    return out;
 }
 
 ImVec2 arrowCountCentre(ImVec2 from, ImVec2 to, float square) {

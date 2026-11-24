@@ -320,6 +320,7 @@ void App::frame() {
     pollPrep();             // a game prepared against an opponent: their games (#52)
     pollDossier();          // a player's dossier: the job that ended, their Lichess games that came (#90)
     pollOpeningReport();    // an opening report: its sections, evaluations, summary, Lichess's answers (#91)
+    pollExport();           // the Export sheet: a file written in the background, its weight estimated (#93)
     pollEvalsReading();     // Lichess's evaluations database read for a book (#53)
     pollOfflineEvals();     // Lichess's evaluations kept offline: a preparation's runs, its end (#58)
     pollToLichess();        // a game shared, a position played out, a game bookmarked on Lichess (#54)
@@ -631,6 +632,94 @@ void App::frame() {
                     file           = file.substr(0, at);
                 }
                 dropFile(file);
+            }
+        } else if (w.rfind("export", 0) == 0 && w.find('=') != std::string::npos) {
+            // The Export sheet (#93) on a format (html, diagram, gif, pdf, pgn): export=FILE[@PLY]@FORMAT, FILE on the
+            // study Board at PLY once read; export-db=FORMAT[@all], the first database's chosen game, or its filter's
+            // games; export-repertoire=N[@FORMAT], the Openings page's repertoire N printed;
+            // export-dossier=NAME@FORMAT, export-report=FILE@PLY@FORMAT, export-crosstable=WORDS@FORMAT, once the
+            // report is made.
+            auto spec       = w.substr(w.find('=') + 1);
+            const auto kind = w.substr(0, w.find('='));
+            int format      = static_cast<int>(ExportFormat::Html);
+            // A gesture once the sheet shows: @print, or @save:PATH.
+            if (spec.size() > 6 && spec.substr(spec.size() - 6) == "@print") {
+                export_action_ = "print";
+                spec.resize(spec.size() - 6);
+            } else if (const auto save = spec.find("@save:"); save != std::string::npos) {
+                export_action_ = "save:" + spec.substr(save + 6);
+                spec.resize(save);
+            }
+            bool all        = false;
+            const auto take = [&] {
+                const auto at = spec.rfind('@');
+                if (at == std::string::npos) return;
+                const auto name = spec.substr(at + 1);
+                if (name == "all") {
+                    all  = true;
+                    spec = spec.substr(0, at);
+                    return;
+                }
+                format = name == "diagram" ? static_cast<int>(ExportFormat::Diagram)
+                         : name == "gif"   ? static_cast<int>(ExportFormat::Gif)
+                         : name == "pdf"   ? static_cast<int>(ExportFormat::Pdf)
+                         : name == "pgn"   ? static_cast<int>(ExportFormat::Pgn)
+                                           : static_cast<int>(ExportFormat::Html);
+                spec   = spec.substr(0, at);
+            };
+            if (kind == "export-db") {
+                if (spec.size() > 4 && spec.substr(spec.size() - 4) == "@all") {
+                    all = true;
+                    spec.resize(spec.size() - 4);
+                }
+                spec = "x@" + spec;
+                take();
+                page_               = Page::Databases;
+                db_selected_        = 0;
+                db_list_            = true;
+                export_when_listed_ = format;
+                export_listed_all_  = all;
+            } else if (kind == "export-repertoire") {
+                take();
+                page_ = Page::Openings;
+                repertoires().setActive(std::atoi(spec.c_str()));
+                openRepertoirePrint(static_cast<std::size_t>(std::max(0, std::atoi(spec.c_str()))));
+            } else if (kind == "export-dossier") {
+                take();
+                page_ = Page::Databases;
+                study::DossierSubject subject;
+                subject.name = spec;
+                openDossier(std::move(subject), false);
+                export_when_made_ = {0, format};
+            } else if (kind == "export-crosstable") {
+                take();
+                const auto at       = spec.rfind('@');
+                crosstable_request_ = std::make_pair(at == std::string::npos ? spec : spec.substr(0, at),
+                                                     at == std::string::npos ? std::string() : spec.substr(at + 1));
+                page_               = Page::Databases;
+                db_selected_        = 0;
+                db_list_            = true;
+                db_tournaments_     = true;
+                export_when_made_   = {2, format};
+            } else if (kind == "export-report") {
+                take();
+                toStudyBoard();
+                if (const auto at = spec.rfind('@'); at != std::string::npos && at > 1) {
+                    ply_when_read_ = std::atoi(spec.c_str() + at + 1);
+                    spec           = spec.substr(0, at);
+                }
+                report_when_read_ = 0;
+                export_when_made_ = {1, format};
+                dropFile(spec);
+            } else {
+                take();
+                toStudyBoard();
+                if (const auto at = spec.rfind('@'); at != std::string::npos && at > 1) {
+                    ply_when_read_ = std::atoi(spec.c_str() + at + 1);
+                    spec           = spec.substr(0, at);
+                }
+                export_when_read_ = format;
+                dropFile(spec);
             }
         } else if (w == "opening-report" || w.rfind("opening-report=", 0) == 0) {
             // opening-report[=FILE@PLY[@TAB]]: the report of the Board page's position (#91); FILE on the board first,
@@ -1849,6 +1938,9 @@ void App::handleDialogs() {
         switch (answer->purpose) {
             case Dialogs::Purpose::AddEngine:
                 addEngine(path);
+                break;
+            case Dialogs::Purpose::Export:  // the Export sheet's file (#93)
+                exportTo(path);
                 break;
             case Dialogs::Purpose::TheoryPgn:  // a theory study (#77)
                 addTheoryFile(path);

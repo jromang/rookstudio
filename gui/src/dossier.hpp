@@ -117,6 +117,13 @@ struct DossierReport {
     double seconds = 0;
 };
 
+// The overview's six cards (#90): their titles, their values said large, what they mean; printed too (#93).
+// `user_names`: Settings › Your names has some.
+struct DossierCards {
+    std::array<std::string, 6> titles, big, text;
+};
+[[nodiscard]] DossierCards dossierCards(const DossierReport& report, bool user_names);
+
 // The dossier made: the choice written first, the subject found, their games read, what they say.
 [[nodiscard]] DossierReport makeDossierReport(DossierAsk ask, study::DossierProgress& progress,
                                               const std::atomic<bool>& cancel);

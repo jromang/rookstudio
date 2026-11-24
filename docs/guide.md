@@ -337,6 +337,7 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | The study Board | Undo, redo |
 | <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> | The study Board | Save the game; save a copy elsewhere |
 | <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | The study Board | The previous, the next game of the list it came from |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> | The study Board | The position's diagram into the clipboard, as an image |
 | <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers (a hint during a game against an engine) |
 | <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | The study Board | The Notation, Analysis, Tree, References and Questions tabs |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
@@ -374,6 +375,10 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>Page Down</kbd>, <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> | An opening report | The next section, the previous one |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd> | An opening report's moves | Choose a move, play it on the Board page |
 | <kbd>Escape</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | An opening report | Back to the position; take out the moves added to the repertoire |
+| <kbd>Enter</kbd>, <kbd>Escape</kbd> | The Export sheet | Save the file (a PDF: open it to print); back to the page |
+| <kbd>Ctrl</kbd>+<kbd>P</kbd> | The Export sheet, a PDF | Open it in the system's reader, to print |
+| <kbd>Ctrl</kbd>+<kbd>Page Down</kbd>, <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> | The Export sheet | The next format, the previous one |
+| <kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd> <kbd>End</kbd>, <kbd>F</kbd> | A page of HTML made by RookStudio | Through the moves; turn the board over |
 | <kbd>←</kbd> <kbd>→</kbd> | The big screen | The previous or next game |
 | <kbd>+</kbd> <kbd>-</kbd> | The big screen | Larger or smaller text |
 | <kbd>Escape</kbd> | The big screen | Leave it |
@@ -1019,7 +1024,9 @@ board is on the left; on the right, the game's strip, then five tabs, Alt+1 to A
 The strip above the tabs tells where the game comes from and what became of it: *Save* (Ctrl+S) with its state
 (*Changed: 2 changes*, then *Saved in “Mega”*), the game's place in the list it came from with the previous
 and the next game (Ctrl+← and Ctrl+→), and *Recent* (see [Recent games and the list](#recent-games-and-the-list)).
-With an empty library, the Analysis, Questions and Review tabs offer to download Gaia in a click.
+With an empty library, the Analysis, Questions and Review tabs offer to download Gaia in a click. *Export…*, under the
+board, makes the game a page to replay, a diagram, an animated GIF or a PDF; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>
+copies the diagram of the position (see [Exporting and printing](#exporting-and-printing)).
 
 A move is typed as well as played: its first letter opens a field above the tabs, which offers the legal moves that
 begin so (in English letters, K Q R B N; in French, R D T F C), and Enter plays it. The letters of the engines' Board
@@ -1199,8 +1206,10 @@ At its top: the position, its opening (Lichess's named openings) and the moves t
 of the Tree tab: your databases whose opening tree is built (those *My databases* adds together), with their games;
 **Masters (Lichess)** and **Lichess** with the Tree tab's speeds and ratings, ticked when the Tree tab shows them, or by
 a click (they ask Lichess's explorer for the position, as the Tree tab does, and need a linked account); and where the
-evaluations come from. *To the repertoire* adds the first main line to the active repertoire (Ctrl+Z takes it out).
-Five sections follow (Ctrl+Page Down and Ctrl+Page Up go from one to the next):
+evaluations come from. *To the repertoire* adds the first main line to the active repertoire (Ctrl+Z takes it out);
+*Print…* makes the report a PDF, its summary marked as the assistant's, and *HTML page* a page of its own whose main
+lines replay on a board (see [Exporting and printing](#exporting-and-printing)). Five sections follow (Ctrl+Page Down and
+Ctrl+Page Up go from one to the next):
 
 - **Lines**: the moves played from the position with the Tree tab's figures (games, White's wins, draws and Black's
   wins, score, average Elo, performance, last year) and an evaluation: Lichess's, kept offline (see [Lichess's
@@ -1297,6 +1306,61 @@ it otherwise (Ctrl+K too), *Copy it* copies the story shown. Without the model (
 that has not learnt RookStudio's comments), or while a tournament on this machine has the processor, the story is the
 templates', as it says. Nothing leaves the machine.
 
+### Exporting and printing
+
+*Export…* under the study Board, beside *Copy FEN* and *lichess.org…*, opens the Export sheet in place of the page;
+Escape goes back to it. Its formats are chips at its top, the one chosen last time already chosen
+(<kbd>Ctrl</kbd>+<kbd>Page Down</kbd> and <kbd>Ctrl</kbd>+<kbd>Page Up</kbd> go through them); its left shows the file
+as it will be, its right what goes into it, and each format keeps its settings for the next time. Enter saves: the
+system's dialog opens in the folder chosen last time. Everything is made by RookStudio, on your disk: nothing is sent
+anywhere (sharing a game on
+lichess.org is *lichess.org…*'s, see [Positions and games to Lichess](#positions-and-games-to-lichess)).
+
+- **HTML page**: one file with everything in it, which opens without the Internet, on a phone too, and can be sent as
+  it is. The board in the app's colours and pieces, the moves, their comments and variations; a click on a move shows
+  it, in a variation too, with the arrows and squares drawn at that move; <kbd>←</kbd> <kbd>→</kbd> <kbd>Home</kbd>
+  <kbd>End</kbd> go through the moves and <kbd>F</kbd> turns the board over. What it holds is ticked: the comments,
+  the variations, the arrows and squares, the assistant's comments (marked as its own), the evaluations and their
+  curve, the clocks. Its weight is estimated before it is saved. From the Databases page, the page holds the chosen
+  game or the filter's games, chosen in a list at its top (<kbd>Page Up</kbd>, <kbd>Page Down</kbd>); beyond 200 games
+  it would be too heavy to open, and the sheet asks: a page per game in a folder, with their list (`index.html`), or
+  the first 200.
+- **Diagram, PNG or SVG**: the position shown, with the arrows and squares drawn at that move (the right button), the
+  coordinates, a dot beside the edge of the side to move, Black below when it is Black's move (if ticked), the last move
+  (if ticked) and a caption under the board, which starts as *White to play* and is written as you like (*White to play
+  and win*). In the app's colours, or in black and white for printing. The PNG is 480 pixels wide, or twice that for a
+  dense screen; the SVG has no size and is drawn sharp at any. *Copy the image*, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
+  <kbd>C</kbd> from anywhere on the Board page (and *Copy the diagram* in the command palette), puts the PNG in the
+  clipboard, for a message or a document.
+- **Animated GIF**: the game in the app's colours, from one move to another (*From … to …* for a passage), a frame a
+  move at the speed chosen, the last held longer; the players' names and the result in a banner, the move under the
+  board, the last move marked and the game's arrows, as ticked. It is made in the background, with its progress and
+  *Cancel*, and its weight estimated before: above 2 MB, the sheet says it is heavy for a message or a forum, and offers
+  a passage or a smaller size.
+- **Print · PDF**: a PDF made by RookStudio, the same on every system, its preview the exact page. *Open to print*
+  (Enter, <kbd>Ctrl</kbd>+<kbd>P</kbd>) gives it to the system's reader, which prints; *Save the PDF…* keeps it where
+  you choose. The paper is A4 or Letter, as the system's language and country have it, or as chosen. A game is printed
+  in one or two columns, its headers at the top of the page, with diagrams at its key moments (the review's mistakes,
+  else the moves marked !!, ??, ? and !), at each comment with arrows or squares (or `[#]`), every 10 moves, or none;
+  the assistant's comments and the evaluations beside the moves when ticked. Its text can be selected and copied: its
+  fonts are embedded, Inter, and the system's Chinese font when the page has Chinese characters. When the system has no
+  reader of PDF files, the PDF is saved and its folder opens.
+- **PGN**, from the Databases page: the chosen game or the filter's games. *Write the names in the games* (off at
+  first, the games as they were read) writes White and Black as the database's table of names has them (see
+  [Players' names](#players-names)), with the players' FIDE ids and titles when it knows them; the database itself
+  does not change.
+
+What an export shows names the players as the table of names does, as the game list shows them. The HTML pages and the
+PDFs end with the notice of the pieces drawn (*Cburnett*, BSD 3-clause license; *Chessnut*, Apache 2.0; *Celtic* and
+*Fantasy*, MIT); a diagram's PNG carries it in its text, its SVG in a comment.
+
+*Print…* is also where there is something to read on paper: a repertoire on the Openings page (each line under the one
+it leaves, a diagram at each branching, your notes, and its coverage and gaps as an annex, when measured; an empty
+repertoire has nothing to print, its moves starred in the Tree tab first), a player's dossier, an opening report and a
+tournament's crosstable (on landscape pages, every player listed). The dossier, the report and the crosstable also have
+*HTML page*: the same content as a page of its own, their lines replayable on a board beside the text. The Engines
+space's Board keeps its own exports (*Copy PGN*, *Save the game as PGN…*).
+
 ## Databases
 
 The **Databases** page holds your game databases: their list on the left, the games of the one chosen on the right. A
@@ -1334,6 +1398,9 @@ under the player's name, and under the mouse the name says how the game writes i
 through the list and the game chosen shows beside, on a small board with its moves; Enter or a double click opens it
 on the Board page. Millions of games scroll and sort at once. **Games** and **Tournaments**, beside the database's name
 above the list, switch between its games and its tournaments (see [Tournaments and crosstables](#tournaments-and-crosstables)).
+*Export…*, after the count of the games, makes the chosen game or the filter's games a page to replay, an animated GIF, a
+PDF or a PGN file, the players' names from the table of names written in it if asked (see
+[Exporting and printing](#exporting-and-printing)).
 
 ### FIDE cards
 
@@ -1365,7 +1432,9 @@ Enter keeps the choice in the tables of names, and the dossier then takes only t
 
 At its top: the player's title, federation, birth year and FIDE ratings when they are matched with the list, and what
 it is made of: your databases, with their games and years, and Lichess when its source is ticked. *Their games in the
-list* shows them on the Databases page. Then four tabs (Ctrl+Page Down and Ctrl+Page Up go from one to the next):
+list* shows them on the Databases page; *Print…* makes the dossier a PDF of a few pages, *HTML page* a page of its own
+whose lines replay on a board (see [Exporting and printing](#exporting-and-printing)). Then four tabs (Ctrl+Page Down
+and Ctrl+Page Up go from one to the next):
 
 - **Overview**: their first moves with White and their score, their answers with Black to the first moves they meet
   most, their rating over the years, their results against stronger and weaker players, their pawn structures, and
@@ -1421,7 +1490,9 @@ its Round tag (*9.2*: round 9, board 2).
 
 A click on a game opens it on the Board page, the tournament's games as its list (Ctrl+← and Ctrl+→, *Back to the
 crosstable*); a click on a name opens the player's dossier (see [A player's dossier](#a-players-dossier)). The
-performance and the rating change say how they were counted under the mouse.
+performance and the rating change say how they were counted under the mouse. *Print…* makes the crosstable a PDF on
+landscape pages, every player listed, and *HTML page* a page of its own (see [Exporting and
+printing](#exporting-and-printing)).
 
 Above the crosstable, a line for each thing wrong with the data, with what fixes it:
 
@@ -1733,7 +1804,8 @@ be undone.
 ## The Openings page
 
 Your repertoires: each a PGN file of the profile (one game and its variations, for White or for Black), which the
-Board page opens and edits like a game (*Open its file on the board*). One is active: the star of the Tree tab adds
+Board page opens and edits like a game (*Open its file on the board*), and *Print…* prints (see [Exporting and
+printing](#exporting-and-printing)). One is active: the star of the Tree tab adds
 the move shown to it, or takes it out, whatever the side to move; the first star makes a repertoire when there is
 none. *New repertoire* makes one by its name and side.
 

@@ -226,7 +226,7 @@ std::string errorText(const study::PatternError& e) {
         case K::TooManySteps:
             return trf("Line {}: eight steps at most.", e.line);
         case K::GapAtEnd:
-            return trf("Line {}: a step is wanted after the plies of anything.", e.line);
+            return trf("Line {}: a line of moves cannot end with plies of anything: a step is wanted after them.", e.line);
         case K::BadGap:
             return trf("Line {}: “{}” does not read: {}, 20 plies at most.", e.line, e.word, ".{0,2}");
         case K::Unexpected:
@@ -1545,7 +1545,7 @@ void App::drawRouteTab() {
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", TR("From"));
     ImGui::SameLine();
-    if (ImGui::RadioButton(TR("anywhere"), !r.from_board)) {
+    if (ImGui::RadioButton(TR("any position"), !r.from_board)) {
         r.from_board = false;
         changed      = true;
     }

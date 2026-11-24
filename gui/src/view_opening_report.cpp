@@ -1286,7 +1286,7 @@ void App::drawReportShapes() {
             if (const int score = whiteScore(p.stats); score >= 0) ImGui::Text("%d %%", score);
             ImGui::PopID();
             if (clicked) {
-                reportGamesInList(p.games, trf("the games of the report where {}", label));
+                reportGamesInList(p.games, trf("the games of the report with “{}”", label));
                 return;
             }
         }
@@ -1416,8 +1416,10 @@ void App::drawReportNovelties() {
             if (n.yours && n.game && n.game->source < r.bases.size()) {
                 const int month = static_cast<int>((n.first >> 5) & 15);
                 const auto when = month ? fide::monthText(fmt::format("{}-{:02}", year, month)) : std::to_string(year);
-                text = trn("Your game of {} ({}) left your databases here: none of the {} game had played it.",
-                           "Your game of {} ({}) left your databases here: none of the {} games had played it.",
+                text = trn("Your game of {} ({}) left your databases here: {} game had reached the position, and "
+                           "played another move.",
+                           "Your game of {} ({}) left your databases here: {} games had reached the position, and "
+                           "none played it.",
                            static_cast<int>(std::min<uint64_t>(n.before, 1000000000)), when,
                            r.bases[n.game->source].name, ui::exactCount(n.before));
             } else {

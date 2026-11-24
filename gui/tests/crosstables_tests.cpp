@@ -103,7 +103,7 @@ TEST_CASE("crosstables: the words and cells the views show") {
     CHECK(systemName({study::TournamentSystem::RoundRobin, 1}) == "round robin");
     CHECK(systemName({study::TournamentSystem::RoundRobin, 2}) == "double round robin");
     CHECK(systemName({study::TournamentSystem::RoundRobin, 4}) == "round robin, 4 cycles");
-    CHECK(systemName({study::TournamentSystem::Swiss, 1}) == "Swiss");
+    CHECK(systemName({study::TournamentSystem::Swiss, 1}) == "Swiss system");
     CHECK(systemName({study::TournamentSystem::Team, 1}) == "team event");
     CHECK(pointsText(5.5) == "5½");
     CHECK(pointsText(0.5) == "½");

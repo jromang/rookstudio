@@ -406,8 +406,8 @@ them.
 
 A view's **Home** page gathers the view's pages in cards, what runs first:
 
-- **The arena** you are in from RookStudio, at the top: its name, your rank and points, the time left, *Back to it*
-  and *Pause* (Alt+P); a Swiss tournament you joined, its round (see [Arenas and Swiss
+- **The arena** you are in from RookStudio, at the top: its name, your rank and points, the time left, *Back to the
+  arena* and *Pause* (Alt+P); a Swiss tournament you joined, its round (see [Arenas and Swiss
   tournaments](#arenas-and-swiss-tournaments)).
 - **Resume where you were**, when the view holds the Board: the game on the board at its move, on a small board, where
   it comes from (its database and number, its place in a filter, or its file), its comments, and whether it has
@@ -459,8 +459,8 @@ The **Tournaments** page is a control room: what runs and what needs you come fi
   once](#several-tournaments-at-once) for the weights and the cores of each.
 - **Your Lichess bot**, while it is online: its engine, its game in progress with *On the Board*, *Its card* and *Put
   offline*; it declines challenges *later* while the tournaments need the cores (see [A Lichess bot](#a-lichess-bot)).
-- **Your engines on lichess.org**, while they serve: each with its state, *Its card* and *Stop the service*; they take
-  only the threads the tournaments leave free (see [Your engine on lichess.org](#your-engine-on-lichessorg)).
+- **Your engines on lichess.org**, while they serve: each with its state, *The engine's card* and *Stop the service*;
+  they take only the threads the tournaments leave free (see [Your engine on lichess.org](#your-engine-on-lichessorg)).
 - **Queue**: the tournaments waiting, each with its length and when it starts, and when everything ends (see
   [Queue and relaunch](#queue-and-relaunch)).
 - **Last finished**: the last five tournaments finished, with their result: a match's score, the SPRT's decision,
@@ -565,7 +565,7 @@ Each version of an engine taken from *Popular engines…* stays in a folder of i
 Once an update has replaced a version in the library, its folder is deleted when no tournament that is not over
 (playing, paused or stopped) plays it: at once when none does, else at the end of the last one, as RookStudio looks
 again at the end of each tournament. A notice at the window's corner says so: *Gaia 4.4.3 deleted: “Night Gaia” is over
-· 118 MB freed*, with *Its card*.
+· 118 MB freed*, with *The engine's card*.
 
 When the engine has more than its library's version on the disk, its card lists them under *Its versions on the disk*,
 each with its state:
@@ -1359,12 +1359,12 @@ Ctrl+Page Up go from one to the next):
   the Board page. Then the **main lines**: the most played continuations, as long as they keep a fifth of their first
   move's games, with the games that reach their end and White's score; a click shows one on the Board page;
 - **Plans and structures**: the pawn structures at move 20 (ten moves on for a later position) in the position's games,
-  as the assistant's facts name them, *kept* when the position has one already; and what the players do in the next
-  fifteen moves: the pawn pushes (one, or two in a row: *b4 then b5*) and the pieces' routes (as the Manoeuvre search
-  follows a piece) played in a tenth of the games or more, three for each side, with their share and White's score.
-  A plan the assistant's facts know is named (*The minority attack: b4 then b5*). These are frequencies, not advice;
-  they need 50 games, and a position of more than 20,000 games is counted in an even sample of them. A click shows those
-  games in the list;
+  as the assistant's facts name them, *already on the board* when the position has one already; and what the players do
+  in the next fifteen moves: the pawn pushes (one, or two in a row: *b4 then b5*) and the pieces' routes (as the
+  Manoeuvre search follows a piece) played in a tenth of the games or more, three for each side, with their share and
+  White's score. A plan the assistant's facts know is named (*The minority attack: b4 then b5*). These are frequencies,
+  not advice; they need 50 games, and a position of more than 20,000 games is counted in an even sample of them. A click
+  shows those games in the list;
 - **Key games**: the strongest (the players' highest mean rating), the most recent of 2500 and more on average, and the
   first game of a novelty repeated since, each with why and the plan it plays; *Open* shows it on the Board page at the
   position (*Back to the report* returns);
@@ -1384,7 +1384,7 @@ evaluations kept offline, the evaluations stay empty and the summary says nothin
 of your games is played live on Lichess, the report is locked, and comes back by itself at its end; on the position of a
 correspondence game, the lines and figures of your databases stay (Lichess allows a book and a database), the
 evaluations, Lichess's explorer and the summary wait. Nothing leaves the machine but what the Tree tab sends: the
-Lichess sources ticked. Printing the report and its HTML page are for later.
+Lichess sources ticked.
 
 ### The report's summary
 
@@ -1465,7 +1465,7 @@ and *Explain the rest* finishes them later.
 Each line says where it comes from: theory, the model, a template, a word, the review. *Every move*, *The moves that
 matter* (the marked moves, the only moves, the turning points, the novelty) and *The key moments* choose which show; a
 click goes to the move. The summary counts them and gives the time a move takes, the facts gathered and the model's
-sentence checked: about a quarter of a second for the sentence on a GPU, some 5 seconds a move on a processor shared
+sentence checked: about a quarter of a second for the sentence on a GPU, some 3 seconds a move on a processor shared
 with other work (32 moves explained in a minute and a half). They are kept with the review, beside the moves, never in
 the game: *Write them into the game* makes them the assistant's comments, marked as its own in the PGN, beside the
 comment a move has already, which is never replaced; Ctrl+Z takes them all back. Nothing leaves the machine. Locked
@@ -1521,8 +1521,8 @@ lichess.org is *lichess.org…*'s, see [Positions and games to Lichess](#positio
   dense screen; the SVG has no size and is drawn sharp at any. *Copy the image*, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
   <kbd>C</kbd> from anywhere on the Board page (and *Copy the diagram* in the command palette), puts the PNG in the
   clipboard, for a message or a document.
-- **Animated GIF**: the game in the app's colours, from one move to another (*From … to …* for a passage), a frame a
-  move at the speed chosen, the last held longer; the players' names and the result in a banner, the move under the
+- **Animated GIF**: the game in the app's colours, from one move to another (*Only from … to …* for a passage), a frame
+  a move at the speed chosen, the last held longer; the players' names and the result in a banner, the move under the
   board, the last move marked and the game's arrows, as ticked. It is made in the background, with its progress and
   *Cancel*, and its weight estimated before: above 2 MB, the sheet says it is heavy for a message or a forum, and offers
   a passage or a smaller size.
@@ -1819,7 +1819,7 @@ The **Manoeuvre** tab looks for a man's route: a click on a man of the small boa
 a click on each square it goes to (b1, d2, f1, g3); Backspace takes the last square off. *Other moves between* lets
 the side play other moves meanwhile; *The same man all along* asks for one man, else any man of its kind on each
 square in turn; *In 15 moves at most* counts the side's moves from the first of the route to its last. *From
-anywhere*, or *From the Board page's position*: the route once a game reaches that position.
+any position*, or *From the Board page's position*: the route once a game reaches that position.
 
 The results say where the same man went next (on f5 in 31 % of the games), and the neighbouring routes, which part
 from it after its first move (b1–d2–b3); a click sets one. The grey arrow on the board is the most played

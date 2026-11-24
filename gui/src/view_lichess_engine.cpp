@@ -996,7 +996,7 @@ void App::drawLichessEnginesCard() {
         ImGui::SameLine();
         ImGui::TextDisabled("· %s", serviceState(o->engine).c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Its card"))) {
+        if (ImGui::SmallButton(TR("The engine's card"))) {
             page_ = Page::Engines;
             for (int i = 0; i < static_cast<int>(engines_.size()); ++i)
                 if (engines_[static_cast<std::size_t>(i)].name == o->engine) selected_engine_ = i;
@@ -1044,7 +1044,7 @@ void App::drawLichessEngineRunning(bool home) {
             state += " · " + trf("depth {}", s.status.job->depth);
         ImGui::TextDisabled("· %s", state.c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Its card"))) {
+        if (ImGui::SmallButton(TR("The engine's card"))) {
             page_ = Page::Engines;
             for (int i = 0; i < static_cast<int>(engines_.size()); ++i)
                 if (engines_[static_cast<std::size_t>(i)].name == name) selected_engine_ = i;

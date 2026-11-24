@@ -129,7 +129,7 @@ std::string differences(const std::vector<std::array<std::string, study::MERGE_F
     if (differs(study::MergeField::Date)) parts.push_back(TR("date"));
     if (differs(study::MergeField::Ratings)) parts.push_back(TR("ratings"));
     if (differs(study::MergeField::Eco)) parts.push_back(TR("ECO"));
-    if (differs(study::MergeField::FideIds)) parts.push_back(TR("FIDE ids"));
+    if (differs(study::MergeField::FideIds)) parts.push_back(TR("FIDE identifiers"));  // a list's word, not a label
     if (differs(study::MergeField::Clocks)) parts.push_back(TR("clocks"));
     if (differs(study::MergeField::Evals)) parts.push_back(TR("evaluations"));
     if (differs(study::MergeField::Site)) parts.push_back(TR("site"));
@@ -1296,7 +1296,7 @@ void App::drawCareNames(std::size_t index) {
             case study::NameReason::Transliteration:
                 return TR(
                     "Another transliteration of the name: a single player of that name on the list, the games' "
-                    "ratings near his.");
+                    "ratings near theirs.");
             case study::NameReason::Several:
                 return TR("Several players of that name on the list.");
             case study::NameReason::NotOnList:

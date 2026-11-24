@@ -24,9 +24,11 @@ namespace {
 std::mutex server_mutex;
 std::string server_url = "https://ratings.fide.com";
 
-constexpr std::array<const char*, 12> MONTHS = {N_("January"),   N_("February"), N_("March"),    N_("April"),
-                                                N_("May"),       N_("June"),     N_("July"),     N_("August"),
-                                                N_("September"), N_("October"),  N_("November"), N_("December")};
+// A list's month and its year, each language its own order and form ("May 2026", "2026年5月"): not "May" alone, which
+// is the short month of a date elsewhere.
+constexpr std::array<const char*, 12> MONTH_YEAR = {
+    N_("January {}"), N_("February {}"), N_("March {}"),     N_("April {}"),   N_("May {}"),      N_("June {}"),
+    N_("July {}"),    N_("August {}"),   N_("September {}"), N_("October {}"), N_("November {}"), N_("December {}")};
 
 fs::path folder(const fs::path& profile) { return profile / "fide"; }
 fs::path keptFile(const fs::path& profile) { return folder(profile) / "list.json"; }
@@ -104,7 +106,7 @@ std::string monthText(std::string_view key) {
     int year = 0, month = 0;
     if (std::sscanf(std::string(key).c_str(), "%d-%d", &year, &month) != 2 || month < 1 || month > 12)
         return std::string(key);
-    return fmt::format("{} {}", TR(MONTHS[static_cast<std::size_t>(month - 1)]), year);
+    return trf(MONTH_YEAR[static_cast<std::size_t>(month - 1)], year);
 }
 
 fs::path listFile(const fs::path& profile, const Kept& kept) {

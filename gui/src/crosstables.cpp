@@ -144,7 +144,7 @@ std::string systemName(const study::SystemChoice& system) {
             if (system.cycles == 2) return TR("double round robin");
             return trf("round robin, {} cycles", system.cycles);
         case study::TournamentSystem::Swiss:
-            return TR("Swiss");
+            return TR("Swiss system");  // within a sentence: "Played as Swiss system, as you chose"
         case study::TournamentSystem::Team:
             return TR("team event");
         case study::TournamentSystem::Knockout:
@@ -324,7 +324,9 @@ std::string crossCellText(const study::Crosstable& table, const study::CrossEntr
     if (e.kind == K::Missing) return number + "?";
     // A result set by hand for a game the database does not have: its colours not known.
     const bool colours = e.game >= table.games.size() || table.games[e.game].ref != UINT64_MAX;
-    return number + (colours ? (e.white ? "w" : "b") : "?") + result();
+    if (!colours) return number + "?" + result();
+    // The colour's letter as each language writes it: w for White, b for Black in English ("4b½").
+    return e.white ? trf("{}w{}", number, result()) : trf("{}b{}", number, result());
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

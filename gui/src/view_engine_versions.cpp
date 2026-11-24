@@ -468,7 +468,7 @@ void App::drawVersionNotice() {
             ImGui::TextDisabled("%s", TR("Downloaded again from its engine's card, its hash checked, if a tournament "
                                          "asks for it again."));
         bool close = false;
-        if (!n.engine.empty() && ImGui::SmallButton(TR("Its card##version_notice"))) {
+        if (!n.engine.empty() && ImGui::SmallButton(TR("The engine's card##version_notice"))) {
             page_ = Page::Engines;
             for (int i = 0; i < static_cast<int>(engines_.size()); ++i)
                 if (engines_[static_cast<std::size_t>(i)].name == n.engine) selected_engine_ = i;

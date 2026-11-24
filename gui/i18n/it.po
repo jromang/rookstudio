@@ -1604,8 +1604,8 @@ msgstr "Un altro programma di {}, per {}: copiato al posto di quello della libre
 msgid "Another program writes to it: another RookStudio importing, for instance."
 msgstr "Un altro programma ci sta scrivendo: per esempio un altro RookStudio che importa."
 
-msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near his."
-msgstr "Un'altra traslitterazione del nome: un solo giocatore con quel nome nella lista, con i rating delle partite vicini al suo."
+msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
+msgstr ""
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "Lo studio di un altro arriva tramite il suo link: Ctrl+V sulla Scacchiera o nella pagina Database."
@@ -1646,8 +1646,8 @@ msgstr "Approssimato."
 msgid "Apr"
 msgstr "apr"
 
-msgid "April"
-msgstr "aprile"
+msgid "April {}"
+msgstr ""
 
 msgid "Arabian mate"
 msgstr "Matto arabo"
@@ -1885,8 +1885,8 @@ msgstr "Attrazione"
 msgid "Aug"
 msgstr "ago"
 
-msgid "August"
-msgstr "agosto"
+msgid "August {}"
+msgstr ""
 
 msgid "Author: {} → {}"
 msgstr "Autore: {} → {}"
@@ -3424,8 +3424,8 @@ msgstr "Data"
 msgid "Dec"
 msgstr "dic"
 
-msgid "December"
-msgstr "dicembre"
+msgid "December {}"
+msgstr ""
 
 msgid "Decision"
 msgstr "Decisione"
@@ -3848,9 +3848,6 @@ msgstr "Ogni turno abbina motori con punteggi simili, mai due volte gli stessi; 
 
 msgid "Each sentence read against these figures and facts. A false sentence would have given way to the templates', and the cursor would say why."
 msgstr "Ogni frase letta confrontandola con questi numeri e fatti. Una frase falsa avrebbe lasciato il posto a quella predefinita, e il cursore direbbe il perché."
-
-msgid "Earlier"
-msgstr "Più in alto"
 
 msgid "Easier"
 msgstr "Più facile"
@@ -4410,6 +4407,9 @@ msgstr "La FIDE non ha pubblicato nessuna lista più recente: quella di {} è l'
 msgid "FIDE id {}"
 msgstr "ID FIDE {}"
 
+msgid "FIDE identifiers"
+msgstr ""
+
 msgid "FIDE ids"
 msgstr "ID FIDE"
 
@@ -4458,8 +4458,8 @@ msgstr "Famiglie"
 msgid "Feb"
 msgstr "feb"
 
-msgid "February"
-msgstr "febbraio"
+msgid "February {}"
+msgstr ""
 
 msgid "Few enough pieces for the tablebase adjudication."
 msgstr "Abbastanza pochi pezzi per l'aggiudicazione con le tablebase."
@@ -4523,9 +4523,6 @@ msgstr "Finito"
 
 msgid "Finishes the running games first, or stops now; either way the tournament can be resumed where it stopped."
 msgstr "Finisce prima le partite in corso, o si ferma subito; in entrambi i casi il torneo può riprendere da dove si è fermato."
-
-msgid "First"
-msgstr "Al primo posto"
 
 msgid "First played in {}, repeated {} time since."
 msgid_plural "First played in {}, repeated {} times since."
@@ -6028,8 +6025,8 @@ msgstr "Il suo spazio di lavoro: classifica, partite in diretta, calendario"
 msgid "Jan"
 msgstr "gen"
 
-msgid "January"
-msgstr "gennaio"
+msgid "January {}"
+msgstr ""
 
 msgid "Join"
 msgstr "Partecipa"
@@ -6055,14 +6052,14 @@ msgstr "Giudicata da {}: {}, il motore del resoconto, non è più nella libreria
 msgid "Jul"
 msgstr "lug"
 
-msgid "July"
-msgstr "luglio"
+msgid "July {}"
+msgstr ""
 
 msgid "Jun"
 msgstr "giu"
 
-msgid "June"
-msgstr "giugno"
+msgid "June {}"
+msgstr ""
 
 msgid "K {} by FIDE's rules"
 msgstr "K {} secondo le regole FIDE"
@@ -6925,11 +6922,11 @@ msgstr "Riga {}, dove inizia la partita {}."
 msgid "Line {}: a condition is wanted."
 msgstr "Riga {}: serve una condizione."
 
+msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
+msgstr ""
+
 msgid "Line {}: a pattern has one line of moves."
 msgstr "Riga {}: uno schema ha una sola linea di mosse."
-
-msgid "Line {}: a step is wanted after the plies of anything."
-msgstr "Riga {}: serve un passo dopo le semimosse qualsiasi."
 
 msgid "Line {}: a step is wanted after “{}”."
 msgstr "Riga {}: serve un passo dopo «{}»."
@@ -7301,8 +7298,8 @@ msgstr "Manovra"
 msgid "Mar"
 msgstr "mar"
 
-msgid "March"
-msgstr "marzo"
+msgid "March {}"
+msgstr ""
 
 msgid "Margin (ms)"
 msgstr "Margine (ms)"
@@ -7401,6 +7398,9 @@ msgstr "Numero massimo di mosse"
 
 msgid "May"
 msgstr "mag"
+
+msgid "May {}"
+msgstr ""
 
 msgid "Mean Elo"
 msgstr "Elo medio"
@@ -7520,6 +7520,9 @@ msgstr "Mossa 15"
 
 msgid "Move down"
 msgstr "Sposta giù"
+
+msgid "Move first"
+msgstr ""
 
 msgid "Move number"
 msgstr "Numero di mossa"
@@ -8454,8 +8457,8 @@ msgstr "Novità"
 msgid "Novelty"
 msgstr "Novità"
 
-msgid "November"
-msgstr "novembre"
+msgid "November {}"
+msgstr ""
 
 msgid "Now"
 msgstr "Ora"
@@ -8475,8 +8478,8 @@ msgstr "OK"
 msgid "Oct"
 msgstr "ott"
 
-msgid "October"
-msgstr "ottobre"
+msgid "October {}"
+msgstr ""
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "Del punteggio di una partita. Coppie: come misurato sulle coppie."
@@ -10876,8 +10879,8 @@ msgstr "set"
 msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr "Separati da virgole, per esempio un girone o una lista Elo."
 
-msgid "September"
-msgstr "settembre"
+msgid "September {}"
+msgstr ""
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
 msgstr "Test sequenziale del rapporto di verosimiglianza, come lo usano fishtest e OpenBench: gioca finché può dire, con i tassi di errore alpha e beta, se A vale elo1 più di B (H1 accettata) o solo elo0."
@@ -11460,6 +11463,9 @@ msgstr "Scambia i motori e i loro orologi."
 
 msgid "Swiss"
 msgstr "Sistema svizzero"
+
+msgid "Swiss system"
+msgstr ""
 
 msgid "Swiss, 9 rounds"
 msgstr "Sistema svizzero, 9 turni"
@@ -12400,6 +12406,9 @@ msgstr "Il motore ha scritto:"
 msgid "The engine's"
 msgstr "Quello del motore"
 
+msgid "The engine's card"
+msgstr ""
+
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr "Il commento del motore come lo ha il PGN: ogni campo scritto dal torneo."
 
@@ -12924,8 +12933,8 @@ msgstr "Il file di chiave {} richiede la sua passphrase."
 msgid "The key moments"
 msgstr "I momenti chiave"
 
-msgid "The key moments come from the review; the question is Guess the moves'; a wrong answer becomes a card of today's review, as your mistakes do."
-msgstr "I momenti chiave vengono dal resoconto; la domanda è quella di Indovina le mosse; una risposta sbagliata diventa una scheda del ripasso di oggi, come i tuoi errori."
+msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
+msgstr ""
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
 msgstr "La chiave di {} richiede la sua passphrase: «Avvia» la chiede una volta in questa sessione."
@@ -14080,9 +14089,6 @@ msgstr "Il token è scaduto: collega di nuovo l'account."
 
 msgid "The token is kept in your profile, readable by you alone. Unlinking revokes it at Lichess and deletes it here; your databases stay."
 msgstr "Il token è conservato nel tuo profilo, leggibile solo da te. Scollegare l'account lo revoca su Lichess e lo elimina qui; i tuoi database restano."
-
-msgid "The tournament"
-msgstr "Il torneo"
 
 msgid "The tournament cannot be reached on {}: {}"
 msgstr "Il torneo non è raggiungibile su {}: {}"
@@ -16030,10 +16036,10 @@ msgstr "Nel frattempo la tua partita continua, con il tuo orologio che corre qua
 msgid "Your game is being played on the Board."
 msgstr "La tua partita si sta giocando sulla Scacchiera."
 
-msgid "Your game of {} ({}) left your databases here: none of the {} game had played it."
-msgid_plural "Your game of {} ({}) left your databases here: none of the {} games had played it."
-msgstr[0] "La tua partita ({}, {}) ha lasciato qui i tuoi database: {} sola partita, che non l'aveva giocata."
-msgstr[1] "La tua partita ({}, {}) ha lasciato qui i tuoi database: nessuna delle {} partite l'aveva giocata."
+msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
+msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Your game on Lichess"
 msgstr "La tua partita su Lichess"
@@ -16239,6 +16245,9 @@ msgstr "I tuoi studi"
 
 msgid "Your studies come with your Lichess account linked. Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "I tuoi studi arrivano con il tuo account Lichess collegato. Lo studio di un altro arriva tramite il suo link: Ctrl+V sulla Scacchiera o nella pagina Database."
+
+msgid "Your tables on the disk (Syzygy, up to {} pieces)"
+msgstr ""
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
 msgstr "Le tue tablebase sul disco arrivano a {} pezzi, e quelle di Lichess non vengono consultate."
@@ -16619,6 +16628,9 @@ msgstr "qualsiasi pezzo nero"
 
 msgid "any man"
 msgstr "qualsiasi pezzo"
+
+msgid "any position"
+msgstr ""
 
 msgid "any white man"
 msgstr "qualsiasi pezzo bianco"
@@ -18399,8 +18411,8 @@ msgstr "il resoconto della partita, mossa per mossa, e i fatti delle sue posizio
 msgid "the game, without an account. Whoever has its address can see it, its players' names too."
 msgstr "la partita, senza account. Chi ha il suo indirizzo può vederla, compresi i nomi dei giocatori."
 
-msgid "the games of the report where {}"
-msgstr "le partite del rapporto: {}"
+msgid "the games of the report with “{}”"
+msgstr ""
 
 msgid "the games of {}"
 msgstr "le partite di {}"
@@ -18988,9 +19000,6 @@ msgstr "il tuo repertorio «{}»"
 
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
 msgstr "i tuoi studi, i problemi di Lichess online, le tue partite su Lichess dalla pagina Gioca."
-
-msgid "your tables on the disk (Syzygy, up to {} pieces)"
-msgstr "le tue tablebase sul disco (Syzygy, fino a {} pezzi)"
 
 msgid "yours, kept for this tournament"
 msgstr "i tuoi, conservati per questo torneo"
@@ -20144,7 +20153,9 @@ msgid "{} is twice in the list of participants."
 msgstr "{} compare due volte nella lista dei partecipanti."
 
 msgid "{} joined"
-msgstr "{} iscritti"
+msgid_plural "{} joined"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} kept in “Broadcasts”"
 msgid_plural "{} kept in “Broadcasts”"
@@ -21564,6 +21575,9 @@ msgstr "{}: partite in attesa di una GPU"
 msgid "{}: games wait for memory"
 msgstr "{}: partite in attesa di memoria"
 
+msgid "{}: in a later version"
+msgstr ""
+
 msgid "{}: its book cannot be used: {}"
 msgstr "{}: il suo libro non è utilizzabile: {}"
 
@@ -21578,9 +21592,6 @@ msgstr "{}: le sue linee, i thread e l'hash; rendilo il primo, rimuovilo"
 
 msgid "{}: kept, judged when the tables answer."
 msgstr "{}: conservata, giudicata quando le tablebase rispondono."
-
-msgid "{}: later"
-msgstr "{}: più avanti"
 
 msgid "{}: lost by forfeit against {}"
 msgstr "{}: persa a forfait contro {}"
@@ -21750,6 +21761,12 @@ msgstr "{}; {}"
 
 msgid "{}\nA new build, or another program: its results may not be those of the engine that played {}."
 msgstr "{}\nUna nuova versione, o un altro programma: i suoi risultati potrebbero non essere quelli del motore che ha giocato {}."
+
+msgid "{}b{}"
+msgstr ""
+
+msgid "{}w{}"
+msgstr ""
 
 msgid "± {}"
 msgstr "± {}"

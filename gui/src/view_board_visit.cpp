@@ -584,7 +584,7 @@ void App::drawVisitColumn() {
         return stopVisit();
     }
     ImGui::TextDisabled("%s",
-                        TR("The key moments come from the review; the question is Guess the moves'; a wrong answer "
+                        TR("The key moments come from the review, the question from Guess the moves; a wrong answer "
                            "becomes a card of today's review, as your mistakes do."));
     ImGui::PopTextWrapPos();
 }

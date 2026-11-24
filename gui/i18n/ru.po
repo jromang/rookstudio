@@ -1622,8 +1622,8 @@ msgstr "Другая программа {} для {}: копируется вм�
 msgid "Another program writes to it: another RookStudio importing, for instance."
 msgstr "В неё пишет другая программа: например, другой RookStudio, выполняющий импорт."
 
-msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near his."
-msgstr "Другая транслитерация имени: в списке единственный игрок с таким именем, рейтинги в партиях близки к его рейтингу."
+msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
+msgstr ""
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "Чужое исследование открывается по ссылке: Ctrl+V на странице «Доска» или на странице «Базы»."
@@ -1664,8 +1664,8 @@ msgstr "Приблизительно."
 msgid "Apr"
 msgstr "апр."
 
-msgid "April"
-msgstr "апрель"
+msgid "April {}"
+msgstr ""
 
 msgid "Arabian mate"
 msgstr "Арабский мат"
@@ -1904,8 +1904,8 @@ msgstr "Завлечение"
 msgid "Aug"
 msgstr "авг."
 
-msgid "August"
-msgstr "август"
+msgid "August {}"
+msgstr ""
 
 msgid "Author: {} → {}"
 msgstr "Автор: {} → {}"
@@ -3446,8 +3446,8 @@ msgstr "Дата"
 msgid "Dec"
 msgstr "дек."
 
-msgid "December"
-msgstr "декабрь"
+msgid "December {}"
+msgstr ""
 
 msgid "Decision"
 msgstr "Решение"
@@ -3874,9 +3874,6 @@ msgstr "В каждом туре встречаются движки с близ
 
 msgid "Each sentence read against these figures and facts. A false sentence would have given way to the templates', and the cursor would say why."
 msgstr "Каждая фраза сверена с этими цифрами и фактами. Ложная фраза уступила бы место шаблонной, а курсор показал бы почему."
-
-msgid "Earlier"
-msgstr "Выше"
 
 msgid "Easier"
 msgstr "Легче"
@@ -4439,6 +4436,9 @@ msgstr "ФИДЕ не публиковала более нового списк�
 msgid "FIDE id {}"
 msgstr "ID ФИДЕ {}"
 
+msgid "FIDE identifiers"
+msgstr ""
+
 msgid "FIDE ids"
 msgstr "ID ФИДЕ"
 
@@ -4487,8 +4487,8 @@ msgstr "Семейства"
 msgid "Feb"
 msgstr "февр."
 
-msgid "February"
-msgstr "февраль"
+msgid "February {}"
+msgstr ""
 
 msgid "Few enough pieces for the tablebase adjudication."
 msgstr "Фигур достаточно мало для присуждения по таблицам."
@@ -4552,9 +4552,6 @@ msgstr "Завершён"
 
 msgid "Finishes the running games first, or stops now; either way the tournament can be resumed where it stopped."
 msgstr "Сначала доигрывает текущие партии или останавливает сразу; в обоих случаях турнир можно продолжить с того места, где он остановился."
-
-msgid "First"
-msgstr "Первым"
 
 msgid "First played in {}, repeated {} time since."
 msgid_plural "First played in {}, repeated {} times since."
@@ -6068,8 +6065,8 @@ msgstr "Его рабочая область: турнирная таблица,
 msgid "Jan"
 msgstr "янв."
 
-msgid "January"
-msgstr "январь"
+msgid "January {}"
+msgstr ""
 
 msgid "Join"
 msgstr "Участвовать"
@@ -6095,14 +6092,14 @@ msgstr "Оценено движком {}: {}, движка разбора, бо�
 msgid "Jul"
 msgstr "июля"
 
-msgid "July"
-msgstr "июль"
+msgid "July {}"
+msgstr ""
 
 msgid "Jun"
 msgstr "июня"
 
-msgid "June"
-msgstr "июнь"
+msgid "June {}"
+msgstr ""
 
 msgid "K {} by FIDE's rules"
 msgstr "K {} по правилам ФИДЕ"
@@ -6968,11 +6965,11 @@ msgstr "Строка {}, где начинается партия {}."
 msgid "Line {}: a condition is wanted."
 msgstr "Строка {}: нужно условие."
 
+msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
+msgstr ""
+
 msgid "Line {}: a pattern has one line of moves."
 msgstr "Строка {}: в шаблоне только одна строка ходов."
-
-msgid "Line {}: a step is wanted after the plies of anything."
-msgstr "Строка {}: после полуходов «что угодно» нужен шаг."
 
 msgid "Line {}: a step is wanted after “{}”."
 msgstr "Строка {}: после «{}» нужен шаг."
@@ -7346,8 +7343,8 @@ msgstr "Манёвр"
 msgid "Mar"
 msgstr "марта"
 
-msgid "March"
-msgstr "март"
+msgid "March {}"
+msgstr ""
 
 msgid "Margin (ms)"
 msgstr "Запас (мс)"
@@ -7447,6 +7444,9 @@ msgstr "Максимальное число ходов"
 
 msgid "May"
 msgstr "мая"
+
+msgid "May {}"
+msgstr ""
 
 msgid "Mean Elo"
 msgstr "Средний Elo"
@@ -7567,6 +7567,9 @@ msgstr "Ход 15"
 
 msgid "Move down"
 msgstr "Вниз"
+
+msgid "Move first"
+msgstr ""
 
 msgid "Move number"
 msgstr "Номер хода"
@@ -8507,8 +8510,8 @@ msgstr "Новинки"
 msgid "Novelty"
 msgstr "Новинка"
 
-msgid "November"
-msgstr "ноябрь"
+msgid "November {}"
+msgstr ""
 
 msgid "Now"
 msgstr "Стало"
@@ -8528,8 +8531,8 @@ msgstr "ОК"
 msgid "Oct"
 msgstr "окт."
 
-msgid "October"
-msgstr "октябрь"
+msgid "October {}"
+msgstr ""
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "Результата одной партии. Пары: как измерено по парам."
@@ -10946,8 +10949,8 @@ msgstr "сент."
 msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr "Через запятую, например пул или рейтинг-лист."
 
-msgid "September"
-msgstr "сентябрь"
+msgid "September {}"
+msgstr ""
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
 msgstr "Последовательный критерий отношения правдоподобия, как в fishtest и OpenBench: играет, пока с ошибками alpha и beta не станет ясно, сильнее ли A, чем B, на elo1 (H1 принята) или только на elo0."
@@ -11542,6 +11545,9 @@ msgstr "Поменять движки и их часы местами."
 
 msgid "Swiss"
 msgstr "Швейцарская система"
+
+msgid "Swiss system"
+msgstr ""
 
 msgid "Swiss, 9 rounds"
 msgstr "Швейцарская система, 9 туров"
@@ -12494,6 +12500,9 @@ msgstr "Движок написал:"
 msgid "The engine's"
 msgstr "Часы движка"
 
+msgid "The engine's card"
+msgstr ""
+
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr "Комментарий движка в том виде, в каком он есть в PGN: все поля, записанные турниром."
 
@@ -13019,8 +13028,8 @@ msgstr "Файлу ключа {} нужна парольная фраза."
 msgid "The key moments"
 msgstr "Ключевые моменты"
 
-msgid "The key moments come from the review; the question is Guess the moves'; a wrong answer becomes a card of today's review, as your mistakes do."
-msgstr "Ключевые моменты берутся из разбора; вопрос — как в «Угадывать ходы»; неверный ответ становится карточкой в «К повторению сегодня», как и ваши ошибки."
+msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
+msgstr ""
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
 msgstr "Ключу {} нужна парольная фраза: «Запустить» запросит её один раз за этот сеанс."
@@ -14182,9 +14191,6 @@ msgstr "Срок действия токена истёк: привяжите у
 
 msgid "The token is kept in your profile, readable by you alone. Unlinking revokes it at Lichess and deletes it here; your databases stay."
 msgstr "Токен хранится в вашем профиле и доступен для чтения только вам. Отвязка отзывает его на Lichess и удаляет здесь; ваши базы остаются."
-
-msgid "The tournament"
-msgstr "К турниру"
 
 msgid "The tournament cannot be reached on {}: {}"
 msgstr "Турнир на {} недоступен: {}"
@@ -16148,11 +16154,11 @@ msgstr "Тем временем ваша партия продолжается: 
 msgid "Your game is being played on the Board."
 msgstr "Ваша партия идёт на «Доске»."
 
-msgid "Your game of {} ({}) left your databases here: none of the {} game had played it."
-msgid_plural "Your game of {} ({}) left your databases here: none of the {} games had played it."
-msgstr[0] "Ваша партия ({}, «{}») вышла здесь из ваших баз: ни в одной из {} партии этого хода не было."
-msgstr[1] "Ваша партия ({}, «{}») вышла здесь из ваших баз: ни в одной из {} партий этого хода не было."
-msgstr[2] "Ваша партия ({}, «{}») вышла здесь из ваших баз: ни в одной из {} партий этого хода не было."
+msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
+msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Your game on Lichess"
 msgstr "Ваша партия на Lichess"
@@ -16360,6 +16366,9 @@ msgstr "Ваши исследования"
 
 msgid "Your studies come with your Lichess account linked. Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "Ваши исследования появятся после привязки учётной записи Lichess. Чужое исследование открывается по ссылке: Ctrl+V на странице «Доска» или на странице «Базы»."
+
+msgid "Your tables on the disk (Syzygy, up to {} pieces)"
+msgstr ""
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
 msgstr "Ваши таблицы на диске — до {} фигур, а к таблицам Lichess запросы не делаются."
@@ -16744,6 +16753,9 @@ msgstr "любая чёрная фигура"
 
 msgid "any man"
 msgstr "любая фигура"
+
+msgid "any position"
+msgstr ""
 
 msgid "any white man"
 msgstr "любая белая фигура"
@@ -18551,8 +18563,8 @@ msgstr "разбор партии, ход за ходом, и факты её п
 msgid "the game, without an account. Whoever has its address can see it, its players' names too."
 msgstr "партия, без учётной записи. Любой, у кого есть её адрес, может её увидеть, включая имена игроков."
 
-msgid "the games of the report where {}"
-msgstr "партии отчёта с планом: {}"
+msgid "the games of the report with “{}”"
+msgstr ""
 
 msgid "the games of {}"
 msgstr "партии {}"
@@ -19144,9 +19156,6 @@ msgstr "ваш репертуар «{}»"
 
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
 msgstr "ваши исследования, задачи Lichess онлайн, ваши партии на Lichess со страницы «Играть»."
-
-msgid "your tables on the disk (Syzygy, up to {} pieces)"
-msgstr "ваши таблицы на диске (Syzygy, до {} фигур)"
 
 msgid "yours, kept for this tournament"
 msgstr "ваши, сохранены для этого турнира"
@@ -20412,7 +20421,10 @@ msgid "{} is twice in the list of participants."
 msgstr "{} дважды указан в списке участников."
 
 msgid "{} joined"
-msgstr "участников: {}"
+msgid_plural "{} joined"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "{} kept in “Broadcasts”"
 msgid_plural "{} kept in “Broadcasts”"
@@ -21956,6 +21968,9 @@ msgstr "{}: партии ждут GPU"
 msgid "{}: games wait for memory"
 msgstr "{}: партии ждут памяти"
 
+msgid "{}: in a later version"
+msgstr ""
+
 msgid "{}: its book cannot be used: {}"
 msgstr "{}: его книгу нельзя использовать: {}"
 
@@ -21970,9 +21985,6 @@ msgstr "{}: его линии, потоки и хеш; сделать первы
 
 msgid "{}: kept, judged when the tables answer."
 msgstr "{}: сохранён, будет оценён, когда ответят таблицы."
-
-msgid "{}: later"
-msgstr "{}: позже"
 
 msgid "{}: lost by forfeit against {}"
 msgstr "{}: поражение по неявке против {}"
@@ -22147,6 +22159,12 @@ msgstr "{}; {}"
 
 msgid "{}\nA new build, or another program: its results may not be those of the engine that played {}."
 msgstr "{}\nНовая версия или другая программа: его результаты могут не совпадать с результатами движка, игравшего в «{}»."
+
+msgid "{}b{}"
+msgstr ""
+
+msgid "{}w{}"
+msgstr ""
 
 msgid "± {}"
 msgstr "± {}"

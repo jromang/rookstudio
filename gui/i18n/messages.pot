@@ -1604,7 +1604,7 @@ msgstr ""
 msgid "Another program writes to it: another RookStudio importing, for instance."
 msgstr ""
 
-msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near his."
+msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
 msgstr ""
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
@@ -1646,7 +1646,7 @@ msgstr ""
 msgid "Apr"
 msgstr ""
 
-msgid "April"
+msgid "April {}"
 msgstr ""
 
 msgid "Arabian mate"
@@ -1885,7 +1885,7 @@ msgstr ""
 msgid "Aug"
 msgstr ""
 
-msgid "August"
+msgid "August {}"
 msgstr ""
 
 msgid "Author: {} → {}"
@@ -3424,7 +3424,7 @@ msgstr ""
 msgid "Dec"
 msgstr ""
 
-msgid "December"
+msgid "December {}"
 msgstr ""
 
 msgid "Decision"
@@ -3847,9 +3847,6 @@ msgid "Each round pairs engines with similar scores, never twice the same; for l
 msgstr ""
 
 msgid "Each sentence read against these figures and facts. A false sentence would have given way to the templates', and the cursor would say why."
-msgstr ""
-
-msgid "Earlier"
 msgstr ""
 
 msgid "Easier"
@@ -4410,6 +4407,9 @@ msgstr ""
 msgid "FIDE id {}"
 msgstr ""
 
+msgid "FIDE identifiers"
+msgstr ""
+
 msgid "FIDE ids"
 msgstr ""
 
@@ -4458,7 +4458,7 @@ msgstr ""
 msgid "Feb"
 msgstr ""
 
-msgid "February"
+msgid "February {}"
 msgstr ""
 
 msgid "Few enough pieces for the tablebase adjudication."
@@ -4522,9 +4522,6 @@ msgid "Finished"
 msgstr ""
 
 msgid "Finishes the running games first, or stops now; either way the tournament can be resumed where it stopped."
-msgstr ""
-
-msgid "First"
 msgstr ""
 
 msgid "First played in {}, repeated {} time since."
@@ -6028,7 +6025,7 @@ msgstr ""
 msgid "Jan"
 msgstr ""
 
-msgid "January"
+msgid "January {}"
 msgstr ""
 
 msgid "Join"
@@ -6055,13 +6052,13 @@ msgstr ""
 msgid "Jul"
 msgstr ""
 
-msgid "July"
+msgid "July {}"
 msgstr ""
 
 msgid "Jun"
 msgstr ""
 
-msgid "June"
+msgid "June {}"
 msgstr ""
 
 msgid "K {} by FIDE's rules"
@@ -6925,10 +6922,10 @@ msgstr ""
 msgid "Line {}: a condition is wanted."
 msgstr ""
 
-msgid "Line {}: a pattern has one line of moves."
+msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
 msgstr ""
 
-msgid "Line {}: a step is wanted after the plies of anything."
+msgid "Line {}: a pattern has one line of moves."
 msgstr ""
 
 msgid "Line {}: a step is wanted after “{}”."
@@ -7301,7 +7298,7 @@ msgstr ""
 msgid "Mar"
 msgstr ""
 
-msgid "March"
+msgid "March {}"
 msgstr ""
 
 msgid "Margin (ms)"
@@ -7400,6 +7397,9 @@ msgid "Maximum number of moves"
 msgstr ""
 
 msgid "May"
+msgstr ""
+
+msgid "May {}"
 msgstr ""
 
 msgid "Mean Elo"
@@ -7519,6 +7519,9 @@ msgid "Move 15"
 msgstr ""
 
 msgid "Move down"
+msgstr ""
+
+msgid "Move first"
 msgstr ""
 
 msgid "Move number"
@@ -8454,7 +8457,7 @@ msgstr ""
 msgid "Novelty"
 msgstr ""
 
-msgid "November"
+msgid "November {}"
 msgstr ""
 
 msgid "Now"
@@ -8475,7 +8478,7 @@ msgstr ""
 msgid "Oct"
 msgstr ""
 
-msgid "October"
+msgid "October {}"
 msgstr ""
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
@@ -10876,7 +10879,7 @@ msgstr ""
 msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr ""
 
-msgid "September"
+msgid "September {}"
 msgstr ""
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
@@ -11459,6 +11462,9 @@ msgid "Swap the engines and their clocks."
 msgstr ""
 
 msgid "Swiss"
+msgstr ""
+
+msgid "Swiss system"
 msgstr ""
 
 msgid "Swiss, 9 rounds"
@@ -12400,6 +12406,9 @@ msgstr ""
 msgid "The engine's"
 msgstr ""
 
+msgid "The engine's card"
+msgstr ""
+
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr ""
 
@@ -12924,7 +12933,7 @@ msgstr ""
 msgid "The key moments"
 msgstr ""
 
-msgid "The key moments come from the review; the question is Guess the moves'; a wrong answer becomes a card of today's review, as your mistakes do."
+msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
 msgstr ""
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
@@ -14079,9 +14088,6 @@ msgid "The token has ended: link the account again."
 msgstr ""
 
 msgid "The token is kept in your profile, readable by you alone. Unlinking revokes it at Lichess and deletes it here; your databases stay."
-msgstr ""
-
-msgid "The tournament"
 msgstr ""
 
 msgid "The tournament cannot be reached on {}: {}"
@@ -16030,8 +16036,8 @@ msgstr ""
 msgid "Your game is being played on the Board."
 msgstr ""
 
-msgid "Your game of {} ({}) left your databases here: none of the {} game had played it."
-msgid_plural "Your game of {} ({}) left your databases here: none of the {} games had played it."
+msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
+msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -16238,6 +16244,9 @@ msgid "Your studies"
 msgstr ""
 
 msgid "Your studies come with your Lichess account linked. Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
+msgstr ""
+
+msgid "Your tables on the disk (Syzygy, up to {} pieces)"
 msgstr ""
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
@@ -16618,6 +16627,9 @@ msgid "any black man"
 msgstr ""
 
 msgid "any man"
+msgstr ""
+
+msgid "any position"
 msgstr ""
 
 msgid "any white man"
@@ -18399,7 +18411,7 @@ msgstr ""
 msgid "the game, without an account. Whoever has its address can see it, its players' names too."
 msgstr ""
 
-msgid "the games of the report where {}"
+msgid "the games of the report with “{}”"
 msgstr ""
 
 msgid "the games of {}"
@@ -18987,9 +18999,6 @@ msgid "your repertoire “{}”"
 msgstr ""
 
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
-msgstr ""
-
-msgid "your tables on the disk (Syzygy, up to {} pieces)"
 msgstr ""
 
 msgid "yours, kept for this tournament"
@@ -20144,7 +20153,9 @@ msgid "{} is twice in the list of participants."
 msgstr ""
 
 msgid "{} joined"
-msgstr ""
+msgid_plural "{} joined"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} kept in “Broadcasts”"
 msgid_plural "{} kept in “Broadcasts”"
@@ -21564,6 +21575,9 @@ msgstr ""
 msgid "{}: games wait for memory"
 msgstr ""
 
+msgid "{}: in a later version"
+msgstr ""
+
 msgid "{}: its book cannot be used: {}"
 msgstr ""
 
@@ -21577,9 +21591,6 @@ msgid "{}: its lines, threads and hash; make it first, remove it"
 msgstr ""
 
 msgid "{}: kept, judged when the tables answer."
-msgstr ""
-
-msgid "{}: later"
 msgstr ""
 
 msgid "{}: lost by forfeit against {}"
@@ -21749,6 +21760,12 @@ msgid "{}; {}"
 msgstr ""
 
 msgid "{}\nA new build, or another program: its results may not be those of the engine that played {}."
+msgstr ""
+
+msgid "{}b{}"
+msgstr ""
+
+msgid "{}w{}"
 msgstr ""
 
 msgid "± {}"

@@ -1586,8 +1586,8 @@ msgstr "{} 的另一个程序，适用于 {}：代替库中的程序复制，并
 msgid "Another program writes to it: another RookStudio importing, for instance."
 msgstr "另一个程序正在写入它：例如另一个正在导入的 RookStudio。"
 
-msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near his."
-msgstr "该姓名的另一种音译：名单中只有一位同名棋手，对局中的等级分与其接近。"
+msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
+msgstr ""
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "他人的研究可通过其链接获取：在棋盘或“数据库”页面上按 Ctrl+V。"
@@ -1628,8 +1628,8 @@ msgstr "近似值。"
 msgid "Apr"
 msgstr "4月"
 
-msgid "April"
-msgstr "4月"
+msgid "April {}"
+msgstr ""
 
 msgid "Arabian mate"
 msgstr "阿拉伯杀"
@@ -1866,8 +1866,8 @@ msgstr "引入"
 msgid "Aug"
 msgstr "8月"
 
-msgid "August"
-msgstr "8月"
+msgid "August {}"
+msgstr ""
 
 msgid "Author: {} → {}"
 msgstr "作者：{} → {}"
@@ -3402,8 +3402,8 @@ msgstr "日期"
 msgid "Dec"
 msgstr "12月"
 
-msgid "December"
-msgstr "12月"
+msgid "December {}"
+msgstr ""
 
 msgid "Decision"
 msgstr "裁决"
@@ -3822,9 +3822,6 @@ msgstr "每轮让得分相近的引擎配对，同一对手不会相遇两次；
 
 msgid "Each sentence read against these figures and facts. A false sentence would have given way to the templates', and the cursor would say why."
 msgstr "每个句子都对照这些数据和事实审读。错误的句子会被换成模板的句子，悬停时会说明原因。"
-
-msgid "Earlier"
-msgstr "提前"
 
 msgid "Easier"
 msgstr "更容易"
@@ -4381,6 +4378,9 @@ msgstr "FIDE 没有发布更新的名单：{} 的名单就是最新的。"
 msgid "FIDE id {}"
 msgstr "FIDE ID {}"
 
+msgid "FIDE identifiers"
+msgstr ""
+
 msgid "FIDE ids"
 msgstr "FIDE ID"
 
@@ -4429,8 +4429,8 @@ msgstr "类别"
 msgid "Feb"
 msgstr "2月"
 
-msgid "February"
-msgstr "2月"
+msgid "February {}"
+msgstr ""
 
 msgid "Few enough pieces for the tablebase adjudication."
 msgstr "棋子足够少，可以用残局库裁定。"
@@ -4494,9 +4494,6 @@ msgstr "已结束"
 
 msgid "Finishes the running games first, or stops now; either way the tournament can be resumed where it stopped."
 msgstr "先下完进行中的对局，或立即停止；无论哪种方式，锦标赛都可以从停止处继续。"
-
-msgid "First"
-msgstr "移到最前"
 
 msgid "First played in {}, repeated {} time since."
 msgid_plural "First played in {}, repeated {} times since."
@@ -5988,8 +5985,8 @@ msgstr "它的工作区：排名、实时对局、赛程"
 msgid "Jan"
 msgstr "1月"
 
-msgid "January"
-msgstr "1月"
+msgid "January {}"
+msgstr ""
 
 msgid "Join"
 msgstr "加入"
@@ -6015,14 +6012,14 @@ msgstr "由 {} 评判：复盘所用的引擎 {} 已不在引擎库中。"
 msgid "Jul"
 msgstr "7月"
 
-msgid "July"
-msgstr "7月"
+msgid "July {}"
+msgstr ""
 
 msgid "Jun"
 msgstr "6月"
 
-msgid "June"
-msgstr "6月"
+msgid "June {}"
+msgstr ""
 
 msgid "K {} by FIDE's rules"
 msgstr "K {}，按 FIDE 规则"
@@ -6882,11 +6879,11 @@ msgstr "第 {} 行，第 {} 局从这里开始。"
 msgid "Line {}: a condition is wanted."
 msgstr "第 {} 行：需要一个条件。"
 
+msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
+msgstr ""
+
 msgid "Line {}: a pattern has one line of moves."
 msgstr "第 {} 行：一个棋型只能有一行着法。"
-
-msgid "Line {}: a step is wanted after the plies of anything."
-msgstr "第 {} 行：任意半回合之后需要一个步骤。"
 
 msgid "Line {}: a step is wanted after “{}”."
 msgstr "第 {} 行：“{}”之后需要一个步骤。"
@@ -7256,8 +7253,8 @@ msgstr "调动"
 msgid "Mar"
 msgstr "3月"
 
-msgid "March"
-msgstr "3月"
+msgid "March {}"
+msgstr ""
 
 msgid "Margin (ms)"
 msgstr "余量 (ms)"
@@ -7355,6 +7352,9 @@ msgstr "最大步数"
 
 msgid "May"
 msgstr "5月"
+
+msgid "May {}"
+msgstr ""
 
 msgid "Mean Elo"
 msgstr "平均 Elo"
@@ -7473,6 +7473,9 @@ msgstr "第 15 回合"
 
 msgid "Move down"
 msgstr "下移"
+
+msgid "Move first"
+msgstr ""
 
 msgid "Move number"
 msgstr "回合数"
@@ -8401,8 +8404,8 @@ msgstr "新着"
 msgid "Novelty"
 msgstr "新着"
 
-msgid "November"
-msgstr "11月"
+msgid "November {}"
+msgstr ""
 
 msgid "Now"
 msgstr "现在"
@@ -8422,8 +8425,8 @@ msgstr "确定"
 msgid "Oct"
 msgstr "10月"
 
-msgid "October"
-msgstr "10月"
+msgid "October {}"
+msgstr ""
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "单局得分的。成对：按成对对局测量。"
@@ -10806,8 +10809,8 @@ msgstr "9月"
 msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr "用逗号分隔，例如一个组或一个等级分榜。"
 
-msgid "September"
-msgstr "9月"
+msgid "September {}"
+msgstr ""
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
 msgstr "序贯概率比检验，与 fishtest 和 OpenBench 相同：一直对局，直到能以错误率 alpha 和 beta 判断 A 比 B 强 elo1（接受 H1）还是只强 elo0。"
@@ -11378,6 +11381,9 @@ msgstr "交换引擎及其棋钟。"
 
 msgid "Swiss"
 msgstr "瑞士制"
+
+msgid "Swiss system"
+msgstr ""
 
 msgid "Swiss, 9 rounds"
 msgstr "瑞士制，9 轮"
@@ -12306,6 +12312,9 @@ msgstr "引擎输出："
 msgid "The engine's"
 msgstr "引擎的"
 
+msgid "The engine's card"
+msgstr ""
+
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr "引擎注释在 PGN 中的原样：锦标赛写入的每个字段。"
 
@@ -12829,8 +12838,8 @@ msgstr "密钥文件 {} 需要口令。"
 msgid "The key moments"
 msgstr "关键时刻"
 
-msgid "The key moments come from the review; the question is Guess the moves'; a wrong answer becomes a card of today's review, as your mistakes do."
-msgstr "关键时刻来自复盘；提问方式与“猜着法”相同；答错的会像你的错误一样成为“今天待复习”中的一张卡片。"
+msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
+msgstr ""
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
 msgstr "{} 的密钥需要口令：“开始”会在本次会话中询问一次。"
@@ -13978,9 +13987,6 @@ msgstr "令牌已过期：请重新关联账户。"
 
 msgid "The token is kept in your profile, readable by you alone. Unlinking revokes it at Lichess and deletes it here; your databases stay."
 msgstr "令牌保存在你的配置文件夹中，只有你能读取。解除关联会在 Lichess 吊销令牌并在本地删除；你的数据库保持不变。"
-
-msgid "The tournament"
-msgstr "返回锦标赛"
 
 msgid "The tournament cannot be reached on {}: {}"
 msgstr "无法连接到 {} 上的比赛：{}"
@@ -15912,9 +15918,9 @@ msgstr "在此期间你的对局继续进行，轮到你走棋时你的棋钟会
 msgid "Your game is being played on the Board."
 msgstr "你的对局正在棋盘上进行。"
 
-msgid "Your game of {} ({}) left your databases here: none of the {} game had played it."
-msgid_plural "Your game of {} ({}) left your databases here: none of the {} games had played it."
-msgstr[0] "你在 {} 的对局（{}）在此脱离了你的数据库：此前 {} 局对局中没有一局走过这步棋。"
+msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
+msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
+msgstr[0] ""
 
 msgid "Your game on Lichess"
 msgstr "你在 Lichess 上的对局"
@@ -16118,6 +16124,9 @@ msgstr "你的研究"
 
 msgid "Your studies come with your Lichess account linked. Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "关联 Lichess 账户后会显示你的研究。他人的研究可通过其链接获取：在棋盘或“数据库”页面上按 Ctrl+V。"
+
+msgid "Your tables on the disk (Syzygy, up to {} pieces)"
+msgstr ""
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
 msgstr "你磁盘上的残局库最多到 {} 子，且不会向 Lichess 残局库查询。"
@@ -16494,6 +16503,9 @@ msgstr "任意黑子"
 
 msgid "any man"
 msgstr "任意棋子"
+
+msgid "any position"
+msgstr ""
 
 msgid "any white man"
 msgstr "任意白子"
@@ -18247,8 +18259,8 @@ msgstr "对局的逐步复盘及其各局面的事实"
 msgid "the game, without an account. Whoever has its address can see it, its players' names too."
 msgstr "对局，无需账户。任何拿到地址的人都能看到它，包括棋手的名称。"
 
-msgid "the games of the report where {}"
-msgstr "报告中出现“{}”的对局"
+msgid "the games of the report with “{}”"
+msgstr ""
 
 msgid "the games of {}"
 msgstr "{} 的对局"
@@ -18832,9 +18844,6 @@ msgstr "你的开局体系“{}”"
 
 msgid "your studies, Lichess's puzzles online, your games on Lichess from the Play page."
 msgstr "你的研究、Lichess 在线谜题，以及从“对弈”页面下你的 Lichess 对局。"
-
-msgid "your tables on the disk (Syzygy, up to {} pieces)"
-msgstr "你磁盘上的残局库（Syzygy，最多 {} 子）"
 
 msgid "yours, kept for this tournament"
 msgstr "你自定的，为此锦标赛保存"
@@ -19876,7 +19885,8 @@ msgid "{} is twice in the list of participants."
 msgstr "{} 在参赛者列表中出现了两次。"
 
 msgid "{} joined"
-msgstr "已有 {} 人加入"
+msgid_plural "{} joined"
+msgstr[0] "已有 {} 人加入"
 
 msgid "{} kept in “Broadcasts”"
 msgid_plural "{} kept in “Broadcasts”"
@@ -21172,6 +21182,9 @@ msgstr "{}：对局在等待 GPU"
 msgid "{}: games wait for memory"
 msgstr "{}：对局在等待内存"
 
+msgid "{}: in a later version"
+msgstr ""
+
 msgid "{}: its book cannot be used: {}"
 msgstr "{}：其开局库无法使用：{}"
 
@@ -21186,9 +21199,6 @@ msgstr "{}：其变化数、线程和哈希；设为第一个、移除"
 
 msgid "{}: kept, judged when the tables answer."
 msgstr "{}：已保留，残局库作答后再评判。"
-
-msgid "{}: later"
-msgstr "{}：以后支持"
 
 msgid "{}: lost by forfeit against {}"
 msgstr "{}：对 {} 弃权告负"
@@ -21353,6 +21363,12 @@ msgstr "{}；{}"
 
 msgid "{}\nA new build, or another program: its results may not be those of the engine that played {}."
 msgstr "{}\n新版本或另一个程序：其成绩可能与参加“{}”的引擎不同。"
+
+msgid "{}b{}"
+msgstr ""
+
+msgid "{}w{}"
+msgstr ""
 
 msgid "± {}"
 msgstr "± {}"

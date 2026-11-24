@@ -1587,7 +1587,7 @@ msgid "Another program writes to it: another RookStudio importing, for instance.
 msgstr "另一个程序正在写入它：例如另一个正在导入的 RookStudio。"
 
 msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
-msgstr ""
+msgstr "该姓名的另一种音译：名单中只有一位同名棋手，对局中的等级分与其接近。"
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "他人的研究可通过其链接获取：在棋盘或“数据库”页面上按 Ctrl+V。"
@@ -1629,7 +1629,7 @@ msgid "Apr"
 msgstr "4月"
 
 msgid "April {}"
-msgstr ""
+msgstr "{}年4月"
 
 msgid "Arabian mate"
 msgstr "阿拉伯杀"
@@ -1867,7 +1867,7 @@ msgid "Aug"
 msgstr "8月"
 
 msgid "August {}"
-msgstr ""
+msgstr "{}年8月"
 
 msgid "Author: {} → {}"
 msgstr "作者：{} → {}"
@@ -3403,7 +3403,7 @@ msgid "Dec"
 msgstr "12月"
 
 msgid "December {}"
-msgstr ""
+msgstr "{}年12月"
 
 msgid "Decision"
 msgstr "裁决"
@@ -4373,13 +4373,13 @@ msgid "FIDE gives its list no licence: it stays on your machine, never sent nor 
 msgstr "FIDE 没有为其名单提供许可证：它只保留在你的机器上，绝不发送或分享。离开本机的内容：在你下载时向 ratings.fide.com 发出的文件请求。"
 
 msgid "FIDE has published no newer list: the list of {} is the latest."
-msgstr "FIDE 没有发布更新的名单：{} 的名单就是最新的。"
+msgstr "FIDE 没有发布更新的名单：{}的名单就是最新的。"
 
 msgid "FIDE id {}"
 msgstr "FIDE ID {}"
 
 msgid "FIDE identifiers"
-msgstr ""
+msgstr "FIDE ID"
 
 msgid "FIDE ids"
 msgstr "FIDE ID"
@@ -4400,13 +4400,13 @@ msgid "FIDE's list could not be taken: {}."
 msgstr "无法获取 FIDE 名单：{}。"
 
 msgid "FIDE's list of {}"
-msgstr "{} 的 FIDE 名单"
+msgstr "{}的 FIDE 名单"
 
 msgid "FIDE's list of {} is out"
-msgstr "{} 的 FIDE 名单已发布"
+msgstr "{}的 FIDE 名单已发布"
 
 msgid "FIDE's list of {} says {}."
-msgstr "{} 的 FIDE 名单显示为 {}。"
+msgstr "{}的 FIDE 名单显示为 {}。"
 
 msgid "FIDE's rating list"
 msgstr "FIDE 等级分名单"
@@ -4415,7 +4415,7 @@ msgid "FIDE's rating list in the profile cannot be read: {}"
 msgstr "无法读取配置文件夹中的 FIDE 等级分名单：{}"
 
 msgid "FIDE's rating list of {}: {} players, kept in your profile"
-msgstr "{} 的 FIDE 等级分名单：{} 名棋手，已保存到你的配置文件夹"
+msgstr "{}的 FIDE 等级分名单：{} 名棋手，已保存到你的配置文件夹"
 
 msgid "Failed or changed"
 msgstr "失败或已更改"
@@ -4430,7 +4430,7 @@ msgid "Feb"
 msgstr "2月"
 
 msgid "February {}"
-msgstr ""
+msgstr "{}年2月"
 
 msgid "Few enough pieces for the tablebase adjudication."
 msgstr "棋子足够少，可以用残局库裁定。"
@@ -4712,7 +4712,7 @@ msgid "From"
 msgstr "从"
 
 msgid "From FIDE's list of {} (FIDE id {}), kept in the database's table of names."
-msgstr "来自 {} 的 FIDE 名单（FIDE ID {}），保存在数据库的名字表中。"
+msgstr "来自 {}的 FIDE 名单（FIDE ID {}），保存在数据库的名字表中。"
 
 msgid "From Lichess's evaluated positions…"
 msgstr "取自 Lichess 的已评估局面…"
@@ -5986,7 +5986,7 @@ msgid "Jan"
 msgstr "1月"
 
 msgid "January {}"
-msgstr ""
+msgstr "{}年1月"
 
 msgid "Join"
 msgstr "加入"
@@ -6013,13 +6013,13 @@ msgid "Jul"
 msgstr "7月"
 
 msgid "July {}"
-msgstr ""
+msgstr "{}年7月"
 
 msgid "Jun"
 msgstr "6月"
 
 msgid "June {}"
-msgstr ""
+msgstr "{}年6月"
 
 msgid "K {} by FIDE's rules"
 msgstr "K {}，按 FIDE 规则"
@@ -6880,7 +6880,7 @@ msgid "Line {}: a condition is wanted."
 msgstr "第 {} 行：需要一个条件。"
 
 msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
-msgstr ""
+msgstr "第 {} 行：一串着法不能以任意半回合结尾：其后需要一个步骤。"
 
 msgid "Line {}: a pattern has one line of moves."
 msgstr "第 {} 行：一个棋型只能有一行着法。"
@@ -7254,7 +7254,7 @@ msgid "Mar"
 msgstr "3月"
 
 msgid "March {}"
-msgstr ""
+msgstr "{}年3月"
 
 msgid "Margin (ms)"
 msgstr "余量 (ms)"
@@ -7354,7 +7354,7 @@ msgid "May"
 msgstr "5月"
 
 msgid "May {}"
-msgstr ""
+msgstr "{}年5月"
 
 msgid "Mean Elo"
 msgstr "平均 Elo"
@@ -7475,7 +7475,7 @@ msgid "Move down"
 msgstr "下移"
 
 msgid "Move first"
-msgstr ""
+msgstr "移到最前"
 
 msgid "Move number"
 msgstr "回合数"
@@ -8405,7 +8405,7 @@ msgid "Novelty"
 msgstr "新着"
 
 msgid "November {}"
-msgstr ""
+msgstr "{}年11月"
 
 msgid "Now"
 msgstr "现在"
@@ -8426,7 +8426,7 @@ msgid "Oct"
 msgstr "10月"
 
 msgid "October {}"
-msgstr ""
+msgstr "{}年10月"
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "单局得分的。成对：按成对对局测量。"
@@ -10810,7 +10810,7 @@ msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr "用逗号分隔，例如一个组或一个等级分榜。"
 
 msgid "September {}"
-msgstr ""
+msgstr "{}年9月"
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
 msgstr "序贯概率比检验，与 fishtest 和 OpenBench 相同：一直对局，直到能以错误率 alpha 和 beta 判断 A 比 B 强 elo1（接受 H1）还是只强 elo0。"
@@ -11383,7 +11383,7 @@ msgid "Swiss"
 msgstr "瑞士制"
 
 msgid "Swiss system"
-msgstr ""
+msgstr "瑞士制"
 
 msgid "Swiss, 9 rounds"
 msgstr "瑞士制，9 轮"
@@ -12313,7 +12313,7 @@ msgid "The engine's"
 msgstr "引擎的"
 
 msgid "The engine's card"
-msgstr ""
+msgstr "引擎的信息卡"
 
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr "引擎注释在 PGN 中的原样：锦标赛写入的每个字段。"
@@ -12839,7 +12839,7 @@ msgid "The key moments"
 msgstr "关键时刻"
 
 msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
-msgstr ""
+msgstr "关键时刻来自复盘，提问方式来自“猜着法”；答错的会像你的错误一样成为“今天待复习”中的一张卡片。"
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
 msgstr "{} 的密钥需要口令：“开始”会在本次会话中询问一次。"
@@ -12971,10 +12971,10 @@ msgid "The list of your studies asked of Lichess again."
 msgstr "重新向 Lichess 请求你的研究列表。"
 
 msgid "The list of {} does not read like the others: its columns changed."
-msgstr "{} 的名单格式与以往不同：其列已更改。"
+msgstr "{}的名单格式与以往不同：其列已更改。"
 
 msgid "The list of {} stays in service; the names brought together do not move."
-msgstr "{} 的名单继续使用；已合并的姓名不会改变。"
+msgstr "{}的名单继续使用；已合并的姓名不会改变。"
 
 msgid "The list order is the seeding."
 msgstr "列表顺序即种子顺序。"
@@ -15920,7 +15920,7 @@ msgstr "你的对局正在棋盘上进行。"
 
 msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
 msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
-msgstr[0] ""
+msgstr[0] "你在 {} 的对局（{}）在此脱离了你的数据库：此前到达该局面的 {} 局对局中没有一局走过这步棋。"
 
 msgid "Your game on Lichess"
 msgstr "你在 Lichess 上的对局"
@@ -16126,7 +16126,7 @@ msgid "Your studies come with your Lichess account linked. Another's study comes
 msgstr "关联 Lichess 账户后会显示你的研究。他人的研究可通过其链接获取：在棋盘或“数据库”页面上按 Ctrl+V。"
 
 msgid "Your tables on the disk (Syzygy, up to {} pieces)"
-msgstr ""
+msgstr "你磁盘上的残局库（Syzygy，最多 {} 子）"
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
 msgstr "你磁盘上的残局库最多到 {} 子，且不会向 Lichess 残局库查询。"
@@ -16505,7 +16505,7 @@ msgid "any man"
 msgstr "任意棋子"
 
 msgid "any position"
-msgstr ""
+msgstr "任意局面"
 
 msgid "any white man"
 msgstr "任意白子"
@@ -18260,7 +18260,7 @@ msgid "the game, without an account. Whoever has its address can see it, its pla
 msgstr "对局，无需账户。任何拿到地址的人都能看到它，包括棋手的名称。"
 
 msgid "the games of the report with “{}”"
-msgstr ""
+msgstr "报告中包含“{}”的对局"
 
 msgid "the games of {}"
 msgstr "{} 的对局"
@@ -21183,7 +21183,7 @@ msgid "{}: games wait for memory"
 msgstr "{}：对局在等待内存"
 
 msgid "{}: in a later version"
-msgstr ""
+msgstr "{}：将在以后的版本中支持"
 
 msgid "{}: its book cannot be used: {}"
 msgstr "{}：其开局库无法使用：{}"
@@ -21365,10 +21365,10 @@ msgid "{}\nA new build, or another program: its results may not be those of the 
 msgstr "{}\n新版本或另一个程序：其成绩可能与参加“{}”的引擎不同。"
 
 msgid "{}b{}"
-msgstr ""
+msgstr "{}黑{}"
 
 msgid "{}w{}"
-msgstr ""
+msgstr "{}白{}"
 
 msgid "± {}"
 msgstr "± {}"
@@ -21461,7 +21461,7 @@ msgid "· its model is writing: {} of {} passages…"
 msgstr "· 其模型正在撰写：{} / {} 段…"
 
 msgid "· matched with FIDE's list of {}"
-msgstr "· 已与 {} 的 FIDE 名单匹配"
+msgstr "· 已与 {}的 FIDE 名单匹配"
 
 msgid "· never against your own account (Lichess forbids it)"
 msgstr "· 绝不与你自己的账户下（Lichess 禁止这样做）"
@@ -21574,7 +21574,7 @@ msgid "— proposed: the nearest to its games' ratings"
 msgstr "—— 建议：与其对局等级分最接近的"
 
 msgid "“4b½”: against no. 4, with Black, a draw; “+” and “−” forfeits. In the accent colour, the games between the players shown. A click on a game opens it, on a name their dossier, on a tie-break's heading changes the tie-breaks, kept for this tournament. The start numbers follow the ratings."
-msgstr "“4b½”：对 4 号，执黑（b），和棋；“+” 和 “−” 表示弃权。强调色标出所显示棋手之间的对局。单击对局可打开它，单击名字打开其档案，单击破同分列标题可更改破同分规则（为此锦标赛保存）。起始编号按等级分排列。"
+msgstr "“4黑½”：执黑对 4 号，和棋；“+” 和 “−” 表示弃权。强调色标出所显示棋手之间的对局。单击对局可打开它，单击名字打开其档案，单击破同分列标题可更改破同分规则（为此锦标赛保存）。起始编号按等级分排列。"
 
 msgid "“Always” can be changed on the Lichess page, under Online for the analysis, which also says what is sent."
 msgstr "“始终”可在 Lichess 页面的“分析中的在线服务”中更改，那里也说明了会发送哪些内容。"

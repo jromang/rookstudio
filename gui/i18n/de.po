@@ -1605,7 +1605,7 @@ msgid "Another program writes to it: another RookStudio importing, for instance.
 msgstr "Ein anderes Programm schreibt hinein: zum Beispiel ein anderes RookStudio, das importiert."
 
 msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
-msgstr ""
+msgstr "Eine andere Transliteration des Namens: ein einziger Spieler dieses Namens auf der Liste, die Wertungen der Partien nahe an seiner."
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "Die Studie eines anderen kommt über ihren Link: Strg+V auf dem Brett oder auf der Seite Datenbanken."
@@ -1647,7 +1647,7 @@ msgid "Apr"
 msgstr "Apr"
 
 msgid "April {}"
-msgstr ""
+msgstr "April {}"
 
 msgid "Arabian mate"
 msgstr "Arabisches Matt"
@@ -1886,7 +1886,7 @@ msgid "Aug"
 msgstr "Aug"
 
 msgid "August {}"
-msgstr ""
+msgstr "August {}"
 
 msgid "Author: {} → {}"
 msgstr "Autor: {} → {}"
@@ -3425,7 +3425,7 @@ msgid "Dec"
 msgstr "Dez"
 
 msgid "December {}"
-msgstr ""
+msgstr "Dezember {}"
 
 msgid "Decision"
 msgstr "Entscheidung"
@@ -4408,7 +4408,7 @@ msgid "FIDE id {}"
 msgstr "FIDE-ID {}"
 
 msgid "FIDE identifiers"
-msgstr ""
+msgstr "FIDE-IDs"
 
 msgid "FIDE ids"
 msgstr "FIDE-IDs"
@@ -4459,7 +4459,7 @@ msgid "Feb"
 msgstr "Feb"
 
 msgid "February {}"
-msgstr ""
+msgstr "Februar {}"
 
 msgid "Few enough pieces for the tablebase adjudication."
 msgstr "Wenig genug Steine für die Abschätzung per Tablebases."
@@ -5377,7 +5377,7 @@ msgid "Import the downloaded file…"
 msgstr "Die heruntergeladene Datei importieren…"
 
 msgid "Import their file again ({})"
-msgstr "Ihre Datei erneut importieren ({})"
+msgstr "Die Datei erneut importieren ({})"
 
 msgid "Import them"
 msgstr "Importieren"
@@ -6026,7 +6026,7 @@ msgid "Jan"
 msgstr "Jan"
 
 msgid "January {}"
-msgstr ""
+msgstr "Januar {}"
 
 msgid "Join"
 msgstr "Beitreten"
@@ -6053,13 +6053,13 @@ msgid "Jul"
 msgstr "Jul"
 
 msgid "July {}"
-msgstr ""
+msgstr "Juli {}"
 
 msgid "Jun"
 msgstr "Jun"
 
 msgid "June {}"
-msgstr ""
+msgstr "Juni {}"
 
 msgid "K {} by FIDE's rules"
 msgstr "K {} nach den Regeln der FIDE"
@@ -6923,7 +6923,7 @@ msgid "Line {}: a condition is wanted."
 msgstr "Zeile {}: Eine Bedingung wird erwartet."
 
 msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
-msgstr ""
+msgstr "Zeile {}: Eine Zeile mit Zügen kann nicht mit beliebigen Halbzügen enden: Danach wird ein Schritt erwartet."
 
 msgid "Line {}: a pattern has one line of moves."
 msgstr "Zeile {}: Ein Muster hat nur eine Zeile mit Zügen."
@@ -7299,7 +7299,7 @@ msgid "Mar"
 msgstr "Mär"
 
 msgid "March {}"
-msgstr ""
+msgstr "März {}"
 
 msgid "Margin (ms)"
 msgstr "Toleranz (ms)"
@@ -7400,7 +7400,7 @@ msgid "May"
 msgstr "Mai"
 
 msgid "May {}"
-msgstr ""
+msgstr "Mai {}"
 
 msgid "Mean Elo"
 msgstr "Elo-Schnitt"
@@ -7522,7 +7522,7 @@ msgid "Move down"
 msgstr "Nach unten"
 
 msgid "Move first"
-msgstr ""
+msgstr "Ganz nach oben"
 
 msgid "Move number"
 msgstr "Zugnummer"
@@ -8458,7 +8458,7 @@ msgid "Novelty"
 msgstr "Neuerung"
 
 msgid "November {}"
-msgstr ""
+msgstr "November {}"
 
 msgid "Now"
 msgstr "Jetzt"
@@ -8479,7 +8479,7 @@ msgid "Oct"
 msgstr "Okt"
 
 msgid "October {}"
-msgstr ""
+msgstr "Oktober {}"
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "Des Ergebnisses einer Partie. Paare: wie an den Paaren gemessen."
@@ -9332,7 +9332,7 @@ msgid "Played as"
 msgstr "Gespielt als"
 
 msgid "Played as a {}, as you chose."
-msgstr "Gespielt als {}, wie du gewählt hast."
+msgstr "System: {}, wie von dir gewählt."
 
 msgid "Played by nothing: being deleted."
 msgstr "Von nichts gespielt: wird gelöscht."
@@ -10880,7 +10880,7 @@ msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr "Durch Kommas getrennt, z. B. ein Pool oder eine Elo-Liste."
 
 msgid "September {}"
-msgstr ""
+msgstr "September {}"
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
 msgstr "Sequentieller Wahrscheinlichkeitsquotiententest, wie fishtest und OpenBench ihn laufen lassen: spielt, bis er mit den Fehlerraten alpha und beta sagen kann, ob A elo1 mehr wert ist als B (H1 angenommen) oder nur elo0."
@@ -11465,7 +11465,7 @@ msgid "Swiss"
 msgstr "Schweizer System"
 
 msgid "Swiss system"
-msgstr ""
+msgstr "Schweizer System"
 
 msgid "Swiss, 9 rounds"
 msgstr "Schweizer System, 9 Runden"
@@ -12407,7 +12407,7 @@ msgid "The engine's"
 msgstr "Die der Engine"
 
 msgid "The engine's card"
-msgstr ""
+msgstr "Die Karte der Engine"
 
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr "Der Kommentar der Engine, wie er im PGN steht: jedes Feld, das das Turnier geschrieben hat."
@@ -12934,7 +12934,7 @@ msgid "The key moments"
 msgstr "Die Schlüsselmomente"
 
 msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
-msgstr ""
+msgstr "Die Schlüsselmomente stammen aus der Auswertung, die Frage aus „Züge erraten“; eine falsche Antwort wird zu einer Karte der heutigen Wiederholung, wie deine Fehler."
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
 msgstr "Der Schlüssel von {} braucht seine Passphrase: „Start“ fragt in dieser Sitzung einmal danach."
@@ -16038,8 +16038,8 @@ msgstr "Deine Partie wird auf dem Brett gespielt."
 
 msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
 msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Deine Partie ({}, {}) hat hier deine Datenbanken verlassen: {} Partie hatte die Stellung erreicht und einen anderen Zug gespielt."
+msgstr[1] "Deine Partie ({}, {}) hat hier deine Datenbanken verlassen: {} Partien hatten die Stellung erreicht, und keine hat ihn gespielt."
 
 msgid "Your game on Lichess"
 msgstr "Deine Partie auf Lichess"
@@ -16247,7 +16247,7 @@ msgid "Your studies come with your Lichess account linked. Another's study comes
 msgstr "Deine Studien kommen mit deinem verknüpften Lichess-Konto. Die Studie eines anderen kommt über ihren Link: Strg+V auf dem Brett oder auf der Seite Datenbanken."
 
 msgid "Your tables on the disk (Syzygy, up to {} pieces)"
-msgstr ""
+msgstr "Deine Tablebases auf der Festplatte (Syzygy, bis zu {} Steine)"
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
 msgstr "Deine Tablebases auf der Festplatte reichen bis {} Steine, und die von Lichess werden nicht gefragt."
@@ -16630,7 +16630,7 @@ msgid "any man"
 msgstr "ein beliebiger Stein"
 
 msgid "any position"
-msgstr ""
+msgstr "eine beliebige Stellung"
 
 msgid "any white man"
 msgstr "ein beliebiger weißer Stein"
@@ -16639,7 +16639,7 @@ msgid "anyone"
 msgstr "beliebig"
 
 msgid "anywhere"
-msgstr "beliebig"
+msgstr "ein beliebiges Feld"
 
 msgid "as the game"
 msgstr "wie in der Partie"
@@ -18412,7 +18412,7 @@ msgid "the game, without an account. Whoever has its address can see it, its pla
 msgstr "die Partie, ohne Konto. Wer ihre Adresse hat, kann sie sehen, auch die Namen ihrer Spieler."
 
 msgid "the games of the report with “{}”"
-msgstr ""
+msgstr "die Partien des Berichts mit „{}“"
 
 msgid "the games of {}"
 msgstr "die Partien von {}"
@@ -20154,8 +20154,8 @@ msgstr "{} steht zweimal in der Teilnehmerliste."
 
 msgid "{} joined"
 msgid_plural "{} joined"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{} beigetreten"
+msgstr[1] "{} beigetreten"
 
 msgid "{} kept in “Broadcasts”"
 msgid_plural "{} kept in “Broadcasts”"
@@ -21576,7 +21576,7 @@ msgid "{}: games wait for memory"
 msgstr "{}: Partien warten auf Speicher"
 
 msgid "{}: in a later version"
-msgstr ""
+msgstr "{}: in einer späteren Version"
 
 msgid "{}: its book cannot be used: {}"
 msgstr "{}: ihr Buch ist nicht verwendbar: {}"
@@ -21763,10 +21763,10 @@ msgid "{}\nA new build, or another program: its results may not be those of the 
 msgstr "{}\nEine neue Version oder ein anderes Programm: die Ergebnisse sind vielleicht nicht die der Engine, die {} gespielt hat."
 
 msgid "{}b{}"
-msgstr ""
+msgstr "{}s{}"
 
 msgid "{}w{}"
-msgstr ""
+msgstr "{}w{}"
 
 msgid "± {}"
 msgstr "± {}"
@@ -21977,7 +21977,7 @@ msgid "— proposed: the nearest to its games' ratings"
 msgstr "— vorgeschlagen: der den Wertungen seiner Partien am nächsten"
 
 msgid "“4b½”: against no. 4, with Black, a draw; “+” and “−” forfeits. In the accent colour, the games between the players shown. A click on a game opens it, on a name their dossier, on a tie-break's heading changes the tie-breaks, kept for this tournament. The start numbers follow the ratings."
-msgstr "„4b½“: gegen Nr. 4, mit Schwarz, remis; „+“ und „−“: kampflos. In der Akzentfarbe die Partien zwischen den gezeigten Spielern. Ein Klick auf eine Partie öffnet sie, auf einen Namen das Dossier des Spielers, auf die Überschrift einer Feinwertung ändert die Feinwertungen, für dieses Turnier gespeichert. Die Startnummern folgen den Wertungen."
+msgstr "„4s½“: gegen Nr. 4, mit Schwarz, remis; „+“ und „−“: kampflos. In der Akzentfarbe die Partien zwischen den gezeigten Spielern. Ein Klick auf eine Partie öffnet sie, auf einen Namen das Dossier des Spielers, auf die Überschrift einer Feinwertung ändert die Feinwertungen, für dieses Turnier gespeichert. Die Startnummern folgen den Wertungen."
 
 msgid "“Always” can be changed on the Lichess page, under Online for the analysis, which also says what is sent."
 msgstr "„Immer“ lässt sich auf der Seite Lichess ändern, unter „Online für die Analyse“, wo auch steht, was gesendet wird."

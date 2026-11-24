@@ -450,12 +450,12 @@ der MIT-Lizenz; die *Darstellung* verlinkt sie.
 | <kbd>Strg</kbd>+<kbd>C</kbd> | Der Headless-Modus | Nach den laufenden Partien anhalten |
 
 ## Die Startseite
-<!-- en: the-home-page ecabd76e -->
+<!-- en: the-home-page 827b3d01 -->
 
 Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das Laufende zuerst:
 
 - **Die Arena**, in der du von RookStudio aus bist, ganz oben: ihr Name, dein Platz und deine Punkte, die
-  verbleibende Zeit, *Zurück zu ihr* und *Pause* (Alt+P); ein Turnier nach Schweizer System, dem du beigetreten bist,
+  verbleibende Zeit, *Zurück zur Arena* und *Pause* (Alt+P); ein Turnier nach Schweizer System, dem du beigetreten bist,
   mit seiner Runde (siehe [Arenen und Turniere nach Schweizer
   System](#arenen-und-turniere-nach-schweizer-system)).
 - **Dort weitermachen, wo du warst**, wenn die Ansicht das Brett enthält: die Partie auf dem Brett bei ihrem Zug, auf
@@ -482,7 +482,7 @@ Die **Startseite** einer Ansicht macht aus den Seiten der Ansicht Karten, das La
 Der Suchknopf oben oder Strg+K findet einen Befehl, eine Partie, eine Datenbank.
 
 ## Die Seite Turniere
-<!-- en: the-tournaments-page f561d9e6 -->
+<!-- en: the-tournaments-page 91a20163 -->
 
 Die Seite **Turniere** ist ein Kontrollraum: Was läuft und was dich braucht, kommt zuerst, danach der Rest.
 
@@ -515,8 +515,8 @@ Die Seite **Turniere** ist ein Kontrollraum: Was läuft und was dich braucht, ko
 - **Dein Lichess-Bot**, solange er online ist: seine Engine, seine laufende Partie mit *Aufs Brett*, *Seine Karte* und
   *Offline schalten*; er lehnt Herausforderungen mit *später* ab, solange die Turniere die Kerne brauchen (siehe [Ein
   Lichess-Bot](#ein-lichess-bot)).
-- **Deine Engines auf lichess.org**, solange sie die Anfragen bedienen: jede mit ihrem Zustand, *Seine Karte* und
-  *Dienst beenden*; sie nehmen nur die Threads, die die Turniere frei lassen (siehe [Deine Engine auf
+- **Deine Engines auf lichess.org**, solange sie die Anfragen bedienen: jede mit ihrem Zustand, *Die Karte der Engine*
+  und *Dienst beenden*; sie nehmen nur die Threads, die die Turniere frei lassen (siehe [Deine Engine auf
   lichess.org](#deine-engine-auf-lichessorg)).
 - **Warteschlange**: die wartenden Turniere, jedes mit seiner Dauer und wann es startet, und wann alles endet (siehe
   [Warteschlange und Neustart](#warteschlange-und-neustart)).
@@ -636,13 +636,13 @@ Assistenten gemacht; die anderen beliebten Engines und eine Engine von der Festp
 entfernt.
 
 ### Die Versionen einer Engine
-<!-- en: an-engines-versions e62023d7 -->
+<!-- en: an-engines-versions 8c733556 -->
 
 Jede Version einer aus *Beliebte Engines…* übernommenen Engine bleibt in einem eigenen Ordner im Ordner `engines` des
 Profils. Sobald ein Update eine Version in der Bibliothek ersetzt hat, wird ihr Ordner gelöscht, wenn kein nicht
 beendetes Turnier (laufend, pausiert oder gestoppt) sie spielt: sofort, wenn keines es tut, sonst am Ende des letzten,
 da RookStudio am Ende jedes Turniers erneut nachsieht. Ein Hinweis in der Fensterecke sagt es: *Gaia 4.4.3 gelöscht:
-„Night Gaia“ ist beendet · 118 MB freigegeben*, mit *Seine Karte*.
+„Night Gaia“ ist beendet · 118 MB freigegeben*, mit *Die Karte der Engine*.
 
 Hat die Engine mehr als die Version ihrer Bibliothek auf der Festplatte, listet ihre Karte sie unter *Ihre Versionen
 auf der Festplatte* auf, jede mit ihrem Zustand:
@@ -1533,7 +1533,7 @@ gegenüber den sechs davor. Die Zusammenfassung sagt dasselbe über die Stellung
 bleibt es aus, bis es verlangt wird; der Explorer der Meister hat keine Monate.
 
 ### Der Eröffnungsbericht
-<!-- en: the-opening-report 4b7befe4 -->
+<!-- en: the-opening-report 4d6f6a24 -->
 
 Der **Eröffnungsbericht** einer Stellung stellt zusammen, was deine Datenbanken über sie wissen. Er öffnet sich über
 *Bericht zu dieser Stellung* im Tab Baum, über eine Variante der Seite Eröffnungen (die rechte Maustaste auf einer
@@ -1589,8 +1589,7 @@ bleiben die Bewertungen leer, und die Zusammenfassung sagt nichts über sie (*Ga
 Partien live auf Lichess gespielt wird, ist der Bericht gesperrt und kommt an ihrem Ende von selbst zurück; bei der
 Stellung einer Fernpartie bleiben die Varianten und Zahlen deiner Datenbanken (Lichess erlaubt ein Buch und eine
 Datenbank), die Bewertungen, der Explorer von Lichess und die Zusammenfassung warten. Nichts verlässt den Computer außer
-dem, was der Tab Baum sendet: die angehakten Lichess-Quellen. Das Drucken des Berichts und seine HTML-Seite kommen
-später.
+dem, was der Tab Baum sendet: die angehakten Lichess-Quellen.
 
 ### Die Zusammenfassung des Berichts
 <!-- en: the-reports-summary a859f9a6 -->
@@ -1664,7 +1663,7 @@ andere GGUF-Datei, die die Kommentare von RookStudio nicht gelernt hat) oder wä
 Prozessor belegt, ist die Geschichte die der Vorlagen, wie sie selbst sagt. Nichts verlässt den Computer.
 
 ### Jeder Zug erklärt
-<!-- en: every-move-explained 52f41ee2 -->
+<!-- en: every-move-explained 5f600fec -->
 
 *Jeden Zug erklären* im Tab *Auswertung* (oder Strg+K) gibt jedem Zug der Partie eine Zeile, im Tab *Erklärungen*
 neben den Zügen; ohne Auswertung wird die Partie zuerst analysiert (Alt+G), und ihre Züge werden erklärt, sobald die
@@ -1686,7 +1685,7 @@ Jede Zeile sagt, woher sie stammt: Theorie, das Modell, eine Vorlage, ein Wort, 
 wichtigen Züge* (die markierten Züge, die einzigen Züge, die Wendepunkte, die Neuerung) und *Die Schlüsselmomente*
 wählen, welche erscheinen; ein Klick geht zum Zug. Die Zusammenfassung zählt sie und gibt die Zeit an, die ein Zug
 braucht, die gesammelten Fakten und den geprüften Satz des Modells: etwa eine Viertelsekunde für den Satz auf einer
-GPU, rund 5 Sekunden pro Zug auf einem Prozessor, der mit anderer Arbeit geteilt wird (32 erklärte Züge in anderthalb
+GPU, rund 3 Sekunden pro Zug auf einem Prozessor, der mit anderer Arbeit geteilt wird (32 erklärte Züge in anderthalb
 Minuten). Sie werden mit der Auswertung gespeichert, neben den Zügen, nie in der Partie: *In die Partie schreiben* macht
 sie zu Kommentaren des Assistenten, im PGN als seine eigenen markiert, neben dem Kommentar, den ein Zug schon hat und
 der nie ersetzt wird; Strg+Z nimmt sie alle zurück. Nichts verlässt den Computer. Gesperrt, solange eine deiner Partien
@@ -1720,7 +1719,7 @@ die Engine, deine Datenbanken und die Fakten belegen. Beides ist gesperrt, solan
 gespielt wird, und während einer Partie gegen eine Engine bis zu ihrem Ende ausgeblendet.
 
 ### Exportieren und drucken
-<!-- en: exporting-and-printing 47d16e05 -->
+<!-- en: exporting-and-printing 33db051f -->
 
 *Exportieren…* unter dem Brett fürs Studium, neben *FEN kopieren* und *lichess.org…*, öffnet anstelle der Seite den
 Bereich Exportieren; Esc geht zurück zur Seite. Seine Formate sind Chips oben, das zuletzt gewählte schon gewählt
@@ -1748,7 +1747,7 @@ deiner Festplatte: Nichts wird irgendwohin gesendet (eine Partie auf lichess.org
   Größe und wird in jeder scharf gezeichnet. *Bild kopieren* oder <kbd>Strg</kbd>+<kbd>Umschalt</kbd>+<kbd>C</kbd>
   überall auf der Seite Brett (und *Diagramm kopieren* in der Befehlspalette) legt das PNG in die Zwischenablage, für
   eine Nachricht oder ein Dokument.
-- **Animiertes GIF**: die Partie in den Farben der App, von einem Zug zu einem anderen (*Von … bis …* für einen
+- **Animiertes GIF**: die Partie in den Farben der App, von einem Zug zu einem anderen (*Nur von … bis …* für einen
   Ausschnitt), ein Bild pro Zug in der gewählten Geschwindigkeit, das letzte länger gehalten; die Namen der Spieler und
   das Ergebnis in einem Banner, der Zug unter dem Brett, der letzte Zug markiert und die Pfeile der Partie, wie
   angehakt. Es wird im Hintergrund erstellt, mit seinem Fortschritt und *Abbrechen*, und sein Gewicht vorher
@@ -1925,7 +1924,7 @@ die Runde jeder Partie wird aus ihrem Tag Round gelesen (*9.2*: Runde 9, Brett 2
 - Die Kreuztabelle eines Rundenturniers hat eine Zelle für jeden Gegner: 1, ½ oder 0 (ein Ergebnis pro Zyklus bei
   einem doppelrundigen Turnier), + und − für kampflos; dann die Punkte, die Feinwertungen, die Siege, die Performance
   und die Wertungsänderung.
-- Die eines Turniers nach Schweizer System hat die Startnummern, nach Wertung, dann eine Zelle für jede Runde: *4b½*
+- Die eines Turniers nach Schweizer System hat die Startnummern, nach Wertung, dann eine Zelle für jede Runde: *4s½*
   ist ein Remis gegen Nummer 4, mit Schwarz; *spielfrei*, der einzige Spieler ohne Paarung in der Runde (die Punkte
   eines Siegs, die Regel der FIDE für ein durch die Paarung zugeteiltes Freilos); *–*, eine Runde ohne Partie. Die
   ersten zehn werden gezeigt, ihre Partien untereinander in der Akzentfarbe; *Alle Spieler* zeigt die anderen.
@@ -2089,14 +2088,14 @@ bekanntes Wort — „attacks“?*); vom Rest von CQL wird gesagt, dass er nicht
 letzte lesbare Fassung, und nichts wird gesucht, bis sich der Text wieder lesen lässt.
 
 ### Manöver
-<!-- en: manoeuvres adacd213 -->
+<!-- en: manoeuvres 9ac8f6fb -->
 
 Der Tab **Manöver** sucht die Route eines Steins: ein Klick auf einen Stein des kleinen Bretts (die Stellung der Seite
 Brett), dann ein Klick auf jedes Feld, auf das er zieht (b1, d2, f1, g3); die Rücktaste nimmt das letzte Feld weg.
 *Andere Züge dazwischen* lässt die Seite währenddessen andere Züge spielen; *Durchgehend derselbe Stein* verlangt einen
 einzigen Stein, sonst nacheinander einen beliebigen Stein seiner Art auf jedem Feld; *In höchstens 15 Zügen* zählt die
-Züge der Seite vom ersten Feld der Route bis zum letzten. *Von* *beliebig* oder *Von* *der Stellung der Seite Brett*:
-die Route, sobald eine Partie diese Stellung erreicht.
+Züge der Seite vom ersten Feld der Route bis zum letzten. *Von: eine beliebige Stellung* oder *Von: die Stellung der
+Seite Brett*: die Route, sobald eine Partie diese Stellung erreicht.
 
 Die Ergebnisse sagen, wohin derselbe Stein danach zog (auf f5 in 31 % der Partien), und die benachbarten Routen, die
 sich nach seinem ersten Zug von ihr trennen (b1–d2–b3); ein Klick setzt eine. Der graue Pfeil auf dem Brett ist die
@@ -2295,7 +2294,7 @@ herunterlädst.
 jede Partie nach: Ihre Signatur und ihr Schlüssel (eine Prüfsumme ihrer Kopfdaten und Züge) werden neu erstellt und mit
 den gespeicherten verglichen, und eine Partie, die sich anders liest, als sie geschrieben wurde, ist beschädigt. Es
 sagt *Intakt* oder nennt die beschädigten Partien und die Dateien, aus denen sie importiert wurden: *Behalten, was
-lesbar ist* legt sie beiseite (gelöscht; Strg+Z holt sie zurück), und *Ihre Datei erneut importieren* holt sie aus ihrer
+lesbar ist* legt sie beiseite (gelöscht; Strg+Z holt sie zurück), und *Die Datei erneut importieren* holt sie aus ihrer
 Datei zurück, wenn sie noch da ist. Auch der Eröffnungsbaum wird mit den Partien verglichen.
 
 Ein Segment, dessen Dateien sich beim Öffnen der Datenbank nicht mehr lesen lassen (abgeschnitten, fehlend oder
@@ -2308,7 +2307,7 @@ lesbar ist* schreibt dieses Segment neu, seine Partien beiseitegelegt (gelöscht
 zuerst importierten Spieler, Veranstaltungen und Orte bleiben erhalten, wenn seine Namensliste noch lesbar ist; sonst
 zeigen die anderen Partien, die sie verwenden, „?“ an ihrer Stelle. Seine beschädigten Dateien bleiben, bis RookStudio
 geschlossen wird: Bis dahin legt *Rückgängig* (oder Strg+Z) sie zurück, solange nichts anderes in die Datenbank
-geschrieben wird. *Ihre Datei erneut importieren* holt seine Partien aus ihrer Datei zurück, wenn sie noch da ist. Das
+geschrieben wird. *Die Datei erneut importieren* holt seine Partien aus ihrer Datei zurück, wenn sie noch da ist. Das
 Komprimieren wartet, bis ein solches Segment behandelt ist, und eine schreibgeschützt geöffnete Datenbank wird nie
 geändert.
 
@@ -2938,8 +2937,8 @@ Seite Lichess führt ebenfalls dorthin, *Beitreten* in der Zeile einer Arena (si
   Runde. Zwei Minuten vorher sagt es ein Hinweis in der Fensterecke, wo immer du bist; deine Partie öffnet sich von
   selbst auf der Seite Brett, und eine Partie, deren ersten Zug du nicht rechtzeitig spielst, ist verloren. *Seine
   Partien in der Mosaikansicht* zeigt die Partien der Runde seiner ersten acht. Ist es vorbei, nimmt *In einer
-  Datenbank aufbewahren…* seine Partien, jede mit ihrer Runde, und seine Tabelle (seine TRF-Datei) in *Lichess
-  tournaments* oder eine andere deiner Datenbanken auf: Die Kreuztabelle der Datenbank liest sie dann, spielfreie Runden
+  Datenbank aufbewahren…* seine Partien, jede mit ihrer Runde, und seine Tabelle (seine TRF-Datei) in *Lichess-Turniere*
+  oder eine andere deiner Datenbanken auf: Die Kreuztabelle der Datenbank liest sie dann, spielfreie Runden
   und späte Einstiege eingeschlossen (siehe [Turniere und Kreuztabellen](#turniere-und-kreuztabellen)), einen Klick
   entfernt mit *Seine Kreuztabelle öffnen*.
 

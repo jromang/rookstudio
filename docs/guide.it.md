@@ -441,12 +441,12 @@ collegamento.
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | La modalità headless | Ferma dopo le partite in corso |
 
 ## La pagina Home
-<!-- en: the-home-page ecabd76e -->
+<!-- en: the-home-page 827b3d01 -->
 
 La pagina **Home** di una vista raccoglie in schede le pagine della vista, a cominciare da ciò che è in corso:
 
 - **L'arena** in cui sei da RookStudio, in cima: il suo nome, la tua posizione e i tuoi punti, il tempo rimasto, *Torna
-  alla partita* e *Pausa* (Alt+P); un torneo svizzero a cui ti sei iscritto, il suo turno (vedi [Arene e tornei
+  all'arena* e *Pausa* (Alt+P); un torneo svizzero a cui ti sei iscritto, il suo turno (vedi [Arene e tornei
   svizzeri](#arene-e-tornei-svizzeri)).
 - **Riprendi da dove eri**, quando la vista contiene la Scacchiera: la partita sulla scacchiera alla sua mossa, su una
   piccola scacchiera, da dove viene (il suo database e il suo numero, il suo posto in un filtro, o il suo file), i suoi
@@ -471,7 +471,7 @@ La pagina **Home** di una vista raccoglie in schede le pagine della vista, a com
 Il pulsante di ricerca in alto, o Ctrl+K, trova un comando, una partita, un database.
 
 ## La pagina Tornei
-<!-- en: the-tournaments-page f561d9e6 -->
+<!-- en: the-tournaments-page 91a20163 -->
 
 La pagina **Tornei** è una sala di controllo: prima ciò che è in corso e ciò che ha bisogno di te, poi il resto.
 
@@ -502,7 +502,7 @@ La pagina **Tornei** è una sala di controllo: prima ciò che è in corso e ciò
 - **Il tuo bot Lichess**, mentre è online: il suo motore, la sua partita in corso con *Sulla Scacchiera*, *La sua
   scheda* e *Metti offline*; rifiuta le sfide con *più tardi* finché i tornei hanno bisogno dei core (vedi [Un bot
   Lichess](#un-bot-lichess)).
-- **I tuoi motori su lichess.org**, mentre servono: ciascuno con il suo stato, *La sua scheda* e *Ferma il servizio*;
+- **I tuoi motori su lichess.org**, mentre servono: ciascuno con il suo stato, *La scheda del motore* e *Ferma il servizio*;
   prendono solo i thread che i tornei lasciano liberi (vedi [Il tuo motore su lichess.org](#il-tuo-motore-su-lichessorg)).
 - **Coda**: i tornei in attesa, ciascuno con la sua durata e quando parte, e quando finisce tutto (vedi [Coda e
   rilancio](#coda-e-rilancio)).
@@ -614,13 +614,13 @@ libreria non ne ha, un riquadro propone Gaia, scaricato con un clic (o Invio) e 
 dell'assistente; anche gli altri motori popolari e un motore dal disco sono lì a un clic.
 
 ### Le versioni di un motore
-<!-- en: an-engines-versions e62023d7 -->
+<!-- en: an-engines-versions 8c733556 -->
 
 Ogni versione di un motore preso da *Motori popolari…* resta in una cartella tutta sua nella cartella `engines` del
 profilo. Quando un aggiornamento ha sostituito una versione nella libreria, la sua cartella viene eliminata quando
 nessun torneo non ancora finito (in gioco, in pausa o fermato) la gioca: subito se nessuno la gioca, altrimenti alla
 fine dell'ultimo, perché RookStudio ricontrolla alla fine di ogni torneo. Lo dice un avviso nell'angolo della finestra:
-*Gaia 4.4.3 eliminato: «Gaia di notte» è finito · 118 MB liberati*, con *La sua scheda*.
+*Gaia 4.4.3 eliminato: «Gaia di notte» è finito · 118 MB liberati*, con *La scheda del motore*.
 
 Quando il motore ha sul disco più versioni di quella della sua libreria, la sua scheda le elenca sotto *Le sue versioni
 sul disco*, ciascuna con il suo stato:
@@ -1486,7 +1486,7 @@ precedenti. Il riepilogo dice lo stesso della posizione. Costa una richiesta per
 non lo chiedi; l'esploratore dei maestri non ha i mesi.
 
 ### Il rapporto sull'apertura
-<!-- en: the-opening-report 4b7befe4 -->
+<!-- en: the-opening-report 4d6f6a24 -->
 
 Il **rapporto sull'apertura** di una posizione riunisce ciò che ne sanno i tuoi database. Si apre da *Rapporto su questa
 posizione* della scheda Albero, da una linea della pagina Aperture (il tasto destro su una lacuna: *Rapporto
@@ -1539,7 +1539,6 @@ riepilogo non ne dice niente (*Scarica Gaia…*). Mentre una delle tue partite s
 è bloccato, e torna da solo alla sua fine; sulla posizione di una partita per corrispondenza, le linee e i numeri dei
 tuoi database restano (Lichess permette un libro e un database), mentre le valutazioni, l'esploratore di Lichess e il
 riepilogo aspettano. Non esce niente dalla macchina tranne ciò che invia la scheda Albero: le fonti Lichess spuntate.
-La stampa del rapporto e la sua pagina HTML arriveranno in seguito.
 
 ### Il riepilogo del rapporto
 <!-- en: the-reports-summary a859f9a6 -->
@@ -1613,7 +1612,7 @@ i commenti di RookStudio), o mentre un torneo su questa macchina occupa il proce
 predefiniti, come indica. Niente esce dalla macchina.
 
 ### Ogni mossa spiegata
-<!-- en: every-move-explained 52f41ee2 -->
+<!-- en: every-move-explained 5f600fec -->
 
 *Spiega ogni mossa*, nella scheda *Resoconto* (o Ctrl+K), dà a ogni mossa della partita una riga, nella scheda
 *Spiegazioni* accanto alle mosse; senza resoconto, la partita viene prima analizzata (Alt+G), e le sue mosse spiegate
@@ -1633,7 +1632,7 @@ una volta finito il resoconto. Le righe arrivano in background, ciascuna appena 
 Ogni riga dice da dove viene: teoria, il modello, una frase predefinita, una parola, il resoconto. *Ogni mossa*, *Le
 mosse che contano* (le mosse segnate, le uniche mosse, i punti di svolta, la novità) e *I momenti chiave* scelgono
 quali mostrare; un clic va alla mossa. Il riepilogo le conta e dà il tempo che richiede una mossa, tra fatti raccolti
-e frase del modello verificata: circa un quarto di secondo per la frase su una GPU, circa 5 secondi per mossa su un
+e frase del modello verificata: circa un quarto di secondo per la frase su una GPU, circa 3 secondi per mossa su un
 processore condiviso con altro lavoro (32 mosse spiegate in un minuto e mezzo). Sono conservate con il resoconto,
 accanto alle mosse, mai nella partita: *Scrivile nella partita* le rende commenti dell'assistente, segnati come suoi
 nel PGN, accanto al commento che una mossa ha già, che non viene mai sostituito; Ctrl+Z li toglie tutti. Niente esce
@@ -1668,7 +1667,7 @@ l'assistente risponde ciò che stabiliscono il motore, i tuoi database e i fatti
 delle tue partite si gioca su Lichess, e nascoste durante una partita contro un motore fino alla sua fine.
 
 ### Esportare e stampare
-<!-- en: exporting-and-printing 47d16e05 -->
+<!-- en: exporting-and-printing 33db051f -->
 
 *Esporta…* sotto la Scacchiera per lo studio, accanto a *Copia FEN* e *lichess.org…*, apre il pannello Esporta al posto
 della pagina; Esc vi torna. I suoi formati sono dei chip in cima, con quello scelto l'ultima volta già scelto
@@ -1695,7 +1694,7 @@ partite verso Lichess](#posizioni-e-partite-verso-lichess)).
   o il doppio per uno schermo ad alta densità; l'SVG non ha dimensione e si disegna nitido a qualsiasi dimensione.
   *Copia l'immagine*, o <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>C</kbd> da qualsiasi punto della pagina Scacchiera (e
   *Copia il diagramma* nella tavolozza dei comandi), mette il PNG negli appunti, per un messaggio o un documento.
-- **GIF animata**: la partita con i colori dell'app, da una mossa a un'altra (*Da … fino a …* per un tratto), un
+- **GIF animata**: la partita con i colori dell'app, da una mossa a un'altra (*Solo da … a …* per un tratto), un
   fotogramma per mossa alla velocità scelta, l'ultimo tenuto più a lungo; i nomi dei giocatori e il risultato in una
   fascia, la mossa sotto la scacchiera, l'ultima mossa evidenziata e le frecce della partita, come spuntato. Viene
   creata in background, con il suo avanzamento e *Annulla*, e il suo peso stimato prima: sopra i 2 MB, il pannello dice
@@ -1867,7 +1866,7 @@ una volta, e il turno di ogni partita viene letto dal suo tag Round (*9.2*: turn
 - La tabella incrociata di un girone all'italiana ha una cella per ogni avversario: 1, ½ o 0 (un risultato per ogni
   ciclo in un doppio girone all'italiana), + e − per un forfait; poi i punti, gli spareggi, le vittorie, la performance
   e la variazione di rating.
-- Quella di uno svizzero ha i numeri di partenza, per rating, poi una cella per ogni turno: *4b½* è una patta contro il
+- Quella di uno svizzero ha i numeri di partenza, per rating, poi una cella per ogni turno: *4n½* è una patta contro il
   numero 4, con il Nero; *riposo*, l'unico giocatore non abbinato nel turno (i punti di una vittoria, la regola FIDE per
   un riposo assegnato dall'abbinamento); *–*, un turno senza partita. Compaiono i primi dieci, con le loro partite tra loro
   nel colore d'accento; *Tutti i giocatori* mostra gli altri.
@@ -2027,13 +2026,13 @@ Una riga che non si legge viene indicata, con la parola a cui somiglia ("Riga 2:
 si cerca niente finché il testo non si legge di nuovo.
 
 ### Manovre
-<!-- en: manoeuvres adacd213 -->
+<!-- en: manoeuvres 9ac8f6fb -->
 
 La scheda **Manovra** cerca il percorso di un pezzo: un clic su un pezzo della scacchiera piccola (la posizione della
 pagina Scacchiera), poi un clic su ogni casa in cui va (b1, d2, f1, g3); Backspace toglie l'ultima casa. *Altre mosse
 in mezzo* lascia che il lato giochi altre mosse nel frattempo; *Lo stesso pezzo per tutto il percorso* chiede un solo
 pezzo, altrimenti qualsiasi pezzo del suo tipo su ogni casa a turno; *In 15 mosse al massimo* conta le mosse del lato
-dalla prima del percorso all'ultima. *Da qualsiasi punto*, o dalla *posizione della pagina Scacchiera*: il percorso una
+dalla prima del percorso all'ultima. *Da qualsiasi posizione*, o dalla *posizione della pagina Scacchiera*: il percorso una
 volta che una partita raggiunge quella posizione.
 
 I risultati dicono dove è andato poi lo stesso pezzo (in f5 nel 31 % delle partite), e i percorsi vicini, che si
@@ -2847,7 +2846,7 @@ Lichess, con *Partecipa* sulla riga di un'arena (vedi [Tornei Lichess](#tornei-l
   avviso nell'angolo della finestra lo dice ovunque tu sia; la tua partita si apre da sola nella pagina Scacchiera, e una
   partita in cui non giochi in tempo la prima mossa è persa. *Le sue partite nel mosaico* mostra le partite del turno
   dei suoi primi otto. Una volta finito, *Conservalo in un database…* prende le sue partite, ciascuna con il suo turno,
-  e la sua classifica (il suo file TRF) in *Lichess tournaments* o in un altro tuo database: la tabella incrociata del
+  e la sua classifica (il suo file TRF) in *Tornei Lichess* o in un altro tuo database: la tabella incrociata del
   database poi la legge, riposi e ingressi in ritardo compresi (vedi [Tornei e tabelle
   incrociate](#tornei-e-tabelle-incrociate)), a un clic con *Apri la sua tabella incrociata*.
 

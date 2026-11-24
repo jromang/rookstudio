@@ -1605,7 +1605,7 @@ msgid "Another program writes to it: another RookStudio importing, for instance.
 msgstr "Un autre programme y écrit : un autre RookStudio en train d'importer, par exemple."
 
 msgid "Another transliteration of the name: a single player of that name on the list, the games' ratings near theirs."
-msgstr ""
+msgstr "Une autre translittération du nom : un seul joueur de ce nom sur la liste, les classements des parties proches du sien."
 
 msgid "Another's study comes by its link: Ctrl+V on the Board or on the Databases page."
 msgstr "L'étude d'un autre vient par son lien : Ctrl+V sur l'Échiquier ou sur la page Bases."
@@ -1647,7 +1647,7 @@ msgid "Apr"
 msgstr "avr."
 
 msgid "April {}"
-msgstr ""
+msgstr "avril {}"
 
 msgid "Arabian mate"
 msgstr "Mat arabe"
@@ -1886,7 +1886,7 @@ msgid "Aug"
 msgstr "août"
 
 msgid "August {}"
-msgstr ""
+msgstr "août {}"
 
 msgid "Author: {} → {}"
 msgstr "Auteur : {} → {}"
@@ -3425,7 +3425,7 @@ msgid "Dec"
 msgstr "déc."
 
 msgid "December {}"
-msgstr ""
+msgstr "décembre {}"
 
 msgid "Decision"
 msgstr "Décision"
@@ -4408,10 +4408,10 @@ msgid "FIDE id {}"
 msgstr "identifiant FIDE {}"
 
 msgid "FIDE identifiers"
-msgstr ""
+msgstr "identifiants FIDE"
 
 msgid "FIDE ids"
-msgstr "identifiants FIDE"
+msgstr "Identifiants FIDE"
 
 msgid "FIDE's for a Swiss"
 msgstr "Ceux de la FIDE pour un suisse"
@@ -4459,7 +4459,7 @@ msgid "Feb"
 msgstr "févr."
 
 msgid "February {}"
-msgstr ""
+msgstr "février {}"
 
 msgid "Few enough pieces for the tablebase adjudication."
 msgstr "Assez peu de pièces pour l'arbitrage par les tables Syzygy."
@@ -6026,7 +6026,7 @@ msgid "Jan"
 msgstr "janv."
 
 msgid "January {}"
-msgstr ""
+msgstr "janvier {}"
 
 msgid "Join"
 msgstr "Rejoindre"
@@ -6053,13 +6053,13 @@ msgid "Jul"
 msgstr "juil."
 
 msgid "July {}"
-msgstr ""
+msgstr "juillet {}"
 
 msgid "Jun"
 msgstr "juin"
 
 msgid "June {}"
-msgstr ""
+msgstr "juin {}"
 
 msgid "K {} by FIDE's rules"
 msgstr "K {} selon les règles de la FIDE"
@@ -6648,13 +6648,13 @@ msgid "Lichess · {}: {} games received"
 msgstr "Lichess · {} : {} parties reçues"
 
 msgid "Lichess's 7-piece tables (none on your disk)"
-msgstr "les tables à 7 pièces de Lichess (aucune sur ton disque)"
+msgstr "Les tables à 7 pièces de Lichess (aucune sur ton disque)"
 
 msgid "Lichess's 7-piece tables (yours on the disk go up to {} pieces)"
-msgstr "les tables à 7 pièces de Lichess (les tiennes sur le disque vont jusqu'à {} pièces)"
+msgstr "Les tables à 7 pièces de Lichess (les tiennes sur le disque vont jusqu'à {} pièces)"
 
 msgid "Lichess's 8-piece tables (op1)"
-msgstr "les tables à 8 pièces de Lichess (op1)"
+msgstr "Les tables à 8 pièces de Lichess (op1)"
 
 msgid "Lichess's Board API cannot play it (bullet): it is played on lichess.org."
 msgstr "La Board API de Lichess ne peut pas le jouer (bullet) : il se joue sur lichess.org."
@@ -6923,7 +6923,7 @@ msgid "Line {}: a condition is wanted."
 msgstr "Ligne {} : une condition est attendue."
 
 msgid "Line {}: a line of moves cannot end with plies of anything: a step is wanted after them."
-msgstr ""
+msgstr "Ligne {} : une ligne de coups ne peut pas finir par des demi-coups quelconques : une étape est attendue après eux."
 
 msgid "Line {}: a pattern has one line of moves."
 msgstr "Ligne {} : un motif a une seule ligne de coups."
@@ -7299,7 +7299,7 @@ msgid "Mar"
 msgstr "mars"
 
 msgid "March {}"
-msgstr ""
+msgstr "mars {}"
 
 msgid "Margin (ms)"
 msgstr "Marge (ms)"
@@ -7400,7 +7400,7 @@ msgid "May"
 msgstr "mai"
 
 msgid "May {}"
-msgstr ""
+msgstr "mai {}"
 
 msgid "Mean Elo"
 msgstr "Elo moyen"
@@ -7522,7 +7522,7 @@ msgid "Move down"
 msgstr "Descendre"
 
 msgid "Move first"
-msgstr ""
+msgstr "Mettre en premier"
 
 msgid "Move number"
 msgstr "Numéro du coup"
@@ -8458,7 +8458,7 @@ msgid "Novelty"
 msgstr "Nouveauté"
 
 msgid "November {}"
-msgstr ""
+msgstr "novembre {}"
 
 msgid "Now"
 msgstr "Maintenant"
@@ -8479,7 +8479,7 @@ msgid "Oct"
 msgstr "oct."
 
 msgid "October {}"
-msgstr ""
+msgstr "octobre {}"
 
 msgid "Of one game's score. Pairs: as measured on the pairs."
 msgstr "Du score d'une partie. Paires : tel que mesuré sur les paires."
@@ -9332,7 +9332,7 @@ msgid "Played as"
 msgstr "Système joué"
 
 msgid "Played as a {}, as you chose."
-msgstr "Système : {}, comme tu l'as choisi."
+msgstr "Joué en {}, comme tu l'as choisi."
 
 msgid "Played by nothing: being deleted."
 msgstr "Plus utilisée : en cours de suppression."
@@ -10880,7 +10880,7 @@ msgid "Separated by commas, e.g. a pool or a rating list."
 msgstr "Séparés par des virgules, par exemple une poule ou une liste de classement."
 
 msgid "September {}"
-msgstr ""
+msgstr "septembre {}"
 
 msgid "Sequential probability ratio test, as fishtest and OpenBench run it: plays until it can tell, with the error rates alpha and beta, whether A is worth elo1 more than B (H1 accepted) or only elo0."
 msgstr "Test séquentiel du rapport de vraisemblance, comme fishtest et OpenBench : joue jusqu'à pouvoir dire, avec les taux d'erreur alpha et beta, si A vaut elo1 de plus que B (H1 acceptée) ou seulement elo0."
@@ -11465,7 +11465,7 @@ msgid "Swiss"
 msgstr "Suisse"
 
 msgid "Swiss system"
-msgstr ""
+msgstr "système suisse"
 
 msgid "Swiss, 9 rounds"
 msgstr "Suisse, 9 rondes"
@@ -12407,7 +12407,7 @@ msgid "The engine's"
 msgstr "Celle du moteur"
 
 msgid "The engine's card"
-msgstr ""
+msgstr "La fiche du moteur"
 
 msgid "The engine's comment as the PGN has it: every field the tournament wrote."
 msgstr "Le commentaire du moteur tel que le PGN l'a : chaque champ qu'a écrit le tournoi."
@@ -12934,7 +12934,7 @@ msgid "The key moments"
 msgstr "Les moments clés"
 
 msgid "The key moments come from the review, the question from Guess the moves; a wrong answer becomes a card of today's review, as your mistakes do."
-msgstr ""
+msgstr "Les moments clés viennent du bilan, la question de Deviner les coups ; une mauvaise réponse devient une carte à revoir aujourd'hui, comme tes erreurs."
 
 msgid "The key of {} needs its passphrase: Start asks for it once this session."
 msgstr "La clé de {} demande sa phrase de passe : Lancer te la demande une fois pour cette session."
@@ -16038,8 +16038,8 @@ msgstr "Ta partie se joue sur l'Échiquier."
 
 msgid "Your game of {} ({}) left your databases here: {} game had reached the position, and played another move."
 msgid_plural "Your game of {} ({}) left your databases here: {} games had reached the position, and none played it."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Ta partie jouée en {} ({}) a quitté tes bases ici : {} partie avait atteint la position, et y avait joué un autre coup."
+msgstr[1] "Ta partie jouée en {} ({}) a quitté tes bases ici : {} parties avaient atteint la position, et aucune ne l'avait joué."
 
 msgid "Your game on Lichess"
 msgstr "Ta partie sur Lichess"
@@ -16247,7 +16247,7 @@ msgid "Your studies come with your Lichess account linked. Another's study comes
 msgstr "Tes études viennent avec ton compte Lichess associé. L'étude d'un autre vient par son lien : Ctrl+V sur l'Échiquier ou sur la page Bases."
 
 msgid "Your tables on the disk (Syzygy, up to {} pieces)"
-msgstr ""
+msgstr "Tes tables sur le disque (Syzygy, jusqu'à {} pièces)"
 
 msgid "Your tables on the disk go up to {} pieces, and Lichess's are not asked."
 msgstr "Tes tables sur le disque vont jusqu'à {} pièces, et celles de Lichess ne sont pas interrogées."
@@ -16630,7 +16630,7 @@ msgid "any man"
 msgstr "n'importe quelle pièce"
 
 msgid "any position"
-msgstr ""
+msgstr "n'importe quelle position"
 
 msgid "any white man"
 msgstr "n'importe quelle pièce blanche"
@@ -18412,7 +18412,7 @@ msgid "the game, without an account. Whoever has its address can see it, its pla
 msgstr "la partie, sans compte. Quiconque a son adresse peut la voir, les noms de ses joueurs aussi."
 
 msgid "the games of the report with “{}”"
-msgstr ""
+msgstr "les parties du rapport avec « {} »"
 
 msgid "the games of {}"
 msgstr "les parties de {}"
@@ -20154,8 +20154,8 @@ msgstr "{} figure deux fois dans la liste des participants."
 
 msgid "{} joined"
 msgid_plural "{} joined"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{} inscrit"
+msgstr[1] "{} inscrits"
 
 msgid "{} kept in “Broadcasts”"
 msgid_plural "{} kept in “Broadcasts”"
@@ -21576,7 +21576,7 @@ msgid "{}: games wait for memory"
 msgstr "{} : des parties attendent de la mémoire"
 
 msgid "{}: in a later version"
-msgstr ""
+msgstr "{} : dans une version ultérieure"
 
 msgid "{}: its book cannot be used: {}"
 msgstr "{} : son livre est inutilisable : {}"
@@ -21763,10 +21763,10 @@ msgid "{}\nA new build, or another program: its results may not be those of the 
 msgstr "{}\nUne nouvelle version, ou un autre programme : ses résultats peuvent ne pas être ceux du moteur qui a joué {}."
 
 msgid "{}b{}"
-msgstr ""
+msgstr "{}n{}"
 
 msgid "{}w{}"
-msgstr ""
+msgstr "{}b{}"
 
 msgid "± {}"
 msgstr "± {}"
@@ -21977,7 +21977,7 @@ msgid "— proposed: the nearest to its games' ratings"
 msgstr "— proposé : le plus proche des classements de ses parties"
 
 msgid "“4b½”: against no. 4, with Black, a draw; “+” and “−” forfeits. In the accent colour, the games between the players shown. A click on a game opens it, on a name their dossier, on a tie-break's heading changes the tie-breaks, kept for this tournament. The start numbers follow the ratings."
-msgstr "« 4b½ » : contre le n° 4, avec les Noirs (b pour black), nulle ; « + » et « − » : des forfaits. Dans la couleur d'accent, les parties entre les joueurs affichés. Un clic sur une partie l'ouvre, sur un nom ouvre son dossier, sur l'en-tête d'un départage change les départages, gardés pour ce tournoi. Les numéros de départ suivent les classements."
+msgstr "« 4n½ » : contre le n° 4, avec les Noirs, nulle ; « + » et « − » : des forfaits. Dans la couleur d'accent, les parties entre les joueurs affichés. Un clic sur une partie l'ouvre, sur un nom ouvre son dossier, sur l'en-tête d'un départage change les départages, gardés pour ce tournoi. Les numéros de départ suivent les classements."
 
 msgid "“Always” can be changed on the Lichess page, under Online for the analysis, which also says what is sent."
 msgstr "« Toujours » peut se changer sur la page Lichess, sous En ligne pour l'analyse, qui dit aussi ce qui est envoyé."

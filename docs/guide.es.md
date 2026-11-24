@@ -442,12 +442,12 @@ licencia MIT; *Apariencia* enlaza con ellas.
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | El modo sin interfaz gráfica | Detenerse tras las partidas en juego |
 
 ## La página Inicio
-<!-- en: the-home-page ecabd76e -->
+<!-- en: the-home-page 827b3d01 -->
 
 La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, primero lo que está en marcha:
 
 - **La arena** en la que estás desde RookStudio, arriba del todo: su nombre, tu puesto y tus puntos, el tiempo que
-  queda, *Volver a ella* y *Pausa* (Alt+P); un torneo suizo al que te uniste, su ronda (consulta [Arenas y torneos
+  queda, *Volver a la arena* y *Pausa* (Alt+P); un torneo suizo al que te uniste, su ronda (consulta [Arenas y torneos
   suizos](#arenas-y-torneos-suizos)).
 - **Retomar donde lo dejaste**, cuando la vista tiene el Tablero: la partida del tablero en su jugada, en un tablero
   pequeño, de dónde viene (su base de datos y su número, su lugar en un filtro, o su archivo), sus comentarios, y si
@@ -472,7 +472,7 @@ La página **Inicio** de una vista reúne en tarjetas las páginas de la vista, 
 El botón de búsqueda de arriba, o Ctrl+K, encuentra un comando, una partida, una base de datos.
 
 ## La página Torneos
-<!-- en: the-tournaments-page f561d9e6 -->
+<!-- en: the-tournaments-page 91a20163 -->
 
 La página **Torneos** es una sala de control: primero lo que está en marcha y lo que te necesita, después el resto.
 
@@ -505,8 +505,9 @@ La página **Torneos** es una sala de control: primero lo que está en marcha y 
 - **Tu bot de Lichess**, mientras está en línea: su motor, su partida en curso con *En el Tablero*, *Su ficha* y
   *Desconectar*; rechaza los desafíos con *más tarde* mientras los torneos necesitan los núcleos (consulta [Un bot de
   Lichess](#un-bot-de-lichess)).
-- **Tus motores en lichess.org**, mientras dan servicio: cada uno con su estado, *Su ficha* y *Detener el servicio*;
-  solo toman los hilos que los torneos dejan libres (consulta [Tu motor en lichess.org](#tu-motor-en-lichessorg)).
+- **Tus motores en lichess.org**, mientras dan servicio: cada uno con su estado, *La ficha del motor* y *Detener el
+  servicio*; solo toman los hilos que los torneos dejan libres (consulta [Tu motor en
+  lichess.org](#tu-motor-en-lichessorg)).
 - **Cola**: los torneos en espera, cada uno con su duración y cuándo empieza, y cuándo termina todo (consulta
   [Cola y relanzamiento](#cola-y-relanzamiento)).
 - **Últimos terminados**: los cinco últimos torneos terminados, con su resultado: el marcador de un match, la
@@ -617,13 +618,13 @@ biblioteca no tiene ninguno, una tarjeta ofrece Gaia, que se descarga con un cli
 análisis y del asistente; los demás motores populares y un motor del disco también están allí a un clic.
 
 ### Las versiones de un motor
-<!-- en: an-engines-versions e62023d7 -->
+<!-- en: an-engines-versions 8c733556 -->
 
 Cada versión de un motor tomado de *Motores populares…* se queda en una carpeta propia dentro de la carpeta `engines`
 del perfil. Cuando una actualización ha reemplazado una versión en la biblioteca, su carpeta se borra cuando ya no la
 juega ningún torneo sin terminar (en juego, en pausa o detenido): enseguida si no la juega ninguno, si no al final del
 último, ya que RookStudio vuelve a mirar al final de cada torneo. Un aviso en la esquina de la ventana lo dice: *Se
-borró Gaia 4.4.3: «Night Gaia» ha terminado · 118 MB liberados*, con *Su ficha*.
+borró Gaia 4.4.3: «Night Gaia» ha terminado · 118 MB liberados*, con *La ficha del motor*.
 
 Cuando el motor tiene en el disco más versiones que la de su biblioteca, su ficha las lista bajo *Sus versiones en el
 disco*, cada una con su estado:
@@ -1489,7 +1490,7 @@ anteriores. El resumen dice lo mismo de la posición. Cuesta una petición por j
 lo pides; el explorador de los maestros no tiene meses.
 
 ### El informe de apertura
-<!-- en: the-opening-report 4b7befe4 -->
+<!-- en: the-opening-report 4d6f6a24 -->
 
 El **informe de apertura** de una posición reúne lo que tus bases de datos saben de ella. Se abre desde *Informe sobre
 esta posición* de la pestaña Árbol, desde una línea de la página Aperturas (el botón derecho sobre un hueco: *Informe de
@@ -1542,7 +1543,7 @@ evaluaciones se quedan vacías y el resumen no dice nada de ellas (*Descargar Ga
 Lichess una de tus partidas, el informe se bloquea, y vuelve solo al final; en la posición de una partida por
 correspondencia, las líneas y cifras de tus bases de datos se quedan (Lichess permite un libro y una base de datos), y
 las evaluaciones, el explorador de Lichess y el resumen esperan. No sale nada de la máquina salvo lo que envía la
-pestaña Árbol: las fuentes de Lichess marcadas. Imprimir el informe y su página HTML quedan para más adelante.
+pestaña Árbol: las fuentes de Lichess marcadas.
 
 ### El resumen del informe
 <!-- en: the-reports-summary a859f9a6 -->
@@ -1614,7 +1615,7 @@ comentarios de RookStudio), o mientras un torneo en esta máquina ocupa el proce
 plantillas, como ella misma indica. Nada sale de la máquina.
 
 ### Cada jugada explicada
-<!-- en: every-move-explained 52f41ee2 -->
+<!-- en: every-move-explained 5f600fec -->
 
 *Explicar cada jugada*, en la pestaña *Revisión* (o Ctrl+K), da a cada jugada de la partida una línea, en la pestaña
 *Explicaciones* junto a las jugadas; sin revisión, primero se analiza la partida (Alt+G), y sus jugadas se explican en
@@ -1633,7 +1634,7 @@ y *Cancelar*; las escritas se quedan, y *Explicar el resto* las termina más tar
 Cada línea dice de dónde viene: la teoría, el modelo, una plantilla, una palabra, la revisión. *Todas las jugadas*, *Las
 jugadas que importan* (las jugadas marcadas, las jugadas únicas, los puntos de inflexión, la novedad) y *Los momentos
 clave* eligen cuáles se muestran; un clic va a la jugada. El resumen las cuenta y da el tiempo que tarda una jugada, con
-los hechos reunidos y la frase del modelo comprobada: alrededor de un cuarto de segundo para la frase en una GPU, unos 5
+los hechos reunidos y la frase del modelo comprobada: alrededor de un cuarto de segundo para la frase en una GPU, unos 3
 segundos por jugada en un procesador compartido con otro trabajo (32 jugadas explicadas en un minuto y medio). Se
 guardan con la revisión, junto a las jugadas, nunca en la partida: *Escribirlas en la partida* las convierte en
 comentarios del asistente, marcados como suyos en el PGN, junto al comentario que ya tiene una jugada, que nunca se
@@ -1668,7 +1669,7 @@ responde lo que establecen el motor, tus bases de datos y los hechos. Ambas se b
 de tus partidas, y se ocultan durante una partida contra un motor hasta que termina.
 
 ### Exportar e imprimir
-<!-- en: exporting-and-printing 47d16e05 -->
+<!-- en: exporting-and-printing 33db051f -->
 
 *Exportar…* bajo el Tablero de estudio, junto a *Copiar FEN* y *lichess.org…*, abre la hoja Exportar en lugar de la
 página; Esc vuelve a ella. Sus formatos son botones en lo alto, con el elegido la última vez ya seleccionado
@@ -1696,7 +1697,7 @@ Lichess](#posiciones-y-partidas-a-lichess)).
   nítido a cualquiera. *Copiar la imagen*, o <kbd>Ctrl</kbd>+<kbd>Mayús</kbd>+<kbd>C</kbd> desde cualquier lugar de la
   página Tablero (y *Copiar el diagrama* en la paleta de comandos), pone el PNG en el portapapeles, para un mensaje o un
   documento.
-- **GIF animado**: la partida con los colores de la aplicación, de una jugada a otra (*Desde … a …* para un pasaje), un
+- **GIF animado**: la partida con los colores de la aplicación, de una jugada a otra (*Solo de … a …* para un pasaje), un
   fotograma por jugada a la velocidad elegida, con el último más largo; los nombres de los jugadores y el resultado en
   una banda, la jugada bajo el tablero, la última jugada marcada y las flechas de la partida, según lo marcado. Se hace
   en segundo plano, con su progreso y *Cancelar*, y su peso se estima antes: por encima de 2 MB, la hoja dice que es
@@ -1867,7 +1868,7 @@ ronda de cada partida se lee de su etiqueta Round (*9.2*: ronda 9, tablero 2).
 - La tabla cruzada de un todos contra todos tiene una casilla por cada rival: 1, ½ o 0 (un resultado por ciclo a doble
   vuelta), + y − para una incomparecencia; luego los puntos, los desempates, las victorias, el rendimiento y la variación
   de rating.
-- La de un suizo tiene los números iniciales, por rating, y luego una casilla por ronda: *4b½* son unas tablas contra el
+- La de un suizo tiene los números iniciales, por rating, y luego una casilla por ronda: *4n½* son unas tablas contra el
   número 4, con negras; *descansa*, el único jugador sin emparejar en la ronda (los puntos de una victoria, la regla de la
   FIDE para un descanso asignado por el emparejamiento); *–*, una ronda sin partida. Se muestran los diez primeros, con
   sus partidas entre ellos en el color de acento; *Todos los jugadores* muestra a los demás.
@@ -2028,13 +2029,13 @@ Una línea que no se lee se indica, con la palabra a la que se parece («Línea 
 busca nada hasta que el texto vuelve a leerse.
 
 ### Maniobras
-<!-- en: manoeuvres adacd213 -->
+<!-- en: manoeuvres 9ac8f6fb -->
 
 La pestaña **Maniobra** busca el recorrido de una pieza: un clic en una pieza del tablero pequeño (la posición de la
 página Tablero), y luego un clic en cada casilla a la que va (b1, d2, f1, g3); Retroceso quita la última casilla. *Otras
 jugadas entre medias* deja que el bando haga otras jugadas mientras tanto; *La misma pieza todo el tiempo* pide una sola
 pieza, si no cualquier pieza de su tipo en cada casilla por turno; *En 15 jugadas como máximo* cuenta las jugadas del
-bando desde la primera del recorrido hasta la última. *Desde cualquier parte*, o *Desde la posición de la página
+bando desde la primera del recorrido hasta la última. *Desde cualquier posición*, o *Desde la posición de la página
 Tablero*: el recorrido una vez que una partida llega a esa posición.
 
 Los resultados dicen adónde fue después la misma pieza (a f5 en el 31 % de las partidas), y los recorridos vecinos, que
@@ -2845,7 +2846,7 @@ lleva allí, con *Unirse* en la línea de una arena (consulta [Torneos de Liches
   aviso en la esquina de la ventana lo dice estés donde estés; tu partida se abre sola en la página Tablero, y una
   partida cuya primera jugada no haces a tiempo está perdida. *Sus partidas en el mosaico* muestra las partidas de la
   ronda de sus ocho primeros. Cuando termina, *Guardarlo en una base de datos…* lleva sus partidas, cada una con su
-  ronda, y su clasificación (su archivo TRF) a *Lichess tournaments* o a otra base de datos tuya: la tabla cruzada de la
+  ronda, y su clasificación (su archivo TRF) a *Torneos de Lichess* o a otra base de datos tuya: la tabla cruzada de la
   base de datos la lee después, descansos e incorporaciones tardías incluidos (consulta [Torneos y tablas
   cruzadas](#torneos-y-tablas-cruzadas)), a un clic con *Abrir su tabla cruzada*.
 

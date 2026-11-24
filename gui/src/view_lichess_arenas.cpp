@@ -246,8 +246,9 @@ std::string figureOf(const lichess::TourCondition& c, std::string_view perf, con
 // The state of things
 
 bool App::arenaHoldsAids() const {
-    // In the arena from here, once it has started: between two games too (point 18), until Pause.
-    return arena_play_ && arena_play_->seat.locks() && arena_play_->state.value &&
+    // In the arena from here, once it has started: between two games too (point 18), until Pause; the account
+    // unlinked, RookStudio is in no arena any more.
+    return lichess_account_ && arena_play_ && arena_play_->seat.locks() && arena_play_->state.value &&
            arena_play_->state.value->info.state == lichess::TourState::Started;
 }
 

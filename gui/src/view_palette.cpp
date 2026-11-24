@@ -971,6 +971,10 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             toStudyBoard();
             annotateBoardGame();
         });
+        add(TR("Explain every move"), TR("Board"), [this] {
+            toStudyBoard();
+            explainEveryMove();
+        });
         // The story of the game (#62): written again by the model, told otherwise; copied as it is shown.
         if (!review_story_.empty()) {
             if (storyWithoutModel().empty())
@@ -982,6 +986,11 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             });
         }
     }
+    if (board_.reviews.empty() && !board_.game.moves.empty())  // the review first, then every move (#94)
+        add(TR("Explain every move"), TR("Board"), [this] {
+            toStudyBoard();
+            explainEveryMove();
+        });
     if (assistant_ && assistant_->state() == AssistantService::State::Ready)
         add(TR("Unload the assistant's model"), TR("Its memory freed; loaded again at the next question"),
             [this] { assistant_->unload(); });

@@ -1663,7 +1663,7 @@ void App::pollBoardPgn() {
     if (export_when_read_ >= 0) openBoardExport(std::exchange(export_when_read_, -1));  // --focus export=… (#93)
     if (review_when_read_) {
         review_when_read_ = false;
-        board_.open_tab   = 0;
+        board_.open_tab   = explain_after_review_ ? 4 : 0;  // the Explained tab, when every move is to be explained
         startGameReview();
         if (review_ply_ >= 0) board_.ply = std::clamp(review_ply_, 0, static_cast<int>(board_.game.moves.size()));
     }
@@ -2843,6 +2843,11 @@ void App::drawBoardMoves(float height) {
         tab(TR("Moves###board_moves_tab"), 0);
         tab(TR("Table###board_table_tab"), 2);
         tab(TR("Review###board_review_tab"), 3);
+        // Every move explained, beside the moves (#94): the Chess space's.
+        if (chessBoard())
+            tab(TR("Explained###board_explained_tab"), 4);
+        else if (b.game_tab == 4)
+            b.game_tab = 0;
         if (b.pgn && b.pgn->index->size() > 1)
             tab(fmt::format("{} ({})###board_games_tab", b.pgn->name, b.pgn->index->size()).c_str(), 1);
         else if (b.game_tab == 1)
@@ -2889,7 +2894,7 @@ void App::drawBoardMoves(float height) {
 
     // This move under the moves and the table; the review is about the whole game. In the Chess space, under the moves
     // of a tournament's game, what the notation shows beside them (#87).
-    const float strip = b.ply > 0 && b.ply <= total && b.game_tab != 3 ? thisMoveHeight() : 0.0f;
+    const float strip = b.ply > 0 && b.ply <= total && b.game_tab != 3 && b.game_tab != 4 ? thisMoveHeight() : 0.0f;
     const float chips =
         chessBoard() && b.game_tab == 0 && hasPlayerEvaluations(main) ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
     if (chessBoard() && b.game_tab == 0) drawBoardNagBar();  // the move field is the column's, above its tabs
@@ -2898,6 +2903,8 @@ void App::drawBoardMoves(float height) {
         std::in_place, b.tree.variations.empty() ? guide::topics::BoardMoves : guide::topics::Variations);
     if (b.game_tab == 3) {
         drawBoardReview();
+    } else if (b.game_tab == 4) {
+        drawBoardExplained();
     } else if (b.game_tab == 2) {
         drawBoardTable();
     } else if (total == 0 && main.moves.empty()) {

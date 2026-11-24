@@ -46,9 +46,44 @@ commentary::PieceLetters letters() {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-// What the checker refused in a passage of the story, in words (#62). A motif or a notion is known to the checker by
-// its French word, quoted only to a reader of French.
-std::string refusalWords(const commentary::Refusal& r) {
+// A card tinted with the assistant's colour, as its story is shown (M11, board 5); pair with endTintedCard().
+void beginTintedCard(const char* id) {
+    const auto tint = ImGui::ColorConvertU32ToFloat4(ui::assistantColour());
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tint.x, tint.y, tint.z, 0.08f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(tint.x, tint.y, tint.z, 0.40f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(14), px(12)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, px(8));
+    ImGui::BeginChild(id, ImVec2(0, 0),
+                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
+}
+
+void endTintedCard() {
+    ImGui::EndChild();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+}
+
+// The assistant's bubble and a line in its colour, in semi-bold.
+void assistantTitle(const char* text) {
+    const ImU32 col   = ui::assistantColour();
+    const float fs    = ImGui::GetFontSize();
+    const ImVec2 at   = ImGui::GetCursorScreenPos();
+    auto* dl          = ImGui::GetWindowDrawList();
+    const float width = ImGui::GetContentRegionAvail().x;
+    ui::drawIcon(dl, ui::Icon::Comment, ImVec2(at.x + fs / 2, at.y + ImGui::GetTextLineHeight() / 2), fs * 0.85f, col);
+    const ImVec2 text_at(at.x + fs + px(6), at.y);
+    const float wrap = std::max(px(80), width - fs - px(6));
+    dl->AddText(ImGui::GetFont(), fs, text_at, col, text, nullptr, wrap);
+    dl->AddText(ImGui::GetFont(), fs, ImVec2(text_at.x + 0.6f, text_at.y), col, text, nullptr, wrap);
+    const auto size = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, wrap, text);
+    ImGui::Dummy(ImVec2(width, size.y));
+}
+
+}  // namespace
+
+// What the checker refused in a passage of the story or a move's sentence, in words (#62, #94). A motif or a notion is
+// known to the checker by its French word, quoted only to a reader of French.
+std::string assistantRefusalWords(const commentary::Refusal& r) {
     using K       = commentary::Refusal::Kind;
     const bool fr = lang() == commentary::Lang::Fr;
     switch (r.kind) {
@@ -92,41 +127,6 @@ std::string refusalWords(const commentary::Refusal& r) {
             return TR("it wrote nothing");
     }
 }
-
-// A card tinted with the assistant's colour, as its story is shown (M11, board 5); pair with endTintedCard().
-void beginTintedCard(const char* id) {
-    const auto tint = ImGui::ColorConvertU32ToFloat4(ui::assistantColour());
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(tint.x, tint.y, tint.z, 0.08f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(tint.x, tint.y, tint.z, 0.40f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(14), px(12)));
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, px(8));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTintedCard() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(2);
-}
-
-// The assistant's bubble and a line in its colour, in semi-bold.
-void assistantTitle(const char* text) {
-    const ImU32 col   = ui::assistantColour();
-    const float fs    = ImGui::GetFontSize();
-    const ImVec2 at   = ImGui::GetCursorScreenPos();
-    auto* dl          = ImGui::GetWindowDrawList();
-    const float width = ImGui::GetContentRegionAvail().x;
-    ui::drawIcon(dl, ui::Icon::Comment, ImVec2(at.x + fs / 2, at.y + ImGui::GetTextLineHeight() / 2), fs * 0.85f, col);
-    const ImVec2 text_at(at.x + fs + px(6), at.y);
-    const float wrap = std::max(px(80), width - fs - px(6));
-    dl->AddText(ImGui::GetFont(), fs, text_at, col, text, nullptr, wrap);
-    dl->AddText(ImGui::GetFont(), fs, ImVec2(text_at.x + 0.6f, text_at.y), col, text, nullptr, wrap);
-    const auto size = ImGui::GetFont()->CalcTextSizeA(fs, FLT_MAX, wrap, text);
-    ImGui::Dummy(ImVec2(width, size.y));
-}
-
-}  // namespace
 
 std::string App::boardTheoryKey() {
     const auto& b = board_;
@@ -664,6 +664,14 @@ void App::drawReviewAssistant() {
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip("%s", TR("The evaluations, the symbols and the better lines written into the notation; "
                                    "Ctrl+Z takes them back"));
+    // Every move explained (#94), in the Explained tab beside the moves.
+    ImGui::SameLine();
+    ImGui::BeginDisabled(explain_job_.has_value() || !review->report.complete);
+    if (ImGui::Button(TR("Explain every move"))) explainEveryMove();
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", TR("A line for each move, beside the moves, kept with the review: theory grouped, the "
+                                   "moves too simple said in a word, the others by the assistant, held to the facts"));
     // What the last gesture did, said here too: the notation that shows it is in the other tab.
     if (!b.toast.empty() && ImGui::GetTime() - b.toast_time < 4.0) {
         ImGui::PushTextWrapPos();
@@ -806,7 +814,7 @@ void App::drawReviewStory(const CommentaryReview& review) {
                 if (p.by_model && p.attempts <= 1) ++first;
                 if (p.by_model && p.attempts >= 2) ++second;
                 if (!p.by_model && p.attempts > 0 && !p.passage.text.empty()) ++fallen;  // the template shown instead
-                for (const auto& [text, why] : p.refused) refused.push_back(refusalWords(why));
+                for (const auto& [text, why] : p.refused) refused.push_back(assistantRefusalWords(why));
             }
             std::string note = TR("Every move, evaluation and name it quotes comes from the review.");
             if (refused.empty()) {

@@ -10,6 +10,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -53,6 +54,7 @@
 #include "engine_notes.hpp"
 #include "engine_play.hpp"
 #include "engines.hpp"
+#include "explained.hpp"
 #include "export_sheet.hpp"
 #include "fide_cards.hpp"
 #include "fide_rating_list.hpp"
@@ -181,6 +183,9 @@ void wdlLine(const std::array<int64_t, 3>& wdl);
 // The move the side to move in a live game thinks of and the reply it expects (the first two moves of its PV), each
 // in the colour of the engine that would play it, the reply lighter; none between searches. `board`: the position.
 [[nodiscard]] std::vector<BoardArrow> pvArrows(const SlotState& st, const chess::Board& board);
+
+// What the assistant's checker refused, in words (view_board_assist.cpp).
+[[nodiscard]] std::string assistantRefusalWords(const commentary::Refusal& refusal);
 
 struct AppOptions {
     bool autostart = false;
@@ -2976,6 +2981,28 @@ class App {
         std::vector<std::string> basis;               // what they rest on (commentBasis())
     };
     std::optional<CommentJob> comment_job_;
+    // Every move explained (#94, mockup M13, board 7, point 15): the board's game's explanations, kept with its review
+    // (explained.hpp) and shown in the Explained tab beside the moves; made in the background, line by line, their
+    // partial results shown while they come.
+    struct ExplainJob {
+        uint64_t game                     = 0;  // board_game_serial_
+        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+        std::shared_ptr<Explained> made;  // under mutex
+        std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        int total                                 = 0;
+        std::future<void> finished;
+    };
+    std::optional<ExplainJob> explain_job_;
+    std::optional<Explained> explained_;
+    std::string explained_of_;           // the game and language the explanations were read for
+    int explained_filter_      = 0;      // 0 every move, 1 the moves that matter, 2 the key moments
+    bool explain_after_review_ = false;  // asked before the review: made once it is done
+    void explainEveryMove();             // "Explain every move" (the review first when there is none)
+    void startExplaining(bool rest);     // `rest`: the lines not written yet of those kept
+    void pollExplained();
+    void drawBoardExplained();      // the Explained tab beside the moves
+    void writeExplainedIntoGame();  // "Write them into the game": the assistant's comments, one change
     std::shared_ptr<const CommentaryReview> board_commentary_;
     std::string board_commentary_of_;
     EngineCurves engine_curves_;    // the board's tournament game as its engines saw it (#87)

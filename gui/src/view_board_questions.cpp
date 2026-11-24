@@ -307,6 +307,7 @@ void App::pollQuestions() {
     assistant_->setGpuTaken(gpuTournament());
     assistant_->poll();
     pollBoardComments();
+    pollExplained();  // every move explained (#94)
     pollStory();
     for (auto& q : questions_)
         if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)

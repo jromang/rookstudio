@@ -1360,6 +1360,31 @@ it otherwise (Ctrl+K too), *Copy it* copies the story shown. Without the model (
 that has not learnt RookStudio's comments), or while a tournament on this machine has the processor, the story is the
 templates', as it says. Nothing leaves the machine.
 
+### Every move explained
+
+*Explain every move*, in the *Review* tab (or Ctrl+K), gives each move of the game a line, in the *Explained* tab beside
+the moves; without a review, the game is analysed first (Alt+G), and its moves explained once the review is done. The
+lines come in the background, each as soon as it is written, with how many are done and *Cancel*; those written stay,
+and *Explain the rest* finishes them later.
+
+- **Theory** is grouped: a line for each opening name its moves reach, three at most, with the games of your databases
+  that reached its last position (*theory, 61,204 games of your databases*).
+- **A move too simple for more** is said in a word: *Forced recapture.*, *The only legal move.*
+- **The others** get a sentence of the assistant's model, written from the facts of the position, its grammar letting
+  it name only legal moves, each sentence read by the checker; a sentence the checker refuses is replaced by the
+  template's, and hovering *template: the checker refused the model's sentence* says why. Without the model, the
+  templates write them; when they have nothing to say, the review's own words do (*The engine preferred 14…Bf5.*).
+
+Each line says where it comes from: theory, the model, a template, a word, the review. *Every move*, *The moves that
+matter* (the marked moves, the only moves, the turning points, the novelty) and *The key moments* choose which show; a
+click goes to the move. The summary counts them and gives the time a move takes, the facts gathered and the model's
+sentence checked: about a quarter of a second for the sentence on a GPU, some 5 seconds a move on a processor shared with
+other work (32 moves explained in a minute and a half). They are kept with the
+review, beside the moves, never in the game: *Write them into the game* makes them the assistant's comments, marked as
+its own in the PGN, beside the comment a move has already, which is never replaced; Ctrl+Z takes them all back. Nothing
+leaves the machine. Locked while one of your games is played on Lichess, hidden during a game against an engine until
+its end.
+
 ### Exporting and printing
 
 *Export…* under the study Board, beside *Copy FEN* and *lichess.org…*, opens the Export sheet in place of the page;

@@ -853,9 +853,23 @@ void App::frame() {
                 review_when_read_ = true;
                 if (w.rfind("board-review-", 0) == 0) review_ply_ = std::atoi(w.c_str() + 13);
             }
-        } else if (w.rfind("board-tab=", 0) == 0) {  // the Board page's moves card on a tab: moves, table, review
+        } else if (w.rfind("board-explain=", 0) == 0) {
+            // board-explain=FILE: its first game on the study Board, reviewed once read, then every move explained, the
+            // Explained tab shown (#94).
+            toStudyBoard();
+            board_side_tab_       = 0;
+            board_.open_tab       = 4;
+            review_when_read_     = true;
+            explain_after_review_ = true;
+            dropFile(w.substr(14));
+        } else if (w.rfind("board-tab=", 0) == 0) {
+            // The Board page's moves card on a tab: moves, table, review, explained (#94).
             const auto tab  = w.substr(10);
-            board_.open_tab = tab == "table" ? 2 : tab == "review" ? 3 : tab == "games" ? 1 : 0;
+            board_.open_tab = tab == "table"       ? 2
+                              : tab == "review"    ? 3
+                              : tab == "explained" ? 4
+                              : tab == "games"     ? 1
+                                                   : 0;
         } else if (w.rfind("board-preview=", 0) == 0) {  // a line shown on the Board page: board-preview=e2e4,e7e5
             BoardPreview p;
             p.ply = p.at = board_.ply;

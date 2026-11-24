@@ -123,6 +123,7 @@ const std::vector<const char*>& allTopics() {
                                               ReferenceGames,
                                               EndgamesTab,
                                               GameReview,
+                                              ExplainedMoves,
                                               Databases,
                                               ImportingGames,
                                               GameList,

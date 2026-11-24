@@ -278,17 +278,29 @@ msgstr "1 pérdida por tiempo"
 msgid "1 point"
 msgstr ""
 
+msgid "1 request in progress"
+msgstr ""
+
+msgid "1. RookStudio registers the engine with your account (one request, with the token)."
+msgstr ""
+
 msgid "1.{} in {} % · score {} %"
 msgstr ""
 
 msgid "10 games at 10+0.1 from 5 positions, to see before a long tournament whether it loses on time, crashes, plays an illegal move or uses its clock badly."
 msgstr "10 partidas a 10+0.1 desde 5 posiciones, para ver antes de un torneo largo si pierde por tiempo, se cuelga, juega una jugada ilegal o gestiona mal su reloj."
 
+msgid "2. It waits for work at engine.lichess.ovh with the secret alone: a long wait, renewed while the service runs."
+msgstr ""
+
 msgid "200 cp: both engines think a side is two pawns ahead, or more."
 msgstr "200 cp: los dos motores creen que un bando lleva dos peones de ventaja, o más."
 
 msgid "200k nodes"
 msgstr "200k nodos"
+
+msgid "3. On lichess.org, the analysis board offers “{}” in its engine menu."
+msgstr ""
 
 msgid "3D board"
 msgstr "Tablero 3D"
@@ -758,6 +770,9 @@ msgstr "Una nueva línea principal"
 msgid "A new record: {} before."
 msgstr "Nuevo récord: antes, {}."
 
+msgid "A new secret drawn here, and the registration changed at Lichess with it (one request, with your token); made again if it was withdrawn."
+msgstr ""
+
 msgid "A new study"
 msgstr "Un estudio nuevo"
 
@@ -838,6 +853,12 @@ msgstr "Texto o página web de una lista de rating, Ordo, CSV (name,elo)"
 
 msgid "A rating list, for the reference Elo…"
 msgstr "Una lista de rating, para el Elo de referencia…"
+
+msgid "A remote machine of the Tests view (Settings > Machines, by SSH) can serve instead of this computer, with its own threads; the engine must have its path there."
+msgstr ""
+
+msgid "A request on one of them (compared by the men and the side to move, as the fair play's lock does) gets an empty answer."
+msgstr ""
 
 msgid "A request to GitHub per engine taken from them, kept a day."
 msgstr "Una petición a GitHub por cada motor tomado de ellos, guardada un día."
@@ -1339,6 +1360,9 @@ msgstr "Añadir también cada partida a:"
 msgid "Also as a zip"
 msgstr "También en zip"
 
+msgid "Also on the Lichess page, under “Your engines on lichess.org”, and on the Home page, under “In progress”."
+msgstr ""
+
 msgid "Alt+A, or Analyse, for the engines' best moves here; + An engine sets another beside them."
 msgstr "Alt+A, o Analizar, para ver aquí las mejores jugadas de los motores; + Un motor pone otro a su lado."
 
@@ -1705,6 +1729,9 @@ msgstr "Se vuelve a preguntar en esta serie, y luego mañana."
 msgid "Asked again in this session, then on its day."
 msgstr "Se vuelve a preguntar en esta sesión, y luego en su día."
 
+msgid "Asked again in {} s."
+msgstr ""
+
 msgid "Asked of Lichess without an account: the channels, and the games you follow. Nothing is kept unless you keep it."
 msgstr "Se pide a Lichess sin cuenta: los canales y las partidas que sigues. No se guarda nada salvo que lo guardes tú."
 
@@ -1773,6 +1800,9 @@ msgstr "Consultando las tablas de Lichess…"
 
 msgid "Asking Lichess…"
 msgstr "Consultando a Lichess…"
+
+msgid "Asking again…"
+msgstr ""
 
 msgid "Asking chess.com for the player's months…"
 msgstr "Pidiendo a chess.com los meses del jugador…"
@@ -2744,6 +2774,12 @@ msgstr "Jaque mate: perdiste"
 msgid "Checks them one after the other, not while a tournament plays."
 msgstr "Los comprueba uno tras otro, no mientras se juega un torneo."
 
+msgid "Chess, in the Chess960 mode Lichess asks for: checked when the engine starts."
+msgstr ""
+
+msgid "Chess, in the Chess960 mode Lichess asks for: {} knows it."
+msgstr ""
+
 msgid "Chess324: the 18 symmetrical starting positions"
 msgstr "Chess324: las 18 posiciones iniciales simétricas"
 
@@ -3054,6 +3090,9 @@ msgstr "Compara el SHA-256 del programa de cada motor allí con el de este orden
 
 msgid "Comparing {} here and on {}…"
 msgstr "Comparando {} aquí y en {}…"
+
+msgid "Computed on {}."
+msgstr ""
 
 msgid "Computer"
 msgstr "Ordenador"
@@ -3418,6 +3457,12 @@ msgstr "Desviación"
 msgid "Delete"
 msgstr "Eliminar"
 
+msgid "Delete it"
+msgstr ""
+
+msgid "Delete it: click again"
+msgstr ""
+
 msgid "Delete the profile {}?"
 msgstr "¿Eliminar el perfil {}?"
 
@@ -3429,6 +3474,9 @@ msgstr "Eliminar esta vista"
 
 msgid "Delete {}…"
 msgstr "Eliminar {}…"
+
+msgid "Deleted; “{}” asks for it again: downloaded again from its release, its hash checked."
+msgstr ""
 
 msgid "Depth"
 msgstr "Profundidad"
@@ -3577,6 +3625,9 @@ msgstr "Descargar y leer {} ({})"
 msgid "Download it"
 msgstr "Descargarlo"
 
+msgid "Download it again"
+msgstr ""
+
 msgid "Download page"
 msgstr "Página de descarga"
 
@@ -3597,6 +3648,9 @@ msgstr ""
 
 msgid "Download · {}"
 msgstr "Descargar · {}"
+
+msgid "Downloaded again from its engine's card, its hash checked, if a tournament asks for it again."
+msgstr ""
 
 msgid "Downloaded from its author's release, its SHA-256 hash checked, into the engines folder of the profile."
 msgstr "Descargado de la versión publicada por su autor, con su hash SHA-256 verificado, en la carpeta de motores del perfil."
@@ -4713,6 +4767,9 @@ msgstr "Desde una fuente…"
 msgid "From a source… (TWIC, a broadcast)"
 msgstr ""
 
+msgid "From its release on GitHub, checked against the hash it had: the tournament plays it again."
+msgstr ""
+
 msgid "From move"
 msgstr "Desde la jugada"
 
@@ -5252,6 +5309,9 @@ msgstr "No lo sé · la solución: {}"
 msgid "Icon"
 msgstr "Icono"
 
+msgid "If none is left, it pauses and says so here; Lichess waits. The tournament first, as for the bot."
+msgstr ""
+
 msgid "Ignore the 50-move rule"
 msgstr "Ignorar la regla de las 50 jugadas"
 
@@ -5346,6 +5406,9 @@ msgstr ""
 msgid "In progress"
 msgstr "En curso"
 
+msgid "In service"
+msgstr ""
+
 msgid "In the Swiss: {} · its first round at {:02}:{:02}"
 msgstr ""
 
@@ -5389,6 +5452,9 @@ msgstr "En la guía: {}"
 
 msgid "In the library"
 msgstr "En la biblioteca"
+
+msgid "In the library: the one the analysis, new tournaments, the bot and the service for Lichess take."
+msgstr ""
 
 msgid "In the table of names already."
 msgstr ""
@@ -5638,6 +5704,9 @@ msgstr "Juega aquello contra lo que te preparaste, y luego el motor; tú juegas 
 msgid "It relies on what your engine, your databases and the endgame tables establish, and says it in words; when nothing establishes it, it says so too. In English or in French."
 msgstr "Se basa en lo que establecen tu motor, tus bases de datos y las tablas de finales, y lo dice con palabras; cuando nada lo establece, también lo dice. En inglés o en francés."
 
+msgid "It resumes by itself once threads are free again; Lichess waits. The tournament first, as for the bot."
+msgstr ""
+
 msgid "It runs on"
 msgstr "Funciona en"
 
@@ -5740,6 +5809,9 @@ msgstr "Sus archivos se quedan donde están: «Añadir una base de datos…» la
 msgid "Its folder"
 msgstr ""
 
+msgid "Its folder deleted from the profile, {} freed; it can be downloaded again from its release. A second click does it."
+msgstr ""
+
 msgid "Its folder {} holds more than {} files: the program goes alone."
 msgstr "Su carpeta {} contiene más de {} archivos: el programa va solo."
 
@@ -5826,6 +5898,12 @@ msgstr ""
 
 msgid "Its name"
 msgstr "Su nombre"
+
+msgid "Its name at Lichess"
+msgstr ""
+
+msgid "Its name at Lichess, the machine, its threads and memory at most: registered again with Lichess."
+msgstr ""
 
 msgid "Its name begins with this library engine's: choose it if it is the same engine, version included."
 msgstr "Su nombre empieza por el de este motor de la biblioteca: elígelo si es el mismo motor, versión incluida."
@@ -5926,11 +6004,17 @@ msgstr "Su fuerza"
 msgid "Its style: its openings"
 msgstr "Su estilo: sus aperturas"
 
+msgid "Its threads first; the service makes do with the rest."
+msgstr ""
+
 msgid "Its token is revoked at Lichess and deleted here."
 msgstr "Su token se revoca en Lichess y se borra aquí."
 
 msgid "Its token is revoked at Lichess and deleted here; the account stays a bot. A second click does it."
 msgstr "Su token se revoca en Lichess y se borra aquí; la cuenta sigue siendo un bot. Hace falta un segundo clic."
+
+msgid "Its versions on the disk"
+msgstr ""
 
 msgid "Its words"
 msgstr "Sus mensajes"
@@ -6091,6 +6175,9 @@ msgstr "Guardada en «{}»"
 msgid "Kept in “{}”: its games and its standing, its crosstable a click away."
 msgstr ""
 
+msgid "Kept on purpose (“Keep … too”): never deleted."
+msgstr ""
+
 msgid "Kept searches"
 msgstr "Búsquedas guardadas"
 
@@ -6102,6 +6189,14 @@ msgstr "Mantenían la victoria: {} (las casillas verdes)."
 
 msgid "Kept when RookStudio closed, at move {}: the clocks wait until you resume."
 msgstr "Guardada al cerrar RookStudio, en la jugada {}: los relojes esperan hasta que la reanudes."
+
+msgid "Kept while {} tournament plays it; deleted at the end of the last one, {} freed."
+msgid_plural "Kept while {} tournaments play it; deleted at the end of the last one, {} freed."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Kept while “{}” plays it ({}); deleted at its end, {} freed."
+msgstr ""
 
 msgid "Kept with the review, beside the moves; “Write them into the game” makes them the assistant's comments, which Ctrl+Z takes back."
 msgstr ""
@@ -6292,11 +6387,17 @@ msgstr "Lichess TV: no se pudo escribir en «{}»: {} no se ha guardado."
 msgid "Lichess allows an opening book and a database there: the tree of your databases stays open. The engine, the cloud, the tables and the assistant look at no position of this game, before the one it has reached or after it."
 msgstr "Lichess permite ahí un libro de aperturas y una base de datos: el árbol de tus bases de datos sigue abierto. El motor, la nube, las tablas y el asistente no miran ninguna posición de esta partida, ni anterior ni posterior a la que ha alcanzado."
 
+msgid "Lichess analysis"
+msgstr ""
+
 msgid "Lichess asks for an account allowed to read studies and broadcasts: asked once, as to follow a round."
 msgstr "Lichess pide una cuenta con permiso para leer estudios y retransmisiones: se pide una vez, como para seguir una ronda."
 
 msgid "Lichess asks for one more permission"
 msgstr "Lichess pide un permiso más"
+
+msgid "Lichess asks for the Chess960 mode, which this engine does not know: it cannot serve."
+msgstr ""
 
 msgid "Lichess asks for the permission to read your teams (team:read); RookStudio writes nothing to them."
 msgstr ""
@@ -6424,6 +6525,9 @@ msgstr "Lichess la marca como BOT; solo juega desafíos: ni sala de espera ni to
 msgid "Lichess no longer answers for your game against {}: {}."
 msgstr "Lichess ya no responde para tu partida contra {}: {}."
 
+msgid "Lichess offers an engine to the analysis board of an account: linking yours asks for the permissions to register an engine (engine:read, engine:write). Lichess's page opens."
+msgstr ""
+
 msgid "Lichess offline"
 msgstr "Lichess sin conexión"
 
@@ -6463,6 +6567,9 @@ msgstr "Lichess rechazó la búsqueda: {}"
 msgid "Lichess refused your move: {}"
 msgstr "Lichess rechazó tu jugada: {}"
 
+msgid "Lichess refuses the secret (401)"
+msgstr ""
+
 msgid "Lichess refuses this round without an account allowed to read broadcasts."
 msgstr "Lichess rechaza esta ronda sin una cuenta autorizada a leer retransmisiones."
 
@@ -6475,6 +6582,9 @@ msgid "Lichess refuses: {}"
 msgstr "Lichess se niega: {}"
 
 msgid "Lichess refuses: “{}”"
+msgstr ""
+
+msgid "Lichess runs an engine offered to its analysis board in the Chess960 mode (UCI_Chess960), for every game; an engine without it cannot be offered."
 msgstr ""
 
 msgid "Lichess sends the browser back to 127.0.0.1, on a port only RookStudio listens on while it links. Without an answer in 5 minutes, the link stops by itself."
@@ -7086,6 +7196,9 @@ msgstr "Lucena"
 msgid "Lumbra's Gigabase (.7z, .pgn)"
 msgstr "Lumbra's Gigabase (.7z, .pgn)"
 
+msgid "MB"
+msgstr ""
+
 msgid "MB of memory (now {})"
 msgstr "MB de memoria (ahora {})"
 
@@ -7303,6 +7416,9 @@ msgstr ""
 
 msgid "Memory"
 msgstr "Memoria"
+
+msgid "Memory at most"
+msgstr ""
 
 msgid "Memory for the engines"
 msgstr "Memoria para los motores"
@@ -8379,6 +8495,15 @@ msgstr "Ofrecer tablas"
 msgid "Offer a draw on Lichess"
 msgstr "Ofrecer tablas en Lichess"
 
+msgid "Offer to Lichess…"
+msgstr ""
+
+msgid "Offer {} to lichess.org…"
+msgstr ""
+
+msgid "Offered from an engine's card on the Engines page; lichess.org shows them in its analysis board's engine menu, for your account only."
+msgstr ""
+
 msgid "Official broadcasts"
 msgstr "Retransmisiones oficiales"
 
@@ -8408,6 +8533,9 @@ msgstr "Sola tras {} s"
 
 msgid "On lichess.org"
 msgstr "En lichess.org"
+
+msgid "On lichess.org, for the analysis"
+msgstr ""
 
 msgid "On macOS, a program copied from another computer may need a signature, or to leave the quarantine: on {}, run codesign -s - {} and xattr -d com.apple.quarantine {}, then Check the engines."
 msgstr "En macOS, un programa copiado desde otro ordenador puede necesitar una firma, o salir de la cuarentena: en {}, ejecuta codesign -s - {} y xattr -d com.apple.quarantine {}, luego Comprobar los motores."
@@ -8624,6 +8752,9 @@ msgstr "Solo {} libres de {} en la unidad de {}: un torneo se detiene cuando sus
 
 msgid "Open"
 msgstr "Abrir"
+
+msgid "Open Lichess's analysis board"
+msgstr ""
 
 msgid "Open a PGN…"
 msgstr "Abrir un PGN…"
@@ -9195,6 +9326,20 @@ msgid "Played as"
 msgstr ""
 
 msgid "Played as a {}, as you chose."
+msgstr ""
+
+msgid "Played by nothing: being deleted."
+msgstr ""
+
+msgid "Played by nothing: kept from before until you delete it ({})."
+msgstr ""
+
+msgid "Played by {} tournament that is not over."
+msgid_plural "Played by {} tournaments that are not over."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Played by “{}” ({})."
 msgstr ""
 
 msgid "Played in pairs: each opening is played twice, with colours reversed."
@@ -9793,6 +9938,12 @@ msgstr "Actualizar"
 msgid "Refresh: the new engines of the folder"
 msgstr "Actualizar: los motores nuevos de la carpeta"
 
+msgid "Register again (a new secret)"
+msgstr ""
+
+msgid "Registering the engine with Lichess…"
+msgstr ""
+
 msgid "Relaunch with…"
 msgstr "Relanzar con…"
 
@@ -10035,6 +10186,9 @@ msgstr "Reanudar la partida contra el motor"
 msgid "Resume the import"
 msgstr "Reanudar la importación"
 
+msgid "Resume the service of {} on lichess.org"
+msgstr ""
+
 msgid "Resume where you were"
 msgstr "Retomar donde lo dejaste"
 
@@ -10176,6 +10330,9 @@ msgstr "RookStudio puede copiarlo: fastchess-gui se queda como está y puede seg
 msgid "RookStudio cannot draw its window."
 msgstr "RookStudio no puede dibujar su ventana."
 
+msgid "RookStudio closed, the engine stays in Lichess's list without answering; at the next start, the service resumes if it was in service when you closed."
+msgstr ""
+
 msgid "RookStudio commentary v11 · {}, downloaded once"
 msgstr "RookStudio commentary v11 · {}, descargado una sola vez"
 
@@ -10202,6 +10359,9 @@ msgstr "RookStudio puede leer tus estudios privados y no listados (study:read); 
 
 msgid "RookStudio may read your studies and the broadcasts."
 msgstr "RookStudio puede leer tus estudios y las retransmisiones."
+
+msgid "RookStudio no longer waits for work; the engine stays registered at Lichess, unanswered. “Resume” serves it again."
+msgstr ""
 
 msgid "RookStudio not installed"
 msgstr "RookStudio no instalado"
@@ -10573,6 +10733,9 @@ msgid "See them in the list"
 msgstr "Verlas en la lista"
 
 msgid "See those that differ"
+msgstr ""
+
+msgid "See whether a version of RookStudio follows it"
 msgstr ""
 
 msgid "Seed"
@@ -11150,6 +11313,12 @@ msgstr "Dejar de seguir"
 msgid "Stop it"
 msgstr "Detenerla"
 
+msgid "Stop keeping it"
+msgstr ""
+
+msgid "Stop keeping it: click again"
+msgstr ""
+
 msgid "Stop now (running games are lost)"
 msgstr "Detener ahora (las partidas en curso se pierden)"
 
@@ -11161,6 +11330,12 @@ msgstr "Detener la partida"
 
 msgid "Stop the game's analysis"
 msgstr "Detener el análisis de la partida"
+
+msgid "Stop the service"
+msgstr ""
+
+msgid "Stop the service of {} on lichess.org"
+msgstr ""
 
 msgid "Stop the tournament when an engine cannot start"
 msgstr "Detener el torneo cuando un motor no arranca"
@@ -11186,11 +11361,17 @@ msgstr "Detenida antes de la primera respuesta"
 msgid "Stopped before the first guess"
 msgstr "Detenida antes del primer intento"
 
+msgid "Stopped: RookStudio no longer waits for work; the engine stays registered at Lichess, unanswered."
+msgstr ""
+
 msgid "Stopped: no game is left to play without {}, which cannot start"
 msgstr "Detenido: no queda ninguna partida por jugar sin {}, que no arranca"
 
 msgid "Stopped: no result"
 msgstr "Detenida: sin resultado"
+
+msgid "Stopped: the next try goes on from there."
+msgstr ""
 
 msgid "Stopped: what came is kept, the next try goes on from there."
 msgstr "Detenida: lo recibido se conserva, el próximo intento continúa desde ahí."
@@ -11556,6 +11737,9 @@ msgstr "Las piezas 3D:"
 msgid "The 50-move counter, the material and the pieces left, under every board of the mosaic."
 msgstr "El contador de las 50 jugadas, el material y las piezas que quedan, bajo cada tablero del mosaico."
 
+msgid "The API changed at Lichess (it is in alpha)"
+msgstr ""
+
 msgid "The Board"
 msgstr "El Tablero"
 
@@ -11915,6 +12099,9 @@ msgstr ""
 msgid "The button lights up once the name typed is its own. What leaves the machine: the request to make it a bot, with the bot's token."
 msgstr "El botón se activa cuando el nombre escrito es el suyo. Lo que sale de la máquina: la petición de convertirla en bot, con el token del bot."
 
+msgid "The catalogue no longer names its file: it cannot be downloaded again."
+msgstr ""
+
 msgid "The catalogue, read from RookStudio's repository; a request to api.github.com per engine, kept a day; the file chosen, from github.com. Only while this page is open or an engine is added, and once a day for the engines taken from it, unless Settings say otherwise."
 msgstr "El catálogo, leído del repositorio de RookStudio; una petición a api.github.com por motor, guardada un día; el archivo elegido, desde github.com. Solo mientras esta página está abierta o se añade un motor, y una vez al día para los motores tomados de ella, salvo que los Ajustes digan otra cosa."
 
@@ -12251,6 +12438,9 @@ msgstr "Los motores discrepan: sus evaluaciones difieren en esta cantidad durant
 
 msgid "The engines disagreed: {} against {}."
 msgstr "Los motores no coincidían: {} contra {}."
+
+msgid "The engines offered to Lichess could not be written: {}"
+msgstr ""
 
 msgid "The engines on machines cannot be started: {}"
 msgstr "Los motores en máquinas no se pueden arrancar: {}"
@@ -12785,6 +12975,18 @@ msgstr "La última perdida, {}: {}."
 msgid "The last move marked"
 msgstr ""
 
+msgid "The last position asked"
+msgstr ""
+
+msgid "The last request was a position of one of your correspondence games: answered empty, never analysed."
+msgstr ""
+
+msgid "The last request, closed by Lichess before its end: {}"
+msgstr ""
+
+msgid "The last request: {}"
+msgstr ""
+
 msgid "The last results sent: {}, {} answers, taken."
 msgstr "Los últimos resultados enviados: {}, {} respuestas, aceptados."
 
@@ -12875,8 +13077,14 @@ msgstr "El logo de {} no se puede mostrar: {}"
 msgid "The logo was not changed: {}"
 msgstr "El logo no se cambió: {}"
 
+msgid "The machine"
+msgstr ""
+
 msgid "The machine chosen in Run on is not in Settings > Machines any more: choose another."
 msgstr "La máquina elegida en «Jugar en» ya no está en Ajustes > Máquinas: elige otra."
+
+msgid "The machine chosen is no longer in Settings > Machines."
+msgstr ""
 
 msgid "The machine is full: the tournament's games and the analysis use {} of its {} threads, and this game needs {}. It would slow them down, and its own engines."
 msgstr "La máquina está llena: las partidas del torneo y el análisis usan {} de sus {} hilos, y esta partida necesita {}. Las ralentizaría, y a sus propios motores."
@@ -13274,6 +13482,9 @@ msgstr "El puerto que el servidor abre para la página, como lo pediría ssh -R 
 msgid "The position after the moves read."
 msgstr "La posición tras las jugadas leídas."
 
+msgid "The position asked"
+msgstr ""
+
 msgid "The position before the fault comes back in the day's review (FSRS): tomorrow."
 msgstr "La posición anterior al fallo vuelve en el repaso del día (FSRS): mañana."
 
@@ -13454,6 +13665,12 @@ msgstr "No se pudieron guardar las partidas recientes: {}"
 msgid "The reference games"
 msgstr "Las partidas de referencia"
 
+msgid "The registration is deleted at Lichess (one request) and the secret is no longer used. “Offer to Lichess…” makes it again."
+msgstr ""
+
+msgid "The registration was withdrawn on lichess.org, or the secret changed."
+msgstr ""
+
 msgid "The repertoire is as it was."
 msgstr ""
 
@@ -13479,6 +13696,9 @@ msgid "The report is made of your databases' opening trees, or of Lichess's mast
 msgstr ""
 
 msgid "The reports come back with Pause (Alt+P), or at the arena's end."
+msgstr ""
+
+msgid "The requests stay unanswered; it resumes by itself at the end of the game."
 msgstr ""
 
 msgid "The results the tablebases decide; the games in other positions play on (-tbadjudicate)."
@@ -13591,6 +13811,9 @@ msgstr ""
 
 msgid "The seek lives while RookStudio holds it open; it stops if RookStudio closes. The game found opens on the Board."
 msgstr "La búsqueda sigue viva mientras RookStudio la mantiene abierta; se detiene si RookStudio se cierra. La partida encontrada se abre en el Tablero."
+
+msgid "The service stopped rather than answer wrongly: {}."
+msgstr ""
 
 msgid "The setup and the templates that use it keep its values."
 msgstr "La configuración y las plantillas que lo usan conservan sus valores."
@@ -13886,6 +14109,12 @@ msgstr "El torneo se ha modificado."
 msgid "The tournament you follow: its standing, the games of its first eight."
 msgstr ""
 
+msgid "The tournament “{}” is playing and leaves no thread free: the service is paused"
+msgstr ""
+
+msgid "The tournament “{}” is playing: the service takes the threads it leaves free"
+msgstr ""
+
 msgid "The tournament “{}” uses the GPU: the assistant answers on the processor meanwhile, in about 3 seconds."
 msgstr "El torneo «{}» usa la GPU: mientras tanto, el asistente responde en el procesador, en unos 3 segundos."
 
@@ -14080,6 +14309,9 @@ msgstr "Tema"
 msgid "Themes"
 msgstr "Temas"
 
+msgid "Then, without asking anything more"
+msgstr ""
+
 msgid "Then: {} tomorrow · {} within three days · {} within a week."
 msgstr "Después: {} mañana · {} en tres días · {} en una semana."
 
@@ -14127,6 +14359,11 @@ msgstr "Este libro no puede jugar por un motor: {}"
 
 msgid "This computer"
 msgstr "Este ordenador"
+
+msgid "This computer · {} thread"
+msgid_plural "This computer · {} threads"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "This computer's RookStudio does not run on the machine's system: download the release for it and choose its program here (RookStudio.exe for Windows). Install copies it."
 msgstr "El RookStudio de este ordenador no funciona en el sistema de la máquina: descarga la versión para él y elige aquí su programa (RookStudio.exe para Windows). Instalar lo copia."
@@ -14235,6 +14472,9 @@ msgstr "Los que sigue tu cuenta, o añadidos por su nombre. Lichess muestra sus 
 
 msgid "Threads"
 msgstr "Threads"
+
+msgid "Threads at most (Lichess asks between 1 and this number)"
+msgstr ""
 
 msgid "Threads of {} set to {} in the engine library."
 msgstr "Threads de {} puesto a {} en la biblioteca de motores."
@@ -14377,11 +14617,17 @@ msgstr "A {}"
 msgid "Today"
 msgstr "Hoy"
 
+msgid "Today: {}, {}."
+msgstr ""
+
 msgid "Too fast for me"
 msgstr "Demasiado rápido para mí"
 
 msgid "Too many games reach it to look for the strongest: early in the opening, the Tree tab tells more."
 msgstr "Demasiadas partidas llegan a ella para buscar las más fuertes: al principio de la apertura, la pestaña Árbol dice más."
+
+msgid "Too many requests (429): Lichess asks to wait a minute."
+msgstr ""
 
 msgid "Too many requests (429): the standing waits a minute ({} s left); the games go on, their streams apart."
 msgstr ""
@@ -14998,6 +15244,9 @@ msgstr "Lo que sale de la máquina: la petición del archivo a database.lichess.
 msgid "What leaves the machine: the request for the file, nothing else."
 msgstr "Lo que sale de la máquina: la petición del archivo, nada más."
 
+msgid "What leaves the machine: this name, these limits and a secret drawn here, which Lichess never shows again; then, at each request of your analysis board, the engine's lines. A remote machine of the Tests view (SSH) can serve instead: its own threads."
+msgstr ""
+
 msgid "What leaves the machine: with the tables of the disk, nothing; with Lichess's, each position played, as its FEN; the download, on your click, its size said before."
 msgstr "Lo que sale de la máquina: con las tablas del disco, nada; con las de Lichess, cada posición jugada, como su FEN; la descarga, cuando haces clic, tras indicar su tamaño."
 
@@ -15326,8 +15575,14 @@ msgstr ""
 msgid "Withdraw an engine"
 msgstr "Retirar un motor"
 
+msgid "Withdraw from Lichess"
+msgstr ""
+
 msgid "Withdraw {}…"
 msgstr "Retirar {}…"
+
+msgid "Withdrawing it needs your Lichess account linked: link it on the Lichess page."
+msgstr ""
 
 msgid "Withdraw…"
 msgstr "Retirar…"
@@ -15622,8 +15877,14 @@ msgstr "Tú: {}; está en {}."
 msgid "Your Lichess account"
 msgstr "Tu cuenta de Lichess"
 
+msgid "Your Lichess account is not linked"
+msgstr ""
+
 msgid "Your Lichess account linked, on the Lichess page."
 msgstr "Tu cuenta de Lichess vinculada, en la página Lichess."
+
+msgid "Your Lichess bot is playing a game"
+msgstr ""
 
 msgid "Your Lichess bot {} is going offline"
 msgstr "Tu bot de Lichess {} se está desconectando"
@@ -15670,6 +15931,9 @@ msgstr "Tu reloj corre cuando te toca jugar."
 msgid "Your correspondence game passes through this position"
 msgstr ""
 
+msgid "Your correspondence games: their positions are never analysed"
+msgstr ""
+
 msgid "Your databases"
 msgstr "Tus bases de datos"
 
@@ -15693,6 +15957,20 @@ msgstr "Tu oferta de tablas se envía con tu próxima jugada."
 
 msgid "Your draw offer waits for their answer."
 msgstr "Tu oferta de tablas espera su respuesta."
+
+msgid "Your engine in Lichess's analysis board: it computes here, on your machine, and its lines show there. Only your account sees it, in the analysis board's engine menu, while RookStudio is open."
+msgstr ""
+
+msgid "Your engine on lichess.org: {}"
+msgstr ""
+
+msgid "Your engines on lichess.org"
+msgstr ""
+
+msgid "Your engines on lichess.org: {} core for a request of your analysis board"
+msgid_plural "Your engines on lichess.org: {} cores for a request of your analysis board"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Your first record."
 msgstr "Tu primer récord."
@@ -15773,6 +16051,9 @@ msgid "Your lines, each repertoire a PGN the Board page edits like a game. The s
 msgstr "Tus líneas: cada repertorio es un PGN que la página Tablero edita como una partida. La estrella de la pestaña Árbol de la página Tablero añade una jugada al repertorio activo."
 
 msgid "Your live game on Lichess: the report is locked"
+msgstr ""
+
+msgid "Your live game on Lichess: the service is paused until its end"
 msgstr ""
 
 msgid "Your mistakes"
@@ -16689,6 +16970,9 @@ msgstr "fin de tu repertorio · luego el motor"
 msgid "ended · {}"
 msgstr "terminada · {}"
 
+msgid "engine:read and engine:write: to register an engine for your account, read it, withdraw it. Lichess's page opens; your account stays linked, the token it replaces is revoked."
+msgstr ""
+
 msgid "estimating…"
 msgstr ""
 
@@ -16902,6 +17186,12 @@ msgstr "en orden"
 msgid "in progress"
 msgstr ""
 
+msgid "in service, 1 request in progress"
+msgstr ""
+
+msgid "in service, waiting for a request"
+msgstr ""
+
 msgid "in the analysis"
 msgstr "en el análisis"
 
@@ -17075,6 +17365,9 @@ msgstr "sus partidas siguieron hasta {}, una jugada que el motor considera un er
 msgid "its id, with your token (one more permission, asked the first time)."
 msgstr "su id, con tu token (un permiso más, que se pide la primera vez)."
 
+msgid "its lines in lichess.org's analysis board, for your account only"
+msgstr ""
+
 msgid "its opening tree being built"
 msgstr "construyendo su árbol de aperturas"
 
@@ -17154,6 +17447,9 @@ msgstr "menos jugada últimamente"
 
 msgid "lichess's accuracy: each move's from the winning chances it lost, the moves of the game's sharp moments weighing more."
 msgstr "La precisión de lichess: la de cada jugada según las posibilidades de victoria que perdió, pesando más las jugadas de los momentos tensos de la partida."
+
+msgid "lichess.org's analysis board in the browser: choose this engine in its engine menu."
+msgstr ""
 
 msgid "lichess.org…"
 msgstr "lichess.org…"
@@ -17591,11 +17887,25 @@ msgstr "pasada {} · {} por posición · {}/{}"
 msgid "pass {} · {} · {}/{}"
 msgstr "pasada {} · {} · {}/{}"
 
+msgid "paused during your live game"
+msgstr ""
+
 msgid "paused while A analyses"
 msgstr "en pausa mientras A analiza"
 
 msgid "paused while Alt+A analyses"
 msgstr "en pausa mientras Alt+A analiza"
+
+msgid "paused, game {} of {}"
+msgstr ""
+
+msgid "paused, {} game played"
+msgid_plural "paused, {} games played"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "paused: a tournament takes the threads"
+msgstr ""
 
 msgid "pawn chains"
 msgstr ""
@@ -17641,6 +17951,14 @@ msgstr "en juego · jugada {}, juegan las negras"
 
 msgid "playing · move {}, White to move"
 msgstr "en juego · jugada {}, juegan las blancas"
+
+msgid "playing, game {} of {}"
+msgstr ""
+
+msgid "playing, {} game played"
+msgid_plural "playing, {} games played"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "plies"
 msgstr "medias jugadas"
@@ -17874,6 +18192,23 @@ msgstr ""
 
 msgid "stopped"
 msgstr "detenido"
+
+msgid "stopped, game {} of {}"
+msgstr ""
+
+msgid "stopped, {} game played"
+msgid_plural "stopped, {} games played"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "stopped: Lichess refuses the secret"
+msgstr ""
+
+msgid "stopped: Lichess's API changed"
+msgstr ""
+
+msgid "stopped: the engine could not serve"
+msgstr ""
 
 msgid "streak: the next win counts double"
 msgstr ""
@@ -18331,6 +18666,9 @@ msgstr "solo este análisis"
 msgid "this analysis only: neither the library nor a tournament sees them"
 msgstr "solo este análisis: ni la biblioteca ni un torneo los ven"
 
+msgid "this computer"
+msgstr ""
+
 msgid "this game does not count: it was voided, or is not over"
 msgstr "esta partida no cuenta: fue anulada, o no ha terminado"
 
@@ -18480,6 +18818,9 @@ msgstr "esperando desafíos"
 
 msgid "waiting for the first game"
 msgstr "esperando la primera partida"
+
+msgid "waiting for the network"
+msgstr ""
 
 msgid "weight {}"
 msgstr "peso {}"
@@ -18929,6 +19270,9 @@ msgstr[1] "{} capítulos leídos."
 msgid "{} chapters, full"
 msgstr "{} capítulos, lleno"
 
+msgid "{} characters: Lichess takes {} to {}."
+msgstr ""
+
 msgid "{} classical game"
 msgid_plural "{} classical games"
 msgstr[0] ""
@@ -18967,11 +19311,17 @@ msgid_plural "{} cores in use"
 msgstr[0] "{} núcleo en uso"
 msgstr[1] "{} núcleos en uso"
 
+msgid "{} could not be deleted: {}"
+msgstr ""
+
 msgid "{} could not be judged"
 msgstr "{} no se pudo juzgar"
 
 msgid "{} could not be read: kept as {}"
 msgstr "{} no se pudo leer: guardado como {}"
+
+msgid "{} could not serve"
+msgstr ""
 
 msgid "{} crash or hang"
 msgid_plural "{} crashes or hangs"
@@ -19017,6 +19367,15 @@ msgstr "{} rechaza las tablas."
 
 msgid "{} declines: {}"
 msgstr "{} lo rechaza: {}"
+
+msgid "{} deleted · {} freed"
+msgstr ""
+
+msgid "{} deleted: replaced by {} · {} freed"
+msgstr ""
+
+msgid "{} deleted: “{}” is over · {} freed"
+msgstr ""
 
 msgid "{} did not answer in time while {}: is the machine overloaded, or the network down?"
 msgstr "{} no respondió a tiempo (paso: {}): ¿está la máquina sobrecargada o la red caída?"
@@ -19068,6 +19427,9 @@ msgstr "{} no arranca en {}: {}"
 
 msgid "{} done of {} · {} right · it is on the disk: it is solved offline too."
 msgstr "{} hechos de {} · {} correctos · está en el disco: también se resuelve sin conexión."
+
+msgid "{} downloaded again: its hash checked, it answered uci."
+msgstr ""
 
 msgid "{} draw adjudicated in a won position"
 msgid_plural "{} draws adjudicated in a won position"
@@ -19678,6 +20040,12 @@ msgstr "{} ocupa más de 2 MB."
 msgid "{} is missing: the folder needs the 12 files wK.svg, wQ.svg … bN.svg, bP.svg."
 msgstr "Falta {}: la carpeta necesita los 12 archivos wK.svg, wQ.svg … bN.svg, bP.svg."
 
+msgid "{} is no longer in the library."
+msgstr ""
+
+msgid "{} is no longer in the library. The registration is deleted at Lichess (one request)."
+msgstr ""
+
 msgid "{} is no longer in the library: add an engine on the Engines page."
 msgstr "{} ya no está en la biblioteca: añade un motor en la página Motores."
 
@@ -19757,6 +20125,9 @@ msgstr[1] ""
 
 msgid "{} kept in “{}”"
 msgstr "{} se guardó en «{}»"
+
+msgid "{} leaves the library, and the version's folder is deleted once no tournament that is not over plays it ({}). A second click does it."
+msgstr ""
 
 msgid "{} left"
 msgstr ""
@@ -19844,6 +20215,11 @@ msgstr[1] "hace {} min"
 
 msgid "{} min left"
 msgstr "quedan {} min"
+
+msgid "{} min of analysis"
+msgid_plural "{} min of analysis"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} min {:02} s"
 msgstr "{} min {:02} s"
@@ -19972,6 +20348,9 @@ msgstr "{} nodos"
 
 msgid "{} nodes · {} · tablebase hits {} · hash {}"
 msgstr "{} nodos · {} · accesos a tablas {} · hash {}"
+
+msgid "{} nodes/s"
+msgstr ""
 
 msgid "{} note"
 msgid_plural "{} notes"
@@ -20426,6 +20805,11 @@ msgid_plural "{} replaced"
 msgstr[0] "{} sustituida"
 msgstr[1] "{} sustituidas"
 
+msgid "{} request"
+msgid_plural "{} requests"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{} resigns"
 msgstr "{} abandona"
 
@@ -20547,6 +20931,9 @@ msgstr[1] "{} casillas en 30 s"
 
 msgid "{} started again: its games are played again."
 msgstr "{} vuelve a arrancar: sus partidas se juegan de nuevo."
+
+msgid "{} stays as an engine of its own in the library, for a match against the new version: never deleted."
+msgstr ""
 
 msgid "{} stays at {}."
 msgstr "{} se queda en {}."
@@ -20924,6 +21311,11 @@ msgstr "{} · {} en las bases de datos · {}"
 
 msgid "{} · {} ms"
 msgstr "{} · {} ms"
+
+msgid "{} · {} thread"
+msgid_plural "{} · {} threads"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "{} · {} · {}"
 msgstr "{} · {} · {}"
@@ -21340,6 +21732,12 @@ msgstr "· %s · %d en paralelo%s"
 msgid "· 30 seconds, as many squares as you can"
 msgstr "· 30 segundos, tantas casillas como puedas"
 
+msgid "· Lichess analyses with it"
+msgstr ""
+
+msgid "· Lichess asks for the Chess960 mode, which this engine does not know: it cannot serve."
+msgstr ""
+
 msgid "· Lichess cannot be reached from here: {}"
 msgstr "· No se puede acceder a Lichess desde aquí: {}"
 
@@ -21409,6 +21807,9 @@ msgstr ""
 msgid "· in the chat"
 msgstr "· en el chat"
 
+msgid "· it waits for the network, then resumes by itself"
+msgstr ""
+
 msgid "· its model is writing: {} of {} passages…"
 msgstr ""
 
@@ -21433,6 +21834,9 @@ msgstr ""
 msgid "· not sent yet"
 msgstr "· aún no enviada"
 
+msgid "· one per folder of the profile"
+msgstr ""
+
 msgid "· pairs [0-2]: %d  %d  %d  %d  %d"
 msgstr "· pares [0-2]: %d  %d  %d  %d  %d"
 
@@ -21445,6 +21849,9 @@ msgstr ""
 msgid "· the continuations played most, as far as they stay common"
 msgstr ""
 
+msgid "· the requests stay unanswered meanwhile"
+msgstr ""
+
 msgid "· the token lasts until {}"
 msgstr "· el token es válido hasta {}"
 
@@ -21455,6 +21862,9 @@ msgstr[1] ""
 
 msgid "· unrated while you test it, as Lichess asks; tick it afterwards"
 msgstr "· amistosas mientras lo pruebas, como pide Lichess; márcala después"
+
+msgid "· waiting for a request from your analysis board"
+msgstr ""
 
 msgid "· waiting for challenges"
 msgstr "· esperando desafíos"
@@ -21555,6 +21965,9 @@ msgid "“{}” and “{}” brought together in the table of names. Ctrl+Z undo
 msgstr ""
 
 msgid "“{}” and “{}” cannot both be true. Told before searching: nothing is started."
+msgstr ""
+
+msgid "“{}” at Lichess, for {}'s account · {} · {} at most"
 msgstr ""
 
 msgid "“{}” brought together"

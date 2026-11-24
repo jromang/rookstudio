@@ -3054,6 +3054,9 @@ msgstr ""
 msgid "Compacted: {} given back."
 msgstr ""
 
+msgid "Compacting waits until the segment that cannot be read is dealt with: “Keep what can be read” first."
+msgstr ""
+
 msgid "Compacting: segment {} of {}"
 msgstr ""
 
@@ -10707,6 +10710,9 @@ msgstr "白方视角"
 msgid "Segment {} cannot be read again: a block changed on the disk."
 msgstr ""
 
+msgid "Segment {} cannot be read again: a file of it is missing."
+msgstr ""
+
 msgid "Selects them in the library, the closest first, among the engines that work: Enter adds them."
 msgstr "在库中选中它们，最接近的在前，仅限能正常工作的引擎：按 Enter 添加。"
 
@@ -12727,6 +12733,9 @@ msgstr ""
 msgid "The games reviewed so far keep their reviews and their exercises."
 msgstr "已复盘的对局会保留其复盘和练习。"
 
+msgid "The games that cannot be read set aside (deleted), their numbers kept, and their segment written again; undone until RookStudio closes."
+msgstr ""
+
 msgid "The games that cannot reach it (their pawns, their material) are left out without being replayed."
 msgstr "无法到达该局面的对局（根据其兵和子力判断）会直接排除，无需重放。"
 
@@ -13261,6 +13270,10 @@ msgstr ""
 msgid "The other headers, as the game has them:"
 msgstr "其他头信息（按对局中的原样）："
 
+msgid "The other segments work. {} game cannot be read."
+msgid_plural "The other segments work. {} games cannot be read."
+msgstr[0] ""
+
 msgid "The other settings: those of the New tournament page."
 msgstr "其他设置：取自“新建锦标赛”页面。"
 
@@ -13359,6 +13372,9 @@ msgstr "PGN 文件中按名称（不计大小写和空格）或按你的选择�
 
 msgid "The players of the PGN files that are no library engine by their name, letter case and spaces aside. Say which library engine a player is, and its games are the engine's; the choice is kept for every PGN file that names the player. A name that two library engines have waits for your choice; a hint is a guess, never applied."
 msgstr "PGN 文件中按名称（不计大小写和空格）不是库引擎的棋手。指定某位棋手是哪个库引擎，其对局即计为该引擎的对局；该选择对所有提到此棋手的 PGN 文件都有效。两个库引擎共有的名称需要你来选择；提示只是猜测，从不自动应用。"
+
+msgid "The players, events and sites first imported with it are lost too: other games show “?” in their place."
+msgstr ""
 
 msgid "The points scored against the players who scored half the points or more."
 msgstr ""
@@ -15044,6 +15060,9 @@ msgstr "更改内容：{}"
 
 msgid "What comes back today, then the exercises by kind. Everything works offline; what goes to Lichess is said where you choose it."
 msgstr "今天要复习的内容，然后是按类别分的练习。一切都可离线使用；发送给 Lichess 的内容会在你选择的地方说明。"
+
+msgid "What could be read is kept. The damaged files stay until RookStudio closes: until then, “Undo” puts them back."
+msgstr ""
 
 msgid "What differs"
 msgstr ""
@@ -18018,6 +18037,9 @@ msgstr "宜简短：它显示在切换器下方"
 msgid "site"
 msgstr ""
 
+msgid "something was written to the database since"
+msgstr ""
+
 msgid "sorted by mean Elo"
 msgstr ""
 
@@ -19167,6 +19189,10 @@ msgstr "剩余 {} 天 {} 小时"
 
 msgid "{} damaged game set aside"
 msgid_plural "{} damaged games set aside"
+msgstr[0] ""
+
+msgid "{} damaged game set aside, its number kept. Ctrl+Z undoes."
+msgid_plural "{} damaged games set aside, their numbers kept. Ctrl+Z undoes."
 msgstr[0] ""
 
 msgid "{} day"

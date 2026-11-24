@@ -3076,6 +3076,9 @@ msgstr ""
 msgid "Compacted: {} given back."
 msgstr ""
 
+msgid "Compacting waits until the segment that cannot be read is dealt with: “Keep what can be read” first."
+msgstr ""
+
 msgid "Compacting: segment {} of {}"
 msgstr ""
 
@@ -10777,6 +10780,9 @@ msgstr "Visto dal Bianco"
 msgid "Segment {} cannot be read again: a block changed on the disk."
 msgstr ""
 
+msgid "Segment {} cannot be read again: a file of it is missing."
+msgstr ""
+
 msgid "Selects them in the library, the closest first, among the engines that work: Enter adds them."
 msgstr "Li seleziona nella libreria, i più vicini per primi, tra i motori che funzionano: Invio li aggiunge."
 
@@ -12822,6 +12828,9 @@ msgstr ""
 msgid "The games reviewed so far keep their reviews and their exercises."
 msgstr "Le partite già esaminate conservano i loro resoconti e i loro esercizi."
 
+msgid "The games that cannot be read set aside (deleted), their numbers kept, and their segment written again; undone until RookStudio closes."
+msgstr ""
+
 msgid "The games that cannot reach it (their pawns, their material) are left out without being replayed."
 msgstr "Le partite che non possono raggiungerla (per i pedoni, per il materiale) vengono escluse senza essere rigiocate."
 
@@ -13356,6 +13365,11 @@ msgstr ""
 msgid "The other headers, as the game has them:"
 msgstr "Le altre intestazioni, come le ha la partita:"
 
+msgid "The other segments work. {} game cannot be read."
+msgid_plural "The other segments work. {} games cannot be read."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "The other settings: those of the New tournament page."
 msgstr "Le altre impostazioni: quelle della pagina Nuovo torneo."
 
@@ -13454,6 +13468,9 @@ msgstr "I giocatori dei file PGN presi per motori della libreria, per nome, maiu
 
 msgid "The players of the PGN files that are no library engine by their name, letter case and spaces aside. Say which library engine a player is, and its games are the engine's; the choice is kept for every PGN file that names the player. A name that two library engines have waits for your choice; a hint is a guess, never applied."
 msgstr "I giocatori dei file PGN che non sono un motore della libreria per nome, maiuscole e spazi a parte. Indica quale motore della libreria è un giocatore, e le sue partite sono quelle del motore; la scelta vale per ogni file PGN che nomina il giocatore. Un nome che hanno due motori della libreria attende la tua scelta; un suggerimento è un'ipotesi, mai applicata."
+
+msgid "The players, events and sites first imported with it are lost too: other games show “?” in their place."
+msgstr ""
 
 msgid "The points scored against the players who scored half the points or more."
 msgstr ""
@@ -15153,6 +15170,9 @@ msgstr "Cosa è cambiato: {}"
 
 msgid "What comes back today, then the exercises by kind. Everything works offline; what goes to Lichess is said where you choose it."
 msgstr "Ciò che torna oggi, poi gli esercizi per tipo. Tutto funziona offline; ciò che va a Lichess viene indicato dove lo scegli."
+
+msgid "What could be read is kept. The damaged files stay until RookStudio closes: until then, “Undo” puts them back."
+msgstr ""
 
 msgid "What differs"
 msgstr ""
@@ -18166,6 +18186,9 @@ msgstr "breve: viene scritto sotto il selettore"
 msgid "site"
 msgstr ""
 
+msgid "something was written to the database since"
+msgstr ""
+
 msgid "sorted by mean Elo"
 msgstr ""
 
@@ -19349,6 +19372,11 @@ msgstr "mancano {} g {} h"
 
 msgid "{} damaged game set aside"
 msgid_plural "{} damaged games set aside"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{} damaged game set aside, its number kept. Ctrl+Z undoes."
+msgid_plural "{} damaged games set aside, their numbers kept. Ctrl+Z undoes."
 msgstr[0] ""
 msgstr[1] ""
 

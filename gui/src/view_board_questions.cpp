@@ -92,11 +92,11 @@ void drawComparison(const commentary::Position& from, const commentary::Answered
     ImGui::PopTextWrapPos();
 }
 
-// A move with its number, as the notation writes it: "14.Nd5", "14…Bxd5".
-std::string numberedSan(const chess::Board& before, const std::string& san) {
-    const auto n = before.fullMoveNumber();
-    return before.sideToMove() == chess::Color::WHITE ? fmt::format("{}.{}", n, localSan(san))
-                                                      : fmt::format("{}…{}", n, localSan(san));
+// A move with its number, as the notation writes it: "14.Nd5", "14…Bxd5"; in the interface's letters, or as `san` is.
+std::string numberedSan(const chess::Board& before, const std::string& san, bool local = true) {
+    const auto n     = before.fullMoveNumber();
+    const auto shown = local ? localSan(san) : san;
+    return before.sideToMove() == chess::Color::WHITE ? fmt::format("{}.{}", n, shown) : fmt::format("{}…{}", n, shown);
 }
 
 }  // namespace
@@ -355,9 +355,11 @@ void App::drawBoardQuestions() {
     std::vector<std::pair<std::string, std::string>> chips;
     const bool asked_french = french();
     if (b.ply >= 1 && b.ply <= static_cast<int>(b.game.moves.size())) {
-        const auto san =
-            numberedSan(boardAt(b.game, b.chess960, b.ply - 1), b.game.moves[static_cast<std::size_t>(b.ply - 1)].san);
-        chips.emplace_back(trf("Why {}?", san), asked_french ? std::string() : fmt::format("Why {}?", san));
+        // Shown in the interface's letters (#66), asked in the assistant's: French ones, else English.
+        const auto before = boardAt(b.game, b.chess960, b.ply - 1);
+        const auto& san   = b.game.moves[static_cast<std::size_t>(b.ply - 1)].san;
+        chips.emplace_back(trf("Why {}?", numberedSan(before, san)),
+                           asked_french ? std::string() : fmt::format("Why {}?", numberedSan(before, san, false)));
     }
     for (const char* c : {N_("What is the threat?"), N_("What is the best move?"), N_("Who played this position?"),
                           N_("What is this opening?")})

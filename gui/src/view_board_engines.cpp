@@ -562,6 +562,9 @@ void App::drawSideEngineCard(std::size_t index, const std::vector<SideEngine>& l
                 it.bold = true;  // the first move strong
                 break;
             }
+            if (!figurines)  // letters rather than figurines: the language's (#66)
+                for (auto& it : items)
+                    if (it.kind == NotationItem::Kind::Move) it.text = localSan(it.text);
             const auto ev = drawNotation(id, items, ImGui::GetContentRegionAvail().x, figurines, max_lines);
             if (ev.hovered >= 0) {
                 BoardPreview preview;

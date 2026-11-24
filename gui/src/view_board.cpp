@@ -26,6 +26,7 @@
 #include "console.hpp"
 #include "i18n.hpp"
 #include "notation_view.hpp"
+#include "piece_letters.hpp"
 #include "review_bridge.hpp"
 #include "review_stats.hpp"
 #include "run.hpp"
@@ -39,67 +40,6 @@ namespace {
 // The nodes of the Chess space's review in each position (#61): "320,000 nodes per position".
 std::string reviewNodesText(uint64_t nodes) {
     return trn("{} node per position", "{} nodes per position", nodes, ui::exactCount(nodes));
-}
-
-// A letter a move can begin with: a file, a piece (English or French letters), castling.
-bool moveStart(ImWchar c) {
-    return (c >= 'a' && c <= 'h') || c == 'K' || c == 'Q' || c == 'R' || c == 'B' || c == 'N' || c == 'O' || c == '0' ||
-           c == 'C' || c == 'F' || c == 'T' || c == 'D';
-}
-
-// The French letters of the pieces (R D T F C) and the English ones (K Q R B N).
-char frenchPiece(char english) {
-    switch (english) {
-        case 'K':
-            return 'R';
-        case 'Q':
-            return 'D';
-        case 'R':
-            return 'T';
-        case 'B':
-            return 'F';
-        case 'N':
-            return 'C';
-        default:
-            return english;
-    }
-}
-
-char englishPiece(char french) {
-    switch (french) {
-        case 'R':
-            return 'K';
-        case 'D':
-            return 'Q';
-        case 'T':
-            return 'R';
-        case 'F':
-            return 'B';
-        case 'C':
-            return 'N';
-        default:
-            return french;
-    }
-}
-
-// A SAN as the interface writes it: French letters in French ("Cf3", "e8=D").
-std::string shownSan(std::string san, bool french) {
-    if (!french || san.empty()) return san;
-    if (std::isupper(static_cast<unsigned char>(san[0])) && san[0] != 'O') san[0] = frenchPiece(san[0]);
-    if (const auto eq = san.find('='); eq != std::string::npos && eq + 1 < san.size())
-        san[eq + 1] = frenchPiece(san[eq + 1]);
-    return san;
-}
-
-// What was typed as an English SAN: French letters read as French in French, "0-0" as "O-O".
-std::string englishSan(std::string typed, bool french) {
-    for (auto& c : typed)
-        if (c == '0') c = 'O';
-    if (!french || typed.empty()) return typed;
-    if (std::isupper(static_cast<unsigned char>(typed[0])) && typed[0] != 'O') typed[0] = englishPiece(typed[0]);
-    if (const auto eq = typed.find('='); eq != std::string::npos && eq + 1 < typed.size())
-        typed[eq + 1] = englishPiece(typed[eq + 1]);
-    return typed;
 }
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
@@ -186,7 +126,7 @@ struct LineBoard final : chess::Board {
 
 }  // namespace
 
-std::string localSan(std::string san) { return shownSan(std::move(san), i18n::language() == i18n::Language::French); }
+std::string localSan(std::string san) { return sanIn(san, i18n::language()); }
 
 std::string localLine(const std::string& line) {
     // Each move of "12.Nf3 Nc6 13.Be2", its number kept.
@@ -854,7 +794,7 @@ void App::drawNewMoveQuestion() {
     }
     const auto& b    = board_;
     const auto board = boardAt(b.game, b.chess960, b.ply);
-    const auto san   = shownSan(chess::uci::moveToSan(board, *new_move_), i18n::language() == i18n::Language::French);
+    const auto san   = localSan(chess::uci::moveToSan(board, *new_move_));
     std::optional<NewMove> as;
     ImGui::TextDisabled("%s", trf("{}: the game went another way here", san).c_str());
     struct Choice {
@@ -1121,10 +1061,11 @@ void App::boardMoveKeys() {
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput) return;
     for (const ImWchar c : io.InputQueueCharacters) {
-        if (!b.move_typed && !io.KeyCtrl && !io.KeyAlt && moveStart(c)) {
+        if (!b.move_typed && !io.KeyCtrl && !io.KeyAlt && beginsMove(c, i18n::language())) {
+            // Its letter as UTF-8: the Russian letters are two bytes (#66).
             b.move_typed.emplace();
-            (*b.move_typed)[0] = static_cast<char>(c);
-            b.move_focus       = true;
+            ImTextCharToUtf8(b.move_typed->data(), c);
+            b.move_focus = true;
             b.move_error.clear();
         }
     }
@@ -1133,69 +1074,137 @@ void App::boardMoveKeys() {
 void App::drawMoveField() {
     auto& b = board_;
     if (!b.move_typed) return;
-    const bool french = i18n::language() == i18n::Language::French;
+    const auto language = i18n::language();
     // During the opponent's turn of a live game on Lichess, the user's moves, made in advance (#84).
     const auto board = boardForPicking(boardAt(b.game, b.chess960, b.ply));
-    // Focused, the field would select its text, which the next letter would replace: the cursor after it instead.
-    static bool cursor_at_end = false;
+    // Focused, the field would select its text, which the next letter would replace: the cursor after it instead. The
+    // arrows choose among the moves offered.
+    struct Keys {
+        bool at_end = false;
+        int step    = 0;
+    };
+    static Keys keys;
+    keys.step = 0;
     if (b.move_focus) {
         ImGui::SetKeyboardFocusHere();
-        b.move_focus  = false;
-        cursor_at_end = true;
+        b.move_focus = false;
+        keys.at_end  = true;
     }
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
     const bool enter = ImGui::InputTextWithHint(
         "##move_typed", TR("A move"), b.move_typed->data(), b.move_typed->size(),
-        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways,
+        ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways | ImGuiInputTextFlags_CallbackHistory,
         [](ImGuiInputTextCallbackData* data) {
-            auto* at_end = static_cast<bool*>(data->UserData);
-            if (*at_end) {
+            auto* k = static_cast<Keys*>(data->UserData);
+            if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
+                k->step += data->EventKey == ImGuiKey_UpArrow ? -1 : 1;
+            } else if (k->at_end) {
                 data->CursorPos = data->SelectionStart = data->SelectionEnd = data->BufTextLen;
-                *at_end                                                     = false;
+                k->at_end                                                   = false;
             }
             return 0;
         },
-        &cursor_at_end);
+        &keys);
     if (ImGui::IsItemDeactivated() && !enter && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         b.move_typed.reset();
         return;
     }
-    // The legal moves it may be, as the notation writes them.
+    // The legal moves it may be, as the notation writes them: in the language's letters first, then those English
+    // letters find (#66).
     const std::string typed = b.move_typed->data();
-    std::vector<std::pair<std::string, chess::Move>> matches;
-    chess::Movelist legal;
-    chess::movegen::legalmoves(legal, board);
-    for (const auto& m : legal) {
-        const auto san = chess::uci::moveToSan(board, m);
-        if (shownSan(san, french).rfind(typed, 0) == 0 || san.rfind(typed, 0) == 0) matches.push_back({san, m});
+    const auto matches      = typedMoves(board, typed, language);
+    if (typed != b.move_choice_of) {
+        b.move_choice    = 0;
+        b.move_choice_of = typed;
     }
+    if (!matches.empty())
+        b.move_choice = std::clamp(b.move_choice + keys.step, 0, static_cast<int>(matches.size()) - 1);
+    std::optional<chess::Move> play;
     if (enter) {
-        std::optional<chess::Move> move;
-        try {
-            auto san = englishSan(typed, french);
+        // The move chosen with the arrows; else the text read as a whole move, in the language's letters, then in
+        // English ones (a piece named on two files where one would do); else the first move offered.
+        if (b.move_choice > 0 && b.move_choice < static_cast<int>(matches.size()))
+            play = matches[static_cast<std::size_t>(b.move_choice)].move;
+        for (const auto as : {language, i18n::Language::English}) {
+            if (play) break;
+            auto san = englishTyped(typed, as);
             std::erase_if(san, [](char c) { return c == '!' || c == '?'; });  // a symbol typed after it
-            const auto m = chess::uci::parseSan(board, san);
-            if (m != chess::Move::NO_MOVE) move = m;
-        } catch (...) {
+            try {
+                const auto m = chess::uci::parseSan(board, san);
+                chess::Movelist legal;
+                chess::movegen::legalmoves(legal, board);
+                if (m != chess::Move::NO_MOVE && std::find(legal.begin(), legal.end(), m) != legal.end()) play = m;
+            } catch (...) {
+            }
         }
-        if (!move && matches.size() == 1) move = matches[0].second;  // what was typed names one move only
-        if (move) {
-            b.move_typed.reset();
-            boardPlayAsked(*move);
-            return;
+        if (!play && !matches.empty()) play = matches.front().move;
+        if (!play) {
+            b.move_error = TR("Not a legal move here");
+            b.move_focus = true;
         }
-        b.move_error = TR("Not a legal move here");
-        b.move_focus = true;
     }
     ImGui::SameLine();
     if (!b.move_error.empty()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", b.move_error.c_str());
+    } else if (matches.empty()) {
+        ImGui::TextDisabled("%s", TR("No legal move begins so"));
     } else {
-        std::string hint;
-        for (std::size_t i = 0; i < matches.size() && i < 8; ++i)
-            hint += (i ? " · " : "") + shownSan(matches[i].first, french);
-        if (matches.size() > 8) hint += " …";
-        ImGui::TextDisabled("%s", matches.empty() ? TR("No legal move begins so") : hint.c_str());
+        // The moves offered, the one Enter plays in the accent; a click plays one. Those English letters find where
+        // the language reads another piece, after their piece's name: "rook (English)".
+        static const char* const english_names[] = {N_("king (English)"), N_("queen (English)"), N_("rook (English)"),
+                                                    N_("bishop (English)"), N_("knight (English)")};
+
+        const auto& style = ImGui::GetStyle();
+        bool marked       = false;
+        for (std::size_t i = 0; i < matches.size() && i < 8; ++i) {
+            const auto& m = matches[i];
+            if (m.english && !marked) {
+                marked           = true;
+                const int index  = m.english == chess::PieceType::KING     ? 0
+                                   : m.english == chess::PieceType::QUEEN  ? 1
+                                   : m.english == chess::PieceType::ROOK   ? 2
+                                   : m.english == chess::PieceType::BISHOP ? 3
+                                                                           : 4;
+                const auto label = trf("· {}", TR(english_names[index]));
+                ui::sameLineOrWrap(ImGui::CalcTextSize(label.c_str()).x, px(6));
+                ImGui::TextDisabled("%s", label.c_str());
+            }
+            const float w = ImGui::CalcTextSize(m.shown.c_str()).x + style.FramePadding.x * 2;
+            if (i > 0 || marked) ui::sameLineOrWrap(w, px(4));
+            const bool chosen = static_cast<int>(i) == b.move_choice;
+            if (chosen) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ui::ACCENT);
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_WHITE);
+            }
+            ImGui::PushID(static_cast<int>(i));
+            if (ImGui::SmallButton(m.shown.c_str())) play = m.move;
+            ImGui::PopID();
+            if (chosen) ImGui::PopStyleColor(2);
+        }
+        if (matches.size() > 8) {
+            ui::sameLineOrWrap(ImGui::CalcTextSize("…").x, px(4));
+            ImGui::TextDisabled("…");
+        }
+        // How to choose, and the English letters that find the same moves ("Ng" for the German "Sg"), said when they
+        // do: the Russian "К" finds the king's moves too, which "N" does not.
+        std::string note   = TR("↑ ↓ choose, Enter plays");
+        const auto english = englishTyped(typed, language);
+        if (english != englishTyped(typed, i18n::Language::English)) {
+            const auto raw = [](const std::vector<TypedMove>& list) {
+                std::vector<uint16_t> out;
+                for (const auto& m : list) out.push_back(m.move.move());
+                std::sort(out.begin(), out.end());
+                return out;
+            };
+            if (raw(typedMoves(board, english, i18n::Language::English)) == raw(matches))
+                note += " · " + trf("“{}” gives the same", english);
+        }
+        ui::sameLineOrWrap(ImGui::CalcTextSize(note.c_str()).x, px(8));
+        ImGui::TextDisabled("%s", note.c_str());
+    }
+    if (play) {
+        b.move_typed.reset();
+        boardPlayAsked(*play);
     }
 }
 
@@ -2120,6 +2129,13 @@ void App::drawBoardColumn(float size) {
     decor.selected = b.selected;
     if (b.selected) {
         for (const auto& m : movesFrom(pick, *b.selected)) decor.targets.push_back(shownTarget(m));
+    } else if (b.move_typed && chessBoard()) {
+        // A move being typed (#66): where the moves offered go, and the one Enter plays, in the accent's blue.
+        const auto typed = typedMoves(pick, b.move_typed->data(), i18n::language());
+        for (const auto& m : typed) decor.targets.push_back(shownTarget(m.move));
+        if (b.move_choice >= 0 && b.move_choice < static_cast<int>(typed.size()) &&
+            b.move_choice_of == b.move_typed->data())
+            decor.arrows.push_back({typed[static_cast<std::size_t>(b.move_choice)].move, IM_COL32(47, 111, 222, 190)});
     }
     // A game on Lichess (#84): a move made in advance, dashed; by correspondence, the move waiting for Enter.
     if (onlineShown() && b.line < 0 && b.ply == static_cast<int>(b.game.moves.size())) {
@@ -2964,6 +2980,9 @@ void App::drawBoardMoves(float height) {
         }
         const auto tags = engineTags();  // what shows beside a tournament engine's moves (#87)
 
+        // In the Chess space, letters rather than figurines are the language's (#66).
+        const bool letters = chessBoard() && !appearance::current().figurines;
+
         const std::function<void(int, int, chess::Board, int)> emit = [&](int line, int base, chess::Board at,
                                                                           int depth) {
             const auto& moves = line < 0 ? main.moves : b.tree.variations[static_cast<std::size_t>(line)].moves;
@@ -2989,7 +3008,8 @@ void App::drawBoardMoves(float height) {
                 }
                 number = false;
                 NotationItem item;
-                item.text    = m.san.empty() ? chess::uci::moveToSan(at, m.move) : m.san;
+                item.text = m.san.empty() ? chess::uci::moveToSan(at, m.move) : m.san;
+                if (letters) item.text = localSan(item.text);
                 item.id      = id_of(line, ply + 1);
                 item.current = line == owner && ply + 1 == b.ply;
                 item.indent  = px(10) * static_cast<float>(depth);
@@ -3393,7 +3413,7 @@ void App::drawThisMove() {
     const auto judged = (b.line < 0 || boardMainPly() == ply) && static_cast<std::size_t>(ply - 1) < b.judged.size()
                             ? b.judged[static_cast<std::size_t>(ply - 1)]
                             : MoveReview{};
-    std::string text  = fmt::format("{}{}{}{}", number, m.mover == chess::Color::WHITE ? "." : "…", m.san,
+    std::string text  = fmt::format("{}{}{}{}", number, m.mover == chess::Color::WHITE ? "." : "…", boardSan(m.san),
                                     judgementMark(judged.judgement));
     if (m.book) {
         text += "   " + std::string(TR("book move"));
@@ -3648,8 +3668,8 @@ std::string App::boardMoveLabel(int ply) const {
 }
 
 std::string App::boardSan(std::string san) const {
-    if (!chessBoard() || i18n::language() != i18n::Language::French) return san;
-    return frenchSan(std::move(san));
+    if (!chessBoard()) return san;
+    return sanIn(san, i18n::language());
 }
 
 void App::drawBoardReview() {

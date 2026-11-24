@@ -1682,8 +1682,8 @@ class App {
     void drawBoardTable();   // the Table tab: each move with its engine's score, depth and time
     void drawBoardReview();  // the Review tab: each side's accuracy and figures, the key moments, who saw them
     [[nodiscard]] std::string boardMoveLabel(int ply) const;  // "12…Qa5", the game's move leading to `ply`
-    // A move's SAN as the board's space writes it: in the Chess space, the reader's piece letters, as the assistant's
-    // sentences have them ("27.Txe8" in French); in the Engines space, as the PGN has it.
+    // A move's SAN as the board's space writes it: in the Chess space, the piece letters of the interface's language
+    // (#66: "27.Txe8" in French and in German); in the Engines space, as the PGN has it.
     [[nodiscard]] std::string boardSan(std::string san) const;
     // The line shown on the board: the game (-1) or a variation, at its position `ply`.
     void showBoardLine(int line, int ply);

@@ -316,10 +316,14 @@ struct BoardPage {
     double nag_time = 0;               // when the last of them was
     std::string toast;                 // a change said for a moment over the moves
     double toast_time = -100;
-    // The move being typed (the Chess space): opened by its first letter, played by Enter, Escape closing it.
+    // The move being typed (the Chess space): opened by its first letter, played by Enter, Escape closing it; the legal
+    // moves it may be offered under it, in the letters of the interface's language and in English ones (#66), the one
+    // chosen with the arrows (its index among them, for the text `move_choice_of`).
     std::optional<std::array<char, 16>> move_typed;
     bool move_focus = false;  // the field takes the keys on its next frame
     std::string move_error;
+    int move_choice = 0;
+    std::string move_choice_of;
 };
 
 // The board's game before a change, which Ctrl+Z brings back.

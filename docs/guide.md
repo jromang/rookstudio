@@ -1029,8 +1029,17 @@ board, makes the game a page to replay, a diagram, an animated GIF or a PDF; <kb
 copies the diagram of the position (see [Exporting and printing](#exporting-and-printing)).
 
 A move is typed as well as played: its first letter opens a field above the tabs, which offers the legal moves that
-begin so (in English letters, K Q R B N; in French, R D T F C), and Enter plays it. The letters of the engines' Board
-are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis, Alt+X shows the threat, Alt+G
+begin so, in the piece letters of the interface's language: K Q R B N in English and in Chinese, R D T F C in French,
+K D T L S in German, R D T A C in Spanish and in Italian, R D T B C in Brazilian Portuguese, Кр Ф Л С К in Russian.
+English letters are always read too: `Ng` offers the same moves as the German `Sg`. A letter with two meanings offers
+both: in French, Spanish, Italian and Portuguese, R gives the king's moves first, then the rook's, marked *rook
+(English)*; in Russian, К gives the knight's moves and the king's, Кр the king's only. The squares the moves offered go
+to are dotted on the board, the first one's arrow drawn: ↑ and ↓ choose another, Enter plays the one chosen, a click
+plays any of them, and `0-0` is castling too. The same field takes the moves of the Training page's exercises (the
+puzzles, your mistakes, guessing the moves, the endgames) and of the games of the Play page. The interface writes the
+moves in the same letters (the notation when *Figurines in the notation* is off, the engines' lines, the review); the
+PGN keeps English SAN, as every program reads it, and the assistant's comments keep the letters of their own language.
+The letters of the engines' Board are then under Alt: Alt+F turns the board over, Alt+A starts or stops the analysis, Alt+X shows the threat, Alt+G
 analyses the game, Alt+N and Alt+Shift+N go to the next and the previous move the analysis marked.
 
 ### Several engines side by side

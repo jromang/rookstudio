@@ -863,6 +863,15 @@ void Database::load(bool clean, int tries) {
                               {name, versions ? GameId{0} : snap->games_, games, versions, e.what(),
                                s.value("source", std::string()), names == 0 || segment->namesKnown()},
                               !names_lost});
+            // A file missing, or one changed: said apart (sig.bin only where its format has one, as the error says).
+            const std::string why = e.what();
+            std::error_code ec;
+            bool missing = !fs::is_directory(dir_ / name, ec);
+            for (const char* file : {"cols.bin", "moves.bin", "annex.bin", "names.bin", "sig.bin"}) {
+                if (std::string_view(file) == "sig.bin" && why.find("sig.bin") == std::string::npos) continue;
+                missing = missing || !fs::exists(dir_ / name / file, ec);
+            }
+            unread.back().bad.missing = missing;
         }
         if (!versions) {
             snap->logical_.push_back(snap->segments_.size());

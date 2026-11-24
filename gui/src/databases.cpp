@@ -106,6 +106,7 @@ DamageSummary damageSummary(const study::CheckReport& report, const study::Snaps
             s.why = s.why.substr(0, start) + s.why.substr(s.why.find_last_of("/\\") + 1);
         }
         s.names_lost = !bad.names_kept;
+        s.missing    = bad.missing;
         out.segments.push_back(std::move(s));
     }
     // A damaged game of those segments: one they add, or one whose last version they hold (it cannot be read since

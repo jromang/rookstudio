@@ -105,6 +105,8 @@ struct BadSegment {
     std::string source;
     // Its names.bin still reads (or it brought no name): the names it brought, which later games may use, are kept.
     bool names_kept = true;
+    // A file of it, or its folder, is not there; else one is there but changed (cut short, written over).
+    bool missing = false;
 };
 
 class Snapshot {

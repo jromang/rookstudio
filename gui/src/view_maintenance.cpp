@@ -1492,7 +1492,9 @@ void App::drawCareChecks(std::size_t index) {
                 ImGui::SameLine();
                 ImGui::TextColored(
                     ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                    trf("Segment {} cannot be read again: a block changed on the disk.", bad.number).c_str());
+                    (bad.missing ? trf("Segment {} cannot be read again: a file of it is missing.", bad.number)
+                                 : trf("Segment {} cannot be read again: a block changed on the disk.", bad.number))
+                        .c_str());
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", bad.why.c_str());  // the store's reason
                 if (bad.names_lost)
                     ImGui::TextDisabled("%s", TR("The players, events and sites first imported with it are lost too: "

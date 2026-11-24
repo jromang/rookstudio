@@ -57,6 +57,7 @@ struct DamageSummary {
         std::string number;       // "7" for seg-000007
         std::string why;          // the store's reason, without the database's folder
         bool names_lost = false;  // the names it brought read "?"
+        bool missing    = false;  // a file of it is not there (else one changed on the disk)
     };
     std::vector<Segment> segments;
     uint64_t in_segments = 0;                               // the damaged games of those segments

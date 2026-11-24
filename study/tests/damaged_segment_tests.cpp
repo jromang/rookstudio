@@ -245,6 +245,7 @@ TEST_CASE("damaged segment: each file cut short, removed or changed in its heade
         CHECK_FALSE(bad.error.empty());
         CHECK(bad.source == utf8(m.autumn));
         CHECK(bad.names_kept == !c.names_lost);
+        CHECK(bad.missing == (c.how == Harm::Removed));
         CHECK(snap->games() == 30);
         CHECK(snap->unreadableGames() == 10);
         CHECK(snap->deletedCount() == 10);

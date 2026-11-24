@@ -330,6 +330,7 @@ void App::frame() {
     pollPuzzles();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
     pollMistakes();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
     pollEndgames();         // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
+    pollEndgameCheck();     // a finished tournament's endgames against the tables (#94)
     pollEngineGame();       // a game against an engine: kept at each move, its end, a hint (#83)
     pollOnlinePlay();       // playing on Lichess: a seek, the challenges, the game on the Board (#84)
     pollBot();              // a Lichess bot for an engine: its account, its challenges, its game (#85)
@@ -862,6 +863,10 @@ void App::frame() {
             review_when_read_     = true;
             explain_after_review_ = true;
             dropFile(w.substr(14));
+        } else if (w.rfind("endgame-check=", 0) == 0) {
+            // endgame-check=DIR: that finished tournament's endgames checked against the tables, as its menu does
+            // (#94).
+            startEndgameCheck(w.substr(14));
         } else if (w.rfind("board-visit=", 0) == 0) {
             // board-visit=FILE: its first game on the study Board, its guided visit started once its review is read
             // (#94).
@@ -1527,6 +1532,7 @@ void App::resetRunView() {
 
 void App::clearRunView() {
     select_game_id_.reset();
+    select_game_ply_.reset();
     games_.clear();
     history_.clear();
     stats_   = {};
@@ -1610,7 +1616,10 @@ void App::pollRun() {
                                              [&](const GameRecord& g) { return g.game_id == *select_game_id_; });
                 if (it != games_.end()) {
                     selectGame(static_cast<int>(it - games_.begin()));
+                    if (select_game_ply_ && replay_)
+                        replay_ply_ = std::clamp(*select_game_ply_, 0, static_cast<int>(replay_->moves.size()));
                     select_game_id_.reset();
+                    select_game_ply_.reset();
                 }
             }
             totals_      = obs->totals();

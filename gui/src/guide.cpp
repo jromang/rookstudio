@@ -84,6 +84,7 @@ const std::vector<const char*>& allTopics() {
                                               CannotStart,
                                               Changing,
                                               Queue,
+                                              EndgameCheck,
                                               Ratings,
                                               RatingList,
                                               EngineCard,

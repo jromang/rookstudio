@@ -171,6 +171,7 @@ inline constexpr const char* Several            = "several-tournaments-at-once";
 inline constexpr const char* CannotStart        = "an-engine-that-cannot-start";
 inline constexpr const char* Changing           = "changing-a-running-tournament";
 inline constexpr const char* Queue              = "queue-and-relaunch";
+inline constexpr const char* EndgameCheck       = "checking-the-endgames-against-the-tables";
 inline constexpr const char* Ratings            = "ratings";
 inline constexpr const char* RatingList         = "rating-list";
 inline constexpr const char* EngineCard         = "engine-card";

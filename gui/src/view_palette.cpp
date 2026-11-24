@@ -197,6 +197,20 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             }
         }
     }
+    // The endgames of a finished tournament against the tables (#94), as its menu offers: the one shown, the last
+    // finished.
+    {
+        std::vector<std::pair<std::filesystem::path, std::string>> sources;
+        const bool shown_done = t && !run_->running() && !(unfinished_ && unfinished_->dir == t->dir());
+        if (shown_done) sources.emplace_back(t->dir(), name);
+        const auto busy = run_->running() && t ? t->dir() : std::filesystem::path();
+        for (const auto* s : home::lastFinished(tournaments_, home::LAST_FINISHED, busy))
+            if (!shown_done || s->dir != t->dir()) sources.emplace_back(s->dir, s->spec.name);
+        for (const auto& source : sources)
+            add(TR("Check the endgames against the tables"),
+                fmt::format("{} · {}", source.second, folderDate(source.first)),
+                [this, dir = source.first] { startEndgameCheck(dir); });
+    }
     // The engines that cannot start, as their card offers.
     if (t) {
         const bool editable = t->spec().format == tour::Format::RoundRobin ||

@@ -47,6 +47,7 @@
 #include "databases.hpp"
 #include "dialogs.hpp"
 #include "dossier.hpp"
+#include "endgame_check.hpp"
 #include "endgames.hpp"
 #include "engine_changes.hpp"
 #include "engine_downloads.hpp"
@@ -3043,6 +3044,39 @@ class App {
     };
     std::unique_ptr<VisitRun> visit_;
     bool visit_when_read_ = false;  // --focus board-visit=FILE: started once the game's review is read
+
+    // "Check the endgames against the tables" (#94 with #42, mockup M13, board 7, point 20): a finished tournament's
+    // games that reached seven pieces or fewer against the tables, asked from its menu (the right button on its header
+    // or its row on the Tournaments page) or Ctrl+K; its card under the tournament's header, nothing shown before.
+    struct EndgameCheckRun {
+        std::filesystem::path dir;
+        std::string name;
+        std::future<EndgameCheckGames> reading;  // its games and their checks
+        std::vector<CheckedGame> games;
+        std::vector<std::unique_ptr<EndgameGameCheck>> checks;
+        std::size_t current = 0;  // the game being checked
+        // The request out to Lichess's tables, one at a time: the game and the position it is for.
+        std::future<lichess::Answer<lichess::Tablebase>> asking;
+        std::size_t asking_game = 0, asking_ply = 0;
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        bool consent                              = false;  // a position waits for the user's word on Lichess's tables
+        bool allowed = false, not_now = false;              // Lichess's tables for this check, or not now
+        int from_disk = 0, from_profile = 0, from_lichess = 0;  // the positions each source told, Lichess's asked
+        std::map<std::string, TablesSays> told;                 // by FEN: a position two games reached is asked once
+        std::string error;                                      // Lichess's, the check waiting for "Try again"
+        std::optional<EndgameCheckSummary> summary;
+    };
+    std::unique_ptr<EndgameCheckRun> endgame_check_;
+    // The jobs of a check closed while they ran, kept until they end: a future's end would wait for them.
+    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_check_asking_left_;
+    std::vector<std::future<EndgameCheckGames>> endgame_check_reading_left_;
+    void startEndgameCheck(const std::filesystem::path& dir);
+    void closeEndgameCheck();
+    void pollEndgameCheck();
+    void drawEndgameCheck();
+    // A finished tournament's menu, the right button on it: its page's header, its row on the Tournaments page.
+    void drawTournamentMenu(const std::filesystem::path& dir);
+    void drawRowMenu(const std::filesystem::path& dir);  // the same on its row of the Tournaments page
     void startVisit();
     void visitShowMoment();
     void visitAnswer(chess::Move move);
@@ -4197,6 +4231,7 @@ class App {
     std::set<std::string> progress_engines_;  // Progress tab
     std::map<std::string, std::vector<tour::RatingPoint>> progress_;
     std::optional<uint64_t> select_game_id_;  // a game to show once its tournament is open
+    std::optional<int> select_game_ply_;      // and the position of it shown (the endgames' check)
 
     // Shell.
     Page page_ = Page::Home;

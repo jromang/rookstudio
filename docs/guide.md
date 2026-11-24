@@ -2645,7 +2645,9 @@ Three services, each asked about at its first use (for this position, always, or
   Analysis tab, and each move by its outcome in the Endgames tab, with the main lines of its moves (see [The Endgames
   tab](#the-endgames-tab)). A win the fifty-move rule turns into a draw, a “cursed win” in the tables' words, is said
   “won, but drawn by the fifty-move rule”. With eight pieces and opposing pawns, they give the verdict and the moves
-  to the next capture, promotion or mate.
+  to the next capture, promotion or mate. A finished tournament's check of its endgames asks them a few positions a
+  game, once allowed for that check or always (see [Checking the endgames against the
+  tables](#checking-the-endgames-against-the-tables)).
 - **Lichess's explorer**, in the Tree tab: for each position, its FEN and the filter chosen are sent with your
   token; it needs a linked account. Nothing of your databases is sent.
 
@@ -3347,6 +3349,30 @@ settings, the time control, the openings, the adjudication and the rest, every v
 named, and one changed since is marked as changed for this tournament. Change what should differ (another time control,
 the next version of an engine, another book), then **Start** or *Add to the queue*. A tournament still playing can be
 cloned too; one started by an older version, which did not keep its setup, cannot.
+
+### Checking the endgames against the tables
+
+A finished tournament's menu, a right click on its header or on its row on the Tournaments page (or **Ctrl+K**), has
+*Check the endgames against the tables*: the games that reached seven pieces or fewer, each result set against what the
+tablebases say. The answer comes in a card under the tournament's header, “12 games reached seven pieces or fewer: 3
+wins let slip (Alpha: 2, Bravo: 1), 1 lost position held, 2 draws adjudicated in a won position”, with a row for each
+finding, *Open* showing its game in the *Games* tab at the move it is about:
+
+- **a win let slip**: an engine's move after which the tables no longer give it the win (a draw, or the other side's
+  win); **a draw let slip**: an engine's move after which they give the other side the win;
+- **a lost position held**: a game drawn by the rules (a threefold repetition, the fifty-move rule) while the tables
+  still give one side the win at its end;
+- **a draw adjudicated in a won position**, by the tournament's draw rule or its move limit, and **a win adjudicated
+  against the tables**, by its resign rule. The tables' own adjudication agrees with them; a game lost on time, by an
+  illegal move or by a crash is judged on its moves only.
+
+A few positions a game are asked: the first one the tables can tell and the last, and when their verdicts differ, a
+bisection between them to the move that changed it (about ten positions for a long endgame). Your tables on the disk
+first (see [Tables for the endgames](#tables-for-the-endgames)), then the answers Lichess gave before, kept in your
+profile, then Lichess's 7-piece tables for the rest, once allowed: for this check, always, or not now (each position's
+FEN goes to tablebase.lichess.ovh, without an account), one request at a time, each answer kept for good. Without them,
+the games your disk's tables cannot tell are counted as left unjudged. Nothing of the tournament's page changes before
+the click.
 
 ## Ratings
 

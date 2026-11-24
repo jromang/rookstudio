@@ -369,7 +369,12 @@ void App::pollMistakes() {
                 }
             }
             for (const auto& [key, e] : live.exercises)
-                if (!scan.record.exercises.contains(key)) scan.record.keep(e);
+                if (!scan.record.exercises.contains(key)) {
+                    if (e.visit)  // a guided visit's card, added while it looked (#94)
+                        scan.record.exercises.emplace(key, e);
+                    else
+                        scan.record.keep(e);
+                }
             for (const auto& [key, k] : live.kept)
                 if (!scan.record.exercises.contains(key)) scan.record.kept.try_emplace(key, k);
             scan.record.answer_ms = live.answer_ms;

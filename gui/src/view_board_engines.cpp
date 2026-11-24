@@ -562,6 +562,9 @@ void App::drawSideEngineCard(std::size_t index, const std::vector<SideEngine>& l
                 it.bold = true;  // the first move strong
                 break;
             }
+            if (!figurines)  // letters rather than figurines: the language's (#66)
+                for (auto& it : items)
+                    if (it.kind == NotationItem::Kind::Move) it.text = localSan(it.text);
             const auto ev = drawNotation(id, items, ImGui::GetContentRegionAvail().x, figurines, max_lines);
             if (ev.hovered >= 0) {
                 BoardPreview preview;
@@ -578,6 +581,21 @@ void App::drawSideEngineCard(std::size_t index, const std::vector<SideEngine>& l
             if (ev.clicked >= 0) {
                 for (const auto& m : legalPrefix(board, l.pv, static_cast<std::size_t>(ev.clicked) + 1)) boardPlay(m);
                 b.preview.reset();
+            }
+            // The right button: "Why not?" its first move, against the game's (#94).
+            if (ev.right_clicked >= 0 && !l.pv.empty()) {
+                why_not_move_ = l.pv.front();
+                ImGui::OpenPopup("##why_not_line");
+            }
+            if (ImGui::BeginPopup("##why_not_line")) {
+                const auto moves = legalPrefix(board, {why_not_move_}, 1);
+                if (!moves.empty() &&
+                    ImGui::MenuItem(
+                        trf("Why not {}?", numbered(board, boardSan(chess::uci::moveToSan(board, moves.front()))))
+                            .c_str(),
+                        "Alt+Q"))
+                    whyNot(b.ply, why_not_move_, whyNotReference(board, why_not_move_));
+                ImGui::EndPopup();
             }
         };
         if (!lines.front().pv.empty()) line(lines.front(), "##best", 2);

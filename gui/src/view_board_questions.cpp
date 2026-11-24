@@ -21,9 +21,13 @@
 #include "assistant_notes.hpp"
 #include "assistant_service.hpp"
 #include "board_text.hpp"
+#include "endgames.hpp"
 #include "engine_oracle.hpp"
 #include "i18n.hpp"
 #include "machines.hpp"
+#include "online_cache.hpp"
+#include "review_tables.hpp"
+#include "tablebases.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -92,11 +96,11 @@ void drawComparison(const commentary::Position& from, const commentary::Answered
     ImGui::PopTextWrapPos();
 }
 
-// A move with its number, as the notation writes it: "14.Nd5", "14…Bxd5".
-std::string numberedSan(const chess::Board& before, const std::string& san) {
-    const auto n = before.fullMoveNumber();
-    return before.sideToMove() == chess::Color::WHITE ? fmt::format("{}.{}", n, localSan(san))
-                                                      : fmt::format("{}…{}", n, localSan(san));
+// A move with its number, as the notation writes it: "14.Nd5", "14…Bxd5"; in the interface's letters, or as `san` is.
+std::string numberedSan(const chess::Board& before, const std::string& san, bool local = true) {
+    const auto n     = before.fullMoveNumber();
+    const auto shown = local ? localSan(san) : san;
+    return before.sideToMove() == chess::Color::WHITE ? fmt::format("{}.{}", n, shown) : fmt::format("{}…{}", n, shown);
 }
 
 }  // namespace
@@ -183,9 +187,33 @@ void App::drawAssistantFirstUse() {
     ui::endCard();
 }
 
-void App::askQuestion(const std::string& text, const std::string& asked_text) {
+std::shared_ptr<commentary::Tablebases> App::boardPositionTables() {
+    const auto& b    = board_;
+    auto tables      = std::make_shared<commentary::Tablebases>();
+    bool taught      = false;
+    const auto teach = [&](const chess::Board& board) {
+        const int pieces = piecesOf(board);
+        if (pieces > 7 || b.chess960 || !board.castlingRights().isEmpty()) return;
+        const auto pos = commentary::Position::fromFen(board.getFen());
+        if (!pos) return;
+        std::optional<lichess::Tablebase> answer;
+        if (!diskTablesLocked() && diskTablesPieces() >= pieces) {
+            const auto lock = lockSyzygy();
+            answer          = probeDiskTables(board, endgameTablesPaths());
+        }
+        if (!answer) answer = cachedTablebase(storage_.root(), board.getFen());
+        if (answer && teachTables(*tables, *pos, *answer)) taught = true;
+    };
+    teach(boardAt(b.game, b.chess960, b.ply));
+    if (b.ply > 0) teach(boardAt(b.game, b.chess960, b.ply - 1));
+    return taught ? tables : nullptr;
+}
+
+void App::askQuestion(const std::string& text, const std::string& asked_text, std::optional<int> at_ply) {
     const auto& b = board_;
     if (text.empty() || !assistant_ || gameLocked()) return;  // fair play (#48)
+    // The position asked about: the board's, or another of the line shown ("Why not?" of a move tried: the one before).
+    const int ply = std::clamp(at_ply.value_or(b.ply), 0, static_cast<int>(b.game.moves.size()));
     // The engine that answers: the analysis's, kept while it is the same.
     const auto* engine = analysisEngine();
     if (!engine)
@@ -194,23 +222,22 @@ void App::askQuestion(const std::string& text, const std::string& asked_text) {
         oracle_ = std::make_shared<EngineOracle>(*engine);
     QuestionAsked q;
     q.question = text;
-    q.fen      = boardAt(b.game, b.chess960, b.ply).getFen();
+    q.fen      = boardAt(b.game, b.chess960, ply).getFen();
     q.line     = b.line;
-    q.ply      = b.ply;
+    q.ply      = ply;
     q.engine   = oracle_ ? oracle_->engine() : std::string();
     // What the answer is made from, owned by the thread that writes it: the position, the one before and the moves
     // that led to them, the moves from the usual start (the opening's name), the databases.
     std::vector<std::string> line;
     if (!b.chess960 && b.game.start_fen == std::string(chess::constants::STARTPOS))
-        for (int i = 0; i < b.ply && i < static_cast<int>(b.game.moves.size()); ++i)
+        for (int i = 0; i < ply && i < static_cast<int>(b.game.moves.size()); ++i)
             line.push_back(chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(i)].move, false));
     std::string earlier_fen, previous, earlier_previous;
-    if (b.ply >= 1) {
-        earlier_fen = boardAt(b.game, b.chess960, b.ply - 1).getFen();
-        previous    = chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(b.ply - 1)].move, b.chess960);
-        if (b.ply >= 2)
-            earlier_previous =
-                chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(b.ply - 2)].move, b.chess960);
+    if (ply >= 1) {
+        earlier_fen = boardAt(b.game, b.chess960, ply - 1).getFen();
+        previous    = chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(ply - 1)].move, b.chess960);
+        if (ply >= 2)
+            earlier_previous = chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(ply - 2)].move, b.chess960);
     }
     auto& s = shelf();
     for (std::size_t i = 0; i < s.entries().size(); ++i)
@@ -221,7 +248,7 @@ void App::askQuestion(const std::string& text, const std::string& asked_text) {
         std::async(std::launch::async,
                    [question = asked_text.empty() ? text : asked_text, fen = q.fen, earlier_fen, previous,
                     earlier_previous, line = std::move(line), bases = q.bases, lang, model = assistant_.get(),
-                    oracle = oracle_]() -> QuestionResult {
+                    oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
                        QuestionResult r;
                        const auto pos = commentary::Position::fromFen(fen);
                        if (!pos) {
@@ -260,7 +287,7 @@ void App::askQuestion(const std::string& text, const std::string& asked_text) {
                            asked.earlier_previous = two_back.parseUci(earlier_previous);
                        }
                        asked.line = moves;
-                       r.answer   = commentary::answer(asked, *model, oracle.get(), nullptr);
+                       r.answer   = commentary::answer(asked, *model, oracle.get(), tables.get());
                        // Two moves compared: the position they are played from, and what the databases hold of it,
                        // for the table under the answer.
                        if (const auto* a = std::get_if<commentary::Answered>(&r.answer);
@@ -281,6 +308,8 @@ void App::pollQuestions() {
     assistant_->setGpuTaken(gpuTournament());
     assistant_->poll();
     pollBoardComments();
+    pollExplained();  // every move explained (#94)
+    pollVisit();      // the guided visit (#94)
     pollStory();
     for (auto& q : questions_)
         if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
@@ -316,6 +345,103 @@ void App::addAssistantComment(const std::string& text, int line, int ply, const 
     boardToast(TR("Answer added to the notation · Ctrl+Z takes it back"));
 }
 
+void App::drawQuestionCard(std::size_t n, std::optional<std::size_t>& remove) {
+    auto& a = *assistant_;
+    auto& b = board_;
+    auto& q = questions_[n];
+    ImGui::PushID(static_cast<int>(n));
+    ui::beginCard("question");
+    ImGui::PushTextWrapPos();
+    ImGui::TextDisabled("%s", trf("You: {}", q.question).c_str());
+    const bool here = q.fen == boardFen();
+    if (!q.done) {
+        ImGui::TextUnformatted(a.state() == AssistantService::State::Loading ? TR("The model is loading…")
+                                                                             : TR("The assistant is thinking…"));
+    } else if (!q.done->error.empty()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", q.done->error.c_str());
+    } else if (const auto* ans = std::get_if<commentary::Answered>(&q.done->answer)) {
+        ImGui::TextUnformatted(ans->text.c_str());
+        if (ans->kind == commentary::Action::Kind::Compare && q.done->from)
+            drawComparison(*q.done->from, *ans, q.done->refs, q.engine, q.bases,
+                           french() ? commentary::PieceLetters::French : commentary::PieceLetters::English);
+        // What it rests on (M5, board 2).
+        using K = commentary::Action::Kind;
+        std::vector<std::string> sources;
+        switch (ans->kind) {
+            case K::Games:
+            case K::Played: {
+                std::string names;
+                for (const auto& base : q.bases) names += (names.empty() ? "" : ", ") + base.name;
+                sources.push_back(trf("{}: the search of the position, the tree for the scores", names));
+                break;
+            }
+            case K::Opening:
+                sources.emplace_back(TR("Lichess's opening names (public domain), the line played"));
+                break;
+            case K::Tablebase:
+                sources.emplace_back(TR("the endgame tables"));
+                break;
+            case K::Threat:
+                sources.push_back(trf("the threat computed by {}, the side to move passing its turn", q.engine));
+                break;
+            default:
+                sources.push_back(trf("{}, 300,000 nodes per position", q.engine));
+                sources.emplace_back(TR("the facts of the positions its lines lead to"));
+                break;
+        }
+        ImGui::TextDisabled("%s", TR("What the answer rests on"));
+        for (const auto& s : sources) ImGui::TextDisabled("· %s", s.c_str());
+        // What can be done with it, on one line.
+        bool any          = false;
+        const auto action = [&](const std::string& label) {
+            if (any) ImGui::SameLine();
+            any = true;
+            return ImGui::SmallButton(label.c_str());
+        };
+        if (ans->best && here) {
+            const auto board = boardAt(b.game, b.chess960, b.ply);
+            const auto m     = chess::uci::uciToMove(board, commentary::uci(*ans->best));
+            if (m != chess::Move::NO_MOVE && action(trf("Play {}", localSan(chess::uci::moveToSan(board, m)))))
+                boardPlayAsked(m);
+        }
+        if (ans->kind == K::Try && !ans->moves.empty() && here && action(TR("Show the line in preview"))) {
+            BoardPreview preview;
+            preview.ply = ans->earlier ? std::max(0, b.ply - 1) : b.ply;
+            preview.at  = b.ply;
+            for (const auto& m : ans->moves) preview.moves.push_back(commentary::uci(m));
+            preview.label  = TR("The move tried");
+            board_.preview = std::move(preview);
+        }
+        if (ans->kind == K::Games && !ans->games.empty()) {
+            const auto& g = ans->games.front();
+            if (action(TR("Open the strongest")) && g.base < q.bases.size())
+                readOnBoard(study::importedPgn(q.bases[g.base].snapshot->game(g.id)),
+                            fmt::format("{} – {}", g.white, g.black));
+            if (action(TR("The reference games"))) board_side_tab_ = 3;
+        }
+        if (q.ply > 0 && ans->kind != K::Opening && action(TR("Add to the notation")))
+            addAssistantComment(ans->text, q.line, q.ply, q.fen, sources);
+        if (action(TR("Remove"))) remove = n;
+    } else if (const auto* problem = std::get_if<commentary::Problem>(&q.done->answer)) {
+        using P         = commentary::Problem;
+        const char* why = *problem == P::UnknownMove  ? TR("The question names no move of this position.")
+                          : *problem == P::Unanalyzed ? TR("This needs the game's review first.")
+                          : *problem == P::InCheck    ? TR("The side to move is in check: no threat beyond the check.")
+                          : *problem == P::NoEngine
+                              ? (q.engine.empty() ? TR("No engine to answer: choose one in the Analysis tab.")
+                                                  : TR("The engine gave no answer, or the game is over."))
+                          : *problem == P::NoDatabase ? TR("No database to look in: import games first.")
+                                                      : TR("No endgame table knows this position.");
+        ImGui::TextUnformatted(TR("I cannot tell."));
+        ImGui::TextDisabled("%s", why);
+    }
+    if (q.done && !std::holds_alternative<commentary::Answered>(q.done->answer) && ImGui::SmallButton(TR("Remove")))
+        remove = n;
+    ImGui::PopTextWrapPos();
+    ui::endCard();
+    ImGui::PopID();
+}
+
 void App::drawBoardQuestions() {
     // The questions are answered with an engine: without one, the card that offers one (M9, board 2).
     if (engines_.empty()) {
@@ -323,9 +449,13 @@ void App::drawBoardQuestions() {
         return;
     }
     auto& a = *assistant_;
-    // The first use, where it is asked, never at start (M5, board 1).
+    // The first use, where it is asked, never at start (M5, board 1); under it, the "Why not?" asked meanwhile, which
+    // the templates answer without the model (#94).
     if (!a.installed() || a.downloading()) {
         drawAssistantFirstUse();
+        std::optional<std::size_t> remove;
+        for (std::size_t n = questions_.size(); n-- > 0;) drawQuestionCard(n, remove);
+        if (remove) questions_.erase(questions_.begin() + static_cast<std::ptrdiff_t>(*remove));
         return;
     }
     auto& b         = board_;
@@ -355,9 +485,11 @@ void App::drawBoardQuestions() {
     std::vector<std::pair<std::string, std::string>> chips;
     const bool asked_french = french();
     if (b.ply >= 1 && b.ply <= static_cast<int>(b.game.moves.size())) {
-        const auto san =
-            numberedSan(boardAt(b.game, b.chess960, b.ply - 1), b.game.moves[static_cast<std::size_t>(b.ply - 1)].san);
-        chips.emplace_back(trf("Why {}?", san), asked_french ? std::string() : fmt::format("Why {}?", san));
+        // Shown in the interface's letters (#66), asked in the assistant's: French ones, else English.
+        const auto before = boardAt(b.game, b.chess960, b.ply - 1);
+        const auto& san   = b.game.moves[static_cast<std::size_t>(b.ply - 1)].san;
+        chips.emplace_back(trf("Why {}?", numberedSan(before, san)),
+                           asked_french ? std::string() : fmt::format("Why {}?", numberedSan(before, san, false)));
     }
     for (const char* c : {N_("What is the threat?"), N_("What is the best move?"), N_("Who played this position?"),
                           N_("What is this opening?")})
@@ -374,100 +506,7 @@ void App::drawBoardQuestions() {
 
     // The questions and their answers, the latest first, for this game.
     std::optional<std::size_t> remove;
-    for (std::size_t n = questions_.size(); n-- > 0;) {
-        auto& q = questions_[n];
-        ImGui::PushID(static_cast<int>(n));
-        ui::beginCard("question");
-        ImGui::PushTextWrapPos();
-        ImGui::TextDisabled("%s", trf("You: {}", q.question).c_str());
-        const bool here = q.fen == boardFen();
-        if (!q.done) {
-            ImGui::TextUnformatted(a.state() == AssistantService::State::Loading ? TR("The model is loading…")
-                                                                                 : TR("The assistant is thinking…"));
-        } else if (!q.done->error.empty()) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", q.done->error.c_str());
-        } else if (const auto* ans = std::get_if<commentary::Answered>(&q.done->answer)) {
-            ImGui::TextUnformatted(ans->text.c_str());
-            if (ans->kind == commentary::Action::Kind::Compare && q.done->from)
-                drawComparison(*q.done->from, *ans, q.done->refs, q.engine, q.bases,
-                               french() ? commentary::PieceLetters::French : commentary::PieceLetters::English);
-            // What it rests on (M5, board 2).
-            using K = commentary::Action::Kind;
-            std::vector<std::string> sources;
-            switch (ans->kind) {
-                case K::Games:
-                case K::Played: {
-                    std::string names;
-                    for (const auto& base : q.bases) names += (names.empty() ? "" : ", ") + base.name;
-                    sources.push_back(trf("{}: the search of the position, the tree for the scores", names));
-                    break;
-                }
-                case K::Opening:
-                    sources.emplace_back(TR("Lichess's opening names (public domain), the line played"));
-                    break;
-                case K::Tablebase:
-                    sources.emplace_back(TR("the endgame tables"));
-                    break;
-                case K::Threat:
-                    sources.push_back(trf("the threat computed by {}, the side to move passing its turn", q.engine));
-                    break;
-                default:
-                    sources.push_back(trf("{}, 300,000 nodes per position", q.engine));
-                    sources.emplace_back(TR("the facts of the positions its lines lead to"));
-                    break;
-            }
-            ImGui::TextDisabled("%s", TR("What the answer rests on"));
-            for (const auto& s : sources) ImGui::TextDisabled("· %s", s.c_str());
-            // What can be done with it, on one line.
-            bool any          = false;
-            const auto action = [&](const std::string& label) {
-                if (any) ImGui::SameLine();
-                any = true;
-                return ImGui::SmallButton(label.c_str());
-            };
-            if (ans->best && here) {
-                const auto board = boardAt(b.game, b.chess960, b.ply);
-                const auto m     = chess::uci::uciToMove(board, commentary::uci(*ans->best));
-                if (m != chess::Move::NO_MOVE && action(trf("Play {}", localSan(chess::uci::moveToSan(board, m)))))
-                    boardPlayAsked(m);
-            }
-            if (ans->kind == K::Try && !ans->moves.empty() && here && action(TR("Show the line in preview"))) {
-                BoardPreview preview;
-                preview.ply = ans->earlier ? std::max(0, b.ply - 1) : b.ply;
-                preview.at  = b.ply;
-                for (const auto& m : ans->moves) preview.moves.push_back(commentary::uci(m));
-                preview.label  = TR("The move tried");
-                board_.preview = std::move(preview);
-            }
-            if (ans->kind == K::Games && !ans->games.empty()) {
-                const auto& g = ans->games.front();
-                if (action(TR("Open the strongest")) && g.base < q.bases.size())
-                    readOnBoard(study::importedPgn(q.bases[g.base].snapshot->game(g.id)),
-                                fmt::format("{} – {}", g.white, g.black));
-                if (action(TR("The reference games"))) board_side_tab_ = 3;
-            }
-            if (q.ply > 0 && ans->kind != K::Opening && action(TR("Add to the notation")))
-                addAssistantComment(ans->text, q.line, q.ply, q.fen, sources);
-            if (action(TR("Remove"))) remove = n;
-        } else if (const auto* problem = std::get_if<commentary::Problem>(&q.done->answer)) {
-            using P         = commentary::Problem;
-            const char* why = *problem == P::UnknownMove  ? TR("The question names no move of this position.")
-                              : *problem == P::Unanalyzed ? TR("This needs the game's review first.")
-                              : *problem == P::InCheck ? TR("The side to move is in check: no threat beyond the check.")
-                              : *problem == P::NoEngine
-                                  ? (q.engine.empty() ? TR("No engine to answer: choose one in the Analysis tab.")
-                                                      : TR("The engine gave no answer, or the game is over."))
-                              : *problem == P::NoDatabase ? TR("No database to look in: import games first.")
-                                                          : TR("No endgame table knows this position.");
-            ImGui::TextUnformatted(TR("I cannot tell."));
-            ImGui::TextDisabled("%s", why);
-        }
-        if (q.done && !std::holds_alternative<commentary::Answered>(q.done->answer) && ImGui::SmallButton(TR("Remove")))
-            remove = n;
-        ImGui::PopTextWrapPos();
-        ui::endCard();
-        ImGui::PopID();
-    }
+    for (std::size_t n = questions_.size(); n-- > 0;) drawQuestionCard(n, remove);
     if (remove) questions_.erase(questions_.begin() + static_cast<std::ptrdiff_t>(*remove));
     if (questions_.empty()) {
         ImGui::PushTextWrapPos();

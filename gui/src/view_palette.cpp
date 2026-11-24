@@ -94,6 +94,8 @@ const char* App::guideSection() const {
                     return ReferenceGames;
                 case 4:
                     return Questions;
+                case 5:
+                    return EndgamesTab;
                 default:
                     return StudyBoard;
             }
@@ -194,6 +196,20 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
                     [this, dir = source.first] { cloneTournament(dir); });
             }
         }
+    }
+    // The endgames of a finished tournament against the tables (#94), as its menu offers: the one shown, the last
+    // finished.
+    {
+        std::vector<std::pair<std::filesystem::path, std::string>> sources;
+        const bool shown_done = t && !run_->running() && !(unfinished_ && unfinished_->dir == t->dir());
+        if (shown_done) sources.emplace_back(t->dir(), name);
+        const auto busy = run_->running() && t ? t->dir() : std::filesystem::path();
+        for (const auto* s : home::lastFinished(tournaments_, home::LAST_FINISHED, busy))
+            if (!shown_done || s->dir != t->dir()) sources.emplace_back(s->dir, s->spec.name);
+        for (const auto& source : sources)
+            add(TR("Check the endgames against the tables"),
+                fmt::format("{} · {}", source.second, folderDate(source.first)),
+                [this, dir = source.first] { startEndgameCheck(dir); });
     }
     // The engines that cannot start, as their card offers.
     if (t) {
@@ -936,17 +952,35 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
     }
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
+    // The practical moves against a human of a level (#94), in the Analysis tab.
+    add(board_.settings.practical ? TR("Practical moves: off") : TR("Practical moves against a human of a level"),
+        TR("Board"), [this] {
+            toStudyBoard();
+            board_side_tab_           = 1;
+            board_.settings.practical = !board_.settings.practical;
+            saveBoardSettings();
+        });
+    // The tables' verdict and each move by its outcome (#42).
+    add(TR("Endgames: what the tables say of the position"), "Alt+6", [this] {
+        toStudyBoard();
+        board_side_tab_ = 5;
+    });
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {
         toStudyBoard();
         board_side_tab_ = 4;
         question_focus_ = true;
     });
-    if (board_.ply > 0)
+    if (board_.ply > 0) {
         add(TR("Comment this move"), "Alt+C", [this] {
             toStudyBoard();
             commentBoardMove();
         });
+        add(TR("Why not? The move tried against the game's"), "Alt+Q", [this] {
+            toStudyBoard();
+            whyNotHere();
+        });
+    }
     if (!board_.reviews.empty()) {
         add(TR("Comment the key moments"), TR("Board"), [this] {
             toStudyBoard();
@@ -955,6 +989,14 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(TR("Annotate the game"), TR("Board"), [this] {
             toStudyBoard();
             annotateBoardGame();
+        });
+        add(TR("Explain every move"), TR("Board"), [this] {
+            toStudyBoard();
+            explainEveryMove();
+        });
+        add(TR("Guided visit of the key moments"), TR("Board"), [this] {
+            toStudyBoard();
+            startVisit();
         });
         // The story of the game (#62): written again by the model, told otherwise; copied as it is shown.
         if (!review_story_.empty()) {
@@ -967,6 +1009,11 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             });
         }
     }
+    if (board_.reviews.empty() && !board_.game.moves.empty())  // the review first, then every move (#94)
+        add(TR("Explain every move"), TR("Board"), [this] {
+            toStudyBoard();
+            explainEveryMove();
+        });
     if (assistant_ && assistant_->state() == AssistantService::State::Ready)
         add(TR("Unload the assistant's model"), TR("Its memory freed; loaded again at the next question"),
             [this] { assistant_->unload(); });

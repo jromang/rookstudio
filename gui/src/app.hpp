@@ -10,6 +10,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -46,6 +47,7 @@
 #include "databases.hpp"
 #include "dialogs.hpp"
 #include "dossier.hpp"
+#include "endgame_check.hpp"
 #include "endgames.hpp"
 #include "engine_changes.hpp"
 #include "engine_downloads.hpp"
@@ -53,6 +55,7 @@
 #include "engine_notes.hpp"
 #include "engine_play.hpp"
 #include "engines.hpp"
+#include "explained.hpp"
 #include "export_sheet.hpp"
 #include "fide_cards.hpp"
 #include "fide_rating_list.hpp"
@@ -88,6 +91,7 @@
 #include "opening_suite.hpp"
 #include "pgn_store.hpp"
 #include "portable.hpp"
+#include "practical.hpp"
 #include "profiles.hpp"
 #include "publish_game.hpp"
 #include "publish_gif.hpp"
@@ -110,6 +114,7 @@
 #include "ui.hpp"
 #include "views.hpp"
 #include "vision.hpp"
+#include "visit.hpp"
 
 #include <tour/book_scan.hpp>
 #include <tour/by_opening.hpp>
@@ -180,6 +185,9 @@ void wdlLine(const std::array<int64_t, 3>& wdl);
 // The move the side to move in a live game thinks of and the reply it expects (the first two moves of its PV), each
 // in the colour of the engine that would play it, the reply lighter; none between searches. `board`: the position.
 [[nodiscard]] std::vector<BoardArrow> pvArrows(const SlotState& st, const chess::Board& board);
+
+// What the assistant's checker refused, in words (view_board_assist.cpp).
+[[nodiscard]] std::string assistantRefusalWords(const commentary::Refusal& refusal);
 
 struct AppOptions {
     bool autostart = false;
@@ -1682,8 +1690,8 @@ class App {
     void drawBoardTable();   // the Table tab: each move with its engine's score, depth and time
     void drawBoardReview();  // the Review tab: each side's accuracy and figures, the key moments, who saw them
     [[nodiscard]] std::string boardMoveLabel(int ply) const;  // "12…Qa5", the game's move leading to `ply`
-    // A move's SAN as the board's space writes it: in the Chess space, the reader's piece letters, as the assistant's
-    // sentences have them ("27.Txe8" in French); in the Engines space, as the PGN has it.
+    // A move's SAN as the board's space writes it: in the Chess space, the piece letters of the interface's language
+    // (#66: "27.Txe8" in French and in German); in the Engines space, as the PGN has it.
     [[nodiscard]] std::string boardSan(std::string san) const;
     // The line shown on the board: the game (-1) or a variation, at its position `ply`.
     void showBoardLine(int line, int ply);
@@ -1717,6 +1725,44 @@ class App {
     // Several engines side by side in the study Board's Analysis tab (#78, mockup M11, board 3;
     // view_board_engines.cpp): each a card with its colour, its arrow on the board, the threads shared between them.
     void drawSideBySide();
+    // Practical moves (#94, mockup M13, board 7, point 17), under the engines in the Analysis tab: "Against a human of
+    // 1500, rapid" (practical.hpp). The level's games at the positions asked (the board's, then along the practical
+    // move's line), by "FEN|level|speed|source": Lichess's explorer with a linked account, else the databases filtered
+    // by rating, one question at a time; an engine of its own (one thread) counts the opponent's replies after each
+    // candidate when no games are known, and judges the level's most played reply.
+    struct PracticalState {
+        std::map<std::string, std::vector<LevelMove>> level;
+        std::set<std::string> level_failed;
+        std::future<std::vector<LevelMove>> db_job;
+        std::future<lichess::Answer<lichess::Explorer>> explorer_job;
+        std::string job_key;
+        std::string error;  // why the explorer gave nothing
+        std::unique_ptr<Analyser> engine;
+        std::string engine_name;
+        std::string
+            task;  // what the engine searches now: "replies|FEN after the candidate", "judge|FEN after the reply"
+        std::map<std::string, std::pair<int, int>>
+            holding;  // by the FEN after a candidate: replies holding, of how many
+        struct Judged {
+            std::string best;  // the engine's answer to the reply (UCI)
+            int score_cp = 0;  // the position after the reply, for the side that answers
+        };
+        std::map<std::string, Judged> judged;  // by the FEN after the level's reply
+        std::string seen;                      // the board's position, and since when: stepping through asks nothing
+        double since = 0;
+    };
+    PracticalState practical_;
+    // The arrows of the practical moves, while their card shows (a frame ago at most): the engine's best and the
+    // practical move, on the position they are for.
+    struct PracticalArrows {
+        uint64_t position = 0;
+        int frame         = 0;
+        std::string best, practical;
+    };
+    std::optional<PracticalArrows> practical_arrows_;
+    void drawPractical();
+    // The level's games at `board` for the practical moves: kept, or asked (one question at a time) once `ask`.
+    [[nodiscard]] const std::vector<LevelMove>* practicalLevelAt(const chess::Board& board, bool ask);
     struct SideGesture {  // asked of an engine's card, done once the cards are drawn
         std::optional<std::pair<std::size_t, std::size_t>> move;  // from, to (made first: to 0)
         std::optional<std::size_t> remove;
@@ -2677,8 +2723,7 @@ class App {
     std::optional<OnlineCloud> online_cloud_;
     std::future<lichess::Answer<lichess::Tablebase>> online_tb_job_;
     std::future<lichess::Answer<lichess::CloudEval>> online_cloud_job_;
-    std::future<lichess::Answer<std::vector<std::string>>> online_line_job_;
-    std::string online_tb_asked_, online_cloud_asked_, online_line_asked_;
+    std::string online_tb_asked_, online_cloud_asked_;
     std::set<std::string> online_once_;          // positions allowed once ("Ask for this position")
     std::set<std::string> online_not_in_cloud_;  // positions the cloud had nothing for, this session
     bool online_tb_not_now_ = false, online_cloud_not_now_ = false;
@@ -2687,6 +2732,34 @@ class App {
     void drawBoardOnline();
     void drawOnlineTablebase(const chess::Board& board, int pieces);
     void drawOnlineCloud(const chess::Board& board);
+    // The Endgames tab (#42, mockup M13, board 7, point 20): the tables' answer for the board's position, from the disk
+    // or Lichess (board_tables.hpp), its moves in the order the tables play them; the main lines after its moves, by
+    // the position each move leads to: the disk's computed at once, Lichess's asked one at a time and kept in the
+    // profile.
+    struct BoardTables {
+        std::string fen;  // the position the tab shows, and since when: stepping through a game asks nothing
+        double since = 0;
+        std::optional<lichess::Tablebase> answer;
+        bool online = false;
+        std::string error;  // why Lichess gave nothing
+        std::future<lichess::Answer<lichess::Tablebase>> asking;
+        std::string asking_fen;
+        std::map<std::string, std::vector<std::string>> lines;
+        std::set<std::string> lines_failed;
+        std::future<lichess::Answer<std::vector<std::string>>> line_job;
+        std::string line_job_fen;
+        std::string hovered;  // the move under the mouse (UCI), and since when: its line asked once it stays
+        double hovered_since = 0;
+        int requests         = 0;  // sent to Lichess this session
+    };
+    BoardTables board_tables_;
+    void drawBoardEndgames();
+    // Whether the Endgames tab can speak of the board's position: seven pieces or fewer, or op1's eight; the tab is
+    // dimmed otherwise.
+    [[nodiscard]] bool boardTablesReach() const;
+    // The main line after `move` of the tab's answer: the disk's at once, Lichess's when it came (asked when `ask`);
+    // none yet.
+    [[nodiscard]] const std::vector<std::string>* boardTablesLine(const lichess::TablebaseMove& move, bool ask);
     // `without_account`: anonymously, as Lichess lets it still (slowly), when the user chose not to give the scope.
     void followBroadcast(const lichess::BroadcastEntry& entry, bool without_account = false);
     void drawLichessPage();
@@ -2782,7 +2855,12 @@ class App {
     void drawAssistantFirstUse();
     // `text` as the user reads it; `asked`, when not empty, what the assistant is given (a suggestion, in its own
     // language).
-    void askQuestion(const std::string& text, const std::string& asked = {});
+    // `at_ply`: a position of the line shown other than the board's, where the question is asked.
+    void askQuestion(const std::string& text, const std::string& asked = {}, std::optional<int> at_ply = std::nullopt);
+    // The tables a question or a comment is answered with (#42): the board's position and the one before it, of seven
+    // pieces or fewer, taught by the disk's tables or by the answers Lichess gave that the profile kept (nothing is
+    // asked); none when they know neither.
+    [[nodiscard]] std::shared_ptr<commentary::Tablebases> boardPositionTables();
     void pollQuestions();  // once a frame: the answers that came, the assistant's download and unloading
     // Settings › Assistant (M5, board 5): where it stands, its model, where it runs, when it unloads.
     void drawAssistantSettings(float label);
@@ -2872,6 +2950,9 @@ class App {
         std::optional<QuestionResult> done;
     };
     std::vector<QuestionAsked> questions_;                     // this game's, the oldest first
+    // A question's card: the question, its answer, the comparison of two moves, what it rests on, its gestures;
+    // `remove` set when "Remove" was clicked.
+    void drawQuestionCard(std::size_t index, std::optional<std::size_t>& remove);
     std::vector<std::future<QuestionResult>> questions_left_;  // those of a game left, still being answered
     std::array<char, 512> question_text_{};
     bool question_focus_ = false;  // the question's field takes the keys at its next drawing
@@ -2906,6 +2987,112 @@ class App {
         std::vector<std::string> basis;               // what they rest on (commentBasis())
     };
     std::optional<CommentJob> comment_job_;
+    // Every move explained (#94, mockup M13, board 7, point 15): the board's game's explanations, kept with its review
+    // (explained.hpp) and shown in the Explained tab beside the moves; made in the background, line by line, their
+    // partial results shown while they come.
+    struct ExplainJob {
+        uint64_t game                     = 0;  // board_game_serial_
+        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+        std::shared_ptr<Explained> made;  // under mutex
+        std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        int total                                 = 0;
+        std::future<void> finished;
+    };
+    std::optional<ExplainJob> explain_job_;
+    std::optional<Explained> explained_;
+    std::string explained_of_;           // the game and language the explanations were read for
+    int explained_filter_      = 0;      // 0 every move, 1 the moves that matter, 2 the key moments
+    bool explain_after_review_ = false;  // asked before the review: made once it is done
+    // "Why not?" (#94, mockup M13, board 7, point 16): the Questions' Compare action asked with one key, wherever a
+    // move is shown (Alt+Q after a variation tried, the right click on an engine's line or a move of the Tree tab, the
+    // guided visit): `asked` against `reference`, both UCI moves of the position `at_ply` of the line shown.
+    void whyNot(int at_ply, const std::string& asked, const std::string& reference);
+    // The move a move is set against at a position: the game's move there, else the engine's best, else its second.
+    [[nodiscard]] std::string whyNotReference(const chess::Board& before, const std::string& asked);
+    void whyNotHere();  // Alt+Q: the variation's move against the game's, or the game's move against the review's best
+    std::string why_not_move_;  // the engine's line right-clicked: its first move
+    // The guided visit (#94, point 16, visit.hpp): the key moments of the review, "what would you have played?", the
+    // answer judged as Guess the moves judges it, the engine's move and why; a wrong answer a card of the day's queue.
+    struct VisitRun {
+        using Phase = VisitPhase;
+        std::vector<std::size_t> moments;  // the plies of the moves visited, in the game's order
+        std::size_t current = 0;
+        Phase phase         = Phase::Asking;
+        std::shared_ptr<const CommentaryReview> review;
+        GameReview analysis;  // the review's analysis it was made from
+        std::string best;     // the engine's move at the moment (UCI)
+        chess::Move answer{};
+        bool answered = false, dont_know = false;
+        Analyser engine;  // the analysis's, one thread, a second a move: the engine's move and the answer
+        AnalysisPosition best_position, answer_position;
+        std::optional<fastchess::Score> best_score, answer_score;  // the other side's, to move after each
+        bool answer_asked = false;
+        VisitVerdict verdict;
+        bool card = false;  // the answer became a card of the day's queue
+        std::string explanation;
+        struct Result {
+            std::size_t ply = 0;
+            std::string answer;  // UCI, empty for "I don't know"
+            int points = 0;
+            bool card  = false;
+        };
+        std::vector<Result> results;
+        std::optional<std::size_t> question;  // its "Why not?" question, in questions_
+        int line = -1, ply = 0;               // the board as it was
+        uint64_t game = 0;                    // board_game_serial_
+    };
+    std::unique_ptr<VisitRun> visit_;
+    bool visit_when_read_ = false;  // --focus board-visit=FILE: started once the game's review is read
+
+    // "Check the endgames against the tables" (#94 with #42, mockup M13, board 7, point 20): a finished tournament's
+    // games that reached seven pieces or fewer against the tables, asked from its menu (the right button on its header
+    // or its row on the Tournaments page) or Ctrl+K; its card under the tournament's header, nothing shown before.
+    struct EndgameCheckRun {
+        std::filesystem::path dir;
+        std::string name;
+        std::future<EndgameCheckGames> reading;  // its games and their checks
+        std::vector<CheckedGame> games;
+        std::vector<std::unique_ptr<EndgameGameCheck>> checks;
+        std::size_t current = 0;  // the game being checked
+        // The request out to Lichess's tables, one at a time: the game and the position it is for.
+        std::future<lichess::Answer<lichess::Tablebase>> asking;
+        std::size_t asking_game = 0, asking_ply = 0;
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
+        bool consent                              = false;  // a position waits for the user's word on Lichess's tables
+        bool allowed = false, not_now = false;              // Lichess's tables for this check, or not now
+        int from_disk = 0, from_profile = 0, from_lichess = 0;  // the positions each source told, Lichess's asked
+        std::map<std::string, TablesSays> told;                 // by FEN: a position two games reached is asked once
+        std::string error;                                      // Lichess's, the check waiting for "Try again"
+        std::optional<EndgameCheckSummary> summary;
+    };
+    std::unique_ptr<EndgameCheckRun> endgame_check_;
+    // The jobs of a check closed while they ran, kept until they end: a future's end would wait for them.
+    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_check_asking_left_;
+    std::vector<std::future<EndgameCheckGames>> endgame_check_reading_left_;
+    void startEndgameCheck(const std::filesystem::path& dir);
+    void closeEndgameCheck();
+    void pollEndgameCheck();
+    void drawEndgameCheck();
+    // A finished tournament's menu, the right button on it: its page's header, its row on the Tournaments page.
+    void drawTournamentMenu(const std::filesystem::path& dir);
+    void drawRowMenu(const std::filesystem::path& dir);  // the same on its row of the Tournaments page
+    void startVisit();
+    void visitShowMoment();
+    void visitAnswer(chess::Move move);
+    void visitDontKnow();
+    void visitJudged();
+    void visitNext();
+    void stopVisit();
+    void pollVisit();
+    void visitWhyNot();
+    void drawVisitPage();
+    void drawVisitColumn();              // the moments, the question, the answer and why
+    void explainEveryMove();             // "Explain every move" (the review first when there is none)
+    void startExplaining(bool rest);     // `rest`: the lines not written yet of those kept
+    void pollExplained();
+    void drawBoardExplained();      // the Explained tab beside the moves
+    void writeExplainedIntoGame();  // "Write them into the game": the assistant's comments, one change
     std::shared_ptr<const CommentaryReview> board_commentary_;
     std::string board_commentary_of_;
     EngineCurves engine_curves_;    // the board's tournament game as its engines saw it (#87)
@@ -2990,7 +3177,8 @@ class App {
     [[nodiscard]] const commentary::Tablebases* reviewTables() const;  // when taught anything
     uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
-    int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions
+    // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions, 5 the endgames (#42)
+    int board_side_tab_  = 0;
     int engine_menu_ply_ = -1;  // the tournament engine's move whose menu is open in the notation (#87)
     struct TreeRow {
         std::string shares;  // My databases: each database's games, said over the Games column
@@ -4043,6 +4231,7 @@ class App {
     std::set<std::string> progress_engines_;  // Progress tab
     std::map<std::string, std::vector<tour::RatingPoint>> progress_;
     std::optional<uint64_t> select_game_id_;  // a game to show once its tournament is open
+    std::optional<int> select_game_ply_;      // and the position of it shown (the endgames' check)
 
     // Shell.
     Page page_ = Page::Home;

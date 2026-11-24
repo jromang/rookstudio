@@ -501,43 +501,50 @@ void App::drawChessColumn() {
 }
 
 void App::drawChessTabs() {
-    // The tabs, in the order of the mockups; Alt+1 to Alt+5.
-    const char* names[] = {TR("Notation"), TR("Analysis"), TR("Tree"), TR("References"), TR("Questions")};
-    constexpr int TABS  = 5;
+    // The tabs, in the order of the mockups; Alt+1 to Alt+6.
+    const char* names[] = {TR("Notation"),   TR("Analysis"),  TR("Tree"),
+                           TR("References"), TR("Questions"), TR("Endgames")};
+    constexpr int TABS  = 6;
     for (int i = 0; i < TABS; ++i) {
         if (!ImGui::IsKeyChordPressed(ImGuiMod_Alt | static_cast<ImGuiKey>(ImGuiKey_1 + i))) continue;
         board_side_tab_ = i;
         if (i == 4) question_focus_ = true;  // Alt+5: the question is typed at once
     }
-    // Fair play (#48): a live game locks every tab but the notation; a correspondence game the Analysis tab on its
-    // positions and the Questions tab on its game, the tree of the databases and their reference games staying open.
+    // Fair play (#48): a live game locks every tab but the notation; a correspondence game the Analysis and Endgames
+    // tabs on its positions and the Questions tab on its game, the tree of the databases and their reference games
+    // staying open.
     const bool live     = liveGameOn() != nullptr;
     const bool position = aidsLocked();
     const bool game     = position || gameLocked();
     // A game against an engine (#83): every tab but the notation hidden until its end, unless shown.
     const bool playing = engineGameHidesAids();
     const auto locked  = [&](int tab) {
-        return ((live || playing) && tab != 0) || (position && tab == 1) || (game && tab == 4);
+        return ((live || playing) && tab != 0) || (position && (tab == 1 || tab == 5)) || (game && tab == 4);
     };
+    // The Endgames tab is dimmed beyond seven pieces (#42): it says so when chosen all the same.
+    const bool tables = boardTablesReach();
     if (ImGui::BeginTabBar("##chess_column")) {
         for (int i = 0; i < TABS; ++i) {
             const auto label = fmt::format("{}###chess_tab{}", names[i], i);
-            if (locked(i)) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            const bool dim   = locked(i) || (i == 5 && !tables);
+            if (dim) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             if (ImGui::BeginTabItem(label.c_str(), nullptr,
                                     board_side_tab_ == i ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
                 ImGui::EndTabItem();
             }
-            if (locked(i)) ImGui::PopStyleColor();
+            if (dim) ImGui::PopStyleColor();
             if (ImGui::IsItemClicked()) board_side_tab_ = i;
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip(
-                    "%s", locked(i) ? fmt::format("Alt+{} · {}", i + 1,
-                                                  playing && !live ? TR("Hidden until the end of your game against the "
-                                                                        "engine.")
-                                                                   : TR("Locked while one of your games is played on "
-                                                                        "Lichess."))
-                                          .c_str()
-                                    : fmt::format("Alt+{}", i + 1).c_str());
+            if (ImGui::IsItemHovered()) {
+                auto tip = fmt::format("Alt+{}", i + 1);
+                if (locked(i))
+                    tip += fmt::format(" · {}", playing && !live
+                                                    ? TR("Hidden until the end of your game against the engine.")
+                                                    : TR("Locked while one of your games is played on Lichess."));
+                else if (i == 5 && !tables)
+                    tip += fmt::format(" · {}", TR("For seven pieces or fewer: the tables' verdict, each move by its "
+                                                   "outcome."));
+                ImGui::SetTooltip("%s", tip.c_str());
+            }
         }
         ImGui::EndTabBar();
     }
@@ -556,6 +563,7 @@ void App::drawChessTabs() {
         case 1: {
             drawBoardOnline();  // Lichess's tables and cloud, when the user has chosen them (M4, board 5)
             drawSideBySide();   // up to four engines side by side (#78, M11 board 3)
+            drawPractical();    // the practical moves against a human of a level (#94)
             const float graph = boardGraphHeight();
             drawBoardGraph(std::max(graph, ImGui::GetContentRegionAvail().y));
             break;
@@ -565,6 +573,9 @@ void App::drawChessTabs() {
             break;
         case 3:
             drawBoardReferences();
+            break;
+        case 5:
+            drawBoardEndgames();  // the tables' verdict and each move by its outcome (#42)
             break;
         default:
             drawBoardQuestions();
@@ -1021,6 +1032,13 @@ void App::drawBoardTree() {
                                   ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap))
                 play = row.move;
             if (ImGui::IsItemHovered()) hovered = row.move;
+            // The right button: "Why not?" the move, against the game's (#94).
+            if (ImGui::BeginPopupContextItem("##tree_why_not")) {
+                const auto uci = chess::uci::moveToUci(row.move, b.chess960);
+                if (ImGui::MenuItem(trf("Why not {}?", row.san).c_str(), "Alt+Q"))
+                    whyNot(b.ply, uci, whyNotReference(here, uci));
+                ImGui::EndPopup();
+            }
             if (tree_row_ == static_cast<int>(r) && tree_scroll_) {
                 ImGui::SetScrollHereY();
                 tree_scroll_ = false;

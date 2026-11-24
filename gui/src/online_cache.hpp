@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "lichess_api.hpp"
 
@@ -14,5 +15,9 @@ namespace fcg {
 [[nodiscard]] std::optional<lichess::Tablebase> cachedTablebase(const std::filesystem::path& root,
                                                                 const std::string& fen);
 void keepTablebase(const std::filesystem::path& root, const std::string& fen, const lichess::Tablebase& t);
+// The tables' main line from a position (lichess::tablebaseMainline()), kept for good too (#42).
+[[nodiscard]] std::optional<std::vector<std::string>> cachedTablebaseLine(const std::filesystem::path& root,
+                                                                          const std::string& fen);
+void keepTablebaseLine(const std::filesystem::path& root, const std::string& fen, const std::vector<std::string>& line);
 
 }  // namespace fcg

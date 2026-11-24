@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 #include <imgui.h>
+#include <imgui_internal.h>  // TableGetHoveredRow(): the right button on a row
 
 #include <implot.h>
 
@@ -835,6 +836,17 @@ void App::drawQueue() {
     if (remove >= 0 || up > 0) storage_.saveQueue(queue_);
 }
 
+// A finished tournament's menu on its row (#94): the right button anywhere on the row, nothing drawn before.
+void App::drawRowMenu(const fs::path& dir) {
+    if (ImGui::TableGetHoveredRow() == ImGui::TableGetRowIndex() && ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
+        ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+        ImGui::OpenPopup("##tournament_menu");
+    if (ImGui::BeginPopup("##tournament_menu")) {
+        drawTournamentMenu(dir);
+        ImGui::EndPopup();
+    }
+}
+
 void App::drawLastFinished() {
     const auto* t       = run_->tournament();
     const fs::path busy = run_->running() && t ? t->dir() : fs::path();
@@ -887,6 +899,7 @@ void App::drawLastFinished() {
             ImGui::SetCursorPosX(
                 std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - open_w));
             if (ImGui::Button(TR("Open"))) openTournament(s->dir);
+            drawRowMenu(s->dir);
             ImGui::PopID();
         }
         ImGui::EndTable();
@@ -1029,6 +1042,7 @@ void App::drawAllTournaments() {
             drawClone(s.dir, true);
             ImGui::SameLine();
             if (ImGui::SmallButton(TR("Folder"))) ui::openPath(s.dir);
+            if (s.finished && !is_running) drawRowMenu(s.dir);
 
             ImGui::PopID();
         }

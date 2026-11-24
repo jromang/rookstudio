@@ -18,6 +18,7 @@
 #include <tour/files.hpp>
 
 #include "app.hpp"
+#include "board_tables.hpp"
 #include "board_text.hpp"
 #include "https.hpp"
 #include "i18n.hpp"
@@ -169,27 +170,6 @@ std::string clockText(int64_t seconds) {
     return text;
 }
 
-// A count of plies (Lichess's DTZ and DTM) as moves, said as the mockup says them.
-int movesOf(int plies) { return (std::abs(plies) + 1) / 2; }
-
-// A position of eight pieces Lichess's op1 tables know, by their server's own test: no castling, a white pawn with a
-// black pawn ahead on its file, and more than a lone pawn on each side. They give its verdict and its distance to the
-// next capture, promotion or mate (DTC), not to mate.
-bool op1(const chess::Board& board) {
-    if (board.occ().count() != 8 || !board.castlingRights().isEmpty()) return false;
-    const auto black_pawns = board.pieces(chess::PieceType::PAWN, chess::Color::BLACK);
-    bool opposed           = false;
-    for (auto w = board.pieces(chess::PieceType::PAWN, chess::Color::WHITE); !w.empty() && !opposed;) {
-        const int square = w.pop();
-        for (int ahead = square + 8; ahead < 64 && !opposed; ahead += 8) opposed = black_pawns.check(ahead);
-    }
-    const auto more_than_lone_pawn = [&](chess::Color c) {
-        const auto pawns = board.pieces(chess::PieceType::PAWN, c);
-        const auto rest  = board.us(c).count() - pawns.count() - 1;  // without the king
-        return pawns.count() > 1 || rest > 0;
-    };
-    return opposed && more_than_lone_pawn(chess::Color::WHITE) && more_than_lone_pawn(chess::Color::BLACK);
-}
 
 // Why Lichess gave nothing, said with what still works (M4, board 6).
 std::string trouble(const std::string& error, const char* host) {
@@ -211,6 +191,17 @@ std::optional<lichess::Tablebase> cachedTablebase(const std::filesystem::path& r
 
 void keepTablebase(const std::filesystem::path& root, const std::string& fen, const lichess::Tablebase& t) {
     writeCached(cacheFile(root, "tablebase", fen), fen, tablebaseJson(t));
+}
+
+std::optional<std::vector<std::string>> cachedTablebaseLine(const std::filesystem::path& root, const std::string& fen) {
+    if (const auto cached = readCached(cacheFile(root, "tablebase-line", fen), fen, 0))
+        return cached->value("moves", std::vector<std::string>{});
+    return std::nullopt;
+}
+
+void keepTablebaseLine(const std::filesystem::path& root, const std::string& fen,
+                       const std::vector<std::string>& line) {
+    writeCached(cacheFile(root, "tablebase-line", fen), fen, nlohmann::json{{"moves", line}});
 }
 
 namespace {}  // namespace
@@ -246,17 +237,6 @@ void App::drawBoardOnline() {
             online_not_in_cloud_.insert(positionOf(online_cloud_asked_));
         online_cloud_ = OnlineCloud{online_cloud_asked_, std::move(answer), nowSeconds()};
     }
-    if (ready(online_line_job_)) {
-        const auto line = online_line_job_.get();
-        if (line.value && !line.value->empty() && online_line_asked_ == fen) {
-            BoardPreview preview;
-            preview.ply   = b.ply;
-            preview.at    = b.ply;
-            preview.moves = *line.value;
-            preview.label = TR("The tables' line");
-            b.preview     = std::move(preview);
-        }
-    }
 
     // A first use: what would go, and three answers (M4, board 5).
     const auto consent = [&](const char* id, const char* what, const char* sent, int& choice, bool& not_now) {
@@ -282,7 +262,7 @@ void App::drawBoardOnline() {
     const bool once = online_once_.count(positionOf(fen)) > 0;
 
     // The tables, for seven pieces or fewer that those of the disk do not know, and the eight of op1 (#42).
-    const bool tb_fits     = ((pieces >= 3 && pieces <= 7) || op1(board)) && !b.chess960;
+    const bool tb_fits     = ((pieces >= 3 && pieces <= 7) || op1Position(board)) && !b.chess960;
     const bool local_knows = b.line < 0 && b.ply < static_cast<int>(b.tb.size()) && b.tb[b.ply] != -2;
     bool tables_shown      = false;
     bool op1_unknown       = false;  // eight pieces the op1 tables do not know: the cloud may
@@ -369,109 +349,24 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
         ui::endCard();
         return;
     }
-    const auto& t     = *a.value;
-    const bool white  = board.sideToMove() == chess::Color::WHITE;
-    const char* mover = white ? TR("White") : TR("Black");
-    const char* other = white ? TR("Black") : TR("White");
-    using O           = lichess::Outcome;
-    std::string verdict;
-    switch (t.outcome) {
-        case O::Win:
-            verdict = trf("{} wins", mover);
-            break;
-        case O::CursedWin:
-            verdict = trf("{} wins, but a draw by the 50-move rule", mover);
-            break;
-        case O::MaybeWin:
-            verdict = trf("{} wins, maybe: the 50-move rule and the game played do not settle it", mover);
-            break;
-        case O::Draw:
-            verdict = TR("Draw");
-            break;
-        case O::BlessedLoss:
-            verdict = trf("{} wins, but a draw by the 50-move rule", other);
-            break;
-        case O::MaybeLoss:
-            verdict = trf("{} wins, maybe: the 50-move rule and the game played do not settle it", other);
-            break;
-        case O::Loss:
-            verdict = trf("{} wins", other);
-            break;
-        default:
-            verdict = TR("Not known");
-    }
-    if (t.checkmate) verdict = TR("Checkmate");
-    if (t.stalemate) verdict = TR("Stalemate");
+    // The verdict and how far, in the Endgames tab's words (#42).
+    const auto& t = *a.value;
     ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.15f);
-    ImGui::TextUnformatted(verdict.c_str());
+    ImGui::TextUnformatted(t.checkmate   ? TR("Checkmate")
+                           : t.stalemate ? TR("Stalemate")
+                                         : outcomeVerdict(t.outcome, board.sideToMove()).c_str());
     ImGui::PopFont();
-    if (t.dtm) ImGui::TextDisabled("%s", trf("mate in {} moves at best", movesOf(*t.dtm)).c_str());
-    if (t.dtz && *t.dtz != 0)
-        ImGui::TextDisabled("%s", trf("{} moves at most before a capture or a pawn move", movesOf(*t.dtz)).c_str());
-    // Eight pieces (op1): no distance to mate nor DTZ, the moves to the next conversion instead.
-    const bool conversion = t.dtc && !t.dtz && !t.dtm;
-    if (conversion)
-        ImGui::TextDisabled(
-            "%s", trf("{} moves at most before the next capture, promotion or mate", std::abs(*t.dtc)).c_str());
-    // Each move, and what it leaves for the side that plays it (the tables give it for the other side).
-    std::optional<std::string> play;
-    if (!t.moves.empty() && ImGui::BeginTable("##online_tb_moves", 4, ImGuiTableFlags_SizingFixedFit)) {
-        ImGui::TableSetupColumn(TR("Move"));
-        ImGui::TableSetupColumn(TR("What it leaves"));
-        ImGui::TableSetupColumn(TR("Mate in"));
-        ImGui::TableSetupColumn(conversion ? TR("Before a capture, a promotion or mate")
-                                           : TR("Before a capture or a pawn move"));
-        ImGui::TableHeadersRow();
-        for (std::size_t i = 0; i < t.moves.size() && i < 10; ++i) {
-            const auto& m = t.moves[i];
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::PushID(static_cast<int>(i));
-            if (ImGui::SmallButton(localSan(m.san).c_str())) play = m.uci;
-            ImGui::PopID();
-            ImGui::TableNextColumn();
-            const char* leaves = m.checkmate                   ? TR("mate")
-                                 : m.stalemate                 ? TR("stalemate")
-                                 : m.outcome == O::Loss        ? TR("a win")
-                                 : m.outcome == O::BlessedLoss ? TR("a win, drawn by the 50-move rule")
-                                 : m.outcome == O::MaybeLoss   ? TR("a win, maybe")
-                                 : m.outcome == O::Draw        ? TR("a draw")
-                                 : m.outcome == O::Win         ? TR("a loss")
-                                 : m.outcome == O::CursedWin   ? TR("a loss, drawn by the 50-move rule")
-                                 : m.outcome == O::MaybeWin    ? TR("a loss, maybe")
-                                                               : "?";
-            ImGui::TextUnformatted(leaves);
-            ImGui::TableNextColumn();
-            if (m.dtm) ImGui::Text("%d", movesOf(*m.dtm));
-            ImGui::TableNextColumn();
-            if (m.zeroing)
-                ImGui::TextDisabled("%s", TR("now"));
-            else if (conversion && m.dtc)
-                ImGui::Text("%d", std::abs(*m.dtc));
-            else if (m.dtz && *m.dtz != 0)
-                ImGui::Text("%d", movesOf(*m.dtz));
-        }
-        ImGui::EndTable();
+    if (const auto distance = tablesDistance(t.dtm, t.dtz, t.dtc); !distance.empty()) {
+        ImGui::TextDisabled("%s", distance.c_str());
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tablesMetric(t.dtm, t.dtz, t.dtc));
     }
-    if (t.outcome != O::Draw && !t.checkmate && !t.stalemate) {
-        if (ImGui::SmallButton(TR("See the winning line on the board")) && !online_line_job_.valid()) {
-            online_line_asked_ = board.getFen();
-            online_line_job_ =
-                std::async(std::launch::async, [fen = online_line_asked_] { return lichess::tablebaseMainline(fen); });
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", TR("the best line to the end, previewed; a click on a move plays it"));
-    }
-    ImGui::TextDisabled("%s", TR("A win drawn by the 50-move rule: the mate takes more than 50 moves without a capture "
-                                 "or a pawn move (a “cursed win”, the tables say); “maybe” when the rule and the "
-                                 "game played do not settle it."));
+    // The moves, each by its outcome, its distance and why a move spoils the result: the Endgames tab's (#42, R1).
+    if (ImGui::SmallButton(TR("Each move by its outcome: the Endgames tab"))) board_side_tab_ = 5;
+    ImGui::SameLine();
+    ImGui::TextDisabled("Alt+6");
     ImGui::PopTextWrapPos();
     ui::endCard();
     ImGui::Dummy(ImVec2(0, px(4)));
-    if (play) {
-        const auto move = chess::uci::uciToMove(board, *play);
-        if (move != chess::Move::NO_MOVE) boardPlay(move);
-    }
     (void)b;
 }
 

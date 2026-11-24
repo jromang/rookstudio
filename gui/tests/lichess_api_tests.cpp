@@ -119,7 +119,9 @@ TEST_CASE("Lichess: the tablebase's answer, each move with what it leaves the ot
     });
     const auto t = tablebase("4k3/6KP/8/8/8/8/7p/8 w - - 0 1");
     REQUIRE_MESSAGE(t.value, t.error);
-    CHECK(lichess.lastPath() == "/tb/standard?fen=4k3%2F6KP%2F8%2F8%2F8%2F8%2F7p%2F8%20w%20-%20-%200%201");
+    // The op1 tables' DTC asked with it (dtc=auxiliary): their server answers their 8-piece positions only then.
+    CHECK(lichess.lastPath() ==
+          "/tb/standard?fen=4k3%2F6KP%2F8%2F8%2F8%2F8%2F7p%2F8%20w%20-%20-%200%201&dtc=auxiliary");
     CHECK(t.value->outcome == Outcome::Win);
     CHECK(t.value->dtz == 1);
     CHECK(t.value->dtm == 17);

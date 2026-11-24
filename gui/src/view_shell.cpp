@@ -488,6 +488,7 @@ void App::drawNewMatch() {
 void App::drawWorkspaceHeader() {
     const auto& info = run_->info();
     const auto* t    = run_->tournament();
+    const ImVec2 header_top = ImGui::GetCursorScreenPos();  // the right button on the header opens its menu
 
     // An SPRT with the tester's bounds, the bias on them and the games before which it decides nothing.
     auto sprt = info.sprt ? sprtText(info.elo0 - info.sprt_bias, info.elo1 - info.sprt_bias, info.sprt_bias, 0) + " " +
@@ -517,6 +518,18 @@ void App::drawWorkspaceHeader() {
         ImGui::PopStyleColor();
     } else {
         ImGui::TextUnformatted(status.c_str());
+    }
+    // A finished tournament's menu (#94): the right button on its name or its lines above, nothing drawn before; not
+    // one stopped before its end.
+    if (finished && t && !(unfinished_ && unfinished_->dir == t->dir())) {
+        const ImVec2 bottom(header_top.x + ImGui::GetContentRegionAvail().x, ImGui::GetItemRectMax().y);
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) && ImGui::IsMouseHoveringRect(header_top, bottom) &&
+            ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+            ImGui::OpenPopup("##tournament_menu");
+        if (ImGui::BeginPopup("##tournament_menu")) {
+            drawTournamentMenu(t->dir());
+            ImGui::EndPopup();
+        }
     }
 
     if (info.total_games > 0 && t) {
@@ -603,6 +616,10 @@ void App::drawWorkspace() {
         drawCastSheet();
         drawCastBanner();
     }
+    // Its endgames against the tables, once asked from its menu (#94).
+    if (endgame_check_ && fs::absolute(endgame_check_->dir).lexically_normal() ==
+                              fs::absolute(run_->tournament()->dir()).lexically_normal())
+        drawEndgameCheck();
 
     drawWorkspaceDock();
 }

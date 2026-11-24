@@ -65,6 +65,8 @@ random_mover
 # The engine picker's catalogue, and the releases its tests read
 !gui/assets/engines.json
 !gui/tests/data/*.json
+# Lichess's tablebase answers the Endgames tab's tests read (#42)
+!gui/tests/data/tablebase/*.json
 
 # Scripts
 *.bat

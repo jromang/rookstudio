@@ -94,6 +94,8 @@ const char* App::guideSection() const {
                     return ReferenceGames;
                 case 4:
                     return Questions;
+                case 5:
+                    return EndgamesTab;
                 default:
                     return StudyBoard;
             }
@@ -936,6 +938,11 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
     }
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
+    // The tables' verdict and each move by its outcome (#42).
+    add(TR("Endgames: what the tables say of the position"), "Alt+6", [this] {
+        toStudyBoard();
+        board_side_tab_ = 5;
+    });
     // The assistant (M5): a question about the board's position, its model unloaded.
     add(TR("Ask the assistant about the position"), "Alt+5", [this] {
         toStudyBoard();

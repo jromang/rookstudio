@@ -200,7 +200,10 @@ Answer<std::vector<std::string>> tablebaseMainline(std::string_view fen, const s
 
 Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cancel) {
     Answer<Tablebase> a;
-    const auto r = politeRequest(get(fmt::format("{}/standard?fen={}", servers().tablebase, urlEncode(fen))), cancel);
+    // dtc=auxiliary: the op1 tables answer their 8-piece positions only when asked so (the server's default is
+    // "never", though its documentation says otherwise: checked against tablebase.lichess.ovh on 2026-11-24).
+    const auto r = politeRequest(
+        get(fmt::format("{}/standard?fen={}&dtc=auxiliary", servers().tablebase, urlEncode(fen))), cancel);
     a.status     = r.status;
     if (r.status != 200) {
         a.error = reason(r);

@@ -66,6 +66,7 @@ inline constexpr const char* SavingGame         = "saving-a-game";
 inline constexpr const char* RecentGames        = "recent-games-and-the-list";
 inline constexpr const char* TreeTab            = "the-tree-tab";
 inline constexpr const char* ReferenceGames     = "reference-games";
+inline constexpr const char* EndgamesTab        = "the-endgames-tab";
 inline constexpr const char* GameReview         = "the-review-of-a-game";
 inline constexpr const char* Databases          = "databases";
 inline constexpr const char* ImportingGames     = "importing-games";

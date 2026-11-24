@@ -120,6 +120,7 @@ const std::vector<const char*>& allTopics() {
                                               RecentGames,
                                               TreeTab,
                                               ReferenceGames,
+                                              EndgamesTab,
                                               GameReview,
                                               Databases,
                                               ImportingGames,

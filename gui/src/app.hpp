@@ -2677,8 +2677,7 @@ class App {
     std::optional<OnlineCloud> online_cloud_;
     std::future<lichess::Answer<lichess::Tablebase>> online_tb_job_;
     std::future<lichess::Answer<lichess::CloudEval>> online_cloud_job_;
-    std::future<lichess::Answer<std::vector<std::string>>> online_line_job_;
-    std::string online_tb_asked_, online_cloud_asked_, online_line_asked_;
+    std::string online_tb_asked_, online_cloud_asked_;
     std::set<std::string> online_once_;          // positions allowed once ("Ask for this position")
     std::set<std::string> online_not_in_cloud_;  // positions the cloud had nothing for, this session
     bool online_tb_not_now_ = false, online_cloud_not_now_ = false;
@@ -2687,6 +2686,34 @@ class App {
     void drawBoardOnline();
     void drawOnlineTablebase(const chess::Board& board, int pieces);
     void drawOnlineCloud(const chess::Board& board);
+    // The Endgames tab (#42, mockup M13, board 7, point 20): the tables' answer for the board's position, from the disk
+    // or Lichess (board_tables.hpp), its moves in the order the tables play them; the main lines after its moves, by
+    // the position each move leads to: the disk's computed at once, Lichess's asked one at a time and kept in the
+    // profile.
+    struct BoardTables {
+        std::string fen;  // the position the tab shows, and since when: stepping through a game asks nothing
+        double since = 0;
+        std::optional<lichess::Tablebase> answer;
+        bool online = false;
+        std::string error;  // why Lichess gave nothing
+        std::future<lichess::Answer<lichess::Tablebase>> asking;
+        std::string asking_fen;
+        std::map<std::string, std::vector<std::string>> lines;
+        std::set<std::string> lines_failed;
+        std::future<lichess::Answer<std::vector<std::string>>> line_job;
+        std::string line_job_fen;
+        std::string hovered;  // the move under the mouse (UCI), and since when: its line asked once it stays
+        double hovered_since = 0;
+        int requests         = 0;  // sent to Lichess this session
+    };
+    BoardTables board_tables_;
+    void drawBoardEndgames();
+    // Whether the Endgames tab can speak of the board's position: seven pieces or fewer, or op1's eight; the tab is
+    // dimmed otherwise.
+    [[nodiscard]] bool boardTablesReach() const;
+    // The main line after `move` of the tab's answer: the disk's at once, Lichess's when it came (asked when `ask`);
+    // none yet.
+    [[nodiscard]] const std::vector<std::string>* boardTablesLine(const lichess::TablebaseMove& move, bool ask);
     // `without_account`: anonymously, as Lichess lets it still (slowly), when the user chose not to give the scope.
     void followBroadcast(const lichess::BroadcastEntry& entry, bool without_account = false);
     void drawLichessPage();
@@ -2783,6 +2810,10 @@ class App {
     // `text` as the user reads it; `asked`, when not empty, what the assistant is given (a suggestion, in its own
     // language).
     void askQuestion(const std::string& text, const std::string& asked = {});
+    // The tables a question or a comment is answered with (#42): the board's position and the one before it, of seven
+    // pieces or fewer, taught by the disk's tables or by the answers Lichess gave that the profile kept (nothing is
+    // asked); none when they know neither.
+    [[nodiscard]] std::shared_ptr<commentary::Tablebases> boardPositionTables();
     void pollQuestions();  // once a frame: the answers that came, the assistant's download and unloading
     // Settings › Assistant (M5, board 5): where it stands, its model, where it runs, when it unloads.
     void drawAssistantSettings(float label);
@@ -2990,7 +3021,8 @@ class App {
     [[nodiscard]] const commentary::Tablebases* reviewTables() const;  // when taught anything
     uint64_t board_game_serial_ = 0;  // one more at each game put on the board
     void drawBoardReferences();
-    int board_side_tab_ = 0;  // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions
+    // 0 the notation, 1 the analysis, 2 the opening tree, 3 the reference games, 4 questions, 5 the endgames (#42)
+    int board_side_tab_  = 0;
     int engine_menu_ply_ = -1;  // the tournament engine's move whose menu is open in the notation (#87)
     struct TreeRow {
         std::string shares;  // My databases: each database's games, said over the Games column

@@ -155,6 +155,9 @@ const std::vector<Motif>& notions() {
         {{"complexe*", "complex"}, [](const Fact& f) { return is<fact::WeakColour>(f); }},
         {{"pression*", "pressure*"}, [](const Fact& f) { return is<fact::Pressure, fact::KingAttack>(f); }},
         {{"dynami*", "positionn*", "positional*", "stratég*", "strateg*"}, [](const Fact&) { return false; }},
+        // The endgame tables, named only when the facts hold what they say (#42).
+        {{"tables", "tablebase*"},
+         [](const Fact& f) { return is<fact::Tablebase, fact::SpoilsWin, fact::SpoilsDraw, fact::OnlyMoveToKeep>(f); }},
     };
     return list;
 }
@@ -738,6 +741,16 @@ std::optional<Refusal> check(std::string_view text, const MoveFacts& facts, cons
     if (key_square &&
         std::none_of(present.begin(), present.end(), [](const Fact* f) { return is<fact::KeySquare>(*f); }))
         return refusal(Refusal::Kind::Motif, "case clé");
+    // A theoretical draw is the tables' verdict (#42): « nulle théorique », "theoretical draw" only with it.
+    static constexpr std::string_view THEORETICAL_DRAW[] = {"nulle théorique", "theoretical draw",
+                                                            "theoretically drawn"};
+    const bool theoretical                               = std::any_of(
+        std::begin(THEORETICAL_DRAW), std::end(THEORETICAL_DRAW),
+        [&](std::string_view phrase) { return plain.find(fmt::format(" {} ", phrase)) != std::string::npos; });
+    if (theoretical && std::none_of(present.begin(), present.end(), [](const Fact* f) {
+            return is<fact::Tablebase, fact::SpoilsWin, fact::SpoilsDraw, fact::OnlyMoveToKeep>(*f);
+        }))
+        return refusal(Refusal::Kind::Unsupported, "nulle théorique");
     // « dame noire », "black queen": a coloured piece must be one the facts know, or the mover's.
     std::vector<Placed> pieces;
     for (const auto* f : present) {

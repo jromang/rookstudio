@@ -329,7 +329,7 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | A view for study | Open a PGN file on the Board page; a new game there |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd> | A view for study | The recent games; letting Ctrl go opens the one chosen |
 | <kbd>Enter</kbd> | The Home page | Resume the game on the board |
-| A letter of a move | The study Board | Type the move: the legal moves that begin so are offered, Enter plays it |
+| A letter of a move | The study Board | Type the move: the legal moves that begin so are offered, in the letters of the interface's language or in English ones; <kbd>↑</kbd> <kbd>↓</kbd> choose, Enter plays it |
 | <kbd>Enter</kbd>, <kbd>Shift</kbd>+<kbd>Enter</kbd> | The study Board | A comment after the move, before it |
 | <kbd>!</kbd> <kbd>?</kbd> | The study Board | The move's symbol; two signs in a row: `!!`, `??`, `!?`, `?!` |
 | <kbd>Delete</kbd> | The study Board | Delete the moves from the one shown |
@@ -339,7 +339,7 @@ them.
 | <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | The study Board | The previous, the next game of the list it came from |
 | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> | The study Board | The position's diagram into the clipboard, as an image |
 | <kbd>Alt</kbd>+<kbd>H</kbd> | The study Board | Unfold the game's headers (a hint during a game against an engine) |
-| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | The study Board | The Notation, Analysis, Tree, References and Questions tabs |
+| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>6</kbd> | The study Board | The Notation, Analysis, Tree, References, Questions and Endgames tabs |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | The study Board | The assistant comments the move |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | The study Board | What F, A, X, G, N and Shift+N do on the engines' Board (on the study Board, the letters type moves) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Enter</kbd>, <kbd>*</kbd> | The Tree tab | Choose a move, play it, mark it in the active repertoire |
@@ -1008,7 +1008,7 @@ with its openings, a handicap, takebacks and hints, its aids hidden until the en
 ### The study Board
 
 In a view whose Board is *For study* (see [Views](#views)), the Board page is where games are read and written. The
-board is on the left; on the right, the game's strip, then five tabs, Alt+1 to Alt+5:
+board is on the left; on the right, the game's strip, then six tabs, Alt+1 to Alt+6:
 
 - **Notation**: the game's title line and its headers (see [Headers](#headers)), then the moves, their comments,
   symbols and variations, written in place (see [Notation](#notation)); the table of the moves and the review are
@@ -1019,7 +1019,9 @@ board is on the left; on the right, the game's strip, then five tabs, Alt+1 to A
 - **Tree**: the moves played from the position in your databases, your books and on Lichess (see [The Tree
   tab](#the-tree-tab));
 - **References**: the strongest games of the position (see [Reference games](#reference-games));
-- **Questions**: the assistant (see [Questions](#questions)).
+- **Questions**: the assistant (see [Questions](#questions));
+- **Endgames**: what the endgame tables say of the position, once seven pieces or fewer are left (see [The Endgames
+  tab](#the-endgames-tab)).
 
 The strip above the tabs tells where the game comes from and what became of it: *Save* (Ctrl+S) with its state
 (*Changed: 2 changes*, then *Saved in “Mega”*), the game's place in the list it came from with the previous
@@ -1191,6 +1193,29 @@ The References tab looks for the strongest games of the position in your databas
 strongest first (by the players' mean rating), then the newest; a click opens one. Early in the opening, too many
 games reach the position to look for the strongest: the Tree tab tells more. *All the games of the position in “…”*
 lists them in the database.
+
+### The Endgames tab
+
+The sixth tab of the study Board, Alt+6, says what the endgame tables say of the position shown, once seven pieces or
+fewer are left, or eight with a pawn of each side on one file (Lichess's op1 tables); dimmed beyond, it says so when
+chosen. At the top, the verdict (*White wins*, *Draw*, *Won for White, but drawn by the fifty-move rule*), where it
+comes from and how far the end is: the moves to mate up to six pieces (DTM, other programs say), at seven the moves to a
+capture or a pawn move (DTZ), at eight the moves to the next capture, promotion or mate (DTC). Then the moves, grouped by
+the outcome they leave the side that plays them, the best first: *Keep the win*, *Keep the draw*, *Throw the win away: a
+draw*, *Lose*… A move that spoils the result is said with why: the answer that refutes it and what the tables then say
+(*→ 52…Kxh7 · Black wins: mate in 19 moves*). A move hovered shows its main line on the board; a click plays it, a
+variation when the game went another way, as on the board. When the game goes on from the position, the assistant says
+what its move did, taught by the tables (*52.Rxh7 loses: after 52…Kxh7, the tables give Black mate in 19 moves. 52.g5
+kept the theoretical draw (7-piece tables).*), written from their verdicts alone: it says so only when they do.
+
+Your tables on the disk answer first (Syzygy, those the tournaments' adjudication and the Training page's endgames use:
+their verdict and the moves to a capture or a pawn move, no distance to mate); Lichess's answer the positions they lack,
+once allowed. The first time, the tab asks: for this position, always, or not now (*Always* can be changed on the Lichess
+page, under *Online for the analysis*). Only the position's FEN goes to tablebase.lichess.ovh, without an account, one
+request at a time: the position you look at, and the main lines of its moves, those that spoil the result first and the
+others when hovered. Each answer is kept in your profile and never asked again. The Analysis tab keeps the verdict and
+its distance, with a link to this tab. The tab is locked while one of your games is played on Lichess, as the Analysis
+tab is, and hidden during a game against an engine until its end.
 
 ### The explorer, more
 
@@ -2545,10 +2570,11 @@ Three services, each asked about at its first use (for this position, always, or
 - **Lichess's cloud evaluation**, in the Analysis tab: the FEN of each position shown is sent, without an account,
   and Lichess answers with the lines its servers have already computed, when it has them. Your engine always answers.
 - **Endgames online, up to 7 pieces**: for a position of seven pieces or fewer that the tables on your disk do not
-  know, its FEN is sent to Lichess's tables, without an account. They give the verdict, mate at best or the moves
-  before a capture or a pawn move, and each move with what it leaves (a click plays it); *See the winning line on the
-  board* previews it. A win the 50-move rule turns into a draw is a “cursed win”. With eight pieces and opposing
-  pawns, they give the verdict and the moves to the next capture.
+  know, its FEN is sent to Lichess's tables, without an account. They give the verdict and how far the end is, in the
+  Analysis tab, and each move by its outcome in the Endgames tab, with the main lines of its moves (see [The Endgames
+  tab](#the-endgames-tab)). A win the fifty-move rule turns into a draw, a “cursed win” in the tables' words, is said
+  “won, but drawn by the fifty-move rule”. With eight pieces and opposing pawns, they give the verdict and the moves
+  to the next capture, promotion or mate.
 - **Lichess's explorer**, in the Tree tab: for each position, its FEN and the filter chosen are sent with your
   token; it needs a linked account. Nothing of your databases is sent.
 

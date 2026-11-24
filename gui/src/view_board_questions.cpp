@@ -21,9 +21,13 @@
 #include "assistant_notes.hpp"
 #include "assistant_service.hpp"
 #include "board_text.hpp"
+#include "endgames.hpp"
 #include "engine_oracle.hpp"
 #include "i18n.hpp"
 #include "machines.hpp"
+#include "online_cache.hpp"
+#include "review_tables.hpp"
+#include "tablebases.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -183,6 +187,28 @@ void App::drawAssistantFirstUse() {
     ui::endCard();
 }
 
+std::shared_ptr<commentary::Tablebases> App::boardPositionTables() {
+    const auto& b    = board_;
+    auto tables      = std::make_shared<commentary::Tablebases>();
+    bool taught      = false;
+    const auto teach = [&](const chess::Board& board) {
+        const int pieces = piecesOf(board);
+        if (pieces > 7 || b.chess960 || !board.castlingRights().isEmpty()) return;
+        const auto pos = commentary::Position::fromFen(board.getFen());
+        if (!pos) return;
+        std::optional<lichess::Tablebase> answer;
+        if (!diskTablesLocked() && diskTablesPieces() >= pieces) {
+            const auto lock = lockSyzygy();
+            answer          = probeDiskTables(board, endgameTablesPaths());
+        }
+        if (!answer) answer = cachedTablebase(storage_.root(), board.getFen());
+        if (answer && teachTables(*tables, *pos, *answer)) taught = true;
+    };
+    teach(boardAt(b.game, b.chess960, b.ply));
+    if (b.ply > 0) teach(boardAt(b.game, b.chess960, b.ply - 1));
+    return taught ? tables : nullptr;
+}
+
 void App::askQuestion(const std::string& text, const std::string& asked_text) {
     const auto& b = board_;
     if (text.empty() || !assistant_ || gameLocked()) return;  // fair play (#48)
@@ -221,7 +247,7 @@ void App::askQuestion(const std::string& text, const std::string& asked_text) {
         std::async(std::launch::async,
                    [question = asked_text.empty() ? text : asked_text, fen = q.fen, earlier_fen, previous,
                     earlier_previous, line = std::move(line), bases = q.bases, lang, model = assistant_.get(),
-                    oracle = oracle_]() -> QuestionResult {
+                    oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
                        QuestionResult r;
                        const auto pos = commentary::Position::fromFen(fen);
                        if (!pos) {
@@ -260,7 +286,7 @@ void App::askQuestion(const std::string& text, const std::string& asked_text) {
                            asked.earlier_previous = two_back.parseUci(earlier_previous);
                        }
                        asked.line = moves;
-                       r.answer   = commentary::answer(asked, *model, oracle.get(), nullptr);
+                       r.answer   = commentary::answer(asked, *model, oracle.get(), tables.get());
                        // Two moves compared: the position they are played from, and what the databases hold of it,
                        // for the table under the answer.
                        if (const auto* a = std::get_if<commentary::Answered>(&r.answer);

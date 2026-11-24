@@ -370,10 +370,12 @@ void App::commentBoardMove() {
     job.basis = commentBasis(review && review->report.get(static_cast<std::size_t>(b.ply)));
     const auto before_fen                          = boardAt(b.game, b.chess960, b.ply - 1).getFen();
     const auto played = chess::uci::moveToUci(b.game.moves[static_cast<std::size_t>(b.ply - 1)].move, b.chess960);
+    // The tables: the review's for the game's move, else those that know the position (#42).
+    auto tables  = review && reviewTables() ? review_tables_ : boardPositionTables();
     job.texts    = std::async(std::launch::async,
                               [review, ply = static_cast<std::size_t>(b.ply), fen = job.targets.front().fen, before_fen,
-                               played, model = assistant_.get(), oracle = oracle_, done = job.done,
-                               tables = reviewTables() ? review_tables_ : nullptr, l = lang(), letters = letters()]() {
+                               played, model = assistant_.get(), oracle = oracle_, done = job.done, tables, l = lang(),
+                               letters = letters()]() {
                                std::vector<std::string> out(1);
                                if (review) {
                                    if (const auto* m = review->report.get(ply)) {
@@ -395,7 +397,7 @@ void App::commentBoardMove() {
                                    asked.previous = earlier->parseUci(played);
                                    asked.lang     = l;
                                    asked.letters  = letters;
-                                   const auto a   = commentary::answer(asked, *model, oracle.get(), nullptr);
+                                   const auto a   = commentary::answer(asked, *model, oracle.get(), tables.get());
                                    if (const auto* said = std::get_if<commentary::Answered>(&a)) out[0] = said->text;
                                }
                                ++*done;

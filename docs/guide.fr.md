@@ -343,7 +343,7 @@ L'échiquier 3D demande OpenGL 3.3. Là où la fenêtre est dessinée sans lui (
 licence MIT ; *Apparence* donne le lien vers elles.
 
 ## Raccourcis clavier
-<!-- en: keyboard-shortcuts e7a7fc57 -->
+<!-- en: keyboard-shortcuts 149fc0ee -->
 
 | Touches | Où | Ce qu'elles font |
 |---|---|---|
@@ -370,7 +370,7 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>Ctrl</kbd>+<kbd>O</kbd>, <kbd>Ctrl</kbd>+<kbd>N</kbd> | Une vue pour l'étude | Ouvrir un fichier PGN sur la page Échiquier ; y commencer une nouvelle partie |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>Tab</kbd> | Une vue pour l'étude | Les parties récentes ; relâcher Ctrl ouvre celle choisie |
 | <kbd>Entrée</kbd> | La page Accueil | Reprendre la partie sur l'échiquier |
-| Une lettre d'un coup | L'Échiquier d'étude | Taper le coup : les coups légaux qui commencent ainsi sont proposés, Entrée le joue |
+| Une lettre d'un coup | L'Échiquier d'étude | Taper le coup : les coups légaux qui commencent ainsi sont proposés, dans les lettres de la langue de l'interface ou dans les lettres anglaises ; <kbd>↑</kbd> <kbd>↓</kbd> choisissent, Entrée le joue |
 | <kbd>Entrée</kbd>, <kbd>Maj</kbd>+<kbd>Entrée</kbd> | L'Échiquier d'étude | Un commentaire après le coup, avant lui |
 | <kbd>!</kbd> <kbd>?</kbd> | L'Échiquier d'étude | Le symbole du coup ; deux signes à la suite : `!!`, `??`, `!?`, `?!` |
 | <kbd>Suppr</kbd> | L'Échiquier d'étude | Supprimer les coups à partir de celui affiché |
@@ -378,9 +378,12 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd>, <kbd>Ctrl</kbd>+<kbd>Y</kbd> | L'Échiquier d'étude | Annuler, rétablir |
 | <kbd>Ctrl</kbd>+<kbd>S</kbd>, <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>S</kbd> | L'Échiquier d'étude | Enregistrer la partie ; en enregistrer une copie ailleurs |
 | <kbd>Ctrl</kbd>+<kbd>←</kbd>, <kbd>Ctrl</kbd>+<kbd>→</kbd> | L'Échiquier d'étude | La partie précédente, la suivante de la liste d'où elle vient |
+| <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>C</kbd> | L'Échiquier d'étude | Le diagramme de la position dans le presse-papiers, en image |
 | <kbd>Alt</kbd>+<kbd>H</kbd> | L'Échiquier d'étude | Déplier les en-têtes de la partie (un indice pendant une partie contre un moteur) |
-| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>5</kbd> | L'Échiquier d'étude | Les onglets Notation, Analyse, Arbre, Références et Questions |
+| <kbd>Alt</kbd>+<kbd>1</kbd> … <kbd>Alt</kbd>+<kbd>6</kbd> | L'Échiquier d'étude | Les onglets Notation, Analyse, Arbre, Références, Questions et Finales |
 | <kbd>Alt</kbd>+<kbd>C</kbd> | L'Échiquier d'étude | L'assistant commente le coup |
+| <kbd>Alt</kbd>+<kbd>Q</kbd> | L'Échiquier d'étude | Pourquoi pas ? Le coup essayé contre celui de la partie, ou le coup de la partie contre le meilleur du bilan |
+| <kbd>Espace</kbd>, <kbd>Entrée</kbd>, <kbd>Alt</kbd>+<kbd>Q</kbd>, <kbd>Échap</kbd> | La visite guidée | « Je ne sais pas », le moment suivant, pourquoi pas un autre coup, arrêter |
 | <kbd>Alt</kbd>+<kbd>F</kbd>, <kbd>Alt</kbd>+<kbd>A</kbd>, <kbd>Alt</kbd>+<kbd>X</kbd>, <kbd>Alt</kbd>+<kbd>G</kbd>, <kbd>Alt</kbd>+<kbd>N</kbd>, <kbd>Alt</kbd>+<kbd>Maj</kbd>+<kbd>N</kbd> | L'Échiquier d'étude | Ce que font F, A, X, G, N et Maj+N sur l'Échiquier des moteurs (ici, les lettres tapent des coups) |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Entrée</kbd>, <kbd>*</kbd> | L'onglet Arbre | Choisir un coup, le jouer, le marquer dans le répertoire actif |
 | <kbd>Entrée</kbd> | La page Ouvertures | Commencer l'entraînement sur le répertoire affiché |
@@ -401,12 +404,26 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>Entrée</kbd> | Une partie contre un moteur | Confirmer *Abandonner…* ; reprendre une partie gardée à la fermeture de RookStudio ; une fois terminée, faire son bilan |
 | <kbd>Entrée</kbd>, <kbd>Échap</kbd> | La page Jouer, sur Lichess | Accepter le défi reçu, sinon chercher une partie ; retirer la recherche d'adversaire ou le défi |
 | <kbd>Entrée</kbd>, <kbd>Échap</kbd> | Une partie sur Lichess | Envoyer le coup par correspondance en attente, confirmer *Abandonner…* ; retirer le coup en attente ou joué à l'avance |
+| <kbd>Entrée</kbd> | La page Jouer, les tournois de Lichess | Rejoindre l'arène ou le tournoi suisse affiché (la première fois : l'autoriser sur Lichess) |
+| <kbd>Alt</kbd>+<kbd>P</kbd> | Partout, dans une arène sur Lichess | Pause dans l'arène, les aides de retour ; une seconde fois : retour dans l'arène |
 | Une lettre, puis un chiffre | Les coordonnées, *Où est… ?* | Nommer une case |
 | <kbd>Maj</kbd> enfoncée, <kbd>F2</kbd> | À l'aveugle | Les pièces montrées 2 secondes, trois fois par partie ; *Où est… ?* |
 | <kbd>N</kbd>, <kbd>n</kbd>, <kbd>-</kbd> | Une ligne lue de tête | La pièce comme l'écrit le FEN (un cavalier blanc, un noir), ou aucune |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Entrée</kbd> | Une liste de parties | Parcourir la liste, ouvrir la partie |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | La page Bases | Le panneau de recherche |
 | <kbd>Échap</kbd> | La page Bases | Fermer le panneau de recherche, puis la liste |
+| <kbd>Ctrl</kbd>+<kbd>Page suiv.</kbd>, <kbd>Ctrl</kbd>+<kbd>Page préc.</kbd> | Le dossier d'un joueur | L'onglet suivant, le précédent |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Entrée</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Le dossier d'un joueur | Choisir parmi les homonymes, garder le choix ; l'annuler |
+| <kbd>Échap</kbd> | Le dossier d'un joueur | Revenir à la page d'où il a été ouvert |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Entrée</kbd> | Les tournois d'une base | Choisir un tournoi, ouvrir son tableau croisé |
+| <kbd>Échap</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Le tableau croisé d'un tournoi | Revenir aux tournois ; annuler sa dernière modification de la base |
+| <kbd>Ctrl</kbd>+<kbd>Page suiv.</kbd>, <kbd>Ctrl</kbd>+<kbd>Page préc.</kbd> | Un rapport d'ouverture | La section suivante, la précédente |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>Entrée</kbd> | Les coups d'un rapport d'ouverture | Choisir un coup, le jouer sur la page Échiquier |
+| <kbd>Échap</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Un rapport d'ouverture | Revenir à la position ; retirer les coups ajoutés au répertoire |
+| <kbd>Entrée</kbd>, <kbd>Échap</kbd> | La feuille Export | Enregistrer le fichier (un PDF : l'ouvrir pour l'imprimer) ; revenir à la page |
+| <kbd>Ctrl</kbd>+<kbd>P</kbd> | La feuille Export, un PDF | L'ouvrir dans le lecteur du système, pour l'imprimer |
+| <kbd>Ctrl</kbd>+<kbd>Page suiv.</kbd>, <kbd>Ctrl</kbd>+<kbd>Page préc.</kbd> | La feuille Export | Le format suivant, le précédent |
+| <kbd>←</kbd> <kbd>→</kbd> <kbd>Origine</kbd> <kbd>Fin</kbd>, <kbd>F</kbd> | Une page HTML faite par RookStudio | Parcourir les coups ; retourner l'échiquier |
 | <kbd>←</kbd> <kbd>→</kbd> | Le grand écran | La partie précédente ou suivante |
 | <kbd>+</kbd> <kbd>-</kbd> | Le grand écran | Texte plus grand ou plus petit |
 | <kbd>Échap</kbd> | Le grand écran | Le quitter |
@@ -421,15 +438,19 @@ licence MIT ; *Apparence* donne le lien vers elles.
 | <kbd>Ctrl</kbd>+clic, <kbd>Maj</kbd>+clic | Listes | En sélectionner plusieurs |
 | <kbd>Suppr</kbd> | La page Moteurs | Retirer le moteur sélectionné (après confirmation) |
 | <kbd>Entrée</kbd> | La fiche d'un moteur, son bot Lichess prêt | Mettre le bot en ligne |
+| <kbd>Entrée</kbd> | La fiche d'un moteur, *Sur lichess.org, pour l'analyse* ouvert | Le proposer à Lichess (la première fois : l'autoriser sur Lichess) ; *Reprendre* le service arrêté |
 | <kbd>Entrée</kbd>, <kbd>Échap</kbd> | Faire d'un compte un bot Lichess, son nom tapé | En faire un bot ; annuler |
 | <kbd>Entrée</kbd>, <kbd>↑</kbd> <kbd>↓</kbd> | La console d'un moteur | Envoyer la ligne ; faire revenir les lignes précédentes |
 | <kbd>Ctrl</kbd>+<kbd>C</kbd> | Le mode sans interface | S'arrêter après les parties en cours |
 
 ## La page Accueil
-<!-- en: the-home-page 317baace -->
+<!-- en: the-home-page ecabd76e -->
 
 La page **Accueil** d'une vue fait des cartes des pages de la vue, ce qui tourne en premier :
 
+- **L'arène** où tu es depuis RookStudio, en haut : son nom, ton rang et tes points, le temps restant, *Y revenir* et
+  *Pause* (Alt+P) ; un tournoi suisse que tu as rejoint, sa ronde (voir [Arènes et tournois
+  suisses](#arènes-et-tournois-suisses)).
 - **Reprendre là où tu en étais**, quand la vue contient l'Échiquier : la partie sur l'échiquier à son coup, sur un
   petit échiquier, d'où elle vient (sa base et son numéro, sa place dans un filtre, ou son fichier), ses commentaires,
   et si elle a des modifications pas encore enregistrées. *Reprendre* (Entrée) y revient ; Ctrl+Tab liste les parties
@@ -444,15 +465,16 @@ La page **Accueil** d'une vue fait des cartes des pages de la vue, ce qui tourne
 - **Lichess** : le compte, les parties d'un joueur avec *Synchroniser*, les nouvelles parties comptées si tu l'as
   choisi, les diffusions en direct (voir [La page Lichess](#la-page-lichess)).
 - **En cours** : une partie sur Lichess jouée depuis RookStudio (*Revenir à la partie*) et les défis reçus (voir [Sur
-  Lichess](#sur-lichess)), ton bot Lichess en ligne et sa partie (voir [Un bot Lichess](#un-bot-lichess)), l'analyse de
-  la partie, celle de la position, un import, l'assistant (son téléchargement, son modèle chargé, *Décharger*), une série de problèmes, une séance d'exercices, une partie à deviner, une finale ou un
+  Lichess](#sur-lichess)), ton bot Lichess en ligne et sa partie (voir [Un bot Lichess](#un-bot-lichess)), tes moteurs
+  au service de l'échiquier d'analyse de lichess.org (voir [Ton moteur sur lichess.org](#ton-moteur-sur-lichessorg)),
+  l'analyse de la partie, celle de la position, un import, l'assistant (son téléchargement, son modèle chargé, *Décharger*), une série de problèmes, une séance d'exercices, une partie à deviner, une finale ou un
   exercice de vision en cours, et ce que la révision du jour a à revoir, en un seul compte, un clic révisant le tout
   (voir [La révision du jour](#la-révision-du-jour)).
 
 Le bouton de recherche en haut, ou Ctrl+K, trouve une commande, une partie, une base.
 
 ## La page Tournois
-<!-- en: the-tournaments-page dc32391d -->
+<!-- en: the-tournaments-page f561d9e6 -->
 
 La page **Tournois** est une salle de contrôle : d'abord ce qui tourne et ce qui a besoin de toi, puis le reste.
 
@@ -465,8 +487,8 @@ La page **Tournois** est une salle de contrôle : d'abord ce qui tourne et ce qu
   d'attente continuer, aussitôt si un tournoi s'est terminé entre-temps.
 - **Cœurs** : les threads matériels de la machine, et ceux que prennent les parties en cours, le reste libre. Une
   partie prend les `Threads` de celui de ses deux moteurs qui en a le plus, puisque les deux moteurs réfléchissent
-  chacun à leur tour ; la barre montre le nom de chaque tournoi et son nombre (les moteurs de la page Échiquier et la
-  partie du bot Lichess aussi), les détails s'affichant au curseur.
+  chacun à leur tour ; la barre montre le nom de chaque tournoi et son nombre (les moteurs de la page Échiquier, la
+  partie du bot Lichess et les requêtes de tes moteurs sur lichess.org aussi), les détails s'affichant au curseur.
 - **À traiter**, quand quelque chose l'exige, chaque fois avec sa correction sur place : un moteur qui ne démarre pas
   (voir [Un moteur qui ne démarre pas](#un-moteur-qui-ne-démarre-pas) : *Réessayer*, *Retirer…*, *Remplacer…*,
   *Journal moteur*) ; le tournoi qu'une erreur ou un moteur a arrêté, avec ce qui l'a arrêté, *Ouvrir le moteur*,
@@ -484,6 +506,9 @@ La page **Tournois** est une salle de contrôle : d'abord ce qui tourne et ce qu
 - **Ton bot Lichess**, tant qu'il est en ligne : son moteur, sa partie en cours avec *Sur l'Échiquier*, *Sa fiche* et
   *Mettre hors ligne* ; il refuse les défis *plus tard* tant que les tournois ont besoin des cœurs (voir [Un bot
   Lichess](#un-bot-lichess)).
+- **Tes moteurs sur lichess.org**, tant qu'ils servent : chacun avec son état, *Sa fiche* et *Arrêter le service* ; ils
+  ne prennent que les threads que les tournois laissent libres (voir [Ton moteur sur
+  lichess.org](#ton-moteur-sur-lichessorg)).
 - **File d'attente** : les tournois en attente, chacun avec sa durée et l'heure à laquelle il commence, et l'heure à
   laquelle tout se termine (voir [File d'attente et relance](#file-dattente-et-relance)).
 - **Derniers terminés** : les cinq derniers tournois terminés, avec leur résultat : le score d'un match, la décision
@@ -573,7 +598,7 @@ en premier.
   [Importer des moteurs et des classements](#importer-des-moteurs-et-des-classements)).
 
 ### Moteurs populaires
-<!-- en: popular-engines 86dab934 -->
+<!-- en: popular-engines bda147a5 -->
 
 *Moteurs populaires…*, à côté d'*Ajouter…*, liste les moteurs les plus forts dont les auteurs publient des
 compilations pour Linux, Windows et macOS sur GitHub (Gaia, Stockfish, Triumviratus, Reckless, PlentyChess,
@@ -592,11 +617,34 @@ Un moteur ajouté ainsi suit ses nouvelles versions : elles sont cherchées une 
 Moteurs (ou seulement à l'ouverture de *Moteurs populaires…*, dans *Réglages*), et montrées au-dessus de la liste avec
 *Mettre à jour*. La nouvelle version va dans un dossier à part et le moteur la prend une fois qu'elle a répondu à
 `uci` ; *Garder aussi …* garde la version précédente comme moteur à part, pour un match entre elles. Un tournoi qui
-n'est pas terminé garde les fichiers avec lesquels il a commencé.
+n'est pas terminé garde les fichiers avec lesquels il a commencé ; la version précédente est supprimée une fois
+terminés les tournois qui la jouent (voir [Les versions d'un moteur](#les-versions-dun-moteur)).
 
 Là où un moteur est nécessaire pour la première fois (l'analyse de la page Échiquier, ses questions et son bilan) et
 que la bibliothèque n'en a aucun, une carte propose Gaia, téléchargé en un clic (ou avec Entrée) et fait moteur de
 l'analyse et de l'assistant ; les autres moteurs populaires et un moteur du disque y sont aussi à un clic.
+
+### Les versions d'un moteur
+<!-- en: an-engines-versions e62023d7 -->
+
+Chaque version d'un moteur prise dans *Moteurs populaires…* reste dans un dossier à part dans le dossier `engines` du
+profil. Une fois qu'une mise à jour a remplacé une version dans la bibliothèque, son dossier est supprimé quand aucun
+tournoi non terminé (en cours, en pause ou arrêté) ne la joue : aussitôt quand aucun ne la joue, sinon à la fin du
+dernier, car RookStudio regarde de nouveau à la fin de chaque tournoi. Un avis dans le coin de la fenêtre le dit :
+*Gaia 4.4.3 supprimé : « Night Gaia » est terminé · 118 Mo libérés*, avec *Sa fiche*.
+
+Quand le moteur a sur le disque plus que la version de sa bibliothèque, sa fiche les liste sous *Ses versions sur le
+disque*, chacune avec son état :
+
+- celle de la bibliothèque : celle que prennent l'analyse, les nouveaux tournois, le bot et le service pour Lichess ;
+- une qu'un tournoi non terminé joue, avec ce tournoi et où il en est (*en cours, partie 212 sur 400*), supprimée à sa
+  fin quand une mise à jour l'a remplacée ; *Garder aussi …* la garde pour de bon, comme moteur à part ;
+- une gardée exprès (*Garder aussi …*, ici ou dans la mise à jour), jamais supprimée ; *Ne plus la garder* (un second
+  clic) retire son moteur de la bibliothèque, et son dossier part dès qu'aucun tournoi non terminé ne la joue ;
+- une restée d'avant, jamais remplacée par une mise à jour depuis : gardée jusqu'à *La supprimer* (un second clic) ;
+- une supprimée qu'un tournoi non terminé redemande (repris depuis un dossier où RookStudio n'a pas regardé) : *La
+  télécharger à nouveau* la reprend depuis sa version publiée sur GitHub, vérifiée avec l'empreinte qu'elle avait, au
+  même endroit.
 
 ### Démarrage des moteurs
 <!-- en: starting-engines 09d107ba -->
@@ -763,6 +811,63 @@ ci-dessous.
 
 La palette de commandes a *Mettre le bot Lichess en ligne*, *Mettre le bot Lichess hors ligne*, *La partie du bot
 Lichess sur l'Échiquier* et *La fiche du bot Lichess*, et sur la page Moteurs *Faire de … un bot Lichess…*.
+
+### Ton moteur sur lichess.org
+<!-- en: your-engine-on-lichessorg 6bee0124 -->
+
+La fiche d'un moteur a une ligne **Sur lichess.org, pour l'analyse** : *Proposer à Lichess…* propose le moteur à
+l'échiquier d'analyse de lichess.org, par l'API des moteurs externes de Lichess. Il calcule ici, sur ta machine, et ses
+lignes s'affichent là-bas, pour ton compte seulement, dans le menu des moteurs de l'échiquier d'analyse, tant que
+RookStudio est ouvert. L'API de Lichess pour cela est encore en alpha.
+
+- **Ce sous quoi il est proposé** : son nom chez Lichess (3 à 200 caractères ; *Gaia 4.4.4 (RookStudio)* par défaut),
+  la machine (cet ordinateur, ou une machine distante de Réglages > Machines où le moteur a son chemin, par SSH, avec
+  ses propres threads), les threads au plus (Lichess en demande de 1 à ce nombre pour chaque requête) et la mémoire au
+  plus. Lichess fait tourner un tel moteur en mode Chess960 (`UCI_Chess960`) pour toutes les parties : un moteur qui ne
+  l'a pas ne peut pas être proposé, et sa ligne le dit à la place de *Proposer à Lichess…*.
+- **La première fois**, Lichess demande deux permissions de plus, `engine:read` et `engine:write` (pour enregistrer un
+  moteur pour ton compte, le lire, le retirer) : *Autoriser sur Lichess…* (Entrée) ouvre la page de Lichess ; ton
+  compte reste associé, et le jeton qu'elle remplace est révoqué. Sans compte associé, la fiche le dit, avec *Associer
+  le compte…*.
+- **Ensuite, sans rien demander de plus**, RookStudio enregistre le moteur sur ton compte (une requête, avec ton jeton)
+  et un secret tiré ici, que Lichess ne montre plus jamais ; RookStudio le garde dans le `lichess-engines.json` du
+  profil, lisible par toi seul, et ne le montre ni ne le journalise jamais. Il attend ensuite du travail sur
+  engine.lichess.ovh avec ce seul secret, sans ton jeton : une longue attente, renouvelée tant que le service tourne.
+  Quand ton échiquier d'analyse le demande, une requête arrive avec la position (une position de départ et des coups),
+  les threads, la mémoire, 1 à 5 lignes et un temps, une profondeur ou des nœuds : le moteur est réglé (le mode
+  Chess960, `UCI_AnalyseMode` quand il l'a, ses options de la bibliothèque), et ses lignes (profondeur, multipv, score,
+  nœuds, temps, pv) partent vers Lichess à mesure qu'il les trouve, puis son meilleur coup. Quand tu passes à autre
+  chose, Lichess ferme la requête, et le moteur s'arrête.
+- **En service**, la fiche montre la requête en cours (ses lignes, threads, mémoire, profondeur et vitesse), les
+  requêtes et les minutes d'analyse du jour, la position demandée avec le meilleur coup du moteur, *Ouvrir l'échiquier
+  d'analyse de Lichess* et **Arrêter le service**. La page Lichess liste les moteurs proposés (*Tes moteurs sur
+  lichess.org*) ; la page Accueil (sous *En cours*) et la page Tournois montrent ceux en service, et la barre des cœurs
+  leurs threads.
+- **Le tournoi d'abord** : le service ne prend que les threads que laissent libres les tournois qui jouent sur sa
+  machine (les cœurs des Réglages), la partie du bot Lichess passant d'abord aussi (voir [Un bot
+  Lichess](#un-bot-lichess)) ; s'il n'en reste aucun, il se met en pause et le dit, les requêtes de Lichess attendant.
+  Une requête en cours quand un tournoi a besoin de ses threads s'arrête là.
+- **Fair-play** : pendant ta propre partie en direct sur Lichess, le service se met en pause jusqu'à la fin de la
+  partie (les requêtes restent sans réponse), puis reprend de lui-même. Les positions de tes parties par
+  correspondance ne sont jamais analysées : une requête sur l'une d'elles, sur une ligne qui y passe ou un coup avant
+  elle (comparée par les pièces et le camp au trait, comme le fait le verrou du [Fair-play](#fair-play)) reçoit une
+  réponse vide. Lichess lui-même ne propose un moteur externe que sur ses pages d'analyse, jamais pendant une partie.
+- **Arrêter le service** : RookStudio n'attend plus de travail ; le moteur reste enregistré chez Lichess, sans
+  répondre ; *Reprendre* (Entrée) le remet en service. *Changer…* l'enregistre à nouveau avec un autre nom, une autre
+  machine ou d'autres limites. **Retirer de Lichess** supprime l'enregistrement (une requête), et son secret n'est plus
+  utilisé ; *Proposer à Lichess…* le refait. RookStudio fermé, le moteur reste dans la liste de Lichess sans répondre ;
+  au prochain démarrage, le service reprend s'il était en service à la fermeture.
+- **Quand quelque chose ne va pas** : Lichess qui refuse le secret (401 : l'enregistrement a été retiré sur
+  lichess.org, ou le secret a changé) arrête le service, avec *Enregistrer à nouveau (un nouveau secret)* ; une réponse
+  de Lichess que RookStudio ne lit pas (l'API est en alpha) l'arrête plutôt que de répondre faux, et le dit, avec *Voir
+  si une version de RookStudio la suit* ; hors ligne, le service attend le réseau et reprend de lui-même (après trop
+  de requêtes, la minute de Lichess).
+- Ce qui quitte la machine : à l'enregistrement, le nom, les limites et le secret, avec ton jeton ; puis les lignes du
+  moteur pour les positions qu'envoie Lichess. Ces positions viennent de ton propre navigateur, via Lichess, qui voit
+  les lignes. Rien d'autre de ta machine.
+
+La palette de commandes a *Proposer … à lichess.org…* sur la page Moteurs, *Arrêter le service de … sur lichess.org*
+et *Reprendre le service de … sur lichess.org*.
 
 ## Livres
 <!-- en: books 4cf13005 -->
@@ -1126,11 +1231,11 @@ choisis, avec ses ouvertures, un handicap, des reprises et des indices, ses aide
 Jouer](#la-page-jouer)).
 
 ### L'Échiquier d'étude
-<!-- en: the-study-board 60138fbd -->
+<!-- en: the-study-board 165eb3bd -->
 
 Dans une vue dont l'Échiquier est *Pour l'étude* (voir [Vues](#vues)), la page Échiquier est l'endroit où les parties
-se lisent et s'écrivent. L'échiquier est à gauche ; à droite, le bandeau de la partie, puis cinq onglets, Alt+1 à
-Alt+5 :
+se lisent et s'écrivent. L'échiquier est à gauche ; à droite, le bandeau de la partie, puis six onglets, Alt+1 à
+Alt+6 :
 
 - **Notation** : la ligne de titre de la partie et ses en-têtes (voir [En-têtes](#en-têtes)), puis les coups, leurs
   commentaires, symboles et variantes, écrits sur place (voir [Notation](#notation)) ; le tableau des coups et le bilan
@@ -1141,19 +1246,33 @@ Alt+5 :
 - **Arbre** : les coups joués depuis la position dans tes bases, tes livres et sur Lichess (voir
   [L'onglet Arbre](#longlet-arbre)) ;
 - **Références** : les parties les plus fortes de la position (voir [Parties de référence](#parties-de-référence)) ;
-- **Questions** : l'assistant (voir [Questions](#questions)).
+- **Questions** : l'assistant (voir [Questions](#questions)) ;
+- **Finales** : ce que les tables de finales disent de la position, une fois qu'il reste sept pièces ou moins (voir
+  [L'onglet Finales](#longlet-finales)).
 
 Le bandeau au-dessus des onglets dit d'où vient la partie et ce qu'elle est devenue : *Enregistrer* (Ctrl+S) avec son
 état (*Modifiée : 2 modifications*, puis *Enregistrée dans « Mega »*), la place de la partie dans la liste
 d'où elle vient avec la partie précédente et la suivante (Ctrl+← et Ctrl+→), et *Récentes* (voir [Les parties
 récentes et la liste](#les-parties-récentes-et-la-liste)). Avec une bibliothèque vide, les onglets Analyse, Questions
-et Bilan proposent de télécharger Gaia en un clic.
+et Bilan proposent de télécharger Gaia en un clic. *Exporter…*, sous l'échiquier, fait de la partie une page à
+rejouer, un diagramme, un GIF animé ou un PDF ; <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>C</kbd> copie le diagramme de la
+position (voir [Exporter et imprimer](#exporter-et-imprimer)).
 
 Un coup se tape aussi bien qu'il se joue : sa première lettre ouvre un champ au-dessus des onglets, qui propose les
-coups légaux commençant ainsi (en lettres anglaises, K Q R B N ; en français, R D T F C), et Entrée le joue. Les
-lettres de l'Échiquier des moteurs passent alors sous Alt : Alt+F retourne l'échiquier, Alt+A lance ou arrête
-l'analyse, Alt+X montre la menace, Alt+G analyse la partie, Alt+N et Alt+Maj+N vont au coup suivant et au coup
-précédent marqués par l'analyse.
+coups légaux commençant ainsi, dans les lettres de pièces de la langue de l'interface : K Q R B N en anglais et en
+chinois, R D T F C en français, K D T L S en allemand, R D T A C en espagnol et en italien, R D T B C en portugais du
+Brésil, Кр Ф Л С К en russe. Les lettres anglaises sont toujours lues aussi : `Ng` propose les mêmes coups que le `Sg`
+allemand. Une lettre à deux sens propose les deux : en français, en espagnol, en italien et en portugais, R donne
+d'abord les coups du roi, puis ceux de la tour, marqués *tour (en anglais)* ; en russe, К donne les coups du cavalier
+et ceux du roi, Кр ceux du roi seulement. Les cases où vont les coups proposés sont pointées sur l'échiquier, la flèche
+du premier dessinée : ↑ et ↓ en choisissent un autre, Entrée joue celui choisi, un clic joue n'importe lequel, et
+`0-0` est aussi le roque. Le même champ prend les coups des exercices de la page Entraînement (les problèmes, tes
+erreurs, deviner les coups, les finales) et des parties de la page Jouer. L'interface écrit les coups dans les mêmes
+lettres (la notation quand *Figurines dans la notation* est désactivé, les lignes des moteurs, le bilan) ; le PGN
+garde le SAN anglais, comme le lit tout programme, et les commentaires de l'assistant gardent les lettres de leur
+propre langue. Les lettres de l'Échiquier des moteurs passent alors sous Alt : Alt+F retourne l'échiquier, Alt+A lance
+ou arrête l'analyse, Alt+X montre la menace, Alt+G analyse la partie, Alt+N et Alt+Maj+N vont au coup suivant et au
+coup précédent marqués par l'analyse.
 
 ### Plusieurs moteurs côte à côte
 <!-- en: several-engines-side-by-side 43f5e1fe -->
@@ -1194,6 +1313,29 @@ Pendant qu'une de tes parties se joue sur Lichess, tous les moteurs s'arrêtent 
 montre aucune de leurs flèches (voir [Fair-play](#fair-play)). *Décharger les moteurs de l'analyse*, dans le menu d'un
 moteur ou dans la palette de commandes, termine leurs processus. Chaque geste de l'onglet est dans la palette de
 commandes (Ctrl+K) : un moteur ajouté, mis en premier ou retiré, ses réglages, les threads de l'analyse.
+
+### Coups pratiques
+<!-- en: practical-moves 26da3fb5 -->
+
+Sous les moteurs, *Contre un humain de 1500, rapide* (le niveau et la vitesse gardés d'une fois sur l'autre) cherche le
+coup pratique : parmi les coups que le premier moteur place à moins de 0,3 pion de son meilleur (ou, une fois que les
+tables connaissent la position, ceux qui gardent leur verdict), celui qui marque le plus contre un joueur de ce niveau,
+dans les parties de ce niveau. Avec un compte Lichess associé, les parties sont celles de l'explorateur de Lichess au
+groupe de classement et à la vitesse du niveau (*Lichess 1400–1600, rapide*) ; sans compte, celles de tes bases dont le
+classement moyen des joueurs est dans la tranche du niveau, quelle que soit leur vitesse. Le score d'un coup compte à
+partir de 200 parties au niveau ; hors des parties connues, le coup pratique est celui qui laisse à l'adversaire le
+moins de bonnes réponses, selon le moteur : un moteur à part, sur un thread, cherche les réponses de chaque candidat,
+et le tableau dit combien tiennent (*2 sur 31*). Jamais un coup perdant.
+
+Le tableau donne chaque candidat, son évaluation par le moteur (celle des Blancs), son score contre ce niveau et ses
+parties à ce niveau, le meilleur du moteur marqué *meilleur* et le coup pratique *pratique* ; sur l'échiquier, le coup
+pratique est la flèche bleue, le meilleur du moteur la grise. Une phrase résume, fidèle aux chiffres : *Le coup
+pratique : 4.Cg5 — à 0.13 du meilleur coup du moteur, et 58 % attendus à ce niveau.* Quand les parties le montrent,
+elle continue avec la réponse la plus jouée au niveau le long de la ligne et ce qui la punit, la réponse du moteur :
+*Après 4…d5 5.exd5, la réponse la plus jouée à 1500 est 5…Cxd5? (46 % pour les Noirs), que 6.Cxf7 punit.* Les coups
+pratiques demandent l'analyse en cours (Alt+A). Ce qui quitte la machine : avec un compte associé, la position et le
+niveau, vers l'explorateur de Lichess ; sans compte, rien. Verrouillé avec l'onglet Analyse pendant qu'une de tes
+parties se joue sur Lichess.
 
 ### Notation
 <!-- en: notation 5147406e -->
@@ -1294,7 +1436,7 @@ Une partie ouverte depuis la liste d'une base y garde sa place : Ctrl+← et Ctr
 suivante de la liste, ou de son filtre, au même coup quand la partie passe par la position affichée.
 
 ### L'onglet Arbre
-<!-- en: the-tree-tab 8350941e -->
+<!-- en: the-tree-tab 184526b8 -->
 
 L'onglet Arbre donne les coups joués depuis la position affichée : leurs parties, les parts des victoires des Blancs,
 des nulles et des victoires des Noirs, le score, l'Elo moyen, la performance du camp au trait (d'après la table de la
@@ -1313,7 +1455,8 @@ de la partie quitte la base, l'onglet dit à quel coup, et si ce coup est une **
 recherche de position (*Voir la dernière position connue*). L'arbre d'une base est construit après chaque import, et
 de nouveau en arrière-plan après qu'une partie y a été enregistrée, sa progression affichée avec *Annuler*. Les notes
 de tes études de théorie accompagnent les coups, quelle que soit la source : une colonne *Théorie*, et *Ce que disent
-tes études* sous les coups (voir [Études de théorie](#études-de-théorie)).
+tes études* sous les coups (voir [Études de théorie](#études-de-théorie)). *Rapport sur cette position*, à droite des
+parties, ouvre son rapport d'ouverture (voir [Le rapport d'ouverture](#le-rapport-douverture)).
 
 ### Parties de référence
 <!-- en: reference-games c45f1d18 -->
@@ -1322,6 +1465,33 @@ L'onglet Références cherche les parties les plus fortes de la position dans te
 fortes d'abord (selon le classement moyen des joueurs), puis les plus récentes ; un clic en ouvre une. Tôt dans
 l'ouverture, trop de parties atteignent la position pour chercher les plus fortes : l'onglet Arbre en dit plus.
 *Toutes les parties de la position dans « … »* les liste dans la base.
+
+### L'onglet Finales
+<!-- en: the-endgames-tab 330bcfca -->
+
+Le sixième onglet de l'Échiquier d'étude, Alt+6, dit ce que les tables de finales disent de la position affichée, une
+fois qu'il reste sept pièces ou moins, ou huit avec un pion de chaque camp sur une même colonne (les tables op1 de
+Lichess) ; grisé au-delà, il le dit quand on le choisit. En haut, le verdict (*Gain des Blancs*, *Nulle*, *Gain des
+Blancs, mais nulle par la règle des 50 coups*), d'où il vient et la distance de la fin : les coups jusqu'au mat jusqu'à
+six pièces (DTM, comme l'appellent d'autres programmes), à sept les coups jusqu'à une prise ou un coup de pion (DTZ), à
+huit les coups jusqu'à la prochaine prise, promotion ou mat (DTC). Puis les coups, groupés selon l'issue qu'ils
+laissent au camp qui les joue, les meilleurs d'abord : *Garder le gain*, *Garder la nulle*, *Gâcher le gain : nulle*,
+*Perdre*… Un coup qui gâche le résultat est dit avec la raison : la réponse qui le réfute et ce que disent alors les
+tables (*→ 52…Rxh7 · Gain des Noirs : mat en 19 coups*). Un coup survolé montre sa ligne principale sur l'échiquier ;
+un clic le joue, en variante quand la partie a pris un autre chemin, comme sur l'échiquier. Quand la partie continue
+depuis la position, l'assistant dit ce qu'a fait son coup, instruit par les tables (*52.Txh7 perd : après 52…Rxh7, les
+tables donnent le mat aux Noirs en 19 coups. 52.g5 gardait la nulle théorique (tables à 7 pièces).*), écrit d'après
+leurs seuls verdicts : il ne le dit que quand elles le disent.
+
+Tes tables sur le disque répondent d'abord (Syzygy, celles qu'utilisent l'adjudication des tournois et les finales de
+la page Entraînement : leur verdict et les coups jusqu'à une prise ou un coup de pion, pas de distance au mat) ; celles
+de Lichess répondent pour les positions qui leur manquent, une fois autorisées. La première fois, l'onglet demande :
+pour cette position, toujours, ou pas maintenant (*Toujours* peut être changé sur la page Lichess, sous *En ligne pour
+l'analyse*). Seul le FEN de la position part vers tablebase.lichess.ovh, sans compte, une requête à la fois : la
+position que tu regardes, et les lignes principales de ses coups, celles qui gâchent le résultat d'abord et les autres
+quand elles sont survolées. Chaque réponse est gardée dans ton profil et n'est jamais redemandée. L'onglet Analyse garde
+le verdict et sa distance, avec un lien vers cet onglet. L'onglet est verrouillé pendant qu'une de tes parties se joue
+sur Lichess, comme l'onglet Analyse, et masqué pendant une partie contre un moteur jusqu'à sa fin.
 
 ### Plus loin avec l'explorateur
 <!-- en: the-explorer-more 1471aca0 -->
@@ -1335,6 +1505,79 @@ combien de parties l'ont joué mois par mois : une ligne de ses deux dernières 
 quand il est plus joué ces derniers temps, rouge quand il l'est moins ; sous la souris, ses parties des six derniers
 mois contre celles des six mois d'avant. Le résumé dit la même chose de la position. Cela coûte une requête par coup,
 aussi l'option reste-t-elle désactivée tant que tu ne la demandes pas ; l'explorateur des maîtres n'a pas de mois.
+
+### Le rapport d'ouverture
+<!-- en: the-opening-report 4b7befe4 -->
+
+Le **rapport d'ouverture** d'une position rassemble ce que tes bases en savent. Il s'ouvre depuis *Rapport sur cette
+position* de l'onglet Arbre, depuis une ligne de la page Ouvertures (le bouton droit sur une lacune : *Rapport
+d'ouverture*) et depuis Ctrl+K, *Rapport d'ouverture* ; il s'affiche à la place de la page Échiquier, Échap revenant à
+la position. Il est refait à chaque ouverture, en arrière-plan à basse priorité, section par section avec sa
+progression et *Annuler* : une fraction de seconde pour la plupart des positions, une seconde environ pour une position
+de millions de parties.
+
+En haut : la position, son ouverture (les ouvertures nommées de Lichess) et les coups qui y mènent ; puis ses sources,
+celles de l'onglet Arbre : tes bases dont l'arbre d'ouvertures est construit (celles qu'additionne *Mes bases*), avec
+leurs parties ; **Maîtres (Lichess)** et **Lichess** avec les vitesses et les classements de l'onglet Arbre, cochées
+quand l'onglet Arbre les montre, ou d'un clic (elles demandent la position à l'explorateur de Lichess, comme le fait
+l'onglet Arbre, et demandent un compte associé) ; et d'où viennent les évaluations. *Au répertoire* ajoute la première
+ligne principale au répertoire actif (Ctrl+Z la retire) ; *Imprimer…* fait du rapport un PDF, son résumé marqué comme
+celui de l'assistant, et *Page HTML* une page à part dont les lignes principales se rejouent sur un échiquier (voir
+[Exporter et imprimer](#exporter-et-imprimer)). Cinq sections suivent (Ctrl+Page suiv. et Ctrl+Page préc. passent de
+l'une à l'autre) :
+
+- **Lignes** : les coups joués depuis la position avec les chiffres de l'onglet Arbre (parties, gains des Blancs,
+  nulles et gains des Noirs, score, Elo moyen, performance, dernière année) et une évaluation : celle de Lichess, gardée
+  hors ligne (voir [Les évaluations de Lichess hors ligne](#les-évaluations-de-lichess-hors-ligne)), sinon celle du
+  moteur de l'analyse (un million de nœuds sur un thread, pour les cinq premiers coups qui n'en ont pas) ; sa source et
+  sa profondeur sous le curseur. Un clic, ou ↑ ↓ et Entrée, joue le coup sur la page Échiquier. Puis les **lignes
+  principales** : les suites les plus jouées, tant qu'elles gardent un cinquième des parties de leur premier coup, avec
+  les parties qui vont jusqu'à leur fin et le score des Blancs ; un clic en montre une sur la page Échiquier ;
+- **Plans et structures** : les structures de pions au 20e coup (dix coups plus loin pour une position plus tardive)
+  dans les parties de la position, telles que les nomment les faits de l'assistant, *déjà sur l'échiquier* quand la
+  position en a déjà une ; et ce que font les joueurs dans les quinze coups suivants : les poussées de pions (une, ou
+  deux à la suite : *b4 puis b5*) et les trajets des pièces (comme la recherche Manœuvre suit une pièce) joués dans un
+  dixième des parties ou plus, trois pour chaque camp, avec leur part et le score des Blancs. Un plan que connaissent
+  les faits de l'assistant est nommé (*L'attaque de minorité : b4 puis b5*). Ce sont des fréquences, pas des conseils ;
+  elles demandent 50 parties, et une position de plus de 20 000 parties est comptée sur un échantillon régulier de
+  celles-ci. Un clic montre ces parties dans la liste ;
+- **Parties clés** : la plus forte (le classement moyen des joueurs le plus haut), la plus récente à 2500 et plus en
+  moyenne, et la première partie d'une nouveauté répétée depuis, chacune avec sa raison et le plan qu'elle joue ;
+  *Ouvrir* la montre sur la page Échiquier à la position (*Revenir au rapport* y ramène) ;
+- **Nouveautés** : le long des lignes principales, les coups joués pour la première fois dans les cinq dernières années
+  de tes bases et répétés depuis, avec leur première année, combien de fois ils ont été répétés et leur score ; et ta
+  propre partie qui a quitté tes bases là (tes noms sont ceux de *Réglages › Tes noms*). La première année d'un coup
+  vient des arbres, qui contiennent toutes les parties qui atteignent sa position dans leurs 60 premiers demi-coups ;
+  ta partie est confirmée par une recherche de la position, comme l'onglet Arbre confirme une nouveauté ;
+- **Résumé** : le résumé du rapport par l'assistant, écrit par son modèle d'après les seuls chiffres et faits du
+  rapport (voir [Le résumé du rapport](#le-résumé-du-rapport)).
+
+Une position qu'atteignent moins de 50 parties donne ses coups et ses parties, sans plans ni structures (*Ajouter les
+joueurs de Lichess comme source*). Sans base dont l'arbre couvre ses parties, le rapport est fait des maîtres de
+Lichess, avec *Reconstruire l'arbre de …* et *Importer une base*. Hors ligne, tes bases et les évaluations gardées hors
+ligne répondent, et les sources de Lichess montrent les derniers chiffres que le rapport a gardés pour la position,
+datés. Sans moteur ni évaluations de Lichess gardées hors ligne, les évaluations restent vides et le résumé n'en dit
+rien (*Télécharger Gaia…*). Pendant qu'une de tes parties se joue en direct sur Lichess, le rapport est verrouillé, et
+revient de lui-même à sa fin ; sur la position d'une partie par correspondance, les lignes et les chiffres de tes bases
+restent (Lichess autorise un livre et une base), les évaluations, l'explorateur de Lichess et le résumé attendent. Rien
+ne quitte la machine sinon ce qu'envoie l'onglet Arbre : les sources Lichess cochées. L'impression du rapport et sa
+page HTML sont pour plus tard.
+
+### Le résumé du rapport
+<!-- en: the-reports-summary a859f9a6 -->
+
+Le résumé s'écrit par passages : la structure de pions, les plans de chaque camp, les coups joués, la ligne
+principale, les évaluations. Le modèle de l'assistant écrit chacun d'après les seuls chiffres de ce passage, tenu par
+une grammaire qui ne le laisse nommer que les coups de la position, les lignes du rapport, leurs cases et leurs
+chiffres ; puis le vérificateur lit chaque phrase : un chiffre doit être un de ceux que le rapport donne pour ce que
+nomme la phrase, un coup un de ceux de la position ou de ses lignes, un plan ou une structure un de ceux qu'a le
+rapport et du camp qu'elle dit, et elle ne donne aucun conseil. Un passage refusé est réécrit une fois ; refusé deux
+fois, le passage de la version type reste, et le curseur dessus dit pourquoi. *Sur quoi il s'appuie* liste les
+chiffres, les faits et les évaluations utilisés ; une carte dit ce que le vérificateur a refusé. *La version type*
+montre le résumé des phrases types, *Réécrire* fait écrire le modèle autrement, *Copier* le copie. Sans le modèle (pas
+téléchargé, un autre fichier GGUF, ou pendant qu'un tournoi sur cette machine occupe le processeur), les phrases types
+l'écrivent d'après les mêmes chiffres, en anglais ou en français. Sur le processeur, un résumé prend quelques secondes
+par passage.
 
 ### Le bilan d'une partie
 <!-- en: the-review-of-a-game 7c5c4437 -->
@@ -1390,6 +1633,120 @@ l'histoire écrite par les commentaires types, *La réécrire* la fait raconter 
 commentaires de RookStudio), ou pendant qu'un tournoi occupe le processeur de cette machine, l'histoire est la version
 type, comme elle le dit. Rien ne quitte la machine.
 
+### Chaque coup expliqué
+<!-- en: every-move-explained 52f41ee2 -->
+
+*Expliquer chaque coup*, dans l'onglet *Bilan* (ou Ctrl+K), donne à chaque coup de la partie une ligne, dans l'onglet
+*Explications* à côté des coups ; sans bilan, la partie est d'abord analysée (Alt+G), et ses coups expliqués une fois
+le bilan fait. Les lignes arrivent en arrière-plan, chacune dès qu'elle est écrite, avec le nombre de lignes faites et
+*Annuler* ; celles déjà écrites restent, et *Expliquer le reste* les termine plus tard.
+
+- **La théorie** est regroupée : une ligne pour chaque nom d'ouverture qu'atteignent ses coups, trois au plus, avec les
+  parties de tes bases qui ont atteint sa dernière position (*théorie, 61 204 parties de tes bases*).
+- **Un coup trop simple pour plus** est dit en un mot : *Reprise forcée.*, *Seul coup légal.*
+- **Les autres** reçoivent une phrase du modèle de l'assistant, écrite d'après les faits de la position, sa grammaire
+  ne le laissant nommer que des coups légaux, chaque phrase lue par le vérificateur ; une phrase que le vérificateur
+  refuse est remplacée par la phrase type, et survoler *phrase type : le vérificateur a refusé la phrase du modèle* dit
+  pourquoi. Sans le modèle, les phrases types les écrivent ; quand elles n'ont rien à dire, ce sont les mots du bilan
+  lui-même (*Le moteur préférait 14…Ff5.*).
+
+Chaque ligne dit d'où elle vient : la théorie, le modèle, une phrase type, un mot, le bilan. *Tous les coups*, *Les
+coups qui comptent* (les coups marqués, les coups uniques, les tournants, la nouveauté) et *Les moments clés* choisissent
+lesquels s'affichent ; un clic va au coup. Le résumé les compte et donne le temps que prend un coup, faits rassemblés
+et phrase du modèle vérifiée : environ un quart de seconde pour la phrase sur un GPU, quelque 5 secondes par coup sur
+un processeur partagé avec d'autres travaux (32 coups expliqués en une minute et demie). Elles sont gardées avec le
+bilan, à côté des coups, jamais dans la partie : *Les écrire dans la partie* en fait des commentaires de l'assistant,
+marqués comme les siens dans le PGN, à côté du commentaire qu'un coup a déjà, qui n'est jamais remplacé ; Ctrl+Z les
+retire tous. Rien ne quitte la machine. Verrouillé pendant qu'une de tes parties se joue sur Lichess, masqué pendant
+une partie contre un moteur jusqu'à sa fin.
+
+### La visite guidée et « Pourquoi pas ? »
+<!-- en: the-guided-visit-and-why-not f67b11ea -->
+
+*Visite guidée*, dans l'onglet *Bilan* (ou Ctrl+K), te fait parcourir les moments clés du bilan l'un après l'autre
+(ses coups marqués quand il n'en a pas) : l'échiquier montre la position avant le coup de la partie, et demande *Avant
+de voir pourquoi : qu'aurais-tu joué ?* Joue le coup sur l'échiquier ou tape-le ; rien n'est montré avant ta réponse,
+ni l'évaluation, ni une flèche, ni la notation de la partie, et Espace dit *Je ne sais pas*. Puis ta réponse est jugée
+comme *Deviner les coups* juge une proposition (voir [Deviner les coups](#deviner-les-coups)) : le coup du moteur
+3 points, un coup aussi bon 2, un coup jouable 1, sinon 0, par le moteur de l'analyse, une seconde pour chacun ;
+l'échiquier montre ton coup en bleu, celui du moteur en vert et celui de la partie en orange, avec une explication
+tenue aux faits du bilan et ce sur quoi elle s'appuie (le moteur du bilan et sa ligne, les faits des positions). Entrée
+passe au moment suivant, *Voir la ligne* joue la ligne du moteur sur l'échiquier, Échap arrête. Une mauvaise réponse,
+aucun point ou *Je ne sais pas*, devient une carte à revoir aujourd'hui, comme tes erreurs (voir [Tes erreurs en
+exercices](#tes-erreurs-en-exercices)) : la position, le coup du moteur à trouver.
+
+**Pourquoi pas ?** (Alt+Q) pose d'une seule touche la question *Comparer* de l'assistant (voir
+[Questions](#questions)), partout où un coup s'affiche : après un coup essayé sur l'échiquier (une variante, comme
+toujours), il oppose ce coup à celui de la partie ; sur le coup même de la partie, le meilleur du bilan contre lui ; le
+bouton droit sur une ligne d'un moteur dans l'onglet Analyse, ou sur un coup de l'onglet Arbre, propose *Pourquoi
+pas … ?* ; dans la visite guidée, *Pourquoi pas un autre coup ?* oppose ta réponse, ou le coup de la partie, à celui du
+moteur. La réponse arrive dans l'onglet Questions (dans la visite, en dessous) : le moteur après chacun des deux coups
+(un thread, 300 000 nœuds par position), les faits des deux positions, les parties et le score de tes bases, la suite ;
+*Ajouter à la notation* l'écrit, comme pour toute question. Pas de conversation libre : l'assistant répond ce
+qu'établissent le moteur, tes bases et les faits. Les deux sont verrouillés pendant qu'une de tes parties se joue sur
+Lichess, et masqués pendant une partie contre un moteur jusqu'à sa fin.
+
+### Exporter et imprimer
+<!-- en: exporting-and-printing 47d16e05 -->
+
+*Exporter…* sous l'Échiquier d'étude, à côté de *Copier le FEN* et de *lichess.org…*, ouvre la feuille Export à la
+place de la page ; Échap y revient. Ses formats sont des pastilles en haut, celui choisi la dernière fois déjà choisi
+(<kbd>Ctrl</kbd>+<kbd>Page suiv.</kbd> et <kbd>Ctrl</kbd>+<kbd>Page préc.</kbd> les parcourent) ; sa gauche montre le
+fichier tel qu'il sera, sa droite ce qui y entre, et chaque format garde ses réglages pour la fois suivante. Entrée
+enregistre : la boîte de dialogue du système s'ouvre dans le dossier choisi la dernière fois. Tout est fait par
+RookStudio, sur ton disque : rien n'est envoyé nulle part (partager une partie sur lichess.org, c'est le rôle de
+*lichess.org…*, voir [Positions et parties vers Lichess](#positions-et-parties-vers-lichess)).
+
+- **Page HTML** : un seul fichier qui contient tout, qui s'ouvre sans Internet, sur un téléphone aussi, et peut être
+  envoyé tel quel. L'échiquier aux couleurs et aux pièces de l'application, les coups, leurs commentaires et leurs
+  variantes ; un clic sur un coup le montre, dans une variante aussi, avec les flèches et les cases dessinées à ce
+  coup ; <kbd>←</kbd> <kbd>→</kbd> <kbd>Origine</kbd> <kbd>Fin</kbd> parcourent les coups et <kbd>F</kbd> retourne
+  l'échiquier. Ce qu'il contient se coche : les commentaires, les variantes, les flèches et les cases, les commentaires
+  de l'assistant (marqués comme les siens), les évaluations et leur courbe, les pendules. Son poids est estimé avant
+  l'enregistrement. Depuis la page Bases, ou depuis la page Échiquier quand sa partie a été ouverte depuis la liste
+  d'une base, la page contient cette partie ou les parties du filtre, choisies dans une liste en haut
+  (<kbd>Page préc.</kbd>, <kbd>Page suiv.</kbd>) ; au-delà de 200 parties elle serait trop lourde à ouvrir, et la
+  feuille demande : une page par partie dans un dossier, avec leur liste (`index.html`), ou les 200 premières.
+- **Diagramme, PNG ou SVG** : la position affichée, avec les flèches et les cases dessinées à ce coup (le bouton
+  droit), les coordonnées, un point près du bord du camp au trait, les Noirs en bas quand c'est aux Noirs de jouer (si
+  coché), le dernier coup (si coché) et une légende sous l'échiquier, qui commence par *Trait aux Blancs* et s'écrit
+  comme tu veux (*Les Blancs jouent et gagnent*). Aux couleurs de l'application, ou en noir et blanc pour
+  l'impression. Le PNG fait 480 pixels de large, ou le double pour un écran dense ; le SVG n'a pas de taille et se
+  dessine net à n'importe laquelle. *Copier l'image*, ou <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>C</kbd> de n'importe où
+  sur la page Échiquier (et *Copier le diagramme* dans la palette de commandes), met le PNG dans le presse-papiers,
+  pour un message ou un document.
+- **GIF animé** : la partie aux couleurs de l'application, d'un coup à un autre (*Depuis … à …* pour un passage), une
+  image par coup à la vitesse choisie, la dernière tenue plus longtemps ; les noms des joueurs et le résultat dans un
+  bandeau, le coup sous l'échiquier, le dernier coup marqué et les flèches de la partie, selon ce qui est coché. Il est
+  fait en arrière-plan, avec sa progression et *Annuler*, et son poids est estimé avant : au-delà de 2 Mo, la feuille
+  dit qu'il est lourd pour un message ou un forum, et propose un passage ou une taille plus petite.
+- **Impression · PDF** : un PDF fait par RookStudio, le même sur tous les systèmes, son aperçu étant la page exacte.
+  *Ouvrir pour imprimer* (Entrée, <kbd>Ctrl</kbd>+<kbd>P</kbd>) le donne au lecteur du système, qui imprime ;
+  *Enregistrer le PDF…* le garde là où tu le choisis. Le papier est A4 ou Letter, selon la langue et le pays du système,
+  ou comme choisi. Une partie s'imprime sur une ou deux colonnes, ses en-têtes en haut de la page, avec des diagrammes
+  à ses moments clés (les erreurs du bilan, sinon les coups marqués !!, ??, ? et !), à chaque commentaire avec des
+  flèches ou des cases (ou `[#]`), tous les 10 coups, ou aucun ; les commentaires de l'assistant et les évaluations à
+  côté des coups quand c'est coché. Son texte peut être sélectionné et copié : ses polices sont incorporées, Inter, et
+  la police chinoise du système quand la page a des caractères chinois. Quand le système n'a pas de lecteur de fichiers
+  PDF, le PDF est enregistré et son dossier s'ouvre.
+- **PGN**, depuis la page Bases : la partie choisie ou les parties du filtre. *Écrire les noms dans les parties*
+  (désactivé au départ, les parties telles qu'elles ont été lues) écrit White et Black comme les a la table des noms de
+  la base (voir [Noms des joueurs](#noms-des-joueurs)), avec les identifiants FIDE et les titres des joueurs quand elle
+  les connaît ; la base elle-même ne change pas.
+
+Ce qu'un export montre nomme les joueurs comme le fait la table des noms, comme les montre la liste des parties. Les
+pages HTML et les PDF se terminent par la mention des pièces dessinées (*Cburnett*, licence BSD 3-clause ;
+*Chessnut*, Apache 2.0 ; *Celtic* et *Fantasy*, MIT) ; le PNG d'un diagramme la porte dans son texte, son SVG dans un
+commentaire.
+
+*Imprimer…* est aussi là où il y a quelque chose à lire sur papier : un répertoire sur la page Ouvertures (chaque ligne
+sous celle qu'elle quitte, un diagramme à chaque embranchement, tes notes, et sa couverture et ses lacunes en annexe,
+quand elles sont mesurées ; un répertoire vide n'a rien à imprimer, ses coups à marquer d'abord d'une étoile dans
+l'onglet Arbre), le dossier d'un joueur, un rapport d'ouverture et le tableau croisé d'un tournoi (sur des pages en
+paysage, chaque joueur listé). Le dossier, le rapport et le tableau croisé ont aussi *Page HTML* : le même contenu en
+page à part, leurs lignes rejouables sur un échiquier à côté du texte. L'Échiquier de l'espace Moteurs garde ses
+propres exports (*Copier le PGN*, *Enregistrer la partie en PGN…*).
+
 ## Bases
 <!-- en: databases e5980ed0 -->
 
@@ -1397,7 +1754,7 @@ La page **Bases** contient tes bases de parties : leur liste à gauche, les part
 est un dossier à part (`Name.fcgdb`), lu vite même avec des millions de parties.
 
 ### Importer des parties
-<!-- en: importing-games d6a0c0eb -->
+<!-- en: importing-games 8ebdd041 -->
 
 *Nouvelle base* en crée une, nommée sur place ; *Ajouter une base…* liste un dossier de base créé ailleurs, ses
 fichiers laissés où ils sont. *Importer dans cette base…* prend un fichier PGN, ou un fichier `.zst`, `.gz` ou `.zip`
@@ -1410,7 +1767,9 @@ n'ajoute que celles qui manquent ; les parties déjà dans la base sont écarté
 À la fin, un bandeau sur la base dit ce qui est arrivé : les parties ajoutées, celles déjà présentes, et celles
 endommagées parmi les parties ajoutées (un coup illisible ou illégal, un texte coupé, une position de départ qui n'en
 est pas une), chacune gardée jusqu'à ce coup avec son texte tel quel ; *Les voir dans la liste*, ou un clic sur l'une
-d'elles, montre le fichier à sa ligne. Un disque plein, un arrêt demandé ou une autre erreur dit ce qui est gardé et ce
+d'elles, montre le fichier à sa ligne. Les parties déjà là, venues d'une autre source, la même partie avec ses en-têtes
+écrits autrement, sont signalées avec *Les fusionner* et *Les voir d'abord* (voir [Parties en
+double](#parties-en-double)). Un disque plein, un arrêt demandé ou une autre erreur dit ce qui est gardé et ce
 qu'il faut, avec *Reprendre l'import* et *Ouvrir le dossier de la base* ; un fichier dont la lecture ne peut pas
 continuer dit pourquoi, les parties lues avant étant gardées. Puis l'arbre d'ouvertures de la base se construit, en
 arrière-plan.
@@ -1423,30 +1782,183 @@ seule : la liste, l'arbre et les recherches fonctionnent ; l'import et l'enregis
 programme ait fini. *Retirer de la liste* laisse les fichiers d'une base où ils sont.
 
 ### La liste des parties
-<!-- en: the-game-list ab35c5d5 -->
+<!-- en: the-game-list 7dc68173 -->
 
 La liste donne pour chaque partie son numéro, ses joueurs, leur Elo, son résultat, son événement, sa date, son code
-ECO et sa longueur ; un clic sur un titre de colonne la trie. Le filtre rapide au-dessus prend des mots libres :
-joueurs, événement, année, code ECO, résultat (`carlsen 2024 B90`). ↑ ↓ parcourent la liste et la partie choisie
-s'affiche à côté, sur un petit échiquier avec ses coups ; Entrée ou un double clic l'ouvre sur la page Échiquier. Des
-millions de parties défilent et se trient aussitôt.
+ECO et sa longueur ; un clic sur un titre de colonne la trie. Les graphies d'un joueur réunies dans la table des noms
+de la base (voir [Noms des joueurs](#noms-des-joueurs)) s'affichent sous le nom du joueur, et sous la souris le nom
+dit comment la partie l'écrit. Le filtre rapide au-dessus prend des mots libres : joueurs, événement, année, code
+ECO, résultat (`carlsen 2024 B90`). ↑ ↓ parcourent la liste et la partie choisie s'affiche à côté, sur un petit
+échiquier avec ses coups ; Entrée ou un double clic l'ouvre sur la page Échiquier. Des millions de parties défilent et
+se trient aussitôt. **Parties** et **Tournois**, à côté du nom de la base au-dessus de la liste, passent de ses parties
+à ses tournois (voir [Tournois et tableaux croisés](#tournois-et-tableaux-croisés)). *Exporter…*, après le nombre de
+parties, fait de la partie choisie ou des parties du filtre une page à rejouer, un GIF animé, un PDF ou un fichier
+PGN, les noms des joueurs de la table des noms écrits dedans si on le demande (voir [Exporter et
+imprimer](#exporter-et-imprimer)).
 
 ### Fiches FIDE
-<!-- en: fide-cards fbfb5b7e -->
+<!-- en: fide-cards 20b6e988 -->
 
 La **fiche FIDE** d'un joueur (titre, fédération, année de naissance, identifiant FIDE, classements standard, rapide et
-blitz) est demandée à Lichess, qui tient la liste de la FIDE, sans compte et seulement quand tu le demandes : un clic
-droit sur un nom de la liste des parties, ou *Fiche FIDE de …* dans l'aperçu de la partie. Une partie qui donne
-l'identifiant FIDE du joueur (*WhiteFideId*, comme le font les diffusions de Lichess) envoie cet identifiant ; sinon,
-le nom est envoyé, et quand plusieurs joueurs de la liste de la FIDE s'appellent ainsi, tu choisis lequel c'est. La
-fiche est gardée dans ton profil pour ce nom : elle s'affiche ensuite sous la souris sur le nom, et dans l'aperçu.
-*Sur lichess.org* y ouvre la page du joueur.
+blitz) est demandée à Lichess, qui tient la liste de la FIDE, sans compte et seulement quand tu le demandes : *Fiche
+FIDE de …*, dans le menu du clic droit sur un nom de la liste des parties ou dans l'aperçu de la partie. Une partie qui
+donne l'identifiant FIDE du joueur (*WhiteFideId*, comme le font les diffusions de Lichess) envoie cet identifiant ;
+sinon, le nom est envoyé, et quand plusieurs joueurs de la liste de la FIDE s'appellent ainsi, tu choisis lequel c'est.
+La fiche est gardée dans ton profil pour ce nom : elle s'affiche ensuite sous la souris sur le nom, et dans l'aperçu.
+*Sur lichess.org* y ouvre la page du joueur, *Dossier de …* son dossier (voir [Le dossier d'un
+joueur](#le-dossier-dun-joueur)). Un joueur rapproché de la liste de classement FIDE dans la table des noms de la base
+montre à la place la fiche de la liste, sans demander à Lichess.
+
+### Le dossier d'un joueur
+<!-- en: a-players-dossier 3e1a2bc7 -->
+
+Le **dossier** d'un joueur rassemble ce que tes bases savent de lui. Il s'ouvre depuis son nom : *Dossier de …* dans
+le menu du clic droit sur un nom de la liste des parties, dans l'aperçu d'une partie ou sur une fiche FIDE ; Ctrl+K,
+*Dossier : Duval* ; *Préparer une partie contre* de la page Lichess (voir [Préparer une
+partie](#préparer-une-partie)). Il s'affiche à la place de la page, Échap revenant en arrière. Il est refait à chaque
+ouverture, d'après tes bases telles qu'elles sont, en arrière-plan à basse priorité avec sa progression et *Annuler*
+(quelques secondes au plus, même pour un joueur de milliers de parties parmi des millions) ; rien n'en est gardé.
+
+Ses parties sont trouvées par la table des noms de chaque base (voir [Noms des joueurs](#noms-des-joueurs)) : toutes
+les graphies d'un joueur réunies, dans chacune de tes bases sauf celles des parties de joueurs Lichess (*Lichess ·
+nom* : celles de son compte sont la source Lichess). Un joueur rapproché de la liste de classement FIDE se distingue de
+ses homonymes par l'identifiant FIDE que donnent les parties, et les parties jouées avant qu'il ait pu jouer sont
+écartées. Quand la liste de la FIDE a plusieurs joueurs de ce nom, le dossier demande lequel, celui dont le classement
+correspond à ses parties proposé en premier : ↑ ↓ choisissent, Entrée garde le choix dans les tables des noms, et le
+dossier ne prend alors que les parties de ce joueur (Ctrl+Z annule ; *Pas maintenant* montre toutes les parties de ce
+nom).
+
+En haut : le titre du joueur, sa fédération, son année de naissance et ses classements FIDE quand il est rapproché de
+la liste, et ce dont il est fait : tes bases, avec leurs parties et leurs années, et Lichess quand sa source est cochée.
+*Ses parties dans la liste* les montre sur la page Bases ; *Imprimer…* fait du dossier un PDF de quelques pages, *Page
+HTML* une page à part dont les lignes se rejouent sur un échiquier (voir [Exporter et
+imprimer](#exporter-et-imprimer)). Puis quatre onglets (Ctrl+Page suiv. et Ctrl+Page préc. passent de l'un à
+l'autre) :
+
+- **Vue d'ensemble** : ses premiers coups avec les Blancs et son score, ses réponses avec les Noirs aux premiers coups
+  qu'il rencontre le plus, son classement au fil des années, ses résultats contre des joueurs plus forts et plus
+  faibles, ses structures de pions, et tes parties contre lui (tes noms sont ceux de *Réglages › Tes noms*) ; puis ses
+  dernières parties. Un clic en ouvre une sur la page Échiquier avec le dossier comme liste : Ctrl+← et Ctrl+→
+  parcourent ses parties, et *Revenir au dossier* y ramène ;
+- **Ouvertures** : ses lignes avec les Blancs et avec les Noirs, par code ECO, chacune avec ses parties, ses gains,
+  nulles et pertes, son score et la dernière année où il l'a jouée. Un clic ouvre la ligne sur la page Échiquier, son
+  onglet Arbre sur ses seules parties, de son côté (*Duval, Anne avec les Blancs*). En dessous, les lacunes de tes
+  répertoires contre lui : les lignes qu'il joue trois fois ou plus et que tes répertoires laissent sans réponse, les
+  plus fréquentes d'abord ;
+- **Classement et structures** : son classement année par année, la moyenne de l'Elo que donnent ses parties
+  classiques chaque année (pas de courbe sous trois ans), son plus haut et ce que dit la liste de la FIDE ; ses
+  structures de pions au 20e coup, telles que les nomment les faits de l'assistant (aucune sous cinq parties), un clic
+  montrant ces parties dans la liste avec la recherche Structure partant de ses pions ; et quand tu as fait le bilan de
+  parties à lui (Alt+G), sa précision dans chaque phase et où tombent ses erreurs nettes ;
+- **Lichess**, avec sa source : ce qu'il joue sur l'échiquier et en ligne côte à côte, son niveau en ligne, tes parties
+  contre lui des deux côtés, et les lacunes de tes répertoires sur les deux sources.
+
+*+ Lichess…* lui associe son compte Lichess, le lien gardé dans les tables des noms, et coche la source : ses parties
+de la dernière année arrivent comme pour une partie préparée contre lui ; un clic sur la pastille de la source la
+retire, ou la remet. Sous vingt parties, le dossier dit qu'il donne des indices plutôt que des tendances. Un joueur
+sans partie dans tes bases est signalé, avec *Depuis une source…* et *+ Lichess…* pour en faire venir. Rien ne quitte
+la machine, sauf, avec la source Lichess cochée, ce qu'envoie la préparation d'une partie : son nom avec les filtres de
+ses parties, et son profil public. Hors ligne, la source montre les parties de sa dernière synchronisation, datées.
+Pendant que tu joues contre lui sur Lichess, le dossier ne montre rien de lui.
+
+### Tournois et tableaux croisés
+<!-- en: tournaments-and-crosstables 208330d7 -->
+
+*Tournois*, à côté de *Parties* au-dessus de la liste d'une base, montre ses tournois : les parties d'un même
+événement, de son lieu et de son année (un tournoi de décembre à janvier reste un seul tournoi ; le même événement en
+deux lieux, avec des joueurs à eux, en fait deux). Les parties en ligne, qui n'ont en commun aucun événement dont les
+rondes sont indiquées, ne sont dans aucun : une base de telles parties dit qu'elle n'a pas de tournoi et propose
+*Parties*. Chaque tournoi donne son système, ses joueurs, ses rondes, l'Elo moyen de ses joueurs et ses parties,
+*286 sur 288* en orange quand des parties manquent. La liste est triée par Elo moyen ; un clic sur un en-tête la trie
+autrement, et son filtre (Ctrl+L) prend des mots de l'événement, du lieu ou de l'année. La liste d'une grande base se
+fait en arrière-plan avec sa progression (quelques secondes pour dix millions de parties), et elle est gardée jusqu'à
+ce que la base change.
+
+Le système est deviné d'après les parties : toutes rondes quand chacun a joué contre chacun (toutes rondes
+aller-retour quand chaque paire s'est rencontrée deux fois), suisse sinon ; *?* quand ce n'est pas sûr (une paire s'est
+rencontrée plus souvent que son système ne le permet, des parties manquent dans un groupe aussi petit que celui d'un
+toutes rondes). Les compétitions par équipes et les éliminations directes sont signalées, leurs tableaux croisés pour
+plus tard. Un clic sur le système le change, gardé pour le tournoi.
+
+Un clic sur un tournoi, ou Entrée, ouvre son **tableau croisé** à la place de la liste, Échap revenant en arrière ;
+Ctrl+K en ouvre un aussi (*Tableau croisé : Open d'automne*). Ses joueurs sont ceux de la table des noms de la base
+(voir [Noms des joueurs](#noms-des-joueurs)) : toutes les graphies d'un joueur réunies. Les parties venues deux fois de
+deux sources (les mêmes joueurs avec les mêmes couleurs, des rondes qui peuvent n'en faire qu'une) sont comptées une
+fois, et la ronde de chaque partie est lue dans son étiquette Round (*9.2* : ronde 9, échiquier 2).
+
+- Le tableau croisé d'un toutes rondes a une case pour chaque adversaire : 1, ½ ou 0 (un résultat par cycle dans un
+  toutes rondes aller-retour), + et − pour un forfait ; puis les points, les départages, les victoires, la performance
+  et la variation de classement.
+- Celui d'un suisse a les numéros de départ, par classement, puis une case pour chaque ronde : *4b½* est une nulle
+  contre le numéro 4, avec les Noirs (b pour black) ; *exempt*, le seul joueur non apparié de la ronde (les points d'un
+  gain, la règle de la FIDE pour une exemption attribuée par l'appariement) ; *–*, une ronde sans partie. Les dix
+  premiers s'affichent, leurs parties entre eux dans la couleur d'accent ; *Tous les joueurs* montre les autres.
+
+Un clic sur une partie l'ouvre sur la page Échiquier, les parties du tournoi comme liste (Ctrl+← et Ctrl+→, *Revenir
+au tableau croisé*) ; un clic sur un nom ouvre le dossier du joueur (voir [Le dossier d'un
+joueur](#le-dossier-dun-joueur)). La performance et la variation de classement disent sous la souris comment elles ont
+été comptées. *Imprimer…* fait du tableau croisé un PDF sur des pages en paysage, chaque joueur listé, et *Page HTML*
+une page à part (voir [Exporter et imprimer](#exporter-et-imprimer)).
+
+Au-dessus du tableau croisé, une ligne pour chaque chose qui ne va pas dans les données, avec ce qui la corrige :
+
+- **des parties manquantes** (une paire d'un toutes rondes qui ne s'est pas rencontrée, deux joueurs d'un suisse sans
+  partie dans une ronde) sont comptées « ? », et les points, les départages et les variations de classement qui les
+  lisent disent « ? ». *Les chercher dans tes autres bases* les trouve sous d'autres graphies, *La copier dans ce
+  tournoi* en ajoute une, son événement, son lieu et ses joueurs écrits comme ceux du tournoi (Ctrl+Z la retire) ;
+  *Fixer les résultats à la main* donne à chacune son résultat, comme le fait un clic sur un « ? », gardé avec le
+  tournoi dans ton profil, la base inchangée ;
+- **un joueur sous deux noms** : deux noms qui peuvent être ceux d'un même joueur, jamais appariés ensemble, leurs
+  rondes séparées ; *Les réunir* les joint dans la table des noms (Ctrl+Z annule) ;
+- **des parties venues deux fois** : *Les fusionner* garde chacune en une seule partie, avec les champs les plus
+  complets de chaque source, comme le font les doublons de la maintenance (Ctrl+Z annule) ; celles dont les coups ou
+  les résultats diffèrent sont montrées dans la liste à la place ;
+- **un forfait** : un résultat décisif sans coups (un PGN n'a pas de mot pour cela) compte dans les points, ni dans la
+  performance ni dans la variation de classement ;
+- **un système pas sûr** : un clic le choisit.
+
+Une diffusion suivie a aussi son tableau croisé : *Tableau croisé*, à côté du classement dans la colonne de la
+mosaïque, le montre à la place des échiquiers (*La mosaïque*, ou Échap, les ramène). Il est fait des rondes que
+RookStudio suit et de celles qu'il a gardées dans la base *Diffusions* : ● une partie en cours (un clic la suit sur la
+page Échiquier), · une partie à venir, les points, les parties jouées et la variation de classement jusqu'ici. Le
+classement propre de Lichess reste à côté, et rien de plus n'est demandé à Lichess pour lui ; une diffusion par équipes
+garde le classement par équipes de Lichess.
+
+### Départages, performance et variation de classement
+<!-- en: tie-breaks-performance-and-rating-change 18737372 -->
+
+Les départages ordonnent les joueurs à égalité de points, l'un après l'autre : ceux de la FIDE par défaut, la ligne
+au-dessus du tableau disant lesquels. Le règlement actuel des départages de la FIDE (C.07, en vigueur depuis le
+1er mars 2026) n'en recommande aucun pour un système, aussi RookStudio prend-il ceux des propres compétitions de la
+FIDE : pour un toutes rondes, comme le Tournoi des candidats 2026, Sonneborn-Berger, les victoires, la confrontation
+directe ; pour un suisse, comme le Grand Swiss 2025, le classement moyen des adversaires tronqué 1, Buchholz tronqué 1,
+Buchholz, la confrontation directe (le classement moyen écarté quand un joueur n'a pas de classement, comme le demande
+C.07). Un clic sur un départage, dans cette ligne ou sur son en-tête, le met en premier, le déplace, le remplace ou le
+retire ; *+* en ajoute un ; *Ceux de la FIDE* remet les leurs. L'ordre est gardé pour le tournoi.
+
+Ce sont ceux de la FIDE : confrontation directe, victoires (les forfaits et les exemptions qui valent un gain
+comptent), parties gagnées, parties avec les Noirs, victoires avec les Noirs, score cumulatif, Buchholz, Buchholz
+tronqué 1, Buchholz médian, Sonneborn-Berger, Koya, le classement moyen des adversaires (aussi tronqué 1) et la
+performance. Dans un suisse, une ronde sans partie compte dans le Buchholz et le Sonneborn-Berger comme le dit la FIDE
+(C.07, article 16) : comme contre un adversaire qui a le score du joueur lui-même, au plus une nulle par ronde (au plus
+le score de l'adversaire prévu pour un forfait), et les rondes d'un joueur après son retrait comptent comme des nulles
+pour ses adversaires.
+
+La **performance** est celle de la FIDE : le classement moyen des adversaires classés rencontrés sur l'échiquier, plus
+l'écart que la table de la FIDE associe au score dans ces parties (arrondi au centième). La **variation de
+classement** suit la formule de la FIDE : pour chaque partie jouée sur l'échiquier contre un adversaire classé, le
+score moins le score attendu d'après la table de la FIDE (un écart compté 400 au plus, sous 2650), multiplié par K. K
+est celui du joueur sur la liste de classement de la FIDE quand il y est rapproché dans la table des noms et que la
+liste est de l'année du tournoi ou de la suivante (voir [La liste de classement FIDE](#la-liste-de-classement-fide)) ;
+sinon les règles de la FIDE le donnent : 40 jusqu'à la fin de l'année de ses 18 ans tant qu'il est sous 2300, 10 à
+partir de 2400, 20 sinon, moins quand 700 serait dépassé sur l'ensemble de ses parties. Un tournoi rapide ou blitz suit
+les règles rapide et blitz de la FIDE. Un forfait ne compte que dans les points.
 
 ### Rechercher
-<!-- en: searching 15418482 -->
+<!-- en: searching fda4d044 -->
 
-*Rechercher* (Ctrl+F) ouvre le panneau de recherche à côté de la liste, en quatre onglets ; la liste suit chaque
-critère à mesure qu'il est tapé :
+*Rechercher* (Ctrl+F) ouvre le panneau de recherche à côté de la liste, en six onglets (Ctrl+Page suiv. et Ctrl+Page
+préc. passent de l'un à l'autre) ; la liste suit chaque critère à mesure qu'il est tapé :
 
 - **En-têtes** : un joueur et sa couleur, l'adversaire, l'événement, les années, les codes ECO, l'Elo minimal des deux
   joueurs, le résultat ; *Parties endommagées seulement* ;
@@ -1456,16 +1968,117 @@ critère à mesure qu'il est tapé :
 - **Matériel** : un préréglage (finales de tours, sans dames, la paire de fous contre fou et cavalier, une dame contre
   deux tours) ou les pièces de chaque camp comptées (`2`, ou `0-2`), pendant au moins tant de demi-coups ;
 - **Motif** : des pièces posées sur l'échiquier à la souris (un clic pose la pièce choisie, un nouveau clic l'enlève ;
-  Maj et un clic, une case vide ; les autres cases, n'importe quoi), *Les Blancs n'ont que ces pions*, et trois
-  exemples.
+  Maj et un clic, une case vide ; les autres cases, n'importe quoi), *Les Blancs n'ont que ces pions*, trois exemples,
+  et des conditions au-delà : ce qui attaque, défend ou cloue quoi, une ligne de coups (voir [Motifs](#motifs)) ;
+- **Manœuvre** : le trajet d'une pièce, comme un cavalier qui va en b1, d2, f1, g3 (voir [Manœuvres](#manœuvres)) ;
+- **Structure** : les pions de la page Échiquier, exactement ou à un ou deux pions près (voir [Structures de
+  pions](#structures-de-pions)).
 
 Chaque recherche donne ses parties et son temps ; *Ajouter au filtre* et *Retirer du filtre* les combinent, *Voir dans
-la liste* (Entrée) montre le résultat, *Tout effacer* recommence.
+la liste* (Entrée) montre le résultat, *Tout effacer* recommence. Les recherches réglées s'additionnent : un motif, et
+un matériel, et des en-têtes. Une recherche qui rejoue les parties (un motif, un trajet, une structure) continue en
+arrière-plan avec sa progression et *Annuler* ; les premières parties qu'elle trouve sont déjà dans la liste, et une
+recherche annulée les garde, *Reprendre (le reste seulement)* cherchant dans les parties qu'elle n'avait pas
+atteintes. Pendant un import dans la base, une recherche couvre les parties déjà enregistrées, et se refait d'elle-même
+à la fin.
 
-*Garder cette recherche…* la nomme d'après ses critères. Ce sont ses critères qui sont gardés, pas ses parties, pour
-n'importe quelle base (ses nouvelles parties sont trouvées la fois suivante) ; les recherches gardées s'affichent en
-haut du panneau, où un clic applique leurs critères et le bouton droit en renomme ou en supprime une, et dans Ctrl+K
-(*Recherche : …*).
+La liste montre alors chaque partie à la position trouvée, dans une colonne *Trouvée à* (le coup qui y a mené) : Entrée
+ou un double clic ouvre la partie à ce coup, comme le font la partie suivante ou précédente de la liste depuis la page
+Échiquier.
+
+*Garder cette recherche…* la nomme d'après ses critères (un motif d'après le nom de son préréglage). Ce sont ses
+critères qui sont gardés, pas ses parties, pour n'importe quelle base (ses nouvelles parties sont trouvées la fois
+suivante) ; les recherches gardées s'affichent en haut du panneau, où un clic applique leurs critères et le bouton
+droit en renomme ou en supprime une, et dans Ctrl+K (*Recherche : …*, ou *Motif : …* pour un motif seul).
+
+### Motifs
+<!-- en: patterns 5821a112 -->
+
+L'onglet **Motif** dit ce qui est vrai dans une position : d'abord les pièces du petit échiquier, puis des conditions,
+une par ligne, toutes vraies à la fois. Un clic sur un mot d'une ligne le change : les pièces (un cavalier blanc, la
+dame noire ou une tour noire, n'importe quelle pièce noire, sur des cases ou n'importe où), le verbe (*est sur*,
+*attaque*, *défend*, *cloue … sur …*, *est en prise*, *est passé*, et leur contraire), le camp au trait, l'échec, le
+mat. *+ Une condition* en ajoute une, × la retire. *La même pièce qu'à la ligne 1*, dans le menu des pièces, fait
+parler deux lignes d'une même pièce : un cavalier qui attaque le roi, et le même cavalier qui attaque la dame ou une
+tour, c'est une fourchette.
+
+Les préréglages fixent un motif entier : *Fourchette de cavalier*, *Clouage sur le roi*, *Mat du couloir*, *Attaque
+double de la dame*, *Sacrifice en h7*, *Pion passé protégé* ; ils sont aussi dans Ctrl+K (*Motif : Fourchette de
+cavalier*), sur la base choisie.
+
+*puis… (une ligne)* ajoute une ligne de positions après la première : chaque étape un coup (« le fou blanc prend en h7
+avec échec ») ou une position, au demi-coup suivant ou en tant de demi-coups au plus (*chaque étape au demi-coup
+suivant*, *en 3 demi-coups au plus*). Un coup peut aussi se jouer sur le petit échiquier (*+ Une étape*, *un coup joué
+sur le petit échiquier* : un clic sur la pièce, puis sur sa case). Dans chaque partie, la position trouvée est la
+première du motif.
+
+Ce qui ne peut jamais être trouvé est dit avant de chercher, et rien n'est lancé : un cavalier en c7 et c7 vide, les
+Blancs et les Noirs au trait, un pion sur sa première rangée ; un clic retire l'une des deux conditions. Une recherche
+qui trouve plus de la moitié des parties le dit (*Très large*) : *Ajouter une condition*, ou *La garder telle quelle*.
+
+### Le langage des motifs
+<!-- en: the-pattern-language af783ff9 -->
+
+Le même motif est un texte sous le constructeur (*Texte*, ou Alt+T) : changer l'un change l'autre, et une recherche
+gardée garde son texte, qui peut être copié et partagé. Ses mots sont ceux de CQL, le langage des requêtes d'échecs :
+
+```
+; Knight fork                       a comment (// also)
+piece $n in N                       $n: one white knight, the same in every line
+$n attacks k                        one condition a line, all true in the same position
+$n attacks [qr]
+btm
+
+Bd3 Nf3 Qd1 Pe5 kg8 ph7 _f6         men on squares, side by side
+line --> move from B to h7 capture check
+     --> move from k to h7 capture
+     --> .{0,2} --> move from N to g5 check
+```
+
+- Les pièces en lettres FEN : K Q R B N P pour les Blancs, k q r b n p pour les Noirs, A et a pour n'importe quelle
+  pièce blanche ou noire, `_` pour une case vide, `[qr]` pour l'une de plusieurs ; les cases après la lettre (`Nf3`,
+  `R[a1,h1]`, `p[a-h7]`), ou seules là où un mot attend des cases (`move to [g5,h5]`).
+- `attacks`, `defends`, `pin from … through … to …`, `en prise`, `passed`, `check`, `mate`, `stalemate`, `wtm` et
+  `btm` (le camp au trait), `not`, `or`, `only P` (les Blancs n'ont pas d'autres pions que ceux nommés sur leurs
+  cases).
+- `line -->` puis une étape après chaque flèche, au demi-coup suivant : `move from … to … capture … promote …` et ce
+  qui est vrai après le coup, ou une position ; `.{0,2}` avant une étape laisse passer d'abord deux demi-coups
+  quelconques.
+- Deux noms (`$n`, `$q`) sont toujours deux pièces ; un nom suit sa pièce à travers les coups d'une ligne.
+
+Une ligne qui ne se lit pas est nommée, avec le mot auquel elle ressemble (*Ligne 2 : « atacks » n'est pas un mot
+connu — « attacks » ?*) ; le reste de CQL est signalé comme non lu. Le constructeur garde la dernière version qui se
+lisait, et rien n'est cherché tant que le texte ne se lit pas de nouveau.
+
+### Manœuvres
+<!-- en: manoeuvres adacd213 -->
+
+L'onglet **Manœuvre** cherche le trajet d'une pièce : un clic sur une pièce du petit échiquier (la position de la page
+Échiquier), puis un clic sur chaque case où elle va (b1, d2, f1, g3) ; Retour arrière retire la dernière case.
+*D'autres coups entre* laisse le camp jouer d'autres coups en attendant ; *La même pièce tout du long* demande une
+seule pièce, sinon n'importe quelle pièce de son espèce sur chaque case à tour de rôle ; *En 15 coups au plus* compte
+les coups du camp du premier du trajet à son dernier. *Depuis n'importe où*, ou *Depuis la position de la page
+Échiquier* : le trajet une fois qu'une partie atteint cette position.
+
+Les résultats disent où la même pièce est allée ensuite (en f5 dans 31 % des parties), et les trajets voisins, qui se
+séparent du sien après son premier coup (b1–d2–b3) ; un clic en applique un. La flèche grise sur l'échiquier est la
+suite la plus jouée, pas une condition. Depuis la page Échiquier, Ctrl+K *Cette manœuvre* prend la pièce sous la
+souris et ses coups dans la partie.
+
+### Structures de pions
+<!-- en: pawn-structures 5c6eb547 -->
+
+L'onglet **Structure** cherche les seuls pions de la page Échiquier, les pièces mises de côté : *Exactement*, *À un
+pion près* ou *À deux pions près* (un pion de plus, de moins ou sur une autre case, d'un côté ou de l'autre, compte
+pour un pion), *Les deux camps*, ou *Les pions blancs* ou *Les pions noirs* seuls, *Les couleurs inversées aussi*,
+tenue au moins tant de demi-coups. *Reprendre les pions de la page Échiquier* les reprend à nouveau ; *Placer les
+pions…* les change case par case. Son nom s'affiche quand les faits de l'assistant le connaissent (Carlsbad, Maroczy,
+hérisson, Stonewall, les chaînes de pions, Benoni, pion dame isolé).
+
+Les résultats donnent les parties qui la tiennent exactement et celles qui en sont proches, les ouvertures qui y
+mènent le plus, et les variantes à un pion près avec leurs parties et le score des Blancs (« le pion b blanc en b4 »,
+« sans le pion a noir ») ; un clic en applique une. Depuis la page Échiquier, Ctrl+K *Parties avec cette structure*
+cherche aussitôt ses pions.
 
 ### Tournois et fichiers PGN
 <!-- en: tournaments-and-pgn-files 688ddcc2 -->
@@ -1495,7 +2108,7 @@ par type. Importée de nouveau (après l'ajout de nouvelles parties dans ChessBa
 parties. Les noms des joueurs sont écrits comme la base les écrit, « Nom, Prénom ».
 
 ### TWIC
-<!-- en: twic d0572313 -->
+<!-- en: twic 56b70a1d -->
 
 *Depuis une source…* apporte des parties d'un site, téléchargées seulement quand tu le demandes. **TWIC**, The Week in
 Chess, publie chaque lundi un numéro des parties de la semaine : sa feuille demande à theweekinchess.com sa liste de
@@ -1504,7 +2117,8 @@ quelques-uns, choisis la base (*Une nouvelle base, « TWIC »* par défaut), pui
 chaque numéro est téléchargé, puis importé, l'un après l'autre, la base restant lisible tout du long ; *Annuler*
 s'arrête après ce qui a été ajouté. Une partie que la base a déjà, mêmes balises et mêmes coups, n'est pas ajoutée deux
 fois. Ensuite, un rapport donne les tournois les plus forts des parties ajoutées (le classement moyen de leurs joueurs)
-et les joueurs les mieux classés ; un nom ouvre ses parties dans la liste.
+et les joueurs les mieux classés ; un nom ouvre ses parties dans la liste. Les parties déjà là, venues d'une autre
+source, une diffusion suivie auparavant par exemple, y sont signalées avec *Les fusionner*.
 
 *Chaque lundi, chercher un nouveau numéro* est désactivé tant que tu ne le coches pas. Coché, RookStudio demande la
 liste des numéros pendant qu'il est ouvert, quatre fois par jour au plus ; un nouveau numéro s'affiche sous la liste
@@ -1552,11 +2166,119 @@ archive .7z (LZMA ou LZMA2) est lue pendant sa décompression : ses fichiers PGN
 fichiers passés, rien n'étant écrit sur le disque que les parties. N'importe quel .7z de fichiers PGN peut être
 importé, ou déposé sur la page, de la même façon.
 
+### Maintenance
+<!-- en: maintenance 9c828c81 -->
+
+Le ⋯ d'une base, à côté de ses boutons sur la page Bases, ou un clic droit sur elle dans la liste, ouvre sa maintenance
+à la place de la page, en trois parties : *Parties en double*, *Noms des joueurs*, *Vérifier et compacter* ; Échap
+revient. Ctrl+K a *Parties en double*, *Noms des joueurs*, *Liste de classement FIDE*, *Vérifier la base* et *Compacter
+la base*. Chaque tâche longue tourne en arrière-plan à basse priorité, avec sa progression et *Annuler*, la base
+restant lisible tout du long : un tournoi à côté ne perd pas de temps. Ctrl+Z annule la dernière fusion, les derniers
+joueurs réunis, ou les parties endommagées mises de côté. Une base dans laquelle un autre programme écrit est ouverte en
+lecture seule : sa maintenance attend que ce programme la libère. La page Accueil ne parle de la maintenance que
+lorsqu'elle trouve quelque chose : des doublons après un import, des parties endommagées trouvées par une vérification
+ou à l'ouverture d'une base.
+
+### Parties en double
+<!-- en: duplicate-games f3c8990b -->
+
+La même partie peut venir deux fois de deux sources, ses en-têtes écrits autrement : une ronde suivie sur Lichess,
+puis le numéro de TWIC du lundi. L'import écarte une partie que la base a exactement (mêmes balises et mêmes coups),
+pas celles-ci. *Parties en double* les trouve : les mêmes joueurs (lus dans la table des noms ; sinon leurs noms de
+famille et l'initiale de leur prénom), la même année, des rondes et des dates qui ne diffèrent pas, et les mêmes coups,
+ou les coups de l'une au début de ceux de l'autre, inachevée (une diffusion écourtée). Une partie demande au moins dix
+coups pour être reconnue (vingt quand son jour n'est pas connu) ; deux parties avec chacune une adresse à elle (celles
+de Lichess) sont deux parties.
+
+Il les compte par genre : les mêmes coups avec d'autres en-têtes ; l'une plus courte, une diffusion écourtée ; des
+résultats qui diffèrent, laissés à toi. *Tout fusionner* (Entrée) fusionne les deux premiers genres : chaque groupe
+devient une seule partie avec le plus complet de chaque champ (un nom en entier plutôt qu'une initiale, l'événement le
+plus long, la ronde qui en dit le plus, « 9.2 » plutôt que « 9 », une date qui en sait plus, les classements, le code
+ECO, les identifiants FIDE, les coups les plus longs avec leurs commentaires, les pendules et les évaluations, un
+résultat plutôt qu'aucun), les autres parties marquées supprimées. Un clic sur un groupe le compare champ par champ,
+chaque source dans une colonne et la partie fusionnée à côté : un clic sur une case prend ce champ de cette source ;
+puis *Fusionner* (Entrée), *Garder les deux* (deux parties, plus jamais proposées) ou *Groupe suivant* (↓). La partie
+fusionnée garde le numéro de la plus ancienne ; son étiquette *MergedFrom* dit d'où vient chaque champ, et l'adresse
+d'une diffusion écartée au profit d'un lieu reste comme son *GameURL*. Ctrl+Z rétablit les autres parties. *Voir dans
+la liste* montre les doublons dans la liste des parties, où *Tout afficher* montre de nouveau toutes les parties.
+
+À la fin d'un import, les parties déjà là, venues d'une autre source, sont signalées dans son rapport, avec *Les
+fusionner* : elles ne sont jamais fusionnées sans ton clic. Les rapports des sources (*Depuis une source…*) les
+signalent aussi.
+
+### Noms des joueurs
+<!-- en: players-names 6b9a8fcb -->
+
+Un même joueur s'écrit souvent de plusieurs façons : « Lindqvist, Erik », « Lindqvist,E », « Erik Lindqvist ». *Noms
+des joueurs* réunit les graphies d'un joueur dans la table des noms de la base. Les parties ne changent pas, mais la
+liste des parties montre le nom du joueur, et son filtre rapide, sa recherche et ses tris, les parties de référence de
+l'arbre d'ouvertures, les rapports des sources et les dossiers des joueurs le lisent. Trois nombres disent ce qui peut
+être fait :
+
+- réunis d'emblée : les parties donnent l'identifiant FIDE du joueur (les diffusions de Lichess le font), ou la liste
+  de classement FIDE a un seul joueur de ce nom, ou de ce nom tel qu'un autre alphabet l'écrit (« Kowalenko » pour
+  « Kovalenko ») avec des classements proches de ceux des parties ; *Réunir les …* (Entrée) le fait ;
+- à confirmer : plusieurs joueurs de la liste ont ce nom. Celui dont le classement est le plus proche de celui des
+  parties est proposé en premier ; ↑ ↓ choisissent parmi eux ou *Aucun d'eux*, et Entrée garde le choix et passe au
+  suivant ;
+- gardés tels quels : un joueur absent de la liste, un nom d'un seul mot (celui d'un compte), ou aucune liste prise ;
+  deux graphies d'un même nom et prénom se réunissent à la main, avec un clic droit et *Réunir*.
+
+Un joueur rapproché de la liste garde dans la table son identifiant FIDE, sa fédération, son titre, son année de
+naissance et ses classements, même une fois la liste retirée. Ctrl+Z annule. La table fait partie de la base : elle va
+avec son dossier. Les parties d'un import ultérieur rejoignent leurs joueurs d'elles-mêmes quand elles donnent
+l'identifiant FIDE d'un joueur ou écrivent son nom en entier ; une autre graphie attend cette page.
+
+### La liste de classement FIDE
+<!-- en: fides-rating-list 85d6baa0 -->
+
+La FIDE publie sa liste de classement chaque mois, environ deux millions de joueurs : leurs identifiants FIDE, noms,
+fédérations, titres, classements et années de naissance. RookStudio ne la livre pas, puisque la FIDE ne lui donne
+aucune licence. *Télécharger*, dans la partie *Noms des joueurs*, demande à ratings.fide.com sa liste combinée (un zip
+d'environ 43 Mo) et la lit dans ton profil (environ 90 Mo), où elle reste, jamais envoyée nulle part ; *Un fichier déjà
+téléchargé…* en lit un que tu as. Un téléchargement interrompu reprend où il s'est arrêté (*Reprendre*). Chaque mois
+ensuite, la page Accueil dit qu'une nouvelle liste est parue, avec *La télécharger* : elle n'est jamais prise sans ton
+clic. *Chercher une liste plus récente* redemande ; *La retirer* retire la liste de ton profil, les joueurs réunis
+restant tels quels. Une liste dont les colonnes ont changé est refusée, la précédente restant en service, avec *Le
+signaler*. Ce qui quitte la machine : la demande du fichier, quand tu le télécharges.
+
+### Vérifier et compacter
+<!-- en: checking-and-compacting d17eb6df -->
+
+*Vérifier* (Entrée, ou Ctrl+K *Vérifier la base*) relit chaque segment de la base depuis le disque et rejoue chaque
+partie : sa signature et sa clé (une empreinte de ses en-têtes et de ses coups) sont refaites et comparées à celles
+enregistrées, et une partie qui se lit autrement qu'elle a été écrite est endommagée. Il dit *Saine*, ou les parties
+endommagées et les fichiers d'où elles ont été importées : *Garder ce qui peut être lu* les met de côté (supprimées ;
+Ctrl+Z les rétablit), et *Importer à nouveau leur fichier* les fait revenir depuis leur fichier quand il est encore là.
+L'arbre d'ouvertures est comparé aux parties aussi.
+
+Un segment dont les fichiers ne se lisent plus à l'ouverture de la base (tronqués, manquants ou modifiés pendant que
+RookStudio était fermé : une erreur de disque, une copie à moitié faite, un outil de synchronisation) n'empêche pas la
+base de s'ouvrir. Ses autres segments fonctionnent : la liste, l'arbre d'ouvertures et les recherches lisent leurs
+parties, et les parties du segment endommagé gardent leurs numéros. La page Accueil et la page Bases le signalent, avec
+*Les voir*, et *Vérifier et compacter* le dit aussitôt : le segment, combien de parties ne peuvent pas être lues, et les
+fichiers d'où elles ont été importées. *Garder ce qui peut être lu* réécrit ce segment, ses parties mises de côté
+(supprimées, leurs numéros gardés). Les joueurs, événements et lieux importés pour la première fois avec lui sont gardés
+quand sa liste de noms se lit encore ; sinon les autres parties qui les utilisent montrent « ? » à leur place. Ses
+fichiers endommagés restent jusqu'à la fermeture de RookStudio : d'ici là, *Annuler* (ou Ctrl+Z) les remet en place,
+tant que rien d'autre n'est écrit dans la base. *Importer à nouveau leur fichier* fait revenir ses parties depuis leur
+fichier quand il est encore là. Le compactage attend qu'un tel segment soit traité, et une base ouverte en lecture seule
+n'est jamais modifiée.
+
+Les parties supprimées ou remplacées, fusions comprises, gardent leur place dans les fichiers. *Compacter* réécrit sans
+elles les segments qui les contiennent : chaque partie garde son numéro (une partie supprimée ses seuls en-têtes), et
+l'arbre d'ouvertures reste valide. Les anciens fichiers sont gardés jusqu'à la fermeture de RookStudio : *Annuler le
+compactage* les remet en place d'ici là, et la place est rendue à la fermeture. Les imports et les enregistrements dans
+la base attendent pendant le compactage ; la liste, l'arbre et les recherches fonctionnent. Quand le disque n'a pas
+assez de place pour la copie, *Compacter segment par segment* ne demande que la place d'un segment, mais ne peut pas
+être annulé.
+
 ## La page Ouvertures
-<!-- en: the-openings-page 651bcc49 -->
+<!-- en: the-openings-page 296260e5 -->
 
 Tes répertoires : chacun un fichier PGN du profil (une partie et ses variantes, pour les Blancs ou pour les Noirs), que
-la page Échiquier ouvre et modifie comme une partie (*Ouvrir son fichier sur l'échiquier*). L'un d'eux est actif :
+la page Échiquier ouvre et modifie comme une partie (*Ouvrir son fichier sur l'échiquier*), et qu'*Imprimer…* imprime
+(voir [Exporter et imprimer](#exporter-et-imprimer)). L'un d'eux est actif :
 l'étoile de l'onglet Arbre y ajoute le coup affiché, ou l'en retire, quel que soit le camp au trait ; la première
 étoile crée un répertoire quand il n'y en a aucun. *Nouveau répertoire* en crée un d'après son nom et son camp.
 
@@ -1564,7 +2286,8 @@ La **couverture** du répertoire actif se mesure sur tes bases dont l'arbre d'ou
 un bouton pour chacune, un clic la retire ou la remet), en arrière-plan : la part des parties le long du répertoire
 qui trouvent une réponse jusqu'au bout de ses lignes, ou jusqu'au coup 10 ou 15. Ses **lacunes** suivent, les plus
 fréquentes d'abord : un coup de l'adversaire joué assez souvent sans ta réponse, ou une ligne qui se termine sur un
-coup de l'adversaire. Un clic montre la position, avec l'arbre à côté.
+coup de l'adversaire. Un clic montre la position, avec l'arbre à côté ; le bouton droit propose aussi son rapport
+d'ouverture (voir [Le rapport d'ouverture](#le-rapport-douverture)).
 
 ### S'entraîner sur un répertoire
 <!-- en: training-a-repertoire 6b0acafe -->
@@ -1944,11 +2667,12 @@ pièce comme l'écrit le FEN (*N* un cavalier blanc, *n* un noir, *-* une case v
 position après les coups. Dix lignes par série.
 
 ## La page Jouer
-<!-- en: the-play-page 468c2ade -->
+<!-- en: the-play-page 7168b30b -->
 
 La page **Jouer** a deux sections : *Contre un moteur*, une partie contre un moteur de ta bibliothèque jouée sur la page
-Échiquier, et *Sur Lichess*, tes parties Lichess jouées depuis RookStudio (voir [Sur Lichess](#sur-lichess)) ; la
-section affichée en dernier revient. Elle est dans la barre après la page Entraînement, dans les vues *Étude* et *Tout*.
+Échiquier, et *Sur Lichess*, tes parties Lichess jouées depuis RookStudio (voir [Sur Lichess](#sur-lichess)) et les
+arènes et tournois suisses de Lichess (voir [Arènes et tournois suisses](#arènes-et-tournois-suisses)) ; la section
+affichée en dernier revient. Elle est dans la barre après la page Entraînement, dans les vues *Étude* et *Tout*.
 Une vue que tu as créée avant elle ne change pas d'elle-même : la page Accueil propose une fois de l'ajouter à la vue
 affichée (*L'ajouter à …*, ou *Pas maintenant*), et Ctrl+K *Jouer contre un moteur* (ou *Jouer sur Lichess*) y mène en
 attendant, comme *Jouer contre un moteur* sur la page Accueil et *La page Jouer* dans la carte *Jouer une partie…* de la
@@ -2034,11 +2758,12 @@ se choisit là ou sur la page Jouer : rien ne monte de lui-même. Chaque partie 
 du profil.
 
 ### Sur Lichess
-<!-- en: on-lichess 4e5ccbb8 -->
+<!-- en: on-lichess 37d530b3 -->
 
 La section **Sur Lichess** de la page Jouer joue tes parties Lichess depuis RookStudio, par la Board API de Lichess, qui
-est faite pour des personnes. Il faut ton compte associé (voir [Associer ton compte](#associer-ton-compte)) ; la première
-fois, Lichess demande une permission de plus, *Jouer tes parties* (`board:play`) : *Autoriser sur Lichess…* (Entrée)
+est faite pour des personnes. Elle a deux moitiés, *Parties*, décrite ici, et *Tournois* (voir [Arènes et tournois
+suisses](#arènes-et-tournois-suisses)) ; celle affichée en dernier revient. Il faut ton compte associé (voir [Associer
+ton compte](#associer-ton-compte)) ; la première fois, Lichess demande une permission de plus, *Jouer tes parties* (`board:play`) : *Autoriser sur Lichess…* (Entrée)
 ouvre la page de Lichess, ton compte reste associé pendant ce temps, et le jeton qu'elle remplace est révoqué. RookStudio
 ne joue jamais un coup que tu n'as pas joué. Ce qui quitte la machine : tes recherches d'adversaire et tes défis, tes
 coups, tes messages de discussion, nulles et abandons, avec le jeton de ton compte ; les choix sont gardés dans le
@@ -2103,11 +2828,67 @@ dans les quelques secondes), *Proposer de reprendre le coup*, *Annuler la partie
   terminées (voir [Tes parties terminées](#tes-parties-terminées)). *Une autre partie* cherche de nouveau avec la même
   cadence.
 
+### Arènes et tournois suisses
+<!-- en: arenas-and-swiss-tournaments 042061fe -->
+
+La moitié *Tournois* de la section **Sur Lichess** de la page Jouer rejoint une arène de Lichess, ou un tournoi suisse
+d'une de tes équipes, et joue ses parties depuis RookStudio. La carte *Tournois Lichess* de la page Lichess y mène
+aussi, *Rejoindre* sur la ligne d'une arène (voir [Les tournois Lichess](#les-tournois-lichess)).
+
+- **Ce que Lichess permet.** Sa Board API ne joue que des parties rapides, classiques et par correspondance, jamais de
+  blitz ni de bullet en tournoi : ces arènes-là se suivent dans la mosaïque et se jouent sur lichess.org, et leur
+  ligne le dit, avec le lien. La section liste les arènes rapides et classiques que tu peux jouer.
+- **La première fois**, Lichess demande une permission de plus, `tournament:write` (pour rejoindre un tournoi, s'y
+  mettre en pause et le quitter) ; `board:play`, pour jouer, est déjà donnée. *Autoriser sur Lichess…* (Entrée) ouvre
+  la page de Lichess ; ton compte reste associé en attendant, et le jeton qu'elle remplace est révoqué.
+- **Rejoindre une arène** : ses conditions telles que Lichess les juge, chacune avec tes chiffres (*Au moins 20 parties
+  classées en Rapide (toi : 312)*), une condition manquante dite avant que tu rejoignes ; ses règles en une ligne
+  chacune, et *Les règles complètes sur lichess.org* ; *Rejoindre* (Entrée). Un refus est dit avec les mots de
+  Lichess : pour une arène réservée aux membres d'une équipe, *Ouvrir l'équipe sur lichess.org*, car RookStudio ne gère
+  pas les équipes.
+- **En attendant une partie** : Lichess n'apparie un joueur absent de la page de l'arène que pendant une minute, aussi
+  RookStudio te réinscrit-il chaque minute pendant que tu attends ; fermé, il ne le fait plus, et tu n'es plus apparié,
+  tes points restant. La partie suivante s'ouvre d'elle-même sur la page Échiquier.
+- **La ligne de l'arène**, au-dessus de la section et de la carte de la partie : ton rang sur tant de joueurs, tes
+  points, la série (*le prochain gain compte double*), le temps restant, et *Pause* (Alt+P), qui te retire après la
+  partie en cours, tes points restant ; *Retour dans l'arène* (Alt+P) te réinscrit. La page de l'arène est demandée
+  toutes les 15 secondes ; après un 429 (trop de requêtes), son classement attend une minute et le dit, tes parties
+  continuant.
+- **Jouer** : comme toute partie sur Lichess (voir [Une partie sur Lichess](#une-partie-sur-lichess)), avec *Berserk*
+  là où l'arène le permet, avant ton premier coup seulement (la moitié de ta pendule, un point de plus si tu gagnes) ;
+  Lichess ne permet ni de reprendre un coup ni d'annuler la partie dans un tournoi. Une partie de tournoi dont tu ne
+  joues pas le premier coup à temps est perdue, pas annulée, et la carte le dit. Sous la carte, la partie précédente à
+  sa fin : *Gagnée en 34 coups · +2 points · la série commence*.
+- **Les aides** restent verrouillées tant que tu es dans l'arène une fois qu'elle a commencé, entre deux parties
+  aussi, puisque la suivante arrive en quelques secondes : le moteur, l'arbre, le cloud, les tables, l'assistant et les
+  rapports (le dossier d'un joueur, un rapport d'ouverture, un tableau croisé). *Pause* te les rend (voir
+  [Fair-play](#fair-play)).
+- **Sa fin** : ton rang et tes points ; chaque partie est dans *Lichess · ton nom*, comme tes parties terminées (voir
+  [Tes parties terminées](#tes-parties-terminées)), leur bilan proposé alors : *Faire le bilan de la dernière partie*,
+  *Ses parties dans la liste*. Fermer RookStudio pendant une arène demande d'abord : *Mettre en pause et fermer*, ou
+  *Rester* (Échap).
+- **Un tournoi suisse**, pour les membres de son équipe : sa ronde sur tant, le classement après sa dernière ronde
+  (points, départage, performance), tes parties ronde par ronde, et l'heure de la ronde suivante. Deux minutes avant,
+  un avis dans le coin de la fenêtre le dit où que tu sois ; ta partie s'ouvre d'elle-même sur la page Échiquier, et une
+  partie dont tu ne joues pas le premier coup à temps est perdue. *Ses parties dans la mosaïque* montre les parties de
+  la ronde de ses huit premiers. Une fois qu'il est terminé, *Le garder dans une base…* prend ses parties, chacune avec
+  sa ronde, et son classement (son fichier TRF) dans *Lichess tournaments* ou une autre de tes bases : le tableau croisé
+  de la base le lit alors, exemptions et arrivées tardives comprises (voir [Tournois et tableaux
+  croisés](#tournois-et-tableaux-croisés)), à un clic avec *Ouvrir son tableau croisé*.
+
+Ce qui quitte la machine : pour suivre, le tournoi demandé et ses parties, sans compte ; pour rejoindre, avec ton
+jeton, l'inscription, la pause et tes coups. Une requête à la fois, une minute après un 429. Ctrl+K a *Jouer une arène
+ou un tournoi suisse sur Lichess*, *Rejoindre l'arène : …*, *Pause dans l'arène*, *Revenir à l'arène*, *Berserk* et
+*Garder le suisse dans une base…*.
+
 ## La page Lichess
-<!-- en: the-lichess-page ea1e19cc -->
+<!-- en: the-lichess-page 0c6f9833 -->
 
 Tout ici est facultatif : RookStudio fonctionne sans compte et sans Internet, et ce qui part chez Lichess est indiqué
-là où tu le décides.
+là où tu le décides. Sa colonne de droite contient les services : les diffusions, les tournois de Lichess, Lichess TV,
+les joueurs suivis, les évaluations gardées hors ligne, *Tes moteurs sur lichess.org* dès qu'un de tes moteurs est
+proposé à l'échiquier d'analyse de lichess.org (voir [Ton moteur sur lichess.org](#ton-moteur-sur-lichessorg)), et ce
+que l'analyse peut demander en ligne.
 
 ### Associer ton compte
 <!-- en: linking-your-account 8b1bc649 -->
@@ -2192,7 +2973,7 @@ cette permission (*Autoriser sur Lichess…*, ou *Suivre sans elle*). Une ronde 
 dans la base *Diffusions*.
 
 ### Plus loin avec une diffusion
-<!-- en: more-of-a-broadcast eed19086 -->
+<!-- en: more-of-a-broadcast 3d035f0f -->
 
 À droite de la mosaïque d'une diffusion, sous la ronde, **le classement** : le rang, le titre, le classement Elo et les
 points de chaque joueur tels que les organisateurs les donnent (la fédération, l'équipe, la performance et la
@@ -2203,6 +2984,8 @@ deux minutes tant que la mosaïque est affichée.
 *Tout le tournoi*, à côté du nom d'une ronde, suit toutes les rondes en cours du tournoi, et chaque suivante dès
 qu'elle commence : la mosaïque montre la ronde en direct, et **Les rondes** au-dessus en montre une autre (un clic sur
 celle en direct suit de nouveau les suivantes). Chaque ronde va dans la base *Diffusions* quand elle se termine.
+*Tableau croisé*, à côté du classement, montre le tableau croisé des rondes suivies à la place des échiquiers (voir
+[Tournois et tableaux croisés](#tournois-et-tableaux-croisés)).
 
 **Chercher dans les diffusions**, en haut des diffusions officielles, cherche une diffusion récente par son nom :
 Lichess ne répond qu'à un compte autorisé à lire les diffusions, demandé la première fois. *Retour à la liste* montre de
@@ -2231,7 +3014,7 @@ Une partie est demandée par son identifiant, sans compte ; une étude privée a
 compte autorisé à les lire, demandé une fois, comme pour suivre une ronde ; tes favoris demandent un compte associé.
 
 ### Fair-play
-<!-- en: fair-play 62d0ad7a -->
+<!-- en: fair-play ca194626 -->
 
 Lichess interdit toute aide pendant une partie. Avec ton compte associé, RookStudio s'y tient où que tu joues, dans le
 navigateur ou sur un téléphone :
@@ -2244,7 +3027,11 @@ navigateur ou sur un téléphone :
 - une partie par correspondance verrouille le moteur, le cloud, les tables et l'assistant sur la partie de l'échiquier
   qui passe par sa position, du premier coup jusqu'à ce qui la suit, y compris une position de cette partie montrée
   depuis une variante ; Lichess y autorise un livre et une base, si bien que l'arbre de tes bases et leurs parties de
-  référence restent ouverts. Sur toute autre partie, tout fonctionne.
+  référence restent ouverts. Avant son premier coup, elle ne verrouille que la position de départ : toute partie y
+  passe. Sur toute autre partie, tout fonctionne.
+- tant que tu es dans une arène depuis RookStudio, chaque aide reste verrouillée entre deux parties aussi, les rapports
+  avec elles, jusqu'à *Pause* (Alt+P) ou la fin de l'arène (voir [Arènes et tournois
+  suisses](#arènes-et-tournois-suisses)).
 
 Un bandeau sur la page Échiquier dit quelle partie verrouille quoi. La carte Lichess de la page Accueil liste tes
 parties en cours, celles où c'est ton tour d'abord, chacune avec sa pendule ou le temps qui reste pour jouer, et
@@ -2252,7 +3039,9 @@ parties en cours, celles où c'est ton tour d'abord, chacune avec sa pendule ou 
 Lichess](#une-partie-sur-lichess)). Les parties de ton bot Lichess ne sont pas les tiennes et ne verrouillent rien ;
 pendant ta propre partie en direct, la recherche du bot n'est pas montrée (voir [Un bot Lichess](#un-bot-lichess)).
 Lichess TV ne montre jamais tes propres parties, même à la une, et les moteurs de la mosaïque se reposent pendant ta
-partie en direct (voir [Lichess TV](#lichess-tv)).
+partie en direct (voir [Lichess TV](#lichess-tv)). Ton moteur proposé à l'échiquier d'analyse de lichess.org se met en
+pause pendant ta partie en direct, et n'analyse jamais les positions de tes parties par correspondance (voir [Ton
+moteur sur lichess.org](#ton-moteur-sur-lichessorg)).
 
 Tes parties en cours sont demandées avec le jeton de ton compte quand la page Accueil s'affiche, toutes les trente
 secondes tant que dure une partie en direct et toutes les dix minutes tant que dure une partie par correspondance. La
@@ -2262,7 +3051,7 @@ avertie par le même flux. RookStudio ne lit les coups que des parties que tu jo
 que tu joues. Sans l'une ni l'autre permission, le verrouillage vient quand la page Accueil s'affiche.
 
 ### Tes parties terminées
-<!-- en: your-finished-games 2e1cf545 -->
+<!-- en: your-finished-games 3109239c -->
 
 Quand une de tes parties se termine, RookStudio l'amène dans *Lichess · ton nom*, une base créée si elle manque, avec
 ses pendules, son ouverture et, quand tu as demandé à Lichess de l'analyser, les évaluations de Lichess. Un bandeau sur
@@ -2273,7 +3062,8 @@ redemande à Lichess son analyse, qui a pu être demandée entre-temps, ouvre la
 L'analyse de Lichess s'affiche alors à côté de celle de ton moteur : sa courbe sur le graphe, et la précision de chaque
 analyse sous les chiffres des deux camps dans l'onglet Bilan, la même formule pour les deux. *Faire aussitôt le bilan
 de mes parties terminées*, sur la page Lichess, lance le bilan de lui-même, sauf si l'Échiquier contient une partie
-aux modifications non enregistrées ou un travail en cours ; le bandeau le propose alors.
+aux modifications non enregistrées ou un travail en cours ; le bandeau le propose alors. Les parties d'une arène
+arrivent de la même façon, leur bilan proposé à la fin de l'arène.
 
 ### Joueurs suivis
 <!-- en: followed-players 9a60f4cb -->
@@ -2290,7 +3080,7 @@ une permission de plus, demandée la première fois ; *Sans elle*, les joueurs a
 propre compte et tes propres parties n'y viennent jamais.
 
 ### Lichess TV
-<!-- en: lichess-tv f41a341a -->
+<!-- en: lichess-tv 820042bb -->
 
 La carte *Lichess TV* de la page Lichess liste les chaînes d'échecs standard : *Mieux classés*, *Bullet*, *Blitz*,
 *Rapide*, *Classique*, *UltraBullet*, *Bots* et *Ordinateur* (des joueurs contre l'IA de Lichess) ; les chaînes des
@@ -2299,8 +3089,8 @@ classements, et sa cadence. La liste est relue quand la carte s'affiche, au plus
 30 secondes.
 
 *La mosaïque* montre les parties en cours de la chaîne dans la mosaïque des diffusions, sa troisième source : la ligne
-en haut passe de l'une à l'autre (*Diffusions*, *Joueurs suivis*, *Lichess TV*), et les chaînes sont des pastilles en
-dessous. Les mêmes tuiles, un de tes moteurs pour chaque partie, la partie choisie à droite avec *Suivre sur
+en haut passe de l'une à l'autre (*Diffusions*, *Joueurs suivis*, *Lichess TV*, *Tournois Lichess*), et les chaînes
+sont des pastilles en dessous. Les mêmes tuiles, un de tes moteurs pour chaque partie, la partie choisie à droite avec *Suivre sur
 l'échiquier*. Lichess liste jusqu'à 30 parties par chaîne, et permet à une adresse de suivre 8 parties à la fois, les
 rondes que tu suis (une chacune) et les parties des joueurs suivis comptées avec elles : la mosaïque montre ce qui reste,
 la partie à la une d'abord. Une partie terminée montre son résultat quelques secondes, puis laisse sa place à une autre
@@ -2323,17 +3113,44 @@ gardé de lui-même. Ctrl+K a *Lichess TV*, chaque chaîne dans la mosaïque (et
 et, pour la partie de l'Échiquier, rester sur elle ou passer à la partie suivante de la chaîne, la garder, et revenir à
 la mosaïque.
 
-### Préparer une partie
-<!-- en: preparing-a-game 5bf402fc -->
+### Les tournois Lichess
+<!-- en: lichess-tournaments fe42cfa6 -->
 
-La carte *Préparer une partie contre* de la page Lichess prend un nom Lichess. Les parties de ce joueur sur la dernière
-année, en blitz, rapide et classique, arrivent dans une base à part, *Lichess · nom*, synchronisée de nouveau la fois
-suivante, et son profil public donne son niveau. Puis, depuis l'arbre de cette base : ses parties et ses années, tes
-parties contre lui (ton compte associé), ce qu'il joue avec les Blancs, et avec les Noirs contre les premiers coups
-qu'il rencontre le plus, et les lignes qu'il joue souvent auxquelles tes répertoires ne répondent pas, les plus
-fréquentes d'abord. Un clic sur l'une d'elles l'ouvre sur l'Échiquier, son onglet Arbre sur ses parties. Seuls son nom
-et ces filtres partent chez Lichess. Pendant qu'une de tes parties contre lui se joue sur Lichess, la carte ne montre
-rien de lui.
+La carte *Tournois Lichess* de la page Lichess liste les arènes de Lichess en cours et à venir, lues sans compte :
+*Rapide*, *Classique* ou *Toutes*, chaque ligne avec son nom, sa cadence, quand (*encore 38 min*, *dans 40 min*), ses
+joueurs, *Suivre*, et *Rejoindre* ou pourquoi pas : *Blitz : sur lichess.org* (un clic l'ouvre), *condition non
+remplie* (sous la souris, laquelle, avec tes chiffres). Les arènes des variantes ne sont pas montrées ; la liste est
+relue quand la carte s'affiche, au plus une fois par minute.
+
+*Les tournois suisses de tes équipes*, en dessous, liste ceux des équipes dont tu es membre : lire tes équipes demande
+une permission de plus, `team:read`, demandée une fois (*Lire mes équipes…*). Chaque ligne donne ses rondes, sa
+cadence, quand, ses joueurs, et *Rejoindre* ; *Suivre* pendant qu'il se joue ; *Le garder dans une base…* une fois
+terminé.
+
+*Suivre* montre le tournoi dans la mosaïque des diffusions, sa quatrième source à côté de *Diffusions*, *Joueurs
+suivis* et *Lichess TV* : les parties en cours de ses huit premiers, comme le tournoi les donne, une partie terminée
+laissant sa place à la suivante ; Lichess montre leurs coups avec trois coups de retard, et permet à une adresse de
+suivre huit parties à la fois, les rondes et les joueurs que tu suis comptés avec elles ; chacune analysée par ton
+moteur, comme le fait la mosaïque. À droite, son classement, demandé toutes les 15 secondes : le rang, le classement,
+la feuille de chaque joueur (les points de chaque partie, la plus récente en dernier comme sur lichess.org, les points
+doublés d'une série en orange) et son score ; celui d'un suisse après sa dernière ronde. Un clic choisit une partie, un
+double clic l'ouvre sur la page Échiquier ; ta propre partie ne s'affiche jamais. Un suisse ne liste pas ses parties en
+cours : elles sont trouvées par joueur, ceux de ses huit premiers, à chaque ronde. Sans compte ; rien n'est gardé de
+lui-même. Ctrl+K a *Tournois Lichess : arènes et tournois suisses*, *Suivre l'arène : …* (une fois que la carte a lu
+la liste) et le tournoi suivi dans la mosaïque.
+
+### Préparer une partie
+<!-- en: preparing-a-game 2c8891af -->
+
+La carte *Préparer une partie contre* de la page Lichess prend un nom Lichess et ouvre son dossier (voir [Le dossier
+d'un joueur](#le-dossier-dun-joueur)) avec sa source Lichess cochée. Les parties de ce joueur sur la dernière année, en
+blitz, rapide et classique, arrivent dans une base à part, *Lichess · nom*, synchronisée de nouveau la fois suivante,
+et son profil public donne son niveau. Le dossier montre alors ce qu'il joue en ligne à côté de ce que tes bases ont
+de lui (le joueur dont c'est le compte Lichess, une fois associé), tes parties contre lui (ton compte associé), et les
+lignes qu'il joue souvent auxquelles tes répertoires ne répondent pas, sur les deux sources, les plus fréquentes
+d'abord ; un clic sur l'une d'elles l'ouvre sur l'Échiquier, son onglet Arbre sur ses parties. Seuls son nom et ces
+filtres partent chez Lichess. Pendant qu'une de tes parties contre lui se joue sur Lichess, le dossier ne montre rien
+de lui.
 
 ### Les évaluations de Lichess, hors ligne
 <!-- en: lichesss-evaluations-offline e972bc19 -->
@@ -2371,7 +3188,7 @@ Ce qui quitte la machine : la demande du fichier à database.lichess.org, et rie
 parties se joue sur Lichess, elles se masquent comme le moteur (voir [Fair-play](#fair-play)).
 
 ### En ligne pour l'analyse
-<!-- en: online-for-the-analysis 991c19c9 -->
+<!-- en: online-for-the-analysis 1f447190 -->
 
 Trois services, chacun demandé à sa première utilisation (pour cette position, toujours, ou pas maintenant) et
 réglable ici :
@@ -2380,11 +3197,13 @@ réglable ici :
   compte, et Lichess répond avec les lignes que ses serveurs ont déjà calculées, quand il les a. Ton moteur répond
   toujours.
 - **Finales en ligne, jusqu'à 7 pièces** : pour une position de sept pièces ou moins que les tables de ton disque ne
-  connaissent pas, son FEN est envoyé aux tables de Lichess, sans compte. Elles donnent le verdict, le mat au mieux ou
-  les coups avant une prise ou un coup de pion, et chaque coup avec ce qu'il laisse (un clic le joue) ; *Voir la ligne
-  gagnante sur l'échiquier* la montre en aperçu. Un gain que la règle des 50 coups change en nulle est un « gain
-  maudit ». Avec huit pièces et des pions face à face, elles donnent le verdict et les coups jusqu'à la prochaine
-  prise.
+  connaissent pas, son FEN est envoyé aux tables de Lichess, sans compte. Elles donnent le verdict et la distance de la
+  fin, dans l'onglet Analyse, et chaque coup selon son issue dans l'onglet Finales, avec les lignes principales de ses
+  coups (voir [L'onglet Finales](#longlet-finales)). Un gain que la règle des 50 coups change en nulle, un « gain
+  maudit » dans les mots des tables, se dit « gain, mais nulle par la règle des 50 coups ». Avec huit pièces et des
+  pions face à face, elles donnent le verdict et les coups jusqu'à la prochaine prise, promotion ou mat. La vérification
+  des finales d'un tournoi terminé leur demande quelques positions par partie, une fois autorisée pour cette
+  vérification ou toujours (voir [Vérifier les finales avec les tables](#vérifier-les-finales-avec-les-tables)).
 - **L'explorateur de Lichess**, dans l'onglet Arbre : pour chaque position, son FEN et le filtre choisi sont envoyés
   avec ton jeton ; il demande un compte associé. Rien de tes bases n'est envoyé.
 
@@ -3200,6 +4019,33 @@ qu'elle a été jouée. Ses profils sont nommés, et un profil modifié depuis e
 Change ce qui doit différer (une autre cadence, la version suivante d'un moteur, un autre livre), puis **Lancer** ou
 *Mettre en file d'attente*. Un tournoi qui joue encore peut aussi être cloné ; un tournoi lancé par une version plus
 ancienne, qui ne gardait pas sa configuration, ne le peut pas.
+
+### Vérifier les finales avec les tables
+<!-- en: checking-the-endgames-against-the-tables fb5b1e89 -->
+
+Le menu d'un tournoi terminé, un clic droit sur son en-tête ou sur sa ligne de la page Tournois (ou **Ctrl+K**), a
+*Vérifier les finales avec les tables* : les parties arrivées à sept pièces ou moins, chaque résultat confronté à ce
+que disent les tables de finales. La réponse arrive dans une carte sous l'en-tête du tournoi, « 12 parties sont
+arrivées à sept pièces ou moins : 3 gains gâchés (Alpha: 2, Bravo: 1), 1 position perdue sauvée, 2 nulles adjugées
+dans une position gagnée », avec une ligne pour chaque constat, *Ouvrir* montrant sa partie dans l'onglet *Parties* au
+coup concerné :
+
+- **un gain gâché** : un coup d'un moteur après lequel les tables ne lui donnent plus le gain (une nulle, ou le gain
+  de l'autre camp) ; **une nulle gâchée** : un coup d'un moteur après lequel elles donnent le gain à l'autre camp ;
+- **une position perdue sauvée** : une partie annulée par les règles (une triple répétition, la règle des 50 coups)
+  alors que les tables donnent encore le gain à un camp à sa fin ;
+- **une nulle adjugée dans une position gagnée**, par la règle de nulle du tournoi ou sa limite de coups, et **un gain
+  adjugé contre les tables**, par sa règle d'abandon. L'adjudication propre aux tables est d'accord avec elles ; une
+  partie perdue au temps, par un coup illégal ou par un crash n'est jugée que sur ses coups.
+
+Quelques positions par partie sont demandées : la première que les tables savent dire et la dernière, et quand leurs
+verdicts diffèrent, une dichotomie entre elles jusqu'au coup qui l'a changé (une dizaine de positions pour une longue
+finale). Tes tables sur le disque d'abord (voir [Des tables pour les finales](#des-tables-pour-les-finales)), puis les
+réponses que Lichess a données avant, gardées dans ton profil, puis les tables à 7 pièces de Lichess pour le reste,
+une fois autorisées : pour cette vérification, toujours, ou pas maintenant (le FEN de chaque position part vers
+tablebase.lichess.ovh, sans compte), une requête à la fois, chaque réponse gardée pour de bon. Sans elles, les parties
+que les tables de ton disque ne savent pas dire sont comptées comme non jugées. Rien de la page du tournoi ne change
+avant le clic.
 
 ## Classements
 <!-- en: ratings 3e4be48f -->

@@ -110,3 +110,5 @@ __pycache__/
 
 # Instructions for Claude Code, kept out of the repository
 CLAUDE.md
+# The roadmap, kept beside the repository: its working notes are not published
+PLAN.md

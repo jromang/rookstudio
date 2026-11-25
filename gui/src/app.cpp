@@ -1236,6 +1236,10 @@ void App::frame() {
         if (!focus_next_.empty()) focusWindow(std::exchange(focus_next_, {}));  // a word after another
     }
 
+    // An import's end and the opening tree that follows, TWIC's issues: whatever shows, the big screen too (#101).
+    pollDatabases();
+    pollTwic();
+
     // The big screen takes the main window's place: the panels taken out of it stay on screen.
     if (big_.on) {
         drawBigScreen();

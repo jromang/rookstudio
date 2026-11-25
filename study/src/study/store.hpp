@@ -377,7 +377,7 @@ class Database {
     uint32_t nameId(const std::string& name, std::vector<std::string>& added);
     // Writes `games` in new segments (of versions when `versions`) and commits them with the edits `replaced` and
     // `deleted` (the snapshot's own when null) and the table of names `players` (the snapshot's when null), in one
-    // manifest. Under the lock.
+    // manifest. Under the writers' lock, mutex_ taken only for a moment: snapshot() never waits for its writes.
     void commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
                 const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
                 const PlayerTable* players = nullptr, const std::string& source = {});
@@ -385,10 +385,13 @@ class Database {
 
     std::filesystem::path dir_;
     std::optional<tour::FolderLock> lock_;  // none when read-only
-    // Held by every change for its whole length, a compaction's included, before mutex_: a long compaction keeps the
-    // other changes waiting, not the readers.
+    // Held by every change for its whole length (a compaction's commit, a read-only database's refresh), before
+    // mutex_: the changes one after the other, the readers never waiting for one (an import's commit writes and syncs
+    // its files while the window takes a snapshot each frame). current_ changes only under both; the indexes of names
+    // and keys are the writers' own, under this lock alone.
     std::mutex write_mutex_;
     std::mutex compact_mutex_;  // one compaction at a time, and its undoing
+    // Taken for a moment: current_ read or published, next_segment_, leftovers_, kept_ and dropped_.
     mutable std::mutex mutex_;
     std::shared_ptr<const Snapshot> current_;
     std::unordered_map<std::string, uint32_t> name_ids_;  // filled at the first append

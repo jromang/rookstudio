@@ -79,7 +79,10 @@ what a commit cut short left (a segment the manifest does not name, a `.tmp` fil
 at each of its steps (`setCommitFaultHook`) and check that the database reopens with all of the commit or none of it,
 and goes on.
 
-A reader holds a `Snapshot`: the segments it maps stay valid while later commits add others.
+A reader holds a `Snapshot`: the segments it maps stay valid while later commits add others. The changes take the
+writers' lock one after the other, for their whole length; the snapshot is published under a lock held for a moment
+(the segment numbers and a compaction's leftovers too), so that `snapshot()`, which the window calls each frame, never
+waits for a commit's writes and syncs (#99).
 
 ### Games replaced and deleted
 

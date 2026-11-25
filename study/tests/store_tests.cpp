@@ -2,10 +2,15 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <future>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -389,4 +394,85 @@ TEST_CASE("store: a database another program writes, read as it commits, nothing
     CHECK_THROWS_AS(reader->setDeleted(one, true), std::runtime_error);
     CHECK(writer->snapshot()->games() == 70);
     CHECK_THROWS(Database::openReadOnly(freshFolder("store-read-only-none")));
+}
+
+TEST_CASE("store: a snapshot comes at once while a change commits, with the games before it (#99)") {
+    const auto games = fixtureGames();
+    const auto dir   = freshFolder("store-commit-readers.fcgdb");
+    auto db          = Database::create(dir);
+    db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 60));
+
+    // Each change held in its commit, its segment written and synced, its manifest not yet: the window's snapshots,
+    // taken meanwhile, come without waiting for it.
+    std::mutex mutex;
+    std::condition_variable changed;
+    bool held = false, go_on = false;
+    setCommitFaultHook([&](std::string_view step) {
+        if (step != "write manifest") return;
+        std::unique_lock lock(mutex);
+        held = true;
+        changed.notify_all();
+        changed.wait(lock, [&] { return go_on; });
+    });
+    const auto whileCommitting = [&](const std::string& what, const std::function<void()>& change) {
+        CAPTURE(what);
+        {
+            std::lock_guard lock(mutex);
+            held  = false;
+            go_on = false;
+        }
+        const auto before = db->snapshot();
+        auto writer       = std::async(std::launch::async, change);
+        {
+            std::unique_lock lock(mutex);
+            changed.wait(lock, [&] { return held; });
+        }
+        auto reader = std::async(std::launch::async, [&] {
+            std::shared_ptr<const Snapshot> seen;
+            for (int i = 0; i < 100; ++i) seen = db->snapshot();
+            return seen;
+        });
+        // Bounded only for a reader that would wait for the commit: then the commit goes on, and the test fails.
+        const bool came = reader.wait_for(std::chrono::seconds(60)) == std::future_status::ready;
+        {
+            std::lock_guard lock(mutex);
+            go_on = true;
+        }
+        changed.notify_all();
+        writer.get();
+        CHECK(came);
+        const auto seen = reader.get();
+        CHECK(seen->generation() == before->generation());
+        CHECK(seen->games() == before->games());
+        CHECK(db->snapshot()->generation() == before->generation() + 1);
+    };
+    whileCommitting("append", [&] { db->append(std::vector<ImportedGame>(games.begin() + 60, games.end())); });
+    CHECK(db->snapshot()->games() == games.size());
+    whileCommitting("replace", [&] { db->replace(3, games[100]); });
+    sameGame(db->snapshot()->game(3), games[100]);
+    whileCommitting("delete", [&] { db->setDeleted(std::vector<GameId>{5, 6}, true); });
+    CHECK(db->snapshot()->deleted(5));
+    std::vector<GameState> before_merge;
+    whileCommitting("merge", [&] { before_merge = db->merge({Database::Merge{10, games[11], {11}}}); });
+    CHECK(db->snapshot()->deleted(11));
+    whileCommitting("restore", [&] { db->restore(before_merge); });
+    CHECK_FALSE(db->snapshot()->deleted(11));
+    Player player;
+    player.name      = "Someone, Anyone";
+    player.spellings = {db->snapshot()->rowIds(0).white};
+    whileCommitting("players", [&] { db->setPlayers(PlayerTable(std::vector<Player>{player})); });
+    CHECK(db->snapshot()->players()->players().size() == 1);
+    setCommitFaultHook({});
+
+    // Reopened: every change in, the games as the last snapshot read them.
+    const auto last = db->snapshot();
+    db.reset();
+    db              = Database::open(dir);
+    const auto snap = db->snapshot();
+    REQUIRE(snap->games() == last->games());
+    for (GameId id = 0; id < snap->games(); ++id) {
+        CAPTURE(id);
+        sameGame(snap->game(id), last->game(id));
+        CHECK(snap->deleted(id) == last->deleted(id));
+    }
 }

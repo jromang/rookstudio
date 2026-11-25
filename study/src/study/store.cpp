@@ -808,6 +808,7 @@ std::shared_ptr<Database> Database::openReadOnly(const fs::path& dir) {
 
 bool Database::refresh() {
     if (lock_) return false;
+    std::lock_guard writing(write_mutex_);  // current_ changes under it, as for a change
     uint64_t generation = 0;
     try {
         std::ifstream in(dir_ / MANIFEST, std::ios::binary);
@@ -840,6 +841,7 @@ void Database::load(bool clean, int tries) {
     auto snap         = std::make_shared<Snapshot>();
     snap->generation_ = manifest.value("generation", uint64_t{0});
     std::vector<std::string> named;
+    uint64_t next_segment = 1;  // the numbers the segments there take, and the next one
     // A segment that cannot be read (a file of it cut short, missing, or not a segment's: damaged while the database
     // was closed) keeps its place, its games and names counted as the manifest gives them (#97).
     struct Unread {
@@ -887,7 +889,7 @@ void Database::load(bool clean, int tries) {
         named.push_back(name);
         unsigned long long number = 0;
         std::sscanf(name.c_str(), "seg-%llu", &number);
-        next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
+        next_segment = std::max<uint64_t>(next_segment, number + 1);
     }
     // Read-only, a segment that the other program removed as it committed (a compaction's, an undoing's) is no damage:
     // read again once its manifest has settled.
@@ -963,7 +965,7 @@ void Database::load(bool clean, int tries) {
             if (name.rfind("seg-", 0) == 0) {
                 unsigned long long number = 0;
                 if (std::sscanf(name.c_str(), "seg-%llu", &number) == 1)
-                    next_segment_ = std::max<uint64_t>(next_segment_, number + 1);
+                    next_segment = std::max<uint64_t>(next_segment, number + 1);
                 if (temporary || std::find(named.begin(), named.end(), name) == named.end())
                     fs::remove_all(entry.path(), ec);
             } else if (temporary || (name.rfind("edits-", 0) == 0 && name != edits) ||
@@ -973,7 +975,8 @@ void Database::load(bool clean, int tries) {
         }
     }
     std::lock_guard lock(mutex_);
-    current_ = std::move(snap);
+    next_segment_ = std::max(next_segment_, next_segment);
+    current_      = std::move(snap);
 }
 
 std::shared_ptr<const Snapshot> Database::snapshot() const {
@@ -1133,8 +1136,12 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             std::string names_text;
             for (std::size_t a = names_before; a < added.size(); ++a) names_text += added[a] + "\n";
 
-            const auto name = segmentName(next_segment_ + made.size());
-            const auto tmp  = dir_ / (name + ".tmp");
+            std::string name;
+            {
+                std::lock_guard lock(mutex_);  // the numbers a compaction takes too, without the writers' lock
+                name = segmentName(next_segment_++);
+            }
+            const auto tmp = dir_ / (name + ".tmp");
             std::error_code ec;
             fs::remove_all(tmp, ec);
             fs::create_directories(tmp, ec);
@@ -1217,22 +1224,27 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
     }
     snap->settle();
+    // Published: the readers take it from now on, never having waited for the files written above.
+    bool edits_kept = false, players_kept = false;
+    {
+        std::lock_guard lock(mutex_);
+        const auto kept = [&](const std::string& name) {
+            return leftovers_ &&
+                   std::find(leftovers_->files.begin(), leftovers_->files.end(), name) != leftovers_->files.end();
+        };
+        edits_kept   = kept(edits_before);
+        players_kept = kept(players_before);
+        current_     = std::move(snap);
+    }
     // The files before, unless a compaction keeps them for its undoing: read by nobody, they are in memory.
-    const auto kept = [&](const std::string& name) {
-        return leftovers_ &&
-               std::find(leftovers_->files.begin(), leftovers_->files.end(), name) != leftovers_->files.end();
-    };
-    if (!edits_written.empty() && !edits_before.empty() && edits_before != edits_written && !kept(edits_before)) {
+    if (!edits_written.empty() && !edits_before.empty() && edits_before != edits_written && !edits_kept) {
         std::error_code gone;
         fs::remove(dir_ / edits_before, gone);
     }
-    if (!players_written.empty() && !players_before.empty() && players_before != players_written &&
-        !kept(players_before)) {
+    if (!players_written.empty() && !players_before.empty() && players_before != players_written && !players_kept) {
         std::error_code gone;
         fs::remove(dir_ / players_before, gone);
     }
-    next_segment_ += made.size();
-    current_ = std::move(snap);
 }
 
 Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates, const std::string& source,
@@ -1240,7 +1252,6 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     Appended appended;
     std::lock_guard writing(write_mutex_);
-    std::lock_guard lock(mutex_);
     // Each game's key, made once: for the duplicates, the key column and the keys known after.
     std::vector<uint64_t> keys(games.size());
     for (std::size_t i = 0; i < games.size(); ++i) keys[i] = duplicateKey(games[i]);
@@ -1298,7 +1309,6 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
 void Database::replace(GameId id, ImportedGame game) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard writing(write_mutex_);
-    std::lock_guard lock(mutex_);
     if (id >= current_->games_) throw std::out_of_range("no game " + std::to_string(id) + " to replace");
     const uint64_t old_key = current_->key(id);
     std::vector<uint64_t> keys{duplicateKey(game)};
@@ -1325,7 +1335,6 @@ void Database::replace(GameId id, ImportedGame game) {
 void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard writing(write_mutex_);
-    std::lock_guard lock(mutex_);
     auto bits = current_->deleted_;
     for (const auto id : ids) {
         if (id >= current_->games_) continue;
@@ -1366,7 +1375,6 @@ void trim(std::vector<uint64_t>& bits) {
 std::vector<GameState> Database::merge(std::vector<Merge> merges) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard writing(write_mutex_);
-    std::lock_guard lock(mutex_);
     std::vector<GameState> before;
     for (const auto& m : merges) {
         if (m.keep >= current_->games_) throw std::out_of_range("no game " + std::to_string(m.keep) + " to merge");
@@ -1405,7 +1413,6 @@ std::vector<GameState> Database::merge(std::vector<Merge> merges) {
 void Database::restore(std::span<const GameState> states) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard writing(write_mutex_);
-    std::lock_guard lock(mutex_);
     std::map<GameId, Snapshot::Version> versions;
     for (const auto& v : current_->replaced_) versions[v.id] = v;
     auto deleted = current_->deleted_;
@@ -1440,7 +1447,6 @@ void Database::restore(std::span<const GameState> states) {
 void Database::setPlayers(PlayerTable table) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard writing(write_mutex_);
-    std::lock_guard lock(mutex_);
     std::vector<ImportedGame> none;
     commit(none, {}, false, nullptr, nullptr, &table);
 }

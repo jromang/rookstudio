@@ -153,6 +153,10 @@ App::~App() {
     // The windows go first: the main loop has stopped drawing them, and what ends below (a task cancelled finishing
     // its step, a hung engine, the question to GitHub) ends out of sight rather than in a frozen window (#98).
     hideWindows();
+    // Every job asked to stop at once (#105): the shelf's import, tree and refreshes, the background readings and
+    // downloads, the books being converted, the list of a database's tournaments; parked when their owner goes, and
+    // waited for at the very end, by jobs_.
+    jobs_.cancelAll();
     ui::setGuideOpener(nullptr);
     closeFileLines();  // a file being read stops within a megabyte
     // Lichess's waits end at once: the link's, the sync's.
@@ -167,11 +171,11 @@ App::~App() {
     leaveCrosstable();
     if (comment_job_) {
         *comment_job_->cancel = true;
-        graveyard_.park(std::move(comment_job_->texts));
+        jobs_.park(std::move(comment_job_->texts));
     }
     if (explain_job_) {
         *explain_job_->cancel = true;
-        graveyard_.park(std::move(explain_job_->finished));
+        jobs_.park(std::move(explain_job_->finished));
     }
     leaveQuestions();
     if (shelf_) shelf_->cancelAll();
@@ -210,7 +214,9 @@ App::~App() {
     }
     for (const auto texture : stale_textures_) render::destroyTexture(texture);
     sound::shutdown();
-    graveyard_.wait();
+    // The tasks parked (a token being revoked among them) waited for, before App's members go; those of the jobs App's
+    // members still hold are parked as they go, and jobs_ waits for them last.
+    jobs_.wait();
 }
 
 bool App::initGraphics() {
@@ -300,7 +306,7 @@ void App::forceQuit() {
 void App::frame() {
     ui::beginTopicFrame();
     retired_runs_.clear();  // the runs taken over during the last frame
-    graveyard_.poll();      // the tasks cancelled that ended (#98)
+    jobs_.poll();           // the tasks parked that ended (#98, #105)
     // Before the engines are read: nothing is read yet, so a resume at launch starts at once, and the queue reads only
     // the engines it plays first.
     if (!launch_checked_) {

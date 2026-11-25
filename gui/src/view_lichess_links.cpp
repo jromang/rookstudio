@@ -178,7 +178,7 @@ void App::closeLinkCard() {
     if (!link_card_) return;
     // Its game may still be asked, behind another request to Lichess or its pause after a 429 (#98).
     *link_card_->cancel = true;
-    graveyard_.park(std::move(link_card_->pgn));
+    jobs_.park(std::move(link_card_->pgn));
     link_card_.reset();
 }
 

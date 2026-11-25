@@ -323,7 +323,7 @@ void App::pollQuestions() {
 void App::leaveQuestions() {
     for (auto& q : questions_) {
         *q.cancel = true;
-        graveyard_.park(std::move(q.answer));
+        jobs_.park(std::move(q.answer));
     }
     questions_.clear();
 }

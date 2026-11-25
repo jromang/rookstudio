@@ -553,8 +553,8 @@ void App::leaveCrosstable() {
     // Reading a large tournament's games, or looking for its missing ones in the other databases, takes a while.
     if (c.cancel) *c.cancel = true;
     if (c.look_cancel) *c.look_cancel = true;
-    graveyard_.park(std::move(c.job));
-    graveyard_.park(std::move(c.looking));
+    jobs_.park(std::move(c.job));
+    jobs_.park(std::move(c.looking));
     crosstable_.reset();
 }
 
@@ -568,7 +568,7 @@ void App::startCrosstable() {
     if (!db) return;
     if (c.job.valid()) {  // read again: the reading under way ends out of sight (#98)
         *c.cancel = true;
-        graveyard_.park(std::move(c.job));
+        jobs_.park(std::move(c.job));
     }
     const auto snapshot = db->snapshot();
     c.snapshot          = snapshot;
@@ -1179,7 +1179,7 @@ void App::drawStudyCrosstable() {
         if (ImGui::SmallButton(TR("Look for them in your other databases"))) {
             if (c.looking.valid()) {  // asked again: the search under way ends out of sight (#98)
                 *c.look_cancel = true;
-                graveyard_.park(std::move(c.looking));
+                jobs_.park(std::move(c.looking));
             }
             c.asked.clear();
             for (const auto& m : t.missing)

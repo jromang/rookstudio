@@ -61,10 +61,10 @@
 #include "fide_cards.hpp"
 #include "fide_rating_list.hpp"
 #include "game_graph.hpp"
-#include "graveyard.hpp"
 #include "guide_view.hpp"
 #include "home.hpp"
 #include "https.hpp"
+#include "jobs.hpp"
 #include "layout.hpp"
 #include "lichess_account.hpp"
 #include "lichess_arenas.hpp"
@@ -306,6 +306,14 @@ class App {
         Count      // none: the sheet of the views is shown in place of the page
     };
     enum class Tab { Overview, Standings, Bracket, Schedule, Live, Games, Openings, Broadcast };
+
+    // The background jobs (jobs.hpp, #105): those of App's pages, the shelf's and the background readings', cancelled
+    // at once by ~App, every window hidden; the futures of tasks whose result nobody wants (a pasted link put away, a
+    // crosstable left, an endgame's questions, a token replaced to revoke), parked, let go of once a frame when they
+    // ended and waited for at the end of ~App. Declared first: gone last, after every job, so that a job destroyed
+    // with App parks its task here, and the group waits for it. The tasks hold what they use (their state, a
+    // shared_ptr to the assistant), never App's members.
+    JobGroup jobs_;
 
     // The views (#43, mockup M6; views.hpp, view_views.cpp): one to three sets of pages of the user's, switched at the
     // top of the rail (Ctrl+1 to Ctrl+3), each with its rail and the Board it shows, in place of the two spaces.
@@ -4796,11 +4804,6 @@ class App {
     void chooseRemote(const std::string& path);
     bool scroll_to_machines_    = false;  // asked from the command palette
     int machines_scroll_frames_ = 0;      // the frames it was asked on
-
-    // The futures of tasks cancelled whose result nobody wants (a pasted link put away, a crosstable left, the
-    // questions of a game left): let go of once a frame when they ended, the others waited for at the end of ~App,
-    // every window hidden (#98). Declared last: gone before what their tasks use (assistant_).
-    Graveyard graveyard_;
 };
 
 }  // namespace fcg

@@ -507,7 +507,7 @@ void App::pollBot() {
     const auto take = [&](lichess::BotTokenCheck c) {
         if (!c.account || !c.facts) {
             if (c.error == "cancelled") return;
-            bot_unanswered_ = c.status == 0 && c.error != "the link was refused on Lichess";
+            bot_unanswered_ = c.status == 0 && !lichess::linkRefused(c.error);
             bot_error_      = c.error.empty() ? std::string(TR("Lichess did not answer")) : c.error;
             if (c.linked && c.account) {
                 const auto token = c.account->token;

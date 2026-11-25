@@ -300,7 +300,7 @@ Answer<Account> link(const std::function<bool(const std::string& url)>& open, co
     (void)open(authorizeUrl(pkce, callback.redirectUri(), scopes, username));
     const auto reply = callback.wait(within, cancel, pkce.state);
     if (!reply.error.empty()) {
-        a.error = reply.error == "access_denied" ? "the link was refused on Lichess" : reply.error;
+        a.error = reply.error == "access_denied" ? std::string(LINK_REFUSED) : reply.error;
         return a;
     }
     if (reply.state != pkce.state) {

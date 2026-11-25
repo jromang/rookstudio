@@ -340,9 +340,8 @@ void App::drawLichessScopeAsk() {
     } else {
         if (!ask.error.empty())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               ask.error.find("refused") != std::string::npos
-                                   ? TR("You refused it on Lichess: nothing changed.")
-                                   : trf("Lichess gave nothing ({}).", ask.error).c_str());
+                               lichess::linkRefused(ask.error) ? TR("You refused it on Lichess: nothing changed.")
+                                                               : trf("Lichess gave nothing ({}).", ask.error).c_str());
         if (ui::iconButton("lichess_scope_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
             auto scopes = lichess_account_->scopes;
             if (!lichess_account_->has(ask.scope)) scopes.push_back(ask.scope);
@@ -466,7 +465,7 @@ void App::drawLichessAccount() {
         }
         // What went wrong last, and the gesture that mends it (M4, board 2).
         if (!lichess_error_.empty()) {
-            const bool refused = lichess_error_.find("refused") != std::string::npos;
+            const bool refused = lichess::linkRefused(lichess_error_);
             const bool late    = lichess_error_.find("in time") != std::string::npos;
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                refused ? TR("You refused the access on Lichess: nothing is linked.")

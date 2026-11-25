@@ -76,7 +76,7 @@ struct FakeLichess {
                   else
                       answer(c, 200, R"({"token_type":"Bearer","access_token":"lio_granted","expires_in":31536000})");
               } else if (head.rfind("GET /api/account", 0) == 0) {
-                  answer(c, head.find("Bearer lio_granted") != std::string::npos ? 200 : 401,
+                  answer(c, head.find("Bearer lio_granted") != std::string::npos && !account_refused ? 200 : 401,
                          R"({"id":"someone","username":"SomeOne"})");
               } else if (head.rfind("DELETE /api/token", 0) == 0) {
                   revoked = head.find("Bearer lio_granted") != std::string::npos;
@@ -92,7 +92,8 @@ struct FakeLichess {
     uint16_t port;
     std::mutex mutex;
     std::string challenge, posted, asked;  // asked: Lichess's page, as the browser was given it
-    bool revoked = false;
+    bool revoked         = false;
+    bool account_refused = false;  // the account's name answered 401, whatever the token
     ScriptedServer server;
 };
 
@@ -229,6 +230,38 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
     CHECK(forgetAccount(profile).empty());
     CHECK(lichess.revoked);
     CHECK_FALSE(fs::exists(profile / "lichess-account.json"));
+}
+
+TEST_CASE("Lichess account: the user's no on Lichess's page told from a token Lichess refuses after a yes") {
+    FakeLichess lichess;
+    // The browser comes back with `query` and the question's state.
+    const auto browser = [&](const std::string& query) {
+        return [&lichess, query](const std::string& url) {
+            {
+                std::lock_guard lock(lichess.mutex);
+                lichess.challenge = valueOf(url, "code_challenge");
+            }
+            const auto redirect = valueOf(url, "redirect_uri");
+            const auto state    = valueOf(url, "state");
+            std::thread([redirect, query, state] { (void)comeBack(redirect, query + "&state=" + state); }).detach();
+            return true;
+        };
+    };
+    const auto no = link(browser("?error=access_denied"), {}, 20s);
+    CHECK_FALSE(no.value);
+    CHECK(linkRefused(no.error));
+    // A yes, then a 401 on the account's name: Lichess refusing the token, not the user (#101); the token revoked.
+    {
+        std::lock_guard lock(lichess.mutex);
+        lichess.account_refused = true;
+    }
+    const auto yes = link(browser("?code=the-code"), {}, 20s);
+    CHECK_FALSE(yes.value);
+    CHECK(yes.status == 401);
+    CHECK(yes.error == "Lichess refused the token");
+    CHECK_FALSE(linkRefused(yes.error));
+    std::lock_guard lock(lichess.mutex);
+    CHECK(lichess.revoked);
 }
 
 TEST_CASE("Lichess account: an answer to another question is ignored, a code Lichess does not take links nothing") {

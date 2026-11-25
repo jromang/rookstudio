@@ -119,7 +119,7 @@ void App::drawCastSheet() {
     } else {
         if (!lichess_error_.empty() && !may)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               lichess_error_.find("refused") != std::string::npos
+                               lichess::linkRefused(lichess_error_)
                                    ? TR("You refused it on Lichess: nothing was made.")
                                    : trf("Lichess gave nothing ({}).", lichess_error_).c_str());
         ImGui::BeginDisabled(!name_ok);

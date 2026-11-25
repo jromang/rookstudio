@@ -248,7 +248,7 @@ void App::drawToLichessResult(float width) {
         } else {
             if (!lichess_error_.empty())
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   lichess_error_.find("refused") != std::string::npos
+                                   lichess::linkRefused(lichess_error_)
                                        ? TR("You refused it on Lichess: nothing changed.")
                                        : trf("Lichess gave nothing ({}).", lichess_error_).c_str());
             if (ui::iconButton("to_lichess_allow", ui::Icon::External, TR("Allow on Lichess…"))) {

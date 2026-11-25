@@ -78,6 +78,8 @@ class DatabaseShelf {
     // the opening tree's build, the linked databases' refreshes) are in `jobs`: one the shelf no longer wants, or that
     // runs when it goes, is cancelled and parked there, never waited for (#105).
     DatabaseShelf(JobGroup& jobs, std::filesystem::path profile);
+    // The folders discard() left to an import, which App's jobs waited for: removed.
+    ~DatabaseShelf();
     DatabaseShelf(const DatabaseShelf&)            = delete;
     DatabaseShelf& operator=(const DatabaseShelf&) = delete;
 
@@ -90,8 +92,8 @@ class DatabaseShelf {
     // stay), its opening tree's build cancelled; the builds of the databases after it, running or asked for, keep
     // theirs.
     void remove(std::size_t index);
-    // Out of the list, its folder deleted: a database made for an import that brought nothing. Its folder stays while
-    // an import into it still ends (as remove() leaves it).
+    // Out of the list, its folder deleted: a database made for an import that brought nothing. While an import into it
+    // still ends (parked by remove(), holding the database), its folder goes once the import let go of it.
     void discard(std::size_t index);
 
     // The linked sources, after the user's own databases: the tournaments, the PGN files opened; those already open
@@ -151,7 +153,8 @@ class DatabaseShelf {
     using TreeJob = TaskState<TreeState>;  // and its cancel
     void rebuildTree(std::size_t index);
     // Each frame: the databases another program writes read again when it committed (every 2 s), and opened to be
-    // written again once it lets them go (tried every 5 s).
+    // written again once it lets them go (tried every 5 s); the folders discard() left to an import removed once it
+    // let go of them (tried every 5 s too).
     void keepReadOnlyCurrent();
     // The build of a database's tree; none while the one of a database removed ends.
     [[nodiscard]] TreeJob* treeJob() noexcept {
@@ -189,6 +192,13 @@ class DatabaseShelf {
         bool refreshed = false;  // once since it was listed
     };
     std::vector<Link> links_;  // beside entries_, empty for the user's own
+    // The databases discarded while their import still ran: their folders, removed once nothing holds the database.
+    struct Discarded {
+        std::filesystem::path folder;
+        std::weak_ptr<study::Database> db;
+    };
+    std::vector<Discarded> discarded_;
+    void removeDiscarded();
     struct CachedTree {
         uint64_t generation = ~uint64_t{0};
         std::shared_ptr<const study::Tree> tree;

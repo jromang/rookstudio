@@ -240,12 +240,29 @@ void DatabaseShelf::discard(std::size_t index) {
     const auto folder    = entries_[index].folder;
     const auto* job      = import();
     const bool importing = job && job->index == index;  // its task holds the database, and may still write there
+    const std::weak_ptr<study::Database> held = open_[index];
     trees_.erase(folder);
     remove(index);  // closed: its lock let go
-    if (importing) return;
+    if (importing) {
+        // The import, parked, holds the database: its folder goes once the task let go of it (removeDiscarded()).
+        discarded_.push_back({folder, held});
+        return;
+    }
     std::error_code ec;
     fs::remove_all(folder, ec);
 }
+
+void DatabaseShelf::removeDiscarded() {
+    // Tried again while something still maps their files (Windows refuses to remove them then).
+    std::erase_if(discarded_, [](const Discarded& d) {
+        if (!d.db.expired()) return false;
+        std::error_code ec;
+        fs::remove_all(d.folder, ec);
+        return !ec;
+    });
+}
+
+DatabaseShelf::~DatabaseShelf() { removeDiscarded(); }
 
 void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::LinkedSource>>& sources) {
     // The user's own first, as they are; then the sources, those listed already keeping what they hold.
@@ -449,7 +466,10 @@ void DatabaseShelf::keepReadOnlyCurrent() {
     const bool try_ = now - read_only_tried_ >= std::chrono::seconds(5);
     if (!read && !try_) return;
     if (read) read_only_read_ = now;
-    if (try_) read_only_tried_ = now;
+    if (try_) {
+        read_only_tried_ = now;
+        removeDiscarded();
+    }
     for (std::size_t i = 0; i < open_.size() && i < entries_.size(); ++i) {
         if (!open_[i] || !open_[i]->readOnly() || entries_[i].source) continue;
         if (try_) {

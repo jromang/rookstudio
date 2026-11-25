@@ -248,6 +248,24 @@ TEST_CASE("databases: a database removed during its import: the import parked, t
     CHECK(shelf.facts(again).error.empty());
 }
 
+TEST_CASE("databases: a database discarded during its import: its folder removed once the import let go of it") {
+    const auto profile = freshDir("shelf-discard-import");
+    JobGroup jobs;
+    fs::path folder;
+    {
+        DatabaseShelf shelf(jobs, profile);
+        const auto index = shelf.create("Imported");
+        folder           = shelf.entries()[index].folder;
+        REQUIRE(shelf.startImport(index, pgnFile(profile, 3000)));
+        shelf.discard(index);  // the import parked, holding the database: its folder stays meanwhile (#105)
+        CHECK(shelf.entries().empty());
+        CHECK(jobs.parked() == 1);
+        CHECK(fs::exists(folder));
+        jobs.wait();  // as App waits for its jobs before its members go
+    }
+    CHECK_FALSE(fs::exists(folder));
+}
+
 TEST_CASE("databases: the linked databases no longer listed: their refreshes parked, never waited for") {
     const auto profile = freshDir("shelf-linked-dropped");
     const auto file    = pgnFile(profile, 2000);

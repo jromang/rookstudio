@@ -363,7 +363,11 @@ std::unique_ptr<TournamentState> TournamentState::open(const fs::path& dir, bool
 }
 
 TournamentState::TournamentState(fs::path dir, TournamentSpec spec)
-    : dir_(std::move(dir)), spec_(std::move(spec)), schedule_(spec_) {
+    : dir_(std::move(dir)),
+      spec_(std::move(spec)),
+      pgn_path_(dir_ / spec_.pgnFile()),
+      chessbase_path_(dir_ / spec_.chessbasePgnFile()),
+      schedule_(spec_) {
     const auto& s = spec_.conditions.sprt;
     if (spec_.format == Format::Match && s.enabled) {
         sprt_ = fastchess::SPRT(s.alpha, s.beta, s.elo0, s.elo1, s.model, true);
@@ -654,6 +658,7 @@ void TournamentState::effects(const nlohmann::json& event, TournamentSpec& spec,
 }
 
 void TournamentState::applyEvent(const nlohmann::json& event) {
+    spec_snapshot_.reset();  // the next specSnapshot() copies spec_ as the event leaves it
     effects(event, spec_, schedule_, results_, done_, dropped_);
     rebuildStats();
     rebuildOpen();
@@ -667,6 +672,12 @@ void TournamentState::applyEvent(const nlohmann::json& event) {
 }
 
 uint64_t TournamentState::totalLocked() const { return plannedGames(spec_, schedule_, dropped_.size()); }
+
+std::shared_ptr<const TournamentSpec> TournamentState::specSnapshot() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!spec_snapshot_) spec_snapshot_ = std::make_shared<const TournamentSpec>(spec_);
+    return spec_snapshot_;
+}
 
 void TournamentState::roundEventTo(const nlohmann::json& event, const TournamentSpec& spec, Schedule& schedule) {
     const auto type  = event.at("t").get<std::string>();
@@ -860,7 +871,10 @@ std::map<uint32_t, std::vector<std::vector<int>>> TournamentState::brackets() co
 
 Impact TournamentState::preview(const Edit& edit) const {
     std::lock_guard<std::mutex> lock(mutex_);
+    return previewLocked(edit);
+}
 
+Impact TournamentState::previewLocked(const Edit& edit) const {
     Impact impact;
     impact.games_before = totalLocked();
     if (edit.kind != Edit::Kind::VoidGames && edit.kind != Edit::Kind::SetResult && !schedule_.editable()) {
@@ -928,10 +942,11 @@ Impact TournamentState::preview(const Edit& edit) const {
 void TournamentState::applyEdit(const Edit& edit) {
     if (read_only_) throw std::runtime_error(READ_ONLY);
     const Bump bump{version_};
-    const auto impact = preview(edit);
-    if (!impact.error.empty()) throw std::runtime_error(impact.error);
-
+    // Checked under the lock it is made with: a game ending in between on another thread could pair the next round of
+    // a knockout from the results, and a result set then would land on a round paired already.
     std::unique_lock<std::mutex> lock(mutex_);
+    if (const auto impact = previewLocked(edit); !impact.error.empty()) throw std::runtime_error(impact.error);
+
     int new_id = 0;
     for (const auto& p : spec_.participants) new_id = std::max(new_id, p.id + 1);
 
@@ -989,6 +1004,7 @@ void TournamentState::undoEdit() {
         writeOut(lock);
         return;
     }
+    spec_snapshot_.reset();
     spec_     = std::move(u.spec);
     schedule_ = std::move(u.schedule);
     done_     = std::move(u.done);
@@ -1191,14 +1207,11 @@ Recorded TournamentState::complete(const GameTask& task, const fastchess::MatchD
     using fastchess::pgn::CommentStyle;
     using fastchess::pgn::PgnBuilder;
 
-    const auto& pgn_config = spec_.conditions.pgn;
-    const auto round       = std::size_t{task.encounter.index} + 1;
+    const auto round = std::size_t{task.encounter.index} + 1;
 
     GameResult result;
     result.encounter   = task.encounter.index;
     result.game        = task.game;
-    result.white       = spec_.firstHasWhite(task.game) ? task.encounter.first : task.encounter.second;
-    result.black       = spec_.firstHasWhite(task.game) ? task.encounter.second : task.encounter.first;
     result.result      = PgnBuilder::getResultFromWhiteMatch(data.players.white);
     result.termination = data.termination;
     result.reason      = data.reason;
@@ -1210,11 +1223,20 @@ Recorded TournamentState::complete(const GameTask& task, const fastchess::MatchD
         for (const auto& w : data.moves[ply].pv_warnings) result.pv_warnings.emplace_back(ply, w);
     }
 
-    // The moves the participants' own books played are book moves in the PGN, as those of the opening are: those of
-    // the Polyglot books their adapters read (a PGN book's conversion). The books are read without the lock.
+    // What the settings say of the game, read under the lock as an edit may change them on another thread: who had
+    // White, the variant, the rule of unbalanced openings, the participants' own books. The moves those books played
+    // are book moves in the PGN, as those of the opening are: those of the Polyglot books their adapters read (a PGN
+    // book's conversion). The books are read without the lock.
     std::vector<std::tuple<chess::Color, std::string, int>> books;
+    bool chess960 = false;
+    UnbalancedRule unbalanced;
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        const bool first_white = spec_.firstHasWhite(task.game);
+        result.white           = first_white ? task.encounter.first : task.encounter.second;
+        result.black           = first_white ? task.encounter.second : task.encounter.first;
+        chess960               = frc();
+        unbalanced             = {spec_.unbalanced_cp, spec_.unbalanced_moves};
         for (const auto& [id, side] :
              {std::pair{result.white, chess::Color::WHITE}, std::pair{result.black, chess::Color::BLACK}}) {
             const auto* p = spec_.participant(id);
@@ -1226,7 +1248,7 @@ Recorded TournamentState::complete(const GameTask& task, const fastchess::MatchD
         try {
             PolyglotBook book(file);
             if (!marked) marked = data;
-            markOwnBookMoves(*marked, side, book, depth, frc());
+            markOwnBookMoves(*marked, side, book, depth, chess960);
         } catch (const std::exception&) {
             // The book is gone: its moves keep the comments of moves the engine made.
         }
@@ -1234,12 +1256,22 @@ Recorded TournamentState::complete(const GameTask& task, const fastchess::MatchD
     const auto& game = marked ? *marked : data;
     // An opening that decided the game by itself, from the evaluations after the book (the own books' moves are book
     // moves by now). The result is not changed.
-    if (spec_.unbalanced_cp > 0) {
-        result.unbalanced = unbalancedOpening(game, {spec_.unbalanced_cp, spec_.unbalanced_moves});
-    }
+    if (unbalanced.score_cp > 0) result.unbalanced = unbalancedOpening(game, unbalanced);
 
     std::unique_lock<std::mutex> lock(mutex_);
-    const auto elo = [&](int id) {
+    // Not open for writing (read-only, or let go of since the game was claimed: see letGo()): nothing is recorded.
+    if (!journal_) {
+        running_.erase(task.number());
+        throw std::logic_error("a game ended in a tournament not open for writing");
+    }
+    // Until it returns, the files are in use, some of the time without the lock: letGo() refuses meanwhile.
+    ++recording_;
+    const struct Recording {
+        std::atomic<int>& count;
+        ~Recording() { --count; }
+    } recording{recording_};
+    const auto& pgn_config = spec_.conditions.pgn;
+    const auto elo         = [&](int id) {
         const auto* p = spec_.participant(id);
         return p ? p->elo : 0;
     };
@@ -1714,6 +1746,11 @@ GameResult gameResultFromJson(const nlohmann::json& j) { return resultFromJson(j
 
 void TournamentState::letGo() {
     std::lock_guard<std::mutex> lock(mutex_);
+    // The files closed under complete() or writeOut(), which write them without the lock, would be written to nothing.
+    // Games claimed and not ended do not hold it back: a runner stopped drops those it had not started yet.
+    if (recording_ > 0 || out_writing_) {
+        throw std::logic_error("a tournament cannot let go of its folder while it records a game");
+    }
     read_only_ = true;
     journal_.reset();  // pairIfReady() and the writes stop at it
     pgn_.reset();

@@ -1,10 +1,13 @@
 #include <doctest/doctest.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <set>
+#include <thread>
 
 #include <tour/journal.hpp>
 #include <tour/standings.hpp>
@@ -477,6 +480,46 @@ TEST_CASE("edit: undoing cycles added to a finished tournament finishes it again
     CHECK(summary->total == 6u);
 }
 
+TEST_CASE("edit: other threads read the spec from a snapshot that edits, and undoing them, leave as it was") {
+    auto state        = TournamentState::create(freshDir("snapshot"), roundRobin(4, 1));
+    const auto before = state->specSnapshot();
+    CHECK(state->specSnapshot() == before);  // shared until the next change
+    Edit add;
+    add.kind   = Edit::Kind::AddParticipant;
+    add.engine = engine("E");
+    state->applyEdit(add);
+    const auto added = state->specSnapshot();
+    CHECK(before->participants.size() == 4);
+    CHECK(added->participants.size() == 5);
+    state->undoEdit();
+    CHECK(added->participants.size() == 5);
+    CHECK(state->specSnapshot()->participants.size() == 4);
+    CHECK(state->spec().participants.size() == 4);
+
+    // Games played on another thread while participants come and go again by undoing: what the game thread reads of
+    // the spec (a snapshot, and complete() under the lock) is never what an edit changes, or an undo replaces.
+    std::atomic<int> unknown{0};
+    std::atomic<bool> over{false};
+    std::thread games([&] {
+        while (const auto task = state->claimNext()) {
+            const auto spec = state->specSnapshot();
+            if (!spec->participant(task->encounter.first) || !spec->participant(task->encounter.second)) ++unknown;
+            state->complete(*task, data(*task, "1-0"));
+        }
+        over = true;
+    });
+    for (int i = 0; i < 10 && !over; ++i) {
+        try {
+            state->applyEdit(add);
+            state->undoEdit();
+        } catch (const std::runtime_error&) {
+            // A game started since the participant came: it stays.
+        }
+    }
+    games.join();
+    CHECK(unknown == 0);
+}
+
 TEST_CASE("programs: rebuilt, missing and new programs are noticed when the tournament is opened again") {
     const auto dir  = freshDir("programs");
     const auto bins = dir.parent_path() / "fcg-tour-edit-programs-bin";
@@ -659,6 +702,105 @@ TEST_CASE("edit: a result is set on a game that counts, to another result") {
     CHECK(match->preview(setResult(0, 1, "0-1")).error.empty());
     match->applyEdit(setResult(0, 1, "0-1"));
     CHECK(match->pairStats(0, 1).wins == 2);  // A has Black in game 1
+}
+
+namespace {
+
+// A knockout of four, its first round played but for its last game, claimed: P0 beat P3 twice; P1 and P2 drew game 2
+// (encounter 1, game 0), and P2, White in the last one, goes to the final by winning it.
+struct KnockoutRound {
+    std::unique_ptr<TournamentState> state;
+    GameTask last;
+};
+
+KnockoutRound knockoutRound(const std::string& name) {
+    TournamentSpec spec;
+    spec.format = Format::Knockout;
+    spec.cycles = 1;
+    for (int i = 0; i < 4; ++i) spec.participants.push_back({i, engine("P" + std::to_string(i))});
+    KnockoutRound out{TournamentState::create(freshDir(name), spec), {}};
+    for (const auto* result : {"1-0", "0-1", "1/2-1/2"}) {
+        const auto task = out.state->claimNext();
+        REQUIRE(task);
+        out.state->complete(*task, data(*task, result));
+    }
+    const auto last = out.state->claimNext();
+    REQUIRE(last);
+    REQUIRE(last->number() == 3);
+    REQUIRE(last->white.name == "P2");
+    out.last = *last;
+    return out;
+}
+
+}  // namespace
+
+TEST_CASE("edit: in a knockout, a result set while its round is played decides the next; refused once paired") {
+    // Set while the round's last game is played: the match is level when it ends, a tiebreak is due, no final yet.
+    {
+        auto round = knockoutRound("ko-set-result");
+        round.state->applyEdit(setResult(1, 0, "1-0", "a hang"));
+        round.state->complete(round.last, data(round.last, "1-0"));
+        CHECK(resultOf(round.state->results(), 2).result == "1-0");
+        CHECK(round.state->brackets().size() == 1);
+        const auto rows = round.state->scheduleRows();
+        REQUIRE(rows.size() == 3);
+        CHECK(std::set<int>{rows[2].encounter.first, rows[2].encounter.second} == std::set<int>{1, 2});
+    }
+    // Looked at while the game is played, made once it ended: the final was paired from the result as played, the
+    // edit is refused and the result stays.
+    {
+        auto round      = knockoutRound("ko-set-result-late");
+        const auto edit = setResult(1, 0, "1-0");
+        CHECK(round.state->preview(edit).error.empty());
+        round.state->complete(round.last, data(round.last, "1-0"));
+        const auto brackets = round.state->brackets();
+        REQUIRE(brackets.count(2));
+        CHECK(brackets.at(2) == std::vector<std::vector<int>>{{0, 2}});
+        CHECK_FALSE(round.state->preview(edit).error.empty());
+        CHECK_THROWS_AS(round.state->applyEdit(edit), std::runtime_error);
+        CHECK(resultOf(round.state->results(), 2).result == "1/2-1/2");
+    }
+}
+
+TEST_CASE("edit: in a knockout, a result set as the round's last game ends on another thread: first, or refused") {
+    // Whichever comes first, never a result set on a round whose next one was paired from the result before it: the
+    // edit is checked under the lock it is made with.
+    for (int i = 0; i < 20; ++i) {
+        auto round = knockoutRound("ko-set-result-race");
+        // Both threads started, then let go at once.
+        std::atomic<int> ready{0};
+        std::atomic<bool> go{false};
+        const auto start = [&] {
+            ++ready;
+            while (!go) std::this_thread::yield();
+        };
+        std::atomic<bool> made{true};
+        std::thread game([&] {
+            start();
+            round.state->complete(round.last, data(round.last, "1-0"));
+        });
+        std::thread edit([&] {
+            start();
+            try {
+                round.state->applyEdit(setResult(1, 0, "1-0"));
+            } catch (const std::runtime_error&) {
+                made = false;
+            }
+        });
+        while (ready < 2) std::this_thread::yield();
+        go = true;
+        game.join();
+        edit.join();
+        const auto brackets = round.state->brackets();
+        const auto result   = resultOf(round.state->results(), 2).result;
+        if (made) {
+            CHECK(brackets.size() == 1);  // level when the game ended: a tiebreak
+            CHECK(result == "1-0");
+        } else {
+            CHECK(brackets.count(2) == 1);  // the final, paired when the game ended
+            CHECK(result == "1/2-1/2");
+        }
+    }
 }
 
 TEST_CASE("edit: the export for a rating list gives the result set by hand") {

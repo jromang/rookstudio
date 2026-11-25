@@ -984,7 +984,8 @@ int runControlled(const std::string& target, const Storage& storage, const Headl
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
 
-    configureFastchess(state->spec());
+    // The control loop makes the window's edits already: from a snapshot of the spec, which none changes.
+    configureFastchess(*state->specSnapshot());
     const auto error    = playTournament(*state, &observer, &observer, [&](tour::Runner* r) {
         std::lock_guard<std::mutex> lock(runner_mutex);
         runner = r;

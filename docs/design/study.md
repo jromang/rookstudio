@@ -301,6 +301,14 @@ counts with (a result set by hand). What was read is read again from the start w
 last bytes read of a file differ, a compressed file changed at all, a tournament's game was voided or its result set,
 or the database holds another count of games than the note (a commit the note did not follow).
 
+Read again from the start, the database is emptied in one commit (`Database::clear()`: no segment, edits nor table of
+names, the generation going on) rather than removed and made again (#100): the refresh runs on a thread of its own
+while the window copies the database's pointer, takes its snapshots and reads the files they map. `database()` is
+always the same `Database`; a snapshot taken before keeps reading its games, whose segments' files go once no snapshot
+holds them (at a later commit, or when the database is closed; a reader still mapping them at closing leaves them to
+the next opening, which removes the segments its manifest does not name). The generation going on, what the window
+keeps by database and generation (its views, the tree, the facts shown) is made again for the new games.
+
 ## Opening tree
 
 `buildTree` makes a database's opening tree and `Tree` reads it: for a position, the games that reach it in their first

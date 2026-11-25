@@ -16,6 +16,7 @@
 
 #include <study/import.hpp>
 #include <study/store.hpp>
+#include <study/tree.hpp>
 
 using namespace fcg::study;
 namespace fs = std::filesystem;
@@ -475,4 +476,78 @@ TEST_CASE("store: a snapshot comes at once while a change commits, with the game
         sameGame(snap->game(id), last->game(id));
         CHECK(snap->deleted(id) == last->deleted(id));
     }
+}
+
+TEST_CASE("store: a database emptied in one commit, a snapshot taken before reading its games until let go (#100)") {
+    const auto games = fixtureGames();
+    const auto dir   = freshFolder("store-clear.fcgdb");
+    auto db          = Database::create(dir);
+    db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 60));
+    db->setDeleted(std::vector<GameId>{4}, true);
+    Player player;
+    player.name      = "Someone, Anyone";
+    player.spellings = {db->snapshot()->rowIds(0).white};
+    db->setPlayers(PlayerTable(std::vector<Player>{player}));
+    std::atomic<bool> cancel{false};
+    TreeProgress tree_progress;
+    REQUIRE(buildTree(*db, *db->snapshot(), {}, tree_progress, cancel).error.empty());
+    auto before        = db->snapshot();
+    const auto segment = before->segmentInfos().front().name;
+
+    // Stopped before its manifest is replaced: nothing changed.
+    setCommitFaultHook([](std::string_view step) {
+        if (step == "write manifest") throw std::runtime_error("disk full");
+    });
+    CHECK_THROWS_AS(db->clear(), std::runtime_error);
+    setCommitFaultHook({});
+    CHECK(db->snapshot() == before);
+    CHECK(Database::openReadOnly(dir)->snapshot()->games() == 60);
+
+    db->clear();
+    const auto empty = db->snapshot();
+    CHECK(empty->games() == 0);
+    CHECK(empty->names() == 0);
+    CHECK(empty->deletedCount() == 0);
+    CHECK(empty->players()->empty());
+    CHECK(empty->generation() == before->generation() + 1);
+    CHECK(empty->editsGeneration() == empty->generation());
+    // The snapshot taken before reads its games as they were, from its files, still there.
+    CHECK(fs::exists(dir / segment / "moves.bin"));
+    for (std::size_t i = 0; i < 60; ++i) sameGame(before->game(i), games[i]);
+
+    // The games added after count from 0 again, their names too; a game the database had before is no duplicate now.
+    db->append(std::vector<ImportedGame>(games.begin() + 60, games.end()));
+    CHECK(db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 1)).added == 1);
+    auto snap = db->snapshot();
+    REQUIRE(snap->games() == 61);
+    sameGame(snap->game(0), games[60]);
+    sameGame(snap->game(60), games[0]);
+    CHECK(fs::exists(dir / segment));  // still held
+    // The tree built before holds other games: it answers nothing, the count of games however close.
+    const auto tree = Tree::open(dir);
+    REQUIRE(tree);
+    CHECK(tree->stale(*snap));
+    // Let go of: its files go at the next change, the edits and the table of names before at once.
+    before.reset();
+    db->setDeleted(std::vector<GameId>{1}, true);
+    CHECK_FALSE(fs::exists(dir / segment));
+    std::size_t edits = 0, players = 0;
+    for (const auto& entry : fs::directory_iterator(dir)) {
+        const auto name = entry.path().filename().string();
+        edits += name.rfind("edits-", 0) == 0;
+        players += name.rfind("players-", 0) == 0;
+    }
+    CHECK(edits == 1);  // the deletion's just made
+    CHECK(players == 0);
+
+    // Reopened: the games added since, the generation gone on.
+    const auto generation = db->snapshot()->generation();
+    db.reset();
+    snap.reset();
+    db = Database::open(dir);
+    CHECK(db->snapshot()->generation() == generation);
+    CHECK(db->snapshot()->games() == 61);
+    CHECK(db->snapshot()->deleted(1));
+    sameGame(db->snapshot()->game(60), games[0]);
+    CHECK_THROWS_AS(Database::openReadOnly(dir)->clear(), std::runtime_error);  // read-only: nothing written
 }

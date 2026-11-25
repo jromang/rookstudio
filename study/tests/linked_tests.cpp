@@ -3,8 +3,10 @@
 #include <doctest/doctest.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <string>
 #include <vector>
 
@@ -173,4 +175,65 @@ TEST_CASE("linked: a tournament, its games as they finish, a game voided") {
     CHECK(r.added == 5);
     CHECK(games(*linked) == 5);
     CHECK(linked->refresh(cancel).added == 0);
+}
+
+TEST_CASE("linked: read again from the start while the window reads it, the same database, a snapshot before whole") {
+    const auto dir   = fs::temp_directory_path() / "linked-rebuilt";
+    const auto cache = dir / "cache";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const auto file  = dir / "games.pgn";
+    const auto lines = randomLines(13, 11, 6, 40);
+    std::string text, other;
+    for (int i = 0; i < 6; ++i) text += pgnOf(lines[static_cast<std::size_t>(i)], i);
+    for (int i = 6; i < 12; ++i) other += pgnOf(lines[static_cast<std::size_t>(i)], i);
+    write(file, text, false);
+    std::atomic<bool> cancel{false};
+    auto linked = LinkedDatabase::open(cache, {LinkedSource::Kind::PgnFile, file});
+    REQUIRE(linked->refresh(cancel).added == 6);
+    const auto db = linked->database();
+    auto before   = db->snapshot();
+    std::vector<ImportedGame> read_before;
+    for (GameId id = 0; id < 6; ++id) read_before.push_back(before->game(id));
+    const auto segment = before->segmentInfos().front().name;
+
+    // The file rewritten: read again from the start on the refresh's thread (as the Databases page runs it), while
+    // this thread copies the database and reads its snapshots as the window does each frame.
+    write(file, other, false);
+    auto refreshing = std::async(std::launch::async, [&] { return linked->refresh(cancel); });
+    bool same       = true;
+    while (refreshing.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        const auto now  = linked->database();
+        same            = same && now == db;
+        const auto snap = now->snapshot();
+        for (GameId id = 0; id < snap->games(); ++id) (void)snap->row(id).white;
+    }
+    const auto r = refreshing.get();
+    CHECK_MESSAGE(r.error.empty(), r.error);
+    CHECK(r.rebuilt);
+    CHECK(r.added == 6);
+    CHECK(same);
+    CHECK(linked->database() == db);
+    const auto now = db->snapshot();
+    CHECK(now->games() == 6);
+    CHECK(now->row(0).round == "6");
+    CHECK(now->generation() > before->generation());  // what the window keeps by generation is made again
+
+    // The snapshot before reads its games whole: their files stay while it is held, and go once it is let go.
+    CHECK(fs::exists(db->folder() / segment / "moves.bin"));
+    for (GameId id = 0; id < 6; ++id) {
+        const auto game = before->game(id);
+        CHECK(game.moves == read_before[id].moves);
+        CHECK(game.tags == read_before[id].tags);
+    }
+    before.reset();
+    write(file, pgnOf(lines[12], 12), true);
+    CHECK(linked->refresh(cancel).added == 1);
+    CHECK_FALSE(fs::exists(db->folder() / segment));
+
+    // The program again: the games read since, nothing read twice.
+    linked.reset();
+    linked = LinkedDatabase::open(cache, {LinkedSource::Kind::PgnFile, file});
+    CHECK(linked->refresh(cancel).added == 0);
+    CHECK(games(*linked) == 7);
 }

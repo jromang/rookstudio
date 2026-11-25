@@ -136,27 +136,29 @@ std::string linkedKey(const LinkedSource& source) {
     return (source.kind == LinkedSource::Kind::PgnFile ? "file-" : "tour-") + hex(fnv1a(utf8(full), fnv1a(kind)));
 }
 
-LinkedDatabase::LinkedDatabase(fs::path cache, std::string key, LinkedSource source)
-    : cache_(std::move(cache)), key_(std::move(key)), source_(std::move(source)) {}
+LinkedDatabase::LinkedDatabase(fs::path cache, std::string key, LinkedSource source, std::shared_ptr<Database> db)
+    : cache_(std::move(cache)), key_(std::move(key)), source_(std::move(source)), db_(std::move(db)) {}
 
 std::shared_ptr<LinkedDatabase> LinkedDatabase::open(const fs::path& cache, const LinkedSource& source) {
-    auto linked = std::make_shared<LinkedDatabase>(cache, linkedKey(source), source);
+    const auto key = linkedKey(source);
     std::error_code ec;
     fs::create_directories(cache, ec);
-    const auto dir = cache / (linked->key_ + ".fcgdb");
-    linked->db_    = fs::exists(dir / "manifest.json", ec) ? Database::open(dir) : Database::create(dir);
+    const auto dir = cache / (key + ".fcgdb");
+    auto db        = fs::exists(dir / "manifest.json", ec) ? Database::open(dir) : Database::create(dir);
+    auto linked    = std::make_shared<LinkedDatabase>(cache, key, source, std::move(db));
     // A copy with a segment that no longer reads: made again from its source, which has the games.
     if (!linked->db_->snapshot()->unreadable().empty()) linked->rebuild();
     return linked;
 }
 
 void LinkedDatabase::rebuild() {
-    const auto dir = cache_ / (key_ + ".fcgdb");
-    db_.reset();
+    // Emptied in one commit rather than removed and made again: the window may hold the database, its snapshots and
+    // the files they map, and copies the pointer while this runs on the refresh's thread; the generation goes on, so
+    // that nothing kept of the games before passes for the new ones'. The note goes after: a crash in between reads
+    // the file again whole, the note's count of games no longer the database's.
+    db_->clear();
     std::error_code ec;
-    fs::remove_all(dir, ec);
     fs::remove(cache_ / (key_ + ".json"), ec);
-    db_ = Database::create(dir);
 }
 
 LinkedRefresh LinkedDatabase::refresh(std::atomic<bool>& cancel) {

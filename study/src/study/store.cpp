@@ -1332,6 +1332,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         std::error_code gone;
         fs::remove(dir_ / players_before, gone);
     }
+    removeReleased();
 }
 
 Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates, const std::string& source,
@@ -1536,6 +1537,68 @@ void Database::setPlayers(PlayerTable table) {
     std::lock_guard writing(write_mutex_);
     std::vector<ImportedGame> none;
     commit(none, {}, false, nullptr, nullptr, &table);
+}
+
+void Database::clear() {
+    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    std::lock_guard writing(write_mutex_);
+    const auto before = snapshot();
+    nlohmann::json manifest;
+    {
+        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
+        manifest = nlohmann::json::parse(in);
+    }
+    const auto edits_before   = manifest.value("edits", std::string());
+    const auto players_before = manifest.value("players", std::string());
+    // As a database just made, its generation going on; every game taken out, as edits do: what was built from the
+    // games before (an opening tree) no longer holds, nor what the window keeps by generation. A compaction under way
+    // stops before its commit for it.
+    const uint64_t generation    = before->generation_ + 1;
+    manifest["segments"]         = nlohmann::json::array();
+    manifest["edits_generation"] = generation;
+    manifest["generation"]       = generation;
+    manifest.erase("edits");
+    manifest.erase("players");
+    step("write manifest");
+    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    step("manifest written");
+    auto snap               = std::make_shared<Snapshot>();
+    snap->generation_       = generation;
+    snap->edits_generation_ = generation;
+    snap->settle();
+    bool edits_kept = false, players_kept = false;
+    {
+        std::lock_guard lock(mutex_);
+        const auto kept = [&](const std::string& name) {
+            return leftovers_ &&
+                   std::find(leftovers_->files.begin(), leftovers_->files.end(), name) != leftovers_->files.end();
+        };
+        edits_kept   = kept(edits_before);
+        players_kept = kept(players_before);
+        current_     = std::move(snap);
+    }
+    name_ids_.clear();
+    names_indexed_ = false;
+    known_keys_.clear();
+    keys_indexed_ = false;
+    // The segments before, still read by the snapshots taken before this commit: their files go once none holds them.
+    for (std::size_t s = 0; s < before->segments_.size(); ++s)
+        released_.push_back({before->segment_names_[s], before->segments_[s]});
+    std::error_code gone;
+    if (!edits_before.empty() && !edits_kept) fs::remove(dir_ / edits_before, gone);  // in memory, read by nobody
+    if (!players_before.empty() && !players_kept) fs::remove(dir_ / players_before, gone);
+    removeReleased();  // an earlier clear's, let go of since
+}
+
+void Database::removeReleased(bool closing) {
+    std::erase_if(released_, [&](const Released& r) {
+        if (!closing && !r.segment.expired()) return false;
+        // Closing, those a snapshot still maps go too where the system lets them (Windows keeps them for the next
+        // opening, which removes the segments its manifest does not name).
+        std::error_code ec;
+        fs::remove_all(dir_ / r.name, ec);
+        return !ec || closing;
+    });
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -2232,6 +2295,7 @@ void Database::dropLeftovers() {
     leftovers_.reset();
     kept_.reset();
     dropped_.clear();
+    removeReleased(true);
 }
 
 Database::~Database() {

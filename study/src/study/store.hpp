@@ -348,6 +348,13 @@ class Database {
     void restore(std::span<const GameState> states);
     // The table of names replaced, in one commit.
     void setPlayers(PlayerTable table);
+    // Every game taken out, in one commit: the database as one just made (no segment, edits nor table of names), its
+    // generation going on, so that what was built or kept of its games before (an opening tree, the window's views
+    // and caches, which go by generation) no longer holds; the same Database for whoever holds it. A snapshot taken
+    // before keeps reading its games: their files go once no snapshot holds them (at a later change, or when the
+    // database is closed). Throws std::runtime_error when read-only, or when the disk refuses (nothing changed then).
+    // A file read as a database is read again from the start so (LinkedDatabase).
+    void clear();
 
     // Every segment read again and every game replayed, in the background on `threads` threads (0: the machine's),
     // the database read and written meanwhile; what is checked is the snapshot of when it starts.
@@ -376,8 +383,8 @@ class Database {
     [[nodiscard]] bool keepReadableUndoable() const;
     bool undoKeepReadable();
 
-    // The files a compaction left (those it replaced), and those keepReadable() did: removed when the database is
-    // closed.
+    // The files a compaction left (those it replaced), those keepReadable() did and the segments clear() took out:
+    // removed when the database is closed.
     ~Database();
     Database(const Database&)            = delete;
     Database& operator=(const Database&) = delete;
@@ -397,6 +404,8 @@ class Database {
                 const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
                 const PlayerTable* players = nullptr, const std::string& source = {});
     void dropLeftovers();  // a compaction's files and keepReadable()'s, at closing
+    // The released segments' files that no snapshot holds any longer removed; closing, all of them.
+    void removeReleased(bool closing = false);
 
     std::filesystem::path dir_;
     std::optional<tour::FolderLock> lock_;  // none when read-only
@@ -424,6 +433,12 @@ class Database {
     std::optional<Leftovers> leftovers_;
     std::optional<Leftovers> kept_;     // keepReadable()'s, as a compaction's
     std::vector<std::string> dropped_;  // the files of a keepReadable() before it, no longer undone: removed at closing
+    // The segments clear() took out, while snapshots taken before it still read them (under the writers' lock).
+    struct Released {
+        std::string name;
+        std::weak_ptr<const Segment> segment;
+    };
+    std::vector<Released> released_;
 };
 
 struct DatabaseImport {

@@ -18,6 +18,8 @@
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
+#include "test_games.hpp"
+
 using namespace fcg::study;
 namespace fs = std::filesystem;
 
@@ -550,4 +552,45 @@ TEST_CASE("store: a database emptied in one commit, a snapshot taken before read
     CHECK(db->snapshot()->deleted(1));
     sameGame(db->snapshot()->game(60), games[0]);
     CHECK_THROWS_AS(Database::openReadOnly(dir)->clear(), std::runtime_error);  // read-only: nothing written
+}
+
+TEST_CASE("store: the files a database writes are the same bytes as before the fixes of #99-#102") {
+    // The format does not change: a database of the fixture's games and random ones, a game replaced, three deleted
+    // and a table of names, written by the code of 7645460c (before #99-#102) gave these sizes and FNV-1a hashes, file
+    // by file. Made again only for a change of the format, saying why in the commit.
+    const std::map<std::string, std::pair<std::size_t, uint64_t>> before{
+        {"edits-000004.bin", {72, 0x78225c1dc4b037d7}},         {"manifest.json", {454, 0xdbce06cb27a9bf05}},
+        {"players-000005.bin", {94, 0xf5d933c0be2294d5}},       {"seg-000001/annex.bin", {15881, 0x42f325bb6d82223b}},
+        {"seg-000001/cols.bin", {8328, 0x44e42c3da1f1a04e}},    {"seg-000001/moves.bin", {720, 0xa01ff12fca46f3d5}},
+        {"seg-000001/names.bin", {2471, 0x27cdaf3874c526e0}},   {"seg-000001/sig.bin", {2880, 0xdf4b44ead9ad7f85}},
+        {"seg-000002/annex.bin", {0, 0xcbf29ce484222325}},      {"seg-000002/cols.bin", {207048, 0xdedef5523d68da02}},
+        {"seg-000002/moves.bin", {134695, 0x6b5e2a65dcf6a51b}}, {"seg-000002/names.bin", {13773, 0xb8cc131e2a0cd1c3}},
+        {"seg-000002/sig.bin", {72000, 0x4af21852a1a0296c}},    {"seg-000003/annex.bin", {307, 0x518b136493654be1}},
+        {"seg-000003/cols.bin", {184, 0x1363f0de17f053f5}},     {"seg-000003/moves.bin", {11, 0xbefbfd65391428cb}},
+        {"seg-000003/names.bin", {0, 0xcbf29ce484222325}},      {"seg-000003/sig.bin", {24, 0x21d8b0c2144168cb}},
+    };
+    const auto games = fixtureGames();
+    const auto dir   = freshFolder("store-format.fcgdb");
+    {
+        auto db = Database::create(dir);
+        db->append(games, true, "/x/games.pgn");
+        db->append(fcg::test::randomGames(3000, 99, 8), false, "/x/random.pgn");
+        db->replace(5, games[7]);
+        db->setDeleted(std::vector<GameId>{3, 9, 11}, true);
+        Player player;
+        player.name      = "Someone, Anyone";
+        player.fide      = 123;
+        player.spellings = {db->snapshot()->rowIds(0).white, db->snapshot()->rowIds(1).black};
+        db->setPlayers(PlayerTable(std::vector<Player>{player}, {{1, 2}}));
+    }
+    std::map<std::string, std::pair<std::size_t, uint64_t>> now;
+    for (const auto& entry : fs::recursive_directory_iterator(dir)) {
+        if (!entry.is_regular_file() || entry.path().filename() == "tournament.lock") continue;
+        std::ifstream in(entry.path(), std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        uint64_t h = 0xcbf29ce484222325ULL;
+        for (const unsigned char c : bytes) h = (h ^ c) * 0x100000001b3ULL;
+        now[fs::relative(entry.path(), dir).generic_string()] = {bytes.size(), h};
+    }
+    CHECK(now == before);
 }

@@ -1,0 +1,75 @@
+[Event "Rated Blitz game"]
+[Site "https://lichess.org/abcdefgh"]
+[Date "2026.11.25"]
+[Round "1"]
+[White "Moreau, Claire"]
+[Black "Duval, Marc"]
+[Result "1-0"]
+[WhiteElo "2010"]
+[BlackElo "1985"]
+[ECO "C50"]
+[TimeControl "180+2"]
+
+1. e4 { [%eval 0.2] [%clk 0:03:00] } 1... e5 { [%eval 0.3] [%clk 0:03:00] } 2. Nf3 { [%eval 0.2] [%clk 0:02:58] }
+2... Nc6 { [%eval 0.3] [%clk 0:02:59] } 3. Bc4 { [%eval 0.1] [%clk 0:02:55] } 3... Bc5 { [%eval 0.2] [%clk 0:02:57] }
+4. c3 { [%eval 0.3] [%clk 0:02:50] } 4... Nf6 { [%eval 0.2] [%clk 0:02:55] } 1-0
+
+[Event "Club Cup"]
+[Site "Lyon"]
+[Date "2026.10.01"]
+[Round "2"]
+[White "Lindqvist, Erik"]
+[Black "Moreau, Claire"]
+[Result "0-1"]
+[SetUp "1"]
+[FEN "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1"]
+
+1... Kd7 2. e4 Ke6 3. Ke2 Ke5 4. Ke3 Kd6 0-1
+
+[Event "Club Freestyle"]
+[Site "Nantes"]
+[Date "2026.09.12"]
+[Round "3"]
+[White "Duval, Marc"]
+[Black "Lindqvist, Erik"]
+[Result "1/2-1/2"]
+[Variant "Chess960"]
+[SetUp "1"]
+[FEN "nrbbqkrn/pppppppp/8/8/8/8/PPPPPPPP/NRBBQKRN w KQkq - 0 1"]
+
+1. e4 e5 2. Ng3 Ng6 3. Nb3 Nb6 1/2-1/2
+
+[Event "Club Cup"]
+[Site "Lyon"]
+[Date "2026.10.02"]
+[Round "4"]
+[White "Brennan, Kate"]
+[Black "Duval, Marc"]
+[Result "*"]
+[Annotator "Moreau, Claire"]
+[Opening "Queen's Gambit"]
+
+1. d4 d5 2. c4 { A gambit of our own. } 2... e6 (2... c6 3. Nf3) 3. Nc3 $1 Nf6 *
+
+[Event "Club Cup"]
+[Site "Lyon"]
+[Date "2026.10.03"]
+[Round "5"]
+[White "Moreau, Claire"]
+[Black "Brennan, Kate"]
+[Result "1-0"]
+
+1. e4 e5 2. Ke3 Nc6 1-0
+
+[Event "Club Cup"]
+[Site "Lyon"]
+[Date "2026.10.04"]
+[Round "6"]
+[White "Duval, Marc"]
+[Black "Moreau, Claire"]
+[Result "1/2-1/2"]
+[WhiteElo "1990"]
+[BlackElo "2015"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be3 e5 7. Nb3 Be6 8. f3 Be7 9. Qd2 O-O 10. O-O-O Nbd7
+11. g4 b5 12. g5 b4 13. Ne2 Ne8 14. f4 a5 15. f5 a4 1/2-1/2

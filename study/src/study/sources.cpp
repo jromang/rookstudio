@@ -242,7 +242,8 @@ std::vector<ZipEntry> zipEntries(uint64_t size, const ArchiveBytes& read, const 
             dir_start = le(&z[48], 8);
         }
     }
-    if (dir_size > (uint64_t{1} << 31)) throw std::runtime_error(label + ": damaged zip directory");
+    // Within the archive: a size read in a damaged or crafted file is never a buffer to make (#102).
+    if (dir_size > size || dir_start > size - dir_size) throw std::runtime_error(label + ": damaged zip directory");
     const auto dir = read(dir_start, static_cast<std::size_t>(dir_size));
     if (dir.size() != dir_size) throw std::runtime_error(label + ": damaged zip directory");
 

@@ -358,3 +358,36 @@ TEST_CASE("crafted segment: an edits file's counts made up to overflow its size 
     writeBytes(dir / "manifest.json", manifest);
     CHECK(Database::open(dir)->snapshot()->games() == 20);
 }
+
+TEST_CASE("crafted segment: a table of names whose spellings are past the database's names") {
+    auto db         = database("crafted-players.fcgdb", gamesOfOurOwn());
+    const auto snap = db->snapshot();
+    Player claire;
+    claire.name      = "Moreau, Claire";
+    claire.spellings = {snap->rowIds(snap->games() - 1).white};
+    db->setPlayers(PlayerTable(std::vector<Player>{claire}));
+    const auto dir = db->folder();
+    db.reset();
+    std::string players_name;
+    for (const auto& e : fs::directory_iterator(dir))
+        if (e.path().filename().string().rfind("players-", 0) == 0) players_name = e.path().filename().string();
+    REQUIRE_FALSE(players_name.empty());
+    // The file written again with name ids no game has, one of them four thousand million: a dossier would have made
+    // room for each name up to it.
+    claire.spellings.push_back(0xFF000000);
+    claire.spellings.push_back(snap->names());
+    writeBytes(dir / players_name, PlayerTable(std::vector<Player>{claire}).bytes());
+
+    db              = Database::open(dir);
+    const auto read = db->snapshot();
+    REQUIRE(read->players()->players().size() == 1);
+    CHECK(read->players()->players()[0].spellings == std::vector<uint32_t>{snap->rowIds(snap->games() - 1).white});
+    CHECK_FALSE(read->players()->playerOf(0xFF000000));
+    const DossierSubject subject{"Moreau, Claire"};
+    const auto source = findSubject("Crafted", read, subject);
+    CHECK(
+        std::all_of(source.spellings.begin(), source.spellings.end(), [&](uint32_t id) { return id < read->names(); }));
+    DossierProgress progress;
+    std::atomic<bool> cancel{false};
+    CHECK_FALSE(makeDossier({source}, subject, DossierOptions{}, progress, cancel).games.empty());
+}

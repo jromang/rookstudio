@@ -200,6 +200,19 @@ std::string segmentName(uint64_t number) {
     return name;
 }
 
+// A table of names without the name ids past a database's `names` (a file damaged or made by hand): no spelling of its,
+// and the callers index arrays of names() entries with them (#102).
+PlayerTable spellingsWithin(PlayerTable table, uint32_t names) {
+    const auto past = [&](uint32_t id) { return id >= names; };
+    if (std::none_of(table.players().begin(), table.players().end(),
+                     [&](const Player& p) { return std::any_of(p.spellings.begin(), p.spellings.end(), past); }))
+        return table;
+    auto players = table.players();
+    for (auto& p : players) std::erase_if(p.spellings, past);
+    std::erase_if(players, [](const Player& p) { return p.spellings.empty(); });  // as withPlayer() leaves none
+    return PlayerTable(std::move(players), table.apart());
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1025,7 +1038,8 @@ void Database::load(bool clean, int tries) {
         std::ifstream in(dir_ / players, std::ios::binary);
         if (!in) throw std::runtime_error((dir_ / players).string() + ": missing");
         const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        snap->players_      = std::make_shared<const PlayerTable>(PlayerTable::fromBytes(text));
+        snap->players_ =
+            std::make_shared<const PlayerTable>(spellingsWithin(PlayerTable::fromBytes(text), snap->names_));
         snap->players_file_ = players;
     }
     // The segments that cannot be read: their one empty game named as games without names are.
@@ -1535,6 +1549,7 @@ void Database::restore(std::span<const GameState> states) {
 void Database::setPlayers(PlayerTable table) {
     if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
     std::lock_guard writing(write_mutex_);
+    table = spellingsWithin(std::move(table), current_->names_);
     std::vector<ImportedGame> none;
     commit(none, {}, false, nullptr, nullptr, &table);
 }

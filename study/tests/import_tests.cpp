@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -320,4 +321,27 @@ TEST_CASE("import: why a damaged game's moves stop") {
     CHECK(position.plies == 0);
     CHECK(damageOf(position).bad_start);
     CHECK(damageOf(position).move.empty());
+}
+
+TEST_CASE(
+    "import: a zip archive whose directory is said larger than the archive is refused, nothing made of its size") {
+    // A damaged or crafted end record: the directory's size and start read there were a buffer's size, up to 2 GB
+    // for an archive of a few kilobytes (#102).
+    std::ifstream in(data("games.zip"), std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const auto end = bytes.rfind(std::string("PK\x05\x06", 4));
+    REQUIRE(end != std::string::npos);
+    for (const auto& [at, value] : std::vector<std::pair<std::size_t, uint32_t>>{
+             {end + 12, 0x7FFFFFFF}, {end + 12, static_cast<uint32_t>(bytes.size()) + 1}, {end + 16, 0xFFFFFFF0}}) {
+        CAPTURE(at - end);
+        CAPTURE(value);
+        auto crafted = bytes;
+        std::memcpy(crafted.data() + at, &value, 4);
+        const auto file = fs::temp_directory_path() / "crafted.zip";
+        std::ofstream(file, std::ios::binary | std::ios::trunc)
+            .write(crafted.data(), static_cast<std::streamsize>(crafted.size()));
+        const auto read = importFile(file, 1);
+        CHECK(read.games.empty());
+        CHECK(read.report.error.find("damaged zip directory") != std::string::npos);
+    }
 }

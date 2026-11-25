@@ -19,7 +19,11 @@ code. The legal moves of a position are numbered in an order that only depends o
 move's code is its rank in that order, one byte when the position has 256 legal moves or fewer (every real game), two
 otherwise. Decoding a code needs no move generation: the code's piece and target are found by counting the pieces'
 moves. A million random games (355 M plies, Chess960 and set-up positions among them) decode to the moves chess.hpp
-plays, and the Polyglot key of each position (`zobrist.hpp`) is the one of the Polyglot books.
+plays, and the Polyglot key of each position (`zobrist.hpp`) is the one of the Polyglot books. Decoding checks no
+legality: a damaged code within a position's count names a move no legal play makes (a castling without its rook, a
+pawn of an edge file taking off the board), and `play()` keeps the board whole for it, a man taken from an empty square
+being none and a man put on another taking it (#102); a test plays random codes from random positions and checks that
+the squares, the bitboards and the count of codes still agree.
 
 ## Import
 
@@ -27,7 +31,8 @@ plays, and the Polyglot key of each position (`zobrist.hpp`) is the one of the P
 frames, `.gz`, `.zip` of `.pgn` entries, zip64 included), cut into pieces at the start of a game, read by several
 workers, and given back in the file's order. The memory it holds stays bounded whatever the file's size. A game's text
 is kept when it has comments, symbols or variations, or could not be read whole (damaged), its lines ended by `\n`
-whatever the file's.
+whatever the file's. A zip archive's directory lies within the archive: a size or a place read in a damaged one is
+refused, never a buffer to make (#102).
 
 `importInto` adds a file's games to a database, committed every 262 144 games: a crash or a cancel keeps what was
 committed, and the same file imported again adds only what is missing.
@@ -179,9 +184,12 @@ names reads as no name (`rowIds()`), an edits file's counts are compared with it
 manifest that gives a segment more games than a commit writes, or games without any name, is refused. The searches,
 the opening tree, a dossier and an opening report set a game's start with `startOf()`, which reads its FEN alone
 (`Snapshot::startFen()`) and tells a damaged one without an exception: their threads catch none. The check tells these
-games as damaged, as before. A test changes a segment's offsets and annex bytes, sixty times at random and once each
-kind on purpose, then lists, reads and writes every game, searches, builds and asks the tree, makes a dossier and an
-opening report, and checks.
+games as damaged, as before. A table of names read with name ids past the names (a damaged file) leaves them out. A
+test changes a segment's offsets and annex bytes, sixty times at random and once each kind on purpose, then lists,
+reads and writes every game, searches, builds and asks the tree, makes a dossier and an opening report, and checks.
+libFuzzer targets do the same with what a database is made of (`fuzz/segment.cpp`, `edits.cpp`, `players.cpp`: changes
+applied to sound files made from games of our own, then every game read, the list, a search, a dossier and the check)
+and with what the store imports (`import.cpp`: PGN, plain or compressed; `chessbase.cpp`: a CBV or 2CBV archive).
 
 ### The compaction
 

@@ -261,5 +261,6 @@ TEST_CASE("practical moves: databases filtered by rating, the moves counted apar
     }
     // 2350: no game at that level.
     CHECK(levelMoves({{tree, db->snapshot()}}, board, 2350).empty());
-    fs::remove_all(dir);
+    // The folder goes with the tests' own temporary folder: the database, still open here, holds a file of it that
+    // Windows would not let go.
 }

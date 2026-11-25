@@ -177,7 +177,8 @@ TEST_CASE("every move explained: theory grouped, its games counted apart over ga
     REQUIRE(bxf7 != plan.end());
     CHECK(bxf7->matters);
     CHECK_FALSE(bxf7->written);
-    fs::remove_all(fs::temp_directory_path() / "explained-db");
+    // The folder goes with the tests' own temporary folder: the database, still open here, holds a file of it that
+    // Windows would not let go.
 }
 
 TEST_CASE("every move explained: the model's sentence held by the checker, the template's when it refuses it") {

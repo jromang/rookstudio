@@ -108,10 +108,9 @@ void App::startExplaining(bool rest) {
     job.made = std::make_shared<Explained>(e);
     for (const auto& l : e.lines) job.total += l.written ? 0 : 1;
     // With the model when it is the catalogue's (it learnt RookStudio's comments); the templates' without it.
-    AssistantService* model =
-        assistant_ && assistant_->installed() && assistant_->knowsComments() && storyWithoutModel().empty()
-            ? assistant_.get()
-            : nullptr;
+    std::shared_ptr<AssistantService> model;
+    if (assistant_ && assistant_->installed() && assistant_->knowsComments() && storyWithoutModel().empty())
+        model = assistant_;
     job.finished  = std::async(std::launch::async, [review, made = job.made, mutex = job.mutex, done = job.done,
                                                     cancel = job.cancel, model, oracle = oracle_,
                                                     tables  = reviewTables() ? review_tables_ : nullptr, lang,
@@ -131,7 +130,7 @@ void App::startExplaining(bool rest) {
                 const auto ctx =
                     commentary::moveContext(review->line, *m, review->analyses, nullptr, tables.get(), oracle.get());
                 const auto start = std::chrono::steady_clock::now();
-                w                = writeExplainedLine(model, ctx, lang, letters);
+                w                = writeExplainedLine(model.get(), ctx, lang, letters);
                 seconds          = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             }
             {

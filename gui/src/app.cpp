@@ -141,7 +141,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     syzygy_download_ = std::make_unique<SyzygyDownload>(jobs_, storage_.root() / "syzygy",
                                                         lichess::servers().tablebase + "/tables/standard/3-4-5/");
     // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
-    assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
+    assistant_ = std::make_shared<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);
     // A new version, asked for at most once a day when the user wants it; the release found last time meanwhile.
     updates_ = storage_.updateSettings();
     if (updates_.enabled && !options_.scripted && update::checkDue(updates_.checked, std::time(nullptr))) {

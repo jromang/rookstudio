@@ -600,13 +600,15 @@ void App::pollOpeningReport() {
             view.rows                = &r.rows;
             view.evals               = &r.evals;
             const auto figures       = summaryFigures(view, lang());
-            commentary::Model* model = storyWithoutModel().empty() ? assistant_.get() : nullptr;
+            // Shared with its task, which may outlive App's other members (#105).
+            std::shared_ptr<commentary::Model> model;
+            if (storyWithoutModel().empty()) model = assistant_;
             r.summary_total          = static_cast<int>(commentary::summaryTopics(figures).size());
             r.summary_cancel         = std::make_shared<std::atomic<bool>>(false);
             r.summary_done           = std::make_shared<std::atomic<int>>(0);
             r.summary_job = std::async(std::launch::async, [model, figures, l = lang(), round = r.round,
                                                             cancel = r.summary_cancel, done = r.summary_done] {
-                return writeSummary(model, figures, l, round, *cancel, *done);
+                return writeSummary(model.get(), figures, l, round, *cancel, *done);
             });
         }
     }

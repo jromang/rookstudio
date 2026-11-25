@@ -3109,7 +3109,8 @@ class App {
     // What the assistant's comments written in this session rest on, by their text: said when one is hovered (R9).
     std::map<std::string, std::vector<std::string>> assistant_basis_;
     [[nodiscard]] std::vector<std::string> commentBasis(bool from_review);
-    std::unique_ptr<AssistantService> assistant_;
+    // Shared with the tasks that ask it (a comment, a story, an answer), which may outlive App's other members.
+    std::shared_ptr<AssistantService> assistant_;
 
     // The engine picker (#59, mockup M9; view_engine_picker.cpp): the strongest engines from their authors' GitHub
     // releases, the build this processor runs downloaded, checked, started and added to the library; the card that

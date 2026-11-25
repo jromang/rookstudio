@@ -4,7 +4,7 @@ name: CodeQL
 # asked for, not on every push.
 on:
   pull_request:
-    branches: ["gui"]
+    branches: ["main"]
     paths: ["**", "!**.md", "!docs/**"]
   schedule:
     - cron: "17 3 * * 1"
@@ -73,8 +73,9 @@ jobs:
 
       - name: Build
         # The GUI, its tests, the tournament layer and the vendored fastchess (its core library and command line
-        # tool), all compiled under CodeQL.
-        run: cmake --build build
+        # tool), all compiled under CodeQL. Two at a time: under CodeQL's extractor the largest views take a few GB
+        # each, and six at once (Ninja's default on the runner's four processors) ran it out of memory.
+        run: cmake --build build -j 2
 
       - uses: github/codeql-action/analyze@v4
         with:

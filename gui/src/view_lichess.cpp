@@ -63,6 +63,15 @@ void App::loadLichess() {
 
 void App::saveLichessSettings() { (void)writeJson(storage_.root() / "lichess.json", lichess_); }
 
+void App::revokeToken(std::string token) {
+    jobs_.park(std::async(std::launch::async, [token = std::move(token)] { return lichess::revoke(token); }),
+               [](const std::string& error) {
+                   if (!error.empty())
+                       Console::instance().add(trf("Lichess: the token replaced could not be revoked: {}", error),
+                                               true);
+               });
+}
+
 void App::pollLichess() {
     // The link: the browser said yes or no, or the wait ended.
     if (lichess_link_ && ready(lichess_link_->result)) {
@@ -79,9 +88,7 @@ void App::pollLichess() {
                 saveLichessSettings();
                 if (window_) SDL_RaiseWindow(window_);  // back in front of the browser
                 // A link made again: the token it replaces revoked (#45).
-                if (!previous.empty() && previous != answer.value->token)
-                    lichess_revokes_.push_back(
-                        std::async(std::launch::async, [previous] { return lichess::revoke(previous); }));
+                if (!previous.empty() && previous != answer.value->token) revokeToken(previous);
                 // Allowed to read broadcasts now: the rounds followed without it followed again with it (#44).
                 if (lichess_account_->has(lichess::SCOPE_STUDY_READ)) {
                     for (auto& f : followed_rounds_) {
@@ -104,12 +111,6 @@ void App::pollLichess() {
                 lichess_error_ = answer.error;
         }
     }
-    std::erase_if(lichess_revokes_, [](auto& f) {
-        if (!ready(f)) return false;
-        if (const auto error = f.get(); !error.empty())
-            Console::instance().add(trf("Lichess: the token replaced could not be revoked: {}", error), true);
-        return true;
-    });
     if (lichess_unlink_.valid() && ready(lichess_unlink_)) {
         const auto error = lichess_unlink_.get();
         if (!error.empty()) Console::instance().add(trf("Lichess: the token could not be revoked: {}", error), true);

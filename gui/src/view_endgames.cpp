@@ -295,8 +295,6 @@ void App::pollEndgames() {
     const auto ready = [](auto& f) {
         return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     };
-    std::erase_if(endgame_left_, ready);
-    std::erase_if(endgame_lines_left_, ready);
     // Fair play (#48): the tables are an aid; the endgame waits for a live game's end, where it is.
     if (!endgame_ || liveGameOn()) return;
     auto& r = *endgame_;
@@ -1269,8 +1267,9 @@ void App::closeEndgame(bool to_training) {
 void App::leaveEndgameQuestions() {
     if (!endgame_) return;
     *endgame_->cancel = true;
-    if (endgame_->asking.valid()) endgame_left_.push_back(std::move(endgame_->asking));
-    if (endgame_->win_line_job.valid()) endgame_lines_left_.push_back(std::move(endgame_->win_line_job));
+    // Ending out of sight (a future of std::async waits for its task when it goes).
+    jobs_.park(std::move(endgame_->asking));
+    jobs_.park(std::move(endgame_->win_line_job));
 }
 
 void App::dropEndgame() {

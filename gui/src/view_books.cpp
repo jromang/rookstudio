@@ -443,7 +443,7 @@ void App::cancelBookScan() {
     if (!book_reading_) return;
     // Reading a big file cannot be interrupted: it ends in the background, and is forgotten.
     *book_reading_->cancel = true;
-    abandoned_scans_.push_back(std::move(book_reading_->result));
+    jobs_.park(std::move(book_reading_->result));
     book_reading_.reset();
 }
 
@@ -470,8 +470,6 @@ void App::startBookScan(int index) {
 }
 
 void App::pollBookScan() {
-    std::erase_if(abandoned_scans_,
-                  [](const auto& f) { return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
     if (!book_reading_ || book_reading_->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
 
     auto reading = std::move(*book_reading_);
@@ -886,8 +884,6 @@ void App::startCtgJob(CtgJobKind kind, const std::string& path, const std::strin
 }
 
 void App::pollCtgJob() {
-    std::erase_if(ctg_abandoned_,
-                  [](const auto& f) { return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
     if (!ctg_job_ || ctg_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
     auto job = std::move(*ctg_job_);
     ctg_job_.reset();
@@ -1027,7 +1023,7 @@ void App::drawCtgDetail(const BookEntry& book) {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Cancel"))) {
             *ctg_job_->cancel = true;
-            ctg_abandoned_.push_back(std::move(ctg_job_->done));
+            jobs_.park(std::move(ctg_job_->done));
             ctg_job_.reset();
         }
     }

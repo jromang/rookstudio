@@ -1247,11 +1247,7 @@ class App {
     [[nodiscard]] std::vector<EndgameTask> gameEndgames();  // the user's mistakes in positions of 7 pieces or fewer
     [[nodiscard]] std::string endgameState(const EndgameEntry& entry);  // "done in 9 (the tables: 7)", "5 pieces"…
     std::unique_ptr<EndgameRun> endgame_;
-    // The questions to Lichess of a session left, cancelled, ending out of sight (a future of std::async waits for its
-    // task when it goes).
-    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_left_;
-    std::vector<std::future<lichess::Answer<std::vector<std::string>>>> endgame_lines_left_;
-    void leaveEndgameQuestions();
+    void leaveEndgameQuestions();  // the questions to Lichess of a session left: cancelled, parked in jobs_
     [[nodiscard]] std::string endgameLock() const;  // why a session cannot start, empty when it can
     bool startEndgame(const EndgameEntry& entry);
     bool startEndgameReview();
@@ -1837,7 +1833,9 @@ class App {
     };
     std::unique_ptr<LichessLink> lichess_link_;
     std::future<std::string> lichess_unlink_;
-    std::vector<std::future<std::string>> lichess_revokes_;  // tokens replaced by a link made again
+    // A token no longer used (replaced by a link made again, one the bot refused) revoked in the background: parked in
+    // jobs_, a failure said in the console, waited for at quit.
+    void revokeToken(std::string token);
     // A scope a feature needs and the token lacks (#45): asked on the Lichess page, the M4 way, before going on.
     struct LichessScopeAsk {
         std::string scope;
@@ -2043,10 +2041,9 @@ class App {
         bool keep_menu         = false;
     };
     std::optional<SwissPlay> swiss_play_;
-    std::vector<std::function<bool()>> tour_jobs_left_;  // requests of a tournament put aside, until they end
-    void dropTour();                                     // the tournament followed, its requests left to end
-    void dropArena();                                    // the arena chosen
-    void dropSwiss();                                    // the Swiss chosen
+    void dropTour();                // the tournament followed, its requests left to end (parked in jobs_)
+    void dropArena();               // the arena chosen
+    void dropSwiss();               // the Swiss chosen
     int online_part_      = -1;     // the "On Lichess" part: 0 its games, 1 the tournaments; -1 not read yet
     bool tour_part_swiss_ = false;  // the Tournaments part shows the Swiss chosen last, not the arena
     void pollLichessArenas();
@@ -2663,7 +2660,6 @@ class App {
         EngineEntry engine;  // as it runs: here, or on its machine
     };
     std::map<std::string, LichessService> services_;               // by engine, those in service
-    std::vector<std::future<void>> retired_services_;              // stopped, their threads ending
     std::map<std::string, lichess::ServiceStatus> service_ended_;  // why a service ended by itself, by engine
     bool offers_resumed_ = false;                                  // those in service at the last close, started
     bool offers_dirty_   = false;                                  // today's counts to write
@@ -3357,9 +3353,6 @@ class App {
         std::optional<EndgameCheckSummary> summary;
     };
     std::unique_ptr<EndgameCheckRun> endgame_check_;
-    // The jobs of a check closed while they ran, kept until they end: a future's end would wait for them.
-    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_check_asking_left_;
-    std::vector<std::future<EndgameCheckGames>> endgame_check_reading_left_;
     void startEndgameCheck(const std::filesystem::path& dir);
     void closeEndgameCheck();
     void pollEndgameCheck();
@@ -3421,14 +3414,9 @@ class App {
         std::future<std::pair<std::vector<commentary::StoryPassage>, std::string>> story;
     };
     std::optional<StoryJob> story_job_;
-    // An opening report's jobs let go (a report made again, another opened), cancelled and kept until they end: the
-    // summary's uses the assistant, which goes after them (#91).
-    struct ReportLeftover {
-        std::shared_ptr<void> hold;
-        std::function<bool()> ready;
-    };
-    std::vector<ReportLeftover> report_leftovers_;
-    void leaveReportJobs();  // the opening report's running jobs cancelled and kept until they end
+    // An opening report's jobs let go (a report made again, another opened): cancelled and parked in jobs_ until they
+    // end (#91, #105).
+    void leaveReportJobs();
     std::vector<commentary::StoryPassage> model_story_;
     std::string model_story_of_;      // the review it was written for
     std::string model_story_error_;   // why the model gave no answer
@@ -4225,12 +4213,10 @@ class App {
         std::future<CtgDone> done;
     };
     std::optional<CtgJob> ctg_job_;
-    std::vector<std::future<CtgDone>> ctg_abandoned_;         // cancelled, still ending
     std::map<std::string, study::CtgSummary> ctg_summaries_;  // by book, this session
     std::map<std::string, std::string> ctg_failed_;           // a book that could not be read, and why
     std::string ctg_said_, ctg_said_of_;                      // the last check's or copy's report, and its book
-    std::vector<std::future<std::shared_ptr<tour::BookScan>>> abandoned_scans_;  // cancelled, still ending
-    std::shared_ptr<const tour::BookScan> book_scan_;                            // of book book_scan_index_
+    std::shared_ptr<const tour::BookScan> book_scan_;         // of book book_scan_index_
     int book_scan_index_ = -1;
     std::string book_scan_error_;
     int book_show_ = 0;  // 0 every opening, 1 those with a problem

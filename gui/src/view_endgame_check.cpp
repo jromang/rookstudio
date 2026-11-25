@@ -135,15 +135,13 @@ void App::closeEndgameCheck() {
     if (!endgame_check_) return;
     auto& c   = *endgame_check_;
     *c.cancel = true;
-    // What runs still ends on its own: kept until then, the window not waiting for it.
-    if (c.asking.valid()) endgame_check_asking_left_.push_back(std::move(c.asking));
-    if (c.reading.valid()) endgame_check_reading_left_.push_back(std::move(c.reading));
+    // What runs still ends on its own: parked until then, the window not waiting for it.
+    jobs_.park(std::move(c.asking));
+    jobs_.park(std::move(c.reading));
     endgame_check_.reset();
 }
 
 void App::pollEndgameCheck() {
-    std::erase_if(endgame_check_asking_left_, [](const auto& f) { return ready(f); });
-    std::erase_if(endgame_check_reading_left_, [](const auto& f) { return ready(f); });
     if (!endgame_check_) return;
     auto& c = *endgame_check_;
     if (c.reading.valid()) {

@@ -196,8 +196,7 @@ App::~App() {
     if (fingerprints_.valid()) fingerprints_.wait();
     machine_activity_.clear();  // the machines' jobs cancelled, a second or two at most
     forgetPassphrases();
-    cancelBookScan();
-    for (auto& f : abandoned_scans_) f.wait();
+    cancelBookScan();  // parked in jobs_
     storage_.saveSetup(setup_);
     storage_.saveEngines(engines_);
     // The engines offered to Lichess: today's counts written, their services ended (they stay registered, and serve

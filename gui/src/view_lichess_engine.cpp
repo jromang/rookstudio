@@ -398,8 +398,7 @@ void App::stopService(const std::string& engine) {
     if (const auto it = services_.find(engine); it != services_.end()) {
         // Its thread ends within a quarter of a second, a request under way within its engine's stop: not waited
         // for here.
-        retired_services_.push_back(
-            std::async(std::launch::async, [s = std::move(it->second.service)]() mutable { s.reset(); }));
+        jobs_.park(std::async(std::launch::async, [s = std::move(it->second.service)]() mutable { s.reset(); }));
         services_.erase(it);
     }
     if (auto* o = offerOf(engine); o && o->serving) {
@@ -435,9 +434,6 @@ void App::withdrawOffer(const std::string& engine) {
 void App::pollLichessEngines() {
     const auto now = SteadyClock::now();
     if (!service_stop_.empty()) stopService(std::exchange(service_stop_, std::string()));
-    std::erase_if(retired_services_, [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    });
     // At the start: those in service when RookStudio closed (nothing asked of the internet for a scripted capture).
     if (!offers_resumed_) {
         offers_resumed_ = true;
@@ -544,8 +540,7 @@ void App::pollLichessEngines() {
             // Refused, the API changed, the engine could not serve: said on its card, not served at the next start.
             service_ended_[name] = s.service->status();
             const auto engine    = name;
-            retired_services_.push_back(
-                std::async(std::launch::async, [svc = std::move(s.service)]() mutable { svc.reset(); }));
+            jobs_.park(std::async(std::launch::async, [svc = std::move(s.service)]() mutable { svc.reset(); }));
             it = services_.erase(it);
             if (auto* stopped = offerOf(engine); stopped && stopped->serving) {
                 stopped->serving = false;

@@ -162,6 +162,58 @@ TEST_CASE("databases: at quit, the import, the tree being built and the one aske
     shelf.reset();
 }
 
+TEST_CASE("databases: a database removed, the tree builds of the others keep their database; its own is cancelled") {
+    const auto profile = freshDir("shelf-remove-tree");
+    DatabaseShelf shelf(profile);
+    const auto a       = shelf.create("A");
+    const auto b       = shelf.create("B");
+    const auto c       = shelf.create("C");
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    const auto ended   = [&] {
+        while (!shelf.pollTreeJob() && std::chrono::steady_clock::now() < give_up)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    };
+    // C's tree being built, B's asked for after it; A removed: both follow their database (#101).
+    shelf.rebuildTree(c);
+    shelf.rebuildTree(b);
+    REQUIRE(shelf.treeJob());
+    shelf.remove(a);
+    REQUIRE(shelf.entries().size() == 2);
+    REQUIRE(shelf.treeJob());
+    CHECK(shelf.entries()[shelf.treeJob()->index].name == "C");
+    ended();  // C's ends, B's starts
+    REQUIRE(shelf.treeJob());
+    CHECK(shelf.entries()[shelf.treeJob()->index].name == "B");
+    ended();
+    CHECK(shelf.treeJob() == nullptr);
+
+    // The database whose tree is being built removed: its build cancelled, shown for no database, and the build asked
+    // for after it, another database's, follows once it ended.
+    const auto d = shelf.create("D");
+    shelf.rebuildTree(0);  // B's
+    shelf.rebuildTree(d);
+    auto* job = shelf.treeJob();
+    REQUIRE(job);
+    CHECK(shelf.entries()[job->index].name == "B");
+    shelf.remove(0);
+    CHECK(job->cancel);
+    CHECK(shelf.treeJob() == nullptr);  // B's, ending, belongs to none
+    ended();
+    REQUIRE(shelf.treeJob());
+    CHECK(shelf.entries()[shelf.treeJob()->index].name == "D");
+    ended();
+
+    // A build asked for the database removed is forgotten.
+    const auto e = shelf.create("E");
+    shelf.rebuildTree(e);  // E's runs
+    shelf.rebuildTree(0);  // C's asked for after it
+    shelf.remove(0);
+    REQUIRE(shelf.treeJob());
+    CHECK(shelf.entries()[shelf.treeJob()->index].name == "E");
+    ended();
+    CHECK(shelf.treeJob() == nullptr);
+}
+
 TEST_CASE("databases: the quick filter's words, a year, an ECO code and a result told apart") {
     auto f = quickFilter("  carlsen  b9 2024 1-0 ");
     CHECK(f.words == "carlsen");

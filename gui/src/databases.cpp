@@ -225,6 +225,18 @@ void DatabaseShelf::remove(std::size_t index) {
     } else if (import_ && import_->index > index) {
         --import_->index;
     }
+    // Its opening tree's build is cancelled and kept until it ends, for no database: one build at a time, and its task
+    // uses its job. Those of the databases after it, running or asked for, follow their database (#101).
+    if (tree_job_ && tree_job_->index == index) {
+        tree_job_->cancel = true;
+        tree_job_->index  = TreeJob::REMOVED;
+    } else if (tree_job_ && tree_job_->index != TreeJob::REMOVED && tree_job_->index > index) {
+        --tree_job_->index;
+    }
+    if (tree_again_ && *tree_again_ == index)
+        tree_again_.reset();
+    else if (tree_again_ && *tree_again_ > index)
+        --*tree_again_;
     const auto at = static_cast<std::ptrdiff_t>(index);
     entries_.erase(entries_.begin() + at);
     open_.erase(open_.begin() + at);

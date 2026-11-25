@@ -92,7 +92,7 @@ jobs:
         run: |
           sarif=$(ls sarif-results/*.sarif)
           jq '.runs[].results |= map(select((.locations[0].physicalLocation.artifactLocation.uri // "")
-                                            | test("^(file://)?(\(env.GITHUB_WORKSPACE)/)?(build|gui/tests|tournament/tests|fuzz)/")
+                                            | test("^(file://)?(\(env.GITHUB_WORKSPACE)/)?(build|gui/tests|tournament/tests|study/tests|commentary/tests|fuzz)/")
                                             | not))' \
             "$sarif" > filtered.sarif
           echo "Results: $(jq '[.runs[].results[]] | length' "$sarif") found," \

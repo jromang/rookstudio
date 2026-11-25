@@ -231,17 +231,31 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
     CHECK_FALSE(fs::exists(profile / "lichess-account.json"));
 }
 
-TEST_CASE("Lichess account: an answer to another question, or a code Lichess does not take, links nothing") {
+TEST_CASE("Lichess account: an answer to another question is ignored, a code Lichess does not take links nothing") {
     FakeLichess lichess;
-    const auto wrong_state = link(
+    // An answer that does not carry the question's state (another program's, here a refusal) is answered 400: it
+    // neither ends the link nor makes it look refused, and the browser's real return is the one taken.
+    std::thread browser;
+    HttpResult foreign;
+    const auto ours = link(
         [&](const std::string& url) {
+            {
+                std::lock_guard lock(lichess.mutex);
+                lichess.challenge = valueOf(url, "code_challenge");
+            }
             const auto redirect = valueOf(url, "redirect_uri");
-            std::thread([redirect] { (void)comeBack(redirect, "?code=the-code&state=someone-elses"); }).detach();
+            const auto state    = valueOf(url, "state");
+            browser             = std::thread([&foreign, redirect, state] {
+                foreign = comeBack(redirect, "?error=access_denied&state=someone-elses");
+                (void)comeBack(redirect, "?code=the-code&state=" + state);
+            });
             return true;
         },
         {}, 20s);
-    CHECK_FALSE(wrong_state.value);
-    CHECK(wrong_state.error == "an answer that does not come from this question");
+    browser.join();
+    CHECK(foreign.status == 400);
+    CHECK(ours.error.empty());
+    CHECK(ours.value);
 
     const auto stale = link(
         [&](const std::string& url) {

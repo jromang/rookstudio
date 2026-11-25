@@ -82,7 +82,7 @@ bool readIndex(std::span<const uint8_t> d, std::size_t at, CffIndex& index) {
     if (offsets + (count + 1) * static_cast<std::size_t>(off_size) > d.size()) return false;
     const auto offset = [&](uint32_t i) {
         uint32_t v = 0;
-        for (int k = 0; k < off_size; ++k) v = v << 8 | d[offsets + i * off_size + k];
+        for (int k = 0; k < off_size; ++k) v = v << 8 | d[offsets + std::size_t{i} * off_size + k];
         return v;
     };
     const std::size_t data = offsets + (count + 1) * static_cast<std::size_t>(off_size) - 1;
@@ -800,7 +800,7 @@ std::string Font::subset(const std::set<int>& wanted) const {
     const auto* gp         = reinterpret_cast<const uint8_t*>(glyf->data());
     const auto glyph_range = [&](uint32_t g) -> std::pair<uint32_t, uint32_t> {
         if (g >= count) return {0, 0};
-        const std::size_t need = (g + 2) * (long_loca ? 4u : 2u);
+        const std::size_t need = (std::size_t{g} + 2) * (long_loca ? 4u : 2u);
         if (need > loca->size()) return {0, 0};
         uint32_t b = long_loca ? u32(lp + g * 4) : u16(lp + g * 2) * 2u;
         uint32_t e = long_loca ? u32(lp + (g + 1) * 4) : u16(lp + (g + 1) * 2) * 2u;

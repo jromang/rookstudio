@@ -140,7 +140,8 @@ TEST_CASE("puzzles offline: prepared from a file downloaded before") {
     const auto file   = fs::temp_directory_path() / "puzzles-file.csv.zst";
     fs::remove_all(folder);
     std::ofstream(file, std::ios::binary) << database(all, 9000);
-    OfflinePuzzles offline(folder);
+    JobGroup jobs;
+    OfflinePuzzles offline(jobs, folder);
     CHECK_FALSE(fs::exists(folder));  // made at the first preparation, not before
     CHECK_FALSE(offline.state().ready);
     CHECK(offline.store() == nullptr);
@@ -212,7 +213,8 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
     // Cut in the middle: on from the last frame's end, of the same file (If-Range), every puzzle once.
     cut_at = static_cast<long>(contents[0].size() / 2);
     {
-        OfflinePuzzles offline(folder);
+        JobGroup jobs;
+        OfflinePuzzles offline(jobs, folder);
         offline.setCheckpointEvery(0);
         offline.setRetryWait(1ms);
         offline.start(url);
@@ -239,7 +241,8 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
     fs::remove_all(folder);
     hold_at = static_cast<long>(contents[0].size() * 3 / 4);
     {
-        OfflinePuzzles offline(folder);
+        JobGroup jobs;
+        OfflinePuzzles offline(jobs, folder);
         offline.setCheckpointEvery(0);
         offline.start(url);
         REQUIRE(waitUntil([&] { return offline.progress().bytes >= contents[0].size() * 3 / 4; }));
@@ -256,7 +259,8 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
     }
     released = true;
     {
-        OfflinePuzzles offline(folder);
+        JobGroup jobs;
+        OfflinePuzzles offline(jobs, folder);
         auto st = offline.state();
         CHECK(st.stopped);
         offline.start(st.source);
@@ -288,6 +292,23 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
         for (const auto& entry : fs::directory_iterator(folder))
             stores += entry.path().filename().string().rfind("puzzles-", 0) == 0 ? 1 : 0;
         CHECK(stores == 1);  // the older one removed
+
+        // Removed during an update, held by the server (#105): no store at once and nothing waits for it; its files
+        // go once it ended, at the finished() that sees its end, which says nothing.
+        hold_at  = static_cast<long>(contents[1].size() / 2);
+        released = false;
+        offline.start(url);
+        REQUIRE(waitUntil([&] { return offline.progress().bytes >= contents[1].size() / 2; }));
+        offline.remove();
+        CHECK(offline.store() == nullptr);
+        CHECK_FALSE(offline.state().ready);
+        CHECK(fs::exists(folder / "build"));  // its thread writes there until it ends
+        released = true;
+        REQUIRE(waitUntil([&] { return !offline.busy(); }, 60s));
+        CHECK_FALSE(offline.finished().has_value());
+        CHECK_FALSE(fs::exists(folder));
+        CHECK_FALSE(offline.state().ready);
+        CHECK_FALSE(offline.state().stopped);
     }
 }
 

@@ -168,7 +168,8 @@ TEST_CASE("offline evaluations: prepared from a file downloaded before, then ans
     fs::remove_all(folder);
     std::ofstream(file, std::ios::binary) << database(all, 20000);
 
-    OfflineEvals evals(folder);
+    JobGroup jobs;
+    OfflineEvals evals(jobs, folder);
     CHECK_FALSE(fs::exists(folder));  // made at the first preparation, not before
     CHECK_FALSE(evals.state().ready);
     CHECK_FALSE(evals.state().stopped);
@@ -229,7 +230,7 @@ TEST_CASE("offline evaluations: prepared from a file downloaded before, then ans
     // The openings only: the positions with 24 men or more.
     const auto folder2 = fs::temp_directory_path() / "offline-evals-openings";
     fs::remove_all(folder2);
-    OfflineEvals openings(folder2);
+    OfflineEvals openings(jobs, folder2);
     openings.setRunEntries(250);
     openings.start(file.string(), study::EVALS_OPENING_MEN);
     REQUIRE(waitUntil([&] { return !openings.busy(); }, 60s));
@@ -294,7 +295,8 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
     // Cut in the middle: on from the last frame's end, of the same file (If-Range), every position once.
     cut_at = static_cast<long>(contents[0].size() / 2);
     {
-        OfflineEvals evals(folder);
+        JobGroup jobs;
+        OfflineEvals evals(jobs, folder);
         evals.setRunEntries(300);
         evals.setCheckpointEvery(0);
         evals.setRetryWait(1ms);
@@ -323,7 +325,8 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
     fs::remove_all(folder);
     hold_at = static_cast<long>(contents[0].size() * 3 / 4);
     {
-        OfflineEvals evals(folder);
+        JobGroup jobs;
+        OfflineEvals evals(jobs, folder);
         evals.setRunEntries(300);
         evals.setCheckpointEvery(0);
         evals.start(url, 0);
@@ -352,7 +355,8 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
     released = true;
     {
         // Opened again: what it read answers at once; Go on reads the rest only.
-        OfflineEvals evals(folder);
+        JobGroup jobs;
+        OfflineEvals evals(jobs, folder);
         auto st = evals.state();
         CHECK(st.stopped);
         CHECK_FALSE(st.ready);
@@ -393,6 +397,31 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
         CHECK(evals.lookup() == nullptr);
         CHECK_FALSE(evals.find(versions[1][0].board).has_value());
         CHECK_FALSE(fs::exists(folder));
+
+        // Removed during a preparation, held by the server (#105): nothing answers at once and nothing waits for it;
+        // its files go once it ended, at the finished() that sees its end, which says nothing.
+        hold_at  = static_cast<long>(contents[1].size() / 2);
+        released = false;
+        evals.start(url, 0);
+        REQUIRE(waitUntil(
+            [&] {
+                evals.poll();
+                return evals.lookup() != nullptr;  // its runs answer
+            },
+            20s));
+        evals.remove();
+        CHECK(evals.lookup() == nullptr);
+        CHECK_FALSE(evals.state().ready);
+        CHECK_FALSE(evals.state().stopped);
+        CHECK(fs::exists(folder / "build"));  // its thread writes there until it ends
+        released = true;
+        REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
+        evals.poll();
+        CHECK(evals.lookup() == nullptr);  // what it published meanwhile is not opened
+        CHECK_FALSE(evals.finished().has_value());
+        CHECK_FALSE(fs::exists(folder));
+        CHECK_FALSE(evals.state().stopped);
+        CHECK(evals.lookup() == nullptr);
     }
 }
 
@@ -408,7 +437,8 @@ TEST_CASE("offline evaluations: the program killed at a place saved, then gone o
     // The folder as a kill leaves it right after the third place saved: copied there, on the reading's thread.
     int saves = 0;
     {
-        OfflineEvals evals(folder);
+        JobGroup jobs;
+        OfflineEvals evals(jobs, folder);
         evals.setRunEntries(200);
         evals.setCheckpointEvery(0);
         evals.setOnSaved([&] {
@@ -426,7 +456,8 @@ TEST_CASE("offline evaluations: the program killed at a place saved, then gone o
     // A run being written at that moment, left half done.
     std::ofstream(killed / "build" / "run-9999.bin.tmp", std::ios::binary) << "half a run";
     {
-        OfflineEvals evals(killed);
+        JobGroup jobs;
+        OfflineEvals evals(jobs, killed);
         CHECK(evals.state().stopped);
         CHECK(evals.state().kept > 0);
         evals.setRunEntries(200);
@@ -451,7 +482,8 @@ TEST_CASE("offline evaluations: the program killed at a place saved, then gone o
         else
             std::ofstream(end / "build" / "run-3.bin", std::ios::binary) << "a run";
         std::ofstream(end / "index-2.bin.tmp", std::ios::binary) << "an index being written";
-        OfflineEvals evals(end);
+        JobGroup jobs;
+        OfflineEvals evals(jobs, end);
         CHECK(evals.state().ready);
         CHECK_FALSE(evals.state().stopped);
         CHECK_FALSE(fs::exists(end / "build"));

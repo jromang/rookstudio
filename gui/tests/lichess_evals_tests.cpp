@@ -303,7 +303,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     // Cut short in the middle: on from the last frame's end, of the same file, everything found once.
     cut_at = static_cast<long>(contents[0].size() / 2);
     {
-        EvalsReading reading;
+        JobGroup jobs;
+        EvalsReading reading(jobs);
         reading.setCheckpointEvery(0);
         reading.setRetryWait(std::chrono::milliseconds(1));
         reading.start(url, folder);
@@ -341,7 +342,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     fs::remove_all(folder);
     hold_at = static_cast<long>(contents[0].size() * 3 / 4);
     {
-        EvalsReading reading;
+        JobGroup jobs;
+        EvalsReading reading(jobs);
         reading.setCheckpointEvery(0);
         reading.start(url, folder);
         REQUIRE(waitUntil([&] { return reading.progress().bytes >= contents[0].size() * 3 / 4; }));
@@ -356,7 +358,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     CHECK(folder_state.size == contents[0].size());
     CHECK(folder_state.source == url);
     {
-        EvalsReading reading;
+        JobGroup jobs;
+        EvalsReading reading(jobs);
         reading.start(url, folder);
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
         CHECK(reading.finished() == std::string());
@@ -369,7 +372,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     fs::remove_all(folder);
     cut_at = static_cast<long>(contents[0].size() / 3);
     {
-        EvalsReading reading;
+        JobGroup jobs;
+        EvalsReading reading(jobs);
         reading.setCheckpointEvery(0);
         reading.setRetryWait(std::chrono::milliseconds(200));
         reading.start(url, folder);
@@ -390,7 +394,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     const auto file = fs::temp_directory_path() / "lichess_db_eval.jsonl.zst";
     {
         std::ofstream(file, std::ios::binary) << contents[0];
-        EvalsReading reading;
+        JobGroup jobs;
+        EvalsReading reading(jobs);
         reading.start(file.string(), folder);
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
         CHECK(reading.finished() == std::string());
@@ -402,7 +407,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     fs::remove_all(folder);
     {
         std::ofstream(file, std::ios::binary | std::ios::trunc) << contents[0].substr(0, contents[0].size() - 100);
-        EvalsReading reading;
+        JobGroup jobs;
+        EvalsReading reading(jobs);
         reading.start(file.string(), folder);
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
         const auto why = reading.finished();

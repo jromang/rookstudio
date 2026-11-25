@@ -7,14 +7,13 @@
 #include <atomic>
 #include <filesystem>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
 
 #include <study/store.hpp>
 
+#include "jobs.hpp"
 #include "zstd_reading.hpp"
 
 namespace fcg::lichess {
@@ -35,8 +34,8 @@ class MonthReading {
         std::atomic<uint64_t> kept{0};   // passing the filter
         std::atomic<uint64_t> added{0};  // to the database (those it had already left out)
     };
-    MonthReading() = default;
-    ~MonthReading();  // cancels and waits
+    // A reading under way when it goes is cancelled and parked in `jobs` (#105).
+    explicit MonthReading(JobGroup& jobs) : job_(jobs) {}
     MonthReading(const MonthReading&)            = delete;
     MonthReading& operator=(const MonthReading&) = delete;
 
@@ -44,21 +43,17 @@ class MonthReading {
     // the same source and filter are read again.
     void start(std::string source, std::shared_ptr<study::Database> db, MonthFilter filter,
                std::filesystem::path state_file);
-    [[nodiscard]] bool busy() const noexcept { return busy_; }
-    void cancel() noexcept { cancel_ = true; }
-    [[nodiscard]] const Progress& progress() const noexcept { return progress_; }
+    [[nodiscard]] bool busy() const noexcept { return job_.running(); }
+    void cancel() noexcept { job_.cancel(); }
+    [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
     // Once stopped: empty when it went to its end, else why ("cancelled" for Cancel).
     [[nodiscard]] std::optional<std::string> finished();
     void setOptions(ZstdReadingOptions options) { options_ = options; }  // the tests' shorter waits
     static constexpr std::size_t BATCH = 20000;                          // games committed together, at most
 
    private:
-    std::thread thread_;
-    std::atomic<bool> busy_{false}, cancel_{false};
-    Progress progress_;
-    std::mutex mutex_;
-    std::optional<std::string> finished_;
     ZstdReadingOptions options_;
+    Job<std::string, Progress> job_;
 };
 
 }  // namespace fcg::lichess

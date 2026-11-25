@@ -133,12 +133,12 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
     loadRecentGames();  // the board's game and the recent ones of the session before
     loadKeptSearches();
     loadLichess();
-    offline_evals_ = std::make_unique<OfflineEvals>(storage_.root() / "lichess-evals");  // #58
-    offline_puzzles_ = std::make_unique<OfflinePuzzles>(storage_.root() / "lichess-puzzles");  // #80
-    player_names_    = storage_.playerNames();                                                 // #81
+    offline_evals_   = std::make_unique<OfflineEvals>(jobs_, storage_.root() / "lichess-evals");      // #58
+    offline_puzzles_ = std::make_unique<OfflinePuzzles>(jobs_, storage_.root() / "lichess-puzzles");  // #80
+    player_names_    = storage_.playerNames();                                                        // #81
     // The Syzygy tables of 3 to 5 pieces, downloaded on the user's click from Lichess's mirror (a test's server when
     // one stands in for Lichess) into the profile (#82).
-    syzygy_download_ = std::make_unique<SyzygyDownload>(storage_.root() / "syzygy",
+    syzygy_download_ = std::make_unique<SyzygyDownload>(jobs_, storage_.root() / "syzygy",
                                                         lichess::servers().tablebase + "/tables/standard/3-4-5/");
     // The assistant: its settings now, its model loaded at the first question (this program, started --assistant).
     assistant_ = std::make_unique<AssistantService>(storage_.root(), fastchess::engine::xboard_adapter);

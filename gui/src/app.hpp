@@ -3853,7 +3853,7 @@ class App {
     // profile; then the book made from them, out of an evaluation, a depth, the plies and a number.
     bool evaluated_suite_shown_ = false;
     EvaluatedSuiteOptions evaluated_suite_;
-    EvalsReading evals_reading_;
+    EvalsReading evals_reading_{jobs_};
     std::optional<EvalsFolder> evals_folder_;  // what the profile holds, read again when a reading stops
     std::optional<std::vector<EvaluatedPosition>> evaluated_positions_;
     std::future<std::vector<EvaluatedPosition>> evaluated_job_;  // what the profile kept, read off the frame

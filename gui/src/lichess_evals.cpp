@@ -382,48 +382,6 @@ std::vector<EvaluatedPosition> evaluatedPositions(const fs::path& folder) {
     return readRows(folder / "evaluations.tsv");
 }
 
-EvalsReading::~EvalsReading() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
-}
-
-void EvalsReading::start(std::string source, fs::path folder) {
-    if (busy_) return;
-    if (thread_.joinable()) thread_.join();
-    busy_   = true;
-    cancel_ = false;
-    {
-        std::lock_guard lock(mutex_);
-        finished_.reset();
-    }
-    progress_.bytes   = 0;
-    progress_.size    = 0;
-    progress_.lines   = 0;
-    progress_.kept    = 0;
-    progress_.resumed = false;
-    thread_           = std::thread([this, source = std::move(source), folder = std::move(folder)] {
-        std::string error;
-        try {
-            run(source, folder);
-        } catch (const std::exception& e) {
-            error = e.what();
-        }
-        {
-            std::lock_guard lock(mutex_);
-            if (!finished_) finished_ = error.empty() ? std::string("stopped") : error;
-        }
-        busy_ = false;
-    });
-}
-
-std::optional<std::string> EvalsReading::finished() {
-    if (busy_) return std::nullopt;
-    std::lock_guard lock(mutex_);
-    auto out = std::move(finished_);
-    finished_.reset();
-    return out;
-}
-
 namespace {
 
 // The evaluations database's lines, each scanned for a candidate position: those found written to a file as they come
@@ -516,16 +474,28 @@ class EvalsConsumer final : public ZstdConsumer {
 
 }  // namespace
 
-void EvalsReading::run(std::string source, fs::path folder) {
-    std::error_code ec;
-    fs::create_directories(folder, ec);
-    EvalsConsumer consumer(folder, source, progress_);
+void EvalsReading::start(std::string source, fs::path folder) {
+    if (busy()) return;
     ZstdReadingOptions options;
     options.checkpoint_every = checkpoint_every_;
     options.retry_wait       = retry_wait_;
-    const auto why           = readZstd(source, folder / "reading.json", consumer, progress_, cancel_, options);
-    std::lock_guard lock(mutex_);
-    finished_ = why;
+    // The task holds what it reads and what it tells: it may outlive this object, parked.
+    job_.start([source = std::move(source), folder = std::move(folder), options](TaskState<Progress>& job) {
+        try {
+            std::error_code ec;
+            fs::create_directories(folder, ec);
+            EvalsConsumer consumer(folder, source, job);
+            return readZstd(source, folder / "reading.json", consumer, job, job.cancel, options);
+        } catch (const std::exception& e) {
+            const std::string why = e.what();
+            return why.empty() ? std::string("stopped") : why;
+        }
+    });
+}
+
+std::optional<std::string> EvalsReading::finished() {
+    if (!job_.ready()) return std::nullopt;
+    return job_.take();
 }
 
 }  // namespace fcg

@@ -10,17 +10,18 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include <chess.hpp>
 #include <study/evals_index.hpp>
 
 #include "game_analysis.hpp"
+#include "jobs.hpp"
 #include "zstd_reading.hpp"
 
 namespace fcg {
@@ -68,8 +69,8 @@ class OfflineEvals {
         std::string source;
     };
 
-    explicit OfflineEvals(std::filesystem::path folder);
-    ~OfflineEvals();  // cancels and waits
+    // A preparation under way when it goes is cancelled and parked in `jobs` (#105).
+    OfflineEvals(JobGroup& jobs, std::filesystem::path folder);
     OfflineEvals(const OfflineEvals&)            = delete;
     OfflineEvals& operator=(const OfflineEvals&) = delete;
 
@@ -87,14 +88,15 @@ class OfflineEvals {
     // `min_men` men or more (0: all). One cut short goes on, unless its source or its choice were others: then it
     // starts again.
     void start(std::string source, int min_men);
-    [[nodiscard]] bool busy() const noexcept { return busy_; }
-    void cancel() noexcept { cancel_ = true; }
-    [[nodiscard]] const Progress& progress() const noexcept { return progress_; }
+    [[nodiscard]] bool busy() const noexcept { return job_.running(); }
+    void cancel() noexcept { job_.cancel(); }
+    [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
     // Once a preparation has stopped: empty when it went to its end, else why it stopped ("cancelled" for Cancel).
     [[nodiscard]] std::optional<std::string> finished();
     // At each frame: the runs a preparation wrote opened, the index it made taken.
     void poll();
-    // Everything removed, a preparation under way cancelled first.
+    // Everything removed, a preparation under way cancelled first: nothing answers at once; the files go once it
+    // ended, at the finished() that sees its end (it writes in the folder until then), and it is not said.
     void remove();
     // A preparation cut short forgotten, its runs removed; the index, if any, stays.
     void forgetStopped();
@@ -107,26 +109,30 @@ class OfflineEvals {
     void setOnSaved(std::function<void()> f) { on_saved_ = std::move(f); }
 
    private:
-    void run(std::string source, int min_men);
-    void reload();  // the state and the lookup read again from the disk
+    void reload();     // the state and the lookup read again from the disk
+    void removeNow();  // the folder removed, nothing preparing in it
     [[nodiscard]] std::filesystem::path build() const { return folder_ / "build"; }
+
+    // What a preparation's thread publishes as it goes, for poll(): the runs it wrote. Held by the thread too.
+    struct Published {
+        std::mutex mutex;
+        std::vector<std::filesystem::path> runs;
+        std::atomic<uint64_t> version{0};
+    };
 
     std::filesystem::path folder_;
     mutable std::mutex mutex_;
     std::shared_ptr<const study::EvalsLookup> lookup_;
     State state_;
-    std::thread thread_;
-    std::atomic<bool> busy_{false}, cancel_{false};
-    Progress progress_;
-    std::optional<std::string> finished_;
-    std::vector<std::filesystem::path> runs_;  // what the preparation published last
-    std::atomic<uint64_t> runs_version_{0};
+    std::shared_ptr<Published> published_ = std::make_shared<Published>();
     std::atomic<uint64_t> generation_{0};
-    uint64_t runs_seen_      = 0;
+    uint64_t runs_seen_      = 0;      // published_'s version opened last
+    bool remove_when_ended_  = false;  // remove() during a preparation
     double checkpoint_every_ = 5;
     std::chrono::milliseconds retry_wait_{2000};
     std::size_t run_entries_ = std::size_t{1} << 23;
     std::function<void()> on_saved_;
+    Job<std::string, Progress> job_;
 };
 
 }  // namespace fcg

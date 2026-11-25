@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <utility>
 
 #include <json.hpp>
 
@@ -150,14 +151,9 @@ std::optional<PositionEval> reviewKnownEval(const study::EvalsLookup& lookup, co
     return knownEval(*e, board);
 }
 
-OfflineEvals::OfflineEvals(fs::path folder) : folder_(std::move(folder)) {
+OfflineEvals::OfflineEvals(JobGroup& jobs, fs::path folder) : folder_(std::move(folder)), job_(jobs) {
     study::tidyEvalsFolder(folder_);  // an index being written when the program stopped, older ones
     reload();
-}
-
-OfflineEvals::~OfflineEvals() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
 }
 
 std::shared_ptr<const study::EvalsLookup> OfflineEvals::lookup() const {
@@ -198,7 +194,7 @@ void OfflineEvals::reload() {
     // What a preparation stopped by a crash at its very end leaves: a folder without its state, or a state whose runs
     // are gone (the index was made, its runs removed, the state not yet). Nothing to go on from: removed.
     std::error_code ec;
-    if (!busy_ && fs::exists(build(), ec)) {
+    if (!busy() && fs::exists(build(), ec)) {
         const auto j  = readJsonFile(build() / "reading.json");
         bool unusable = !j;
         if (j) {
@@ -232,80 +228,55 @@ void OfflineEvals::reload() {
 }
 
 void OfflineEvals::start(std::string source, int min_men) {
-    if (busy_) return;
-    if (thread_.joinable()) thread_.join();
+    if (job_.ready() && remove_when_ended_) (void)finished();  // the removal asked for during the last one, first
+    if (busy()) return;
     if (const auto st = state(); st.stopped && (st.source != source || st.stopped_min_men != min_men)) forgetStopped();
-    busy_   = true;
-    cancel_ = false;
-    {
-        std::lock_guard lock(mutex_);
-        finished_.reset();
-    }
-    progress_.bytes   = 0;
-    progress_.size    = 0;
-    progress_.resumed = false;
-    progress_.lines   = 0;
-    progress_.kept    = 0;
-    progress_.merging = false;
-    progress_.merged  = 0;
-    progress_.total   = 0;
-    thread_           = std::thread([this, source = std::move(source), min_men] {
-        std::string error;
-        try {
-            run(source, min_men);
-        } catch (const std::exception& e) {
-            error = e.what();
-        }
-        {
-            std::lock_guard lock(mutex_);
-            if (!finished_) finished_ = error.empty() ? std::string("stopped") : error;
-        }
-        busy_ = false;
-    });
-}
-
-void OfflineEvals::run(std::string source, int min_men) {
-    std::error_code ec;
-    fs::create_directories(build(), ec);
     study::EvalsBuilder::Options options;
     options.min_men     = min_men;
     options.run_entries = run_entries_;
-    IndexConsumer consumer(folder_, options, progress_, [this](std::vector<fs::path> runs) {
-        {
-            std::lock_guard lock(mutex_);
-            runs_ = std::move(runs);
-        }
-        ++runs_version_;
-    });
     ZstdReadingOptions o;
     o.checkpoint_every = checkpoint_every_;
     o.retry_wait       = retry_wait_;
     o.on_saved         = on_saved_;
-    auto why           = readZstd(source, build() / "reading.json", consumer, progress_, cancel_, o);
-    if (why.empty()) fs::remove_all(build(), ec);  // the index made: its runs and logs are gone, its state too
-    std::lock_guard lock(mutex_);
-    finished_ = std::move(why);
+    // The task holds what it reads, what it tells and what it publishes: it may outlive this object, parked.
+    job_.start([source = std::move(source), folder = folder_, options, o,
+                published = published_](TaskState<Progress>& job) -> std::string {
+        try {
+            const auto build = folder / "build";
+            std::error_code ec;
+            fs::create_directories(build, ec);
+            IndexConsumer consumer(folder, options, job, [published](std::vector<fs::path> runs) {
+                {
+                    std::lock_guard lock(published->mutex);
+                    published->runs = std::move(runs);
+                }
+                ++published->version;
+            });
+            auto why = readZstd(source, build / "reading.json", consumer, job, job.cancel, o);
+            if (why.empty()) fs::remove_all(build, ec);  // the index made: its runs and logs are gone, its state too
+            return why;
+        } catch (const std::exception& e) {
+            const std::string why = e.what();
+            return why.empty() ? std::string("stopped") : why;
+        }
+    });
 }
 
 std::optional<std::string> OfflineEvals::finished() {
-    if (busy_) return std::nullopt;
-    std::optional<std::string> out;
-    {
-        std::lock_guard lock(mutex_);
-        out = std::move(finished_);
-        finished_.reset();
+    if (!job_.ready()) return std::nullopt;
+    auto out = job_.take();
+    if (std::exchange(remove_when_ended_, false)) {
+        removeNow();
+        return std::nullopt;  // cancelled by the removal
     }
-    if (out) {
-        if (thread_.joinable()) thread_.join();
-        if (out->empty()) study::tidyEvalsFolder(folder_);  // the index it replaced
-        reload();
-        runs_seen_ = runs_version_;
-    }
+    if (out.empty()) study::tidyEvalsFolder(folder_);  // the index it replaced
+    reload();
+    runs_seen_ = published_->version;
     return out;
 }
 
 void OfflineEvals::poll() {
-    const auto version = runs_version_.load();
+    const auto version = published_->version.load();
     if (version == runs_seen_) return;
     runs_seen_ = version;
     {
@@ -314,8 +285,8 @@ void OfflineEvals::poll() {
     }
     std::vector<fs::path> files;
     {
-        std::lock_guard lock(mutex_);
-        files = runs_;
+        std::lock_guard lock(published_->mutex);
+        files = published_->runs;
     }
     auto runs = openRuns(files);
     std::shared_ptr<const study::EvalsLookup> lookup;
@@ -326,34 +297,48 @@ void OfflineEvals::poll() {
 }
 
 void OfflineEvals::remove() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
     {
         std::lock_guard lock(mutex_);
         lookup_.reset();
-        finished_.reset();
-        runs_.clear();
         ++generation_;
     }
+    // What a preparation still publishes goes to its own list, never opened.
+    published_ = std::make_shared<Published>();
+    runs_seen_ = 0;
+    if (busy()) {
+        job_.cancel();
+        remove_when_ended_ = true;
+        std::lock_guard lock(mutex_);
+        state_ = {};
+        return;
+    }
+    job_.drop();  // a result not taken: forgotten
+    remove_when_ended_ = false;
+    removeNow();
+}
+
+void OfflineEvals::removeNow() {
     std::error_code ec;
     fs::remove_all(folder_, ec);
     reload();
-    runs_seen_ = runs_version_;
+    runs_seen_ = published_->version;
 }
 
 void OfflineEvals::forgetStopped() {
-    if (busy_) return;
-    if (thread_.joinable()) thread_.join();
+    if (busy()) return;
     {
         std::lock_guard lock(mutex_);
         if (lookup_ && !lookup_->index()) lookup_.reset();
-        runs_.clear();
         ++generation_;
+    }
+    {
+        std::lock_guard lock(published_->mutex);
+        published_->runs.clear();
     }
     std::error_code ec;
     fs::remove_all(build(), ec);
     reload();
-    runs_seen_ = runs_version_;
+    runs_seen_ = published_->version;
 }
 
 }  // namespace fcg

@@ -132,45 +132,24 @@ bool keepGame(std::string_view game, const MonthFilter& filter) {
     return true;
 }
 
-MonthReading::~MonthReading() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
-}
-
 void MonthReading::start(std::string source, std::shared_ptr<study::Database> db, MonthFilter filter,
                          std::filesystem::path state_file) {
-    if (busy_ || !db) return;
-    if (thread_.joinable()) thread_.join();
-    busy_   = true;
-    cancel_ = false;
-    {
-        std::lock_guard lock(mutex_);
-        finished_.reset();
-    }
-    progress_.bytes = progress_.size = progress_.games = progress_.kept = progress_.added = 0;
-    progress_.resumed                                                                     = false;
-    thread_ = std::thread([this, source = std::move(source), db = std::move(db), filter, state_file] {
-        std::string why;
+    if (busy() || !db) return;
+    // The task holds what it reads and what it tells: it may outlive this object, parked.
+    job_.start([source = std::move(source), db = std::move(db), filter, state_file = std::move(state_file),
+                options = options_](TaskState<Progress>& job) {
         try {
-            MonthConsumer consumer(db, filter, progress_);
-            why = readZstd(source, state_file, consumer, progress_, cancel_, options_);
+            MonthConsumer consumer(db, filter, job);
+            return readZstd(source, state_file, consumer, job, job.cancel, options);
         } catch (const std::exception& e) {
-            why = e.what();
+            return std::string(e.what());
         }
-        {
-            std::lock_guard lock(mutex_);
-            finished_ = why;
-        }
-        busy_ = false;
     });
 }
 
 std::optional<std::string> MonthReading::finished() {
-    if (busy_) return std::nullopt;
-    std::lock_guard lock(mutex_);
-    auto out = std::move(finished_);
-    finished_.reset();
-    return out;
+    if (!job_.ready()) return std::nullopt;
+    return job_.take();
 }
 
 }  // namespace fcg::lichess

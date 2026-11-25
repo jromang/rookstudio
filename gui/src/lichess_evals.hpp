@@ -11,14 +11,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
+#include "jobs.hpp"
 #include "opening_suite.hpp"
 
 #include "zstd_reading.hpp"
@@ -129,15 +128,15 @@ class EvalsReading {
         std::atomic<uint64_t> lines{0};  // positions of the database read
         std::atomic<uint64_t> kept{0};   // candidates found
     };
-    EvalsReading() = default;
-    ~EvalsReading();  // cancels and waits
+    // A reading under way when it goes is cancelled and parked in `jobs` (#105).
+    explicit EvalsReading(JobGroup& jobs) : job_(jobs) {}
     EvalsReading(const EvalsReading&)            = delete;
     EvalsReading& operator=(const EvalsReading&) = delete;
 
     void start(std::string source, std::filesystem::path folder);
-    [[nodiscard]] bool busy() const noexcept { return busy_; }
-    void cancel() noexcept { cancel_ = true; }
-    [[nodiscard]] const Progress& progress() const noexcept { return progress_; }
+    [[nodiscard]] bool busy() const noexcept { return job_.running(); }
+    void cancel() noexcept { job_.cancel(); }
+    [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
     // Once a reading has stopped: empty when it went to its end, else why it stopped ("cancelled" for Cancel).
     [[nodiscard]] std::optional<std::string> finished();
     // Seconds between checkpoints; the tests make it 0.
@@ -146,14 +145,9 @@ class EvalsReading {
     void setRetryWait(std::chrono::milliseconds wait) noexcept { retry_wait_ = wait; }
 
    private:
-    void run(std::string source, std::filesystem::path folder);
-    std::thread thread_;
-    std::atomic<bool> busy_{false}, cancel_{false};
-    Progress progress_;
-    std::mutex mutex_;
-    std::optional<std::string> finished_;
     double checkpoint_every_ = 5;
     std::chrono::milliseconds retry_wait_{2000};
+    Job<std::string, Progress> job_;
 };
 
 }  // namespace fcg

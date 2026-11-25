@@ -222,3 +222,49 @@ TEST_CASE("codec: more queens than one byte holds, and SAN as other programs wri
     CHECK(promo.parseSan("b8Q")->promotion == QUEEN);
     CHECK(!promo.parseSan("b8"));  // a promotion must say into what
 }
+
+TEST_CASE("codec: any code of a position played, its move legal or not, leaves a board that holds together (#102)") {
+    // A damaged game's codes are within the position's count but name moves no legal play makes: decode() checks no
+    // legality, and play() must not break the board (a castling without its rook took a man from an empty square,
+    // out of the bitboards' bounds). Random walks of any codes, from random positions of legal play.
+    std::mt19937 random(102);
+    long played = 0;
+    for (int walk = 0; walk < 400; ++walk) {
+        const bool chess960 = walk % 3 == 0;
+        chess::Board legal;
+        legal.set960(chess960);
+        legal.setFen(chess960 ? random960(random) : std::string(chess::constants::STARTPOS));
+        for (int ply = static_cast<int>(random() % 40); ply > 0; --ply) {
+            chess::Movelist moves;
+            chess::movegen::legalmoves(moves, legal);
+            if (moves.empty()) break;
+            legal.makeMove<false>(moves[static_cast<int>(random() % static_cast<unsigned>(moves.size()))]);
+        }
+        ScanBoard board;
+        REQUIRE(board.set(legal));
+        for (int step = 0; step < 60; ++step) {
+            const int count = board.codeCount();
+            if (count <= 1) break;  // no man of the side to move left: only the null move
+            board.play(board.decode(static_cast<int>(random() % static_cast<unsigned>(count))));
+            ++played;
+            // Each man on one square, its square in its bitboard and in no other, every bitboard's men on a square.
+            int men = 0;
+            for (int square = 0; square < 64; ++square) {
+                const int piece = board.on(square);
+                if (piece == 0) {
+                    REQUIRE(((board.occupied() >> square) & 1) == 0);
+                    continue;
+                }
+                ++men;
+                const int side = (piece - 1) / 6, kind = (piece - 1) % 6;
+                REQUIRE(((board.pieces(side, kind) >> square) & 1) == 1);
+            }
+            int bits = 0;
+            for (int side = 0; side < 2; ++side)
+                for (int kind = PAWN; kind <= KING; ++kind) bits += __builtin_popcountll(board.pieces(side, kind));
+            REQUIRE(bits == men);
+            REQUIRE(board.codeCount() == countedCodes(board));
+        }
+    }
+    MESSAGE(played << " codes played, legal or not");
+}

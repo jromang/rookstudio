@@ -302,7 +302,9 @@ struct BuildGame {
 bool sortedBefore(const BuildGame& a, const BuildGame& b) {
     if (a.start != b.start) return a.start < b.start;
     if (a.chess960 != b.chess960) return a.chess960 < b.chess960;
-    const int c = std::memcmp(a.codes, b.codes, std::min(a.bytes, b.bytes));
+    // A game without codes may have none at all (null): memcmp() takes no null pointer, even for no byte.
+    const std::size_t common = std::min(a.bytes, b.bytes);
+    const int c              = common == 0 ? 0 : std::memcmp(a.codes, b.codes, common);
     if (c != 0) return c < 0;
     if (a.bytes != b.bytes) return a.bytes < b.bytes;
     return a.id < b.id;
@@ -467,12 +469,15 @@ class Builder {
             if (kept[id]) games_.push_back(all[id]);
     }
 
-    // The board a game starts from.
+    // The board a game starts from: false when it cannot be set (its FEN damaged too, read without an exception on
+    // the build's threads).
     bool startBoard(const BuildGame& g, ScanBoard& board) const {
-        if (g.fen) return board.setFen(snap_.game(g.id).start_fen, g.chess960 != 0);
-        if (g.chess960) return board.setFen(chess::constants::STARTPOS, true);
-        board = standard_;
-        return true;
+        if (!g.fen && !g.chess960) {
+            board = standard_;
+            return true;
+        }
+        return startOf(snap_, g.id, static_cast<uint16_t>((g.fen ? GAME_FEN : 0) | (g.chess960 ? GAME_CHESS960 : 0)),
+                       board);
     }
 
     // The games' numbers, in the order of their moves.

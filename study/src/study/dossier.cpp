@@ -250,24 +250,6 @@ constexpr uint32_t STRUCTURE_PLY  = 40;
 constexpr uint64_t SCAN_PART      = 16384;
 constexpr std::size_t REPLAY_PART = 64;
 
-// The board a game starts from; false when its start cannot be set.
-bool startOf(const Snapshot& snap, GameId id, uint16_t flags, ScanBoard& board) {
-    static const ScanBoard standard = [] {
-        ScanBoard b;
-        b.setFen(chess::constants::STARTPOS, false);
-        return b;
-    }();
-    static const ScanBoard standard960 = [] {
-        ScanBoard b;
-        b.setFen(chess::constants::STARTPOS, true);
-        return b;
-    }();
-    const bool chess960 = (flags & GAME_CHESS960) != 0;
-    if (flags & GAME_FEN) return board.setFen(snap.game(id).start_fen, chess960);
-    board = chess960 ? standard960 : standard;
-    return true;
-}
-
 // Runs `work(thread)` on `threads` threads, the background of the caller kept.
 template <typename Work>
 void onThreads(int threads, Work&& work) {

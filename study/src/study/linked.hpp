@@ -42,20 +42,25 @@ class LinkedDatabase {
     // disk sets `cancel` too, as importInto() does.
     LinkedRefresh refresh(std::atomic<bool>& cancel);
 
-    [[nodiscard]] const std::shared_ptr<Database>& database() const noexcept { return db_; }
+    // The database, a copy of the pointer for the caller to hold: always the same one, which refresh() changes by
+    // commits only, on its own thread while the window reads it (#100). Read again from the start, it is emptied in
+    // one commit (Database::clear()): a snapshot taken before keeps its games, and their files stay until none holds
+    // them.
+    [[nodiscard]] std::shared_ptr<Database> database() const noexcept { return db_; }
     [[nodiscard]] const LinkedSource& source() const noexcept { return source_; }
 
-    LinkedDatabase(std::filesystem::path cache, std::string key, LinkedSource source);  // use open()
+    LinkedDatabase(std::filesystem::path cache, std::string key, LinkedSource source,
+                   std::shared_ptr<Database> db);  // use open()
 
    private:
     LinkedRefresh refreshFile(std::atomic<bool>& cancel);
     LinkedRefresh refreshTournament(std::atomic<bool>& cancel);
-    void rebuild();  // an empty database in place of the one there
+    void rebuild();  // the database emptied, and the note of what was read gone
 
     std::filesystem::path cache_;
     std::string key_;
     LinkedSource source_;
-    std::shared_ptr<Database> db_;
+    const std::shared_ptr<Database> db_;  // never another: no lock needed to copy it
 };
 
 // The name of a source's files in the cache: a hash of its kind and its full path.

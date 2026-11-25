@@ -223,7 +223,7 @@ Duplicates findDuplicates(const std::shared_ptr<const Snapshot>& snapshot, GameI
                 c.date             = numbers.date;
                 c.result           = numbers.result;
                 c.round            = snap.name(snap.rowIds(id).round);
-                if (c.flags & GAME_FEN) c.fen = snap.game(id).start_fen;
+                if (c.flags & GAME_FEN) c.fen = snap.startFen(id);
                 // A site that is the game's own address is kept with the other tags, not in the column.
                 if (snap.row(id).site.empty()) {
                     c.address = snap.tag(id, "Site");

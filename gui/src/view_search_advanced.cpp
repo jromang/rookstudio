@@ -291,7 +291,8 @@ std::optional<GameAt> gameAt(const study::Snapshot& snap, study::GameId id, uint
     GameAt at;
     at.board.set960((g.flags & study::GAME_CHESS960) != 0);
     if (g.flags & study::GAME_FEN) {
-        if (!at.board.setFen(snap.game(id).start_fen)) return std::nullopt;
+        const auto fen = snap.startFen(id);  // empty for a damaged record
+        if (fen.empty() || !at.board.setFen(fen)) return std::nullopt;
     } else {
         at.board.setFen(chess::constants::STARTPOS);
     }

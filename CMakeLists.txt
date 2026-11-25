@@ -278,6 +278,19 @@ if(FCG_STUDY_BENCH)
     target_compile_options(fcg-study-bench PRIVATE -Wall -Wextra)
 endif()
 
+if(FCG_FUZZ)
+    # What a database is made of, changed after it was written (#102): a segment's files, its edits, its table of
+    # names; and what the store imports: a PGN file plain or compressed, a ChessBase archive. Linked with the study
+    # layer alone, built with the window or without it. Each target fuzz_<name> from fuzz/<name>.cpp, its seeds in
+    # fuzz/corpus/<name>.
+    foreach(name segment edits players import chessbase)
+        add_executable(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
+                                    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
+        target_link_libraries(fuzz_${name} PRIVATE fcg_study)
+        target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
+    endforeach()
+endif()
+
 # ---------------------------------------------------------------------------
 # Commentary: the assistant's facts, comments and review, ported from the Rust prototype (no UI)
 # ---------------------------------------------------------------------------

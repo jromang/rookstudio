@@ -31,6 +31,7 @@
 #include "chessbase.hpp"
 #include "import.hpp"
 #include "players.hpp"
+#include "scan_board.hpp"
 
 namespace fcg::study {
 
@@ -70,7 +71,8 @@ struct HeaderNumbers {
     char result        = '*';
 };
 
-// A game's move codes, what replaying it needs (a game with a start position of its own: GAME_FEN).
+// A game's move codes, what replaying it needs (a game with a start position of its own: GAME_FEN). Its plies never
+// more than its codes' bytes, a damaged record's included.
 struct GameMoves {
     std::span<const uint8_t> codes;
     uint32_t plies = 0;
@@ -121,7 +123,8 @@ class Snapshot {
     [[nodiscard]] HeaderRow row(GameId id) const;
     [[nodiscard]] HeaderNumbers numbers(GameId id) const;
     [[nodiscard]] GameMoves gameMoves(GameId id) const;
-    // The ids of a game's names, for the filters and sorts that read names once.
+    // The ids of a game's names, for the filters and sorts that read names once: each below names(), an id past them
+    // (a damaged or crafted segment) read as no name.
     struct NameIds {
         uint32_t white = 0, black = 0, event = 0, site = 0, round = 0;
     };
@@ -166,8 +169,14 @@ class Snapshot {
     // (duplicateKey()).
     [[nodiscard]] uint64_t key(GameId id) const;
     // Everything kept of a game: its tags in their order of import less those of the columns (which come first),
-    // its moves, its text when annotated or damaged, its clocks and evaluations.
+    // its moves, its text when annotated or damaged, its clocks and evaluations. A record that does not read whole (a
+    // damaged or crafted segment: its offsets out of its files, its annex cut short) gives its headers and what could
+    // be read before the damage, marked damaged, without its moves when its start position is lost; never an
+    // exception (the window and the threads that read games catch none).
     [[nodiscard]] ImportedGame game(GameId id) const;
+    // Its start position's FEN, read alone (as tag() reads a tag); empty for a game of the standard start, and for a
+    // record whose FEN cannot be read. Never throws for a damaged record: startOf() reads it on the searches' threads.
+    [[nodiscard]] std::string startFen(GameId id) const;
     [[nodiscard]] uint32_t names() const noexcept { return names_; }
     [[nodiscard]] std::string_view name(uint32_t id) const;
     // A tag of a game kept with its other tags (not one of the columns): "WhiteFideId", "GameURL"; empty when none.
@@ -225,6 +234,7 @@ class Snapshot {
     uint64_t unreadable_edits_ = 0;  // while segments cannot be read: the edits generation made of theirs (else 0)
     uint64_t games_      = 0;
     uint32_t names_      = 0;
+    uint32_t no_name_    = 0;  // what rowIds() gives for a name id past names_: the empty name, else "?" (blankName())
     uint64_t generation_ = 0;
     std::vector<std::string> segment_names_;  // of each segment
     std::vector<std::string> sources_;        // of each segment
@@ -232,6 +242,11 @@ class Snapshot {
     std::shared_ptr<const PlayerTable> players_ = std::make_shared<const PlayerTable>();
     std::string players_file_;
 };
+
+// The board a game starts from, as its flags say (GameMoves::flags: a FEN of its own, Chess960 or not); false when it
+// cannot be set, its FEN damaged included. Never throws: the searches, the opening tree, a dossier and an opening
+// report call it on threads that catch nothing.
+[[nodiscard]] bool startOf(const Snapshot& snapshot, GameId id, uint16_t flags, ScanBoard& board);
 
 struct CheckProgress {
     std::atomic<uint64_t> done{0};  // of the games read
@@ -333,6 +348,13 @@ class Database {
     void restore(std::span<const GameState> states);
     // The table of names replaced, in one commit.
     void setPlayers(PlayerTable table);
+    // Every game taken out, in one commit: the database as one just made (no segment, edits nor table of names), its
+    // generation going on, so that what was built or kept of its games before (an opening tree, the window's views
+    // and caches, which go by generation) no longer holds; the same Database for whoever holds it. A snapshot taken
+    // before keeps reading its games: their files go once no snapshot holds them (at a later change, or when the
+    // database is closed). Throws std::runtime_error when read-only, or when the disk refuses (nothing changed then).
+    // A file read as a database is read again from the start so (LinkedDatabase).
+    void clear();
 
     // Every segment read again and every game replayed, in the background on `threads` threads (0: the machine's),
     // the database read and written meanwhile; what is checked is the snapshot of when it starts.
@@ -361,8 +383,8 @@ class Database {
     [[nodiscard]] bool keepReadableUndoable() const;
     bool undoKeepReadable();
 
-    // The files a compaction left (those it replaced), and those keepReadable() did: removed when the database is
-    // closed.
+    // The files a compaction left (those it replaced), those keepReadable() did and the segments clear() took out:
+    // removed when the database is closed.
     ~Database();
     Database(const Database&)            = delete;
     Database& operator=(const Database&) = delete;
@@ -377,18 +399,23 @@ class Database {
     uint32_t nameId(const std::string& name, std::vector<std::string>& added);
     // Writes `games` in new segments (of versions when `versions`) and commits them with the edits `replaced` and
     // `deleted` (the snapshot's own when null) and the table of names `players` (the snapshot's when null), in one
-    // manifest. Under the lock.
+    // manifest. Under the writers' lock, mutex_ taken only for a moment: snapshot() never waits for its writes.
     void commit(std::vector<ImportedGame>& games, const std::vector<uint64_t>& keys, bool versions,
                 const std::vector<Snapshot::Version>* replaced, const std::vector<uint64_t>* deleted,
                 const PlayerTable* players = nullptr, const std::string& source = {});
     void dropLeftovers();  // a compaction's files and keepReadable()'s, at closing
+    // The released segments' files that no snapshot holds any longer removed; closing, all of them.
+    void removeReleased(bool closing = false);
 
     std::filesystem::path dir_;
     std::optional<tour::FolderLock> lock_;  // none when read-only
-    // Held by every change for its whole length, a compaction's included, before mutex_: a long compaction keeps the
-    // other changes waiting, not the readers.
+    // Held by every change for its whole length (a compaction's commit, a read-only database's refresh), before
+    // mutex_: the changes one after the other, the readers never waiting for one (an import's commit writes and syncs
+    // its files while the window takes a snapshot each frame). current_ changes only under both; the indexes of names
+    // and keys are the writers' own, under this lock alone.
     std::mutex write_mutex_;
     std::mutex compact_mutex_;  // one compaction at a time, and its undoing
+    // Taken for a moment: current_ read or published, next_segment_, leftovers_, kept_ and dropped_.
     mutable std::mutex mutex_;
     std::shared_ptr<const Snapshot> current_;
     std::unordered_map<std::string, uint32_t> name_ids_;  // filled at the first append
@@ -406,6 +433,12 @@ class Database {
     std::optional<Leftovers> leftovers_;
     std::optional<Leftovers> kept_;     // keepReadable()'s, as a compaction's
     std::vector<std::string> dropped_;  // the files of a keepReadable() before it, no longer undone: removed at closing
+    // The segments clear() took out, while snapshots taken before it still read them (under the writers' lock).
+    struct Released {
+        std::string name;
+        std::weak_ptr<const Segment> segment;
+    };
+    std::vector<Released> released_;
 };
 
 struct DatabaseImport {

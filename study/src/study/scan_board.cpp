@@ -194,6 +194,9 @@ std::string ScanBoard::fen() const {
 }
 
 void ScanBoard::put(int square, int side, int kind) noexcept {
+    // A move no legal play makes (a damaged code decodes to one: decode() does not check legality, #102) may land on
+    // a man: taken, so that the squares and the bitboards keep agreeing.
+    if (board_[square] != 0) remove(square);
     board_[square] = static_cast<uint8_t>(1 + kind + 6 * side);
     bb_[side][kind] |= bit(square);
     occ_[side] |= bit(square);
@@ -205,6 +208,7 @@ void ScanBoard::put(int square, int side, int kind) noexcept {
 
 void ScanBoard::remove(int square) noexcept {
     const auto piece = board_[square];
+    if (piece == 0) return;  // an empty square (a castling without its rook, from a damaged code): nothing to take
     const int kind = kindOf(piece), side = sideOf(piece);
     board_[square] = 0;
     bb_[side][kind] &= ~bit(square);
@@ -312,7 +316,9 @@ CodedMove ScanBoard::decode(int code) const noexcept {
                 }
                 if (direction == 1) to -= 1;
                 if (direction == 2) to += 1;
-                if (direction != 0 && to == ep_ && board_[to] == 0) move.flags = MOVE_EN_PASSANT;
+                // ep_ first: a pawn of an edge file taking off the board (a damaged code's) has a square of -1 here,
+                // which no square behind a pawn is, and which board_ has not.
+                if (direction != 0 && ep_ >= 0 && to == ep_ && board_[to] == 0) move.flags = MOVE_EN_PASSANT;
                 break;
             }
             case ROOK:

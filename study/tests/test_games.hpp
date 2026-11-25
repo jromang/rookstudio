@@ -100,8 +100,13 @@ inline std::vector<ImportedGame> randomGames(std::size_t count, uint32_t seed, i
         s.result    = results[random() % 4];
         s.white_elo = random() % 4 ? 1800 + static_cast<int>(random() % 1000) : 0;
         s.black_elo = random() % 4 ? 1800 + static_cast<int>(random() % 1000) : 0;
-        s.date      = std::to_string(1990 + random() % 37) + ".0" + std::to_string(1 + random() % 9) + ".1" +
-                      std::to_string(random() % 10);
+        // Drawn one at a time, the day first: in one expression the operands of + go in an order each compiler
+        // chooses (gcc from the right, clang from the left), and the games, which a test holds to bytes written
+        // before, must be the same built by either.
+        const auto day   = random() % 10;
+        const auto month = 1 + random() % 9;
+        const auto year  = 1990 + random() % 37;
+        s.date = std::to_string(year) + ".0" + std::to_string(month) + ".1" + std::to_string(day);
         games.push_back(make(s, i));
     }
     return games;

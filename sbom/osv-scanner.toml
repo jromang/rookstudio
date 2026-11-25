@@ -28,3 +28,19 @@ reason = "llama.cpp: a reachable assertion in the Mirostat sampler. The assistan
 [[IgnoredVulns]]
 id = "CVE-2026-116096"
 reason = "llama.cpp: an out-of-bounds write in the Pocket-TTS model of tools/mtmd. No tool of llama.cpp is built (LLAMA_BUILD_TOOLS off), mtmd least of all."
+
+[[IgnoredVulns]]
+id = "CVE-2025-55188"
+reason = "7-Zip: symbolic links mishandled when 7-Zip extracts an archive to the disk. Only the LZMA SDK's C decoders and 7z reader are compiled in (fcg_lzma: 7zArcIn.c, 7zDec.c, LzmaDec.c, Lzma2Dec.c and the filters); study/src/study/sevenzip.cpp streams each entry's bytes to the importer and never makes a file, a folder or a link from an archive."
+
+[[IgnoredVulns]]
+id = "CVE-2026-125742"
+reason = "7-Zip: an out-of-bounds write in the LZX decoder of multi-volume CAB archives (CPP/7zip/Compress/LzxDecoder.cpp). Only the LZMA SDK's C decoders and 7z reader are compiled in (fcg_lzma): no CAB handler and no LZX decoder."
+
+[[IgnoredVulns]]
+id = "CVE-2026-130067"
+reason = "7-Zip File Manager: a misleading entry name not warned about before ShellExecute. The File Manager is not compiled in, only the LZMA SDK's C decoders and 7z reader (fcg_lzma); no entry is ever opened or run."
+
+[[IgnoredVulns]]
+id = "CVE-2026-58052"
+reason = "7-Zip for Windows: the Mark-of-the-Web lost when it extracts a crafted RAR5 archive to an NTFS disk. No RAR handler is compiled in, only the LZMA SDK's C decoders and 7z reader (fcg_lzma), and no entry is extracted to the disk."

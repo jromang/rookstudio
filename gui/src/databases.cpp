@@ -155,14 +155,13 @@ DatabaseShelf::DatabaseShelf(fs::path profile) : profile_(std::move(profile)) {
 }
 
 DatabaseShelf::~DatabaseShelf() {
-    if (import_) {
-        import_->cancel = true;
-        if (import_->done.valid()) import_->done.wait();
-    }
-    for (auto& link : links_) {
-        if (link.cancel) *link.cancel = true;
+    // Cancelled first, then waited for: an opening tree's build too, which would otherwise run to its end (#98). The
+    // tasks use their job's fields until they end.
+    cancelAll();
+    if (import_ && import_->done.valid()) import_->done.wait();
+    if (tree_job_ && tree_job_->done.valid()) tree_job_->done.wait();
+    for (auto& link : links_)
         if (link.refresh.valid()) link.refresh.wait();
-    }
 }
 
 void DatabaseShelf::save() const {
@@ -226,6 +225,18 @@ void DatabaseShelf::remove(std::size_t index) {
     } else if (import_ && import_->index > index) {
         --import_->index;
     }
+    // Its opening tree's build is cancelled and kept until it ends, for no database: one build at a time, and its task
+    // uses its job. Those of the databases after it, running or asked for, follow their database (#101).
+    if (tree_job_ && tree_job_->index == index) {
+        tree_job_->cancel = true;
+        tree_job_->index  = TreeJob::REMOVED;
+    } else if (tree_job_ && tree_job_->index != TreeJob::REMOVED && tree_job_->index > index) {
+        --tree_job_->index;
+    }
+    if (tree_again_ && *tree_again_ == index)
+        tree_again_.reset();
+    else if (tree_again_ && *tree_again_ > index)
+        --*tree_again_;
     const auto at = static_cast<std::ptrdiff_t>(index);
     entries_.erase(entries_.begin() + at);
     open_.erase(open_.begin() + at);
@@ -507,6 +518,13 @@ bool DatabaseShelf::pollTreeJob() {
 void DatabaseShelf::cancelTreeJob() {
     if (tree_job_) tree_job_->cancel = true;
     tree_again_.reset();
+}
+
+void DatabaseShelf::cancelAll() {
+    if (import_) import_->cancel = true;
+    cancelTreeJob();
+    for (auto& link : links_)
+        if (link.cancel) *link.cancel = true;
 }
 
 }  // namespace fcg

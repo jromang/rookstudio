@@ -192,8 +192,6 @@ void App::drawShell() {
         ImGui::SetNavCursorVisible(false);
         nav_page_ = page_;
     }
-    pollDatabases();
-    pollTwic();
     if (chessBoard()) {
         drawRecentGames();  // Ctrl+Tab, on any of its pages
         if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {

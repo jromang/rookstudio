@@ -374,14 +374,15 @@ void App::commentBoardMove() {
     auto tables  = review && reviewTables() ? review_tables_ : boardPositionTables();
     job.texts    = std::async(std::launch::async,
                               [review, ply = static_cast<std::size_t>(b.ply), fen = job.targets.front().fen, before_fen,
-                               played, model = assistant_.get(), oracle = oracle_, done = job.done, tables, l = lang(),
-                               letters = letters()]() {
+                               played, service = assistant_.get(), cancel = job.cancel, oracle = oracle_,
+                               done = job.done, tables, l = lang(), letters = letters()]() {
                                std::vector<std::string> out(1);
+                               CancellableModel model(*service, cancel);  // cancelled, it asks nothing more (#98)
                                if (review) {
                                    if (const auto* m = review->report.get(ply)) {
                                        const auto ctx = commentary::moveContext(review->line, *m, review->analyses,
                                                                                 nullptr, tables.get(), oracle.get());
-                                       if (const auto w = commentary::writtenComment(*model, ctx, l, letters))
+                                       if (const auto w = commentary::writtenComment(model, ctx, l, letters))
                                            out[0] = w->text;
                                        ++*done;
                                        return out;
@@ -397,7 +398,7 @@ void App::commentBoardMove() {
                                    asked.previous = earlier->parseUci(played);
                                    asked.lang     = l;
                                    asked.letters  = letters;
-                                   const auto a   = commentary::answer(asked, *model, oracle.get(), tables.get());
+                                   const auto a   = commentary::answer(asked, model, oracle.get(), tables.get());
                                    if (const auto* said = std::get_if<commentary::Answered>(&a)) out[0] = said->text;
                                }
                                ++*done;

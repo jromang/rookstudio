@@ -1,10 +1,13 @@
 #include <doctest/doctest.hpp>
 
 #include <filesystem>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include <chess.hpp>
+#include <study/pgn_reader.hpp>
+#include <tour/pgn_index.hpp>
 
 #include "repertoires.hpp"
 
@@ -30,6 +33,25 @@ chess::Move next(const std::vector<std::string>& line, const std::string& san) {
 }
 
 }  // namespace
+
+TEST_CASE("repertoires: a line shown on the board, a repertoire's name with quotes and a backslash as its event") {
+    CHECK(lineMovetext({"e4", "c5", "Nf3"}) == "1.e4 c5 2.Nf3");
+    CHECK(lineMovetext({}).empty());
+    // A double quote in the name ended the tag's value there: the rest broke the header (#101).
+    const std::string title = R"(Sicilian "Najdorf" \ 6.Bg5)";
+    const auto pgn          = linePgn({"e4", "c5", "Nf3", "d6"}, title);
+    CHECK(pgn.rfind(R"([Event "Sicilian \"Najdorf\" \\ 6.Bg5"])", 0) == 0);
+    // As the Board page reads it: its list of games, then the game.
+    std::istringstream in(pgn);
+    const auto index = tour::indexPgn(in);
+    REQUIRE(index.games.size() == 1);
+    CHECK(index.strings[index.games[0].event] == title);
+    const auto read = study::readPgnGame(pgn);
+    REQUIRE_MESSAGE(read.tree, read.error);
+    CHECK(read.error.empty());
+    CHECK(read.tree->main.header("Event") == title);
+    CHECK(read.tree->main.moves.size() == 4);
+}
 
 TEST_CASE("repertoires: made, starred moves added and taken out, kept in their PGN files") {
     const auto profile = fs::temp_directory_path() / "repertoires-profile";

@@ -165,10 +165,21 @@ bool App::offerLichessLink(const std::string& text, bool databases) {
     // One game or one chapter: its PGN at once, for its line on the card and to open it.
     if (onBoard(link->kind)) {
         const auto token = lichess_account_ ? lichess_account_->token : std::string();
-        card.pgn         = std::async(std::launch::async, [l = *link, token] { return lichess::linkPgn(l, token); });
+        card.pgn         = std::async(std::launch::async, [l = *link, token, cancel = card.cancel] {
+            return lichess::linkPgn(l, token, cancel.get());
+        });
     }
+    closeLinkCard();  // the card of a link pasted before
     link_card_ = std::move(card);
     return true;
+}
+
+void App::closeLinkCard() {
+    if (!link_card_) return;
+    // Its game may still be asked, behind another request to Lichess or its pause after a 429 (#98).
+    *link_card_->cancel = true;
+    graveyard_.park(std::move(link_card_->pgn));
+    link_card_.reset();
 }
 
 void App::pollLinkJob() {
@@ -207,7 +218,7 @@ void App::actOnLink() {
         if (link.white) b.flip = !*link.white;
         if (link.ply >= 0) b.ply = std::clamp(link.ply, 0, static_cast<int>(b.game.moves.size()));
         page_ = Page::Board;
-        link_card_.reset();
+        closeLinkCard();
         return;
     }
     if (link.kind == LinkKind::Player) {
@@ -215,7 +226,7 @@ void App::actOnLink() {
         saveLichessSettings();
         startLichessSync();
         page_ = Page::Lichess;
-        link_card_.reset();
+        closeLinkCard();
         return;
     }
     if (link.kind == LinkKind::BroadcastRound && card.follow) {
@@ -241,7 +252,7 @@ void App::actOnLink() {
         }
         followBroadcast(entry);
         page_ = Page::Lichess;
-        link_card_.reset();
+        closeLinkCard();
         return;
     }
     if (link_job_ && !link_job_->done) return;  // one at a time
@@ -277,7 +288,7 @@ void App::actOnLink() {
         return lichess::importLink(*db, l, token, *games, *cancel);
     });
     link_job_  = std::move(job);
-    link_card_.reset();
+    closeLinkCard();  // a game's link imported: its game may still be asked for the card
 }
 
 void App::drawLinkCard() {
@@ -400,7 +411,7 @@ void App::drawLinkCard() {
     if (ImGui::SmallButton(TR("Not now")) ||
         (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !ImGui::GetIO().WantTextInput)) {
         link_key_frame_ = ImGui::GetFrameCount();
-        link_card_.reset();
+        closeLinkCard();
         ImGui::PopTextWrapPos();
         ui::endCard();
         return;

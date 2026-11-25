@@ -84,7 +84,8 @@ class DatabaseShelf {
     std::size_t create(const std::string& name);
     // A database folder made elsewhere, listed last (or where it already is): its index. Throws when it is none.
     std::size_t add(const std::filesystem::path& folder);
-    // Out of the list; its files stay. Not a linked one's.
+    // Out of the list; its files stay. Not a linked one's. Its import is cancelled and waited for, its opening tree's
+    // build cancelled; the builds of the databases after it, running or asked for, keep theirs.
     void remove(std::size_t index);
     // Out of the list, its folder deleted: a database made for an import that brought nothing.
     void discard(std::size_t index);
@@ -140,6 +141,8 @@ class DatabaseShelf {
     // one at a time and none during an import, whose own build follows it; asked again while one runs, it runs
     // again after it, the edits made meanwhile in it. treeSource() asks it for a stale tree it finds.
     struct TreeJob {
+        // The index of a build whose database was removed: cancelled, it ends for no database.
+        static constexpr std::size_t REMOVED = ~std::size_t{0};
         std::size_t index = 0;
         study::TreeProgress progress;
         std::atomic<bool> cancel{false};
@@ -149,10 +152,16 @@ class DatabaseShelf {
     // Each frame: the databases another program writes read again when it committed (every 2 s), and opened to be
     // written again once it lets them go (tried every 5 s).
     void keepReadOnlyCurrent();
-    [[nodiscard]] TreeJob* treeJob() noexcept { return tree_job_.get(); }
+    // The build of a database's tree; none while the one of a database removed ends.
+    [[nodiscard]] TreeJob* treeJob() noexcept {
+        return tree_job_ && tree_job_->index != TreeJob::REMOVED ? tree_job_.get() : nullptr;
+    }
     // Each frame: a build that ended taken, the next one asked for started. True when one ended.
     bool pollTreeJob();
     void cancelTreeJob();
+    // At quit (#98): the import, the tree's build and the linked databases' refreshes cancelled, the build asked for
+    // after them forgotten. Each ends within about a second; the destructor, which does the same, waits for them.
+    void cancelAll();
 
    private:
     void save() const;

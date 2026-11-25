@@ -1063,7 +1063,7 @@ void App::drawGameList() {
         drawStudyCrosstable();
         return;
     }
-    crosstable_.reset();  // another database's
+    leaveCrosstable();  // another database's
     if (db_tournaments_ && snapshot->games() > 0) {
         drawTournamentList(index);
         return;

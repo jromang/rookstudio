@@ -38,6 +38,19 @@ namespace fcg {
 
 namespace fs = std::filesystem;
 
+namespace {
+
+// Every window of the program hidden: the main one and the panels dragged out of it (ImGui's viewports).
+void hideWindows() {
+    int count            = 0;
+    SDL_Window** windows = SDL_GetWindows(&count);
+    if (!windows) return;
+    for (int i = 0; i < count; ++i) SDL_HideWindow(windows[i]);
+    SDL_free(windows);
+}
+
+}  // namespace
+
 App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions options)
     : window_(window),
       storage_(std::move(storage)),
@@ -137,28 +150,44 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
 }
 
 App::~App() {
+    // The windows go first: the main loop has stopped drawing them, and what ends below (a task cancelled finishing
+    // its step, a hung engine, the question to GitHub) ends out of sight rather than in a frozen window (#98).
+    hideWindows();
     ui::setGuideOpener(nullptr);
     closeFileLines();  // a file being read stops within a megabyte
     // Lichess's waits end at once: the link's, the sync's.
     if (lichess_link_) *lichess_link_->cancel = true;
     if (lichess_sync_) *lichess_sync_->cancel = true;
     *lichess_count_cancel_ = true;
+    if (link_job_) *link_job_->cancel = true;  // a pasted link's games coming into a database: those committed stay
+    // Cancelled, then waited for at the end, while what their tasks use is still there (#98): a pasted link's game
+    // being asked, a crosstable's games being read, the assistant's comment, explanations and answers, which stop at
+    // their next request; the databases' import, opening tree and refreshes, waited for by the shelf when it goes.
+    closeLinkCard();
+    leaveCrosstable();
+    if (comment_job_) {
+        *comment_job_->cancel = true;
+        graveyard_.park(std::move(comment_job_->texts));
+    }
+    if (explain_job_) {
+        *explain_job_->cancel = true;
+        graveyard_.park(std::move(explain_job_->finished));
+    }
+    leaveQuestions();
+    if (shelf_) shelf_->cancelAll();
     if (review_tables_job_) *review_tables_job_->cancel = true;  // the tables of a review, within a quarter of a second
     if (story_job_) *story_job_->cancel = true;                  // the story by the model, at its next passage (#62)
     leaveReportJobs();  // an opening report's: waited for while the assistant is still there (#91)
     if (mistake_scan_job_) *mistake_scan_job_->cancel = true;    // the user's games looked for, at the next game (#81)
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
-    // thread ends at once, and the window goes away first rather than freeze while it does.
+    // thread ends at once.
     if (probe_.valid() || check_.valid()) {
-        if (window_) SDL_HideWindow(window_);
         fastchess::atomic::stop = true;  // fastchess' Windows reads give up
         interruptEngineProcesses();      // with what they started (a wrapper script's engine)
         fastchess::stopProcesses();
         if (probe_.valid()) probe_.wait();
         if (check_.valid()) check_.wait();
     }
-    // The question to GitHub gives up within its timeout: the window goes away meanwhile.
-    if (update_checker_.running() && window_) SDL_HideWindow(window_);
     fingerprints_cancel_ = true;
     if (fingerprints_.valid()) fingerprints_.wait();
     machine_activity_.clear();  // the machines' jobs cancelled, a second or two at most
@@ -181,6 +210,7 @@ App::~App() {
     }
     for (const auto texture : stale_textures_) render::destroyTexture(texture);
     sound::shutdown();
+    graveyard_.wait();
 }
 
 bool App::initGraphics() {
@@ -270,6 +300,7 @@ void App::forceQuit() {
 void App::frame() {
     ui::beginTopicFrame();
     retired_runs_.clear();  // the runs taken over during the last frame
+    graveyard_.poll();      // the tasks cancelled that ended (#98)
     // Before the engines are read: nothing is read yet, so a resume at launch starts at once, and the queue reads only
     // the engines it plays first.
     if (!launch_checked_) {
@@ -1204,6 +1235,10 @@ void App::frame() {
         focus_done_ = true;
         if (!focus_next_.empty()) focusWindow(std::exchange(focus_next_, {}));  // a word after another
     }
+
+    // An import's end and the opening tree that follows, TWIC's issues: whatever shows, the big screen too (#101).
+    pollDatabases();
+    pollTwic();
 
     // The big screen takes the main window's place: the panels taken out of it stay on screen.
     if (big_.on) {
@@ -2270,13 +2305,16 @@ void App::handleDialogs() {
                     board_.message_error = true;
                 }
                 break;
-            case Dialogs::Purpose::AssistantModel:
+            case Dialogs::Purpose::AssistantModel: {
                 // A GGUF file in place of the catalogue's model: loaded at the next question.
-                assistant_->unload();
-                assistant_->settings().model_file = path;
-                assistant_->settings().not_now    = false;
+                auto settings       = assistant_->settings();
+                settings.model_file = path;
+                settings.not_now    = false;
+                assistant_->setSettings(settings);
+                assistant_->unload();  // after: a request that starts meanwhile loads the file chosen
                 assistant_->saveSettings();
                 break;
+            }
             case Dialogs::Purpose::SaveBoardPgn:
                 try {
                     if (chessBoard()) fillBoardEco();

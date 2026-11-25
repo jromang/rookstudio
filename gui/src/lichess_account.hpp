@@ -92,11 +92,15 @@ struct TokenState {
 
 // The whole question: `open` is given Lichess's page to open in the browser (false: the program could not, and shows
 // the address to copy; the wait goes on). The account's scopes are those Lichess says the token has, else those asked.
-// `username`: the account Lichess offers, for a link made again with more scopes.
+// `username`: the account Lichess offers, for a link made again with more scopes. The user's no on Lichess's page is
+// the error LINK_REFUSED, which linkRefused() tells from every other: a token Lichess refuses after a yes (a 401 on the
+// account's name) says "refused" too, and is no refusal of the user's (#101).
 [[nodiscard]] Answer<Account> link(const std::function<bool(const std::string& url)>& open,
                                    const std::vector<std::string>& scopes,
                                    std::chrono::milliseconds within = std::chrono::minutes(5),
                                    const std::atomic<bool>* cancel = nullptr, std::string_view username = {});
+inline constexpr std::string_view LINK_REFUSED = "the link was refused on Lichess";
+[[nodiscard]] inline bool linkRefused(std::string_view error) noexcept { return error == LINK_REFUSED; }
 
 // In the profile, readable and writable by its owner alone: lichess-account.json, the user's account; a Lichess bot's
 // account has its own (#85), its token apart from the user's.

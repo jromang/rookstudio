@@ -1221,9 +1221,8 @@ void App::drawStudySendCard() {
                                       "here."));
             } else if (!s.error.empty()) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   s.error.find("refused") != std::string::npos
-                                       ? TR("You refused it on Lichess: nothing was sent.")
-                                       : trf("Not sent: {}.", s.error).c_str());
+                                   lichess::linkRefused(s.error) ? TR("You refused it on Lichess: nothing was sent.")
+                                                                 : trf("Not sent: {}.", s.error).c_str());
             }
             const bool can =
                 !s.busy && !lichess_link_ && (s.where == 0 ? !s.study.empty() : lichess::studyNameOk(s.name.data()));

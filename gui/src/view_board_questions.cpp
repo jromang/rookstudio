@@ -174,7 +174,9 @@ void App::drawAssistantFirstUse() {
             dialogs_.openFile(Dialogs::Purpose::AssistantModel, {{"GGUF", "gguf"}});
         ImGui::SameLine();
         if (ImGui::Button(TR("Not now"))) {
-            a.settings().not_now = true;
+            auto settings    = a.settings();
+            settings.not_now = true;
+            a.setSettings(settings);
             a.saveSettings();
         }
         ImGui::TextDisabled("%s", TR("Without it, everything else works: the analysis, the review's figures, the "
@@ -247,9 +249,10 @@ void App::askQuestion(const std::string& text, const std::string& asked_text, st
     q.answer =
         std::async(std::launch::async,
                    [question = asked_text.empty() ? text : asked_text, fen = q.fen, earlier_fen, previous,
-                    earlier_previous, line = std::move(line), bases = q.bases, lang, model = assistant_.get(),
-                    oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
+                    earlier_previous, line = std::move(line), bases = q.bases, lang, service = assistant_.get(),
+                    cancel = q.cancel, oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
                        QuestionResult r;
+                       if (*cancel) return r;  // left before it began: nobody reads it
                        const auto pos = commentary::Position::fromFen(fen);
                        if (!pos) {
                            r.error = "the position cannot be read";
@@ -287,7 +290,8 @@ void App::askQuestion(const std::string& text, const std::string& asked_text, st
                            asked.earlier_previous = two_back.parseUci(earlier_previous);
                        }
                        asked.line = moves;
-                       r.answer   = commentary::answer(asked, *model, oracle.get(), tables.get());
+                       CancellableModel model(*service, cancel);  // left, it stops at its next request (#98)
+                       r.answer = commentary::answer(asked, model, oracle.get(), tables.get());
                        // Two moves compared: the position they are played from, and what the databases hold of it,
                        // for the table under the answer.
                        if (const auto* a = std::get_if<commentary::Answered>(&r.answer);
@@ -314,8 +318,14 @@ void App::pollQuestions() {
     for (auto& q : questions_)
         if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             q.done = q.answer.get();
-    std::erase_if(questions_left_,
-                  [](auto& f) { return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
+}
+
+void App::leaveQuestions() {
+    for (auto& q : questions_) {
+        *q.cancel = true;
+        graveyard_.park(std::move(q.answer));
+    }
+    questions_.clear();
 }
 
 void App::addAssistantComment(const std::string& text, int line, int ply, const std::string& fen,
@@ -560,6 +570,7 @@ void App::drawAssistantSettings(float label) {
     bool changed     = false;
     using S          = AssistantService::State;
     const auto state = a.state();
+    auto settings    = a.settings();  // a copy: a request reads its own (#100)
 
     ui::label(TR("Assistant"), label);
     ImGui::BeginGroup();
@@ -599,7 +610,7 @@ void App::drawAssistantSettings(float label) {
                               "in the log."));
         if (ImGui::SmallButton(TR("Try the GPU again"))) a.retryGpu();
     }
-    if (!a.gpuTaken().empty() && a.settings().gpu) {
+    if (!a.gpuTaken().empty() && settings.gpu) {
         ImGui::TextDisabled("%s", trf("The tournament “{}” uses the GPU: the assistant answers on the processor "
                                       "meanwhile, in about 3 seconds.",
                                       a.gpuTaken())
@@ -616,7 +627,7 @@ void App::drawAssistantSettings(float label) {
     ui::label(TR("Its model"), label);
     ImGui::BeginGroup();
     ImGui::PushTextWrapPos();
-    if (a.settings().model_file.empty()) {
+    if (settings.model_file.empty()) {
         ImGui::TextUnformatted(trf("RookStudio commentary v11 · {}{}", formatBytes(a.recommended().size),
                                    a.installed() ? std::string() : std::string(" · ") + TR("not downloaded"))
                                    .c_str());
@@ -625,13 +636,14 @@ void App::drawAssistantSettings(float label) {
             if (ImGui::SmallButton(a.partlyDownloaded() ? TR("Resume the download") : TR("Download"))) a.download();
         }
     } else {
-        ImGui::TextUnformatted(a.settings().model_file.c_str());
+        ImGui::TextUnformatted(settings.model_file.c_str());
         if (!a.knowsComments())
             ImGui::TextDisabled("%s", TR("It answers the questions, but it has not learnt RookStudio's comments: "
                                          "those stay the templates'."));
         if (ImGui::SmallButton(TR("Back to RookStudio's model"))) {
-            a.unload();
-            a.settings().model_file.clear();
+            settings.model_file.clear();
+            a.setSettings(settings);
+            a.unload();  // after: a request that starts meanwhile loads RookStudio's
             changed = true;
         }
         ImGui::SameLine();
@@ -643,20 +655,22 @@ void App::drawAssistantSettings(float label) {
 
     // Where it runs, and for how long it stays.
     ui::label(TR("It runs on"), label);
-    int where = a.settings().gpu ? 0 : 1;
+    int where = settings.gpu ? 0 : 1;
     if (ImGui::RadioButton(TR("The GPU, when there is one to use"), &where, 0)) changed = true;
     ImGui::SameLine();
     if (ImGui::RadioButton(TR("The processor"), &where, 1)) changed = true;
-    if (changed && a.settings().gpu != (where == 0)) {
-        a.settings().gpu = where == 0;
+    if (changed && settings.gpu != (where == 0)) {
+        settings.gpu = where == 0;
+        a.setSettings(settings);
         a.unload();  // loaded again where it now runs
     }
     ui::label(TR("Unloaded after"), label);
-    int minutes = a.settings().unload_minutes;
+    int minutes = settings.unload_minutes;
     ImGui::SetNextItemWidth(px(110));
     if (ImGui::InputInt("##unload_minutes", &minutes, 5, 15)) {
-        a.settings().unload_minutes = std::clamp(minutes, 0, 24 * 60);
-        changed                     = true;
+        settings.unload_minutes = std::clamp(minutes, 0, 24 * 60);
+        a.setSettings(settings);
+        changed = true;
     }
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("minutes without serving; 0: kept until Unload"));

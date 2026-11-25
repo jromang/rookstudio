@@ -220,9 +220,11 @@ TEST_CASE("every move explained: the assistant's scripted model refused by the c
     fs::create_directories(profile);
     AssistantService service(profile, (test::selfPath().parent_path() / FCG_MOCK_ASSISTANT).string());
     std::ofstream(profile / "commentary.gguf") << "model";
-    service.settings().model_file = (profile / "commentary.gguf").string();
-    service.settings().gpu        = false;
-    const auto game               = parseReplay(GAME);
+    auto settings       = service.settings();
+    settings.model_file = (profile / "commentary.gguf").string();
+    settings.gpu        = false;
+    service.setSettings(settings);
+    const auto game = parseReplay(GAME);
     REQUIRE(game);
     const auto review = commentaryReview(*game, false, reviewOf(*game));
     REQUIRE(review);

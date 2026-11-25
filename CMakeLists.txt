@@ -177,7 +177,10 @@ target_link_libraries(fcg_tournament PUBLIC fastchess_core)
 # The program's name where the tournament layer writes it (engine logs, a rating list's header, the book adapter's
 # messages), set by each repository: tournament/src stays the same in fastchess-gui's.
 set(FCG_PRODUCT_NAME "RookStudio")
-target_compile_definitions(fcg_tournament PRIVATE FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
+# The program's file, as a usage line names it.
+set(FCG_PROGRAM_NAME "rookstudio")
+target_compile_definitions(fcg_tournament PRIVATE FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}"
+                                                  FCG_PROGRAM_NAME="${FCG_PROGRAM_NAME}")
 
 if(FCG_BUILD_TESTS)
     # fastchess' own mock engine, so the integration tests play real (random) games.

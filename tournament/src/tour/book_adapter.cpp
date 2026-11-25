@@ -227,7 +227,7 @@ int runBookAdapter(const std::vector<std::string>& args) {
         }
     }
     if (book.empty() || i + 1 >= args.size()) {
-        std::fprintf(stderr, "usage: " FCG_PRODUCT_NAME
+        std::fprintf(stderr, "usage: " FCG_PROGRAM_NAME
                              " --book-adapter --book FILE [--depth PLIES] [--seed N] [--randomness R] "
                              "[--chess960] -- ENGINE [ARGS...]\n");
         return 2;

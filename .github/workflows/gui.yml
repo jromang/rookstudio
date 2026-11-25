@@ -484,7 +484,9 @@ jobs:
         run: |
           notes="docs/releases/${GITHUB_REF_NAME}.md"
           if [ -f "$notes" ]; then args=(--notes-file "$notes"); else args=(--generate-notes); fi
-          # A preview (v0.7.0-preview.1) is a pre-release: the programs of a release do not offer it.
-          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then args+=(--prerelease); fi
+          # Before 1.0, a preview (v0.7.0-preview.4) is published as a release, the latest: the previews' update
+          # check reads GitHub's latest release only, and the repository's page shows it. From 1.0 on, a preview is a
+          # pre-release, which the programs of a release do not offer.
+          if [[ "${GITHUB_REF_NAME}" == *-* && "${GITHUB_REF_NAME}" != v0.* ]]; then args+=(--prerelease); fi
           gh release create "${GITHUB_REF_NAME}" --title "RookStudio ${GITHUB_REF_NAME}" "${args[@]}" \
             dist/*.tar.gz dist/*.zip dist/SHA256SUMS.txt

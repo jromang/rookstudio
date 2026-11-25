@@ -334,7 +334,7 @@ version, the system and the end of the log, to read and complete before sending 
 
 ## Downloads
 
-The programs are on the [releases page](https://github.com/jromang/rookstudio/releases), each preview a pre-release
+The programs are on the [releases page](https://github.com/jromang/rookstudio/releases), each version
 with its notes: `rookstudio-<version>-linux-x86_64.tar.gz`, `rookstudio-<version>-windows-x86_64.zip` and
 `rookstudio-<version>-macos-universal.zip`, with `SHA256SUMS.txt` to check them. Unpack the archive and keep its files
 together: the assistant's runtime (llama.cpp) is in libraries beside the program.

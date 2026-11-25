@@ -1455,6 +1455,16 @@ void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
         return;
     }
     out_writing_ = true;
+    // However the write ends, an exception of any kind from anywhere included, the writes after it are not held back
+    // for good: out_writing_ is reset under the lock, held again as when it returns.
+    const struct Reset {
+        std::unique_lock<std::mutex>& lock;
+        bool& writing;
+        ~Reset() {
+            if (!lock.owns_lock()) lock.lock();
+            writing = false;
+        }
+    } reset{lock, out_writing_};
     const auto written = [&](const std::vector<std::size_t>& games) {
         for (const auto i : games) out_written_.insert(results_[i].number());
         const std::set<std::size_t> gone(games.begin(), games.end());
@@ -1478,15 +1488,7 @@ void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
             } catch (const std::exception& e) {
                 error = e.what();
             }
-            if (settled) {
-                try {
-                    journal_->append({{"t", "pgn_out"}, {"pgn", cut.offsets}});
-                } catch (...) {
-                    lock.lock();
-                    out_writing_ = false;
-                    throw;
-                }
-            }
+            if (settled) journal_->append({{"t", "pgn_out"}, {"pgn", cut.offsets}});
             lock.lock();
             out_error_ = error;
             if (!error.empty()) break;
@@ -1566,11 +1568,7 @@ void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
                 journal({{"t", "pgn_out"}, {"pgn", offsets}});
             }
         } catch (const std::exception& e) {
-            if (journal_failed) {
-                lock.lock();
-                out_writing_ = false;
-                throw;
-            }
+            if (journal_failed) throw;
             error = e.what();
         }
         lock.lock();
@@ -1582,7 +1580,6 @@ void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
         }
         written(ready);
     } while (out_again_);
-    out_writing_ = false;
 }
 
 bool TournamentState::settleOut(const nlohmann::json& begun,

@@ -1039,6 +1039,39 @@ TEST_CASE("state: a tournament does not let go of its folder while it records a 
     CHECK(state->readOnly());
 }
 
+TEST_CASE("state: the PGN file of the user's is written again after a write ended by an exception none expected") {
+    const auto dir = freshDir("pgn-out-unexpected");
+    const auto out = dir / "all.pgn";
+    auto spec      = matchSpec(4);
+    spec.pgn_out   = out.string();
+    auto state     = TournamentState::create(dir, spec);
+
+    // The first write ends with an exception none of its ways out expects, from where it journals its start (a
+    // std::bad_alloc while the games are read back, out of its try blocks, would end it so too).
+    struct Unexpected {};
+    state->setJournalListener([](uint64_t, uint64_t, const nlohmann::json& event) {
+        if (event.value("t", std::string{}) == "pgn_out" && event.contains("begun")) throw Unexpected{};
+    });
+    const auto first = state->claimNext();
+    REQUIRE(first);
+    CHECK_THROWS_AS(state->complete(*first, gameData(*first, "1-0")), Unexpected);
+    state->setJournalListener({});
+    CHECK(gamesOf(out).empty());
+
+    // The next game's write is not held back: both games go, in their order.
+    const auto second = state->claimNext();
+    REQUIRE(second);
+    state->complete(*second, gameData(*second, "0-1"));
+    CHECK(state->pgnOutError().empty());
+    CHECK(gamesOf(out).size() == 2);
+    CHECK(readAll(out) == readAll(dir / "test.pgn"));
+
+    // Nothing written twice when the tournament is opened again.
+    state.reset();
+    state = TournamentState::open(dir);
+    CHECK(readAll(out) == readAll(dir / "test.pgn"));
+}
+
 TEST_CASE("state: games recorded by many threads at once resume exactly, each game where the journal says") {
     const auto dir = freshDir("concurrent");
     auto spec      = matchSpec(100);

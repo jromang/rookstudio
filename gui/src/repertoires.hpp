@@ -25,6 +25,12 @@ struct RepertoireFile {
     uint64_t revision = 0;  // changed with its lines: what is made of them (the training's cards) is made again
 };
 
+// "1.e4 c5 2.Nf3": a line of moves from the start, in SAN.
+[[nodiscard]] std::string lineMovetext(const std::vector<std::string>& line);
+// The line as one game's PGN for the board, `title` its event: a repertoire's name, written as PGN writes a tag's
+// value, so that a double quote or a backslash in it breaks nothing (#101).
+[[nodiscard]] std::string linePgn(const std::vector<std::string>& line, const std::string& title);
+
 class RepertoireShelf {
    public:
     // The repertoires in `profile`'s repertoires folder, by name.

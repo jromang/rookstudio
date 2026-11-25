@@ -10,6 +10,7 @@
 #include <study/pgn_writer.hpp>
 #include <study/scan_board.hpp>
 #include <tour/files.hpp>
+#include <tour/pgn_file.hpp>
 
 namespace fs = std::filesystem;
 
@@ -30,6 +31,18 @@ chess::Board after(std::span<const chess::Move> path) {
 }
 
 }  // namespace
+
+std::string lineMovetext(const std::vector<std::string>& line) {
+    std::string out;
+    for (std::size_t i = 0; i < line.size(); ++i)
+        out += (i % 2 == 0 ? std::to_string(i / 2 + 1) + "." : std::string()) + line[i] + " ";
+    if (!out.empty()) out.pop_back();
+    return out;
+}
+
+std::string linePgn(const std::vector<std::string>& line, const std::string& title) {
+    return "[Event \"" + tour::pgnTagValue(title) + "\"]\n\n" + lineMovetext(line) + " *\n";
+}
 
 RepertoireShelf::RepertoireShelf(fs::path profile) : dir_(std::move(profile) / "repertoires") {
     std::error_code ec;

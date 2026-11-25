@@ -18,15 +18,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-// "1.e4 c5 2.Nf3", the moves from the start.
-std::string movetext(const std::vector<std::string>& line) {
-    std::string out;
-    for (std::size_t i = 0; i < line.size(); ++i)
-        out += (i % 2 == 0 ? std::to_string(i / 2 + 1) + "." : std::string()) + line[i] + " ";
-    if (!out.empty()) out.pop_back();
-    return out;
-}
-
 }  // namespace
 
 RepertoireShelf& App::repertoires() {
@@ -45,7 +36,7 @@ std::optional<std::vector<chess::Move>> App::boardPath() const {
 }
 
 void App::showLineOnBoard(const std::vector<std::string>& line, const std::string& title) {
-    readOnBoard("[Event \"" + title + "\"]\n\n" + movetext(line) + " *\n", title);
+    readOnBoard(linePgn(line, title), title);
     board_.ply      = static_cast<int>(board_.game.moves.size());
     board_side_tab_ = 2;  // the tree beside it, its replies there
     page_           = Page::Board;
@@ -235,7 +226,7 @@ void App::drawOpeningsPage() {
         const auto& g = c.gaps[i];
         ImGui::PushID(static_cast<int>(i));
         const auto missing = g.move.empty() ? std::string(TR("no move of yours here")) : "→ " + g.move;
-        const auto label   = fmt::format("{:5.1f} %   {} {}", 100 * g.reach, movetext(g.line), missing);
+        const auto label   = fmt::format("{:5.1f} %   {} {}", 100 * g.reach, lineMovetext(g.line), missing);
         if (ImGui::Selectable(label.c_str())) showLineOnBoard(g.line, e.name);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s",

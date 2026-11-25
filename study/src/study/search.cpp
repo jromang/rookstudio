@@ -15,24 +15,6 @@ namespace {
 // The games a thread takes at a time: their search takes far less than a twentieth of a second.
 constexpr uint64_t PART = 4096;
 
-// The board a game starts from; false when its start cannot be set.
-bool startOf(const Snapshot& snap, GameId id, uint16_t flags, ScanBoard& board) {
-    static const ScanBoard standard = [] {
-        ScanBoard b;
-        b.setFen(chess::constants::STARTPOS, false);
-        return b;
-    }();
-    static const ScanBoard standard960 = [] {
-        ScanBoard b;
-        b.setFen(chess::constants::STARTPOS, true);
-        return b;
-    }();
-    const bool chess960 = (flags & GAME_CHESS960) != 0;
-    if (flags & GAME_FEN) return board.setFen(snap.game(id).start_fen, chess960);
-    board = chess960 ? standard960 : standard;
-    return true;
-}
-
 // Calls at(ply, board) for the start and after each move, up to ply `last`, until it returns true: true then.
 template <typename At>
 bool replay(std::span<const uint8_t> codes, uint32_t plies, uint32_t last, ScanBoard& board, At&& at) {

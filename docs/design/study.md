@@ -168,6 +168,21 @@ segment that cannot be read again counts all its games. On the reference databas
 without signatures), 11.4 s on 6 threads, no game damaged: the key read back is the key written; on the month of Lichess
 games, 0.1 s.
 
+### A record that does not read
+
+A segment's header and its files' sizes are checked when it opens (#97), its games' bytes are not (#102): a record
+whose offsets are out of order or past its files has no moves or no annex (`Snapshot::moves()`, `gameMoves()`), an
+annex record cut short or made up gives what could be read before the damage (a count read there is never a size to
+make past the bytes left), and the game reads as damaged (`Snapshot::game()`, which never throws; without its moves when
+its start position is lost). A game's plies are never more than its codes' bytes (`gameMoves()`), a name id past the
+names reads as no name (`rowIds()`), an edits file's counts are compared with its size without overflowing, and a
+manifest that gives a segment more games than a commit writes, or games without any name, is refused. The searches,
+the opening tree, a dossier and an opening report set a game's start with `startOf()`, which reads its FEN alone
+(`Snapshot::startFen()`) and tells a damaged one without an exception: their threads catch none. The check tells these
+games as damaged, as before. A test changes a segment's offsets and annex bytes, sixty times at random and once each
+kind on purpose, then lists, reads and writes every game, searches, builds and asks the tree, makes a dossier and an
+opening report, and checks.
+
 ### The compaction
 
 Games deleted and versions replaced keep their room in the files. `Database::compact` writes again the segments that

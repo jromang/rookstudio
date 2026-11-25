@@ -291,12 +291,16 @@ class Segment {
     [[nodiscard]] T value(Column column, std::size_t i) const {
         return readAt<T>(cols_data_, at_[column], i);
     }
+    // A record's moves and annex; none when its offsets are out of order or past its file (a damaged or crafted
+    // segment, whose bytes are not checked when it opens: offsetsSound() tells it, the game reads as damaged).
     [[nodiscard]] std::span<const uint8_t> moves(std::size_t i) const {
         const auto from = value<uint64_t>(MOVES, i), to = value<uint64_t>(MOVES, i + 1);
+        if (from > to || to > moves_.size()) return {};
         return {moves_.data() + from, static_cast<std::size_t>(to - from)};
     }
     [[nodiscard]] std::span<const uint8_t> annex(std::size_t i) const {
         const auto from = value<uint64_t>(ANNEX, i), to = value<uint64_t>(ANNEX, i + 1);
+        if (from > to || to > annex_.size()) return {};
         return {annex_.data() + from, static_cast<std::size_t>(to - from)};
     }
     [[nodiscard]] uint32_t version() const noexcept { return version_; }
@@ -506,8 +510,10 @@ HeaderRow recordRow(const Snapshot& snap, const Segment& segment, std::size_t i)
     return row;
 }
 
-// Everything kept of a segment's record i (Snapshot::game()). Throws std::runtime_error on a damaged annex record.
-ImportedGame recordGame(const Snapshot& snap, const Segment& segment, std::size_t i) {
+// Everything kept of a segment's record i (Snapshot::game()). A record that does not read whole (its offsets out of its
+// files, its annex record cut short or made up) throws std::runtime_error when `strict` (the check); else it gives its
+// headers and what could be read before the damage, marked damaged (#102).
+ImportedGame recordGame(const Snapshot& snap, const Segment& segment, std::size_t i, bool strict) {
     const auto r = recordRow(snap, segment, i);
     ImportedGame g;
     const auto tag = [&](std::string_view name, std::string_view value) {
@@ -526,50 +532,76 @@ ImportedGame recordGame(const Snapshot& snap, const Segment& segment, std::size_
     if (r.eco) tag("ECO", ecoText(r.eco));
     tag("TimeControl", r.time_control);
     tag("Annotator", r.annotator);
-    g.plies          = r.plies;
-    g.chess960       = r.flags & GAME_CHESS960;
-    g.annotated      = r.flags & GAME_ANNOTATED;
-    g.damaged        = r.flags & GAME_DAMAGED;
+    g.plies     = r.plies;
+    g.chess960  = r.flags & GAME_CHESS960;
+    g.annotated = r.flags & GAME_ANNOTATED;
+    g.damaged   = r.flags & GAME_DAMAGED;
+    if (!segment.offsetsSound(i)) {
+        if (strict) throw std::runtime_error("damaged offsets");
+        g.damaged = true;  // its moves or its annex, whichever its offsets leave out, read as none
+    }
     const auto moves = segment.moves(i);
     g.moves.assign(moves.begin(), moves.end());
 
     const auto annex   = segment.annex(i);
     const uint8_t* p   = annex.data();
     const uint8_t* end = p + annex.size();
-    if (p == end) return g;
-    const uint8_t parts = *p++;
-    if (parts & ANNEX_FEN) {
-        g.start_fen = getText(p, end);
-        tag("FEN", g.start_fen);
-    }
-    if (parts & ANNEX_TAGS) {
-        const auto count = getVarint(p, end);
-        for (uint64_t t = 0; t < count; ++t) {
-            auto name  = getText(p, end);
-            auto value = getText(p, end);
-            g.tags.emplace_back(std::move(name), std::move(value));
+    try {
+        const uint8_t parts = p == end ? uint8_t{0} : *p++;
+        if (parts & ANNEX_FEN) {
+            g.start_fen = getText(p, end);
+            tag("FEN", g.start_fen);
         }
-        // A site kept in the annex (an address) back in its place, after the event.
-        if (r.site.empty()) {
-            const auto site =
-                std::find_if(g.tags.begin(), g.tags.end(), [](const auto& t) { return t.first == "Site"; });
-            if (site != g.tags.end()) std::rotate(g.tags.begin() + (r.event.empty() ? 0 : 1), site, site + 1);
+        if (parts & ANNEX_TAGS) {
+            const auto count = getVarint(p, end);
+            for (uint64_t t = 0; t < count; ++t) {
+                auto name  = getText(p, end);
+                auto value = getText(p, end);
+                g.tags.emplace_back(std::move(name), std::move(value));
+            }
+            // A site kept in the annex (an address) back in its place, after the event.
+            if (r.site.empty()) {
+                const auto site =
+                    std::find_if(g.tags.begin(), g.tags.end(), [](const auto& t) { return t.first == "Site"; });
+                if (site != g.tags.end()) std::rotate(g.tags.begin() + (r.event.empty() ? 0 : 1), site, site + 1);
+            }
         }
-    }
-    if (parts & ANNEX_TEXT) g.text = getText(p, end);
-    if (parts & ANNEX_CLOCKS) {
-        const auto count = getVarint(p, end);
-        g.clocks.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
-        for (std::size_t k = 0; k < g.clocks.size(); ++k) {
-            const int64_t before = k >= 2 ? g.clocks[k - 2] : 0;
-            g.clocks[k]          = static_cast<int32_t>(before + unzigzag(getVarint(p, end)));
+        if (parts & ANNEX_TEXT) g.text = getText(p, end);
+        // A clock or an evaluation takes a byte at least: a count past the bytes left is a damaged one, never a size
+        // to make (a count read from the file could ask for gigabytes).
+        if (parts & ANNEX_CLOCKS) {
+            const auto count = getVarint(p, end);
+            if (count > static_cast<uint64_t>(end - p)) throw std::runtime_error("damaged annex record");
+            g.clocks.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
+            for (std::size_t k = 0; k < g.clocks.size(); ++k) {
+                const int64_t before = k >= 2 ? g.clocks[k - 2] : 0;
+                g.clocks[k]          = static_cast<int32_t>(before + unzigzag(getVarint(p, end)));
+            }
         }
+        if (parts & ANNEX_EVALS) {
+            const auto count = getVarint(p, end);
+            if (count > static_cast<uint64_t>(end - p)) throw std::runtime_error("damaged annex record");
+            g.evals.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
+            for (auto& e : g.evals) e = static_cast<int16_t>(unzigzag(getVarint(p, end)));
+        }
+    } catch (const std::runtime_error&) {
+        if (strict) throw;
+        g.damaged = true;
     }
-    if (parts & ANNEX_EVALS) {
-        const auto count = getVarint(p, end);
-        g.evals.resize(static_cast<std::size_t>(std::min<uint64_t>(count, g.plies)));
-        for (auto& e : g.evals) e = static_cast<int16_t>(unzigzag(getVarint(p, end)));
+    if (strict) return g;
+    // A ply takes a code of a byte or two: more plies than bytes is a damaged count.
+    if (g.plies > g.moves.size()) {
+        g.damaged = true;
+        g.plies   = static_cast<uint32_t>(g.moves.size());
     }
+    // Its start position lost with its annex: its moves, which are those of that position, cannot be replayed.
+    if ((r.flags & GAME_FEN) && g.start_fen.empty()) {
+        g.damaged = true;
+        g.moves.clear();
+        g.plies = 0;
+    }
+    if (g.clocks.size() > g.plies) g.clocks.resize(g.plies);
+    if (g.evals.size() > g.plies) g.evals.resize(g.plies);
     return g;
 }
 
@@ -595,13 +627,21 @@ HeaderNumbers Snapshot::numbers(GameId id) const {
 
 GameMoves Snapshot::gameMoves(GameId id) const {
     const auto [segment, i] = locate(id);
-    return {segment->moves(i), segment->value<uint32_t>(PLIES, i), segment->value<uint16_t>(FLAGS, i)};
+    const auto codes        = segment->moves(i);
+    // A ply takes a code of a byte or two: no more plies than bytes, whatever a damaged count says (the replays index
+    // the codes by ply).
+    const auto plies = std::min<uint64_t>(segment->value<uint32_t>(PLIES, i), codes.size());
+    return {codes, static_cast<uint32_t>(plies), segment->value<uint16_t>(FLAGS, i)};
 }
 
 Snapshot::NameIds Snapshot::rowIds(GameId id) const {
     const auto [segment, i] = locate(id);
-    return {segment->value<uint32_t>(WHITE, i), segment->value<uint32_t>(BLACK, i), segment->value<uint32_t>(EVENT, i),
-            segment->value<uint32_t>(SITE, i), segment->value<uint32_t>(ROUND, i)};
+    // A name id past the database's names (a damaged or crafted segment) reads as no name: the callers index arrays
+    // of names() entries with them.
+    const auto known = [this](uint32_t name) { return name < names_ ? name : no_name_; };
+    return {known(segment->value<uint32_t>(WHITE, i)), known(segment->value<uint32_t>(BLACK, i)),
+            known(segment->value<uint32_t>(EVENT, i)), known(segment->value<uint32_t>(SITE, i)),
+            known(segment->value<uint32_t>(ROUND, i))};
 }
 
 uint64_t Snapshot::key(GameId id) const {
@@ -621,7 +661,41 @@ std::optional<GameSignature> Snapshot::signature(GameId id) const {
 
 ImportedGame Snapshot::game(GameId id) const {
     const auto [segment, i] = locate(id);
-    return recordGame(*this, *segment, i);
+    return recordGame(*this, *segment, i, false);
+}
+
+std::string Snapshot::startFen(GameId id) const {
+    const auto [segment, i] = locate(id);
+    const auto annex        = segment->annex(i);
+    const uint8_t* p        = annex.data();
+    const uint8_t* end      = p + annex.size();
+    if (p == end || !(*p & ANNEX_FEN)) return {};
+    ++p;
+    try {
+        return getText(p, end);
+    } catch (const std::runtime_error&) {
+        return {};  // a damaged record: no start that can be set
+    }
+}
+
+bool startOf(const Snapshot& snapshot, GameId id, uint16_t flags, ScanBoard& board) {
+    static const ScanBoard standard = [] {
+        ScanBoard b;
+        b.setFen(chess::constants::STARTPOS, false);
+        return b;
+    }();
+    static const ScanBoard standard960 = [] {
+        ScanBoard b;
+        b.setFen(chess::constants::STARTPOS, true);
+        return b;
+    }();
+    const bool chess960 = (flags & GAME_CHESS960) != 0;
+    if (flags & GAME_FEN) {
+        const auto fen = snapshot.startFen(id);
+        return !fen.empty() && board.setFen(fen, chess960);
+    }
+    board = chess960 ? standard960 : standard;
+    return true;
 }
 
 std::string Snapshot::tag(GameId id, std::string_view wanted) const {
@@ -692,6 +766,9 @@ std::vector<GameId> Snapshot::unreadableIds() const {
 }
 
 void Snapshot::settle() {
+    // What a name id past the names reads as (rowIds()): no name, as for the empty games of the segments that cannot be
+    // read. Found among the first names, the empty one being any game's that lacks a name.
+    no_name_ = blankName().value_or(0);
     unknown_names_.clear();
     for (std::size_t s = 0; s < segments_.size(); ++s)
         if (!segments_[s]->namesKnown() && segments_[s]->nameCount() > 0)
@@ -854,6 +931,9 @@ void Database::load(bool clean, int tries) {
         const auto name       = s.at("name").get<std::string>();
         const auto games      = s.at("games").get<uint32_t>();
         const auto names      = s.at("names").get<uint32_t>();
+        // No commit writes more: seven names a game at most (a segment that cannot be read would make room for each).
+        if (games > SEGMENT_GAMES || names > 7 * SEGMENT_GAMES + 1 || snap->names_ > UINT32_MAX - names)
+            throw std::runtime_error(dir_.string() + ": damaged manifest");
         const bool versions   = s.value("versions", false);
         const bool names_lost = s.value("unknown_names", false);  // written as "?" by keepReadable()
         std::shared_ptr<const Segment> segment;
@@ -891,6 +971,9 @@ void Database::load(bool clean, int tries) {
         std::sscanf(name.c_str(), "seg-%llu", &number);
         next_segment = std::max<uint64_t>(next_segment, number + 1);
     }
+    // Every game names its players, if only with the empty name: games without any name are a manifest made up, whose
+    // games' name ids could not read as no name (rowIds()).
+    if (snap->games_ > 0 && snap->names_ == 0) throw std::runtime_error(dir_.string() + ": damaged manifest");
     // Read-only, a segment that the other program removed as it committed (a compaction's, an undoing's) is no damage:
     // read again once its manifest has settled.
     if (!lock_ && !unread.empty() && tries > 0) {
@@ -914,8 +997,11 @@ void Database::load(bool clean, int tries) {
             std::memcpy(&v, bytes.data() + o, sizeof v);
             return v;
         };
+        // Counts read from the file, compared with its size without overflowing (#102).
         const auto replaced = at(16, uint64_t{0}), deleted = at(24, uint64_t{0});
-        if (bytes.size() != 32 + replaced * 16 + deleted * 8) throw bad();
+        const uint64_t room = bytes.size() - 32;
+        if (replaced > room / 16 || (room - replaced * 16) % 8 != 0 || deleted != (room - replaced * 16) / 8)
+            throw bad();
         for (uint64_t i = 0; i < replaced; ++i) {
             const std::size_t o = 32 + i * 16;
             const Snapshot::Version v{at(o, uint64_t{0}), at(o + 8, uint32_t{0}), at(o + 12, uint32_t{0})};
@@ -930,7 +1016,8 @@ void Database::load(bool clean, int tries) {
             if (snap->deleted_.size() <= id / 64) snap->deleted_.resize(id / 64 + 1, 0);
             snap->deleted_[id / 64] |= uint64_t{1} << (id % 64);
         }
-        snap->deleted_count_ = deleted;
+        // Counted from the games marked: a number written twice in a file made by hand counts once.
+        for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
     }
     // The table of names it names.
     const auto players = manifest.value("players", std::string());
@@ -1463,7 +1550,7 @@ bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
         for (int c = 0; c < NAME_COLUMNS; ++c)
             if (segment.value<uint32_t>(static_cast<Column>(c), i) >= snap.names()) return false;
         if (!segment.offsetsSound(i)) return false;
-        const auto game  = recordGame(snap, segment, i);  // throws on a damaged annex
+        const auto game  = recordGame(snap, segment, i, true);  // throws on a damaged annex
         const auto flags = segment.value<uint16_t>(FLAGS, i);
         ScanBoard board;
         const bool start = board.setFen(

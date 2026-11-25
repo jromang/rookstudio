@@ -31,6 +31,7 @@
 #include "chessbase.hpp"
 #include "import.hpp"
 #include "players.hpp"
+#include "scan_board.hpp"
 
 namespace fcg::study {
 
@@ -70,7 +71,8 @@ struct HeaderNumbers {
     char result        = '*';
 };
 
-// A game's move codes, what replaying it needs (a game with a start position of its own: GAME_FEN).
+// A game's move codes, what replaying it needs (a game with a start position of its own: GAME_FEN). Its plies never
+// more than its codes' bytes, a damaged record's included.
 struct GameMoves {
     std::span<const uint8_t> codes;
     uint32_t plies = 0;
@@ -121,7 +123,8 @@ class Snapshot {
     [[nodiscard]] HeaderRow row(GameId id) const;
     [[nodiscard]] HeaderNumbers numbers(GameId id) const;
     [[nodiscard]] GameMoves gameMoves(GameId id) const;
-    // The ids of a game's names, for the filters and sorts that read names once.
+    // The ids of a game's names, for the filters and sorts that read names once: each below names(), an id past them
+    // (a damaged or crafted segment) read as no name.
     struct NameIds {
         uint32_t white = 0, black = 0, event = 0, site = 0, round = 0;
     };
@@ -166,8 +169,14 @@ class Snapshot {
     // (duplicateKey()).
     [[nodiscard]] uint64_t key(GameId id) const;
     // Everything kept of a game: its tags in their order of import less those of the columns (which come first),
-    // its moves, its text when annotated or damaged, its clocks and evaluations.
+    // its moves, its text when annotated or damaged, its clocks and evaluations. A record that does not read whole (a
+    // damaged or crafted segment: its offsets out of its files, its annex cut short) gives its headers and what could
+    // be read before the damage, marked damaged, without its moves when its start position is lost; never an
+    // exception (the window and the threads that read games catch none).
     [[nodiscard]] ImportedGame game(GameId id) const;
+    // Its start position's FEN, read alone (as tag() reads a tag); empty for a game of the standard start, and for a
+    // record whose FEN cannot be read. Never throws for a damaged record: startOf() reads it on the searches' threads.
+    [[nodiscard]] std::string startFen(GameId id) const;
     [[nodiscard]] uint32_t names() const noexcept { return names_; }
     [[nodiscard]] std::string_view name(uint32_t id) const;
     // A tag of a game kept with its other tags (not one of the columns): "WhiteFideId", "GameURL"; empty when none.
@@ -225,6 +234,7 @@ class Snapshot {
     uint64_t unreadable_edits_ = 0;  // while segments cannot be read: the edits generation made of theirs (else 0)
     uint64_t games_      = 0;
     uint32_t names_      = 0;
+    uint32_t no_name_    = 0;  // what rowIds() gives for a name id past names_: the empty name, else "?" (blankName())
     uint64_t generation_ = 0;
     std::vector<std::string> segment_names_;  // of each segment
     std::vector<std::string> sources_;        // of each segment
@@ -232,6 +242,11 @@ class Snapshot {
     std::shared_ptr<const PlayerTable> players_ = std::make_shared<const PlayerTable>();
     std::string players_file_;
 };
+
+// The board a game starts from, as its flags say (GameMoves::flags: a FEN of its own, Chess960 or not); false when it
+// cannot be set, its FEN damaged included. Never throws: the searches, the opening tree, a dossier and an opening
+// report call it on threads that catch nothing.
+[[nodiscard]] bool startOf(const Snapshot& snapshot, GameId id, uint16_t flags, ScanBoard& board);
 
 struct CheckProgress {
     std::atomic<uint64_t> done{0};  // of the games read

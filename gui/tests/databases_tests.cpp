@@ -59,7 +59,8 @@ TEST_CASE("databases: made, added, removed, and listed again from databases.json
     const auto profile = freshDir("shelf-profile");
     std::size_t made   = 0;
     {
-        DatabaseShelf shelf(profile);
+        JobGroup jobs;
+        DatabaseShelf shelf(jobs, profile);
         CHECK(shelf.entries().empty());
         made = shelf.create("Mes parties");
         CHECK(shelf.entries()[made].name == "Mes parties");
@@ -75,7 +76,8 @@ TEST_CASE("databases: made, added, removed, and listed again from databases.json
         CHECK(shelf.facts(made).error.empty());
     }
     {
-        DatabaseShelf shelf(profile);
+        JobGroup jobs;
+        DatabaseShelf shelf(jobs, profile);
         REQUIRE(shelf.entries().size() == 3);
         CHECK(shelf.entries()[1].name == "Mes parties (2)");
         const auto folder = shelf.entries()[1].folder;
@@ -92,7 +94,8 @@ TEST_CASE("databases: made, added, removed, and listed again from databases.json
 
 TEST_CASE("databases: an import in the background, then the database's opening tree built") {
     const auto profile = freshDir("shelf-import");
-    DatabaseShelf shelf(profile);
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
     const auto index = shelf.create("Test");
     REQUIRE(shelf.startImport(index, pgnFile(profile, 40)));
     CHECK_FALSE(shelf.startImport(index, pgnFile(profile, 40)));  // one at a time
@@ -120,7 +123,8 @@ TEST_CASE("databases: an import in the background, then the database's opening t
 
 TEST_CASE("databases: a cancelled import keeps what was committed") {
     const auto profile = freshDir("shelf-cancel");
-    DatabaseShelf shelf(profile);
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
     const auto index = shelf.create("Test");
     REQUIRE(shelf.startImport(index, pgnFile(profile, 20)));
     shelf.cancelImport();
@@ -134,7 +138,8 @@ TEST_CASE("databases: a cancelled import keeps what was committed") {
 
 TEST_CASE("databases: at quit, the import, the tree being built and the one asked for after it are cancelled") {
     const auto profile = freshDir("shelf-quit");
-    auto shelf         = std::make_unique<DatabaseShelf>(profile);
+    JobGroup jobs;
+    auto shelf         = std::make_unique<DatabaseShelf>(jobs, profile);
     const auto first   = shelf->create("First");
     const auto second  = shelf->create("Second");
     REQUIRE(shelf->startImport(first, pgnFile(profile, 40)));
@@ -156,15 +161,19 @@ TEST_CASE("databases: at quit, the import, the tree being built and the one aske
     while (!shelf->pollTreeJob() && std::chrono::steady_clock::now() < give_up)
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     CHECK(shelf->treeJob() == nullptr);
-    // A shelf that goes during a build cancels it, then waits for it.
+    // A shelf that goes during a build cancels it and parks it, without waiting (#105): its group waits for it.
     shelf->rebuildTree(first);
     REQUIRE(shelf->treeJob());
     shelf.reset();
+    CHECK(jobs.parked() == 1);
+    jobs.wait();
+    CHECK(jobs.parked() == 0);
 }
 
 TEST_CASE("databases: a database removed, the tree builds of the others keep their database; its own is cancelled") {
     const auto profile = freshDir("shelf-remove-tree");
-    DatabaseShelf shelf(profile);
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
     const auto a       = shelf.create("A");
     const auto b       = shelf.create("B");
     const auto c       = shelf.create("C");
@@ -214,6 +223,46 @@ TEST_CASE("databases: a database removed, the tree builds of the others keep the
     CHECK(shelf.treeJob() == nullptr);
 }
 
+TEST_CASE("databases: a database removed during its import: the import parked, the database let go once it ended") {
+    const auto profile = freshDir("shelf-remove-import");
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
+    const auto index  = shelf.create("Imported");
+    const auto folder = shelf.entries()[index].folder;
+    REQUIRE(shelf.startImport(index, pgnFile(profile, 3000)));
+    shelf.remove(index);  // cancelled and parked, never waited for (#105)
+    CHECK(shelf.import() == nullptr);
+    CHECK(jobs.parked() == 1);
+    CHECK(shelf.entries().empty());
+    // Another import may start at once, into another database.
+    const auto other = shelf.create("Other");
+    REQUIRE(shelf.startImport(other, pgnFile(profile, 10)));
+    REQUIRE(imported(shelf));
+    jobs.wait();
+    CHECK(jobs.parked() == 0);
+    // The import's task let go of the database: listed again, it is written here, its files kept.
+    const auto again = shelf.add(folder);
+    const auto db    = shelf.open(again);
+    REQUIRE(db);
+    CHECK_FALSE(db->readOnly());
+    CHECK(shelf.facts(again).error.empty());
+}
+
+TEST_CASE("databases: the linked databases no longer listed: their refreshes parked, never waited for") {
+    const auto profile = freshDir("shelf-linked-dropped");
+    const auto file    = pgnFile(profile, 2000);
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
+    shelf.setLinked({{"games.pgn", study::LinkedSource{study::LinkedSource::Kind::PgnFile, file}}});
+    REQUIRE(shelf.entries().size() == 1);
+    shelf.refresh(0);
+    shelf.setLinked({});  // its refresh cancelled and parked, ended or not (#105)
+    CHECK(shelf.entries().empty());
+    CHECK(jobs.parked() == 1);
+    jobs.wait();
+    CHECK(jobs.parked() == 0);
+}
+
 TEST_CASE("databases: the quick filter's words, a year, an ECO code and a result told apart") {
     auto f = quickFilter("  carlsen  b9 2024 1-0 ");
     CHECK(f.words == "carlsen");
@@ -238,7 +287,8 @@ TEST_CASE("databases: a PGN file read as a database without a copy, after the us
     const auto profile = freshDir("shelf-linked");
     const auto file    = pgnFile(profile, 25);
     {
-        DatabaseShelf shelf(profile);
+        JobGroup jobs;
+        DatabaseShelf shelf(jobs, profile);
         shelf.create("Mine");
         shelf.setLinked({{"games.pgn", study::LinkedSource{study::LinkedSource::Kind::PgnFile, file}}});
         REQUIRE(shelf.entries().size() == 2);
@@ -260,13 +310,15 @@ TEST_CASE("databases: a PGN file read as a database without a copy, after the us
         CHECK(shelf.entries()[2].name == "renamed");
         CHECK(shelf.facts(2).games == 25);
     }
-    DatabaseShelf again(profile);
+    JobGroup jobs;
+    DatabaseShelf again(jobs, profile);
     CHECK(again.entries().size() == 2);  // databases.json keeps the user's own only
 }
 
 TEST_CASE("databases: an archive's wrong password, a file that is no text: nothing imported, the database discarded") {
     const auto profile = freshDir("shelf-refused");
-    DatabaseShelf shelf(profile);
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
     // Archives of our own test games, enciphered with this password.
     const std::string password = "rstest20";
     for (const char* name : {"cbtest1.cbz", "cbtest2.2cbz"}) {
@@ -330,7 +382,8 @@ TEST_CASE("databases: a database whose segment no longer reads opens with the ot
     fs::path folder;
     std::string segment;
     {
-        DatabaseShelf shelf(profile);
+        JobGroup jobs;
+        DatabaseShelf shelf(jobs, profile);
         const auto index = shelf.create("Club 2026");  // a folder whose name holds a space
         for (const auto& file :
              {numberedGames(profile / "first.pgn", 0, 10), second, numberedGames(profile / "third.pgn", 20, 10)}) {
@@ -346,7 +399,8 @@ TEST_CASE("databases: a database whose segment no longer reads opens with the ot
     }
     // Damaged while RookStudio was closed: it opens with its other segments, the damaged games told apart.
     REQUIRE(fs::remove(folder / segment / "moves.bin"));
-    DatabaseShelf shelf(profile);
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
     auto facts = shelf.facts(0);
     CHECK(facts.error.empty());
     CHECK(facts.games == 20);

@@ -2178,14 +2178,13 @@ class App {
     // made in the background and kept for their snapshot; each crosstable's system, tie-breaks and results set by hand
     // are kept in the profile.
     bool db_tournaments_ = false;  // the game list shows the database's tournaments
-    struct DbTournamentsJob {
+    // A list being made: its database's folder and the snapshot it reads (App's), the games gone through.
+    struct DbTournamentsState {
         std::filesystem::path folder;
         uint64_t generation = 0;
         std::shared_ptr<const study::Snapshot> snapshot;
-        std::shared_ptr<study::TournamentProgress> progress = std::make_shared<study::TournamentProgress>();
-        std::shared_ptr<std::atomic<bool>> cancel           = std::make_shared<std::atomic<bool>>(false);
         std::chrono::steady_clock::time_point started;
-        std::future<study::TournamentList> done;
+        study::TournamentProgress progress;
     };
     struct TournamentsKept {
         uint64_t generation = 0;
@@ -2193,7 +2192,11 @@ class App {
         std::shared_ptr<const study::TournamentList> list;
     };
     std::map<std::filesystem::path, TournamentsKept> tournament_lists_;
-    std::optional<DbTournamentsJob> db_tournaments_job_;
+    Job<study::TournamentList, DbTournamentsState> db_tournaments_job_{jobs_};
+    // The list being made, none when none is.
+    [[nodiscard]] const DbTournamentsState* dbTournamentsJob() const {
+        return db_tournaments_job_.idle() ? nullptr : &db_tournaments_job_.state();
+    }
     std::vector<std::filesystem::path> tournaments_wanted_;  // lists asked for (Ctrl+K), made one after another
     std::size_t tournament_row_ = 0;
     std::array<char, 128> tournament_filter_{};

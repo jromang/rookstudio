@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
-#include <future>
 #include <map>
 #include <memory>
 #include <optional>
@@ -24,6 +23,8 @@
 #include <study/query.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
+
+#include "jobs.hpp"
 
 namespace fcg {
 
@@ -73,9 +74,10 @@ struct DamageSummary {
 
 class DatabaseShelf {
    public:
-    // The databases listed in `profile`'s databases.json; new ones go in its databases folder.
-    explicit DatabaseShelf(std::filesystem::path profile);
-    ~DatabaseShelf();
+    // The databases listed in `profile`'s databases.json; new ones go in its databases folder. Its jobs (the import,
+    // the opening tree's build, the linked databases' refreshes) are in `jobs`: one the shelf no longer wants, or that
+    // runs when it goes, is cancelled and parked there, never waited for (#105).
+    DatabaseShelf(JobGroup& jobs, std::filesystem::path profile);
     DatabaseShelf(const DatabaseShelf&)            = delete;
     DatabaseShelf& operator=(const DatabaseShelf&) = delete;
 
@@ -84,10 +86,12 @@ class DatabaseShelf {
     std::size_t create(const std::string& name);
     // A database folder made elsewhere, listed last (or where it already is): its index. Throws when it is none.
     std::size_t add(const std::filesystem::path& folder);
-    // Out of the list; its files stay. Not a linked one's. Its import is cancelled and waited for, its opening tree's
-    // build cancelled; the builds of the databases after it, running or asked for, keep theirs.
+    // Out of the list; its files stay. Not a linked one's. Its import is cancelled and parked (the games it committed
+    // stay), its opening tree's build cancelled; the builds of the databases after it, running or asked for, keep
+    // theirs.
     void remove(std::size_t index);
-    // Out of the list, its folder deleted: a database made for an import that brought nothing.
+    // Out of the list, its folder deleted: a database made for an import that brought nothing. Its folder stays while
+    // an import into it still ends (as remove() leaves it).
     void discard(std::size_t index);
 
     // The linked sources, after the user's own databases: the tournaments, the PGN files opened; those already open
@@ -111,26 +115,24 @@ class DatabaseShelf {
     [[nodiscard]] std::optional<TreeSource> treeSource(std::size_t index);
 
     // An import into a database, one at a time: started, followed, cancelled. After it, the database's opening
-    // tree is built again (the tree's own progress), the database open all along.
-    struct Import {
-        std::size_t index = 0;
+    // tree is built again (the tree's own progress), the database open all along. Its job's state: what the shelf
+    // keeps of it (its database's place, its file, its start) and what its task tells.
+    struct ImportState {
+        std::size_t index = 0;  // the shelf's, moved as databases come and go
         std::filesystem::path file;
+        std::chrono::steady_clock::time_point started;
         study::ImportProgress progress;
         study::TreeProgress tree;
-        std::atomic<bool> cancel{false};
         std::atomic<bool> looking{false};   // the import done, the same games from other sources looked for
         std::atomic<bool> building{false};  // then the tree being built
-        std::chrono::steady_clock::time_point started;
-        std::future<study::DatabaseImport> done;
         // The groups of duplicates that hold games of the import (M13, board 1): the same game from another source.
-        uint64_t games_before = 0;
         study::DuplicateProgress duplicates_progress;
-        study::Duplicates duplicates;
     };
+    using Import = TaskState<ImportState>;  // and its cancel
     // False when one runs already, or the database cannot be opened.
     bool startImport(std::size_t index, const std::filesystem::path& file, const std::string& password = {},
                      std::vector<uint64_t> forget = {});
-    [[nodiscard]] Import* import() noexcept { return import_.get(); }
+    [[nodiscard]] Import* import() noexcept { return import_.idle() ? nullptr : &import_.state(); }
     // The import's report once it is over (its tree built), taken once; none while it runs.
     [[nodiscard]] std::optional<study::DatabaseImport> finishedImport();
     // The duplicates the import whose report finishedImport() just gave found, taken once.
@@ -140,32 +142,37 @@ class DatabaseShelf {
     // A database's opening tree built again in the background, when an edit made it stale (a game saved or deleted):
     // one at a time and none during an import, whose own build follows it; asked again while one runs, it runs
     // again after it, the edits made meanwhile in it. treeSource() asks it for a stale tree it finds.
-    struct TreeJob {
+    struct TreeState {
         // The index of a build whose database was removed: cancelled, it ends for no database.
         static constexpr std::size_t REMOVED = ~std::size_t{0};
         std::size_t index = 0;
         study::TreeProgress progress;
-        std::atomic<bool> cancel{false};
-        std::future<study::TreeBuilt> done;
     };
+    using TreeJob = TaskState<TreeState>;  // and its cancel
     void rebuildTree(std::size_t index);
     // Each frame: the databases another program writes read again when it committed (every 2 s), and opened to be
     // written again once it lets them go (tried every 5 s).
     void keepReadOnlyCurrent();
     // The build of a database's tree; none while the one of a database removed ends.
     [[nodiscard]] TreeJob* treeJob() noexcept {
-        return tree_job_ && tree_job_->index != TreeJob::REMOVED ? tree_job_.get() : nullptr;
+        return tree_job_.idle() || tree_job_.state().index == TreeJob::REMOVED ? nullptr : &tree_job_.state();
     }
     // Each frame: a build that ended taken, the next one asked for started. True when one ended.
     bool pollTreeJob();
     void cancelTreeJob();
     // At quit (#98): the import, the tree's build and the linked databases' refreshes cancelled, the build asked for
-    // after them forgotten. Each ends within about a second; the destructor, which does the same, waits for them.
+    // after them forgotten. Each ends within about a second, parked when the shelf goes.
     void cancelAll();
 
    private:
+    // An import's result: its report, and the duplicates it found.
+    struct ImportDone {
+        study::DatabaseImport report;
+        study::Duplicates duplicates;
+    };
     void save() const;
 
+    JobGroup& jobs_;
     std::filesystem::path profile_;
     std::vector<DatabaseEntry> entries_;
     std::vector<std::shared_ptr<study::Database>> open_;
@@ -176,9 +183,9 @@ class DatabaseShelf {
     };
     std::vector<CachedFacts> facts_;  // refreshed when the database's snapshot changes
     struct Link {
+        explicit Link(JobGroup& jobs) : refresh(jobs) {}
         std::shared_ptr<study::LinkedDatabase> db;
-        std::shared_ptr<std::atomic<bool>> cancel;
-        std::future<study::LinkedRefresh> refresh;
+        Job<study::LinkedRefresh> refresh;
         bool refreshed = false;  // once since it was listed
     };
     std::vector<Link> links_;  // beside entries_, empty for the user's own
@@ -187,9 +194,9 @@ class DatabaseShelf {
         std::shared_ptr<const study::Tree> tree;
     };
     std::map<std::filesystem::path, CachedTree> trees_;  // by the database's folder, filled by treeSource()
-    std::unique_ptr<Import> import_;
+    Job<ImportDone, ImportState> import_;
     study::Duplicates import_duplicates_;
-    std::unique_ptr<TreeJob> tree_job_;
+    Job<study::TreeBuilt, TreeState> tree_job_;
     std::chrono::steady_clock::time_point read_only_read_{}, read_only_tried_{};
     std::optional<std::size_t> tree_again_;  // a build asked for while another ran, or during an import
 };

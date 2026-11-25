@@ -69,7 +69,7 @@ const std::vector<std::pair<std::string, std::string>>& gameFiles() {
 }  // namespace
 
 DatabaseShelf& App::shelf() {
-    if (!shelf_) shelf_ = std::make_unique<DatabaseShelf>(storage_.root());
+    if (!shelf_) shelf_ = std::make_unique<DatabaseShelf>(jobs_, storage_.root());
     return *shelf_;
 }
 

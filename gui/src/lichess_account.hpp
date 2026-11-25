@@ -54,8 +54,11 @@ class Callback {
         std::string error;  // Lichess's ("access_denied": the user said no), or why no answer came
     };
     // Waits for the browser's request, at most `within`, or until `cancel`; the browser is shown a page that says to
-    // come back to the program. Other requests (a browser's icon) are answered 404 and the wait goes on.
-    [[nodiscard]] Reply wait(std::chrono::milliseconds within, const std::atomic<bool>* cancel = nullptr);
+    // come back to the program. Other requests (a browser's icon) are answered 404 and the wait goes on. Given the
+    // question's `state`, an answer that does not carry it (another program's, an old page's) is answered 400 and the
+    // wait goes on: it can neither end the link nor make it look refused.
+    [[nodiscard]] Reply wait(std::chrono::milliseconds within, const std::atomic<bool>* cancel = nullptr,
+                             std::string_view state = {});
 
    private:
     net::TcpListener listener_;

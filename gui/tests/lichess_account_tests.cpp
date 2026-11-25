@@ -154,6 +154,19 @@ TEST_CASE("Lichess account: the program's server takes the browser's return, and
     std::thread no([&] { (void)comeBack(refused.redirectUri(), "?error=access_denied&state=xyz"); });
     CHECK(refused.wait(20s).error == "access_denied");
     no.join();
+    // An answer that does not carry the question's state (another program's) neither ends the wait nor makes it look
+    // refused: it is answered 400, and the answer to this question is the one taken.
+    Callback ours;
+    HttpResult foreign;
+    std::thread both([&] {
+        foreign = comeBack(ours.redirectUri(), "?error=access_denied&state=not-ours");
+        (void)comeBack(ours.redirectUri(), "?code=mine&state=ours");
+    });
+    const auto mine = ours.wait(20s, nullptr, "ours");
+    both.join();
+    CHECK(foreign.status == 400);
+    CHECK(mine.error.empty());
+    CHECK(mine.code == "mine");
     Callback idle;
     CHECK(idle.wait(30ms).error == "no answer came from Lichess in time");
     std::atomic<bool> cancel{true};

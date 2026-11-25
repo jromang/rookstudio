@@ -160,7 +160,8 @@ Callback::Callback() { (void)listener_.listen(0, true); }
 
 std::string Callback::redirectUri() const { return fmt::format("http://127.0.0.1:{}/callback", port()); }
 
-Callback::Reply Callback::wait(std::chrono::milliseconds within, const std::atomic<bool>* cancel) {
+Callback::Reply Callback::wait(std::chrono::milliseconds within, const std::atomic<bool>* cancel,
+                               std::string_view state) {
     Reply r;
     if (port() == 0) {
         r.error = "the program cannot receive Lichess's answer (no port on 127.0.0.1)";
@@ -190,22 +191,28 @@ Callback::Reply Callback::wait(std::chrono::milliseconds within, const std::atom
         const auto question = target.find('?');
         std::string_view query =
             question == std::string::npos ? std::string_view() : std::string_view(target).substr(question + 1);
+        Reply got;
         while (!query.empty()) {
             const auto amp   = query.find('&');
             const auto pair  = query.substr(0, amp);
             const auto equal = pair.find('=');
             const auto name  = pair.substr(0, equal);
             const auto value = equal == std::string_view::npos ? std::string() : percentDecoded(pair.substr(equal + 1));
-            if (name == "code") r.code = value;
-            if (name == "state") r.state = value;
-            if (name == "error") r.error = value;
+            if (name == "code") got.code = value;
+            if (name == "state") got.state = value;
+            if (name == "error") got.error = value;
             query = amp == std::string_view::npos ? std::string_view() : query.substr(amp + 1);
         }
-        if (r.code.empty() && r.error.empty()) r.error = "Lichess's answer has no code";
+        // An answer to another question, or another program's: refused, and the wait goes on for this one.
+        if (!state.empty() && got.state != state) {
+            reply(c, 400, page("RookStudio", "This answer is not for the question RookStudio asked."));
+            continue;
+        }
+        if (got.code.empty() && got.error.empty()) got.error = "Lichess's answer has no code";
         reply(c, 200,
-              r.error.empty() ? page("RookStudio", "Your Lichess account is being linked: you can close this page.")
-                              : page("RookStudio", "Your Lichess account was not linked: you can close this page."));
-        return r;
+              got.error.empty() ? page("RookStudio", "Your Lichess account is being linked: you can close this page.")
+                                : page("RookStudio", "Your Lichess account was not linked: you can close this page."));
+        return got;
     }
 }
 
@@ -291,7 +298,7 @@ Answer<Account> link(const std::function<bool(const std::string& url)>& open, co
         return a;
     }
     (void)open(authorizeUrl(pkce, callback.redirectUri(), scopes, username));
-    const auto reply = callback.wait(within, cancel);
+    const auto reply = callback.wait(within, cancel, pkce.state);
     if (!reply.error.empty()) {
         a.error = reply.error == "access_denied" ? "the link was refused on Lichess" : reply.error;
         return a;

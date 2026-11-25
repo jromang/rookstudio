@@ -47,24 +47,39 @@ AssistantService::~AssistantService() {
     process_.reset();
 }
 
-void AssistantService::saveSettings() { (void)writeJson(profile_ / "assistant.json", settings_); }
+AssistantSettings AssistantService::settings() const {
+    std::lock_guard lock(settings_mutex_);
+    return settings_;
+}
+
+void AssistantService::setSettings(const AssistantSettings& settings) {
+    std::lock_guard lock(settings_mutex_);
+    settings_ = settings;
+}
+
+void AssistantService::saveSettings() { (void)writeJson(profile_ / "assistant.json", settings()); }
 
 const AssistantModel& AssistantService::recommended() const { return assistantModels().front(); }
 
-std::filesystem::path AssistantService::modelPath() const {
-    return settings_.model_file.empty() ? modelFile(profile_, recommended())
-                                        : std::filesystem::path(settings_.model_file);
+std::filesystem::path AssistantService::modelPath() const { return modelPathFor(settings()); }
+
+bool AssistantService::installed() const { return installedFor(settings()); }
+
+std::filesystem::path AssistantService::modelPathFor(const AssistantSettings& settings) const {
+    return settings.model_file.empty() ? modelFile(profile_, recommended())
+                                       : std::filesystem::path(settings.model_file);
 }
 
-bool AssistantService::installed() const {
-    if (settings_.model_file.empty()) return modelInstalled(profile_, recommended());
+bool AssistantService::installedFor(const AssistantSettings& settings) const {
+    if (settings.model_file.empty()) return modelInstalled(profile_, recommended());
     std::error_code ec;
-    return std::filesystem::is_regular_file(settings_.model_file, ec);
+    return std::filesystem::is_regular_file(settings.model_file, ec);
 }
 
 bool AssistantService::knowsComments() const {
-    if (settings_.model_file.empty()) return true;
-    const auto name = std::filesystem::path(settings_.model_file).filename().string();
+    const auto file = settings().model_file;
+    if (file.empty()) return true;
+    const auto name = std::filesystem::path(file).filename().string();
     for (const auto& m : assistantModels())
         if (name == m.file) return true;
     return false;
@@ -173,9 +188,9 @@ void AssistantService::poll() {
     }
     if (unload_asked_) unload();
     // Unloaded by itself after so long unused (M5, board 5); a request under way holds the lock, and the model.
-    if (settings_.unload_minutes > 0) {
+    if (const auto minutes = settings().unload_minutes; minutes > 0) {
         std::unique_lock lock(mutex_, std::try_to_lock);
-        if (lock && process_ && now - last_use_ > std::chrono::minutes(settings_.unload_minutes)) {
+        if (lock && process_ && now - last_use_ > std::chrono::minutes(minutes)) {
             process_.reset();
             loaded_on_gpu_ = false;
         }
@@ -198,19 +213,21 @@ std::optional<commentary::Generation> AssistantService::generate(const commentar
         if (error) *error = "cancelled";
         return std::nullopt;
     }
-    last_use_ = std::chrono::steady_clock::now();
+    // The settings as they are when its turn comes: the window may change them meanwhile (#100).
+    const auto settings = this->settings();
+    last_use_           = std::chrono::steady_clock::now();
     // On the GPU when it is wanted and free; a model loaded where it no longer should be is loaded again.
-    const bool want_gpu = settings_.gpu && !gpu_busy_ && !gpu_failed_;
+    const bool want_gpu = settings.gpu && !gpu_busy_ && !gpu_failed_;
     if (process_ && process_->running() && loaded_on_gpu_ && !want_gpu) process_.reset();
     if (!process_ || !process_->running()) {
-        if (!installed()) {
+        if (!installedFor(settings)) {
             if (error) *error = "the assistant's model is not on this machine";
             return std::nullopt;
         }
         loading_     = true;
         auto process = std::make_unique<AssistantProcess>();
         std::string why;
-        const bool ok = process->start(program_, modelPath(), want_gpu ? 999 : 0, why);
+        const bool ok = process->start(program_, modelPathFor(settings), want_gpu ? 999 : 0, why);
         loading_      = false;
         if (!ok) {
             failure_ = why;

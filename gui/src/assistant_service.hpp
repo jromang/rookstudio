@@ -39,7 +39,10 @@ class AssistantService final : public commentary::Model {
     AssistantService(const AssistantService&)            = delete;
     AssistantService& operator=(const AssistantService&) = delete;
 
-    AssistantSettings& settings() noexcept { return settings_; }
+    // Read on the window's thread, and copied by a request when its turn comes (generate(), on the thread that asks):
+    // a copy, changed with setSettings() only, under a lock of their own (#100). saveSettings() writes them.
+    [[nodiscard]] AssistantSettings settings() const;
+    void setSettings(const AssistantSettings& settings);
     void saveSettings();
 
     // The model: the catalogue's recommended one, unless a file was chosen.
@@ -87,10 +90,15 @@ class AssistantService final : public commentary::Model {
                                                                  const std::atomic<bool>* cancel);
 
    private:
+    // The model's file and whether it is there, for these settings.
+    [[nodiscard]] std::filesystem::path modelPathFor(const AssistantSettings& settings) const;
+    [[nodiscard]] bool installedFor(const AssistantSettings& settings) const;
+
     std::filesystem::path profile_;
     std::string program_;
-    AssistantSettings settings_;
-    mutable std::mutex mutex_;
+    AssistantSettings settings_;  // under settings_mutex_
+    mutable std::mutex settings_mutex_;
+    mutable std::mutex mutex_;  // a request's: one at a time
     std::unique_ptr<AssistantProcess> process_;
     std::atomic<bool> loading_{false};
     std::atomic<bool> unload_asked_{false};  // Unload while a request held the model: done once it is answered

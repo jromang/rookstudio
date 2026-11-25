@@ -2301,13 +2301,16 @@ void App::handleDialogs() {
                     board_.message_error = true;
                 }
                 break;
-            case Dialogs::Purpose::AssistantModel:
+            case Dialogs::Purpose::AssistantModel: {
                 // A GGUF file in place of the catalogue's model: loaded at the next question.
-                assistant_->unload();
-                assistant_->settings().model_file = path;
-                assistant_->settings().not_now    = false;
+                auto settings       = assistant_->settings();
+                settings.model_file = path;
+                settings.not_now    = false;
+                assistant_->setSettings(settings);
+                assistant_->unload();  // after: a request that starts meanwhile loads the file chosen
                 assistant_->saveSettings();
                 break;
+            }
             case Dialogs::Purpose::SaveBoardPgn:
                 try {
                     if (chessBoard()) fillBoardEco();

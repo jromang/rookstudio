@@ -155,14 +155,13 @@ DatabaseShelf::DatabaseShelf(fs::path profile) : profile_(std::move(profile)) {
 }
 
 DatabaseShelf::~DatabaseShelf() {
-    if (import_) {
-        import_->cancel = true;
-        if (import_->done.valid()) import_->done.wait();
-    }
-    for (auto& link : links_) {
-        if (link.cancel) *link.cancel = true;
+    // Cancelled first, then waited for: an opening tree's build too, which would otherwise run to its end (#98). The
+    // tasks use their job's fields until they end.
+    cancelAll();
+    if (import_ && import_->done.valid()) import_->done.wait();
+    if (tree_job_ && tree_job_->done.valid()) tree_job_->done.wait();
+    for (auto& link : links_)
         if (link.refresh.valid()) link.refresh.wait();
-    }
 }
 
 void DatabaseShelf::save() const {
@@ -507,6 +506,13 @@ bool DatabaseShelf::pollTreeJob() {
 void DatabaseShelf::cancelTreeJob() {
     if (tree_job_) tree_job_->cancel = true;
     tree_again_.reset();
+}
+
+void DatabaseShelf::cancelAll() {
+    if (import_) import_->cancel = true;
+    cancelTreeJob();
+    for (auto& link : links_)
+        if (link.cancel) *link.cancel = true;
 }
 
 }  // namespace fcg

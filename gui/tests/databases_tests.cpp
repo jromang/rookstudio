@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <string>
 #include <thread>
@@ -129,6 +130,36 @@ TEST_CASE("databases: a cancelled import keeps what was committed") {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     REQUIRE(report);
     CHECK(shelf.facts(index).games == report->added);
+}
+
+TEST_CASE("databases: at quit, the import, the tree being built and the one asked for after it are cancelled") {
+    const auto profile = freshDir("shelf-quit");
+    auto shelf         = std::make_unique<DatabaseShelf>(profile);
+    const auto first   = shelf->create("First");
+    const auto second  = shelf->create("Second");
+    REQUIRE(shelf->startImport(first, pgnFile(profile, 40)));
+    REQUIRE(imported(*shelf));
+    // A tree being built, another asked for after it, an import beside them (#98).
+    shelf->rebuildTree(first);
+    shelf->rebuildTree(second);
+    auto* job = shelf->treeJob();
+    REQUIRE(job);
+    CHECK(job->index == first);
+    REQUIRE(shelf->startImport(second, pgnFile(profile, 40)));
+    shelf->cancelAll();
+    CHECK(job->cancel);
+    REQUIRE(shelf->import());
+    CHECK(shelf->import()->cancel);
+    REQUIRE(imported(*shelf));
+    // Once the build cancelled ended, none follows it.
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    while (!shelf->pollTreeJob() && std::chrono::steady_clock::now() < give_up)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    CHECK(shelf->treeJob() == nullptr);
+    // A shelf that goes during a build cancels it, then waits for it.
+    shelf->rebuildTree(first);
+    REQUIRE(shelf->treeJob());
+    shelf.reset();
 }
 
 TEST_CASE("databases: the quick filter's words, a year, an ECO code and a result told apart") {

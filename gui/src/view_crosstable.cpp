@@ -145,7 +145,7 @@ bool App::drawListSwitch() {
     bool tournaments = db_tournaments_;
     if (!twoSegments("##list_switch", TR("Games"), TR("Tournaments"), tournaments)) return false;
     db_tournaments_ = tournaments;
-    if (!tournaments) crosstable_.reset();
+    if (!tournaments) leaveCrosstable();
     return true;
 }
 
@@ -525,14 +525,7 @@ void App::openCrosstable(std::size_t database, const std::string& key) {
     const auto& list = kept->list->tournaments;
     const auto it    = std::find_if(list.begin(), list.end(), [&](const auto& e) { return e.key == key; });
     if (it == list.end()) return;
-    if (crosstable_ && crosstable_->job.valid()) {
-        *crosstable_->cancel = true;
-        crosstable_->job.wait();
-    }
-    if (crosstable_ && crosstable_->looking.valid()) {
-        *crosstable_->look_cancel = true;
-        crosstable_->looking.wait();
-    }
+    leaveCrosstable();  // the one shown before
     CrosstableView v;
     v.folder    = s.entries()[database].folder;
     v.database  = s.entries()[database].name;
@@ -554,6 +547,17 @@ void App::openCrosstable(std::size_t database, const std::string& key) {
     startCrosstable();
 }
 
+void App::leaveCrosstable() {
+    if (!crosstable_) return;
+    auto& c = *crosstable_;
+    // Reading a large tournament's games, or looking for its missing ones in the other databases, takes a while.
+    if (c.cancel) *c.cancel = true;
+    if (c.look_cancel) *c.look_cancel = true;
+    graveyard_.park(std::move(c.job));
+    graveyard_.park(std::move(c.looking));
+    crosstable_.reset();
+}
+
 void App::startCrosstable() {
     if (!crosstable_) return;
     auto& c = *crosstable_;
@@ -562,9 +566,9 @@ void App::startCrosstable() {
     for (std::size_t i = 0; i < s.entries().size(); ++i)
         if (s.entries()[i].folder == c.folder) db = s.open(i);
     if (!db) return;
-    if (c.job.valid()) {
+    if (c.job.valid()) {  // read again: the reading under way ends out of sight (#98)
         *c.cancel = true;
-        c.job.wait();
+        graveyard_.park(std::move(c.job));
     }
     const auto snapshot = db->snapshot();
     c.snapshot          = snapshot;
@@ -1047,8 +1051,7 @@ void App::drawStudyCrosstable() {
     const bool popup  = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup);
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !popup && !ImGui::GetIO().WantTextInput;
     if (ui::iconButton("crosstable_back", ui::Icon::Back, TR("Tournaments")) || escape) {
-        if (c.looking.valid()) *c.look_cancel = true;
-        crosstable_.reset();
+        leaveCrosstable();
         return;
     }
     ImGui::SameLine();
@@ -1174,7 +1177,10 @@ void App::drawStudyCrosstable() {
                   trn("{} game is missing", "{} games are missing", t.missing.size(), t.missing.size()),
                   trf("{}. Counted “?”: the points, the tie-breaks and the rating change say so.", said));
         if (ImGui::SmallButton(TR("Look for them in your other databases"))) {
-            if (c.looking.valid()) *c.look_cancel = true;
+            if (c.looking.valid()) {  // asked again: the search under way ends out of sight (#98)
+                *c.look_cancel = true;
+                graveyard_.park(std::move(c.looking));
+            }
             c.asked.clear();
             for (const auto& m : t.missing)
                 if (m.alone == study::NO_PLAYER)
@@ -1387,7 +1393,7 @@ void App::drawStudyCrosstable() {
                 db_only_        = std::move(ids);
                 db_only_said_   = TR("games that came twice and differ");
                 db_tournaments_ = false;
-                crosstable_.reset();
+                leaveCrosstable();
                 return;
             }
         }

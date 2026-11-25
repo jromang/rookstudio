@@ -201,11 +201,9 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     if (endgame_) dropEndgame();  // an endgame against the tables, a vision exercise (#82)
     if (vision_) dropVision();
     rememberBoardGame();            // its changes and undo history go with it
-    // The questions were about the game left: those still being answered end on their own, out of sight; so do the
-    // comments being written, which go nowhere.
-    for (auto& q : questions_)
-        if (q.answer.valid()) questions_left_.push_back(std::move(q.answer));
-    questions_.clear();
+    // The questions were about the game left: those still being answered stop at their next request, out of sight;
+    // so do the comments being written, which go nowhere.
+    leaveQuestions();
     if (comment_job_) *comment_job_->cancel = true;
     ++board_game_serial_;
     board_broadcast_.reset();  // another game: the broadcast's, if it is one, is followed again by its caller

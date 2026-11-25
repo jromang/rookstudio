@@ -184,7 +184,20 @@ void AssistantService::poll() {
 
 std::optional<commentary::Generation> AssistantService::generate(const commentary::Request& request,
                                                                  std::string* error) {
+    return generate(request, error, nullptr);
+}
+
+std::optional<commentary::Generation> AssistantService::generate(const commentary::Request& request, std::string* error,
+                                                                 const std::atomic<bool>* cancel) {
+    if (cancel && *cancel) {  // not even its turn waited for
+        if (error) *error = "cancelled";
+        return std::nullopt;
+    }
     std::lock_guard lock(mutex_);  // one request at a time, as the model answers them
+    if (cancel && *cancel) {       // cancelled while the request before it was answered
+        if (error) *error = "cancelled";
+        return std::nullopt;
+    }
     last_use_ = std::chrono::steady_clock::now();
     // On the GPU when it is wanted and free; a model loaded where it no longer should be is loaded again.
     const bool want_gpu = settings_.gpu && !gpu_busy_ && !gpu_failed_;

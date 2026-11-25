@@ -5,8 +5,11 @@
 
 #    include <doctest/doctest.hpp>
 
+#    include <atomic>
 #    include <filesystem>
 #    include <fstream>
+#    include <memory>
+#    include <string>
 
 #    include "../../tournament/tests/self_path.hpp"
 #    include "assistant_service.hpp"
@@ -59,6 +62,31 @@ TEST_CASE("assistant service: no model, no answer; the model chosen loads at the
     // Loaded again by the next request.
     REQUIRE(service.generate(asked("again"), &error));
     CHECK(service.state() == AssistantService::State::Ready);
+}
+
+TEST_CASE("assistant service: a request cancelled is refused before the model loads; a task's model stops asking") {
+    const auto profile = freshProfile("assistant_cancel");
+    AssistantService service(profile, mock());
+    const auto file = profile / "commentary.gguf";
+    std::ofstream(file) << "model";
+    service.settings().model_file = file.string();
+    // Cancelled by the time its turn came (#98): nothing loaded for it.
+    std::atomic<bool> cancelled{true};
+    std::string error;
+    CHECK_FALSE(service.generate(asked("hello"), &error, &cancelled));
+    CHECK(error == "cancelled");
+    CHECK(service.state() == AssistantService::State::Unloaded);
+    // A question's model: it answers until its task is left, then refuses.
+    auto left = std::make_shared<std::atomic<bool>>(false);
+    CancellableModel model(service, left);
+    const auto answer = model.generate(asked("hello"), &error);
+    REQUIRE_MESSAGE(answer, error);
+    CHECK(answer->text.find("hello") != std::string::npos);
+    *left = true;
+    error.clear();
+    CHECK_FALSE(model.generate(asked("again"), &error));
+    CHECK(error == "cancelled");
+    service.unload();
 }
 
 TEST_CASE("assistant service: its settings are kept in the profile") {

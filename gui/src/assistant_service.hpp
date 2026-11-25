@@ -81,6 +81,10 @@ class AssistantService final : public commentary::Model {
     // commentary::Model: the model's answer, loading it first when it is not loaded (on the caller's thread).
     [[nodiscard]] std::optional<commentary::Generation> generate(const commentary::Request& request,
                                                                  std::string* error) override;
+    // The same, refused ("cancelled") when `cancel` is set by the time the request's turn comes, before the model is
+    // loaded: a request waits for the one before it (#98).
+    [[nodiscard]] std::optional<commentary::Generation> generate(const commentary::Request& request, std::string* error,
+                                                                 const std::atomic<bool>* cancel);
 
    private:
     std::filesystem::path profile_;
@@ -104,6 +108,22 @@ class AssistantService final : public commentary::Model {
     std::chrono::steady_clock::time_point speed_at_{};
     uint64_t speed_bytes_ = 0;
     double speed_         = 0;
+};
+
+// The assistant as the model of one task of the window's (a question, a comment): its requests refused once `cancel`
+// is set, the one waiting for its turn too, so that a task left stops at its next request instead of its last (#98).
+class CancellableModel final : public commentary::Model {
+   public:
+    CancellableModel(AssistantService& service, std::shared_ptr<const std::atomic<bool>> cancel)
+        : service_(service), cancel_(std::move(cancel)) {}
+    [[nodiscard]] std::optional<commentary::Generation> generate(const commentary::Request& request,
+                                                                 std::string* error) override {
+        return service_.generate(request, error, cancel_.get());
+    }
+
+   private:
+    AssistantService& service_;
+    std::shared_ptr<const std::atomic<bool>> cancel_;
 };
 
 }  // namespace fcg

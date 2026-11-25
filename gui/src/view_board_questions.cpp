@@ -247,9 +247,10 @@ void App::askQuestion(const std::string& text, const std::string& asked_text, st
     q.answer =
         std::async(std::launch::async,
                    [question = asked_text.empty() ? text : asked_text, fen = q.fen, earlier_fen, previous,
-                    earlier_previous, line = std::move(line), bases = q.bases, lang, model = assistant_.get(),
-                    oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
+                    earlier_previous, line = std::move(line), bases = q.bases, lang, service = assistant_.get(),
+                    cancel = q.cancel, oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
                        QuestionResult r;
+                       if (*cancel) return r;  // left before it began: nobody reads it
                        const auto pos = commentary::Position::fromFen(fen);
                        if (!pos) {
                            r.error = "the position cannot be read";
@@ -287,7 +288,8 @@ void App::askQuestion(const std::string& text, const std::string& asked_text, st
                            asked.earlier_previous = two_back.parseUci(earlier_previous);
                        }
                        asked.line = moves;
-                       r.answer   = commentary::answer(asked, *model, oracle.get(), tables.get());
+                       CancellableModel model(*service, cancel);  // left, it stops at its next request (#98)
+                       r.answer = commentary::answer(asked, model, oracle.get(), tables.get());
                        // Two moves compared: the position they are played from, and what the databases hold of it,
                        // for the table under the answer.
                        if (const auto* a = std::get_if<commentary::Answered>(&r.answer);
@@ -314,8 +316,14 @@ void App::pollQuestions() {
     for (auto& q : questions_)
         if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             q.done = q.answer.get();
-    std::erase_if(questions_left_,
-                  [](auto& f) { return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
+}
+
+void App::leaveQuestions() {
+    for (auto& q : questions_) {
+        *q.cancel = true;
+        graveyard_.park(std::move(q.answer));
+    }
+    questions_.clear();
 }
 
 void App::addAssistantComment(const std::string& text, int line, int ply, const std::string& fen,

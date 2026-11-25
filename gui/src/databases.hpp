@@ -153,6 +153,9 @@ class DatabaseShelf {
     // Each frame: a build that ended taken, the next one asked for started. True when one ended.
     bool pollTreeJob();
     void cancelTreeJob();
+    // At quit (#98): the import, the tree's build and the linked databases' refreshes cancelled, the build asked for
+    // after them forgotten. Each ends within about a second; the destructor, which does the same, waits for them.
+    void cancelAll();
 
    private:
     void save() const;

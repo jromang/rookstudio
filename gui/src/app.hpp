@@ -61,6 +61,7 @@
 #include "fide_cards.hpp"
 #include "fide_rating_list.hpp"
 #include "game_graph.hpp"
+#include "graveyard.hpp"
 #include "guide_view.hpp"
 #include "home.hpp"
 #include "https.hpp"
@@ -2230,6 +2231,9 @@ class App {
     CrosstableStore& crosstableStore();
     // A database's tournament (its key) shown as a crosstable: the database's list of tournaments under it.
     void openCrosstable(std::size_t database, const std::string& key);
+    // The crosstable left: the reading of its games and the search for the missing ones cancelled, ending out of
+    // sight (#98).
+    void leaveCrosstable();
     void startCrosstable();
     void pollCrosstable();
     void remakeCrosstable();  // its settings changed: computed again from its games read
@@ -2445,9 +2449,11 @@ class App {
         bool follow  = false;  // a round followed live
         int base     = -1;     // the database chosen; -1: the one by default, made when missing
         std::future<lichess::Answer<std::string>> pgn;  // a game's or a chapter's, asked at once
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);  // of `pgn`
         std::optional<lichess::Answer<std::string>> got;
     };
     std::optional<LinkCard> link_card_;
+    void closeLinkCard();  // put away: its game no longer asked, the question ending out of sight (#98)
     struct LinkJob {
         lichess::Link link;
         std::size_t index = 0;  // the database's
@@ -3218,13 +3224,15 @@ class App {
         std::string engine;                            // the engine that answered, for what the answer rests on
         std::vector<commentary::ReferenceBase> bases;  // the databases it looked in: a game it names opens from them
         std::future<QuestionResult> answer;
+        // Its model refuses the next request once set: a question left stops there (#98).
+        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
         std::optional<QuestionResult> done;
     };
     std::vector<QuestionAsked> questions_;                     // this game's, the oldest first
+    void leaveQuestions();  // those being answered cancelled, ending out of sight (#98)
     // A question's card: the question, its answer, the comparison of two moves, what it rests on, its gestures;
     // `remove` set when "Remove" was clicked.
     void drawQuestionCard(std::size_t index, std::optional<std::size_t>& remove);
-    std::vector<std::future<QuestionResult>> questions_left_;  // those of a game left, still being answered
     std::array<char, 512> question_text_{};
     bool question_focus_ = false;  // the question's field takes the keys at its next drawing
     // The assistant's comments on the board (M5, boards 3 and 4; view_board_assist.cpp): Alt+C on the move shown, the
@@ -4788,6 +4796,11 @@ class App {
     void chooseRemote(const std::string& path);
     bool scroll_to_machines_    = false;  // asked from the command palette
     int machines_scroll_frames_ = 0;      // the frames it was asked on
+
+    // The futures of tasks cancelled whose result nobody wants (a pasted link put away, a crosstable left, the
+    // questions of a game left): let go of once a frame when they ended, the others waited for at the end of ~App,
+    // every window hidden (#98). Declared last: gone before what their tasks use (assistant_).
+    Graveyard graveyard_;
 };
 
 }  // namespace fcg

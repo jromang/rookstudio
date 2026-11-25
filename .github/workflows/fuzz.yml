@@ -72,9 +72,7 @@ jobs:
       - name: Build
         run: |
           ccache -z
-          cmake --build build-fuzz --target fuzz_web_request fuzz_tunnel_text fuzz_tlcs_message fuzz_pgn_book \
-            fuzz_epd_book fuzz_app_pgn fuzz_engine_info fuzz_pgn_reader fuzz_segment fuzz_edits fuzz_players \
-            fuzz_import fuzz_chessbase
+          cmake --build build-fuzz --target fuzz
           ccache -s
 
       - name: The corpora of earlier runs
@@ -92,8 +90,8 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
           FUZZ_SECONDS: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 120 || 15 }}
         run: |
-          targets=(web_request tunnel_text tlcs_message pgn_book epd_book app_pgn engine_info pgn_reader segment edits
-            players import chessbase)
+          # Those CMake defines, as it lists them (fuzz_targets.txt): none forgotten here.
+          mapfile -t targets < build-fuzz/fuzz_targets.txt
           pids=()
           for target in "${targets[@]}"; do
             mkdir -p "fuzz-corpus/${target}" "fuzz-crashes/${target}"

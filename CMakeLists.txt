@@ -288,6 +288,7 @@ if(FCG_FUZZ)
                                     ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
         target_link_libraries(fuzz_${name} PRIVATE fcg_study)
         target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
+        list(APPEND FCG_FUZZ_NAMES ${name})
     endforeach()
 endif()
 
@@ -915,8 +916,34 @@ if(FCG_BUILD_GUI)
                                         ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
             target_link_libraries(fuzz_${name} PRIVATE fcg_lib)
             target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
+            list(APPEND FCG_FUZZ_NAMES ${name})
         endforeach()
     endif()
+endif()
+
+# The test programs and the fuzz targets, each listed here only. The tests target builds the test programs (and the
+# engines and programs they start), test_programs.txt next to them names them: tools/run_tests.py given that folder
+# runs them, as the check target and the workflows do. The fuzz target builds the fuzz targets, fuzz_targets.txt names
+# them (fuzz_<name>: <name>), which fuzz.yml runs.
+if(FCG_BUILD_TESTS)
+    set(FCG_TEST_PROGRAMS fcg-tournament-tests fcg-study-tests fcg-commentary-tests)
+    if(FCG_BUILD_GUI)
+        list(PREPEND FCG_TEST_PROGRAMS fastchess-gui-tests)
+    endif()
+    add_custom_target(tests)
+    add_dependencies(tests ${FCG_TEST_PROGRAMS})
+    set(FCG_TEST_LIST "")
+    foreach(program IN LISTS FCG_TEST_PROGRAMS)
+        string(APPEND FCG_TEST_LIST "$<TARGET_FILE_NAME:${program}>\n")
+    endforeach()
+    file(GENERATE OUTPUT "$<TARGET_FILE_DIR:fcg-tournament-tests>/test_programs.txt" CONTENT "${FCG_TEST_LIST}")
+endif()
+if(FCG_FUZZ)
+    add_custom_target(fuzz)
+    list(TRANSFORM FCG_FUZZ_NAMES PREPEND fuzz_ OUTPUT_VARIABLE FCG_FUZZ_TARGETS)
+    add_dependencies(fuzz ${FCG_FUZZ_TARGETS})
+    list(JOIN FCG_FUZZ_NAMES "\n" FCG_FUZZ_LIST)
+    file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/fuzz_targets.txt" CONTENT "${FCG_FUZZ_LIST}\n")
 endif()
 
 # cmake --build build --target check: the test programs built, then their test cases run side by side, each in a
@@ -926,23 +953,15 @@ if(FCG_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     set(FCG_TEST_JOBS "" CACHE STRING "Test cases the check target runs at once; empty: one per processor")
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
-        set(FCG_TEST_PROGRAMS fcg-tournament-tests fcg-study-tests fcg-commentary-tests)
-        if(FCG_BUILD_GUI)
-            list(PREPEND FCG_TEST_PROGRAMS fastchess-gui-tests)
-        endif()
-        set(FCG_TEST_FILES)
-        foreach(program IN LISTS FCG_TEST_PROGRAMS)
-            list(APPEND FCG_TEST_FILES $<TARGET_FILE:${program}>)
-        endforeach()
         set(FCG_TEST_JOBS_OPTION)
         if(FCG_TEST_JOBS)
             set(FCG_TEST_JOBS_OPTION -j ${FCG_TEST_JOBS})
         endif()
         add_custom_target(check
             COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_tests.py ${FCG_TEST_JOBS_OPTION}
-                    ${FCG_TEST_FILES}
-            DEPENDS ${FCG_TEST_PROGRAMS}
+                    $<TARGET_FILE_DIR:fcg-tournament-tests>
             USES_TERMINAL
             COMMENT "Running the tests")
+        add_dependencies(check tests)
     endif()
 endif()

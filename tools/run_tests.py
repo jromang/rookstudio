@@ -5,8 +5,12 @@ The tests mostly wait (for engines, servers, timeouts): run one after the other 
 the time. Here they run side by side, the slowest of the last run started first; each process has its temporary
 folder and its ports of its own (tournament/tests/own_temp.hpp, gui/tests/free_ports.hpp).
 
+    tools/run_tests.py build
     tools/run_tests.py build/fastchess-gui-tests build/fcg-tournament-tests
     tools/run_tests.py -j 8 build/fcg-tournament-tests -sf='*runner*'
+
+A folder stands for the test programs its test_programs.txt names: CMake writes it next to them (the tests target
+builds them), so that the check target and the workflows run the programs CMake defines, none forgotten.
 
 The options that follow the programs are given to doctest to choose the test cases (-tc, -ts, -sf, their -e forms...).
 The time each test case took is kept next to its program (<program>.durations.json) for the next run's order.
@@ -26,6 +30,23 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def programs_of(path):
+    """The test program `path`, or those a folder's test_programs.txt names."""
+    if not os.path.isdir(path):
+        return [os.path.abspath(path)]
+    listing = os.path.join(path, "test_programs.txt")
+    try:
+        with open(listing, encoding="utf-8") as f:
+            names = [line.strip() for line in f if line.strip()]
+    except OSError:
+        sys.exit(f"run_tests: no {listing}: a build folder configured with the tests (FCG_BUILD_TESTS) has one")
+    programs = [os.path.abspath(os.path.join(path, name)) for name in names]
+    missing = [p for p in programs if not os.path.isfile(p)]
+    if missing:
+        sys.exit("run_tests: not built (cmake --build <folder> --target tests): " + ", ".join(missing))
+    return programs
 
 
 def list_test_cases(program, filters):
@@ -111,11 +132,11 @@ def main():
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4, help="test cases at once")
     parser.add_argument("--timeout", type=float, default=600, help="seconds a test case may take")
     parser.add_argument("--no-skips", action="store_true", help="fail when a test case skipped itself")
-    parser.add_argument("programs", nargs="+", metavar="program")
+    parser.add_argument("programs", nargs="+", metavar="program", help="a test program, or a build folder")
     args, filters = parser.parse_known_args()
     # argparse takes an option with a space in it (-tc=a name*) for a positional argument: a filter all the same.
     filters += [p for p in args.programs if p.startswith("-")]
-    programs = [os.path.abspath(p) for p in args.programs if not p.startswith("-")]
+    programs = [q for p in args.programs if not p.startswith("-") for q in programs_of(p)]
 
     durations = {p: load_durations(p) for p in programs}
     cases = [(p, n) for p in programs for n in list_test_cases(p, filters)]

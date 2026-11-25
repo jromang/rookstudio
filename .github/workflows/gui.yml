@@ -123,8 +123,7 @@ jobs:
         # processor, counted on the runner (a public repository's has four, a private one's two: twice as many tests at
         # once there make their waits too short). fastchess' own tests run when app/ changes (upstream_tests.yml).
         run: |
-          python3 tools/run_tests.py -j $(( $(nproc) * 2 )) build/fastchess-gui-tests build/fcg-tournament-tests \
-            build/fcg-study-tests build/fcg-commentary-tests
+          python3 tools/run_tests.py -j $(( $(nproc) * 2 )) build
 
       - name: The window drawn without OpenGL
         # SDL's software renderer, what a machine without OpenGL 3.2 gets: the program starts, draws its Settings page
@@ -210,8 +209,7 @@ jobs:
       - name: Build
         run: |
           ccache -z
-          cmake --build build-asan --target fastchess-gui-tests fcg-tournament-tests fcg-study-tests \
-            fcg-commentary-tests
+          cmake --build build-asan --target tests
           ccache -s
 
       - name: Compiler cache saved
@@ -235,8 +233,7 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ runner.temp }}/sanitizers/report
         run: |
           mkdir -p "${RUNNER_TEMP}/sanitizers"
-          python3 tools/run_tests.py -j $(nproc) build-asan/fastchess-gui-tests build-asan/fcg-tournament-tests \
-            build-asan/fcg-study-tests build-asan/fcg-commentary-tests
+          python3 tools/run_tests.py -j $(nproc) build-asan
 
       - name: Sanitizer reports
         if: always()
@@ -318,17 +315,11 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: windows
+          # The programs, the test programs and those they start, and the list of the test programs CMake wrote.
           path: |
-            build-win/rookstudio.exe
-            build-win/fastchess.exe
-            build-win/fastchess-gui-tests.exe
-            build-win/fcg-tournament-tests.exe
-            build-win/fcg-study-tests.exe
-            build-win/fcg-commentary-tests.exe
-            build-win/fcg_random_mover.exe
-            build-win/fcg_wb_mover.exe
-            build-win/fcg_mock_assistant.exe
+            build-win/*.exe
             build-win/*.dll
+            build-win/test_programs.txt
 
   windows-tests:
     name: Windows tests
@@ -347,8 +338,7 @@ jobs:
         env:
           FCG_SOURCE_DIR: ${{ github.workspace }}
         run: >-
-          python tools/run_tests.py -j ([int]$env:NUMBER_OF_PROCESSORS * 2) bin\fastchess-gui-tests.exe
-          bin\fcg-tournament-tests.exe bin\fcg-study-tests.exe bin\fcg-commentary-tests.exe
+          python tools/run_tests.py -j ([int]$env:NUMBER_OF_PROCESSORS * 2) bin
 
   macos:
     name: macOS build and tests
@@ -410,8 +400,7 @@ jobs:
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py), two per processor.
         run: |
-          python3 tools/run_tests.py -j $(( $(sysctl -n hw.ncpu) * 2 )) build/fastchess-gui-tests \
-            build/fcg-tournament-tests build/fcg-study-tests build/fcg-commentary-tests
+          python3 tools/run_tests.py -j $(( $(sysctl -n hw.ncpu) * 2 )) build
 
       - name: Package
         run: |

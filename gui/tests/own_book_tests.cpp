@@ -322,7 +322,8 @@ TEST_CASE("own book: a PGN book is prepared in the background while it is asked 
     const auto pgn       = writePgnBook(root / "answers.pgn").string();
 
     {
-        PgnBookJobs jobs;
+        JobGroup group;
+        PgnBookJobs jobs(group);
         CHECK(jobs.want(pgn, 4, false).state == State::Queued);
         const auto status = prepared(jobs, pgn, 4);
         REQUIRE(status.state == State::Ready);
@@ -348,7 +349,8 @@ TEST_CASE("own book: a PGN book is prepared in the background while it is asked 
         CHECK(empty.error.find("no game") != std::string::npos);
     }
     // Another session: found in the cache at once.
-    PgnBookJobs jobs;
+    JobGroup group;
+    PgnBookJobs jobs(group);
     const auto again = jobs.want(pgn, 4, false);
     CHECK(again.state == State::Ready);
     CHECK(again.stats.skipped == 1);
@@ -444,7 +446,8 @@ TEST_CASE("own book: a conversion that failed is done again when asked, never by
     tour::book_cache_dir = root / "cache";
     std::ofstream(tour::book_cache_dir, std::ios::binary) << "in the way";
 
-    PgnBookJobs jobs;
+    JobGroup group;
+    PgnBookJobs jobs(group);
     const auto failed = prepared(jobs, pgn, 4);
     REQUIRE(failed.state == State::Failed);
     CHECK_FALSE(failed.error.empty());
@@ -483,7 +486,8 @@ TEST_CASE("Polyglot build: a book built from a PGN file in the background with i
     };
 
     // Two plies by count: the 20 first moves and the answer to each, written where asked, its folder made.
-    PolyglotBuild build;
+    JobGroup group;
+    PolyglotBuild build(group);
     tour::PgnBookOptions options;
     options.plies  = 2;
     const auto bin = (root / "out" / "answers.bin").string();

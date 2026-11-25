@@ -3712,7 +3712,7 @@ class App {
     // those of its conversion (pgn_books_).
     const std::string& ownBookCheck(const std::string& path);
     // The participants' PGN books turned into Polyglot books, in the background.
-    PgnBookJobs pgn_books_;
+    PgnBookJobs pgn_books_{jobs_};
     // At each frame: the PGN books of the setup are wanted (prepared as soon as chosen or loaded), the conversions
     // move on, and those that ended say so in the console.
     void pollOwnBooks();
@@ -3868,7 +3868,7 @@ class App {
     void drawEvaluatedSuite();
     void writeEvaluatedSuiteBook(std::string path);
     std::string book_build_error_;   // why the last build failed, shown in the form
-    PolyglotBuild book_build_;
+    PolyglotBuild book_build_{jobs_};
 
     // engines
     void refreshPrograms();

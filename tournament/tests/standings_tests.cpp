@@ -878,7 +878,7 @@ TEST_CASE("rating list: HTML and Markdown with a header of sources, results, anc
                         {"Anchor", "C\\D at 3000"},
                         {"Filters", "time control 60+0.6, every engine, the last 30 days, imported games left out"},
                         {"Minimum games", "2"},
-                        {"Made", "2026-11-13 by fastchess-gui 0.5.6"},
+                        {"Made", "2026-11-13 by " FCG_PRODUCT_NAME " 0.5.6"},
                     });
     const auto text = ratingListHeaderText(list, {});
     CHECK(text.find("Anchor: none, the ratings average 0\n") != std::string::npos);

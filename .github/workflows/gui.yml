@@ -326,6 +326,7 @@ jobs:
             build-win/fcg-study-tests.exe
             build-win/fcg-commentary-tests.exe
             build-win/fcg_random_mover.exe
+            build-win/fcg_wb_mover.exe
             build-win/fcg_mock_assistant.exe
             build-win/*.dll
 

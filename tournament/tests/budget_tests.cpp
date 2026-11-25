@@ -327,7 +327,10 @@ TEST_CASE("runner: an allowance changed while it plays holds games back or start
     std::thread thread([&] { runner.start(); });
 
     REQUIRE(waitUntil([&] { return state->results().size() >= 3; }));
-    CHECK(watch.most == 1);
+    {
+        std::lock_guard<std::mutex> lock(watch.mutex);  // the runner's threads write it
+        CHECK(watch.most == 1);
+    }
     CHECK(waitUntil([&] { return runner.waiting() == Wait::Cores; }, 5s));
 
     // Room for four games: they start at once.

@@ -174,6 +174,13 @@ target_compile_features(fcg_tournament PUBLIC cxx_std_20)
 target_include_directories(fcg_tournament PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tournament/src)
 target_compile_options(fcg_tournament PRIVATE -Wall -Wextra)
 target_link_libraries(fcg_tournament PUBLIC fastchess_core)
+# The program's name where the tournament layer writes it (engine logs, a rating list's header, the book adapter's
+# messages), set by each repository: tournament/src stays the same in fastchess-gui's.
+set(FCG_PRODUCT_NAME "RookStudio")
+# The program's file, as a usage line names it.
+set(FCG_PROGRAM_NAME "rookstudio")
+target_compile_definitions(fcg_tournament PRIVATE FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}"
+                                                  FCG_PROGRAM_NAME="${FCG_PROGRAM_NAME}")
 
 if(FCG_BUILD_TESTS)
     # fastchess' own mock engine, so the integration tests play real (random) games.
@@ -188,7 +195,8 @@ if(FCG_BUILD_TESTS)
     add_executable(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES})
     target_link_libraries(fcg-tournament-tests PRIVATE fcg_tournament)
     add_dependencies(fcg-tournament-tests fcg_random_mover)
-    target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>")
+    target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
+                                                              FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
     if(WIN32)
         target_link_options(fcg-tournament-tests PRIVATE -static -static-libgcc -static-libstdc++)
     endif()
@@ -899,8 +907,10 @@ if(FCG_BUILD_GUI)
 endif()
 
 # cmake --build build --target check: the test programs built, then their test cases run side by side, each in a
-# process of its own (tools/run_tests.py; its options there for a part of them only).
+# process of its own (tools/run_tests.py; its options there for a part of them only), FCG_TEST_JOBS at once (the
+# build's -j does not reach them).
 if(FCG_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
+    set(FCG_TEST_JOBS "" CACHE STRING "Test cases the check target runs at once; empty: one per processor")
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
         set(FCG_TEST_PROGRAMS fcg-tournament-tests fcg-study-tests fcg-commentary-tests)
@@ -911,8 +921,13 @@ if(FCG_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
         foreach(program IN LISTS FCG_TEST_PROGRAMS)
             list(APPEND FCG_TEST_FILES $<TARGET_FILE:${program}>)
         endforeach()
+        set(FCG_TEST_JOBS_OPTION)
+        if(FCG_TEST_JOBS)
+            set(FCG_TEST_JOBS_OPTION -j ${FCG_TEST_JOBS})
+        endif()
         add_custom_target(check
-            COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_tests.py ${FCG_TEST_FILES}
+            COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_tests.py ${FCG_TEST_JOBS_OPTION}
+                    ${FCG_TEST_FILES}
             DEPENDS ${FCG_TEST_PROGRAMS}
             USES_TERMINAL
             COMMENT "Running the tests")

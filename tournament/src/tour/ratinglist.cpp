@@ -297,7 +297,8 @@ std::vector<std::pair<std::string, std::string>> ratingListHeader(const RatingLi
                     info.period.empty() ? "every game" : info.period, info.external ? "counted" : "left out"));
     out.emplace_back("Minimum games", std::to_string(info.min_games));
     std::string made = info.date;
-    if (!info.version.empty()) made += (made.empty() ? "" : " ") + std::string("by fastchess-gui ") + info.version;
+    if (!info.version.empty())
+        made += (made.empty() ? "" : " ") + std::string("by " FCG_PRODUCT_NAME " ") + info.version;
     if (!made.empty()) out.emplace_back("Made", made);
     return out;
 }

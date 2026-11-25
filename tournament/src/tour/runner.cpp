@@ -67,7 +67,9 @@ Runner::Runner(TournamentState& state, fastchess::observer::GameObserver* downst
       state_(state),
       downstream_(downstream),
       listener_(listener),
-      log_every_game_(state.spec().log_every_game) {
+      // Made on the thread that plays the tournament, while another may make edits (the window's, or the control
+      // loop of the tournament process): from a snapshot of the spec.
+      log_every_game_(state.specSnapshot()->log_every_game) {
     // What the engines write on their error output goes to their logs.
     fastchess::engine::process::capture_stderr = true;
 }
@@ -304,8 +306,9 @@ void Runner::closeSettledPairs() {
 }
 
 void Runner::startFailed(const GameTask& task, const StartFailureLine& failure) {
+    const auto spec    = state_.specSnapshot();  // on the game's thread: an edit may change the spec meanwhile
     const bool white   = failure.engine == task.white.name;
-    const int id       = state_.spec().firstHasWhite(task.game) == white ? task.encounter.first : task.encounter.second;
+    const int id       = spec->firstHasWhite(task.game) == white ? task.encounter.first : task.encounter.second;
     const auto& engine = white ? task.white : task.black;
 
     // What the engines of the game exchanged until then, the engine's error output first: what its author needs. A
@@ -324,7 +327,7 @@ void Runner::startFailed(const GameTask& task, const StartFailureLine& failure) 
 
     using Kind            = StartFailureEvent::Kind;
     const auto engine_now = failures.engine(id);
-    if (outcome == StartFailures::Outcome::Failed && state_.spec().stop_on_start_failure) {
+    if (outcome == StartFailures::Outcome::Failed && spec->stop_on_start_failure) {
         report(Kind::Stopped, engine_now);
         fail(fmt::format("{} cannot start: {}", failure.engine, failure.error));
         return;

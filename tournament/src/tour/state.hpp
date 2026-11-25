@@ -185,10 +185,20 @@ class TournamentState {
     [[nodiscard]] bool readOnly() const noexcept { return read_only_; }
     // Lets go of the folder: its lock and its files closed, read-only from now on, as shown. The window's view of a
     // stopped tournament does so before the process that resumes it starts, which takes the folder's lock (#191).
+    // Only once no runner plays the tournament: a game being recorded (complete()) or written to spec().pgn_out uses
+    // the files, some of the time without the state's lock, and letGo() throws std::logic_error then, letting go of
+    // nothing. A game claimed before and ending after is not recorded: complete() throws std::logic_error.
     void letGo();
+
+    // The settings and participants, as the edits left them. spec() is for the thread that makes the edits
+    // (applyEdit(), undoEdit(), follow(): the window's, or the control loop of the tournament process), and for any
+    // thread while none can be made: an edit changes what it refers to, undoEdit() replaces it. Another thread (the
+    // runner's, a listener it calls) takes specSnapshot(): a copy that no edit changes, shared until the next edit.
     [[nodiscard]] const TournamentSpec& spec() const noexcept { return spec_; }
-    [[nodiscard]] std::filesystem::path pgnPath() const { return dir_ / spec_.pgnFile(); }
-    [[nodiscard]] std::filesystem::path chessbasePgnPath() const { return dir_ / spec_.chessbasePgnFile(); }
+    [[nodiscard]] std::shared_ptr<const TournamentSpec> specSnapshot() const;
+    // Any thread: the names of the PGN files never change.
+    [[nodiscard]] std::filesystem::path pgnPath() const { return pgn_path_; }
+    [[nodiscard]] std::filesystem::path chessbasePgnPath() const { return chessbase_path_; }
 
     // Number of games the tournament plays, nullopt for a match without a game limit.
     [[nodiscard]] std::optional<uint64_t> totalGames() const;
@@ -199,7 +209,8 @@ class TournamentState {
     [[nodiscard]] Impact preview(const Edit& edit) const;
 
     // Makes `edit`: journaled, then applied; the runner sees the new schedule at its next claim. Throws with a
-    // readable message when the edit cannot be made.
+    // readable message when the edit cannot be made, as preview() tells it under the same lock: a game that ends on
+    // another thread meanwhile (and pairs the next round of a knockout) cannot come between.
     void applyEdit(const Edit& edit);
 
     // The last edit can be undone until the next game starts: nothing has been played under it yet. Games that
@@ -343,6 +354,7 @@ class TournamentState {
     TournamentState(std::filesystem::path dir, TournamentSpec spec);
 
     void load();  // replays the journal
+    [[nodiscard]] Impact previewLocked(const Edit& edit) const;  // preview(), mutex_ held
     // Returns true when the result completes its encounter.
     bool apply(const GameResult& result);
     bool count(std::size_t index);                 // adds results_[index] to the statistics
@@ -420,9 +432,13 @@ class TournamentState {
     };
 
     std::filesystem::path dir_;
-    bool read_only_ = false;
+    std::atomic<bool> read_only_{false};
     std::unique_ptr<FolderLock> lock_;
-    TournamentSpec spec_;
+    TournamentSpec spec_;  // changed under mutex_, on the thread that makes the edits (see spec())
+    // specSnapshot()'s copy, made when asked and dropped whenever spec_ changes; mutex_.
+    mutable std::shared_ptr<const TournamentSpec> spec_snapshot_;
+    std::filesystem::path pgn_path_;  // pgnPath(), chessbasePgnPath()
+    std::filesystem::path chessbase_path_;
     Schedule schedule_;
     std::unique_ptr<OpeningSource> openings_;  // loaded when a new encounter first needs it
     std::map<std::pair<std::string, int>, std::string> own_book_files_;  // (book, depth) -> its Polyglot book
@@ -433,6 +449,9 @@ class TournamentState {
     std::unique_ptr<Journal> journal_;
     std::unique_ptr<PgnFile> pgn_;
     std::unique_ptr<PgnFile> pgn_chessbase_;
+    // Threads in complete() that use the files, some of the time without mutex_ (letGo() refuses meanwhile); counted up
+    // under mutex_.
+    std::atomic<int> recording_{0};
 
     std::vector<GameResult> results_;
     std::set<uint64_t> done_;                               // game numbers

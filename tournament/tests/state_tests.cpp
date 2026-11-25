@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -551,6 +553,20 @@ TEST_CASE("state: a tournament looked at lets go of its folder for the process t
 #endif
 }
 
+TEST_CASE("state: a game claimed before the folder was let go of and ended after is not recorded, nothing written") {
+    const auto dir  = freshDir("state-let-go-late");
+    auto state      = TournamentState::create(dir, matchSpec(4));
+    const auto task = state->claimNext();
+    REQUIRE(task);
+    const auto journal = readAll(dir / "journal.jsonl");
+    const auto pgn     = readAll(dir / "test.pgn");
+    state->letGo();
+    CHECK_THROWS_AS(state->complete(*task, gameData(*task, "1-0")), std::logic_error);
+    CHECK(state->results().empty());
+    CHECK(readAll(dir / "journal.jsonl") == journal);
+    CHECK(readAll(dir / "test.pgn") == pgn);
+}
+
 TEST_CASE("files: a replaced file keeps its permissions, and the old content as .bak when asked") {
     const auto dir = freshDir("files");
     fs::create_directories(dir);
@@ -974,6 +990,86 @@ TEST_CASE("state: a replayed game goes to the PGN file of the user's when it end
 
     const std::vector<std::pair<std::string, std::string>> expected = {{"1", "A"}, {"1", "B"}, {"2", "A"}, {"1", "A"}};
     CHECK(gamesOf(dir / "all.pgn") == expected);
+}
+
+TEST_CASE("state: a tournament does not let go of its folder while it records a game") {
+    const auto dir = freshDir("state-let-go-busy");
+    const auto out = dir / "all.pgn";
+    auto spec      = matchSpec(4);
+    spec.pgn_out   = out.string();
+    auto state     = TournamentState::create(dir, spec);
+
+    // The game's write to the user's PGN file, made without the state's lock, held where it journals its start.
+    std::mutex mutex;
+    std::condition_variable told;
+    bool held = false, release = false;
+    state->setJournalListener([&](uint64_t, uint64_t, const nlohmann::json& event) {
+        if (event.value("t", std::string{}) != "pgn_out" || !event.contains("begun")) return;
+        std::unique_lock<std::mutex> lock(mutex);
+        held = true;
+        told.notify_all();
+        told.wait(lock, [&] { return release; });
+    });
+    const auto task = state->claimNext();
+    REQUIRE(task);
+    std::thread recorder([&] { state->complete(*task, gameData(*task, "1-0")); });
+    bool reached = false;
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        reached = told.wait_for(lock, std::chrono::seconds(60), [&] { return held; });
+    }
+
+    // The files in use without the lock: refused, nothing let go of.
+    CHECK(reached);
+    if (reached) {
+        CHECK_THROWS_AS(state->letGo(), std::logic_error);
+        CHECK_FALSE(state->readOnly());
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        release = true;
+    }
+    told.notify_all();
+    recorder.join();
+    CHECK(state->results().size() == 1);
+    CHECK(gamesOf(out).size() == 1);
+
+    // Once the game is recorded, the folder is let go of.
+    state->letGo();
+    CHECK(state->readOnly());
+}
+
+TEST_CASE("state: the PGN file of the user's is written again after a write ended by an exception none expected") {
+    const auto dir = freshDir("pgn-out-unexpected");
+    const auto out = dir / "all.pgn";
+    auto spec      = matchSpec(4);
+    spec.pgn_out   = out.string();
+    auto state     = TournamentState::create(dir, spec);
+
+    // The first write ends with an exception none of its ways out expects, from where it journals its start (a
+    // std::bad_alloc while the games are read back, out of its try blocks, would end it so too).
+    struct Unexpected {};
+    state->setJournalListener([](uint64_t, uint64_t, const nlohmann::json& event) {
+        if (event.value("t", std::string{}) == "pgn_out" && event.contains("begun")) throw Unexpected{};
+    });
+    const auto first = state->claimNext();
+    REQUIRE(first);
+    CHECK_THROWS_AS(state->complete(*first, gameData(*first, "1-0")), Unexpected);
+    state->setJournalListener({});
+    CHECK(gamesOf(out).empty());
+
+    // The next game's write is not held back: both games go, in their order.
+    const auto second = state->claimNext();
+    REQUIRE(second);
+    state->complete(*second, gameData(*second, "0-1"));
+    CHECK(state->pgnOutError().empty());
+    CHECK(gamesOf(out).size() == 2);
+    CHECK(readAll(out) == readAll(dir / "test.pgn"));
+
+    // Nothing written twice when the tournament is opened again.
+    state.reset();
+    state = TournamentState::open(dir);
+    CHECK(readAll(out) == readAll(dir / "test.pgn"));
 }
 
 TEST_CASE("state: games recorded by many threads at once resume exactly, each game where the journal says") {

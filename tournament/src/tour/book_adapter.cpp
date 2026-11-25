@@ -77,7 +77,8 @@ uint64_t processEntropy() {
 
 fastchess::EngineConfiguration throughBookAdapter(fastchess::EngineConfiguration engine, const std::string& book,
                                                   int depth, uint64_t seed, int randomness) {
-    if (book_adapter.empty()) throw std::runtime_error("an engine's own book needs fastchess-gui's book adapter");
+    if (book_adapter.empty())
+        throw std::runtime_error("an engine's own book needs " FCG_PRODUCT_NAME "'s book adapter");
 
     // The engine behind it: a WinBoard engine through the WinBoard adapter, which is fastchess-gui too.
     auto child = inQuotes(engine.cmd) + (engine.args.empty() ? "" : " " + engine.args);
@@ -226,9 +227,9 @@ int runBookAdapter(const std::vector<std::string>& args) {
         }
     }
     if (book.empty() || i + 1 >= args.size()) {
-        std::fprintf(stderr,
-                     "usage: fastchess-gui --book-adapter --book FILE [--depth PLIES] [--seed N] [--randomness R] "
-                     "[--chess960] -- ENGINE [ARGS...]\n");
+        std::fprintf(stderr, "usage: " FCG_PROGRAM_NAME
+                             " --book-adapter --book FILE [--depth PLIES] [--seed N] [--randomness R] "
+                             "[--chess960] -- ENGINE [ARGS...]\n");
         return 2;
     }
 

@@ -10,6 +10,10 @@ folder and its ports of its own (tournament/tests/own_temp.hpp, gui/tests/free_p
 
 The options that follow the programs are given to doctest to choose the test cases (-tc, -ts, -sf, their -e forms...).
 The time each test case took is kept next to its program (<program>.durations.json) for the next run's order.
+
+A test case that cannot run here (a mock engine, a window, the internet missing) skips itself: it passes, and says why
+in a doctest MESSAGE ending with ", skipped" (or ", skipped: " and details). The summary lists those test cases;
+--no-skips makes them fail the run.
 """
 
 import argparse
@@ -32,6 +36,20 @@ def list_test_cases(program, filters):
         if case.get("skipped") != "true" and name not in names:
             names.append(name)
     return names
+
+
+# doctest's line for a MESSAGE, "file:line: MESSAGE: text" ("file(line): ..." with MSVC), whose text says the test case
+# skipped itself.
+SKIP_LINE = re.compile(r"^.*?(?::\d+:|\(\d+\):) MESSAGE: (.*, skipped(?::[^\r\n]*)?)\r?$", re.MULTILINE)
+
+
+def skip_reasons(text):
+    reasons = []
+    for match in SKIP_LINE.finditer(text):
+        reason = match.group(1).strip()
+        if reason not in reasons:
+            reasons.append(reason)
+    return reasons
 
 
 def name_filter(name):
@@ -92,6 +110,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4, help="test cases at once")
     parser.add_argument("--timeout", type=float, default=600, help="seconds a test case may take")
+    parser.add_argument("--no-skips", action="store_true", help="fail when a test case skipped itself")
     parser.add_argument("programs", nargs="+", metavar="program")
     args, filters = parser.parse_known_args()
     # argparse takes an option with a space in it (-tc=a name*) for a positional argument: a filter all the same.
@@ -108,6 +127,7 @@ def main():
 
     start = time.monotonic()
     failures = []
+    skips = []  # (name, why) of the test cases that passed by skipping themselves
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         futures = {pool.submit(run_one, p, n, args.timeout): (p, n) for p, n in cases}
         for future in as_completed(futures):
@@ -117,6 +137,8 @@ def main():
             if problem:
                 failures.append(name)
                 print(f"\n=== FAILED ({problem}, {seconds:.1f} s): {name}\n{text.rstrip()}\n", flush=True)
+            elif reasons := skip_reasons(text):
+                skips.append((name, "; ".join(reasons)))
     wall = time.monotonic() - start
 
     for program in programs:
@@ -129,8 +151,13 @@ def main():
     slowest = sorted(cases, key=lambda c: -durations[c[0]][c[1]])[:3]
     print(f"{len(cases) - len(failures)}/{len(cases)} test cases passed in {wall:.1f} s, {args.jobs} at once; slowest: "
           + "; ".join(f"{durations[p][n]:.1f} s {n}" for p, n in slowest))
+    if skips:
+        print(f"Skipped themselves ({len(skips)}):\n" + "\n".join(f"  {n}: {why}" for n, why in sorted(skips)))
     if failures:
         print("Failed:\n" + "\n".join("  " + n for n in failures))
+        return 1
+    if skips and args.no_skips:
+        print("--no-skips: test cases skipped themselves")
         return 1
     return 0
 

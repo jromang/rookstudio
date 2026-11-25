@@ -50,7 +50,7 @@ std::string EngineLog::text(uint64_t game_number, const fastchess::MatchData& da
         return fmt::format("{} ({}{}{})", p.config.name, p.config.cmd, p.config.args.empty() ? "" : " ", p.config.args);
     };
 
-    std::string out = fmt::format("fastchess-gui engine log, game {}\n", game_number);
+    std::string out = fmt::format(FCG_PRODUCT_NAME " engine log, game {}\n", game_number);
     out += fmt::format("White: {}\nBlack: {}\n", engine(white), engine(black));
     out += fmt::format("Start: {}  Duration: {}\n", data.start_time, data.duration);
     out += fmt::format("Position: {}\n", data.fen);
@@ -62,7 +62,7 @@ std::string EngineLog::text(uint64_t game_number, const fastchess::MatchData& da
 }
 
 std::string EngineLog::startText(const fastchess::EngineConfiguration& engine, const std::string& error) const {
-    std::string out = fmt::format("fastchess-gui engine log, start of {}\n", engine.name);
+    std::string out = fmt::format(FCG_PRODUCT_NAME " engine log, start of {}\n", engine.name);
     out += fmt::format("Program: {}{}{}\n", engine.cmd, engine.args.empty() ? "" : " ", engine.args);
     if (!engine.dir.empty() && engine.dir != ".") out += fmt::format("Folder: {}\n", engine.dir);
     out += fmt::format("Error: {}\n", error);

@@ -174,6 +174,10 @@ target_compile_features(fcg_tournament PUBLIC cxx_std_20)
 target_include_directories(fcg_tournament PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tournament/src)
 target_compile_options(fcg_tournament PRIVATE -Wall -Wextra)
 target_link_libraries(fcg_tournament PUBLIC fastchess_core)
+# The program's name where the tournament layer writes it (engine logs, a rating list's header, the book adapter's
+# messages), set by each repository: tournament/src stays the same in fastchess-gui's.
+set(FCG_PRODUCT_NAME "RookStudio")
+target_compile_definitions(fcg_tournament PRIVATE FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
 
 if(FCG_BUILD_TESTS)
     # fastchess' own mock engine, so the integration tests play real (random) games.
@@ -188,7 +192,8 @@ if(FCG_BUILD_TESTS)
     add_executable(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES})
     target_link_libraries(fcg-tournament-tests PRIVATE fcg_tournament)
     add_dependencies(fcg-tournament-tests fcg_random_mover)
-    target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>")
+    target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
+                                                              FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
     if(WIN32)
         target_link_options(fcg-tournament-tests PRIVATE -static -static-libgcc -static-libstdc++)
     endif()

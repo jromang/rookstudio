@@ -1,8 +1,11 @@
 #include <doctest/doctest.hpp>
 
 #include <string>
+#include <vector>
 
+#include <chess.hpp>
 #include <study/import.hpp>
+#include <study/scan_board.hpp>
 
 #include "test_games.hpp"
 
@@ -53,4 +56,32 @@ TEST_CASE("imported games as PGN: a start of its own, Black to move, and random 
         CHECK(again.moves == g.moves);
         CHECK(again.plies == g.plies);
     }
+}
+
+TEST_CASE("imported games as PGN: a move code no move has stops the game there, never a null move (#101)") {
+    ImportedGame game;
+    REQUIRE(readImportedGame("[Event \"T\"]\n[Result \"1-0\"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0\n", game));
+    REQUIRE(game.plies == 6);
+    REQUIRE(game.moves.size() == 6);
+    // The codes of the position after 2...Nc6: the null move's is the last.
+    ScanBoard board;
+    REQUIRE(board.setFen(chess::constants::STARTPOS, false));
+    for (std::size_t ply = 0; ply < 4; ++ply) board.play(board.decode(game.moves[ply]));
+    const int count = board.codeCount();
+    REQUIRE(count <= 255);
+    for (const int code : {count, 255}) {
+        CAPTURE(code);
+        auto damaged     = game;
+        damaged.moves[4] = static_cast<uint8_t>(code);
+        const auto pgn   = importedPgn(damaged);
+        CHECK(pgn.find("--") == std::string::npos);
+        CHECK(pgn.find("1. e4 e5 2. Nf3 Nc6 1-0") != std::string::npos);
+        const auto again = readBack(damaged);
+        CHECK(again.plies == 4);
+        CHECK(std::vector<uint8_t>(game.moves.begin(), game.moves.begin() + 4) == again.moves);
+    }
+    // The null move's own code is one.
+    auto null     = game;
+    null.moves[4] = static_cast<uint8_t>(count - 1);
+    CHECK(importedPgn(null).find("2. Nf3 Nc6 3. -- a6 1-0") != std::string::npos);
 }

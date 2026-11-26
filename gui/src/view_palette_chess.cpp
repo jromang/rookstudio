@@ -16,6 +16,7 @@
 #include "assistant_service.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
+#include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
 #include "ui.hpp"
@@ -255,32 +256,9 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
         add(TR("Open the game on lichess.org"), "Lichess",
             [this] { SDL_OpenURL(fmt::format("https://lichess.org/{}", online_game_->id).c_str()); });
     }
-    // A Lichess bot for an engine (#85): online or offline, its game on the Board, its card; the engine shown's setup.
-    loadBot();
-    const auto bot_card = [this] {
-        page_ = Page::Engines;
-        for (int i = 0; i < static_cast<int>(engines_.size()); ++i)
-            if (engines_[static_cast<std::size_t>(i)].name == botSettings().engine) selected_engine_ = i;
-        engine_marked_.clear();
-    };
-    if (botReady()) {
-        if (!bot_online_ || bot_closing_)
-            add(TR("Put the Lichess bot online"), bot_account_->username, [this] { setBotOnline(true); });
-        else
-            add(TR("Put the Lichess bot offline"), bot_account_->username, [this] { setBotOnline(false); });
-        if (botPlaying())
-            add(TR("The Lichess bot's game on the Board"), bot_account_->username, [this] { openBotGame(); });
-        add(TR("The Lichess bot's card"), bot_account_->username, bot_card);
-    } else if (page_ == Page::Engines && selected_engine_ >= 0 &&
-               selected_engine_ < static_cast<int>(engines_.size())) {
-        add(trf("Make {} a Lichess bot…", engines_[static_cast<std::size_t>(selected_engine_)].name), TR("Engines"),
-            [this] {
-                bot_setup_engine_    = engines_[static_cast<std::size_t>(selected_engine_)].name;
-                bot_step_            = BotStep::Account;
-                botSettings().engine = bot_setup_engine_;
-                saveBotSettings();
-            });
-    }
+    // A Lichess bot for an engine, its module's (#85): online or offline, its game on the Board, its card; the engine
+    // shown's setup.
+    bot_->addCommands(add);
     // The engines offered to lichess.org's analysis board (#96): stop or resume each; the engine shown's offer.
     {
         std::vector<std::string> serving, stopped;

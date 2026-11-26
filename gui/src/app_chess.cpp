@@ -11,12 +11,16 @@
 #include <fstream>
 #include <future>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
+#include <SDL3/SDL.h>
 #include <imgui.h>
 
 #include <study/evals_index.hpp>
+#include <study/game_tree.hpp>
 #include <study/import.hpp>
 #include <study/patterns.hpp>
 #include <tour/files.hpp>
@@ -29,6 +33,7 @@
 #include "focus_words.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
+#include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
 #include "twic.hpp"
@@ -177,7 +182,6 @@ class App::ModulesContext final : public AppContext {
         const auto& g = *app_.online_game_;
         return context::OnlineGame{g.id, g.white, g.shown, g.ended, g.state};
     }
-    bool liveGameOn() const override { return app_.liveGameOn() != nullptr; }
     void backToOnlineGame() override { app_.backToOnlineGame(); }
     std::string onlineOpponent() const override { return app_.onlineOpponent(); }
     void onlineCall(std::string what, std::function<lichess::Reply(const std::string& token)> call) override {
@@ -211,6 +215,88 @@ class App::ModulesContext final : public AppContext {
         app_.requestQuit();
     }
 
+    // Fair play.
+    bool liveGameOn() const override { return app_.liveGameOn() != nullptr; }
+
+    // The engines.
+    const std::vector<EngineEntry>& engines() const override { return app_.engines_; }
+    const std::vector<BookEntry>& books() const override { return app_.books_; }
+    std::string tournamentTables() const override { return app_.setup_.tb_paths; }
+    bool tournamentPlaysHere() const override {
+        return std::any_of(app_.runs_.begin(), app_.runs_.end(), [](const auto& r) {
+            return r.run->remote() && r.run->running() && r.machine_id.empty() && r.run->tournament();
+        });
+    }
+    int freeCores() const override { return app_.freeCores(); }
+    const EngineEntry* engineShown() const override {
+        const int i = app_.selected_engine_;
+        if (app_.page_ != Page::Engines || i < 0 || i >= static_cast<int>(app_.engines_.size())) return nullptr;
+        return &app_.engines_[static_cast<std::size_t>(i)];
+    }
+    void showEngineCard(std::optional<int> engine, bool alone) override {
+        app_.page_ = Page::Engines;
+        if (engine) app_.selected_engine_ = *engine;
+        if (alone) app_.engine_marked_.clear();
+    }
+
+    // The Board taken by a game followed live.
+    void takeBoard(const std::string& title) override {
+        auto& b = app_.board_;
+        app_.rememberBoardGame();
+        app_.board_origin_.reset();
+        b.undo.clear();
+        b.redo.clear();
+        b.start_notes = {};
+        b.comment_edit.reset();
+        b.changes  = {};
+        b.watching = false;
+        b.selected.reset();
+        b.move_typed.reset();
+        b.preview.reset();
+        b.pgn.reset();
+        if (b.analysing) app_.setBoardAnalysis(false);
+        b.game           = ReplayGame{};
+        b.game.start_fen = std::string(chess::constants::STARTPOS);
+        b.tree           = GameTree{b.game, {}};
+        b.line           = -1;
+        b.ply            = INT32_MAX;
+        b.chess960       = false;
+        b.title          = title;
+        b.message.clear();
+        if (app_.online_game_) app_.online_game_->shown = false;
+        ++app_.board_game_serial_;
+    }
+    void updateBoard(ReplayGame game, bool chess960, const std::string& title, std::optional<bool> flip) override {
+        auto& b = app_.board_;
+        // The board follows the game, unless the user went back in it.
+        const bool at_end = b.line >= 0 || b.ply >= static_cast<int>(b.game.moves.size());
+        b.game            = std::move(game);
+        b.tree            = GameTree{b.game, {}};
+        b.line            = -1;
+        b.chess960        = chess960;
+        if (at_end) b.ply = static_cast<int>(b.game.moves.size());
+        b.ply = std::clamp(b.ply, 0, static_cast<int>(b.game.moves.size()));
+        if (!title.empty()) b.title = title;
+        if (flip) b.flip = *flip;
+    }
+    void showLiveBoard() override {
+        if (!app_.views_.empty() && !app_.view().holds(views::PageId::Board))
+            app_.toStudyBoard();
+        else
+            app_.page_ = Page::Board;
+        app_.board_back_.reset();
+    }
+    std::string boardSan(std::string san) const override { return app_.boardSan(std::move(san)); }
+    const PieceAtlas& pieces() const override { return app_.atlas_; }
+
+    // The tokens given up.
+    void revokeToken(std::string token) override { app_.revokeToken(std::move(token)); }
+
+    // The window.
+    void raiseWindow() override {
+        if (app_.window_) SDL_RaiseWindow(app_.window_);
+    }
+
    private:
     // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.
     std::vector<FinishedGame*> held(const std::string& tournament) const {
@@ -227,6 +313,7 @@ void App::initChessModules() {
     modules_context_ = std::make_unique<ModulesContext>(*this);
     tv_              = std::make_unique<LichessTvPage>(*modules_context_);
     arenas_          = std::make_unique<LichessArenasPage>(*modules_context_);
+    bot_             = std::make_unique<LichessBotPage>(*modules_context_);
 }
 
 // The arenas' hooks in fastchess-gui's pages (#95), which do not include its module's header.
@@ -239,6 +326,25 @@ void App::leaveTvBoard() { tv_->leaveBoard(); }
 void App::drawTvBoardCard() { tv_->drawBoardCard(); }
 void App::drawTvEngineLine(const EngineEntry& e) { tv_->drawEngineLine(e.name); }
 std::string App::tvName(const std::string& name) { return fcg::tvName(name); }
+
+// The Lichess bot's hooks in fastchess-gui's pages (#85), which do not include its module's header.
+void App::drawBotPart(const EngineEntry& e) { bot_->drawEnginePart(e, lichess_engine_enter_); }
+void App::drawBotRunning(bool home) { bot_->drawRunning(home); }
+int App::botThreads() const { return bot_->threads(); }
+bool App::botOnBoard() const { return bot_->onBoard(); }
+bool App::botShown() const { return bot_->shown(); }
+void App::drawBotGameCard() { bot_->drawBoardCard(); }
+const lichess::BoardState& App::botGame() const { return bot_->game(); }
+std::optional<std::string> App::botStripClock(chess::Color side) const { return bot_->stripClock(side); }
+void App::leaveBotBoard() { bot_->leaveBoard(); }
+bool App::botLive() const { return bot_->live(); }
+void App::drawQuitBot() {
+    // Close anyway: RookStudio closes, the bot's question answered (requestQuit() asks the others first).
+    if (bot_->drawQuitQuestion(std::exchange(quit_bot_open_, false))) {
+        quit_bot_said_ = true;
+        requestQuit();
+    }
+}
 
 void App::initChessServers() {
     // Scripted screenshots ask nothing of the internet (AppOptions::scripted): Lichess, its database, TWIC, chess.com
@@ -283,7 +389,7 @@ void App::pollChess() {
     pollEndgameCheck();        // a finished tournament's endgames against the tables (#94)
     pollEngineGame();          // a game against an engine: kept at each move, its end, a hint (#83)
     pollOnlinePlay();          // playing on Lichess: a seek, the challenges, the game on the Board (#84)
-    pollBot();                 // a Lichess bot for an engine: its account, its challenges, its game (#85)
+    bot_->poll();              // a Lichess bot for an engine: its account, its challenges, its game (#85)
     pollLichessEngines();      // the engines offered to lichess.org: their registrations, guards, requests (#96)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
@@ -813,18 +919,8 @@ bool App::applyChessFocusWord(const std::string& w) {
         page_      = Page::Play;
         play_part_ = 1;
     });
-    words.on({"engines-bot", "bot-online"}, [&] {
-        // The Engines page, the first engine's card: its bot's setup started (#85); bot-online: the bot put online,
-        // its account linked already.
-        page_            = Page::Engines;
-        selected_engine_ = engines_.empty() ? -1 : 0;
-        loadBot();
-        if (w == "engines-bot" && !engines_.empty()) {
-            bot_setup_engine_ = engines_[0].name;
-            bot_step_         = BotStep::Account;
-        }
-        if (w == "bot-online") setBotOnline(true);
-    });
+    // The Lichess bot's, its module's (#85): engines-bot, bot-online.
+    bot_->addFocusWords(words, w);
     words.on({"lichess-game=*"}, [&] {
         // lichess-game=ID[@black]: a game of the user's on Lichess played on the Board (#84), its stream asked of
         // the server --focus lichess-api= named.

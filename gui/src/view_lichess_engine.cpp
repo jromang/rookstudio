@@ -25,6 +25,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas.hpp"
+#include "lichess_bot_page.hpp"
 #include "machine_jobs.hpp"
 #include "ui.hpp"
 #include "update_check.hpp"
@@ -896,7 +897,7 @@ void App::drawLichessEngineService(const EngineEntry& e, lichess::OfferedEngine&
                         TR("If none is left, it pauses and says so here; Lichess waits. The tournament first, "
                            "as for the bot."));
         }
-        if (botPlaying() && service->second.engine.machine.empty())
+        if (bot_->playing() && service->second.engine.machine.empty())
             calmBox("##service_bot", ui::Icon::Bot, TR("Your Lichess bot is playing a game"),
                     TR("Its threads first; the service makes do with the rest."));
         if (std::any_of(lichess_playing_.begin(), lichess_playing_.end(),

@@ -21,6 +21,7 @@
 #include "lichess_account.hpp"
 #include "lichess_arenas.hpp"
 #include "lichess_arenas_page.hpp"
+#include "lichess_bot_page.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
 #include "lichess_tv_page.hpp"
@@ -73,9 +74,10 @@ void App::loadLichess() {
 void App::saveLichessSettings() { (void)writeJson(storage_.root() / "lichess.json", lichess_); }
 
 std::vector<std::string> App::ownLichessIds() {
-    loadBot();  // the user's bot (#85) is theirs too
     std::vector<std::string> out;
-    for (const auto* a : {lichess_account_ ? &*lichess_account_ : nullptr, bot_account_ ? &*bot_account_ : nullptr}) {
+    // The user's bot (#85) is theirs too: its module reads its account the first time it is asked.
+    const lichess::Account* const accounts[] = {lichess_account_ ? &*lichess_account_ : nullptr, bot_->account()};
+    for (const auto* a : accounts) {
         if (!a) continue;
         const auto id = lower(a->username);
         if (!id.empty() && std::find(out.begin(), out.end(), id) == out.end()) out.push_back(id);

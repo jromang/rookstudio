@@ -235,7 +235,7 @@ void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title
     board_.new_game = true;
     board_.watching = false;
     if (online_game_) online_game_->shown = false;  // a game on Lichess goes on meanwhile (#84)
-    bot_shown_ = false;                             // and the Lichess bot's (#85)
+    leaveBotBoard();                                // and the Lichess bot's (#85)
     page_ = Page::Board;
     if (analyse) setBoardAnalysis(true);
 }
@@ -1069,7 +1069,7 @@ void App::drawBoardPage() {
     drawStudySendCard();        // the game sent to a Lichess study (#79)
     drawFinishedBanner(false);  // a game of the user's that ended on Lichess (#49)
     if (online_game_) drawOnlineGameCard();  // a game on Lichess played here (#84)
-    if (bot_shown_) drawBotGameCard();       // the Lichess bot's game followed here (#85)
+    if (botOnBoard()) drawBotGameCard();     // the Lichess bot's game followed here (#85)
     if (tvOnBoard()) drawTvBoardCard();      // a game of Lichess TV's followed here (#86)
     // A game against an engine of the Play page (#83); once it is over, the card of the games from here closes it.
     if (engine_game_ && engine_game_->over && b.play_open) closeEngineGame();
@@ -2237,9 +2237,9 @@ void App::drawPlayerStrip(chess::Color side, float size, const std::vector<std::
         if (player.rating > 0) name += " · " + std::to_string(player.rating) + (player.provisional ? "?" : "");
     }
     // The Lichess bot's game (#85): the same.
-    const bool bot = !online && botShown() && bot_state_.game.full;
+    const bool bot = !online && botShown() && botGame().full;
     if (bot) {
-        const auto& player = side == chess::Color::WHITE ? bot_state_.game.white : bot_state_.game.black;
+        const auto& player = side == chess::Color::WHITE ? botGame().white : botGame().black;
         if (player.rating > 0) name += " · " + std::to_string(player.rating) + (player.provisional ? "?" : "");
     }
     // A game followed from Lichess's TV or the followed players (#86): the ratings its PGN gives, Lichess's AI named.

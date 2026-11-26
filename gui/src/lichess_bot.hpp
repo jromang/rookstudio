@@ -7,7 +7,7 @@
 // the upgrade to a bot is irreversible. Online, the bot accepts the challenges its rules allow and declines the others
 // with the reason Lichess shows the challenger; its games are played by the engine through Lichess's Bot API (the
 // stream and requests of #84's Board API under /api/bot/, lichess_board.hpp), the engine driven as #83's games drive
-// theirs (board_game.hpp's EnginePlayer). The view is view_bot.cpp.
+// theirs (board_game.hpp's EnginePlayer). The view is its module's, lichess_bot_page.hpp (#107).
 
 #include <atomic>
 #include <chrono>

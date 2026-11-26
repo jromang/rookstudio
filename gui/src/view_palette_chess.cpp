@@ -19,6 +19,7 @@
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
+#include "puzzles_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -288,55 +289,8 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
         add(trn("Review all · {} to review today", "Review all · {} to review today", day.due(),
                 ui::exactCount(day.due())),
             TR("Training"), [this] { startReview(); });
-    add(TR("Puzzles"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_ = 1;
-    });
-    if (offline_puzzles_) {
-        const auto store = offline_puzzles_->store();
-        if (store && puzzleLock().empty()) {
-            add(TR("Puzzles: random"), TR("Training"), [this] {
-                puzzles_online_ = false;
-                puzzles_theme_.clear();
-                startPuzzles();
-            });
-            for (const auto key : puzzleThemesShown()) {
-                if (!store->themeList(key)) continue;
-                add(trf("Puzzles: {}", puzzleThemeName(key)), TR("Training"), [this, key = std::string(key)] {
-                    puzzles_online_ = false;
-                    puzzles_theme_  = key;
-                    startPuzzles();
-                });
-            }
-        }
-        if (offline_puzzles_->busy()) {
-            add(TR("Cancel the download of Lichess's puzzles"), TR("Training"), [this] { offline_puzzles_->cancel(); });
-        } else if (store) {
-            add(TR("Update Lichess's puzzles"), TR("Training"), [this, go = page(Page::Training)] {
-                go();
-                training_tab_ = 1;
-                offline_puzzles_note_.clear();
-                offline_puzzles_update_ =
-                    std::async(std::launch::async, [] { return evalsSize(lichess::puzzlesUrl()); });
-            });
-            add(TR("Remove Lichess's puzzles…"), TR("Training"), [this, go = page(Page::Training)] {
-                go();
-                training_tab_           = 1;
-                offline_puzzles_remove_ = true;
-            });
-        } else {
-            add(TR("Download Lichess's puzzles"), TR("Training"), [this, go = page(Page::Training)] {
-                go();
-                training_tab_ = 1;
-                startOfflinePuzzles(lichess::puzzlesUrl());
-            });
-        }
-    }
-    add(TR("Puzzles online, from my Lichess account"), "Lichess", [this, go = page(Page::Training)] {
-        go();
-        training_tab_   = 1;
-        puzzles_online_ = true;
-    });
+    // The puzzles, their module's (#107): the Puzzles part, each theme's, the database's commands, the puzzles online.
+    puzzles_->addCommands(add, where(Page::Training));
     // Your mistakes as exercises, guessing the moves (#81).
     add(TR("My mistakes"), where(Page::Training), [this, go = page(Page::Training)] {
         go();
@@ -363,7 +317,7 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
     add(TR("Your names…"), TR("Settings"), page(Page::Settings));
     add(TR("Guess the moves"), where(Page::Training), [this, go = page(Page::Training)] {
         // The Board page's game, from the position shown; else the Training page's part.
-        if (page_ == Page::Board && !training_ && !puzzle_ && !mistake_ && !guess_ &&
+        if (page_ == Page::Board && !training_ && !puzzles_->onBoard() && !mistake_ && !guess_ &&
             board_.ply < static_cast<int>(board_.game.moves.size()) && trainingLock().empty()) {
             startGuessBoard();
             return;

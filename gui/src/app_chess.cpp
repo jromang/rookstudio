@@ -39,6 +39,7 @@
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
+#include "puzzles_page.hpp"
 #include "twic.hpp"
 
 namespace fcg {
@@ -478,19 +479,17 @@ class App::ModulesContext final : public AppContext {
     App& app_;
 };
 
-// A kind of training session still in App (#76, #80–#82): its session answers the Board's hooks with App's functions,
-// until the kind moves into a module of its own.
+// A kind of training session still in App (#76, #81, #82): its session answers the Board's hooks with App's functions,
+// until the kind moves into a module of its own, as the puzzles did (puzzles_page.hpp).
 class App::OwnSession final : public BoardSession {
    public:
-    enum class Kind { Training, Puzzles, Mistakes, Guess, Endgame, Vision };
+    enum class Kind { Training, Mistakes, Guess, Endgame, Vision };
     OwnSession(App& app, Kind kind) : app_(app), kind_(kind) {}
 
     void sessionMove(chess::Move move) override {
         switch (kind_) {
             case Kind::Training:
                 return app_.trainingAnswer(move);
-            case Kind::Puzzles:
-                return app_.puzzleAnswer(move);
             case Kind::Mistakes:
                 return app_.mistakeAnswer(move);
             case Kind::Guess:
@@ -505,8 +504,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.drawTrainingPage();
-            case Kind::Puzzles:
-                return app_.drawPuzzlePage();
             case Kind::Mistakes:
                 return app_.drawMistakePage();
             case Kind::Guess:
@@ -521,8 +518,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.dropTraining();
-            case Kind::Puzzles:
-                return app_.dropPuzzles();
             case Kind::Mistakes:
                 return app_.dropMistakes();
             case Kind::Guess:
@@ -537,8 +532,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.closeTraining(back);  // back to the Openings page, or the Training page in the review
-            case Kind::Puzzles:
-                return app_.closePuzzles(back);
             case Kind::Mistakes:
                 return app_.closeMistakes(back);
             case Kind::Guess:
@@ -554,9 +547,6 @@ class App::OwnSession final : public BoardSession {
             case Kind::Training:  // a question, or its cards being prepared
                 return app_.training_->phase == TrainingRun::Phase::Asking ||
                        app_.training_->phase == TrainingRun::Phase::Preparing;
-            case Kind::Puzzles:  // a puzzle's question, its opponent's reply coming
-                return app_.puzzle_->phase == PuzzleRun::Phase::Asking ||
-                       app_.puzzle_->phase == PuzzleRun::Phase::Reply;
             case Kind::Mistakes:  // an exercise's question, its answer being judged
                 return app_.mistake_->phase == MistakeRun::Phase::Asking ||
                        app_.mistake_->phase == MistakeRun::Phase::Checking;
@@ -574,8 +564,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.training_->aside;
-            case Kind::Puzzles:
-                return app_.puzzle_->aside;
             case Kind::Mistakes:
                 return app_.mistake_->aside;
             case Kind::Guess:
@@ -591,8 +579,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return guide::topics::Training;
-            case Kind::Puzzles:
-                return guide::topics::Puzzles;
             case Kind::Mistakes:
                 return guide::topics::Mistakes;
             case Kind::Guess:
@@ -615,8 +601,8 @@ void App::initChessModules() {
     tv_               = std::make_unique<LichessTvPage>(*modules_context_);
     arenas_           = std::make_unique<LichessArenasPage>(*modules_context_);
     bot_              = std::make_unique<LichessBotPage>(*modules_context_);
+    puzzles_          = std::make_unique<PuzzlesPage>(*modules_context_);
     training_session_ = std::make_unique<OwnSession>(*this, OwnSession::Kind::Training);
-    puzzle_session_   = std::make_unique<OwnSession>(*this, OwnSession::Kind::Puzzles);
     mistake_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Mistakes);
     guess_session_    = std::make_unique<OwnSession>(*this, OwnSession::Kind::Guess);
     endgame_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Endgame);
@@ -627,7 +613,7 @@ void App::initChessModules() {
 // the Board's hooks asked the kinds before.
 BoardSession* App::boardSession() const {
     if (training_) return training_session_.get();
-    if (puzzle_) return puzzle_session_.get();
+    if (puzzles_->onBoard()) return puzzles_.get();
     if (mistake_) return mistake_session_.get();
     if (guess_) return guess_session_.get();
     if (endgame_) return endgame_session_.get();
@@ -662,6 +648,9 @@ const char* App::sessionGuideTopic() const {
     const auto* session = boardSession();
     return session ? session->guideTopic() : nullptr;
 }
+
+// The puzzles' hook in the guessing's part (#80), which does not include its module's header.
+bool App::puzzleSeriesOn() const { return puzzles_->onBoard(); }
 
 // The arenas' hooks in fastchess-gui's pages (#95), which do not include its module's header.
 bool App::arenaHoldsAids() const { return arenas_->holdsAids(); }
@@ -730,7 +719,7 @@ void App::pollChess() {
     pollStudies();             // the user's Lichess studies: read, imported, followed, a game sent (#79)
     pollTheory();              // the theory studies: read, read again when their files change (#77)
     pollTraining();            // a repertoire's training: its cards prepared, its first question (#76)
-    pollPuzzles();             // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
+    puzzles_->poll();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
     pollMistakes();            // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
     pollEndgames();            // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
     pollEndgameCheck();        // a finished tournament's endgames against the tables (#94)
@@ -931,23 +920,7 @@ bool App::applyChessFocusWord(const std::string& w) {
             startTraining(static_cast<std::size_t>(repertoires().active()),
                           w == "training" ? TrainingRun::Kind::Due : TrainingRun::Kind::New);
     });
-    words.on({"training-page", "training-puzzles", "puzzles-online"}, [&] {
-        // The Training page (#80): its Today part, its Puzzles part, the puzzles online chosen.
-        page_           = Page::Training;
-        training_tab_   = w == "training-page" ? 0 : 1;
-        puzzles_online_ = w == "puzzles-online";
-    });
-    words.on({"puzzles-file=*"}, [&] {  // puzzles-file=FILE: Lichess's puzzle database read from it
-        page_         = Page::Training;
-        training_tab_ = 1;
-        startOfflinePuzzles(w.substr(13));
-    });
-    words.on({"puzzles-series", "puzzles-series=*"}, [&] {
-        // puzzles-series[=THEME]: a series of the offline puzzles at once, of THEME (a Lichess key) or any.
-        puzzles_online_ = false;
-        puzzles_theme_  = w.size() > 15 ? w.substr(15) : std::string();
-        startPuzzles();
-    });
+    puzzles_->addFocusWords(words, w);  // the Training page, its puzzles: their module's (#80)
     words.on({"review-all"}, [&] {  // the day's review, every kind one after the other (#80)
         startReview();
     });
@@ -1378,7 +1351,7 @@ void App::handleChessDialog(const Dialogs::Answer& answer) {
             startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
             break;
         case Dialogs::Purpose::OfflinePuzzlesFile:
-            startOfflinePuzzles(path);
+            puzzles_->startOffline(path);
             break;
         case Dialogs::Purpose::LichessMonthFile:
             startMonthReading(path);

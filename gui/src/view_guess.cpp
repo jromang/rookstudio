@@ -257,7 +257,7 @@ void App::drawTrainingGuess() {
     ImGui::PopFont();
     const auto& b = board_;
     const bool game_on =
-        !mistake_ && !guess_ && !training_ && !puzzle_ && b.ply < static_cast<int>(b.game.moves.size());
+        !mistake_ && !guess_ && !training_ && !puzzleSeriesOn() && b.ply < static_cast<int>(b.game.moves.size());
     if (game_on) {
         const auto title = b.title.empty() ? std::string(TR("the game shown")) : b.title;
         wrapped(trf("{}: from the position shown, for the side to move there.", title), true);

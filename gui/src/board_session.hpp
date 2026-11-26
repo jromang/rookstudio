@@ -6,8 +6,8 @@
 // positions, draws its page with the Board's own parts, and gives it back as it was at its end. App's hooks in
 // fastchess-gui's Board page (view_board.cpp: a move played, the page, another game opened) ask the session that holds
 // the Board (App::boardSession()) through this interface, whatever its kind: a kind in a module of its own is its own
-// session; the kinds still in App answer through sessions of App's (App::OwnSession, app_chess.cpp) until they move
-// into modules of their own, which then plug in the same way.
+// session (the puzzles, puzzles_page.hpp); the kinds still in App answer through sessions of App's (App::OwnSession,
+// app_chess.cpp) until they move into modules of their own, which then plug in the same way.
 
 #include <chess.hpp>
 

@@ -5,8 +5,8 @@ database.lichess.org, CC0). RookStudio downloads it when the user asks, reads it
 own in the profile, and gives puzzles from it without a network, by theme, opening and rating (#80, mockup M12,
 board 1). The code: `study/src/study/puzzles.*` (the file's lines, the store, its build), `study/src/study/glicko2.*`
 (the RookStudio rating), `gui/src/puzzles.*` (the preparation, the user's puzzles, a puzzle's moves judged),
-`gui/src/lichess_puzzles.*` (the batches online), `gui/src/view_training_page.cpp` and `gui/src/view_puzzles.cpp`
-(the Training page, a series on the Board page).
+`gui/src/lichess_puzzles.*` (the batches online), `gui/src/puzzles_page.*` (their module out of App, #107: the Training
+page's Puzzles part, a series on the Board page).
 
 ## The file, measured
 

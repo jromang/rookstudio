@@ -14,6 +14,7 @@
 #include <core/globals/globals.hpp>
 #include <core/observer.hpp>
 #include <engine/uci_engine.hpp>
+#include <game/book/pgn_reader.hpp>
 #include <game/pgn/pgn_builder.hpp>
 #include <matchmaking/elo/elo_pentanomial.hpp>
 #include <matchmaking/match/match.hpp>
@@ -981,7 +982,8 @@ TEST_CASE("the setup becomes a sanitized fastchess configuration") {
     setup.participants = {{"new"}};
     CHECK_THROWS((void)buildRun(setup, engines, topology, dir));
 
-    // A Polyglot book: its lines become positions in the tournament folder.
+    // A Polyglot book: its lines become a PGN book in the tournament folder, their moves played from the initial
+    // position.
     setup.participants = {{"new"}, {"old"}};
     {
         const auto bin = dir / "tiny.bin";
@@ -999,12 +1001,28 @@ TEST_CASE("the setup becomes a sanitized fastchess configuration") {
         setup.book       = bin.string();
         setup.book_plies = 1;
         run              = buildRun(setup, engines, topology, dir / "polyglot");
-        CHECK(run.tournament.opening.format == fastchess::FormatType::EPD);
-        CHECK(fs::path(run.tournament.opening.file) == dir / "polyglot" / "tiny-1plies.epd");
-        std::ifstream epd(run.tournament.opening.file);
-        int lines = 0;
-        for (std::string line; std::getline(epd, line);) ++lines;
-        CHECK(lines == 2);
+        CHECK(run.tournament.opening.format == fastchess::FormatType::PGN);
+        CHECK(fs::path(run.tournament.opening.file) == dir / "polyglot" / "tiny-1plies.pgn");
+        CHECK(run.tournament.opening.plies == -1);  // every move of the lines
+        {
+            const fastchess::book::PgnReader reader(run.tournament.opening.file);
+            REQUIRE(reader.get().size() == 2);
+            for (const auto& opening : reader.get()) {
+                CHECK(opening.fen_epd == chess::constants::STARTPOS);
+                CHECK(opening.moves.size() == 1);
+            }
+        }
+        // A tournament named after its book, whatever the letter case: its games' PGN file would be the book's name,
+        // so the book takes another.
+        setup.name = "TINY-1plies";
+        run        = buildRun(setup, engines, topology, dir / "polyglot-named");
+        CHECK(fs::path(run.tournament.opening.file).filename() == "tiny-1plies-2.pgn");
+        {
+            auto named = run.spec;
+            tour::namePgnFiles(named);
+            CHECK(named.pgnFile() == "TINY-1plies.pgn");
+        }
+        setup.name.clear();
         // In random order, drawn in order already from the seed: played in that order. The book, its depth and the
         // randomness are kept for the line under the standings.
         CHECK(run.tournament.opening.order == fastchess::OrderType::SEQUENTIAL);

@@ -135,8 +135,9 @@ struct TournamentSpec {
     std::vector<Participant> participants;
     FileFingerprint book;
 
-    // A Polyglot book the openings were drawn from (conditions.opening.file is then the positions its lines lead to,
-    // written to the tournament's folder): its file, and the depth its lines were followed to. Empty for another
+    // A Polyglot book the openings were drawn from (conditions.opening.file is then the PGN book of its lines, played
+    // from the initial position, written to the tournament's folder; in the tournaments of earlier versions, an EPD
+    // book of the positions they lead to): its file, and the depth its lines were followed to. Empty for another
     // book, and in the tournaments of 0.5.9 and earlier.
     std::string polyglot_book;
     int polyglot_plies = 0;

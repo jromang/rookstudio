@@ -8,9 +8,11 @@
 
 #include <chess.hpp>
 
+#include <game/book/pgn_reader.hpp>
 #include <tour/polyglot.hpp>
 
 #include "polyglot_writer.hpp"
+#include "test_support.hpp"
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
@@ -239,4 +241,102 @@ TEST_CASE("polyglot randomness: the openings drawn in order, each once, the like
     std::vector<std::string> written;
     for (std::string line; std::getline(in, line);) written.push_back(line);
     CHECK(written == drawnInOrder(polyglotLines(book, {1}), 42));
+
+    // The order of the lines themselves, which gives that of their positions.
+    const auto drawn = drawnOrder(lines, 7);
+    std::vector<std::string> positions;
+    for (const auto i : drawn) positions.push_back(lines.at(i).epd);
+    CHECK(positions == drawnInOrder(lines, 7));
+}
+
+TEST_CASE("polyglot: the lines as a PGN book of their moves, read by fastchess, lead to the EPD book's positions") {
+    // Castling at the seventh ply (the book's move as the format writes it, the king taking its rook; the line to the
+    // next position in UCI), a line that ends where en passant may be taken, a transposition (1. Nf3 Nf6 2. d4
+    // reaches the position of 1. d4 Nf6 2. Nf3, met first: no line of its own), a line the depth cuts.
+    const auto book       = writeBook("fcg-polyglot-pgn.bin", {{"", {{"e2e4", 100}, {"d2d4", 60}, {"g1f3", 40}}},
+                                                               {"e2e4", {{"e7e5", 100}, {"c7c5", 90}, {"g8f6", 50}}},
+                                                               {"e2e4 e7e5", {{"g1f3", 10}}},
+                                                               {"e2e4 e7e5 g1f3", {{"b8c6", 10}}},
+                                                               {"e2e4 e7e5 g1f3 b8c6", {{"f1c4", 10}}},
+                                                               {"e2e4 e7e5 g1f3 b8c6 f1c4", {{"g8f6", 10}}},
+                                                               {"e2e4 e7e5 g1f3 b8c6 f1c4 g8f6", {{"e1h1", 10}}},
+                                                               {"e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 e1g1", {{"f8c5", 10}}},
+                                                               {"e2e4 c7c5", {{"g1f3", 10}}},
+                                                               {"e2e4 g8f6", {{"e4e5", 10}}},
+                                                               {"e2e4 g8f6 e4e5", {{"d7d5", 10}}},
+                                                               {"d2d4", {{"g8f6", 10}, {"d7d5", 8}}},
+                                                               {"d2d4 g8f6", {{"g1f3", 10}}},
+                                                               {"g1f3", {{"g8f6", 10}}},
+                                                               {"g1f3 g8f6", {{"d2d4", 10}}}});
+    const auto epd        = fs::temp_directory_path() / "fcg-polyglot-pgn.epd";
+    const auto pgn        = fs::temp_directory_path() / "fcg-polyglot-pgn.pgn";
+    const auto read_lines = [](const fs::path& file) {
+        std::ifstream in(file);
+        std::vector<std::string> out;
+        for (std::string line; std::getline(in, line);) out.push_back(line);
+        return out;
+    };
+    const auto replayed = [](const std::vector<chess::Move>& moves) {
+        chess::Board board;
+        for (const auto& m : moves) board.makeMove<true>(m);
+        return board.getFen(false);
+    };
+
+    for (const int plies : {7, 20}) {
+        for (const int randomness : {0, 60}) {
+            for (const auto seed :
+                 {std::optional<uint64_t>{}, std::optional<uint64_t>{42}, std::optional<uint64_t>{7}}) {
+                CAPTURE(plies);
+                CAPTURE(randomness);
+                CAPTURE(seed.value_or(0));
+                PolyglotWalk walk;
+                walk.plies      = plies;
+                walk.randomness = randomness;
+
+                // Each line's moves lead to its position.
+                const auto lines = polyglotLines(book, walk);
+                REQUIRE(lines.size() == 5);
+                for (const auto& line : lines) CHECK(replayed(line.moves) == line.epd);
+
+                // The PGN book holds the same lines as the EPD book, in the same order: fastchess plays each one's
+                // moves from the initial position, to the EPD book's position.
+                const auto n = polyglotToEpd(book, epd, walk, seed);
+                CHECK(polyglotToPgn(book, pgn, walk, seed) == n);
+                const auto positions = read_lines(epd);
+                REQUIRE(positions.size() == n);
+                const fastchess::book::PgnReader reader(pgn.string());
+                CHECK(reader.skipped() == 0);
+                const auto& openings = reader.get();
+                REQUIRE(openings.size() == n);
+                std::vector<std::size_t> order(lines.size());
+                for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+                if (seed) order = drawnOrder(lines, *seed);
+                for (std::size_t i = 0; i < n; ++i) {
+                    CAPTURE(i);
+                    CHECK(openings[i].fen_epd == chess::constants::STARTPOS);
+                    CHECK(replayed(openings[i].moves) == positions[i]);
+                    CHECK(openings[i].moves == lines[order[i]].moves);
+                }
+            }
+        }
+    }
+
+    // In the order of the book: the seven tags of an opening suite, then the moves in SAN, castling as O-O; the
+    // transposed line under its first moves only. The depth cuts the first line after its castling.
+    REQUIRE(polyglotToPgn(book, pgn, {7}) == 5);
+    const std::string tags =
+        "[Event \"?\"]\n[Site \"?\"]\n[Date \"????.??.??\"]\n[Round \"?\"]\n[White \"?\"]\n[Black \"?\"]\n[Result "
+        "\"*\"]\n\n";
+    CHECK(fcg::test::readFile(pgn) == tags + "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O *\n\n" + tags +
+                                          "1. e4 c5 2. Nf3 *\n\n" + tags + "1. e4 Nf6 2. e5 d5 *\n\n" + tags +
+                                          "1. d4 Nf6 2. Nf3 *\n\n" + tags + "1. d4 d5 *\n\n");
+    // The en passant capture the position after 2... d5 allows, in the EPD book's position too.
+    REQUIRE(polyglotToEpd(book, epd, {7}) == 5);
+    CHECK(read_lines(epd)[2] == "rnbqkb1r/ppp1pppp/5n2/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6");
+    // Deeper, the book's own end.
+    REQUIRE(polyglotToPgn(book, pgn, {20}) == 5);
+    CHECK(fcg::test::readFile(pgn).rfind(tags + "1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. O-O Bc5 *\n\n", 0) == 0);
+
+    CHECK_THROWS_WITH((void)polyglotToPgn(fs::temp_directory_path() / "fcg-no-such-book.bin", pgn),
+                      doctest::Contains("cannot read"));
 }

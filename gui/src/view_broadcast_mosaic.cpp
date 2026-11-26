@@ -443,7 +443,7 @@ void App::drawBroadcastStandings() {
     const auto* players = s.players.value ? &*s.players.value : nullptr;
     const auto* teams   = s.teams.value ? &*s.teams.value : nullptr;
     if ((!players || players->empty()) && (!teams || teams->empty())) {
-        if (!s.players.error.empty()) ImGui::TextDisabled("%s", trf("Standings: {}", s.players.error).c_str());
+        if (s.players.failed()) ImGui::TextDisabled("%s", trf("Standings: {}", lichess::describe(s.players)).c_str());
         return;
     }
     ImGui::Dummy(ImVec2(0, px(6)));
@@ -661,13 +661,14 @@ void App::drawBroadcastMosaic() {
                                            round->whole ? TR("the whole tournament") : round->entry.round.name)
                                    .c_str());
         ImGui::SameLine();
-        const auto error = round->follower->error();
+        const auto broke = round->follower->failure();
         if (round->follower->streaming())
             ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s", TR("live"));
         else
-            ImGui::TextDisabled("%s", error.empty()
-                                          ? TR("connecting…")
-                                          : trf("the stream broke ({}): it opens again by itself", error).c_str());
+            ImGui::TextDisabled(
+                "%s", broke.failed()
+                          ? trf("the stream broke ({}): it opens again by itself", lichess::describe(broke)).c_str()
+                          : TR("connecting…"));
         // A round's tournament followed whole: its rounds one after another (#55).
         if (!round->whole && !round->entry.tour.id.empty()) {
             ImGui::SameLine();

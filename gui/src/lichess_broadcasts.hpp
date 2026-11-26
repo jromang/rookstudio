@@ -94,7 +94,8 @@ class RoundFollower {
     [[nodiscard]] std::vector<BroadcastGame> games() const;
     [[nodiscard]] uint64_t changes() const noexcept { return changes_; }  // grows with each game that changes
     [[nodiscard]] bool streaming() const noexcept { return streaming_; }
-    [[nodiscard]] std::string error() const;  // why the stream broke, last; empty while it runs
+    // Why the stream broke, last: no answer, or Lichess's refusal; none while it runs, or when Lichess closed it.
+    [[nodiscard]] Failure failure() const;
     // Lichess refused the round to this token, or to no token (401, 403): an account allowed to read broadcasts is
     // needed. Cleared when the stream opens.
     [[nodiscard]] bool refused() const noexcept { return refused_; }
@@ -117,7 +118,7 @@ class RoundFollower {
     mutable std::mutex mutex_;
     std::vector<BroadcastGame> games_;
     std::map<std::string, std::size_t> index_;  // address -> place in games_
-    std::string error_;
+    Failure failure_;
     std::thread thread_;
 };
 

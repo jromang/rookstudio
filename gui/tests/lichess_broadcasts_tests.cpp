@@ -10,6 +10,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -62,7 +63,7 @@ TEST_CASE("Lichess broadcasts: those on now and those to come") {
     REQUIRE(server.ok());
     Servers_ local(port);
     const auto list = topBroadcasts();
-    REQUIRE_MESSAGE(list.value, list.error);
+    REQUIRE_MESSAGE(list.value, describe(list));
     REQUIRE(list.value->active.size() == 1);
     const auto& on = list.value->active[0];
     CHECK(on.tour.id == "qEXour3L");
@@ -134,7 +135,7 @@ TEST_CASE("Lichess broadcasts: a round followed, its games as they change, the s
     CHECK(games[1].version == 1);
     CHECK(games[1].url == "https://lichess.org/broadcast/test-open/round-7/R1/g2");
     CHECK(follower.streaming());
-    CHECK(follower.error().empty());
+    CHECK_FALSE(follower.failure().failed());
     const auto asked = std::chrono::steady_clock::now();
     follower.stop();
     CHECK(std::chrono::steady_clock::now() - asked < 5s);
@@ -151,7 +152,8 @@ TEST_CASE("Lichess broadcasts: a round Lichess does not have") {
     Servers_ local(port);
     RoundFollower::setRetry(10ms, 40ms);
     RoundFollower follower("nope");
-    REQUIRE(waitUntil([&] { return follower.error() == "Lichess has no such round"; }));
+    REQUIRE(waitUntil([&] { return follower.failure().net == NetError::NotFound; }));
+    CHECK(describe(follower.failure()) == "Lichess has no such round");
     CHECK(follower.connections() == 0);
     CHECK(follower.games().empty());
     follower.stop();
@@ -168,7 +170,8 @@ TEST_CASE("Lichess broadcasts: a round refused without a token allowed to read b
     RoundFollower::setRetry(10ms, 40ms);
     RoundFollower follower("private");
     REQUIRE(waitUntil([&] { return follower.refused(); }));
-    CHECK(follower.error() == "Lichess asks for an account allowed to read broadcasts");
+    CHECK(follower.failure().net == NetError::Forbidden);
+    CHECK(describe(follower.failure()) == "Lichess refuses this without an account allowed to read broadcasts");
     CHECK(follower.connections() == 0);
     follower.stop();
     RoundFollower::setRetry(5s, 60s);
@@ -232,7 +235,7 @@ TEST_CASE("Lichess broadcasts: a tournament's players, its team standings, and a
     CHECK((*teams.value)[0].name == "Club A");
     CHECK((*teams.value)[1].name == "Club C");  // the game points part the two on 2 match points
     CHECK((*teams.value)[1].matches == 2);
-    CHECK(teamStandings("T2").error == "Lichess answered 404");
+    CHECK(teamStandings("T2").net == NetError::NotFound);
 
     const auto found = searchBroadcasts("world cup", "allowed");
     REQUIRE(found.value);
@@ -243,7 +246,8 @@ TEST_CASE("Lichess broadcasts: a tournament's players, its team standings, and a
     const auto refused = searchBroadcasts("world cup", "other");
     CHECK_FALSE(refused.value);
     CHECK(refused.status == 403);
-    CHECK(refused.error == "Lichess asks for an account allowed to read broadcasts");
+    CHECK(refused.net == NetError::Forbidden);
+    CHECK(describe(refused) == "Lichess refuses this without an account allowed to read broadcasts");
     CHECK(searches == 2);
 }
 
@@ -323,4 +327,72 @@ TEST_CASE("Lichess broadcasts: a round's tournament and names, from its address"
     std::lock_guard lock(mutex);
     CHECK(asked == "/api/broadcast/brazil-masters/round-6/STz0PpOV");
     CHECK(authorization == "Bearer allowed");
+}
+
+TEST_CASE("Lichess broadcasts: each failure of the lists, a round and its follower told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    RoundFollower::setRetry(10ms, 40ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(topBroadcasts().net == net);
+        CHECK(searchBroadcasts("world cup", "tok").net == net);
+        CHECK(broadcastRoundEntry("https://lichess.org/broadcast/t/r/R1", "tok").net == net);
+        CHECK(broadcastPlayers("T1").net == net);
+        CHECK(teamStandings("T1").net == net);
+        for (const bool whole : {false, true}) {
+            RoundFollower follower("R1", "tok", whole);
+            REQUIRE(waitUntil([&] { return follower.failure().net == net; }));
+            CHECK(follower.refused() == (net == NetError::Unauthorized || net == NetError::Forbidden));
+            CHECK(follower.connections() == 0);
+        }
+    }
+    // What Lichess has not, in the words of what was asked.
+    server.answer(404, "{}");
+    CHECK(describe(broadcastPlayers("T1")) == "Lichess has no such tournament");
+    {
+        RoundFollower tour("T1", {}, true);
+        REQUIRE(waitUntil([&] { return tour.failure().net == NetError::NotFound; }));
+        CHECK(describe(tour.failure()) == "Lichess has no such tournament");
+    }
+    // An answer that is not what Lichess sends.
+    server.answer(200, "<html>not JSON</html>");
+    CHECK(topBroadcasts().net == NetError::BadAnswer);
+    CHECK(searchBroadcasts("world cup", "tok").net == NetError::BadAnswer);
+    CHECK(broadcastRoundEntry("https://lichess.org/broadcast/t/r/R1", "tok").net == NetError::BadAnswer);
+    CHECK(broadcastPlayers("T1").net == NetError::BadAnswer);
+    server.answer(200, "[]");
+    CHECK(searchBroadcasts("world cup", "tok").net == NetError::BadAnswer);  // not its object
+    CHECK(broadcastRoundEntry("https://lichess.org/broadcast/t/r/R1", "tok").net == NetError::BadAnswer);
+    server.answer(200, "{}");
+    CHECK(teamStandings("T1").net == NetError::BadAnswer);  // not its array
+    // Not a round's address: the program's own words.
+    CHECK(describe(broadcastRoundEntry("https://lichess.org/study/abc", "tok")) == "not a broadcast round's address");
+    // No answer: said without the network's words, which go to the log.
+    pointNowhere();
+    const auto nobody = topBroadcasts();
+    CHECK(nobody.net == NetError::Offline);
+    CHECK(describe(nobody) == "Lichess cannot be reached");
+    {
+        RoundFollower follower("R1");
+        REQUIRE(waitUntil([&] { return follower.failure().net == NetError::Offline; }));
+        CHECK(describe(follower.failure()) == "Lichess cannot be reached");
+        CHECK_FALSE(follower.refused());
+    }
+    pointAtPausedHost("lichess-broadcasts.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(topBroadcasts(&cancel).net == NetError::Cancelled);
+    CHECK(broadcastPlayers("T1", &cancel).net == NetError::Cancelled);
+    servers() = Servers{};
+    RoundFollower::setRetry(5s, 60s);
 }

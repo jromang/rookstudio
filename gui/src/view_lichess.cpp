@@ -269,7 +269,7 @@ void App::askBroadcasts() {
     if (lichess_broadcasts_job_.valid()) return;
     const auto now = std::chrono::steady_clock::now();
     if (lichess_broadcasts_.value && now - lichess_broadcasts_time_ < std::chrono::minutes(10)) return;
-    if (!lichess_broadcasts_.value && !lichess_broadcasts_.error.empty() &&
+    if (!lichess_broadcasts_.value && lichess_broadcasts_.failed() &&
         now - lichess_broadcasts_time_ < std::chrono::minutes(1))
         return;
     lichess_broadcasts_time_ = now;
@@ -658,8 +658,7 @@ void App::drawLichessBroadcasts() {
     }
     const auto& b = lichess_broadcasts_;
     if (!b.value && !broadcast_found_ && !broadcast_search_job_.valid()) {
-        ImGui::TextDisabled("%s", b.error.empty() ? TR("Asking Lichess…")
-                                                  : trf("Lichess cannot be reached from here: {}.", b.error).c_str());
+        ImGui::TextDisabled("%s", b.failed() ? lichess::gaveNothing(b).c_str() : TR("Asking Lichess…"));
     } else {
         const auto row = [&](const lichess::BroadcastEntry& e, bool live) {
             ImGui::PushID(e.round.id.c_str());
@@ -702,7 +701,7 @@ void App::drawLichessBroadcasts() {
             const auto& found = *broadcast_found_;
             if (!found.value)
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess did not search: {}", found.error).c_str());
+                                   trf("Lichess did not search: {}", lichess::describe(found)).c_str());
             else if (found.value->empty())
                 ImGui::TextDisabled("%s", trf("No broadcast found for “{}”.", broadcast_searched_).c_str());
             else
@@ -781,13 +780,14 @@ void App::drawLichessFollowed() {
             fmt::format("{} · {}", f.entry.tour.name, f.whole ? TR("the whole tournament") : f.entry.round.name)
                 .c_str());
         ImGui::SameLine();
-        const auto error = f.follower->error();
+        const auto broke = f.follower->failure();
         if (f.follower->streaming())
             ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s", TR("live"));
         else
-            ImGui::TextDisabled("%s", error.empty()
-                                          ? TR("connecting…")
-                                          : trf("the stream broke ({}): it opens again by itself", error).c_str());
+            ImGui::TextDisabled(
+                "%s", broke.failed()
+                          ? trf("the stream broke ({}): it opens again by itself", lichess::describe(broke)).c_str()
+                          : TR("connecting…"));
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("The mosaic"))) openBroadcastMosaic(f.key());
         ImGui::SameLine();

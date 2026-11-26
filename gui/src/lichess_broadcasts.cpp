@@ -60,39 +60,26 @@ bool whole(std::string_view text) {
 }  // namespace
 
 Answer<BroadcastList> topBroadcasts(const std::atomic<bool>* cancel) {
-    Answer<BroadcastList> a;
-    HttpRequest request;
-    request.url    = servers().api + "/api/broadcast/top?page=1";
-    request.method = "GET";
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = r.status == 0 ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                                : fmt::format("Lichess answered {}", r.status);
-        return a;
-    }
-    try {
-        const auto j = nlohmann::json::parse(r.body);
-        BroadcastList list;
-        for (const auto& [key, out] : {std::pair{"active", &list.active}, std::pair{"upcoming", &list.upcoming}}) {
-            if (const auto it = j.find(key); it != j.end() && it->is_array())
-                for (const auto& e : *it) out->push_back(entryOf(e));
-        }
-        a.value = std::move(list);
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
-    return a;
+    return call<BroadcastList>(
+        request("GET", servers().api + "/api/broadcast/top?page=1"),
+        [](const nlohmann::json& j) {
+            BroadcastList list;
+            for (const auto& [key, out] : {std::pair{"active", &list.active}, std::pair{"upcoming", &list.upcoming}}) {
+                if (const auto it = j.find(key); it != j.end() && it->is_array())
+                    for (const auto& e : *it) out->push_back(entryOf(e));
+            }
+            return list;
+        },
+        cancel);
 }
 
 namespace {
 
-std::string refusal(int status, const std::string& error) {
-    return status == 0                      ? (error.empty() ? std::string("Lichess did not answer") : error)
-           : status == 401 || status == 403 ? std::string("Lichess asks for an account allowed to read broadcasts")
-           : status == 429                  ? std::string("Lichess asks to wait a minute: too many requests")
-                                            : fmt::format("Lichess answered {}", status);
+// An answer about a broadcast: who may read it, what Lichess has not.
+template <typename T>
+Answer<T> about(Asked asked, Answer<T> a) {
+    a.asked = asked;
+    return a;
 }
 
 // The first number of an object of numbers ({"standard": 2509}), 0 without.
@@ -108,78 +95,39 @@ double firstNumber(const nlohmann::json& j, const char* key) {
 
 Answer<std::vector<BroadcastEntry>> searchBroadcasts(const std::string& query, const std::string& token,
                                                      const std::atomic<bool>* cancel) {
-    Answer<std::vector<BroadcastEntry>> a;
-    HttpRequest request;
-    request.url    = fmt::format("{}/api/broadcast/search?q={}&page=1", servers().api, urlEncode(query));
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = refusal(r.status, r.error);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    std::vector<BroadcastEntry> found;
-    if (const auto it = j.find("currentPageResults"); it != j.end() && it->is_array())
-        for (const auto& e : *it)
-            if (e.is_object()) found.push_back(entryOf(e));
-    a.value = std::move(found);
-    return a;
+    return about(
+        Asked::Broadcast,
+        call<std::vector<BroadcastEntry>>(
+            request("GET", fmt::format("{}/api/broadcast/search?q={}&page=1", servers().api, urlEncode(query)), token),
+            [](const nlohmann::json& j) -> std::optional<std::vector<BroadcastEntry>> {
+                if (!j.is_object()) return std::nullopt;
+                std::vector<BroadcastEntry> found;
+                if (const auto it = j.find("currentPageResults"); it != j.end() && it->is_array())
+                    for (const auto& e : *it)
+                        if (e.is_object()) found.push_back(entryOf(e));
+                return found;
+            },
+            cancel));
 }
 
 Answer<BroadcastEntry> broadcastRoundEntry(const std::string& round_url, const std::string& token,
                                            const std::atomic<bool>* cancel) {
-    Answer<BroadcastEntry> a;
     const auto at = round_url.find("/broadcast/");
-    if (at == std::string::npos) {
-        a.error = "not a broadcast round's address";
-        return a;
-    }
+    if (at == std::string::npos) return failedWith<BroadcastEntry>(Failure::own("not a broadcast round's address"));
     auto path = round_url.substr(at);  // /broadcast/<tour>/<round>/<id>
     if (const auto end = path.find_first_of("?#"); end != std::string::npos) path.resize(end);
-    HttpRequest request;
-    request.url    = servers().api + "/api" + path;
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = refusal(r.status, r.error);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    a.value = entryOf(j);
-    return a;
+    return about(Asked::Broadcast, call<BroadcastEntry>(
+                                       request("GET", servers().api + "/api" + path, token),
+                                       [](const nlohmann::json& j) -> std::optional<BroadcastEntry> {
+                                           if (!j.is_object()) return std::nullopt;
+                                           return entryOf(j);
+                                       },
+                                       cancel));
 }
 
-Answer<std::vector<BroadcastPlayer>> broadcastPlayers(const std::string& tour_id, const std::atomic<bool>* cancel) {
-    Answer<std::vector<BroadcastPlayer>> a;
-    HttpRequest request;
-    request.url    = fmt::format("{}/broadcast/{}/players", servers().api, urlEncode(tour_id));
-    request.method = "GET";
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = refusal(r.status, r.error);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_array()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
+namespace {
+
+std::vector<BroadcastPlayer> playersOf(const nlohmann::json& j) {
     std::vector<BroadcastPlayer> players;
     for (const auto& p : j) {
         if (!p.is_object()) continue;
@@ -206,27 +154,10 @@ Answer<std::vector<BroadcastPlayer>> broadcastPlayers(const std::string& tour_id
         if (x.score != y.score) return x.score > y.score;
         return x.rating > y.rating;
     });
-    a.value = std::move(players);
-    return a;
+    return players;
 }
 
-Answer<std::vector<BroadcastTeam>> teamStandings(const std::string& tour_id, const std::atomic<bool>* cancel) {
-    Answer<std::vector<BroadcastTeam>> a;
-    HttpRequest request;
-    request.url    = fmt::format("{}/broadcast/{}/teams/standings", servers().api, urlEncode(tour_id));
-    request.method = "GET";
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = refusal(r.status, r.error);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_array()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
+std::vector<BroadcastTeam> teamsOf(const nlohmann::json& j) {
     std::vector<BroadcastTeam> teams;
     for (const auto& t : j) {
         if (!t.is_object()) continue;
@@ -241,8 +172,32 @@ Answer<std::vector<BroadcastTeam>> teamStandings(const std::string& tour_id, con
         if (x.match_points != y.match_points) return x.match_points > y.match_points;
         return x.game_points > y.game_points;
     });
-    a.value = std::move(teams);
-    return a;
+    return teams;
+}
+
+// A JSON array read by `read`; another JSON is not what Lichess sends.
+template <typename T>
+auto arrayOf(T (*read)(const nlohmann::json&)) {
+    return [read](const nlohmann::json& j) -> std::optional<T> {
+        if (!j.is_array()) return std::nullopt;
+        return read(j);
+    };
+}
+
+}  // namespace
+
+Answer<std::vector<BroadcastPlayer>> broadcastPlayers(const std::string& tour_id, const std::atomic<bool>* cancel) {
+    return about(Asked::BroadcastTour,
+                 call<std::vector<BroadcastPlayer>>(
+                     request("GET", fmt::format("{}/broadcast/{}/players", servers().api, urlEncode(tour_id))),
+                     arrayOf(playersOf), cancel));
+}
+
+Answer<std::vector<BroadcastTeam>> teamStandings(const std::string& tour_id, const std::atomic<bool>* cancel) {
+    return about(Asked::BroadcastTour,
+                 call<std::vector<BroadcastTeam>>(
+                     request("GET", fmt::format("{}/broadcast/{}/teams/standings", servers().api, urlEncode(tour_id))),
+                     arrayOf(teamsOf), cancel));
 }
 
 void RoundFollower::setRetry(std::chrono::milliseconds first, std::chrono::milliseconds most) {
@@ -265,9 +220,9 @@ std::vector<BroadcastGame> RoundFollower::games() const {
     return games_;
 }
 
-std::string RoundFollower::error() const {
+Failure RoundFollower::failure() const {
     std::lock_guard lock(mutex_);
-    return error_;
+    return failure_;
 }
 
 void RoundFollower::take(std::string_view pgn) {
@@ -311,35 +266,34 @@ void RoundFollower::run() {
     while (!stop_) {
         // The round as it stands first: the stream sends the games that change. A tournament's stream sends its
         // ongoing and recent rounds as they stand itself.
-        HttpResult s{200, {}, {}};
+        Failure broke;  // why it stopped this time: none when Lichess closed the stream
         if (!whole_) {
-            HttpRequest now;
-            now.url    = fmt::format("{}/api/broadcast/round/{}.pgn", servers().api, urlEncode(round_));
-            now.method = "GET";
-            now.token  = token_;
-            s          = politeRequest(now, &stop_);
-            if (s.status == 200)
-                for (const auto piece : study::splitGames(s.body))
+            const auto now =
+                send(request("GET", fmt::format("{}/api/broadcast/round/{}.pgn", servers().api, urlEncode(round_)),
+                             token_, "application/x-chess-pgn"),
+                     &stop_);
+            broke = now;
+            if (!now.failed())
+                for (const auto piece : study::splitGames(now.body))
                     if (whole(piece)) take(piece);
         }
-        HttpRequest request;
-        request.url    = fmt::format("{}/api/stream/broadcast/{}/{}.pgn", servers().api, whole_ ? "tour" : "round",
-                                     urlEncode(round_));
-        request.method = "GET";
-        request.token  = token_;
+        const auto asked = request("GET",
+                                   fmt::format("{}/api/stream/broadcast/{}/{}.pgn", servers().api,
+                                               whole_ ? "tour" : "round", urlEncode(round_)),
+                                   token_, "application/x-chess-pgn");
         std::string pending;
-        int status = 0;
+        bool opened = false;
         HttpStream stream;
         stream.on_head = [&](int s, std::string_view) {
-            status = s;
-            if (s == 200) {
+            opened = s == 200;
+            if (opened) {
                 ++connections_;
                 streaming_ = true;
                 refused_   = false;
                 std::lock_guard lock(mutex_);
-                error_.clear();
+                failure_ = {};
             }
-            return s == 200;
+            return opened;
         };
         // The games that came whole: those that end with their result; the rest waits for more.
         stream.on_data = [&](std::string_view data) {
@@ -355,26 +309,21 @@ void RoundFollower::run() {
         };
         stream.cancel = &stop_;
         stream.idle_s = 120;  // Lichess sends nothing while no game changes
-        const auto r  = s.status == 200 ? politeStream(request, stream) : HttpResult{s.status, {}, s.error};
-        if (s.status != 200) status = s.status;
+        if (!broke.failed()) broke = responseOf(asked, politeStream(asked, stream));
         streaming_ = false;
         if (stop_) break;
         {
             std::lock_guard lock(mutex_);
-            refused_ = status == 401 || status == 403;
-            error_   = status == 200 ? (r.error.empty() ? std::string("the stream ended") : r.error)
-                       : status == 0 ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                       : status == 404
-                           ? std::string(whole_ ? "Lichess has no such tournament" : "Lichess has no such round")
-                       : refused_ ? std::string("Lichess asks for an account allowed to read broadcasts")
-                                  : fmt::format("Lichess answered {}", status);
+            refused_       = broke.net == NetError::Unauthorized || broke.net == NetError::Forbidden;
+            failure_       = broke;
+            failure_.asked = whole_ ? Asked::BroadcastTour : Asked::BroadcastRound;
         }
-        if (status == 200) pause = std::chrono::milliseconds(g_first_retry_ms.load());
+        if (opened) pause = std::chrono::milliseconds(g_first_retry_ms.load());
         // Then again, after a pause that grows while it fails.
         const auto until = std::chrono::steady_clock::now() + pause;
         while (!stop_ && std::chrono::steady_clock::now() < until)
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        if (status != 200) pause = std::min(pause * 2, std::chrono::milliseconds(g_most_retry_ms.load()));
+        if (!opened) pause = std::min(pause * 2, std::chrono::milliseconds(g_most_retry_ms.load()));
     }
 }
 

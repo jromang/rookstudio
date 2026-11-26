@@ -86,24 +86,12 @@ Answer<std::vector<PlayerStatus>> playerStatuses(const std::vector<std::string>&
         std::string ids;
         for (std::size_t i = from; i < std::min(names.size(), from + 100); ++i)
             ids += (ids.empty() ? "" : ",") + names[i];
-        HttpRequest request;
-        request.url    = fmt::format("{}/api/users/status?ids={}&withGameMetas=true", servers().api, ids);
-        request.method = "GET";
-        request.headers.emplace_back("Accept", "application/json");
-        const auto r = politeRequest(request, cancel);
-        a.status     = r.status;
-        if (r.status != 200) {
-            a.error = r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                      : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                                        : fmt::format("Lichess answered {}", r.status);
-            return a;
-        }
-        try {
-            for (auto& s : readStatuses(nlohmann::json::parse(r.body))) all.push_back(std::move(s));
-        } catch (const std::exception&) {
-            a.error = "Lichess's answer could not be read";
-            return a;
-        }
+        auto some = call<std::vector<PlayerStatus>>(
+            request("GET", fmt::format("{}/api/users/status?ids={}&withGameMetas=true", servers().api, ids)),
+            readStatuses, cancel);
+        if (!some.value) return some;
+        for (auto& s : *some.value) all.push_back(std::move(s));
+        a = failedWith<std::vector<PlayerStatus>>(some);
     }
     a.value = std::move(all);
     return a;
@@ -131,22 +119,9 @@ std::vector<std::string> readFollowing(std::string_view ndjson) {
 }
 
 Answer<std::vector<std::string>> followingOf(const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::vector<std::string>> a;
-    HttpRequest request;
-    request.url    = servers().api + "/api/rel/following";
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/x-ndjson");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = r.status == 0 ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                  : r.status == 401 || r.status == 403 ? std::string("Lichess refused the token")
-                                                       : fmt::format("Lichess answered {}", r.status);
-        return a;
-    }
-    a.value = readFollowing(r.body);
-    return a;
+    return readBody<std::vector<std::string>>(
+        send(request("GET", servers().api + "/api/rel/following", token, "application/x-ndjson"), cancel),
+        readFollowing);
 }
 
 bool addStreamMove(std::string& pgn, const nlohmann::json& event) {
@@ -257,9 +232,9 @@ std::vector<BroadcastGame> PlayersFollower::games() const {
     return out;
 }
 
-std::string PlayersFollower::error() const {
+PlayersFollower::GameFailure PlayersFollower::failure() const {
     std::lock_guard lock(mutex_);
-    return error_;
+    return failure_;
 }
 
 void PlayersFollower::manage() {
@@ -348,7 +323,8 @@ void PlayersFollower::follow(Game& g) {
         if (!answer.value) {
             {
                 std::lock_guard lock(mutex_);
-                error_ = fmt::format("{}: {}", g.id, describe(answer));
+                failure_               = {g.id, answer};
+                failure_.failure.asked = Asked::Game;
             }
             if (++failures >= 3) return;
             rest(g.stop, 10);
@@ -363,10 +339,8 @@ void PlayersFollower::follow(Game& g) {
         bool ended = false, apart = false;
         std::size_t known = 0;  // the plies the stream went through: it sends the game again from its start
         std::string pending;
-        HttpRequest request;
-        request.url    = fmt::format("{}/api/stream/game/{}", servers().api, g.id);
-        request.method = "GET";
-        request.headers.emplace_back("Accept", "application/x-ndjson");
+        const auto asked =
+            request("GET", fmt::format("{}/api/stream/game/{}", servers().api, g.id), {}, "application/x-ndjson");
         HttpStream stream;
         stream.on_head = [](int status, std::string_view) { return status == 200; };
         stream.on_data = [&](std::string_view data) {
@@ -399,11 +373,14 @@ void PlayersFollower::follow(Game& g) {
         };
         stream.cancel = &g.stop;
         stream.idle_s = 120;  // a long think sends nothing: the game is asked whole again then
-        (void)politeStream(request, stream);
+        (void)politeStream(asked, stream);
         if (g.stop) return;
-        if (apart && ++out_of_step > 5) {
+        if (apart && ++out_of_step > 5) {  // its moves never fit the game: not what Lichess sends
             std::lock_guard lock(mutex_);
-            error_ = fmt::format("{}: its moves could not be followed", g.id);
+            failure_                = {g.id, {}};
+            failure_.failure.net    = NetError::BadAnswer;
+            failure_.failure.asked  = Asked::Game;
+            failure_.failure.detail = "its moves could not be followed";
             return;
         }
         if (!ended && !apart) rest(g.stop, 2);  // a break: not at once

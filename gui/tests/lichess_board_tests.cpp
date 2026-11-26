@@ -13,6 +13,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -343,7 +344,8 @@ TEST_CASE("Lichess board: the requests of a game and of a challenge, and Lichess
     const auto refused = boardMove("tok", "gAme1234", "e2e5");
     CHECK_FALSE(refused.ok);
     CHECK(refused.status == 400);
-    CHECK(refused.error == "Not your turn, or game already over");
+    CHECK(refused.net == NetError::Server);
+    CHECK(describe(refused) == "Not your turn, or game already over");  // Lichess's words
     CHECK(boardAction("tok", "gAme1234", "resign").ok);
     CHECK(boardAction("tok", "gAme1234", "draw/no").ok);
     CHECK(boardAction("tok", "gAme1234", "claim-victory").ok);
@@ -353,7 +355,8 @@ TEST_CASE("Lichess board: the requests of a game and of a challenge, and Lichess
     CHECK(cancelChallenge("tok", "qUfdwN19").ok);
     const auto missing = boardAction("tok", "missing", "abort");
     CHECK(missing.status == 404);
-    CHECK(missing.error == "Not found");
+    CHECK(missing.net == NetError::NotFound);
+    CHECK(describe(missing) == "Lichess does not know it");
     servers() = Servers{};
     std::lock_guard lock(mutex);
     REQUIRE(seen.size() == 10);
@@ -409,7 +412,7 @@ TEST_CASE("Lichess board: a real-time seek held open, called back by closing it;
     {
         Seek seek("tok", SeekAsk{{30, 20, 0}, false, 0, 0});
         CHECK(waitUntil([&] { return seek.state() == Seek::State::Closed; }));
-        CHECK(seek.error().empty());
+        CHECK_FALSE(seek.failure().failed());
     }
     {
         Seek seek("tok", SeekAsk{{0, 0, 3}, true, 0, 0});
@@ -420,7 +423,8 @@ TEST_CASE("Lichess board: a real-time seek held open, called back by closing it;
     {
         Seek seek("tok", SeekAsk{{10, 0, 0}, true, 0, 0});
         CHECK(waitUntil([&] { return seek.state() == Seek::State::Failed; }));
-        CHECK(seek.error() == "Invalid value");
+        CHECK(seek.failure().net == NetError::Server);
+        CHECK(describe(seek.failure()) == "time: Invalid value");  // Lichess's words, with the field they are of
     }
     servers() = Servers{};
     std::lock_guard lock(mutex);
@@ -498,7 +502,8 @@ TEST_CASE("Lichess board: a challenge kept alive until Lichess says how it ended
     {
         ChallengeOut out("tok", ChallengeAsk{"nobody", {5, 3, 0}, false, "random"});
         CHECK(waitUntil([&] { return out.state() == ChallengeOut::State::Failed; }));
-        CHECK(out.error() == "User not found");
+        CHECK(out.failure().net == NetError::Server);
+        CHECK(describe(out.failure()) == "User not found");
     }
     servers() = Servers{};
     std::lock_guard lock(mutex);
@@ -566,7 +571,7 @@ TEST_CASE("Lichess board: a game's stream heard, opened again after a cut, stopp
         CHECK(state.moves.size() == 4);
         CHECK(state.status == "mate");
         CHECK(state.winner == "black");
-        CHECK(state.error.empty());
+        CHECK_FALSE(state.failure.failed());
         CHECK(state.white.name == "RS_Sample");
         // The chat as Lichess keeps it, not twice for having opened the stream twice.
         REQUIRE(state.chat.size() == 2);
@@ -581,8 +586,84 @@ TEST_CASE("Lichess board: a game's stream heard, opened again after a cut, stopp
             (void)stream.state(state, version);
             return state.ended;
         }));
-        CHECK(state.error == "Lichess does not know this game");
+        CHECK(state.failure.net == NetError::NotFound);
+        CHECK(describe(state.failure) == "Lichess has no such game");
     }
+    servers() = Servers{};
+}
+
+TEST_CASE("Lichess board: each failure of a request, a seek, a challenge and a game's stream told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(boardMove("tok", "gAme1234", "e2e4").net == net);
+        CHECK_FALSE(boardMove("tok", "gAme1234", "e2e4").ok);
+        CHECK(boardAction("tok", "gAme1234", "resign").net == net);
+        CHECK(boardChat("tok", "gAme1234", "Hello").net == net);
+        CHECK(acceptChallenge("tok", "qUfdwN17").net == net);
+        CHECK(declineChallenge("tok", "qUfdwN17", "later").net == net);
+        CHECK(cancelChallenge("tok", "qUfdwN17").net == net);
+        CHECK(boardChatLines("tok", "gAme1234").net == net);
+        Seek seek("tok", SeekAsk{{10, 5, 0}, true, 0, 0});  // held open in real time
+        CHECK(waitUntil([&] { return seek.state() == Seek::State::Failed; }));
+        CHECK(seek.failure().net == net);
+        ChallengeOut out("tok", ChallengeAsk{"Player_B", {5, 3, 0}, false, "random"});
+        CHECK(waitUntil([&] { return out.state() == ChallengeOut::State::Failed; }));
+        CHECK(out.failure().net == net);
+        GameStream stream("tok", "gAme1234");
+        BoardState state;
+        uint64_t version = 0;
+        // Unknown to Lichess, or the token refused: it stops; otherwise tried again.
+        CHECK(waitUntil([&] {
+            (void)stream.state(state, version);
+            return state.failure.net == net && (state.ended || state.tries > 0);
+        }));
+        const bool stops = net == NetError::NotFound || net == NetError::Unauthorized || net == NetError::Forbidden;
+        CHECK(state.ended == stops);
+    }
+    // An answer that is not what Lichess sends: the chat's; a POST's answer is not read.
+    server.answer(200, "<html>not JSON</html>");
+    CHECK(boardChatLines("tok", "gAme1234").net == NetError::BadAnswer);
+    CHECK(boardMove("tok", "gAme1234", "e2e4").ok);
+    // Nothing listening: no answer.
+    pointNowhere();
+    const auto nobody = boardMove("tok", "gAme1234", "e2e4");
+    CHECK(nobody.net == NetError::Offline);
+    CHECK(describe(nobody) == "Lichess cannot be reached");
+    CHECK(boardChatLines("tok", "gAme1234").net == NetError::Offline);
+    {
+        Seek seek("tok", SeekAsk{{10, 5, 0}, true, 0, 0});
+        CHECK(waitUntil([&] { return seek.state() == Seek::State::Failed; }));
+        CHECK(seek.failure().net == NetError::Offline);
+        ChallengeOut out("tok", ChallengeAsk{"Player_B", {5, 3, 0}, false, "random"});
+        CHECK(waitUntil([&] { return out.state() == ChallengeOut::State::Failed; }));
+        CHECK(out.failure().net == NetError::Offline);
+        GameStream stream("tok", "gAme1234");
+        BoardState state;
+        uint64_t version = 0;
+        CHECK(waitUntil([&] {
+            (void)stream.state(state, version);
+            return state.tries > 0;
+        }));
+        CHECK(state.failure.net == NetError::Offline);
+        CHECK_FALSE(state.ended);
+    }
+    // Cancelled while the host pauses after a 429: sent nowhere.
+    pointAtPausedHost("lichess-board.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(boardMove("tok", "gAme1234", "e2e4", false, &cancel).net == NetError::Cancelled);
+    CHECK(boardChatLines("tok", "gAme1234", &cancel).net == NetError::Cancelled);
     servers() = Servers{};
 }
 

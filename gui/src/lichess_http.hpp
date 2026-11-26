@@ -38,17 +38,20 @@ enum class NetError {
 
 // What was asked, for the words of a failure (describe()): what Lichess may not have, who may read it.
 enum class Asked {
-    Anything,    // the words that fit any request
-    Link,        // an account's link: its code exchanged, its name asked
-    Game,        // a game
-    Study,       // a study, or a chapter to read
-    Chapter,     // a chapter of the user's study, to change or delete
-    Player,      // a player's account (their studies)
-    FidePlayer,  // a FIDE player's card
-    Page,        // a page of lichess.org a link names (a study, a game…)
-    Broadcast,   // a broadcast a link names
-    Bookmarks,   // the account's bookmarks
-    Engines,     // the external engines' API (#96), in alpha
+    Anything,        // the words that fit any request
+    Link,            // an account's link: its code exchanged, its name asked
+    Game,            // a game
+    Study,           // a study, or a chapter to read
+    Chapter,         // a chapter of the user's study, to change or delete
+    Player,          // a player's account (their studies)
+    FidePlayer,      // a FIDE player's card
+    Page,            // a page of lichess.org a link names (a study, a game…)
+    Broadcast,       // a broadcast a link names, or one searched
+    Bookmarks,       // the account's bookmarks
+    Engines,         // the external engines' API (#96), in alpha
+    Tournament,      // an arena or a Swiss tournament (#95)
+    BroadcastRound,  // a broadcast's round, followed (#44)
+    BroadcastTour,   // a broadcast's tournament: followed whole, its players, its teams (#55)
 };
 
 // Why a request gave nothing, as an answer carries it and the interface keeps it to say it later (describe()).
@@ -57,8 +60,8 @@ struct Failure {
     int status   = 0;  // HTTP's, 0 without an answer
     Asked asked  = Asked::Anything;
     std::string said;    // Lichess's own words when it refused ({"error": "…"}), shown as they are
-    std::string error;   // a problem of the program's own, in words (no port to listen on, a name too long), or the
-                         // words of a module that does not give a NetError yet; empty for the network's failures
+    std::string error;   // a problem of the program's own, in words (no port to listen on, a name too long, a
+                         // database that refused the games); empty for Lichess's and the network's failures
     std::string detail;  // the network's or the reader's words, for the log and the tests: never shown
     [[nodiscard]] bool failed() const noexcept { return net != NetError::None || !error.empty(); }
     // A problem of the program's own, in its words.
@@ -91,6 +94,12 @@ template <typename T>
                                    std::string_view said = {});
 // The same for a failure as it was kept; a problem of the program's own (`error`) in its own words.
 [[nodiscard]] std::string describe(const Failure& failure);
+// The same for a line of its own, which names Lichess once: describe()'s words, Lichess's own quoted after "Lichess
+// refuses: ".
+[[nodiscard]] std::string describeAlone(const Failure& failure);
+// Why nothing is shown where Lichess's answer would be, as a sentence: "Lichess cannot be reached from here." when no
+// answer came, else "Lichess gave nothing (…)." with describe()'s words.
+[[nodiscard]] std::string gaveNothing(const Failure& failure);
 
 // The kind of failure an HTTP result is: None for a whole 2xx; Cancelled when the program stopped it.
 [[nodiscard]] NetError netErrorOf(const HttpResult& result);
@@ -117,8 +126,9 @@ struct Response : Failure {
     std::string asked_for;  // the method and the address, for the log
 };
 // `request` sent politely: in its host's turn (one request at a time), once the host's pause after a 429 is over;
-// `cancel` stops the wait for the turn. No answer, or a body that cannot be read later, leaves a line in the log with
-// the network's words, which the interface does not show.
+// `cancel` stops the wait for the turn. The network's words go to the log, never to the interface: no answer once, when
+// the host's outage starts (not at each try until it answers again); an answer cut short, or a body that cannot be read
+// later, each time.
 [[nodiscard]] Response send(const HttpRequest& request, const std::atomic<bool>* cancel = nullptr);
 // A result had otherwise (a stream's, an upload's) read the same way, for `request`.
 [[nodiscard]] Response responseOf(const HttpRequest& request, HttpResult result);
@@ -158,6 +168,15 @@ template <typename T, typename Parse>
         a.detail = e.what();
     }
     if (a.net == NetError::BadAnswer) logUnreadable(response, a.detail);
+    return a;
+}
+
+// The value of a response's body that is not JSON (NDJSON, PGN, text), made of it by `read`; the response's failure
+// otherwise.
+template <typename T, typename Read>
+[[nodiscard]] Answer<T> readBody(const Response& response, Read&& read) {
+    auto a = failedWith<T>(response);
+    if (!response.failed()) a.value = read(response.body);
     return a;
 }
 

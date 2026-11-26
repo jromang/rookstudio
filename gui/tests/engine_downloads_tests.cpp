@@ -205,7 +205,7 @@ TEST_CASE("engine downloads: the latest release, the list when it is a side rele
     // The latest is the engine's: one question.
     github.set("/repos/test/mover/releases/latest", releaseJson("v1.0", {"mover-file"}, base));
     auto got = fetchReleases(engine, cpu, base);
-    CHECK(got.error.empty());
+    CHECK_FALSE(got.failed());
     REQUIRE(got.list.size() == 1);
     CHECK(github.requests() == std::vector<std::string>{"/repos/test/mover/releases/latest"});
 
@@ -223,13 +223,28 @@ TEST_CASE("engine downloads: the latest release, the list when it is a side rele
     // GitHub's limit for requests without an account.
     github.set("/repos/test/mover/releases/latest", R"({"message":"API rate limit exceeded for 127.0.0.1."})", 403);
     got = fetchReleases(engine, cpu, base);
-    CHECK(got.limited);
-    CHECK(got.error.find("60 an hour") != std::string::npos);
+    CHECK(got.limited());
+    CHECK(describe(got).find("60 an hour") != std::string::npos);
     CHECK(got.list.empty());
+    github.set("/repos/test/mover/releases/latest", "{}", 429);
+    CHECK(fetchReleases(engine, cpu, base).failure == GitHubFailure::RateLimited);
+
+    // GitHub in trouble, or refusing for another reason: its status.
+    github.set("/repos/test/mover/releases/latest", "<html>down</html>", 503);
+    got = fetchReleases(engine, cpu, base);
+    CHECK(got.failure == GitHubFailure::Refused);
+    CHECK(describe(got) == "GitHub answered 503 for test/mover");
 
     // A repository that is not there.
     const auto absent = fetchReleases(testEngine("x"), cpu, base + "/nowhere");
-    CHECK(absent.error == "GitHub has no repository test/mover");
+    CHECK(absent.failure == GitHubFailure::NoRepository);
+    CHECK(describe(absent) == "GitHub has no repository test/mover");
+
+    // No answer: GitHub named, the network's words in the log.
+    const auto nobody = fetchReleases(engine, cpu, fmt::format("http://127.0.0.1:{}", freePort()));
+    CHECK(nobody.failure == GitHubFailure::Offline);
+    CHECK(describe(nobody) == "GitHub cannot be reached");
+    CHECK(describe(Releases{}).empty());
 }
 
 TEST_CASE("engine downloads: a program downloaded, checked against its hash, made executable and started") {

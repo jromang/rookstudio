@@ -18,6 +18,8 @@
 #include <study/sources.hpp>
 #include <tour/files.hpp>
 
+#include "console.hpp"
+#include "i18n.hpp"
 #include "model.hpp"
 
 namespace fcg::catalogue {
@@ -37,19 +39,20 @@ HttpResult apiGet(std::string_view api, const std::string& path) {
     return httpRequest(request);
 }
 
-// Why GitHub's answer is not one to read.
-void refused(const HttpResult& r, const Engine& engine, Releases& out) {
+// Why GitHub's answer is not one to read: its kind; no answer leaves the network's words in the log.
+void refused(const HttpResult& r, const std::string& url, const Engine& engine, Releases& out) {
+    out.repo   = engine.repo;
+    out.status = r.status;
     if (r.status == 0) {
-        out.error = r.error.empty() ? "GitHub did not answer" : "GitHub did not answer: " + r.error;
+        out.failure = GitHubFailure::Offline;
+        Console::instance().add(fmt::format("GET {}: {}", url, r.error.empty() ? "no answer" : r.error), true,
+                                "network");
     } else if (r.status == 429 || (r.status == 403 && r.body.find("rate limit") != std::string::npos)) {
-        out.limited = true;
-        out.error =
-            "GitHub refuses more requests from this address for now (60 an hour without an account): "
-            "try again later";
+        out.failure = GitHubFailure::RateLimited;
     } else if (r.status == 404) {
-        out.error = "GitHub has no repository " + engine.repo;
+        out.failure = GitHubFailure::NoRepository;
     } else {
-        out.error = fmt::format("GitHub answered {} for {}", r.status, engine.repo);
+        out.failure = GitHubFailure::Refused;
     }
 }
 
@@ -195,9 +198,28 @@ int64_t nowSeconds() {
 
 }  // namespace
 
+std::string describe(const Releases& releases) {
+    switch (releases.failure) {
+        case GitHubFailure::None:
+            return {};
+        case GitHubFailure::Offline:
+            return TR("GitHub cannot be reached");
+        case GitHubFailure::RateLimited:
+            return TR(
+                "GitHub refuses more requests from this address for now (60 an hour without an account): try "
+                "again later");
+        case GitHubFailure::NoRepository:
+            return trf("GitHub has no repository {}", releases.repo);
+        case GitHubFailure::Refused:
+            return trf("GitHub answered {} for {}", releases.status, releases.repo);
+    }
+    return {};
+}
+
 Releases fetchReleases(const Engine& engine, const CpuFeatures& cpu, std::string_view api) {
     Releases out;
-    const auto latest = apiGet(api, "/repos/" + engine.repo + "/releases/latest");
+    const auto latest_path = "/repos/" + engine.repo + "/releases/latest";
+    const auto latest      = apiGet(api, latest_path);
     if (latest.status == 200) {
         if (auto release = parseRelease(latest.body)) {
             out.list.push_back(std::move(*release));
@@ -208,13 +230,14 @@ Releases fetchReleases(const Engine& engine, const CpuFeatures& cpu, std::string
             if (pick.error == PickError::None || pick.error == PickError::NoPlatform) return out;
         }
     } else if (latest.status != 404) {  // 404: no release is marked latest (none, or pre-releases only)
-        refused(latest, engine, out);
+        refused(latest, std::string(api) + latest_path, engine, out);
         return out;
     }
     // A side release (another network, a tool), or files not sent yet: the releases before.
-    const auto list = apiGet(api, "/repos/" + engine.repo + "/releases?per_page=20");
+    const auto list_path = "/repos/" + engine.repo + "/releases?per_page=20";
+    const auto list      = apiGet(api, list_path);
     if (list.status != 200) {
-        if (out.list.empty()) refused(list, engine, out);
+        if (out.list.empty()) refused(list, std::string(api) + list_path, engine, out);
         return out;
     }
     if (auto all = parseReleases(list.body); !all.empty()) out.list = std::move(all);

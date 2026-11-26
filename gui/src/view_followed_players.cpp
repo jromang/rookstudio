@@ -59,7 +59,7 @@ void App::pollFollowedPlayers() {
         if (answer.value)
             lichess_following_ = std::move(*answer.value);
         else
-            lichess_status_error_ = answer.error;
+            lichess_status_error_ = answer;
     }
     const bool may_read = lichess_account_ && lichess_account_->has(lichess::SCOPE_FOLLOW_READ);
     if (!lichess_account_) {
@@ -84,10 +84,10 @@ void App::pollFollowedPlayers() {
     if (ready(lichess_status_job_)) {
         auto answer = lichess_status_job_.get();
         if (answer.value) {
-            lichess_statuses_ = std::move(*answer.value);
-            lichess_status_error_.clear();
+            lichess_statuses_     = std::move(*answer.value);
+            lichess_status_error_ = {};
         } else {
-            lichess_status_error_ = answer.error;
+            lichess_status_error_ = answer;
         }
     }
     const auto names = followedPlayers();
@@ -216,9 +216,9 @@ void App::drawFollowedPlayers() {
     }
     ImGui::TextDisabled("%s", TR("Those your account follows, or added by name. Lichess shows their moves three moves "
                                  "late; eight games at once at most."));
-    if (!lichess_status_error_.empty())
+    if (lichess_status_error_.failed())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trf("Lichess: {}", lichess_status_error_).c_str());
+                           lichess::describeAlone(lichess_status_error_).c_str());
     ImGui::PopTextWrapPos();
     ui::endCard();
 }

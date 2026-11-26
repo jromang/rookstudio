@@ -184,7 +184,7 @@ void App::pollEnginePicker() {
     if (ready(p.answer)) {
         auto answer = p.answer.get();
         if (auto* e = pickerEngine(p.asking)) {
-            p.limited |= answer.limited;
+            p.limited |= answer.limited();
             e->pick = {};
             if (const auto* engine = p.catalogue.find(e->id); engine && !answer.list.empty())
                 e->pick = catalogue::pickBuild(*engine, answer.list, cpu());
@@ -206,18 +206,17 @@ void App::pollEnginePicker() {
         const auto profile = storage_.root();
         if (auto kept = catalogue::keptReleases(profile, id)) {
             e->pick     = catalogue::pickBuild(*engine, *kept, cpu());
-            e->releases = catalogue::Releases{std::move(*kept), {}, false};
+            e->releases = catalogue::Releases(std::move(*kept));
             if (e->install_when_known) {
                 e->install_when_known = false;
                 installPicked(*e, e->keep_old);
             }
             continue;
         }
-        if (p.limited) {
-            e->releases = catalogue::Releases{
-                {},
-                TR("GitHub refuses more requests from this address for now (60 an hour without an account)."),
-                true};
+        if (p.limited) {  // not asked: GitHub would refuse it
+            catalogue::Releases refused;
+            refused.failure       = catalogue::GitHubFailure::RateLimited;
+            e->releases           = std::move(refused);
             e->install_when_known = false;
             continue;
         }
@@ -246,7 +245,7 @@ void App::installPicked(PickerEngine& e, bool keep_old) {
     }
     const auto* engine = picker_.catalogue.find(e.id);
     if (!engine || e.pick.choices.empty()) {
-        e.result       = !e.releases->error.empty() ? e.releases->error : e.pick.message();
+        e.result       = e.releases->failed() ? catalogue::describe(*e.releases) : e.pick.message();
         e.result_error = true;
         e.for_board    = false;
         return;
@@ -514,8 +513,9 @@ void App::drawEnginePicker() {
                     trf("For this processor: {}, {}", choice->asset.name, megabytes(choice->asset.size)).c_str());
             } else if (!e.releases) {
                 ImGui::TextDisabled("%s", TR("Looking at its latest release…"));
-            } else if (!e.releases->error.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", e.releases->error.c_str());
+            } else if (e.releases->failed()) {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                                   catalogue::describe(*e.releases).c_str());
             } else {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", e.pick.message().c_str());
             }
@@ -566,7 +566,7 @@ void App::drawEnginePicker() {
                 ImGui::EndDisabled();
             } else if (choice) {
                 if (primaryButton(TR("Add"))) installPicked(e);
-            } else if (e.releases && !e.releases->error.empty() && !e.releases->limited) {
+            } else if (e.releases && e.releases->failed() && !e.releases->limited()) {
                 if (ImGui::Button(TR("Try again"))) {
                     e.asked = false;
                     e.releases.reset();
@@ -650,7 +650,7 @@ void App::drawFirstEngineCard(const char* why) {
     if (gaia && engine && !gaia->releases) {
         if (auto kept = catalogue::keptReleases(storage_.root(), "gaia", std::chrono::hours(24 * 30))) {
             gaia->pick     = catalogue::pickBuild(*engine, *kept, cpu());
-            gaia->releases = catalogue::Releases{std::move(*kept), {}, false};
+            gaia->releases = catalogue::Releases(std::move(*kept));
             gaia->asked    = true;
         }
     }

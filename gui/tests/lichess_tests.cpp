@@ -16,6 +16,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess.hpp"
@@ -218,7 +219,7 @@ TEST_CASE("lichess: a broadcast made, its rounds filled up to 64 games, over HTT
     CHECK((*saved)["round_id"] == "ROUND002");
     CHECK((*saved)["finished"].size() == 65);
     CHECK(saved->dump().find("secret") == std::string::npos);
-    CHECK_MESSAGE(relay.status().error.empty(), relay.status().error);
+    CHECK_MESSAGE(!relay.status().error.failed(), relayError(relay.status()));
 
     // Started again on the same tournament: the broadcast is kept, the finished games are not pushed again.
     const auto before = server.requests().size();
@@ -227,6 +228,68 @@ TEST_CASE("lichess: a broadcast made, its rounds filled up to 64 games, over HTT
     relay.stop();
     REQUIRE(relay.wait());
     CHECK(server.requests().size() == before);
+    fs::remove_all(dir);
+}
+
+TEST_CASE("lichess: the relay's failures told by their kind and what failed, in the words of each") {
+    fcg::test::AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    const auto dir = fs::temp_directory_path() / "fcg-lichess-relay-failures";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    // A relay that stops by itself: what it could not make.
+    const auto ended = [&](const std::string& base, const std::string& round) {
+        LichessRelay relay;
+        relay.start({"secret", round, false, "Failures", dir, base});
+        CHECK(relay.wait(10s));
+        return relay.status();
+    };
+    // A relay that pushes a game: its push's failure.
+    const auto pushed = [&] {
+        LichessRelay relay;
+        relay.start({"secret", "ABCDEFGH", false, "Failures", dir, server.base()});
+        relay.offer({lichessLiveGame(liveGame(1), "Failures", 0, 0, false)}, {});
+        CHECK(fcg::test::waitUntil([&] { return relay.status().error.failed(); }));
+        const auto status = relay.status();
+        relay.stop();
+        CHECK(relay.wait(10s));
+        return status;
+    };
+
+    server.answer(401, R"({"error":"No such token"})");
+    auto s = ended(server.base(), "");
+    CHECK(s.failed == LichessRelay::Step::Broadcast);
+    CHECK(s.error.net == lichess::NetError::Unauthorized);
+    CHECK(relayError(s) ==
+          "The broadcast could not be made on Lichess: Lichess refused the token: link the account again");
+    // The broadcast made, its round's answer not what Lichess sends.
+    server.answer(200, R"({"tour":{"id":"TOUR0001"}})");
+    s = ended(server.base(), "");
+    CHECK(s.failed == LichessRelay::Step::Round);
+    CHECK(s.error.net == lichess::NetError::BadAnswer);
+    CHECK(relayError(s) == "A round could not be made on Lichess: Lichess's answer could not be read");
+    // A push: too many requests; a game Lichess could not read, in its words.
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    server.answer(429, "{}");
+    s = pushed();
+    CHECK(s.failed == LichessRelay::Step::Push);
+    CHECK(s.error.net == lichess::NetError::RateLimited);
+    CHECK(relayError(s) ==
+          "The games could not be pushed to Lichess: Lichess asks to wait a minute: too many requests");
+    server.answer(200, R"({"games":[{"error":"Invalid PGN"}]})");
+    s = pushed();
+    CHECK(s.error.net == lichess::NetError::Server);
+    CHECK(relayError(s) == "The games could not be pushed to Lichess: Invalid PGN");
+    server.answer(503, "<html>down</html>");
+    CHECK(relayError(pushed()) == "The games could not be pushed to Lichess: Lichess answered 503");
+    // No answer: without the network's words, which go to the log.
+    s = ended(fmt::format("http://127.0.0.1:{}", fcg::test::freePort()), "");
+    CHECK(s.error.net == lichess::NetError::Offline);
+    CHECK(relayError(s) == "The broadcast could not be made on Lichess: Lichess cannot be reached");
+    // A round that is none: the program's own words.
+    CHECK(relayError(ended(server.base(), "not a round")) == "Lichess: not a broadcast round URL or id: not a round");
     fs::remove_all(dir);
 }
 

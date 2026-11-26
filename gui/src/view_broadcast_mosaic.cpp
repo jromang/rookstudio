@@ -443,7 +443,7 @@ void App::drawBroadcastStandings() {
     const auto* players = s.players.value ? &*s.players.value : nullptr;
     const auto* teams   = s.teams.value ? &*s.teams.value : nullptr;
     if ((!players || players->empty()) && (!teams || teams->empty())) {
-        if (!s.players.error.empty()) ImGui::TextDisabled("%s", trf("Standings: {}", s.players.error).c_str());
+        if (s.players.failed()) ImGui::TextDisabled("%s", trf("Standings: {}", lichess::describe(s.players)).c_str());
         return;
     }
     ImGui::Dummy(ImVec2(0, px(6)));
@@ -643,7 +643,7 @@ void App::drawBroadcastMosaic() {
         ImGui::TextDisabled("%s", state.c_str());
         if (tv_list_error_.failed()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", trf("· Lichess: {}", lichess::describe(tv_list_error_)).c_str());
+            ImGui::TextDisabled("· %s", lichess::describeAlone(tv_list_error_).c_str());
         }
     } else if (players) {
         const auto live = std::count_if(broadcast_boards_.begin(), broadcast_boards_.end(),
@@ -651,23 +651,25 @@ void App::drawBroadcastMosaic() {
         if (live > 0)
             ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s",
                                trn("{} game live", "{} games live", static_cast<uint64_t>(live), live).c_str());
-        const auto error = players_follower_ ? players_follower_->error() : std::string();
-        if (!error.empty()) {
+        if (const auto broke =
+                players_follower_ ? players_follower_->failure() : lichess::PlayersFollower::GameFailure{};
+            broke.failure.failed()) {
             if (live > 0) ImGui::SameLine();
-            ImGui::TextDisabled("%s", trf("· Lichess: {}", error).c_str());
+            ImGui::TextDisabled("· %s: %s", broke.game.c_str(), lichess::describeAlone(broke.failure).c_str());
         }
     } else {
         ImGui::TextUnformatted(fmt::format("{} · {}", round->entry.tour.name,
                                            round->whole ? TR("the whole tournament") : round->entry.round.name)
                                    .c_str());
         ImGui::SameLine();
-        const auto error = round->follower->error();
+        const auto broke = round->follower->failure();
         if (round->follower->streaming())
             ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s", TR("live"));
         else
-            ImGui::TextDisabled("%s", error.empty()
-                                          ? TR("connecting…")
-                                          : trf("the stream broke ({}): it opens again by itself", error).c_str());
+            ImGui::TextDisabled(
+                "%s", broke.failed()
+                          ? trf("the stream broke ({}): it opens again by itself", lichess::describe(broke)).c_str()
+                          : TR("connecting…"));
         // A round's tournament followed whole: its rounds one after another (#55).
         if (!round->whole && !round->entry.tour.id.empty()) {
             ImGui::SameLine();
@@ -809,10 +811,7 @@ void App::drawBroadcastMosaic() {
                                    lichess::MOST_GAME_STREAMS)
                                    .c_str());
         else if (tv && tv_list_error_.failed() && tv_listed_of_ != channel)
-            ImGui::TextDisabled(
-                "%s", tv_list_error_.net == lichess::NetError::Offline
-                          ? TR("Lichess cannot be reached from here.")
-                          : trf("Lichess cannot be reached from here: {}.", lichess::describe(tv_list_error_)).c_str());
+            ImGui::TextDisabled("%s", lichess::gaveNothing(tv_list_error_).c_str());
         else
             ImGui::TextDisabled("%s", tv        ? TR("No game of the channel has come yet: they appear as Lichess "
                                                      "lists them, three moves late.")

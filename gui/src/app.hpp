@@ -473,9 +473,9 @@ class App {
     bool broadcast_sheet_ = false;
     int broadcast_pick_   = 0;
     int broadcast_target_ = -2;                                                           // as twic_target_
-    std::optional<std::future<std::pair<std::string, std::string>>> lichess_months_job_;  // the page, or why not
+    std::optional<std::future<lichess::Answer<std::string>>> lichess_months_job_;         // the page, or why not
     std::vector<lichess::Month> lichess_broadcast_months_, lichess_standard_months_;
-    std::string lichess_months_error_;
+    lichess::Failure lichess_months_error_;  // Lichess's, or a page without a month the program reads
     // A chess.com player's games (#74): their months asked for, then each month's PGN; a followed player under the
     // list of databases, looked at again when the user asks.
     void drawChesscomSheet();
@@ -1855,7 +1855,7 @@ class App {
     std::vector<lichess::PlayerStatus> lichess_statuses_;
     std::future<lichess::Answer<std::vector<lichess::PlayerStatus>>> lichess_status_job_;
     std::chrono::steady_clock::time_point lichess_status_asked_{};
-    std::string lichess_status_error_;
+    lichess::Failure lichess_status_error_;     // why whom the account follows, or their status, was not read
     int lichess_players_drawn_        = -1000;  // the frame that drew their card last
     bool lichess_players_then_mosaic_ = false;  // the permission granted, their mosaic opens
     std::unique_ptr<lichess::PlayersFollower> players_follower_;
@@ -1896,7 +1896,7 @@ class App {
         int tries = 0;              // the next game asked again since it ended
         std::chrono::steady_clock::time_point next_at{};
         std::future<lichess::Answer<lichess::TvNext>> next;
-        std::string error;  // why the next game did not come
+        lichess::Failure error;  // why the next game did not come
     };
     std::optional<BoardTv> board_tv_;
     struct TvKept {
@@ -1973,7 +1973,7 @@ class App {
         std::chrono::steady_clock::time_point status_asked{};
         std::vector<std::string> top;         // the first eight's names, as the standing gives them
         std::vector<lichess::TvGame> listed;  // their games in progress, the first ranked first
-        std::string status_error;
+        lichess::Failure status_error;        // why their status was not read, last
         std::unique_ptr<lichess::PlayersFollower> follower;
         std::vector<std::string> places, slots;  // as Lichess TV's: the games of the tiles, the tiles' games
         std::set<std::string> over;
@@ -1997,7 +1997,7 @@ class App {
         std::chrono::steady_clock::time_point join_asked{};
         bool quiet_join   = false;  // a join again of the minute: its failure said in the line only
         bool join_pending = false;  // joined once tournament:write is granted
-        std::string error;          // Lichess's refusal, as it words it
+        lichess::Failure error;     // why the last join or pause failed: Lichess's refusal, in its words if any
         // The games played in it from here, and the last one's end: its result, its points, the streak.
         std::vector<std::string> games;
         std::string last_game, last_result;
@@ -2013,7 +2013,8 @@ class App {
     std::optional<ArenaPlay> arena_play_;
     // A finished Swiss kept: into which database, its games, its crosstable's key and its rounds set by hand.
     struct SwissKept {
-        std::string base, error, key;
+        std::string base, key;
+        lichess::Failure failure;  // Lichess's, or the database's in its own words
         std::size_t index = SIZE_MAX, games = 0;
         std::vector<study::HandResult> hand;
     };
@@ -2031,12 +2032,14 @@ class App {
         std::chrono::steady_clock::time_point asked{};
         std::future<lichess::Reply> join_job, pause_job;
         bool join_pending = false;
-        std::string error;
+        // Why the last join or withdrawal failed.
+        lichess::Failure error;
         int noticed_round = 0;  // the round its notice said, or put aside
         std::string game;       // its game the user plays now
         // Kept in a database once over: its games and its standing.
         std::future<SwissKept> keep_job;
-        std::string kept_in, keep_error, kept_folder;
+        std::string kept_in, kept_folder;
+        lichess::Failure keep_error;
         std::size_t kept_games = 0;
         bool keep_menu         = false;
     };
@@ -2097,10 +2100,10 @@ class App {
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<lichess::SyncProgress> progress;
         std::future<lichess::SyncReport> sync;
-        std::string error;
+        lichess::Failure error;  // why their games did not come: Lichess's, or the database's own words
         std::future<lichess::Answer<lichess::Profile>> profile_job;
         std::optional<lichess::Profile> profile;
-        std::string profile_error;
+        lichess::Failure profile_error;
         uint64_t synced = 0;    // the syncs ended: the dossier made again after each (#90)
         std::string last_sync;  // the day their database last took games ("2026-11-20"), empty when it never did
     };
@@ -2477,7 +2480,7 @@ class App {
     std::optional<lichess::Profile> lichess_profile_;
     bool lichess_profile_loaded_ = false;
     std::future<lichess::Answer<lichess::Profile>> lichess_profile_job_;
-    std::string lichess_profile_error_;
+    lichess::Failure lichess_profile_error_;
     std::chrono::steady_clock::time_point lichess_profile_asked_{};
     int lichess_speed_ = 1;  // the speed whose figures show: blitz
     std::map<std::string, lichess::Answer<lichess::PerfFigures>> lichess_figures_;
@@ -2531,7 +2534,7 @@ class App {
     // The account as last checked, the check under way, the refusal said.
     std::optional<lichess::BotAccountFacts> bot_facts_;
     std::future<lichess::BotTokenCheck> bot_check_;  // a token pasted, checked
-    std::string bot_error_;                          // why the last link, check or upgrade gave nothing
+    lichess::Failure bot_error_;                     // why the last link, check or upgrade gave nothing
     bool bot_unanswered_ = false;                    // Lichess did not answer: nothing changed, to try again
     // An account refused before it was kept (the user's own, closed, a token that may not play), and why.
     std::optional<lichess::BotAccountFacts> bot_candidate_;

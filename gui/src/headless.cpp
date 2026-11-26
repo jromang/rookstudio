@@ -546,9 +546,9 @@ int runHeadless(const std::string& target, const Storage& storage, const CpuTopo
                     lichess_url = s.url;
                     std::printf("lichess: %s\n", s.url.c_str());
                 }
-                if (s.error != lichess_error) {
-                    lichess_error = s.error;
-                    if (!s.error.empty()) std::fprintf(stderr, "warning: %s\n", s.error.c_str());
+                if (const auto failed = relayError(s); failed != lichess_error) {
+                    lichess_error = failed;
+                    if (!failed.empty()) std::fprintf(stderr, "warning: %s\n", failed.c_str());
                 }
             };
             // The tunnel: its address each time it changes, and every new error.

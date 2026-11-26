@@ -609,7 +609,7 @@ void App::drawDossier() {
             text = trf("Lichess · {}", d.subject.lichess);
         } else if (p && p->sync.valid()) {
             text = trf("Lichess · {} · {}", d.subject.lichess, TR("coming from Lichess…"));
-        } else if (p && !p->error.empty()) {
+        } else if (p && p->error.failed()) {
             // Offline: the games of the last sync, dated.
             text = p->last_sync.empty() ? trf("Lichess · {} · never synced", d.subject.lichess)
                                         : trf("Lichess · {} · synced on {}", d.subject.lichess, p->last_sync);
@@ -637,8 +637,9 @@ void App::drawDossier() {
                                       "{} spellings brought together (the tables of names)", r->spellings, r->spellings)
                                       .c_str());
     }
-    if (prep_ && d.lichess && lower(prep_->opponent) == lower(d.subject.lichess) && !prep_->error.empty())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trf("Lichess: {}", prep_->error).c_str());
+    if (prep_ && d.lichess && lower(prep_->opponent) == lower(d.subject.lichess) && prep_->error.failed())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           lichess::describeAlone(prep_->error).c_str());
     if (!d.said.empty()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", d.said.c_str());
     }
@@ -1351,8 +1352,8 @@ void App::drawDossierOnline() {
                         fmt::format(fmt::runtime(format), fmt::format("{}{}", sp.rating, sp.provisional ? "?" : "")));
             }
             for (const auto& e : each) level += (level.empty() ? "" : " · ") + e;
-        } else if (p && !p->profile_error.empty()) {
-            from = p->profile_error;
+        } else if (p && p->profile_error.failed()) {
+            from = lichess::describeAlone(p->profile_error);
         }
         card("dossier_level", TR("Their level online"), level, from);
         ImGui::TableNextColumn();

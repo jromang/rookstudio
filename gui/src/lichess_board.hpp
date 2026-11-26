@@ -59,13 +59,13 @@ inline constexpr const char* SCOPE_BOARD_PLAY = "board:play";
 // (#85, lichess_bot.hpp). A game's endpoints are the same under /api/board/ and /api/bot/.
 enum class PlayApi { Board, Bot };
 
-// What Lichess answered: taken, or why not (Failure: its own words when it gave some, "Not your turn, or game already
-// over"; status 0 without an answer, a cut).
+// What Lichess answered: taken, or why not (Failure: its kind, and Lichess's own words when it refused with some, "Not
+// your turn, or game already over").
 struct Reply : Failure {
     bool ok = false;
 };
-// A POST of the API (`path`, from "/api/"), its form `fields` (none: no body), with the token: Lichess's answer, its
-// own words when it refused. The tournaments' requests go through it too (#95).
+// A POST of the API (`path`, from "/api/"), its form `fields` (none: no body), with the token: taken, or why not. The
+// tournaments' requests go through it too (#95).
 [[nodiscard]] Reply lichessPost(const std::string& path, const std::string& token,
                                 const std::vector<std::pair<std::string, std::string>>& fields = {},
                                 const std::atomic<bool>* cancel = nullptr, int timeout_s = 15);
@@ -108,7 +108,7 @@ class Seek {
         Opening,  // asked
         Open,     // in the lobby, waiting for an opponent
         Closed,   // Lichess closed it: taken (or expired); a correspondence seek made (its id())
-        Failed,   // refused: error() says why
+        Failed,   // refused, or cut: failure() says why
     };
     Seek(std::string token, SeekAsk ask);
     ~Seek();  // a seek still open is called back
@@ -116,7 +116,7 @@ class Seek {
     Seek& operator=(const Seek&) = delete;
 
     [[nodiscard]] State state() const { return state_; }
-    [[nodiscard]] std::string error() const;
+    [[nodiscard]] Failure failure() const;
     [[nodiscard]] std::string id() const;  // a correspondence seek's
     [[nodiscard]] const SeekAsk& ask() const { return ask_; }
     [[nodiscard]] std::chrono::steady_clock::time_point since() const { return since_; }
@@ -131,7 +131,8 @@ class Seek {
     std::atomic<State> state_{State::Opening};
     std::atomic<bool> stop_{false};
     mutable std::mutex mutex_;
-    std::string error_, id_;
+    Failure failure_;
+    std::string id_;
     std::chrono::steady_clock::time_point closed_{};
     std::thread thread_;
 };
@@ -156,7 +157,7 @@ class ChallengeOut {
         Sending,  // asked
         Waiting,  // sent: the player has it
         Done,     // accepted, declined or called back: done()
-        Failed,   // refused: error() says why
+        Failed,   // refused, or cut before Lichess said how it ended: failure() says why
     };
     ChallengeOut(std::string token, ChallengeAsk ask);
     ~ChallengeOut();  // one still waiting is called back, unless settle() said how it ended
@@ -166,7 +167,7 @@ class ChallengeOut {
     [[nodiscard]] State state() const { return state_; }
     [[nodiscard]] std::string id() const;
     [[nodiscard]] std::string done() const;  // "accepted", "declined", "canceled"; empty before
-    [[nodiscard]] std::string error() const;
+    [[nodiscard]] Failure failure() const;
     [[nodiscard]] const ChallengeAsk& ask() const { return ask_; }
     [[nodiscard]] std::chrono::steady_clock::time_point since() const { return since_; }
     void cancel();  // called back: its request closed, Lichess asked to cancel it
@@ -184,7 +185,8 @@ class ChallengeOut {
     std::atomic<bool> stop_{false};
     std::atomic<bool> settled_{false};
     mutable std::mutex mutex_;
-    std::string id_, done_, error_;
+    std::string id_, done_;
+    Failure failure_;
     std::thread thread_;
 };
 
@@ -243,7 +245,7 @@ struct BoardState {
     bool connected = false;
     int tries      = 0;  // since it broke, the next try counted
     std::chrono::steady_clock::time_point retry_at{};
-    std::string error;   // why it broke last
+    Failure failure;     // why it broke last: no answer, or Lichess's refusal; none when Lichess closed it
     bool ended = false;  // it will not come back: the game is over, unknown to Lichess, or the token refused
 
     // The game is over: anything but created and started.

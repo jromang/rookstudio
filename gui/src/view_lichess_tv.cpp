@@ -329,7 +329,7 @@ void App::pollLichessTv() {
                 return;  // the rest at the next frame, with the new game
             }
             ++t.tries;
-            t.error   = a.value ? std::string() : lichess::describe(a);
+            t.error   = a.value ? lichess::Failure{} : lichess::Failure(a);
             t.next_at = now + 3s;
         }
         // Lichess chooses the channel's next featured game within seconds: asked again every 3 s, another of the
@@ -442,11 +442,7 @@ void App::drawLichessTvCard() {
     ImGui::TextDisabled("%s", TR("· each channel's featured game"));
     const auto own = ownLichessIds();
     if (!tv_rows_.value) {
-        ImGui::TextDisabled("%s",
-                            !tv_rows_.failed() ? TR("Asking Lichess…")
-                            : tv_rows_.net == lichess::NetError::Offline
-                                ? TR("Lichess cannot be reached from here.")
-                                : trf("Lichess cannot be reached from here: {}.", lichess::describe(tv_rows_)).c_str());
+        ImGui::TextDisabled("%s", tv_rows_.failed() ? lichess::gaveNothing(tv_rows_).c_str() : TR("Asking Lichess…"));
     } else {
         const auto ai = [](const lichess::TvPlayer& p) { return trf("Lichess AI, level {}", p.ai); };
         float name_w  = 0;
@@ -513,9 +509,8 @@ void App::drawLichessTvCard() {
             ImGui::EndTable();
         }
         if (tv_rows_.failed())
-            ImGui::TextColored(
-                ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                trf("Lichess: {}. The list shown was read earlier.", lichess::describe(tv_rows_)).c_str());
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               trf("The list shown was read earlier: {}.", lichess::describe(tv_rows_)).c_str());
     }
     ImGui::TextDisabled("%s", TR("The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again "
                                  "when the card shows, at most once every 30 s."));
@@ -620,8 +615,8 @@ void App::drawTvBoardCard() {
     else
         then = TR("When it ends, the channel goes on to the next one, by itself.");
     ImGui::TextDisabled("%s", then.c_str());
-    if (!t.error.empty() && ended && !t.stay)
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trf("Lichess: {}", t.error).c_str());
+    if (t.error.failed() && ended && !t.stay)
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", lichess::describeAlone(t.error).c_str());
     if (!g && tv_quota_ == 0)
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                            trf("Lichess lets an address follow {} games at once: the rounds and the players followed "

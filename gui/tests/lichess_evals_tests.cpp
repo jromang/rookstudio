@@ -12,6 +12,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_evals.hpp"
@@ -249,9 +250,41 @@ TEST_CASE("evaluations: the database's size asked by its first byte") {
     });
     REQUIRE(server.ok());
     const auto size = evalsSize(fmt::format("http://127.0.0.1:{}/lichess_db_eval.jsonl.zst", port));
-    CHECK(size.error.empty());
+    CHECK_FALSE(size.failed());
     CHECK(size.bytes == 22499667845ull);
     CHECK(size.date == "2026-11-01");
+}
+
+TEST_CASE("evaluations: the database's size not known, each failure told by its kind") {
+    fcg::test::AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(std::chrono::milliseconds(50));
+    const auto url = server.base() + "/lichess_db_eval.jsonl.zst";
+    struct Case {
+        int status;
+        lichess::NetError net;
+    };
+    for (const auto& [status, net] :
+         {Case{401, lichess::NetError::Unauthorized}, Case{403, lichess::NetError::Forbidden},
+          Case{404, lichess::NetError::NotFound}, Case{429, lichess::NetError::RateLimited},
+          Case{503, lichess::NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, "<html></html>");
+        const auto size = evalsSize(url);
+        CHECK(size.net == net);
+        CHECK(size.bytes == 0);
+    }
+    // An answer without the size: not what the server sends.
+    server.answer(200, "");
+    CHECK(evalsSize(url).net == lichess::NetError::BadAnswer);
+    const auto nobody = evalsSize(fmt::format("http://127.0.0.1:{}/lichess_db_eval.jsonl.zst", fcg::test::freePort()));
+    CHECK(nobody.net == lichess::NetError::Offline);
+    CHECK(lichess::describe(nobody) == "Lichess cannot be reached");
+    HostGate::instance().setPause(std::chrono::seconds(60));
+    HostGate::instance().tooMany("lichess-evals.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(evalsSize("http://lichess-evals.invalid/lichess_db_eval.jsonl.zst", &cancel).net ==
+          lichess::NetError::Cancelled);
 }
 
 TEST_CASE("evaluations: read while it downloads, cut short and resumed at a frame's end, or from its start") {

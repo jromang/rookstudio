@@ -47,34 +47,9 @@ std::string lower(std::string s) {
     return s;
 }
 
-struct Got {
-    std::optional<nlohmann::json> json;
-    std::string error;
-    int status = 0;
-};
-
-Got getJson(const std::string& url, const std::string& token, const std::atomic<bool>* cancel) {
-    HttpRequest request;
-    request.url    = url;
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    Got got;
-    got.status = r.status;
-    if (r.status != 200) {
-        got.error = r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                    : r.status == 401 ? std::string("Lichess refused the token")
-                    : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                                      : fmt::format("Lichess answered {}", r.status);
-        return got;
-    }
-    try {
-        got.json = nlohmann::json::parse(r.body);
-    } catch (const std::exception&) {
-        got.error = "Lichess's answer could not be read";
-    }
-    return got;
+// A JSON answer, whole: the readers below take what they know of it.
+Answer<nlohmann::json> jsonOf(const std::string& url, const std::string& token, const std::atomic<bool>* cancel) {
+    return call<nlohmann::json>(request("GET", url, token), [](const nlohmann::json& j) { return j; }, cancel);
 }
 
 void to_json(nlohmann::json& j, const Profile& p) {
@@ -233,64 +208,48 @@ Progress progressOf(const SpeedRating& speed, int64_t today) {
     return p;
 }
 
-Answer<Profile> publicProfile(const std::string& username, const std::atomic<bool>* cancel) {
-    Answer<Profile> a;
-    const auto user = getJson(fmt::format("{}/api/user/{}", servers().api, urlEncode(username)), {}, cancel);
-    a.status        = user.status;
-    if (!user.json) {
-        a.error = user.status == 404 ? std::string("no such player on Lichess") : user.error;
-        return a;
-    }
+namespace {
+
+// An account's profile, read now; none without its name (not what Lichess sends).
+std::optional<Profile> profileOf(const nlohmann::json& j) {
     Profile p;
-    readAccount(*user.json, p);
-    if (p.username.empty()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
+    readAccount(j, p);
+    if (p.username.empty()) return std::nullopt;
     p.read_at = static_cast<int64_t>(std::time(nullptr));
-    a.value   = std::move(p);
+    return p;
+}
+
+}  // namespace
+
+Answer<Profile> publicProfile(const std::string& username, const std::atomic<bool>* cancel) {
+    auto a = call<Profile>(request("GET", fmt::format("{}/api/user/{}", servers().api, urlEncode(username))), profileOf,
+                           cancel);
+    a.asked = Asked::Player;
     return a;
 }
 
 Answer<Profile> accountProfile(const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<Profile> a;
     const auto& api = servers().api;
-    auto account    = getJson(api + "/api/account", token, cancel);
-    a.status        = account.status;
-    if (!account.json) {
-        a.error = account.error;
-        return a;
-    }
-    Profile p;
-    readAccount(*account.json, p);
-    if (p.username.empty()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    // The history only a token makes Lichess compute; the activity of the last days.
+    auto a          = call<Profile>(request("GET", api + "/api/account", token), profileOf, cancel);
+    if (!a.value) return a;
+    // The history only a token makes Lichess compute; the activity of the last days: without them, the rest.
+    auto& p         = *a.value;
     const auto user = urlEncode(p.username);
-    if (const auto history = getJson(fmt::format("{}/api/user/{}/rating-history", api, user), token, cancel);
-        history.json)
-        readRatingHistory(*history.json, p);
-    if (const auto activity = getJson(fmt::format("{}/api/user/{}/activity", api, user), token, cancel); activity.json)
-        readActivity(*activity.json, p);
+    if (const auto history = jsonOf(fmt::format("{}/api/user/{}/rating-history", api, user), token, cancel);
+        history.value)
+        readRatingHistory(*history.value, p);
+    if (const auto activity = jsonOf(fmt::format("{}/api/user/{}/activity", api, user), token, cancel); activity.value)
+        readActivity(*activity.value, p);
     p.read_at = static_cast<int64_t>(std::time(nullptr));
-    a.value   = std::move(p);
     return a;
 }
 
 Answer<PerfFigures> perfFigures(const std::string& username, std::string_view speed, const std::string& token,
                                 const std::atomic<bool>* cancel) {
-    Answer<PerfFigures> a;
-    const auto got = getJson(
-        fmt::format("{}/api/user/{}/perf/{}", servers().api, urlEncode(username), urlEncode(speed)), token, cancel);
-    a.status = got.status;
-    if (!got.json) {
-        a.error = got.error;
-        return a;
-    }
-    a.value = readPerfFigures(*got.json);
-    return a;
+    return call<PerfFigures>(
+        request("GET", fmt::format("{}/api/user/{}/perf/{}", servers().api, urlEncode(username), urlEncode(speed)),
+                token),
+        readPerfFigures, cancel);
 }
 
 void keepProfile(const std::filesystem::path& root, const Profile& profile) {

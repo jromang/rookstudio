@@ -330,11 +330,9 @@ std::vector<SuitePosition> evaluatedSuite(const std::vector<EvaluatedPosition>& 
 
 EvalsSize evalsSize(const std::string& url, const std::atomic<bool>* cancel) {
     EvalsSize out;
-    HttpRequest request;
-    request.url       = url;
-    request.method    = "GET";
-    request.timeout_s = 30;
-    request.headers.emplace_back("Range", "bytes=0-0");
+    auto asked      = lichess::request("GET", url, {}, "*/*");
+    asked.timeout_s = 30;
+    asked.headers.emplace_back("Range", "bytes=0-0");
     HttpStream stream;
     stream.cancel  = cancel;
     stream.on_head = [&](int status, std::string_view head) {
@@ -346,16 +344,16 @@ EvalsSize evalsSize(const std::string& url, const std::atomic<bool>* cancel) {
             }
         } else if (status == 200) {
             if (const auto length = httpHeader(head, "Content-Length")) (void)number(*length, out.bytes);
-        } else {
-            out.error = fmt::format("the server answered {}", status);
         }
         if (const auto date = httpHeader(head, "Last-Modified")) out.date = httpDate(*date);
         return false;  // the head is all that is wanted
     };
-    stream.on_data    = [](std::string_view) { return false; };
-    const auto result = politeStream(request, stream);
-    if (out.error.empty() && out.bytes == 0)
-        out.error = result.error.empty() ? std::string("the server did not give the size") : result.error;
+    stream.on_data                      = [](std::string_view) { return false; };
+    static_cast<lichess::Failure&>(out) = lichess::responseOf(asked, politeStream(asked, stream));
+    if (!out.failed() && out.bytes == 0) {  // an answer without the size
+        out.net    = lichess::NetError::BadAnswer;
+        out.detail = "the server did not give the size";
+    }
     return out;
 }
 

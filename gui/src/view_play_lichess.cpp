@@ -351,8 +351,7 @@ void App::pollOnlinePlay() {
         if (!ready(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
-        play_online_error_ =
-            r.status == 0 ? trf("{}: Lichess cannot be reached ({})", c.what, r.error) : trf("{}: {}", c.what, r.error);
+        play_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
         if (page_ == Page::Board) boardToast(play_online_error_);
     }
     std::erase_if(online_calls_, [](const auto& c) { return !c.reply.valid(); });
@@ -377,7 +376,10 @@ void App::pollOnlinePlay() {
         const auto st  = online_seek_->state();
         const auto ask = online_seek_->ask();
         if (st == lichess::Seek::State::Failed) {
-            online_seek_said_ = trf("Lichess refused the seek: {}", online_seek_->error());
+            const auto why    = online_seek_->failure();
+            online_seek_said_ = why.net == lichess::NetError::Offline
+                                    ? trf("Your seek stopped: {}.", lichess::describe(why))
+                                    : trf("Lichess refused the seek: {}", lichess::describe(why));
             online_seek_.reset();
         } else if (st == lichess::Seek::State::Closed) {
             if (ask.clock.days > 0) {
@@ -398,7 +400,10 @@ void App::pollOnlinePlay() {
         const auto st  = online_challenge_->state();
         const auto who = online_challenge_->ask().user;
         if (st == lichess::ChallengeOut::State::Failed) {
-            online_challenge_said_ = trf("Lichess refused the challenge to {}: {}", who, online_challenge_->error());
+            const auto why         = online_challenge_->failure();
+            online_challenge_said_ = why.net == lichess::NetError::Offline
+                                         ? trf("Your challenge to {} stopped: {}.", who, lichess::describe(why))
+                                         : trf("Lichess refused the challenge to {}: {}", who, lichess::describe(why));
             online_challenge_.reset();
         } else if (st == lichess::ChallengeOut::State::Done) {
             const auto done = online_challenge_->done();
@@ -483,9 +488,10 @@ void App::pollOnlinePlay() {
         if (!r.ok) {
             og.sent.reset();
             og.board_dirty = true;
-            boardToast(r.status == 0 ? std::string(TR("The connection to Lichess is cut: your move did not go. Play "
-                                                      "it again when it comes back."))
-                                     : trf("Lichess refused your move: {}", r.error));
+            boardToast(r.net == lichess::NetError::Offline
+                           ? std::string(TR("The connection to Lichess is cut: your move did not go. Play it again "
+                                            "when it comes back."))
+                           : trf("Lichess refused your move: {}", lichess::describe(r)));
         }
     }
     // A move made during the opponent's turn: played at the user's, if it is legal then.
@@ -1125,13 +1131,14 @@ void App::drawSeekCard(bool& enter) {
         }
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("Enter"));
-        if (!stream)
-            wrapped(lichess_events_ && !lichess_events_->error().empty()
+        if (!stream) {
+            const auto broke = lichess_events_ ? lichess_events_->failure() : lichess::Failure{};
+            wrapped(broke.failed()
                         ? trf("Waiting for Lichess's event stream ({}): a seek goes once it is open.",
-                              lichess_events_->error())
+                              lichess::describe(broke))
                         : std::string(TR("Waiting for Lichess's event stream: a seek goes once it is open.")),
                     true);
-        else if (lock)
+        } else if (lock)
             wrapped(TR("One of your games is being played live: no seek meanwhile."), true);
     } else {
         // Seeking: since when, called back by Escape.
@@ -1477,7 +1484,9 @@ void App::drawOnlineGameCard() {
                         "comes back.",
                         left, s.tries + 1),
                     true);
-            if (!s.error.empty()) ImGui::TextDisabled("%s", s.error.c_str());
+            // Why, when Lichess said something: no answer is what the line above says.
+            if (s.failure.failed() && s.failure.net != lichess::NetError::Offline)
+                ImGui::TextDisabled("%s", lichess::describe(s.failure).c_str());
         }
         if (ImGui::SmallButton(TR("Open the game on lichess.org")))
             SDL_OpenURL(fmt::format("https://lichess.org/{}", og.id).c_str());
@@ -1694,7 +1703,9 @@ void App::drawOnlineGameEnd() {
     if (!s.over()) {
         beginTinted("##online_lost", ui::WARN);
         ImGui::PushTextWrapPos();
-        coloured(trf("Lichess no longer answers for your game against {}: {}.", onlineOpponent(), s.error), ui::WARN);
+        coloured(trf("Lichess no longer answers for your game against {}: {}.", onlineOpponent(),
+                     lichess::describe(s.failure)),
+                 ui::WARN);
         if (ImGui::SmallButton(TR("Open the game on lichess.org##lost")))
             SDL_OpenURL(fmt::format("https://lichess.org/{}", og.id).c_str());
         ImGui::SameLine();

@@ -210,14 +210,16 @@ Arrival bringGame(const std::string& id, const std::string& token, study::Databa
     Arrival out;
     auto answer = gamePgn(id, token, cancel);
     if (!answer.value) {
-        out.error = answer.failed() ? describe(answer) : std::string("Lichess did not answer");
+        out.failure       = answer;
+        out.failure.asked = Asked::Game;  // the user's game, not a link's page
         return out;
     }
     out.pgn      = std::move(*answer.value);
     out.analysed = out.pgn.find("[%eval ") != std::string::npos;
     study::ImportedGame g;
-    if (!study::readImportedGame(out.pgn, g)) {
-        out.error = "the game could not be read";
+    if (!study::readImportedGame(out.pgn, g)) {  // not the PGN Lichess sends
+        out.failure.net    = NetError::BadAnswer;
+        out.failure.detail = "the game's PGN could not be read";
         return out;
     }
     out.plies  = g.plies;
@@ -228,33 +230,14 @@ Arrival bringGame(const std::string& id, const std::string& token, study::Databa
         one.push_back(std::move(g));
         out.added = db->append(std::move(one)).added > 0;
     } catch (const std::exception& e) {
-        out.error = e.what();
+        out.failure = Failure::own(e.what());
     }
     return out;
 }
 
 Answer<std::vector<PlayingGame>> playingGames(const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::vector<PlayingGame>> a;
-    HttpRequest request;
-    request.url    = servers().api + "/api/account/playing?nb=50";
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-                  : r.status == 401 ? std::string("Lichess refused the token")
-                  : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                                    : fmt::format("Lichess answered {}", r.status);
-        return a;
-    }
-    try {
-        a.value = readPlaying(nlohmann::json::parse(r.body));
-    } catch (const std::exception&) {
-        a.error = "Lichess's answer could not be read";
-    }
-    return a;
+    return call<std::vector<PlayingGame>>(request("GET", servers().api + "/api/account/playing?nb=50", token),
+                                          readPlaying, cancel);
 }
 
 std::optional<GameEvent> readGameEvent(std::string_view line) {
@@ -302,27 +285,21 @@ std::vector<GameEvent> EventListener::take() {
     return out;
 }
 
-std::string EventListener::error() const {
+Failure EventListener::failure() const {
     std::lock_guard lock(mutex_);
-    return error_;
+    return failure_;
 }
 
 void EventListener::run() {
     int breaks = 0;  // in a row: the wait before the next try grows with them
     while (!stop_) {
-        HttpRequest request;
-        request.url    = servers().api + "/api/stream/event";
-        request.method = "GET";
-        request.token  = token_;
-        request.headers.emplace_back("Accept", "application/x-ndjson");
+        const auto asked = request("GET", servers().api + "/api/stream/event", token_, "application/x-ndjson");
         std::string pending;
-        int status = 0;
         HttpStream stream;
         stream.on_head = [&](int s, std::string_view) {
-            status = s;
             if (s == 200) {
                 std::lock_guard lock(mutex_);
-                error_.clear();
+                failure_ = {};
                 events_.push_back(GameEvent{GameEvent::Kind::Opened, {}, {}});
                 connected_ = true;
                 breaks     = 0;
@@ -342,19 +319,16 @@ void EventListener::run() {
             pending.erase(0, at);
             return !stop_;
         };
-        stream.cancel     = &stop_;
-        stream.idle_s     = 30;  // Lichess sends an empty line every 7 s
-        const auto result = politeStream(request, stream);
-        connected_        = false;
+        stream.cancel    = &stop_;
+        stream.idle_s    = 30;  // Lichess sends an empty line every 7 s
+        const auto broke = responseOf(asked, politeStream(asked, stream));
+        connected_       = false;
         if (stop_) break;
         {
             std::lock_guard lock(mutex_);
-            error_ = status == 401 || status == 403 ? std::string("Lichess refused the token")
-                     : status != 200 && status != 0 ? fmt::format("Lichess answered {}", status)
-                     : result.error.empty()         ? std::string("the stream ended")
-                                                    : result.error;
+            failure_ = broke;  // none when Lichess closed it
         }
-        if (status == 401 || status == 403) {
+        if (broke.net == NetError::Unauthorized || broke.net == NetError::Forbidden) {
             refused_ = true;
             break;
         }

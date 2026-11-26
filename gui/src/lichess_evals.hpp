@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "jobs.hpp"
+#include "lichess_http.hpp"
 #include "opening_suite.hpp"
 
 #include "zstd_reading.hpp"
@@ -96,11 +97,11 @@ struct EvaluatedSuiteOptions {
 [[nodiscard]] std::vector<SuitePosition> evaluatedSuite(const std::vector<EvaluatedPosition>& all,
                                                         const EvaluatedSuiteOptions& options);
 
-// The database's size on the server and its date, asked by its first byte: what the reading will download.
-struct EvalsSize {
+// The database's size on the server and its date, asked by its first byte: what the reading will download. Why it is
+// not known (Failure): no answer, Lichess's refusal, or an answer without the size (BadAnswer).
+struct EvalsSize : lichess::Failure {
     uint64_t bytes = 0;
-    std::string date;   // its Last-Modified, as the server gives it
-    std::string error;  // why it is not known
+    std::string date;  // its Last-Modified, as the server gives it
 };
 [[nodiscard]] EvalsSize evalsSize(const std::string& url, const std::atomic<bool>* cancel = nullptr);
 

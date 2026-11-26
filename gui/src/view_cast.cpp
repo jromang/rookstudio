@@ -160,7 +160,7 @@ void App::drawCastBanner() {
     ImGui::TextUnformatted(status.running ? TR("Live on Lichess") : TR("Lichess"));
     ImGui::SameLine();
     std::string detail;
-    if (!status.error.empty())
+    if (status.error.failed())
         detail = "";
     else if (broadcastToken().empty())  // the account unlinked meanwhile, say
         detail =
@@ -192,9 +192,9 @@ void App::drawCastBanner() {
         setup_.broadcast_lichess = false;  // the last games pushed, then the relay stops
         saveSetupSoon();
     }
-    if (!status.error.empty()) {
+    if (const auto failed = relayError(status); !failed.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ui::BAD);
-        ImGui::TextWrapped("%s", status.error.c_str());
+        ImGui::TextWrapped("%s", failed.c_str());
         ImGui::PopStyleColor();
     }
     endTinted();

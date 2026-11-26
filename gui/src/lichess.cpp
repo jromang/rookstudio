@@ -6,6 +6,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "i18n.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -173,8 +174,9 @@ struct LichessRelay::Session {
     bool prepare();  // the broadcast and its first round, made or read; false when it cannot be
     bool newRound();
     void push();
-    HttpResult post(const std::string& path, const std::string& type, const std::string& body);
+    lichess::Response post(const std::string& path, const std::string& type, const std::string& body);
     void save();
+    void fail(LichessRelay::Step step, const lichess::Failure& why);  // said by the status
 
     Settings settings_;
     LichessTarget target_;
@@ -245,37 +247,41 @@ void LichessRelay::offer(std::vector<LichessGame> live, std::vector<LichessGame>
     for (auto& g : finished) session_->pending_[g.key] = std::move(g);
 }
 
-HttpResult LichessRelay::Session::post(const std::string& path, const std::string& type, const std::string& body) {
-    HttpRequest request;
-    request.url          = settings_.base + path;
-    request.token        = settings_.token;
-    request.content_type = type;
-    request.body         = body;
-    return httpPost(request);
+lichess::Response LichessRelay::Session::post(const std::string& path, const std::string& type,
+                                              const std::string& body) {
+    auto asked         = lichess::request("POST", settings_.base + path, settings_.token);
+    asked.content_type = type;
+    asked.body         = body;
+    // Sent at once, as it always was: not in the host's turns, which log every request (a push every few seconds
+    // would fill the log); the relay keeps its own minute after a 429.
+    return lichess::responseOf(asked, httpRequest(asked));
 }
 
 void LichessRelay::Session::save() { writeJson(settings_.dir / "lichess.json", target_); }
 
+void LichessRelay::Session::fail(LichessRelay::Step step, const lichess::Failure& why) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    status_.failed = step;
+    status_.error  = why;
+}
+
 bool LichessRelay::Session::newRound() {
     const auto name = fmt::format("Part {}", target_.round_index);
-    const auto r    = post("/broadcast/" + target_.tour_id + "/new", "application/x-www-form-urlencoded",
-                           formEncode({{"name", name}}));
-    std::string error;
-    if (r.status == 200) {
-        try {
-            const auto j     = nlohmann::json::parse(r.body);
-            target_.round_id = j.at("round").at("id").get<std::string>();
-            target_.url      = j.at("round").value("url", settings_.base + "/broadcast/-/-/" + target_.round_id);
-            save();
-            return true;
-        } catch (const std::exception& e) {
-            error = e.what();
-        }
+    const auto made = lichess::readAnswer<std::pair<std::string, std::string>>(
+        post("/broadcast/" + target_.tour_id + "/new", "application/x-www-form-urlencoded",
+             formEncode({{"name", name}})),
+        [&](const nlohmann::json& j) {
+            const auto id = j.at("round").at("id").get<std::string>();
+            return std::pair{id, j.at("round").value("url", settings_.base + "/broadcast/-/-/" + id)};
+        });
+    if (!made.value) {
+        fail(Step::Round, made);
+        return false;
     }
-    std::lock_guard<std::mutex> lock(mutex_);
-    status_.error =
-        fmt::format("lichess: cannot make a round ({}): {}", r.status, error.empty() ? r.error + r.body : error);
-    return false;
+    target_.round_id = made.value->first;
+    target_.url      = made.value->second;
+    save();
+    return true;
 }
 
 bool LichessRelay::Session::prepare() {
@@ -290,8 +296,7 @@ bool LichessRelay::Session::prepare() {
     if (!settings_.round.empty()) {
         const auto id = lichessRoundId(settings_.round);
         if (!id) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            status_.error = "lichess: not a broadcast round URL or id: " + settings_.round;
+            fail(Step::Round, lichess::Failure::own("not a broadcast round URL or id: " + settings_.round));
             return false;
         }
         if (target_.round_id != *id) {
@@ -307,28 +312,24 @@ bool LichessRelay::Session::prepare() {
         while (cut > 0 && cut < settings_.name.size() && (settings_.name[cut] & 0xC0) == 0x80) --cut;
         auto name = settings_.name.substr(0, cut);
         while (name.size() < 3) name += '.';
-        const auto r =
+        const auto tour = lichess::readAnswer<std::string>(
             post("/broadcast/new", "application/x-www-form-urlencoded",
                  formEncode({{"name", name},
                              {"visibility", settings_.listed ? "public" : "unlisted"},
                              {"markdown", settings_.description.empty()
                                               ? std::string("Engine games played with RookStudio.")
-                                              : settings_.description + "\n\nEngine games played with RookStudio."}}));
-        std::string error;
-        if (r.status == 200) {
-            try {
-                target_         = {};
-                target_.tour_id = nlohmann::json::parse(r.body).at("tour").at("id").get<std::string>();
-            } catch (const std::exception& e) {
-                error = e.what();
-            }
-        }
-        if (target_.tour_id.empty()) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            status_.error = fmt::format("lichess: cannot make the broadcast ({}): {}", r.status,
-                                        error.empty() ? r.error + r.body : error);
+                                              : settings_.description + "\n\nEngine games played with RookStudio."}})),
+            [](const nlohmann::json& j) -> std::optional<std::string> {
+                auto id = j.at("tour").at("id").get<std::string>();
+                if (id.empty()) return std::nullopt;
+                return id;
+            });
+        if (!tour.value) {
+            fail(Step::Broadcast, tour);
             return false;
         }
+        target_         = {};
+        target_.tour_id = *tour.value;
         if (!newRound()) return false;
     }
     std::lock_guard<std::mutex> lock(mutex_);
@@ -370,24 +371,29 @@ void LichessRelay::Session::push() {
         by_round[it->second].push_back(&g);
     }
 
-    std::string error;
+    lichess::Failure failure;
     for (const auto& [round, list] : by_round) {
         std::string body;
         for (const auto* g : list) body += g->pgn(target_.annotated[g->key]);
         const auto r = post("/api/broadcast/round/" + round + "/push", "text/plain", body);
-        if (r.status == 429) {
+        if (r.net == lichess::NetError::RateLimited) {  // a minute's wait, the host's too
             not_before_ = std::chrono::steady_clock::now() + std::chrono::minutes(1);
-            error       = "lichess: too many requests, waiting a minute";
+            failure     = r;
             break;
         }
-        if (r.status != 200) {
-            error = fmt::format("lichess ({}): {}", r.status, r.status == 0 ? r.error : r.body);
+        if (r.failed()) {
+            failure = r;
             continue;
         }
-        // The games lichess could not read say why.
+        // The games lichess could not read say why, in its words.
         try {
             for (const auto& g : nlohmann::json::parse(r.body).value("games", nlohmann::json::array())) {
-                if (g.contains("error")) error = "lichess: " + g.at("error").get<std::string>();
+                if (auto said = lichess::textOf(g, "error"); !said.empty()) {
+                    failure        = {};
+                    failure.net    = lichess::NetError::Server;
+                    failure.status = r.status;
+                    failure.said   = std::move(said);
+                }
             }
         } catch (...) {
         }
@@ -401,7 +407,8 @@ void LichessRelay::Session::push() {
 
     std::lock_guard<std::mutex> lock(mutex_);
     for (const auto& k : target_.finished) pending_.erase(k);
-    status_.error     = error;
+    status_.failed    = failure.failed() ? Step::Push : Step::None;
+    status_.error     = failure;
     status_.last_push = now();
     status_.games     = target_.rounds.size();
     status_.url       = target_.url;
@@ -428,6 +435,22 @@ void LichessRelay::Session::loop() {
     running_ = false;
     std::lock_guard<std::mutex> lock(mutex_);
     status_.running = false;
+}
+
+std::string relayError(const LichessRelay::Status& status) {
+    if (!status.error.failed()) return {};
+    const auto why = lichess::describe(status.error);
+    if (status.error.net == lichess::NetError::None) return trf("Lichess: {}", why);  // the program's own words
+    switch (status.failed) {
+        case LichessRelay::Step::Broadcast:
+            return trf("The broadcast could not be made on Lichess: {}", why);
+        case LichessRelay::Step::Round:
+            return trf("A round could not be made on Lichess: {}", why);
+        case LichessRelay::Step::Push:
+        case LichessRelay::Step::None:
+            break;
+    }
+    return trf("The games could not be pushed to Lichess: {}", why);
 }
 
 }  // namespace fcg

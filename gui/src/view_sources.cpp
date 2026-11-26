@@ -191,15 +191,15 @@ void App::pollTwic() {
     }
     // Lichess's page of monthly files, asked for by a sheet.
     if (lichess_months_job_ && lichess_months_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto [html, error] = lichess_months_job_->get();
+        auto page = lichess_months_job_->get();
         lichess_months_job_.reset();
-        if (!error.empty()) {
-            lichess_months_error_ = error;
+        if (!page.value) {
+            lichess_months_error_ = page;
         } else {
-            lichess_broadcast_months_ = lichess::parseMonths(html, lichess::MonthKind::Broadcast);
-            lichess_standard_months_  = lichess::parseMonths(html, lichess::MonthKind::Standard);
+            lichess_broadcast_months_ = lichess::parseMonths(*page.value, lichess::MonthKind::Broadcast);
+            lichess_standard_months_  = lichess::parseMonths(*page.value, lichess::MonthKind::Standard);
             if (lichess_broadcast_months_.empty())
-                lichess_months_error_ = TR("The page lists no month the program can read.");
+                lichess_months_error_ = lichess::Failure::own(TR("The page lists no month the program can read."));
         }
     }
     pollMonthReading();
@@ -575,19 +575,23 @@ void App::drawFileAddProgress() {
     }
 }
 
+namespace {
+
+// Why Lichess's months are not listed: Lichess's failure, or the program's words about the page it sent.
+std::string monthsFailure(const lichess::Failure& failure) {
+    return failure.net == lichess::NetError::None ? lichess::describe(failure) : lichess::gaveNothing(failure);
+}
+
+}  // namespace
+
 void App::startLichessMonths() {
     if (lichess_months_job_) return;
-    lichess_months_error_.clear();
-    lichess_months_job_ = std::async(std::launch::async, [] {
-        HttpRequest request;
-        request.url       = lichess::databaseUrl();
-        request.method    = "GET";
-        request.timeout_s = 30;
-        const auto answer = politeRequest(request);
-        if (answer.status != 200)
-            return std::pair<std::string, std::string>{
-                "", answer.error.empty() ? fmt::format("HTTP {}", answer.status) : answer.error};
-        return std::pair<std::string, std::string>{answer.body, ""};
+    lichess_months_error_ = {};
+    lichess_months_job_   = std::async(std::launch::async, [] {
+        auto asked      = lichess::request("GET", lichess::databaseUrl(), {}, "text/html");
+        asked.timeout_s = 30;
+        return lichess::readBody<std::string>(lichess::send(asked),
+                                              [](std::string_view html) { return std::string(html); });
     });
 }
 
@@ -606,13 +610,13 @@ void App::drawBroadcastSheet() {
             if (!entries[i].source && entries[i].name == new_name) broadcast_target_ = static_cast<int>(i);
     }
     if (lichess_broadcast_months_.empty()) {
-        if (!lichess_months_job_ && lichess_months_error_.empty()) startLichessMonths();
+        if (!lichess_months_job_ && !lichess_months_error_.failed()) startLichessMonths();
         if (lichess_months_job_) {
             ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its months…"));
         } else {
             ImGui::PushTextWrapPos();
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                               trf("database.lichess.org did not answer: {}", lichess_months_error_).c_str());
+                               monthsFailure(lichess_months_error_).c_str());
             ImGui::PopTextWrapPos();
             if (ImGui::Button(TR("Try again"))) startLichessMonths();
         }
@@ -913,13 +917,13 @@ void App::drawMonthSheet() {
     ui::topic(guide::topics::LichessMonths);
     const bool busy = monthReading();
     if (lichess_standard_months_.empty()) {
-        if (!lichess_months_job_ && lichess_months_error_.empty()) startLichessMonths();
+        if (!lichess_months_job_ && !lichess_months_error_.failed()) startLichessMonths();
         if (lichess_months_job_) {
             ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its months…"));
         } else {
             ImGui::PushTextWrapPos();
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                               trf("database.lichess.org did not answer: {}", lichess_months_error_).c_str());
+                               monthsFailure(lichess_months_error_).c_str());
             ImGui::PopTextWrapPos();
             if (ImGui::Button(TR("Try again"))) startLichessMonths();
         }

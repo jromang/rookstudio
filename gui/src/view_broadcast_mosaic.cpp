@@ -651,10 +651,11 @@ void App::drawBroadcastMosaic() {
         if (live > 0)
             ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s",
                                trn("{} game live", "{} games live", static_cast<uint64_t>(live), live).c_str());
-        const auto error = players_follower_ ? players_follower_->error() : std::string();
-        if (!error.empty()) {
+        if (const auto broke =
+                players_follower_ ? players_follower_->failure() : lichess::PlayersFollower::GameFailure{};
+            broke.failure.failed()) {
             if (live > 0) ImGui::SameLine();
-            ImGui::TextDisabled("%s", trf("· Lichess: {}", error).c_str());
+            ImGui::TextDisabled("· %s: %s", broke.game.c_str(), lichess::describeAlone(broke.failure).c_str());
         }
     } else {
         ImGui::TextUnformatted(fmt::format("{} · {}", round->entry.tour.name,

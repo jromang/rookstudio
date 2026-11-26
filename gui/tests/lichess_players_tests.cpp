@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_players.hpp"
@@ -187,5 +188,47 @@ TEST_CASE("Lichess players: a game followed from its start to its end") {
         std::this_thread::sleep_for(50ms);
         CHECK(follower.games().size() == 1);
     }  // stopped at once
+    servers() = Servers{};
+}
+
+TEST_CASE("Lichess players: each failure of their status, whom the account follows, a game followed by kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(playerStatuses({"Player_A", "Player_B"}).net == net);
+        CHECK(followingOf("tok").net == net);
+        // A game that cannot be read: its id and why.
+        PlayersFollower follower;
+        follower.watch({"game0001"});
+        REQUIRE(waitUntil([&] { return follower.failure().failure.net == net; }));
+        CHECK(follower.failure().game == "game0001");
+    }
+    server.answer(404, "{}");
+    {
+        PlayersFollower follower;
+        follower.watch({"game0001"});
+        REQUIRE(waitUntil([&] { return follower.failure().failure.failed(); }));
+        CHECK(describe(follower.failure().failure) == "Lichess has no such game");
+    }
+    server.answer(200, "<html>not JSON</html>");
+    CHECK(playerStatuses({"Player_A"}).net == NetError::BadAnswer);
+    pointNowhere();
+    CHECK(playerStatuses({"Player_A"}).net == NetError::Offline);
+    CHECK(followingOf("tok").net == NetError::Offline);
+    pointAtPausedHost("lichess-players.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(playerStatuses({"Player_A"}, &cancel).net == NetError::Cancelled);
+    CHECK(followingOf("tok", &cancel).net == NetError::Cancelled);
     servers() = Servers{};
 }

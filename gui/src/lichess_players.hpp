@@ -74,7 +74,13 @@ class PlayersFollower {
     // The games, in the order they came: their PGN as it goes on, "*" until they end.
     [[nodiscard]] std::vector<BroadcastGame> games() const;
     [[nodiscard]] uint64_t changes() const noexcept { return changes_; }
-    [[nodiscard]] std::string error() const;  // why a game could not be read, last
+    // The game that could not be read, last, and why: no answer, Lichess's refusal, or its moves that never fit it
+    // (BadAnswer); no failure while none failed.
+    struct GameFailure {
+        std::string game;
+        Failure failure;
+    };
+    [[nodiscard]] GameFailure failure() const;
     // The games' threads still running: a stream each, open or about to be; one that stops closes its stream within a
     // quarter of a second, and counts until then.
     [[nodiscard]] std::size_t open() const;
@@ -102,7 +108,7 @@ class PlayersFollower {
     mutable std::mutex mutex_;
     std::vector<std::string> wanted_;
     std::vector<std::unique_ptr<Game>> games_;
-    std::string error_;
+    GameFailure failure_;
     std::thread manager_;
 };
 

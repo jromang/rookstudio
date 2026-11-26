@@ -1855,7 +1855,7 @@ class App {
     std::vector<lichess::PlayerStatus> lichess_statuses_;
     std::future<lichess::Answer<std::vector<lichess::PlayerStatus>>> lichess_status_job_;
     std::chrono::steady_clock::time_point lichess_status_asked_{};
-    std::string lichess_status_error_;
+    lichess::Failure lichess_status_error_;     // why whom the account follows, or their status, was not read
     int lichess_players_drawn_        = -1000;  // the frame that drew their card last
     bool lichess_players_then_mosaic_ = false;  // the permission granted, their mosaic opens
     std::unique_ptr<lichess::PlayersFollower> players_follower_;

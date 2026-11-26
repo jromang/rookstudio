@@ -257,7 +257,7 @@ void App::drawTrainingGuess() {
     ImGui::PopFont();
     const auto& b = board_;
     const bool game_on =
-        !mistake_ && !guess_ && !training_ && !puzzle_ && b.ply < static_cast<int>(b.game.moves.size());
+        !mistake_ && !guess_ && !training_ && !puzzleSeriesOn() && b.ply < static_cast<int>(b.game.moves.size());
     if (game_on) {
         const auto title = b.title.empty() ? std::string(TR("the game shown")) : b.title;
         wrapped(trf("{}: from the position shown, for the side to move there.", title), true);
@@ -352,12 +352,7 @@ void App::startGuess(ReplayGame game, bool chess960, std::string title, chess::C
         boardToast(guess_error_);
         return;
     }
-    if (training_) closeTraining(false);
-    if (puzzle_) closePuzzles(false);
-    if (mistake_) closeMistakes(false);
-    if (guess_) closeGuess(false);
-    if (endgame_) closeEndgame(false);  // an endgame against the tables, a vision exercise (#82)
-    if (vision_) closeVision(false);
+    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
     auto run      = std::make_unique<GuessRun>();
     run->game     = std::move(game);
     run->chess960 = chess960;

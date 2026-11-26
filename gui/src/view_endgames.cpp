@@ -29,6 +29,7 @@
 #include "i18n.hpp"
 #include "machines.hpp"
 #include "online_cache.hpp"
+#include "puzzles_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -742,26 +743,18 @@ void App::drawMatesCard() {
     wrapped(TR("Lichess's mate puzzles, in 1 to 5 moves, and by pattern: back rank, smothered, Anastasia's, Arabian, "
                "Boden's… And the elementary mates above, counted against the tables."),
             true);
+    auto& puzzles   = *puzzles_;  // their module (puzzles_page.hpp, #107)
     const auto rate = [&](std::string_view key) -> std::string {
-        const auto it = puzzleRecord().themes.find(std::string(key));
-        if (it == puzzleRecord().themes.end() || it->second.tried < 5) return {};
+        const auto& themes = puzzles.puzzleRecord().themes;
+        const auto it      = themes.find(std::string(key));
+        if (it == themes.end() || it->second.tried < 5) return {};
         return fmt::format(" {} %", 100 * it->second.won / it->second.tried);
     };
-    const auto store = offline_puzzles_ ? offline_puzzles_->store() : nullptr;
-    const auto lock  = puzzleLock();
+    const auto store = puzzles.store();
+    const auto lock  = trainingLock();
     const auto play  = [&](std::string_view key) {
-        puzzles_theme_ = std::string(key);
-        if (store) {
-            puzzles_online_ = false;
-            startPuzzles();
-        } else if (puzzleScopes()) {
-            puzzles_online_ = true;
-            startPuzzles();
-        } else {
-            // Neither the database nor the account: the Puzzles part says how to have them.
-            puzzles_online_ = false;
-            training_tab_   = 1;
-        }
+        // Neither the database nor the account: the Puzzles part says how to have them.
+        if (!puzzles.startTheme(std::string(key))) training_tab_ = 1;
     };
     ImGui::BeginDisabled(!lock.empty());
     static constexpr std::string_view MATES[]    = {"mateIn1", "mateIn2", "mateIn3", "mateIn4", "mateIn5"};
@@ -783,12 +776,13 @@ void App::drawMatesCard() {
     }
     ImGui::EndDisabled();
     if (!lock.empty()) ImGui::TextDisabled("%s", lock.c_str());
-    ImGui::TextDisabled(
-        "%s", store            ? TR("A click starts 20 puzzles of the database on your disk; Ctrl+K “puzzles mate”.")
-              : puzzleScopes() ? TR("A click starts a batch of your Lichess puzzles; the database offline is on the "
-                                    "Puzzles part.")
-                               : TR("Lichess's puzzle database first, on the Puzzles part (a click leads there), or "
-                                    "your account online."));
+    ImGui::TextDisabled("%s", store
+                                  ? TR("A click starts 20 puzzles of the database on your disk; Ctrl+K “puzzles mate”.")
+                              : puzzles.puzzleScopes()
+                                  ? TR("A click starts a batch of your Lichess puzzles; the database offline is on "
+                                       "the Puzzles part.")
+                                  : TR("Lichess's puzzle database first, on the Puzzles part (a click leads there), "
+                                       "or your account online."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }
@@ -852,13 +846,8 @@ bool App::startGameEndgames() {
 }
 
 void App::startEndgameRun(std::unique_ptr<EndgameRun> run) {
-    if (training_) closeTraining(false);
     const bool chained = review_running_;
-    if (puzzle_) closePuzzles(false);
-    if (mistake_) closeMistakes(false);
-    if (guess_) closeGuess(false);
-    if (endgame_) closeEndgame(false);
-    if (vision_) closeVision(false);
+    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
     review_running_ = chained;
     endgame_error_.clear();
     run->flip     = board_.flip;

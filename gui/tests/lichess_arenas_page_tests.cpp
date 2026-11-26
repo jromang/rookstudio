@@ -119,6 +119,7 @@ class FakeApp final : public ArenasContext {
     void dropScopeAsk() override { scope_asked.clear(); }
     const lichess::Profile* lichessProfile() const override { return nullptr; }
     void askLichessProfile() override {}
+    void askLichessProfileOnce() override {}
 
     // The user's games on Lichess.
     const std::vector<lichess::PlayingGame>& playingGames() const override { return playing; }

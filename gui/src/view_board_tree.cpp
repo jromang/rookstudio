@@ -19,6 +19,7 @@
 #include <tour/files.hpp>
 
 #include "app.hpp"
+#include "board_session.hpp"
 #include "board_text.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
@@ -147,12 +148,10 @@ void App::saveRecentGames() const {
     };
     const auto& b = board_;
     // During a training session the board shows its position, not a game: the game put aside for it is the one shown
-    // (#76).
-    const bool aside =
-        ((training_ && training_->aside) || (puzzle_ && puzzle_->aside) || (mistake_ && mistake_->aside) ||
-         (guess_ && guess_->aside) || (endgame_ && endgame_->aside) || (vision_ && vision_->aside)) &&
-        !recent_games_.empty();  // a session of exercises, a game guessed (#81), an endgame (#82)
-    if (boardHasGame(b) && !training_ && !puzzle_ && !mistake_ && !guess_ && !endgame_ && !vision_)
+    // (#76, #80–#82).
+    const auto* session = boardSession();
+    const bool aside    = session && session->keptAside() && !recent_games_.empty();
+    if (boardHasGame(b) && !session)
         entry(b.title,
               board_origin_ ? board_origin_->name
               : b.pgn       ? b.pgn->name

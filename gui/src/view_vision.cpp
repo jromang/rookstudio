@@ -311,12 +311,7 @@ void App::drawTrainingVision() {
 // The sessions
 
 void App::startVisionRun(std::unique_ptr<VisionRun> run) {
-    if (training_) closeTraining(false);
-    if (puzzle_) closePuzzles(false);
-    if (mistake_) closeMistakes(false);
-    if (guess_) closeGuess(false);
-    if (endgame_) closeEndgame(false);
-    if (vision_) closeVision(false);
+    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
     vision_error_.clear();
     run->flip     = board_.flip;
     run->tab      = board_side_tab_;

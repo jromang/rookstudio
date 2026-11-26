@@ -78,7 +78,6 @@
 #include "lichess_players.hpp"
 #include "lichess_playing.hpp"
 #include "lichess_profile.hpp"
-#include "lichess_puzzles.hpp"
 #include "lichess_settings.hpp"
 #include "lichess_share.hpp"
 #include "live.hpp"
@@ -96,7 +95,6 @@
 #include "profiles.hpp"
 #include "publish_game.hpp"
 #include "publish_gif.hpp"
-#include "puzzles.hpp"
 #include "qr.hpp"
 #include "remote_run.hpp"
 #include "repertoires.hpp"
@@ -132,10 +130,12 @@ namespace fcg {
 
 class AppContext;
 class AssistantService;
+class BoardSession;
 class EngineOracle;
 class LichessArenasPage;
 class LichessBotPage;
 class LichessTvPage;
+class PuzzlesPage;
 struct CommentaryReview;
 
 class EngineHub;
@@ -991,20 +991,15 @@ class App {
     [[nodiscard]] bool trainingDue();
 
     // The Training page (#80, mockup M12, board 1; view_training_page.cpp): its Today part (the day's review, the kinds
-    // of exercises, the puzzles to start) and its Puzzles part (the database offline, the batch online, the results by
-    // theme). Offered once on the Home page of a view that lacks it.
+    // of exercises, the puzzles to start) and its Puzzles part (the puzzles module's, below). Offered once on the Home
+    // page of a view that lacks it.
     int training_tab_            = 0;      // 0 Today, 1 Puzzles
     int training_offer_          = -1;     // the page offered once: -1 not known yet, 0 to offer, 1 done
     bool training_enter_puzzles_ = false;  // Enter starts the puzzles, not the review: a choice of theirs was clicked
     bool training_scroll_        = false;  // the page brought to its puzzles (Ctrl+K)
     void drawTraining();
     void drawTrainingToday();
-    void drawTrainingPuzzles();
     void drawReviewCard(bool& enter);
-    void drawPuzzleChooser(bool& enter);
-    void drawPuzzleStoreCard();
-    void drawOnlinePuzzles(bool& enter);
-    void drawPuzzleThemes();   // the results by theme
     void drawTrainingOffer();  // the Home page: the Training page offered once to a view without it
     [[nodiscard]] bool trainingOffered() const;
     void answerTrainingOffer(bool add);
@@ -1025,73 +1020,31 @@ class App {
     void drawReviewNext(bool enter);              // at a session's end: go on, or back to the Training page
     void drawReviewHome();                        // the Home page's "In progress": one count, a click reviews
 
-    // Puzzles (#80; puzzles.hpp, lichess_puzzles.hpp, view_puzzles.cpp). Lichess's database offline, in the profile.
-    std::unique_ptr<OfflinePuzzles> offline_puzzles_;
-    std::string offline_puzzles_error_;  // why the last preparation stopped
-    std::string offline_puzzles_note_;   // what Update found
-    bool offline_puzzles_remove_ = false;
-    std::future<EvalsSize> offline_puzzles_update_;
-    std::chrono::steady_clock::time_point offline_puzzles_since_{};
-    uint64_t offline_puzzles_from_ = 0;
-    void startOfflinePuzzles(std::string source);
-    void pollPuzzles();  // each frame: a preparation's end, Update's answer, the online batch's requests
-    // The user's puzzles: their rating, their results, the puzzles missed (in the profile's puzzles/ folder).
-    std::optional<PuzzleRecord> puzzle_record_;
-    PuzzleRecord& puzzleRecord();
-    [[nodiscard]] std::filesystem::path puzzlesFolder() const { return storage_.root() / "puzzles"; }
-    [[nodiscard]] PuzzleRating puzzleRating();                     // the user's, or where it would start
-    [[nodiscard]] std::optional<int> lichessPuzzleRating() const;  // the linked account's, when known
-    // The page's choice: offline or online, the theme ("" every theme, else a theme's key or "opening:<key>"), the
-    // difficulty.
-    bool puzzles_online_ = false;
-    std::string puzzles_theme_;
-    PuzzleDifficulty puzzles_difficulty_ = PuzzleDifficulty::Normal;
-    bool puzzles_themes_open_            = false;  // the list of every theme and opening
-    std::array<char, 48> puzzles_filter_{};
-    static constexpr std::size_t PUZZLE_SERIES = 20;
-    // A series on the Board page.
-    std::unique_ptr<PuzzleRun> puzzle_;
-    [[nodiscard]] std::string puzzleLock() const;  // why a series cannot start, empty when it can
-    void startPuzzles();                           // a series of the page's choice
-    void startPuzzleRun(std::unique_ptr<PuzzleRun> run);
-    bool startPuzzleReview();  // the missed puzzles due today; false when there are none
-    void askPuzzle();          // the next puzzle of the queue, the opponent's move played
-    void showPuzzlePosition(std::size_t index,
-                            std::size_t played);  // the board at the question, `played` solution moves after
-    void puzzleAnswer(chess::Move move);
-    void puzzleGrade(bool win);  // the first answer to the puzzle asked, kept
-    void puzzleDontKnow();
-    void puzzleRetry();
-    void puzzleSolutionStep();  // the solution, a move at a time
-    void puzzleNext();
-    void finishPuzzles(bool stopped);
-    void reviewMissedPuzzles();  // "Review the 4 now": the puzzles missed in a series of their own
-    void closePuzzles(bool to_training);
-    void dropPuzzles();  // another game came on the board: the series left where it is
-    void puzzleKeys();
-    void drawPuzzlePage();
-    void drawPuzzleBoard(float size);
-    void drawPuzzleColumn();
-    void drawPuzzleEnd();
-    // Online (lichess_puzzles.hpp): the batch kept in the profile, its requests one at a time.
-    std::optional<lichess::OnlineBatch> online_batch_;
-    bool online_batch_loaded_ = false;
-    lichess::OnlineBatch* onlineBatch();  // read from the profile once; null when none
-    void saveOnlineBatch();
-    [[nodiscard]] bool puzzleScopes() const;  // the token may read and write puzzles
-    void askPuzzleScopes();
-    std::future<lichess::Answer<lichess::PuzzleBatch>> online_ask_;
-    std::future<lichess::Answer<lichess::PuzzleSolved>> online_send_;
-    std::string online_error_;                              // why the last request gave nothing
-    int online_status_ = 0;                                 // its HTTP status
-    std::chrono::steady_clock::time_point online_retry_{};  // a send that failed tried again then
-    bool online_start_after_ = false;                       // the batch, once it comes, starts a series
-    // The last 30 days on Lichess, by theme (puzzle:read): asked once a session, when the online choice shows.
-    std::future<lichess::Answer<lichess::PuzzleDashboard>> online_dashboard_job_;
-    std::optional<lichess::PuzzleDashboard> online_dashboard_;
-    bool online_dashboard_asked_ = false;
-    void askOnlineBatch();
-    void sendOnlineResults();
+    // Puzzles (#80, mockup M12, board 1): a module of its own (puzzles_page.hpp, #107), made by initChessModules():
+    // Lichess's database offline, the batch online, the user's puzzles and their results by theme, the Training page's
+    // Puzzles part, a series on the Board page (a training session, below). The Training page, the day's review and
+    // the endgames' mates reach it directly; the guessing's part through its hook: a series holds the Board.
+    std::unique_ptr<PuzzlesPage> puzzles_;
+    [[nodiscard]] bool puzzleSeriesOn() const;
+
+    // The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, whatever its
+    // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
+    // The kinds still in App answer through sessions of App's own (OwnSession, app_chess.cpp), made by
+    // initChessModules(); a kind in a module of its own is its own session (the puzzles'), and takes the Board through
+    // context::SessionBoard (app_context.hpp).
+    class OwnSession;
+    std::unique_ptr<BoardSession> training_session_, mistake_session_, guess_session_, endgame_session_,
+        vision_session_;
+    [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
+    // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
+    // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
+    // another game on the Board, the session left there; another session starting, the one that holds the Board
+    // closed, the Board page staying; the guide's section of its page (none when no session holds the Board).
+    bool drawBoardSession();
+    bool boardSessionMove(chess::Move move);
+    void leaveBoardSession();
+    void closeBoardSession();
+    [[nodiscard]] const char* sessionGuideTopic() const;
 
     // Your mistakes as exercises and guessing the moves (#81, mockup M12, board 2; mistakes.hpp, view_mistakes.cpp,
     // view_guess.cpp). The user's names (Settings › Your names, and the linked Lichess account's); the exercises their

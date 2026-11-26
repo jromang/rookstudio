@@ -7,7 +7,8 @@
 // when an account is linked), a line per puzzle answered, and the puzzles missed, cards of the day's review (FSRS, as
 // the repertoires' training). Nothing leaves the machine but the request for the file.
 //
-// A series runs on the Board page (view_puzzles.cpp), whose column becomes the puzzle's: PuzzleRun is its state.
+// A series runs on the Board page (puzzles_page.hpp, the puzzles' module, #107), whose column becomes the puzzle's:
+// PuzzleRun is its state.
 
 #include <atomic>
 #include <chrono>

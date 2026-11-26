@@ -15,6 +15,7 @@
 
 #include "app.hpp"
 #include "board_session.hpp"
+#include "guess_page.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "puzzles_page.hpp"
@@ -378,7 +379,7 @@ void App::drawTraining() {
     else if (training_tab_ == 2)
         drawTrainingMistakes();
     else if (training_tab_ == 3)
-        drawTrainingGuess();
+        guessing_->drawPart();
     else if (training_tab_ == 4)
         drawTrainingEndgames();
     else if (training_tab_ == 5)
@@ -450,15 +451,10 @@ void App::drawTrainingToday() {
                  2);
         }
         ImGui::SameLine(0, gap);
-        if (!guess_last_read_) {
-            guess_last_read_ = true;
-            guess_last_      = lastGuessRecord(guessFolder());
-        }
+        const auto& last = guessing_->lastRecord();
         card("##training_kind_guess", ui::Icon::Eye, TR("Guess the moves"),
              TR("A game of a database, a side, move by move; the engine scores."),
-             guess_last_ ? trf("the last: {} points of {}", guess_last_->points, guess_last_->max)
-                         : std::string(TR("not tried yet")),
-             3);
+             last ? trf("the last: {} points of {}", last->points, last->max) : std::string(TR("not tried yet")), 3);
         // The second row (#82): the endgames against the tables, the mates, board vision.
         ImGui::Dummy(ImVec2(0, gap - ImGui::GetStyle().ItemSpacing.y));
         {

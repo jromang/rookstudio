@@ -4,6 +4,7 @@
 #include "assistant_service.hpp"
 #include "board_session.hpp"
 #include "engine_hub.hpp"
+#include "guess_page.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "lichess_tv_page.hpp"

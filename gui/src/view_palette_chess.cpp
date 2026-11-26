@@ -14,6 +14,7 @@
 
 #include "app.hpp"
 #include "assistant_service.hpp"
+#include "guess_page.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
@@ -315,18 +316,8 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
             TR("Training"), [this] { startMistakeReviews(); });
     if (mistake_reviews_) add(TR("Cancel the reviews of my games"), TR("Training"), [this] { cancelMistakeReviews(); });
     add(TR("Your names…"), TR("Settings"), page(Page::Settings));
-    add(TR("Guess the moves"), where(Page::Training), [this, go = page(Page::Training)] {
-        // The Board page's game, from the position shown; else the Training page's part.
-        if (page_ == Page::Board && !training_ && !puzzles_->onBoard() && !mistake_ && !guess_ &&
-            board_.ply < static_cast<int>(board_.game.moves.size()) && trainingLock().empty()) {
-            startGuessBoard();
-            return;
-        }
-        go();
-        training_tab_ = 3;
-    });
-    if (trainingLock().empty())
-        add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
+    // Guessing the moves, its module's (#107): the Board page's game, a random game.
+    guessing_->addCommands(add, where(Page::Training));
     // The endgames against the tables, the mates, board vision (#82).
     add(TR("Endgames"), where(Page::Training), [this, go = page(Page::Training)] {
         go();

@@ -23,6 +23,7 @@
 #include "board_session.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
+#include "guess_page.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
 
@@ -1239,12 +1240,7 @@ void App::drawTrainingHome() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
     }
-    if (guess_) {
-        ImGui::TextUnformatted(
-            trf("Guessing “{}”: {} points of {}", guess_->title, guess_->points, 3 * guess_->guesses.size()).c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Back to the game guessed"))) page_ = Page::Board;
-    }
+    guessing_->drawHomeLine();  // its module's (#107)
     // An endgame against the tables, a vision exercise (#82).
     if (endgame_) {
         const auto& r = *endgame_;

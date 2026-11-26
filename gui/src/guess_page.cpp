@@ -1,17 +1,19 @@
-// Guessing the moves of a game (#81, mockup M12, board 2; mistakes.hpp): the Training page's part (a game drawn at
-// random from a database and a filter, or the Board page's game), and the game replayed on the Board page from the
-// chosen side, a move to guess at each of its turns: as the game 3 points, as good by the engine 2, playable 1. The
-// moves of theory of the user's databases pass by themselves; the analysis engine scores, one thread, a second a move.
+// Guessing the moves of a game (#81, mockup M12, board 2), a module of its own out of App (#107; guess_page.hpp): the
+// Training page's part (a game drawn at random from a database and a filter, or the Board page's game), and the game
+// replayed on the Board page from the chosen side, a move to guess at each of its turns: as the game 3 points, as good
+// by the engine 2, playable 1. The moves of theory of the user's databases pass by themselves; the analysis engine
+// scores, one thread, a second a move.
 //
 // The keys: a move played on the board, or typed; after the score, Enter goes on (or the game goes on by itself after a
 // moment, as a right answer of the repertoires' training does); Escape stops.
+
+#include "guess_page.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <random>
 
-#include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
@@ -21,13 +23,15 @@
 #include <study/game_tree.hpp>
 #include <study/import.hpp>
 
-#include "app.hpp"
+#include "analysis.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "console.hpp"
+#include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "review_bridge.hpp"
+#include "training.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -156,10 +160,65 @@ AnalysisPosition positionAfter(const ReplayGame& game, bool chess960, int ply, s
 
 }  // namespace
 
+GuessPage::GuessPage(GuessContext& app) : app_(app) {}
+
+GuessPage::~GuessPage() = default;
+
+bool GuessPage::hidesAids() const {
+    // A guess, until the game's move is shown.
+    return guess_ && guess_->phase != GuessPhase::Shown && guess_->phase != GuessPhase::End;
+}
+
+const char* GuessPage::guideTopic() const { return guide::topics::GuessMoves; }
+
+const std::optional<GuessRecord>& GuessPage::lastRecord() {
+    if (!guess_last_read_) {
+        guess_last_read_ = true;
+        guess_last_      = lastGuessRecord(guessFolder());
+    }
+    return guess_last_;
+}
+
+// ---------------------------------------------------------------------------
+// The Home page, the palette, the --focus words
+
+void GuessPage::drawHomeLine() {
+    if (!guess_) return;
+    ImGui::TextUnformatted(
+        trf("Guessing “{}”: {} points of {}", guess_->title, guess_->points, 3 * guess_->guesses.size()).c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Back to the game guessed"))) app_.showSession();
+}
+
+void GuessPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
+    add(TR("Guess the moves"), training_view, [this] {
+        // The Board page's game, from the position shown; else the Training page's part.
+        const auto shown = app_.shownGame();
+        if (shown.page && !shown.session && shown.ply < static_cast<int>(shown.game.moves.size()) &&
+            app_.sessionLock().empty()) {
+            startGuessBoard();
+            return;
+        }
+        app_.showTrainingPage(3);
+    });
+    if (app_.sessionLock().empty())
+        add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
+}
+
+void GuessPage::addFocusWords(FocusWords& words, const std::string& w) {
+    words.on({"guess-board", "guess-random"}, [&] {
+        // Guessing the moves of the Board page's game from the position shown, or of a random game (#81).
+        if (w == "guess-board")
+            startGuessBoard();
+        else
+            (void)startGuessRandom();
+    });
+}
+
 // ---------------------------------------------------------------------------
 // The Training page's part
 
-void App::drawTrainingGuess() {
+void GuessPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::GuessMoves);
     bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
                  (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
@@ -172,17 +231,11 @@ void App::drawTrainingGuess() {
         TR("A game of your databases replayed from one side: at each of its moves, guess the one played. The engine "
            "scores the guess: as the game 3 points, as good 2, playable 1."),
         true);
-    if (!guess_last_read_) {
-        guess_last_read_ = true;
-        guess_last_      = lastGuessRecord(guessFolder());
-    }
-    if (guess_last_)
-        ImGui::TextDisabled(
-            "%s",
-            trf("The last: {} points of {} · {}", guess_last_->points, guess_last_->max, guess_last_->title).c_str());
+    if (const auto& last = lastRecord())
+        ImGui::TextDisabled("%s", trf("The last: {} points of {} · {}", last->points, last->max, last->title).c_str());
     ImGui::Dummy(ImVec2(0, px(2)));
-    const auto lock = trainingLock();
-    auto& s         = shelf();
+    const auto lock = app_.sessionLock();
+    auto& s         = app_.shelf();
     ui::beginCard("##guess_random");
     ImGui::PushTextWrapPos();
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
@@ -227,8 +280,8 @@ void App::drawTrainingGuess() {
         ImGui::SameLine(0, px(4));
         if (chip(TR("Black"), guess_side_ == 1, "guess_black")) guess_side_ = 1;
         ImGui::SameLine(0, px(16));
-        if (ImGui::Checkbox(TR("The moves of theory pass by themselves"), &trainingSettings().guess_theory))
-            saveTrainingSettings();
+        bool theory = app_.trainingSettings().guess_theory;
+        if (ImGui::Checkbox(TR("The moves of theory pass by themselves"), &theory)) app_.setGuessTheory(theory);
         tip(
             TR("The moves played by many games of your databases (their opening tree): the guessing starts where the "
                "game leaves them."));
@@ -255,9 +308,8 @@ void App::drawTrainingGuess() {
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(TR("The Board page's game"));
     ImGui::PopFont();
-    const auto& b = board_;
-    const bool game_on =
-        !mistake_ && !guess_ && !training_ && !puzzleSeriesOn() && b.ply < static_cast<int>(b.game.moves.size());
+    const auto b       = app_.shownGame();
+    const bool game_on = !b.session && b.ply < static_cast<int>(b.game.moves.size());
     if (game_on) {
         const auto title = b.title.empty() ? std::string(TR("the game shown")) : b.title;
         wrapped(trf("{}: from the position shown, for the side to move there.", title), true);
@@ -282,10 +334,24 @@ void App::drawTrainingGuess() {
 // ---------------------------------------------------------------------------
 // A game guessed
 
-bool App::startGuessRandom() {
+void GuessPage::poll() {
+    // A game drawn at random for guessing.
+    if (guess_pick_.valid() && guess_pick_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto pick = guess_pick_.get();
+        if (pick.game)
+            startGuess(std::move(*pick.game), pick.chess960, std::move(pick.title), guess_pick_side_, 0,
+                       std::make_pair(pick.folder, pick.id));
+        else
+            guess_error_ = pick.error == "none" ? TR("No game of this database passes the filter.")
+                                                : TR("No game long enough passes the filter.");
+    }
+    if (guess_) pollGuess();
+}
+
+bool GuessPage::startGuessRandom() {
     guess_error_.clear();
-    if (!trainingLock().empty() || guess_pick_.valid()) return false;
-    auto& s = shelf();
+    if (!app_.sessionLock().empty() || guess_pick_.valid()) return false;
+    auto& s = app_.shelf();
     if (guess_source_ < 0 || guess_source_ >= static_cast<int>(s.entries().size())) return false;
     const auto index = static_cast<std::size_t>(guess_source_);
     const auto db    = s.open(index);
@@ -329,55 +395,55 @@ bool App::startGuessRandom() {
     return true;
 }
 
-void App::startGuessBoard() {
-    if (!trainingLock().empty()) return;
-    const auto& b = board_;
+void GuessPage::startGuessBoard() {
+    if (!app_.sessionLock().empty()) return;
+    const auto b = app_.shownGame();
     if (b.ply >= static_cast<int>(b.game.moves.size())) {
-        boardToast(TR("No move left to guess after the position shown."));
+        app_.toast(TR("No move left to guess after the position shown."));
         return;
     }
     const auto side = b.game.moves[static_cast<std::size_t>(b.ply)].mover;
     auto title = b.title.empty() ? fmt::format("{} – {}", b.game.header("White"), b.game.header("Black")) : b.title;
-    std::optional<std::pair<std::filesystem::path, uint64_t>> origin;
-    if (board_origin_) origin = std::make_pair(board_origin_->folder, board_origin_->id);
-    startGuess(b.game, b.chess960, std::move(title), side, b.ply, origin);
+    startGuess(b.game, b.chess960, std::move(title), side, b.ply, b.origin);
 }
 
-void App::startGuess(ReplayGame game, bool chess960, std::string title, chess::Color side, int from,
-                     std::optional<std::pair<std::filesystem::path, uint64_t>> origin) {
-    if (!trainingLock().empty()) return;
-    const auto* engine = analysisEngine();
+void GuessPage::startGuess(ReplayGame game, bool chess960, std::string title, chess::Color side, int from,
+                           std::optional<std::pair<std::filesystem::path, uint64_t>> origin) {
+    if (!app_.sessionLock().empty()) return;
+    const auto* engine = app_.analysisEngine();
     if (!engine) {
         guess_error_ = TR("No engine to score with: add one on the Engines page.");
-        boardToast(guess_error_);
+        app_.toast(guess_error_);
         return;
     }
-    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
     auto run      = std::make_unique<GuessRun>();
     run->game     = std::move(game);
     run->chess960 = chess960;
     run->title    = std::move(title);
     run->side     = side;
     run->from     = std::clamp(from, 0, static_cast<int>(run->game.moves.size()));
-    run->flip     = board_.flip;
-    run->tab      = board_side_tab_;
-    const auto& b = board_;
-    run->aside    = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
+    // The Board taken, the session that holds it closed: the game on the board goes among the recent games (Ctrl+Tab),
+    // given back after the game guessed; the column at the tree rather than the notation's editing.
+    const auto taken = app_.takeBoard(trf("Guessing · {}", run->title), true);
+    run->aside       = taken.aside;
+    run->flip        = taken.flip;
+    run->tab         = taken.tab;
     // The engine: the analysis's, one thread, a second a move.
     AnalysisSettings settings;
     settings.engine  = engine->name;
     settings.threads = 1;
-    settings.hash    = board_.settings.analysis.hash;
+    settings.hash    = app_.analysisSettings().hash;
     settings.multipv = 1;
     run->engine.start(*engine, settings);
     run->engine_name = engine->name;
     // The moves of theory of the user's databases, from the start of a game that starts at the usual position.
     const bool usual = run->game.start_fen.empty() || run->game.start_fen == std::string(chess::constants::STARTPOS);
-    if (trainingSettings().guess_theory && run->from == 0 && usual && !chess960) {
-        auto& s = shelf();
+    if (app_.trainingSettings().guess_theory && run->from == 0 && usual && !chess960) {
+        auto& s        = app_.shelf();
+        const int tree = app_.treeDatabase();
         std::optional<std::size_t> base;
-        if (tree_db_ >= 0 && static_cast<std::size_t>(tree_db_) < s.entries().size() && !s.entries()[tree_db_].source)
-            base = static_cast<std::size_t>(tree_db_);
+        if (tree >= 0 && static_cast<std::size_t>(tree) < s.entries().size() && !s.entries()[tree].source)
+            base = static_cast<std::size_t>(tree);
         for (std::size_t i = 0; i < s.entries().size() && !base; ++i)
             if (!s.entries()[i].source && s.facts(i).tree) base = i;
         if (base) {
@@ -394,17 +460,15 @@ void App::startGuess(ReplayGame game, bool chess960, std::string title, chess::C
             }
         }
     }
-    toStudyBoard();
-    openOnBoard(gameUpTo(run->game, run->from), run->from, chess960, trf("Guessing · {}", run->title), false);
-    board_back_.reset();
-    if (board_side_tab_ == 0) board_side_tab_ = 2;
-    board_.flip  = side == chess::Color::BLACK;
+    // On the Board, the game up to the position it starts from.
+    app_.replaySessionGame(gameUpTo(run->game, run->from), run->from, chess960);
+    app_.setFlip(side == chess::Color::BLACK);
     run->started = Clock::now();
     guess_       = std::move(run);
     if (!guess_->theory.valid()) askGuess();
 }
 
-void App::askGuess() {
+void GuessPage::askGuess() {
     auto& g = *guess_;
     int ply = std::max(g.from, static_cast<int>(g.book));
     if (g.phase != GuessPhase::Preparing) ply = g.ply + 1;
@@ -413,15 +477,7 @@ void App::askGuess() {
     if (ply >= static_cast<int>(g.game.moves.size())) return finishGuess(false);
     g.ply = ply;
     // The board at the question, the game's moves before it.
-    auto& b    = board_;
-    b.game     = gameUpTo(g.game, ply);
-    b.tree     = GameTree{b.game, {}};
-    b.line     = -1;
-    b.ply      = ply;
-    b.chess960 = g.chess960;
-    b.selected.reset();
-    b.move_typed.reset();
-    b.new_game = true;
+    app_.replaySessionGame(gameUpTo(g.game, ply), ply, g.chess960);
     g.game_score.reset();
     g.guess_score.reset();
     g.guess_asked = false;
@@ -439,13 +495,13 @@ void App::askGuess() {
     g.phase = GuessPhase::Asking;
 }
 
-void App::guessAnswer(chess::Move move) {
+void GuessPage::guessAnswer(chess::Move move) {
     auto& g = *guess_;
-    if (g.phase != GuessPhase::Asking || liveGameOn() || board_.ply != g.ply) return;
+    if (g.phase != GuessPhase::Asking || app_.liveGameOn() || app_.sessionPly() != g.ply) return;
     const auto& played = g.game.moves[static_cast<std::size_t>(g.ply)].move;
     g.guess            = move;
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
     if (move == played) {
         GuessRun::Guess r;
         r.ply   = g.ply;
@@ -470,7 +526,7 @@ void App::guessAnswer(chess::Move move) {
     pollGuess();
 }
 
-void App::pollGuess() {
+void GuessPage::pollGuess() {
     auto& g = *guess_;
     g.engine.poll();
     if (g.phase == GuessPhase::Preparing) {
@@ -497,12 +553,12 @@ void App::pollGuess() {
     }
     if (g.phase == GuessPhase::Checking && g.game_score && g.guess_score) guessScored();
     // The game goes on by itself after a moment, unless the mouse is on the score.
-    const int advance = trainingSettings().advance_ms;
+    const int advance = app_.trainingSettings().advance_ms;
     if (g.phase == GuessPhase::Shown && advance > 0 && !g.hovered && since(g.shown_at) * 1000 >= advance + 1500)
         guessAdvance();
 }
 
-void App::guessScored() {
+void GuessPage::guessScored() {
     auto& g = *guess_;
     GuessRun::Guess r;
     r.ply         = g.ply;
@@ -517,26 +573,20 @@ void App::guessScored() {
     g.shown_at = Clock::now();
 }
 
-void App::guessAdvance() {
+void GuessPage::guessAdvance() {
     auto& g = *guess_;
     if (g.phase != GuessPhase::Shown) return;
     askGuess();
 }
 
-void App::finishGuess(bool stopped) {
+void GuessPage::finishGuess(bool stopped) {
     auto& g   = *guess_;
     g.phase   = GuessPhase::End;
     g.stopped = stopped;
     g.took    = since(g.started);
     g.engine.stop();
-    board_.selected.reset();
-    board_.move_typed.reset();
     // The whole game on the board, to read it again.
-    auto& b    = board_;
-    b.game     = g.game;
-    b.tree     = GameTree{b.game, {}};
-    b.ply      = std::min<int>(g.ply, static_cast<int>(b.game.moves.size()));
-    b.new_game = true;
+    app_.replaySessionGame(g.game, std::min<int>(g.ply, static_cast<int>(g.game.moves.size())), g.chess960);
     if (g.guesses.empty()) return;
     GuessRecord r;
     r.at    = epochNow();
@@ -552,40 +602,33 @@ void App::finishGuess(bool stopped) {
     r.loss /= std::max(1, r.moves);
     guess_last_      = r;
     guess_last_read_ = true;
-    if (!options_.scripted) appendGuessRecord(guessFolder(), r);
+    if (!app_.scripted()) appendGuessRecord(guessFolder(), r);
 }
 
-void App::closeGuess(bool to_training) {
+void GuessPage::closeGuess(bool to_training) {
     if (!guess_) return;
-    if (to_training) {
-        review_running_ = false;
-        review_chain_.clear();
-    }
-    const bool aside = guess_->aside, flip = guess_->flip;
-    board_side_tab_ = guess_->tab;
+    if (to_training) app_.stopReview();
+    BoardTaken taken;
+    taken.aside = guess_->aside;
+    taken.flip  = guess_->flip;
+    taken.tab   = guess_->tab;
     guess_.reset();
-    forget_board_game_ = true;
-    if (aside && !recent_games_.empty())
-        restoreRecentGame(0);
-    else
-        newBoardGame();
-    forget_board_game_ = false;
-    board_.flip        = flip;
-    board_back_.reset();
-    page_ = to_training ? Page::Training : Page::Board;
+    app_.giveBoardBack(taken, to_training);  // the game's position is no game to remember
 }
 
-void App::dropGuess() {
-    board_.flip     = guess_->flip;
-    board_side_tab_ = guess_->tab;
+void GuessPage::dropGuess() {
+    BoardTaken taken;
+    taken.aside = guess_->aside;
+    taken.flip  = guess_->flip;
+    taken.tab   = guess_->tab;
     guess_.reset();
-    forget_board_game_ = true;
+    app_.leaveBoard(taken);  // the game that comes takes the board; the one put aside stays among the recent ones
 }
 
 // ---------------------------------------------------------------------------
 // The Board page during a game guessed
 
-void App::guessKeys() {
+void GuessPage::guessKeys() {
     auto& g        = *guess_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
@@ -605,8 +648,8 @@ void App::guessKeys() {
         case GuessPhase::Asking:
             if (escape)
                 finishGuess(true);
-            else if (!liveGameOn())
-                boardMoveKeys();
+            else if (!app_.liveGameOn())
+                app_.moveKeys();
             break;
         case GuessPhase::Shown:
             if (escape)
@@ -616,29 +659,26 @@ void App::guessKeys() {
             break;
         case GuessPhase::End: {
             // The whole game, a move at a time.
-            auto& b     = board_;
-            const int n = static_cast<int>(b.game.moves.size());
+            const int n   = static_cast<int>(app_.sessionGame().moves.size());
+            const int ply = app_.sessionPly();
             if (escape || enter) {
                 closeGuess(true);
             } else if (plain && ImGui::IsKeyPressed(ImGuiKey_LeftArrow, true)) {
-                b.ply = std::max(0, b.ply - 1);
+                app_.showSessionPly(std::max(0, ply - 1));
             } else if (plain && ImGui::IsKeyPressed(ImGuiKey_RightArrow, true)) {
-                b.ply = std::min(n, b.ply + 1);
+                app_.showSessionPly(std::min(n, ply + 1));
             } else if (plain && ImGui::IsKeyPressed(ImGuiKey_Home, false)) {
-                b.ply = 0;
+                app_.showSessionPly(0);
             } else if (plain && ImGui::IsKeyPressed(ImGuiKey_End, false)) {
-                b.ply = n;
+                app_.showSessionPly(n);
             }
             break;
         }
     }
 }
 
-void App::drawGuessPage() {
-    ui::pageTitle(TR("Board"), guideSection());
-    if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        !SDL_TextInputActive(window_))
-        SDL_StartTextInput(window_);
+void GuessPage::drawGuessPage() {
+    app_.beginSessionPage();
     guessKeys();
     if (!guess_) return;
     auto& g            = *guess_;
@@ -675,64 +715,35 @@ void App::drawGuessPage() {
     ImGui::EndChild();
 }
 
-void App::drawGuessBoard(float size) {
-    auto& b          = board_;
+void GuessPage::drawGuessBoard(float size) {
     auto& g          = *guess_;
-    const auto board = boardAt(b.game, b.chess960, b.ply);
-    BoardDecor decor;
-    decor.flipped    = b.flip;
-    decor.eval_white = -1.0f;
-    if (b.ply > 0 && b.ply <= static_cast<int>(b.game.moves.size()))
-        decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
+    const int ply    = app_.sessionPly();
+    const auto board = boardAt(app_.sessionGame(), g.chess960, ply);
+    BoardDecor marks;  // the arrows of the guess's: the Board adds the rest
     const GuessRun::Guess* shown = nullptr;
     if (g.phase == GuessPhase::Shown && !g.guesses.empty()) shown = &g.guesses.back();
     if (g.phase == GuessPhase::End && g.shown_guess >= 0 && g.shown_guess < static_cast<int>(g.guesses.size()))
         shown = &g.guesses[static_cast<std::size_t>(g.shown_guess)];
     if (g.phase == GuessPhase::Checking && g.guess != chess::Move::NO_MOVE)
-        decor.arrows.push_back({g.guess, markColour('B', false)});
-    if (shown && b.ply == shown->ply) {
+        marks.arrows.push_back({g.guess, markColour('B', false)});
+    if (shown && ply == shown->ply) {
         try {
             const auto game = chess::uci::uciToMove(board, shown->game);
             if (!shown->same)
-                decor.arrows.push_back({chess::uci::uciToMove(board, shown->guess), markColour('B', false)});
-            decor.arrows.push_back({game, markColour('G', false)});
+                marks.arrows.push_back({chess::uci::uciToMove(board, shown->guess), markColour('B', false)});
+            marks.arrows.push_back({game, markColour('G', false)});
         } catch (const std::exception&) {
         }
     }
-    const bool moves = g.phase == GuessPhase::Asking && b.ply == g.ply && !liveGameOn();
-    decor.selected   = moves ? b.selected : std::nullopt;
-    if (decor.selected)
-        for (const auto& m : movesFrom(board, *decor.selected)) decor.targets.push_back(shownTarget(m));
-    const bool dragging = moves && b.drag && b.drag->moved && b.selected == b.drag->from;
-    if (dragging) {
-        decor.lifted = b.drag->from;
-        if (b.drag_over && std::find(decor.targets.begin(), decor.targets.end(), *b.drag_over) != decor.targets.end())
-            decor.drop = b.drag_over;
-    }
-    const ImVec2 top = ImGui::GetCursorScreenPos();
-    if (appearance::current().board3d.on && board3d_.available()) {
-        board3d_.setMarks(Board3d::Marks::Off);
-        const auto input = board3d_.draw(board, size, decor);
-        if (moves) boardPointer(board, input.clicked, input.hovered, input.right_click);
-    } else {
-        if (!appearance::current().board3d.on) board3d_.release();
-        drawBoard(atlas_, board, size, decor);
-        const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
-        if (moves) {
-            const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
-                       right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
-            boardPointer(board, left ? hover : std::nullopt, hover, right);
-            if (dragging && b.drag) drawDraggedPiece(atlas_, board.at(b.drag->from), size);
-        }
-    }
-    drawPromotionPopup(board);
+    const bool moves = g.phase == GuessPhase::Asking && ply == g.ply && !app_.liveGameOn();
+    app_.drawSessionBoard(size, marks, moves);
 }
 
-void App::drawGuessColumn() {
+void GuessPage::drawGuessColumn() {
     auto& g = *guess_;
     const ui::TopicRegion topic(guide::topics::GuessMoves);
-    if (liveGameOn()) {  // fair play (#48): the engine is silent during a live game; the guessing waits
-        drawFairPlayBanner();
+    if (app_.liveGameOn()) {  // fair play (#48): the engine is silent during a live game; the guessing waits
+        app_.drawFairPlayBanner();
         if (ImGui::Button(TR("Stop · Esc"))) finishGuess(true);
         return;
     }
@@ -811,7 +822,7 @@ void App::drawGuessColumn() {
                 wrapped(trf("{}: {} weighs it against the game's move…", numbered(before, g.guess), g.engine_name));
             } else {
                 wrapped(TR("Guess the move played in the game. Play on the board, or type it and press Enter."), true);
-                drawMoveField();
+                app_.drawMoveField();
             }
             if (ImGui::Button(TR("Stop · Esc"))) finishGuess(true);
             ImGui::PopTextWrapPos();
@@ -828,7 +839,7 @@ void App::drawGuessColumn() {
                 break;
             }
             ImGui::SameLine(0, px(8));
-            const int advance = trainingSettings().advance_ms;
+            const int advance = app_.trainingSettings().advance_ms;
             ImGui::TextDisabled("%s", advance > 0
                                           ? trf("Enter, or on its own after {} s", (advance + 1500) / 1000.0).c_str()
                                           : TR("Enter"));
@@ -881,7 +892,7 @@ void App::drawGuessColumn() {
         true);
 }
 
-void App::drawGuessEnd() {
+void GuessPage::drawGuessEnd() {
     auto& g = *guess_;
     ui::inlineIcon(ui::Icon::Check, ui::GOOD);
     ImGui::SameLine();
@@ -933,7 +944,7 @@ void App::drawGuessEnd() {
                 ImGui::PushID(static_cast<int>(i));
                 if (ImGui::Selectable(label.c_str(), g.shown_guess == static_cast<int>(i))) {
                     g.shown_guess = static_cast<int>(i);
-                    board_.ply    = r.ply;
+                    app_.showSessionPly(r.ply);
                 }
                 ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10),
                                          ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(said.c_str()).x));

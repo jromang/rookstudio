@@ -132,6 +132,7 @@ class AppContext;
 class AssistantService;
 class BoardSession;
 class EngineOracle;
+class GuessPage;
 class LichessArenasPage;
 class LichessBotPage;
 class LichessTvPage;
@@ -1023,18 +1024,21 @@ class App {
     // Puzzles (#80, mockup M12, board 1): a module of its own (puzzles_page.hpp, #107), made by initChessModules():
     // Lichess's database offline, the batch online, the user's puzzles and their results by theme, the Training page's
     // Puzzles part, a series on the Board page (a training session, below). The Training page, the day's review and
-    // the endgames' mates reach it directly; the guessing's part through its hook: a series holds the Board.
+    // the endgames' mates reach it directly.
     std::unique_ptr<PuzzlesPage> puzzles_;
-    [[nodiscard]] bool puzzleSeriesOn() const;
+
+    // Guessing the moves (#81, mockup M12, board 2): a module of its own (guess_page.hpp, #107), made by
+    // initChessModules(): the Training page's part "Guess the moves", a game guessed on the Board page (a training
+    // session, below). The Training page and the Home page reach it directly.
+    std::unique_ptr<GuessPage> guessing_;
 
     // The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, whatever its
     // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
     // The kinds still in App answer through sessions of App's own (OwnSession, app_chess.cpp), made by
-    // initChessModules(); a kind in a module of its own is its own session (the puzzles'), and takes the Board through
-    // context::SessionBoard (app_context.hpp).
+    // initChessModules(); a kind in a module of its own is its own session (the puzzles', a game guessed), and takes
+    // the Board through context::SessionBoard (app_context.hpp).
     class OwnSession;
-    std::unique_ptr<BoardSession> training_session_, mistake_session_, guess_session_, endgame_session_,
-        vision_session_;
+    std::unique_ptr<BoardSession> training_session_, mistake_session_, endgame_session_, vision_session_;
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
     // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
     // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
@@ -1046,11 +1050,10 @@ class App {
     void closeBoardSession();
     [[nodiscard]] const char* sessionGuideTopic() const;
 
-    // Your mistakes as exercises and guessing the moves (#81, mockup M12, board 2; mistakes.hpp, view_mistakes.cpp,
-    // view_guess.cpp). The user's names (Settings › Your names, and the linked Lichess account's); the exercises their
-    // reviewed games give, looked for in the background when the databases, the names or the reviews change; the latest
-    // of their games without a review reviewed in the background; a session of exercises, or a game guessed, on the
-    // Board page.
+    // Your mistakes as exercises (#81, mockup M12, board 2; mistakes.hpp, view_mistakes.cpp). The user's names
+    // (Settings › Your names, and the linked Lichess account's); the exercises their reviewed games give, looked for in
+    // the background when the databases, the names or the reviews change; the latest of their games without a review
+    // reviewed in the background; a session of exercises on the Board page.
     std::vector<std::string> player_names_;  // settings.json "player_names"
     std::array<char, 96> player_name_input_{};
     [[nodiscard]] std::vector<std::string> userNames() const;  // the user's, with the linked Lichess account's
@@ -1059,7 +1062,6 @@ class App {
     std::optional<MistakeRecord> mistake_record_;
     MistakeRecord& mistakeRecord();
     [[nodiscard]] std::filesystem::path mistakesFolder() const { return storage_.root() / "mistakes"; }
-    [[nodiscard]] std::filesystem::path guessFolder() const { return storage_.root() / "guess"; }
     void saveMistakeRecord();
     struct MistakeScanJob {
         std::string of;
@@ -1125,45 +1127,6 @@ class App {
     void drawMistakeEnd();
     void drawTrainingMistakes();    // the Training page's part
     void drawMistakeReviewsCard();  // the games without a review, reviewed in the background
-    // Guessing the moves: the Training page's part, a game on the Board page.
-    int guess_source_  = -1;    // the database a game is drawn from (the shelf's index); -1 the first of the user's
-    int guess_side_    = 0;     // 0 White, 1 Black
-    int guess_elo_     = 0;     // both players at least
-    std::array<char, 96> guess_words_{};  // the quick filter's words: players, event, an ECO code, a year
-    // A game drawn at random from the database and the filter chosen, in the background (a large database's filter
-    // takes a moment).
-    struct GuessPick {
-        std::optional<ReplayGame> game;
-        bool chess960 = false;
-        std::string title;
-        std::filesystem::path folder;
-        uint64_t id = 0;
-        std::string error;  // "none": no game passes the filter; "short": none long enough
-    };
-    std::future<GuessPick> guess_pick_;
-    chess::Color guess_pick_side_ = chess::Color::WHITE;
-    std::optional<GuessRecord> guess_last_;
-    bool guess_last_read_ = false;
-    std::string guess_error_;
-    std::unique_ptr<GuessRun> guess_;
-    void drawTrainingGuess();
-    void pollGuess();         // each frame: the theory looked for, the searches after the game's move and the guess
-    bool startGuessRandom();  // a game of the chosen database and filter, drawn in the background
-    void startGuessBoard();   // the Board page's game, from the position shown, for the side to move
-    void startGuess(ReplayGame game, bool chess960, std::string title, chess::Color side, int from,
-                    std::optional<std::pair<std::filesystem::path, uint64_t>> origin);
-    void askGuess();  // the next question, or the end
-    void guessAnswer(chess::Move move);
-    void guessScored();   // both searches back: the points
-    void guessAdvance();  // the game's move and the reply played, the next question
-    void finishGuess(bool stopped);
-    void closeGuess(bool to_training);
-    void dropGuess();
-    void guessKeys();
-    void drawGuessPage();
-    void drawGuessBoard(float size);
-    void drawGuessColumn();
-    void drawGuessEnd();
 
     // Endgames against the tablebases, mates, board vision (#82, mockup M12, board 3; endgames.hpp, vision.hpp,
     // syzygy_download.hpp; view_endgames.cpp, view_vision.cpp): the Training page's Endgames and Vision parts, a

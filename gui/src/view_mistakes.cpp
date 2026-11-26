@@ -449,17 +449,6 @@ void App::pollMistakes() {
             }
         }
     }
-    // A game drawn at random for guessing.
-    if (guess_pick_.valid() && guess_pick_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto pick = guess_pick_.get();
-        if (pick.game)
-            startGuess(std::move(*pick.game), pick.chess960, std::move(pick.title), guess_pick_side_, 0,
-                       std::make_pair(pick.folder, pick.id));
-        else
-            guess_error_ = pick.error == "none" ? TR("No game of this database passes the filter.")
-                                                : TR("No game long enough passes the filter.");
-    }
-    if (guess_) pollGuess();
 }
 
 // ---------------------------------------------------------------------------

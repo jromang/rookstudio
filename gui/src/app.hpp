@@ -3613,6 +3613,14 @@ class App {
     };
     void drawPalette();
     [[nodiscard]] std::vector<PaletteEntry> paletteEntries();
+    // RookStudio's entries, out of paletteEntries() (view_palette_chess.cpp, #108): made with its add(label, where,
+    // run) and page(p), each where it was among fastchess-gui's.
+    using PaletteAdd  = std::function<void(std::string, std::string, std::function<void()>)>;
+    using PalettePage = std::function<std::function<void()>(Page)>;
+    void addEndgameCheckCommands(const PaletteAdd& add, const tour::TournamentState* t, const std::string& name);
+    void addAnalysisCommands(const PaletteAdd& add);
+    void addNotationCommands(const PaletteAdd& add);
+    void addChessCommands(const PaletteAdd& add, const PalettePage& page);
     [[nodiscard]] const char* guideSection() const;  // the guide's topic of the page and tab shown
     void toggleGuide();                              // F1
     bool palette_request_ = false;                   // opens on the next frame (Ctrl+K, --focus palette)

@@ -3613,6 +3613,14 @@ class App {
     };
     void drawPalette();
     [[nodiscard]] std::vector<PaletteEntry> paletteEntries();
+    // RookStudio's entries, out of paletteEntries() (view_palette_chess.cpp, #108): made with its add(label, where,
+    // run) and page(p), each where it was among fastchess-gui's.
+    using PaletteAdd  = std::function<void(std::string, std::string, std::function<void()>)>;
+    using PalettePage = std::function<std::function<void()>(Page)>;
+    void addEndgameCheckCommands(const PaletteAdd& add, const tour::TournamentState* t, const std::string& name);
+    void addAnalysisCommands(const PaletteAdd& add);
+    void addNotationCommands(const PaletteAdd& add);
+    void addChessCommands(const PaletteAdd& add, const PalettePage& page);
     [[nodiscard]] const char* guideSection() const;  // the guide's topic of the page and tab shown
     void toggleGuide();                              // F1
     bool palette_request_ = false;                   // opens on the next frame (Ctrl+K, --focus palette)
@@ -4001,6 +4009,11 @@ class App {
     void drawSubmissionChecklist();  // in the overview of a finished tournament
 
     void handleDialogs();
+    // RookStudio's parts of frame() and handleDialogs(), out of them (app_chess.cpp, #108): the polls of its pages and
+    // jobs; its --focus words, tried before fastchess-gui's (false: the word is not one of them); its dialogs' files.
+    void pollChess();
+    [[nodiscard]] bool applyChessFocusWord(const std::string& w);
+    void handleChessDialog(const Dialogs::Answer& answer);
     void saveSetupSoon() { setup_dirty_ = true; }
 
     SDL_Window* window_;

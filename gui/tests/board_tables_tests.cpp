@@ -105,7 +105,7 @@ struct Tables {
 
 lichess::Tablebase asked(const char* fen) {
     auto a = lichess::tablebase(fen);
-    REQUIRE_MESSAGE(a.value, a.error);
+    REQUIRE_MESSAGE(a.value, lichess::describe(a));
     sortTableMoves(*a.value);
     return *a.value;
 }

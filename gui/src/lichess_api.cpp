@@ -13,22 +13,6 @@ namespace fcg::lichess {
 
 namespace {
 
-std::string reason(const HttpResult& r) {
-    if (r.status == 0) return r.error.empty() ? std::string("Lichess did not answer") : r.error;
-    if (r.status == 401) return "Lichess asks for a linked account";
-    if (r.status == 429) return "Lichess asks to wait a minute: too many requests";
-    return fmt::format("Lichess answered {}", r.status);
-}
-
-HttpRequest get(std::string url, std::string token = {}) {
-    HttpRequest r;
-    r.url    = std::move(url);
-    r.method = "GET";
-    r.token  = std::move(token);
-    r.headers.emplace_back("Accept", "application/json");
-    return r;
-}
-
 std::optional<int> intOf(const nlohmann::json& j, const char* key) {
     const auto it = j.find(key);
     if (it == j.end() || !it->is_number_integer()) return std::nullopt;
@@ -51,17 +35,6 @@ Outcome outcomeOf(std::string_view c) {
     if (c == "blessed-loss") return Outcome::BlessedLoss;
     if (c == "loss" || c == "syzygy-loss") return Outcome::Loss;
     return Outcome::Unknown;
-}
-
-// Reads a body as JSON into `a` with `read`; a body that is not what Lichess sends says so.
-template <typename T, typename Read>
-void readInto(Answer<T>& a, const std::string& body, Read&& read) {
-    try {
-        a.value = read(nlohmann::json::parse(body));
-    } catch (const std::exception& e) {
-        a.value.reset();
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
 }
 
 ExplorerGame gameOf(const nlohmann::json& g) {
@@ -149,17 +122,15 @@ std::string urlEncode(std::string_view value) {
 }
 
 Answer<CloudEval> cloudEval(std::string_view fen, int lines, const std::atomic<bool>* cancel) {
-    Answer<CloudEval> a;
-    const auto r = politeRequest(
-        get(fmt::format("{}/api/cloud-eval?fen={}&multiPv={}", servers().api, urlEncode(fen), std::clamp(lines, 1, 5))),
-        cancel);
-    a.status = r.status;
-    if (r.status == 404) return a;  // not in the cloud
-    if (r.status != 200) {
-        a.error = reason(r);
+    const auto r = send(request("GET", fmt::format("{}/api/cloud-eval?fen={}&multiPv={}", servers().api, urlEncode(fen),
+                                                   std::clamp(lines, 1, 5))),
+                        cancel);
+    if (r.net == NetError::NotFound) {  // not in the cloud: nothing, and nothing wrong
+        Answer<CloudEval> a;
+        a.status = r.status;
         return a;
     }
-    readInto(a, r.body, [](const nlohmann::json& j) {
+    return readAnswer<CloudEval>(r, [](const nlohmann::json& j) {
         CloudEval e;
         e.depth  = intOf(j, "depth").value_or(0);
         e.knodes = countOf(j, "knodes");
@@ -173,62 +144,51 @@ Answer<CloudEval> cloudEval(std::string_view fen, int lines, const std::atomic<b
         }
         return e;
     });
-    return a;
 }
 
 Answer<std::vector<std::string>> tablebaseMainline(std::string_view fen, const std::atomic<bool>* cancel) {
-    Answer<std::vector<std::string>> a;
-    const auto r =
-        politeRequest(get(fmt::format("{}/standard/mainline?fen={}", servers().tablebase, urlEncode(fen))), cancel);
-    a.status = r.status;
-    if (r.status != 200) {
-        a.error = reason(r);
-        return a;
-    }
-    readInto(a, r.body, [](const nlohmann::json& j) {
-        std::vector<std::string> moves;
-        for (const auto& m : j.at("mainline")) moves.push_back(textOf(m, "uci"));
-        return moves;
-    });
-    return a;
+    return call<std::vector<std::string>>(
+        request("GET", fmt::format("{}/standard/mainline?fen={}", servers().tablebase, urlEncode(fen))),
+        [](const nlohmann::json& j) {
+            std::vector<std::string> moves;
+            for (const auto& m : j.at("mainline")) moves.push_back(textOf(m, "uci"));
+            return moves;
+        },
+        cancel);
 }
 
 Answer<Tablebase> tablebase(std::string_view fen, const std::atomic<bool>* cancel) {
-    Answer<Tablebase> a;
     // dtc=auxiliary: the op1 tables answer their 8-piece positions only when asked so (the server's default is
     // "never", though its documentation says otherwise: checked against tablebase.lichess.ovh on 2026-11-24).
-    const auto r = politeRequest(
-        get(fmt::format("{}/standard?fen={}&dtc=auxiliary", servers().tablebase, urlEncode(fen))), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = reason(r);
-        return a;
-    }
-    readInto(a, r.body, [](const nlohmann::json& j) {
-        Tablebase t;
-        t.outcome               = outcomeOf(textOf(j, "category"));
-        t.dtz                   = intOf(j, "dtz");
-        t.dtm                   = intOf(j, "dtm");
-        t.dtc                   = intOf(j, "dtc");
-        t.checkmate             = j.value("checkmate", false);
-        t.stalemate             = j.value("stalemate", false);
-        t.insufficient_material = j.value("insufficient_material", false);
-        for (const auto& m : j.at("moves")) {
-            TablebaseMove move;
-            move.uci       = textOf(m, "uci");
-            move.san       = textOf(m, "san");
-            move.outcome   = outcomeOf(textOf(m, "category"));
-            move.dtz       = intOf(m, "dtz");
-            move.dtm       = intOf(m, "dtm");
-            move.dtc       = intOf(m, "dtc");
-            move.zeroing   = m.value("zeroing", false);
-            move.checkmate = m.value("checkmate", false);
-            move.stalemate = m.value("stalemate", false);
-            t.moves.push_back(std::move(move));
-        }
-        return t;
-    });
-    return a;
+    const auto asked =
+        request("GET", fmt::format("{}/standard?fen={}&dtc=auxiliary", servers().tablebase, urlEncode(fen)));
+    return call<Tablebase>(
+        asked,
+        [](const nlohmann::json& j) {
+            Tablebase t;
+            t.outcome               = outcomeOf(textOf(j, "category"));
+            t.dtz                   = intOf(j, "dtz");
+            t.dtm                   = intOf(j, "dtm");
+            t.dtc                   = intOf(j, "dtc");
+            t.checkmate             = j.value("checkmate", false);
+            t.stalemate             = j.value("stalemate", false);
+            t.insufficient_material = j.value("insufficient_material", false);
+            for (const auto& m : j.at("moves")) {
+                TablebaseMove move;
+                move.uci       = textOf(m, "uci");
+                move.san       = textOf(m, "san");
+                move.outcome   = outcomeOf(textOf(m, "category"));
+                move.dtz       = intOf(m, "dtz");
+                move.dtm       = intOf(m, "dtm");
+                move.dtc       = intOf(m, "dtc");
+                move.zeroing   = m.value("zeroing", false);
+                move.checkmate = m.value("checkmate", false);
+                move.stalemate = m.value("stalemate", false);
+                t.moves.push_back(std::move(move));
+            }
+            return t;
+        },
+        cancel);
 }
 
 Trend trendOf(const std::vector<ExplorerMonth>& history) {
@@ -243,21 +203,15 @@ Trend trendOf(const std::vector<ExplorerMonth>& history) {
 }
 
 Answer<std::string> mastersGame(const std::string& id, const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    auto request                  = get(servers().explorer + "/masters/pgn/" + urlEncode(id), token);
-    request.headers.back().second = "application/x-chess-pgn";
-    const auto r                  = politeRequest(request, cancel);
-    a.status                      = r.status;
-    if (r.status != 200) {
-        a.error = r.status == 404 ? std::string("Lichess has no such game") : reason(r);
-        return a;
-    }
-    a.value = r.body;
+    const auto r = send(
+        request("GET", servers().explorer + "/masters/pgn/" + urlEncode(id), token, "application/x-chess-pgn"), cancel);
+    auto a  = failedWith<std::string>(r);
+    a.asked = Asked::Game;
+    if (!r.failed()) a.value = r.body;
     return a;
 }
 
 Answer<Explorer> explorer(const ExplorerQuery& q, const std::atomic<bool>* cancel) {
-    Answer<Explorer> a;
     std::string url = servers().explorer;
     switch (q.source) {
         case ExplorerSource::Masters:
@@ -283,16 +237,7 @@ Answer<Explorer> explorer(const ExplorerQuery& q, const std::atomic<bool>* cance
     }
     if (!q.since.empty()) url += "&since=" + urlEncode(q.since);
     if (!q.until.empty()) url += "&until=" + urlEncode(q.until);
-    if (q.source != ExplorerSource::Player) {
-        const auto r = politeRequest(get(url, q.token), cancel);
-        a.status     = r.status;
-        if (r.status != 200) {
-            a.error = reason(r);
-            return a;
-        }
-        readInto(a, r.body, explorerOf);
-        return a;
-    }
+    if (q.source != ExplorerSource::Player) return call<Explorer>(request("GET", url, q.token), explorerOf, cancel);
     // A player's games are counted as they are read: each line the answer so far, the last one whole.
     std::string last;
     LineSplitter lines([&](std::string_view line) {
@@ -300,24 +245,15 @@ Answer<Explorer> explorer(const ExplorerQuery& q, const std::atomic<bool>* cance
         return true;
     });
     HttpStream stream;
-    stream.on_head = [&](int status, std::string_view) {
-        a.status = status;
-        return status == 200;
-    };
-    stream.on_data                = [&](std::string_view data) { return lines.feed(data); };
-    stream.cancel                 = cancel;
-    auto request                  = get(url, q.token);
-    request.headers.back().second = "application/x-ndjson";
-    const auto r                  = politeStream(request, stream);
+    stream.on_head   = [](int status, std::string_view) { return status == 200; };
+    stream.on_data   = [&](std::string_view data) { return lines.feed(data); };
+    stream.cancel    = cancel;
+    const auto asked = request("GET", url, q.token, "application/x-ndjson");
+    auto r           = responseOf(asked, politeStream(asked, stream));
     lines.flush();
-    if (a.status != 200 || !r.error.empty()) {
-        HttpResult failed = r;
-        failed.status     = a.status;
-        a.error           = a.status == 200 ? r.error : reason(failed);
-        return a;
-    }
-    readInto(a, last, explorerOf);
-    return a;
+    if (!r.failed() && r.status != 200) r.net = NetError::Server;  // another 2xx: not the stream asked for
+    r.body = std::move(last);
+    return readAnswer<Explorer>(r, explorerOf);
 }
 
 }  // namespace fcg::lichess

@@ -1073,8 +1073,11 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
             pause.count() > 0
                 ? trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {} s.",
                       std::chrono::duration_cast<std::chrono::seconds>(pause).count())
+            : a.net == lichess::NetError::Offline
+                ? std::string(TR("Lichess did not answer: asked again in a minute. The local databases answer as "
+                                 "always."))
                 : trf("Lichess did not answer ({}): asked again in a minute. The local databases answer as always.",
-                      a.error);
+                      lichess::describe(a));
         // Asked again after a minute, or at once in another position: never in a loop.
         if (ImGui::GetTime() - explorer_failed_[key] > 60) {
             explorer_answers_.erase(found);
@@ -1194,7 +1197,7 @@ void App::drawTreeGames() {
                 if (ply < n) board.makeMove(b.game.moves[static_cast<std::size_t>(ply)].move);
             }
         } else {
-            explorer_game_error_ = answer.error;
+            explorer_game_error_ = lichess::describe(answer);
         }
     }
     if (tree_games_.empty() || !lichess_account_) return;

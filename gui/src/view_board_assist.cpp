@@ -224,7 +224,7 @@ void App::updateReviewTables() {
         review_tables_once_    = false;
         review_tables_not_now_ = false;
         review_tables_started_ = false;
-        review_tables_error_.clear();
+        review_tables_error_   = {};
         review_tables_positions_.clear();
         review_tables_line_.reset();
         if (!key.empty()) {
@@ -271,10 +271,10 @@ void App::drawReviewTables() {
                                       review_tables_job_->done->load(), review_tables_job_->total)
                                       .c_str());
     } else if (review_tables_taught_ > 0) {
-        if (!review_tables_error_.empty())
+        if (review_tables_error_.failed())
             ImGui::TextDisabled("%s", trf("Lichess's tables could not be asked to the end ({}): the engine judged the "
                                           "moves they did not answer for.",
-                                          review_tables_error_)
+                                          lichess::describe(review_tables_error_))
                                           .c_str());
         else
             ImGui::TextDisabled("%s", trn("The endgame judged by Lichess's tables: {} position of seven pieces or "

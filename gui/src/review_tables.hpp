@@ -36,10 +36,10 @@ struct TablePosition {
                                                         const commentary::Tablebases& tables);
 
 // Asks Lichess about `positions` one at a time, those the profile kept answers for read from it, and teaches `tables`
-// each answer as it comes; `done` counts the positions dealt with. The error that stopped it, empty when it went to the
-// end or `cancel` stopped it.
-[[nodiscard]] std::string askTables(const std::vector<TablePosition>& positions, const commentary::MainLine& line,
-                                    const std::filesystem::path& profile, commentary::Tablebases& tables,
-                                    const std::atomic<bool>& cancel, std::atomic<int>& done);
+// each answer as it comes; `done` counts the positions dealt with. The failure that stopped it, none when it went to
+// the end or `cancel` stopped it.
+[[nodiscard]] lichess::Failure askTables(const std::vector<TablePosition>& positions, const commentary::MainLine& line,
+                                         const std::filesystem::path& profile, commentary::Tablebases& tables,
+                                         const std::atomic<bool>& cancel, std::atomic<int>& done);
 
 }  // namespace fcg

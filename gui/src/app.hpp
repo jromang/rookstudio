@@ -3440,7 +3440,7 @@ class App {
         std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
         std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
         int total                                 = 0;
-        std::future<std::string> finished;  // why it stopped early, empty when it went to the end
+        std::future<lichess::Failure> finished;  // why it stopped early, none when it went to the end
     };
     std::optional<ReviewTablesJob> review_tables_job_;
     std::shared_ptr<commentary::Tablebases> review_tables_;  // what they were taught, for review_tables_of_
@@ -3451,7 +3451,7 @@ class App {
     bool review_tables_started_ = false;                              // asked for this game already
     bool review_tables_once_    = false;                              // asked for this game, without « Always »
     bool review_tables_not_now_ = false;                              // not asked for this game
-    std::string review_tables_error_;
+    lichess::Failure review_tables_error_;
     void updateReviewTables();  // a new game's tables; the asking started when allowed, its end taken
     void drawReviewTables();    // the review's line about them: the question, the asking, what they judged
     [[nodiscard]] const commentary::Tablebases* reviewTables() const;  // when taught anything

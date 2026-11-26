@@ -10,6 +10,7 @@
 #include <functional>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <thread>
@@ -705,6 +706,8 @@ class FakeServer {
     uint32_t session_channel = 0;
     std::map<uint32_t, uint64_t> adjusted;
     std::atomic_int keepalives{0};  // the client's, answered
+    // On the server's thread: what the client sent that makes no whole packet yet, a packet that went in part.
+    [[nodiscard]] std::size_t unopened() const { return in_.size(); }
 
     // For the scenarios.
     struct Failure : std::runtime_error {
@@ -1502,8 +1505,14 @@ TEST_CASE("Tunnel: 40 viewers' connections relayed at once, 40 more waiting, 40 
         // takes none of them meanwhile, nor closes them). Beyond: refused, by libssh2, before any window is given.
         for (uint32_t i = 0; i < 2 * MAX_CHANNELS + 2; ++i) openForwarded(server, 2000 + i);
         std::map<uint32_t, uint32_t> channel;
-        const auto until = std::chrono::steady_clock::now() + 2s;
-        while (std::chrono::steady_clock::now() < until) {
+        // Until each one is confirmed or refused, then a second more: none is closed meanwhile.
+        const auto until = std::chrono::steady_clock::now() + 60s;
+        std::optional<std::chrono::steady_clock::time_point> quiet;
+        while (!quiet || std::chrono::steady_clock::now() < *quiet) {
+            server.expect(std::chrono::steady_clock::now() < until, "a connection neither confirmed nor refused");
+            if (!quiet && waiting.size() + refused.size() == 2 * MAX_CHANNELS + 2) {
+                quiet = std::chrono::steady_clock::now() + 1s;
+            }
             const auto m = server.poll(50ms);
             if (!m) continue;
             Reader r(std::string_view(*m).substr(1));
@@ -1527,7 +1536,7 @@ TEST_CASE("Tunnel: 40 viewers' connections relayed at once, 40 more waiting, 40 
     tunnel.start(loopback(fingerprint(serverKey().blob)));
     CHECK(waitUntil([&] { return tunnel.status().connections == static_cast<int>(MAX_CHANNELS); }));
     relayed = true;
-    REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }));
+    REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }, 90s));
     CHECK(confirmed == static_cast<int>(MAX_CHANNELS));
     // The first 40 wait. Of the others, 40 at most wait in libssh2's queue (any of them: those that came faster than
     // the tunnel took the first ones were refused meanwhile); the rest are refused. None is closed.
@@ -2285,8 +2294,10 @@ TEST_CASE("Tunnel: a request of the server's while it reads nothing costs no pro
 TEST_CASE("Tunnel: a keepalive that went in part is sent on, though the server talks again") {
     // libssh2 sends the rest of a keepalive only from the call that sends one, and nothing else meanwhile. The tunnel
     // made that call only while the server was silent: once it talked again, nothing went until it was silent for as
-    // long again (30 s). Here every packet takes several sends, and the server talks all the time once the keepalive
-    // went in part.
+    // long again (30 s). Here every packet takes several sends. The server is silent until the keepalive's first part
+    // comes (after the tunnel's second of silence), then talks, more often than once a second, until its rest comes
+    // (libssh2 sends it 2 s later), which a tunnel waiting for the server's silence never sent. Every wait is bounded
+    // by what it awaits.
     WebServer web;
     REQUIRE(web.start(WEB_PORT).empty());
     std::atomic_bool finished{false};
@@ -2294,19 +2305,27 @@ TEST_CASE("Tunnel: a keepalive that went in part is sent on, though the server t
     std::string answer;
     FakeServer::Script script;
     script.on_air = [&](FakeServer& server) {
-        std::this_thread::sleep_for(1500ms);  // silent: a keepalive goes, in part
-        // Talking, for 3 s: the rest of the keepalive comes meanwhile (libssh2 sends it again after 2 s).
-        const auto talking = std::chrono::steady_clock::now() + 3s;
-        while (std::chrono::steady_clock::now() < talking) {
+        // Silent: the client sends nothing but its keepalive, which goes in part.
+        const auto silent = std::chrono::steady_clock::now() + 30s;
+        while (server.unopened() == 0) {
+            server.expect(!server.poll(50ms).has_value(), "unexpected message");
+            server.expect(std::chrono::steady_clock::now() < silent, "no keepalive while the server was silent");
+        }
+        server.expect(server.keepalives == 0, "the keepalive went whole");
+        // Talking until its rest comes.
+        const auto talking = std::chrono::steady_clock::now() + 30s;
+        while (server.keepalives == 0) {
             server.send(Writer().byte(IGNORE_DATA).string("x").take());
             server.expect(!server.poll(200ms).has_value(), "unexpected message");
+            server.expect(std::chrono::steady_clock::now() < talking, "the keepalive's rest never came");
         }
         keepalives_meanwhile = server.keepalives.load();
         // And a viewer, served.
         openForwarded(server, 200);
-        const auto until = std::chrono::steady_clock::now() + 10s;
+        const auto until = std::chrono::steady_clock::now() + 30s;
         uint32_t channel = 0;
-        while (std::chrono::steady_clock::now() < until) {
+        while (true) {
+            server.expect(std::chrono::steady_clock::now() < until, "the viewer was not served");
             server.send(Writer().byte(IGNORE_DATA).string("x").take());
             const auto m = server.poll(200ms);
             if (!m) continue;
@@ -2330,7 +2349,8 @@ TEST_CASE("Tunnel: a keepalive that went in part is sent on, though the server t
     settings.send_limit = 40;
     SshTunnel tunnel;
     tunnel.start(settings);
-    REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }, 20s));
+    REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }, 120s));
+    CHECK_MESSAGE(server.error.empty(), server.error);
     CHECK(keepalives_meanwhile.load() == 1);
     CHECK(answer.rfind("HTTP/1.0 200 OK", 0) == 0);
     CHECK(tunnel.status().state == TunnelState::OnAir);

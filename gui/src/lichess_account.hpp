@@ -49,9 +49,11 @@ class Callback {
     Callback();  // port() is 0 when it cannot listen
     [[nodiscard]] uint16_t port() const { return listener_.port(); }
     [[nodiscard]] std::string redirectUri() const;  // http://127.0.0.1:<port>/callback
-    struct Reply {
+    // The code and its state; or why none came: Lichess's error in `said` ("access_denied", the user's no, is
+    // Forbidden; another is Server), the wait cancelled (Cancelled) or over (TimedOut), an answer without a code
+    // (BadAnswer), no port to listen on (`error`).
+    struct Reply : Failure {
         std::string code, state;
-        std::string error;  // Lichess's ("access_denied": the user said no), or why no answer came
     };
     // Waits for the browser's request, at most `within`, or until `cancel`; the browser is shown a page that says to
     // come back to the program. Other requests (a browser's icon) are answered 404 and the wait goes on. Given the
@@ -87,20 +89,22 @@ struct TokenState {
                                        const std::atomic<bool>* cancel = nullptr);
 // The name of the account a token is for.
 [[nodiscard]] Answer<std::string> accountName(std::string_view token, const std::atomic<bool>* cancel = nullptr);
-// The token revoked: an error, empty when Lichess took it.
-[[nodiscard]] std::string revoke(std::string_view token, const std::atomic<bool>* cancel = nullptr);
+// The token revoked: no failure when Lichess took it.
+[[nodiscard]] Failure revoke(std::string_view token, const std::atomic<bool>* cancel = nullptr);
 
 // The whole question: `open` is given Lichess's page to open in the browser (false: the program could not, and shows
 // the address to copy; the wait goes on). The account's scopes are those Lichess says the token has, else those asked.
-// `username`: the account Lichess offers, for a link made again with more scopes. The user's no on Lichess's page is
-// the error LINK_REFUSED, which linkRefused() tells from every other: a token Lichess refuses after a yes (a 401 on the
-// account's name) says "refused" too, and is no refusal of the user's (#101).
+// `username`: the account Lichess offers, for a link made again with more scopes. Its failures are worded as a link's
+// (Asked::Link). The user's no on Lichess's page is Forbidden without a status (it came through the browser), which
+// linkRefused() tells from every other: a token Lichess refuses after a yes (a 401 on the account's name) is
+// Unauthorized, and is no refusal of the user's (#101); the five minutes over, TimedOut.
 [[nodiscard]] Answer<Account> link(const std::function<bool(const std::string& url)>& open,
                                    const std::vector<std::string>& scopes,
                                    std::chrono::milliseconds within = std::chrono::minutes(5),
                                    const std::atomic<bool>* cancel = nullptr, std::string_view username = {});
-inline constexpr std::string_view LINK_REFUSED = "the link was refused on Lichess";
-[[nodiscard]] inline bool linkRefused(std::string_view error) noexcept { return error == LINK_REFUSED; }
+[[nodiscard]] inline bool linkRefused(const Failure& failure) noexcept {
+    return failure.net == NetError::Forbidden && failure.status == 0;
+}
 
 // In the profile, readable and writable by its owner alone: lichess-account.json, the user's account; a Lichess bot's
 // account has its own (#85), its token apart from the user's.
@@ -109,8 +113,8 @@ inline constexpr const char* BOT_ACCOUNT_FILE = "lichess-bot.json";
 [[nodiscard]] std::optional<Account> loadAccount(const std::filesystem::path& profile, const char* file = ACCOUNT_FILE);
 // Throws std::runtime_error.
 void saveAccount(const std::filesystem::path& profile, const Account& account, const char* file = ACCOUNT_FILE);
-// Unlinks: the token revoked at Lichess, then the file removed whatever Lichess said; Lichess's error, if any.
-std::string forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel = nullptr,
-                          const char* file = ACCOUNT_FILE);
+// Unlinks: the token revoked at Lichess, then the file removed whatever Lichess said; Lichess's failure, if any.
+Failure forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel = nullptr,
+                      const char* file = ACCOUNT_FILE);
 
 }  // namespace fcg::lichess

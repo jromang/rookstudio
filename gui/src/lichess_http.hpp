@@ -59,6 +59,12 @@ struct Failure {
                          // words of a module that does not give a NetError yet; empty for the network's failures
     std::string detail;  // the network's or the reader's words, for the log and the tests: never shown
     [[nodiscard]] bool failed() const noexcept { return net != NetError::None || !error.empty(); }
+    // A problem of the program's own, in its words.
+    [[nodiscard]] static Failure own(std::string words) {
+        Failure f;
+        f.error = std::move(words);
+        return f;
+    }
 };
 
 // What a request gave: its value, or none and why. No value and no failure: the server has nothing for it (a position
@@ -77,8 +83,8 @@ template <typename T>
 }
 
 // The user-visible words of a failure, translated: a phrase without a final stop, to stand alone or within a sentence
-// ("Lichess gave nothing ({})."). Lichess's own words (`said`) are given for a refusal NetError does not name (Server).
-// None has no words.
+// ("Lichess gave nothing ({})."). Lichess's own words (`said`) are given as they are for a refusal NetError does not
+// name (Server). None has no words.
 [[nodiscard]] std::string describe(NetError net, Asked asked = Asked::Anything, int status = 0,
                                    std::string_view said = {});
 // The same for a failure as it was kept; a problem of the program's own (`error`) in its own words.
@@ -149,6 +155,16 @@ template <typename T, typename Parse>
         a.detail = e.what();
     }
     if (a.net == NetError::BadAnswer) logUnreadable(response, a.detail);
+    return a;
+}
+
+// An answer without a value for a response whose body could not be read (BadAnswer): `why` in the log.
+template <typename T>
+[[nodiscard]] Answer<T> unreadable(const Response& response, std::string why) {
+    auto a   = failedWith<T>(response);
+    a.net    = NetError::BadAnswer;
+    a.detail = std::move(why);
+    logUnreadable(response, a.detail);
     return a;
 }
 

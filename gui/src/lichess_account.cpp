@@ -74,11 +74,17 @@ void reply(net::TcpConnection& c, int status, const std::string& body) {
               body);
 }
 
-std::string reason(const HttpResult& r) {
-    if (r.status == 0) return r.error.empty() ? std::string("Lichess did not answer") : r.error;
-    if (r.status == 401) return "Lichess refused the token";
-    if (r.status == 429) return "Lichess asks to wait a minute: too many requests";
-    return fmt::format("Lichess answered {}", r.status);
+// The token of the answer to a code exchanged, and when it ends.
+Account tokenOf(const nlohmann::json& j) {
+    Account account;
+    account.token = j.at("access_token").get<std::string>();
+    if (const auto e = j.find("expires_in"); e != j.end() && e->is_number_integer())
+        account.expires =
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count() +
+            e->get<int64_t>();
+    if (account.token.empty()) throw std::runtime_error("an empty token");
+    return account;
 }
 
 }  // namespace
@@ -119,19 +125,12 @@ bool Account::has(std::string_view scope) const {
 }
 
 Answer<TokenState> testToken(std::string_view token, const std::atomic<bool>* cancel) {
-    Answer<TokenState> a;
-    HttpRequest request;
-    request.url          = servers().api + "/api/token/test";
-    request.method       = "POST";
-    request.content_type = "text/plain";
-    request.body         = std::string(token);
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = reason(r);
-        return a;
-    }
+    auto asked         = request("POST", servers().api + "/api/token/test");
+    asked.content_type = "text/plain";
+    asked.body         = std::string(token);
+    const auto r       = send(asked, cancel);
+    auto a             = failedWith<TokenState>(r);
+    if (r.failed()) return a;
     try {
         const auto j  = nlohmann::json::parse(r.body);
         const auto it = j.find(std::string(token));
@@ -151,7 +150,7 @@ Answer<TokenState> testToken(std::string_view token, const std::atomic<bool>* ca
             t.expires = e->get<int64_t>() / 1000;  // milliseconds
         a.value = std::move(t);
     } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
+        return unreadable<TokenState>(r, e.what());
     }
     return a;
 }
@@ -170,11 +169,11 @@ Callback::Reply Callback::wait(std::chrono::milliseconds within, const std::atom
     const auto deadline = std::chrono::steady_clock::now() + within;
     for (;;) {
         if (cancel && *cancel) {
-            r.error = "cancelled";
+            r.net = NetError::Cancelled;
             return r;
         }
         if (std::chrono::steady_clock::now() >= deadline) {
-            r.error = "no answer came from Lichess in time";
+            r.net = NetError::TimedOut;
             return r;
         }
         const auto fd = listener_.accept(100);
@@ -200,7 +199,7 @@ Callback::Reply Callback::wait(std::chrono::milliseconds within, const std::atom
             const auto value = equal == std::string_view::npos ? std::string() : percentDecoded(pair.substr(equal + 1));
             if (name == "code") got.code = value;
             if (name == "state") got.state = value;
-            if (name == "error") got.error = value;
+            if (name == "error") got.said = value;
             query = amp == std::string_view::npos ? std::string_view() : query.substr(amp + 1);
         }
         // An answer to another question, or another program's: refused, and the wait goes on for this one.
@@ -208,114 +207,74 @@ Callback::Reply Callback::wait(std::chrono::milliseconds within, const std::atom
             reply(c, 400, page("RookStudio", "This answer is not for the question RookStudio asked."));
             continue;
         }
-        if (got.code.empty() && got.error.empty()) got.error = "Lichess's answer has no code";
+        // Lichess's error: the user's no ("access_denied"), or another of OAuth's.
+        if (!got.said.empty()) {
+            got.net = got.said == "access_denied" ? NetError::Forbidden : NetError::Server;
+        } else if (got.code.empty()) {
+            got.net    = NetError::BadAnswer;
+            got.detail = "Lichess's answer has no code";
+        }
         reply(c, 200,
-              got.error.empty() ? page("RookStudio", "Your Lichess account is being linked: you can close this page.")
-                                : page("RookStudio", "Your Lichess account was not linked: you can close this page."));
+              !got.failed() ? page("RookStudio", "Your Lichess account is being linked: you can close this page.")
+                            : page("RookStudio", "Your Lichess account was not linked: you can close this page."));
         return got;
     }
 }
 
 Answer<Account> exchange(std::string_view code, const Pkce& pkce, std::string_view redirect_uri,
                          const std::atomic<bool>* cancel) {
-    Answer<Account> a;
-    HttpRequest request;
-    request.url          = servers().api + "/api/token";
-    request.method       = "POST";
-    request.content_type = "application/x-www-form-urlencoded";
-    request.body         = formEncode({{"grant_type", "authorization_code"},
-                                       {"code", std::string(code)},
-                                       {"code_verifier", pkce.verifier},
-                                       {"redirect_uri", std::string(redirect_uri)},
-                                       {"client_id", CLIENT_ID}});
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = r.status == 400 ? "Lichess did not take the code" : reason(r);
-        return a;
-    }
-    try {
-        const auto j = nlohmann::json::parse(r.body);
-        Account account;
-        account.token = j.at("access_token").get<std::string>();
-        if (const auto e = j.find("expires_in"); e != j.end() && e->is_number_integer())
-            account.expires =
-                std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-                    .count() +
-                e->get<int64_t>();
-        if (account.token.empty()) throw std::runtime_error("an empty token");
-        a.value = std::move(account);
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
+    const Form fields = {{"grant_type", "authorization_code"},
+                         {"code", std::string(code)},
+                         {"code_verifier", pkce.verifier},
+                         {"redirect_uri", std::string(redirect_uri)},
+                         {"client_id", CLIENT_ID}};
+    auto a            = call<Account>(withForm(request("POST", servers().api + "/api/token"), fields), tokenOf, cancel);
+    a.asked           = Asked::Link;  // a 400: the code not taken
     return a;
 }
 
 Answer<std::string> accountName(std::string_view token, const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    HttpRequest request;
-    request.url    = servers().api + "/api/account";
-    request.method = "GET";
-    request.token  = std::string(token);
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = reason(r);
-        return a;
-    }
-    try {
-        a.value = nlohmann::json::parse(r.body).at("username").get<std::string>();
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
-    return a;
+    return call<std::string>(
+        request("GET", servers().api + "/api/account", std::string(token)),
+        [](const nlohmann::json& j) { return j.at("username").get<std::string>(); }, cancel);
 }
 
-std::string revoke(std::string_view token, const std::atomic<bool>* cancel) {
-    HttpRequest request;
-    request.url    = servers().api + "/api/token";
-    request.method = "DELETE";
-    request.token  = std::string(token);
-    const auto r   = politeRequest(request, cancel);
-    return r.status == 204 || r.status == 200 ? std::string() : reason(r);
+Failure revoke(std::string_view token, const std::atomic<bool>* cancel) {
+    return send(request("DELETE", servers().api + "/api/token", std::string(token)), cancel);
 }
 
 Answer<Account> link(const std::function<bool(const std::string& url)>& open, const std::vector<std::string>& scopes,
                      std::chrono::milliseconds within, const std::atomic<bool>* cancel, std::string_view username) {
-    Answer<Account> a;
-    Callback callback;
-    if (callback.port() == 0) {
-        a.error = "the program cannot receive Lichess's answer (no port on 127.0.0.1)";
+    // Worded as a link's failures: the user's no, the code not taken.
+    const auto failed = [](const Failure& why) {
+        auto a  = failedWith<Account>(why);
+        a.asked = Asked::Link;
         return a;
-    }
+    };
+    Callback callback;
+    if (callback.port() == 0)
+        return failed(Failure::own("the program cannot receive Lichess's answer (no port on 127.0.0.1)"));
     Pkce pkce;
     try {
         pkce = makePkce();
     } catch (const std::exception& e) {
-        a.error = e.what();
-        return a;
+        return failed(Failure::own(e.what()));
     }
     (void)open(authorizeUrl(pkce, callback.redirectUri(), scopes, username));
     const auto reply = callback.wait(within, cancel, pkce.state);
-    if (!reply.error.empty()) {
-        a.error = reply.error == "access_denied" ? std::string(LINK_REFUSED) : reply.error;
-        return a;
-    }
+    if (reply.failed()) return failed(reply);
     if (reply.state != pkce.state) {
-        a.error = "an answer that does not come from this question";
-        return a;
+        Failure foreign;
+        foreign.net    = NetError::BadAnswer;
+        foreign.detail = "an answer that does not come from this question";
+        return failed(foreign);
     }
-    a = exchange(reply.code, pkce, callback.redirectUri(), cancel);
+    auto a = exchange(reply.code, pkce, callback.redirectUri(), cancel);
     if (!a.value) return a;
     const auto name = accountName(a.value->token, cancel);
     if (!name.value) {
         (void)revoke(a.value->token, cancel);
-        a.value.reset();
-        a.error  = name.error;
-        a.status = name.status;
-        return a;
+        return failed(name);
     }
     a.value->username = *name.value;
     // What the token may do, as Lichess says it; else what was asked.
@@ -352,12 +311,12 @@ void saveAccount(const std::filesystem::path& profile, const Account& account, c
     tour::replaceFile(profile / file, j.dump(1), false, true);
 }
 
-std::string forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel, const char* file) {
-    std::string error;
-    if (const auto account = loadAccount(profile, file)) error = revoke(account->token, cancel);
+Failure forgetAccount(const std::filesystem::path& profile, const std::atomic<bool>* cancel, const char* file) {
+    Failure failure;
+    if (const auto account = loadAccount(profile, file)) failure = revoke(account->token, cancel);
     std::error_code ec;
     std::filesystem::remove(profile / file, ec);
-    return error;
+    return failure;
 }
 
 }  // namespace fcg::lichess

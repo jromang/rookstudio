@@ -332,7 +332,8 @@ TEST_CASE("Lichess bot: the account asked, the upgrade, Lichess's refusal") {
     const auto refused = upgradeToBot("bot-token");
     CHECK_FALSE(refused.ok);
     CHECK(refused.status == 400);
-    CHECK(refused.error == "You already have games played. Make a new account.");
+    CHECK(refused.net == NetError::Server);
+    CHECK(describe(refused) == "You already have games played. Make a new account.");
     servers() = Servers{};
     std::lock_guard lock(mutex);
     REQUIRE(seen.size() == 3);

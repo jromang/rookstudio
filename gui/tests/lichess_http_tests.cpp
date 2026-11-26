@@ -86,8 +86,7 @@ TEST_CASE("Lichess HTTP: the user's words for each kind, by what was asked") {
     CHECK(describe(NetError::NotFound) == "Lichess does not know it");
     CHECK(describe(NetError::RateLimited) == "Lichess asks to wait a minute: too many requests");
     CHECK(describe(NetError::Server, Asked::Anything, 503) == "Lichess answered 503");
-    CHECK(describe(NetError::Server, Asked::Anything, 400, "This game is over") ==
-          "Lichess answered 400: This game is over");
+    CHECK(describe(NetError::Server, Asked::Anything, 400, "This game is over") == "This game is over");
     CHECK(describe(NetError::BadAnswer) == "Lichess's answer could not be read");
     // What Lichess may not have.
     CHECK(describe(NetError::NotFound, Asked::Game) == "Lichess has no such game");
@@ -192,7 +191,7 @@ TEST_CASE("Lichess HTTP: a request sent and read, each failure with its kind") {
     // Lichess's own words for a refusal NetError does not name.
     const auto refused = call<Rating>(get("/refused"), ratingOf);
     CHECK(refused.net == NetError::Server);
-    CHECK(describe(refused) == "Lichess answered 400: This tournament is finished");
+    CHECK(describe(refused) == "This tournament is finished");
     const auto down = call<Rating>(get("/down"), ratingOf);
     CHECK(down.net == NetError::Server);
     CHECK(down.said.empty());

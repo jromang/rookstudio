@@ -1822,7 +1822,7 @@ class App {
     // Lichess (mockup M4): the account, a player's games, the broadcasts, the online services of the analysis.
     LichessSettings lichess_;
     std::optional<lichess::Account> lichess_account_;
-    std::string lichess_error_;  // why the last link failed
+    lichess::Failure lichess_error_;  // why the last link failed
     struct LichessLink {
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<std::string> url;  // Lichess's page, as given to the browser
@@ -1832,7 +1832,7 @@ class App {
         std::optional<lichess::BroadcastEntry> then_follow;  // the round to follow once the scope is granted
     };
     std::unique_ptr<LichessLink> lichess_link_;
-    std::future<std::string> lichess_unlink_;
+    std::future<lichess::Failure> lichess_unlink_;
     // A token no longer used (replaced by a link made again, one the bot refused) revoked in the background: parked in
     // jobs_, a failure said in the console, waited for at quit.
     void revokeToken(std::string token);
@@ -1840,7 +1840,7 @@ class App {
     struct LichessScopeAsk {
         std::string scope;
         std::optional<lichess::BroadcastEntry> follow;  // the round to follow with it (#44)
-        std::string error;                              // why the last try gave nothing
+        lichess::Failure error;                         // why the last try gave nothing
         bool players = false;                           // the followed players' mosaic to open with it (#50)
         bool search  = false;                           // a search among the broadcasts to make with it (#55)
     };
@@ -2551,7 +2551,7 @@ class App {
     std::array<char, 40> bot_confirm_{};      // the name typed to confirm the upgrade
     bool bot_confirm_focus_ = false;
     std::future<lichess::Reply> bot_upgrade_;
-    std::future<std::string> bot_unlink_;
+    std::future<lichess::Failure> bot_unlink_;
     bool bot_unlink_asked_ = false;  // "Unlink…" armed: a second click
     // Online: its event stream, its game, the challenges answered.
     std::unique_ptr<lichess::EventListener> bot_events_;
@@ -2760,6 +2760,7 @@ class App {
         bool after_link = false;  // sent once Lichess gave the permission
         bool busy       = false;
         std::string error;
+        bool refused = false;                     // the error: the permission refused on Lichess's page
         lichess::SentRecord going;                // what goes, while it goes
         uint64_t serial = 0;                      // the board's game then (board_game_serial_)
         int count       = 0;                      // and its changes

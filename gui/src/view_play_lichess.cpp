@@ -1009,7 +1009,8 @@ void App::drawOnlineScopeCard() {
     if (lichess_link_) {
         coloured(TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."), ui::ACCENT);
     } else {
-        if (!lichess_error_.empty()) coloured(trf("Lichess gave nothing ({}).", lichess_error_), ui::WARN);
+        if (lichess_error_.failed())
+            coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
         const auto& io = ImGui::GetIO();
         const bool enter =
             !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt &&

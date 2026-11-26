@@ -59,11 +59,10 @@ inline constexpr const char* SCOPE_BOARD_PLAY = "board:play";
 // (#85, lichess_bot.hpp). A game's endpoints are the same under /api/board/ and /api/bot/.
 enum class PlayApi { Board, Bot };
 
-// What Lichess answered: taken, or why not (its own words when it gave some: "Not your turn, or game already over").
-struct Reply {
-    bool ok    = false;
-    int status = 0;  // HTTP's, 0 without an answer (a cut)
-    std::string error;
+// What Lichess answered: taken, or why not (Failure: its own words when it gave some, "Not your turn, or game already
+// over"; status 0 without an answer, a cut).
+struct Reply : Failure {
+    bool ok = false;
 };
 // A POST of the API (`path`, from "/api/"), its form `fields` (none: no body), with the token: Lichess's answer, its
 // own words when it refused. The tournaments' requests go through it too (#95).

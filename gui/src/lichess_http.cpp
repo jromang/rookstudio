@@ -83,8 +83,8 @@ std::string describe(NetError net, Asked asked, int status, std::string_view sai
             return TR("Lichess asks to wait a minute: too many requests");
         case NetError::Server:
             if (asked == Asked::Link && status == 400) return TR("Lichess did not take the code");
-            if (status == 0 && !said.empty()) return std::string(said);  // through the browser: its words alone
-            return said.empty() ? trf("Lichess answered {}", status) : trf("Lichess answered {}: {}", status, said);
+            if (!said.empty()) return std::string(said);  // Lichess's own words, as they are
+            return trf("Lichess answered {}", status);
         case NetError::BadAnswer:
             if (asked == Asked::Engines)
                 return TR("Lichess's answer could not be read: the external engine API may have changed");

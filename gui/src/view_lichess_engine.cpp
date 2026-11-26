@@ -718,7 +718,8 @@ void App::drawLichessEngineForm(const EngineEntry& e) {
         wrapped(TR("Lichess offers an engine to the analysis board of an account: linking yours asks for the "
                    "permissions to register an engine (engine:read, engine:write). Lichess's page opens."),
                 true);
-        if (!lichess_error_.empty()) coloured(trf("Lichess gave nothing ({}).", lichess_error_), ui::WARN);
+        if (lichess_error_.failed())
+            coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
         if (primaryButton(TR("Link the account…")) || enter) {
             offer_after_link_ = e.name;
             startLichessLink({lichess::SCOPE_ENGINE_READ, lichess::SCOPE_ENGINE_WRITE});
@@ -734,7 +735,8 @@ void App::drawLichessEngineForm(const EngineEntry& e) {
         wrapped(TR("engine:read and engine:write: to register an engine for your account, read it, withdraw it. "
                    "Lichess's page opens; your account stays linked, the token it replaces is revoked."),
                 true);
-        if (!lichess_error_.empty()) coloured(trf("Lichess gave nothing ({}).", lichess_error_), ui::WARN);
+        if (lichess_error_.failed())
+            coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
         if (primaryButton(TR("Allow on Lichess…##engine")) || enter) {
             offer_after_link_ = e.name;
             auto scopes       = lichess::scopesAdding(lichess_account_->scopes, lichess::SCOPE_ENGINE_READ);

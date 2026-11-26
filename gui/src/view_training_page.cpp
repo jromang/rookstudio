@@ -1058,9 +1058,9 @@ void App::drawOnlinePuzzles(bool& enter) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                                TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
         } else {
-            if (!lichess_error_.empty())
+            if (lichess_error_.failed())
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess gave nothing ({}).", lichess_error_).c_str());
+                                   trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)).c_str());
             if (primaryButton(TR("Allow on Lichess…")) || enter) {
                 enter = false;
                 askPuzzleScopes();

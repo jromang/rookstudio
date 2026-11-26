@@ -146,15 +146,29 @@ TEST_CASE("Lichess account: the program's server takes the browser's return, and
     CHECK(icon.status == 404);
     CHECK(back.status == 200);
     CHECK(back.body.find("you can close this page") != std::string::npos);
-    CHECK(reply.error.empty());
+    CHECK_FALSE(reply.failed());
     CHECK(reply.code == "abc/def");
     CHECK(reply.state == "xyz");
 
     // The user said no on Lichess; nobody came back in time; the wait cancelled.
     Callback refused;
     std::thread no([&] { (void)comeBack(refused.redirectUri(), "?error=access_denied&state=xyz"); });
-    CHECK(refused.wait(20s).error == "access_denied");
+    const auto denied = refused.wait(20s);
     no.join();
+    CHECK(denied.net == NetError::Forbidden);
+    CHECK(denied.status == 0);  // through the browser
+    CHECK(denied.said == "access_denied");
+    // Another of OAuth's errors: Lichess's word, as it is; an answer without a code: not one to read.
+    Callback odd;
+    std::thread other([&] { (void)comeBack(odd.redirectUri(), "?error=invalid_scope&state=xyz"); });
+    const auto scope = odd.wait(20s);
+    other.join();
+    CHECK(scope.net == NetError::Server);
+    CHECK(describe(scope) == "invalid_scope");
+    Callback empty;
+    std::thread nothing([&] { (void)comeBack(empty.redirectUri(), "?state=xyz"); });
+    CHECK(empty.wait(20s).net == NetError::BadAnswer);
+    nothing.join();
     // An answer that does not carry the question's state (another program's) neither ends the wait nor makes it look
     // refused: it is answered 400, and the answer to this question is the one taken.
     Callback ours;
@@ -166,12 +180,12 @@ TEST_CASE("Lichess account: the program's server takes the browser's return, and
     const auto mine = ours.wait(20s, nullptr, "ours");
     both.join();
     CHECK(foreign.status == 400);
-    CHECK(mine.error.empty());
+    CHECK_FALSE(mine.failed());
     CHECK(mine.code == "mine");
     Callback idle;
-    CHECK(idle.wait(30ms).error == "no answer came from Lichess in time");
+    CHECK(idle.wait(30ms).net == NetError::TimedOut);
     std::atomic<bool> cancel{true};
-    CHECK(idle.wait(20s, &cancel).error == "cancelled");
+    CHECK(idle.wait(20s, &cancel).net == NetError::Cancelled);
 }
 
 TEST_CASE("Lichess account: linked, its token kept for its owner alone, then forgotten and revoked") {
@@ -190,7 +204,7 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
     };
     // Linked again with a scope, the account offered by its name.
     const auto linked = link(opened, {SCOPE_STUDY_READ}, 20s, nullptr, "SomeOne");
-    REQUIRE_MESSAGE(linked.value, linked.error);
+    REQUIRE_MESSAGE(linked.value, describe(linked));
     CHECK(linked.value->username == "SomeOne");
     CHECK(linked.value->token == "lio_granted");
     // What the token may do and until when, as Lichess says it.
@@ -202,9 +216,9 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
         CHECK(valueOf(lichess.asked, "scope") == "study:read");
         CHECK(valueOf(lichess.asked, "username") == "SomeOne");
     }
-    // A token Lichess no longer takes: no state, and no error.
+    // A token Lichess no longer takes: no state, and no failure.
     const auto gone = testToken("lio_revoked");
-    CHECK(gone.error.empty());
+    CHECK_FALSE(gone.failed());
     CHECK_FALSE(gone.value);
     {
         std::lock_guard lock(lichess.mutex);
@@ -227,7 +241,7 @@ TEST_CASE("Lichess account: linked, its token kept for its owner alone, then for
     const auto perms = fs::status(profile / "lichess-account.json").permissions();
     CHECK((perms & (fs::perms::group_all | fs::perms::others_all)) == fs::perms::none);
 #endif
-    CHECK(forgetAccount(profile).empty());
+    CHECK_FALSE(forgetAccount(profile).failed());
     CHECK(lichess.revoked);
     CHECK_FALSE(fs::exists(profile / "lichess-account.json"));
 }
@@ -249,7 +263,8 @@ TEST_CASE("Lichess account: the user's no on Lichess's page told from a token Li
     };
     const auto no = link(browser("?error=access_denied"), {}, 20s);
     CHECK_FALSE(no.value);
-    CHECK(linkRefused(no.error));
+    CHECK(linkRefused(no));
+    CHECK(no.net == NetError::Forbidden);
     // A yes, then a 401 on the account's name: Lichess refusing the token, not the user (#101); the token revoked.
     {
         std::lock_guard lock(lichess.mutex);
@@ -258,8 +273,14 @@ TEST_CASE("Lichess account: the user's no on Lichess's page told from a token Li
     const auto yes = link(browser("?code=the-code"), {}, 20s);
     CHECK_FALSE(yes.value);
     CHECK(yes.status == 401);
-    CHECK(yes.error == "Lichess refused the token");
-    CHECK_FALSE(linkRefused(yes.error));
+    CHECK(yes.net == NetError::Unauthorized);
+    CHECK(describe(yes) == "Lichess refused the token: link the account again");
+    CHECK_FALSE(linkRefused(yes));
+    // A 403 Lichess answers is no refusal of the user's either: only the browser's no, without a status, is.
+    Failure answered;
+    answered.net    = NetError::Forbidden;
+    answered.status = 403;
+    CHECK_FALSE(linkRefused(answered));
     std::lock_guard lock(lichess.mutex);
     CHECK(lichess.revoked);
 }
@@ -287,7 +308,7 @@ TEST_CASE("Lichess account: an answer to another question is ignored, a code Lic
         {}, 20s);
     browser.join();
     CHECK(foreign.status == 400);
-    CHECK(ours.error.empty());
+    CHECK_FALSE(ours.failed());
     CHECK(ours.value);
 
     const auto stale = link(
@@ -303,5 +324,65 @@ TEST_CASE("Lichess account: an answer to another question is ignored, a code Lic
         },
         {}, 20s);
     CHECK_FALSE(stale.value);
-    CHECK(stale.error == "Lichess did not take the code");
+    CHECK(stale.net == NetError::Server);
+    CHECK(stale.status == 400);
+    CHECK(describe(stale) == "Lichess did not take the code");
+}
+
+TEST_CASE("Lichess account: each failure of the token's requests told by its kind") {
+    std::mutex mutex;
+    std::pair<int, std::string> next{200, "{}"};  // what the server answers next
+    const auto port = freePort();
+    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+        std::pair<int, std::string> now;
+        {
+            std::lock_guard lock(mutex);
+            now = next;
+        }
+        answer(c, now.first, now.second);
+    });
+    REQUIRE(server.ok());
+    servers().api = fmt::format("http://127.0.0.1:{}", port);
+    HostGate::instance().setPause(50ms);
+    const auto answering = [&](int status, std::string body) {
+        std::lock_guard lock(mutex);
+        next = {status, std::move(body)};
+    };
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{403, R"({"error":"Missing scope"})", NetError::Forbidden}, Case{404, "{}", NetError::NotFound},
+          Case{429, "{}", NetError::RateLimited}, Case{503, "<html>down</html>", NetError::Server},
+          Case{200, "<html>not JSON</html>", NetError::BadAnswer}}) {
+        CAPTURE(status);
+        answering(status, body);
+        const auto name = accountName("lio_x");
+        CHECK_FALSE(name.value);
+        CHECK(name.net == net);
+        const auto tested = testToken("lio_x");
+        CHECK_FALSE(tested.value);
+        CHECK(tested.net == net);
+        // A revocation reads no body: a 200 is taken, whatever it says.
+        CHECK(revoke("lio_x").net == (status == 200 ? NetError::None : net));
+    }
+    answering(401, R"({"error":"No such token"})");
+    CHECK(accountName("lio_x").net == NetError::Unauthorized);
+    CHECK(describe(revoke("lio_x")) == "Lichess refused the token: link the account again");
+    // Nothing listens: no answer.
+    servers().api      = fmt::format("http://127.0.0.1:{}", freePort());
+    const auto offline = accountName("lio_x");
+    CHECK(offline.net == NetError::Offline);
+    CHECK(offline.status == 0);
+    CHECK(revoke("lio_x").net == NetError::Offline);
+    // Cancelled while the host pauses after a 429: nothing sent.
+    HostGate::instance().setPause(60s);
+    HostGate::instance().tooMany("lichess-account.invalid");
+    servers().api = "http://lichess-account.invalid";
+    std::atomic<bool> cancel{true};
+    CHECK(accountName("lio_x", &cancel).net == NetError::Cancelled);
+    CHECK(testToken("lio_x", &cancel).net == NetError::Cancelled);
+    servers() = Servers{};
 }

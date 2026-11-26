@@ -171,6 +171,15 @@ template <typename T, typename Parse>
     return a;
 }
 
+// The value of a response's body that is not JSON (NDJSON, PGN, text), made of it by `read`; the response's failure
+// otherwise.
+template <typename T, typename Read>
+[[nodiscard]] Answer<T> readBody(const Response& response, Read&& read) {
+    auto a = failedWith<T>(response);
+    if (!response.failed()) a.value = read(response.body);
+    return a;
+}
+
 // An answer without a value for a response whose body could not be read (BadAnswer): `why` in the log.
 template <typename T>
 [[nodiscard]] Answer<T> unreadable(const Response& response, std::string why) {

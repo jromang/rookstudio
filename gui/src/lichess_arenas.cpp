@@ -35,21 +35,19 @@ std::string lower(std::string_view text) {
     return out;
 }
 
-std::string failure(const HttpResult& r) {
-    return r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-           : r.status == 401 ? std::string("Lichess refused the token")
-           : r.status == 404 ? std::string("Lichess does not know it")
-           : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                             : fmt::format("Lichess answered {}", r.status);
+// An answer about a tournament: its 404 says Lichess has no such tournament.
+template <typename T>
+Answer<T> aboutTournament(Answer<T> a) {
+    a.asked = Asked::Tournament;
+    return a;
 }
 
-HttpRequest getRequest(const std::string& url, const std::string& token, const char* accept = "application/json") {
-    HttpRequest r;
-    r.url    = url;
-    r.method = "GET";
-    r.token  = token;
-    r.headers.emplace_back("Accept", accept);
-    return r;
+// Anyone's verdicts, asked without a token: none of them the user's.
+void anyonesVerdicts(std::vector<TourCondition>& conditions) {
+    for (auto& c : conditions) {
+        c.ok.reset();
+        c.refusal.clear();
+    }
 }
 
 // A time Lichess writes as ms since the epoch, or as an ISO date.
@@ -328,19 +326,7 @@ std::vector<ArenaInfo> readArenaList(const nlohmann::json& j) {
 }
 
 Answer<std::vector<ArenaInfo>> arenaList(const std::atomic<bool>* cancel) {
-    Answer<std::vector<ArenaInfo>> a;
-    const auto r = politeRequest(getRequest(servers().api + "/api/tournament", {}), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    try {
-        a.value = readArenaList(nlohmann::json::parse(r.body));
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
-    return a;
+    return call<std::vector<ArenaInfo>>(request("GET", servers().api + "/api/tournament"), readArenaList, cancel);
 }
 
 bool arenaShown(const ArenaInfo& arena, ArenaSpeeds speeds) {
@@ -430,29 +416,20 @@ Arena readArena(const nlohmann::json& j) {
 }
 
 Answer<Arena> arenaOf(const std::string& id, int page, const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<Arena> a;
     auto url = fmt::format("{}/api/tournament/{}", servers().api, urlEncode(id));
     if (page > 1) url += fmt::format("?page={}", page);
-    const auto r = politeRequest(getRequest(url, token), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    try {
-        a.value = readArena(nlohmann::json::parse(r.body));
-        if (token.empty()) {  // an anonymous answer's verdicts are anyone's
-            a.value->info.judged   = false;
-            a.value->info.accepted = true;
-            for (auto& c : a.value->info.conditions) {
-                c.ok.reset();
-                c.refusal.clear();
+    return aboutTournament(call<Arena>(
+        request("GET", url, token),
+        [&](const nlohmann::json& j) {
+            auto arena = readArena(j);
+            if (token.empty()) {  // an anonymous answer's verdicts are anyone's
+                arena.info.judged   = false;
+                arena.info.accepted = true;
+                anyonesVerdicts(arena.info.conditions);
             }
-        }
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
-    return a;
+            return arena;
+        },
+        cancel));
 }
 
 int standingPage(int rank) { return rank <= 0 ? 1 : (rank - 1) / 10 + 1; }
@@ -529,19 +506,9 @@ std::vector<Team> readTeams(const nlohmann::json& j) {
 
 Answer<std::vector<Team>> teamsOf(const std::string& username, const std::string& token,
                                   const std::atomic<bool>* cancel) {
-    Answer<std::vector<Team>> a;
-    const auto r =
-        politeRequest(getRequest(fmt::format("{}/api/team/of/{}", servers().api, urlEncode(username)), token), cancel);
-    a.status = r.status;
-    if (r.status != 200) {
-        a.error = r.status == 403 ? std::string("the token may not read your teams") : failure(r);
-        return a;
-    }
-    try {
-        a.value = readTeams(nlohmann::json::parse(r.body));
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
+    auto a = call<std::vector<Team>>(
+        request("GET", fmt::format("{}/api/team/of/{}", servers().api, urlEncode(username)), token), readTeams, cancel);
+    a.asked = Asked::Player;
     return a;
 }
 
@@ -597,53 +564,35 @@ bool playableHere(const SwissInfo& swiss) {
 
 Answer<std::vector<SwissInfo>> teamSwisses(const std::string& team, const std::string& token, int most,
                                            const std::atomic<bool>* cancel) {
-    Answer<std::vector<SwissInfo>> a;
-    const auto r = politeRequest(
-        getRequest(fmt::format("{}/api/team/{}/swiss?max={}", servers().api, urlEncode(team), std::max(1, most)), token,
-                   "application/x-ndjson"),
+    const auto r = send(
+        request("GET", fmt::format("{}/api/team/{}/swiss?max={}", servers().api, urlEncode(team), std::max(1, most)),
+                token, "application/x-ndjson"),
         cancel);
-    a.status = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    auto list = readSwissList(r.body);
-    for (auto& s : list) {
-        s.team_id = team;
-        if (token.empty()) {  // anyone's verdicts
-            s.judged = false;
-            for (auto& c : s.conditions) {
-                c.ok.reset();
-                c.refusal.clear();
+    return readBody<std::vector<SwissInfo>>(r, [&](std::string_view ndjson) {
+        auto list = readSwissList(ndjson);
+        for (auto& s : list) {
+            s.team_id = team;
+            if (token.empty()) {  // anyone's verdicts
+                s.judged = false;
+                anyonesVerdicts(s.conditions);
             }
         }
-    }
-    a.value = std::move(list);
-    return a;
+        return list;
+    });
 }
 
 Answer<SwissInfo> swissOf(const std::string& id, const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<SwissInfo> a;
-    const auto r =
-        politeRequest(getRequest(fmt::format("{}/api/swiss/{}", servers().api, urlEncode(id)), token), cancel);
-    a.status = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    try {
-        a.value = readSwiss(nlohmann::json::parse(r.body));
-        if (token.empty()) {
-            a.value->judged = false;
-            for (auto& c : a.value->conditions) {
-                c.ok.reset();
-                c.refusal.clear();
+    return aboutTournament(call<SwissInfo>(
+        request("GET", fmt::format("{}/api/swiss/{}", servers().api, urlEncode(id)), token),
+        [&](const nlohmann::json& j) {
+            auto swiss = readSwiss(j);
+            if (token.empty()) {
+                swiss.judged = false;
+                anyonesVerdicts(swiss.conditions);
             }
-        }
-    } catch (const std::exception& e) {
-        a.error = std::string("Lichess's answer could not be read: ") + e.what();
-    }
-    return a;
+            return swiss;
+        },
+        cancel));
 }
 
 std::vector<SwissRow> readSwissResults(std::string_view ndjson) {
@@ -669,17 +618,10 @@ std::vector<SwissRow> readSwissResults(std::string_view ndjson) {
 }
 
 Answer<std::vector<SwissRow>> swissResults(const std::string& id, int most, const std::atomic<bool>* cancel) {
-    Answer<std::vector<SwissRow>> a;
     auto url = fmt::format("{}/api/swiss/{}/results", servers().api, urlEncode(id));
     if (most > 0) url += fmt::format("?nb={}", most);
-    const auto r = politeRequest(getRequest(url, {}, "application/x-ndjson"), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    a.value = readSwissResults(r.body);
-    return a;
+    return aboutTournament(readBody<std::vector<SwissRow>>(
+        send(request("GET", url, {}, "application/x-ndjson"), cancel), readSwissResults));
 }
 
 Reply joinSwiss(const std::string& token, const std::string& id, const std::atomic<bool>* cancel) {
@@ -691,32 +633,18 @@ Reply withdrawSwiss(const std::string& token, const std::string& id, const std::
 }
 
 Answer<std::string> swissTrf(const std::string& id, const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    const auto r = politeRequest(
-        getRequest(fmt::format("{}/swiss/{}.trf", servers().api, urlEncode(id)), {}, "text/plain"), cancel);
-    a.status = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    a.value = r.body;
-    return a;
+    const auto r =
+        send(request("GET", fmt::format("{}/swiss/{}.trf", servers().api, urlEncode(id)), {}, "text/plain"), cancel);
+    return aboutTournament(readBody<std::string>(r, [](std::string_view text) { return std::string(text); }));
 }
 
 Answer<std::string> swissGames(const std::string& id, const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    auto request =
-        getRequest(fmt::format("{}/api/swiss/{}/games?clocks=true&opening=true", servers().api, urlEncode(id)), token,
-                   "application/x-chess-pgn");
-    request.timeout_s = 120;
-    const auto r      = politeRequest(request, cancel);
-    a.status          = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    a.value = r.body;
-    return a;
+    auto asked =
+        request("GET", fmt::format("{}/api/swiss/{}/games?clocks=true&opening=true", servers().api, urlEncode(id)),
+                token, "application/x-chess-pgn");
+    asked.timeout_s = 120;
+    return aboutTournament(
+        readBody<std::string>(send(asked, cancel), [](std::string_view pgn) { return std::string(pgn); }));
 }
 
 bool roundNoticeDue(int64_t next_round_at_ms, int64_t now_ms) {

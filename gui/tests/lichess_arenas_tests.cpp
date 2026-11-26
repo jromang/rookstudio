@@ -22,6 +22,7 @@
 #include <study/import.hpp>
 #include <study/store.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_account.hpp"
@@ -478,7 +479,8 @@ TEST_CASE("Lichess arenas: joined again each minute while waiting, the lock betw
     CHECK(again.ok);
     CHECK(pause.ok);
     CHECK_FALSE(team.ok);
-    CHECK(team.error == "This tournament is reserved for the members of team Rook Club");  // Lichess's words
+    CHECK(team.net == NetError::Server);
+    CHECK(describe(team) == "This tournament is reserved for the members of team Rook Club");  // Lichess's words
     std::lock_guard lock(mutex);
     REQUIRE(seen.size() == 4);
     CHECK(seen[0].line == "POST /api/tournament/rap1d100/join HTTP/1.1");
@@ -546,7 +548,7 @@ TEST_CASE("Lichess arenas: berserk only before the user's first move where the a
     servers()        = Servers{};
     CHECK(early.ok);
     CHECK_FALSE(late.ok);
-    CHECK(late.error == "Cannot berserk after the first move");
+    CHECK(describe(late) == "Cannot berserk after the first move");
     std::lock_guard lock(mutex);
     REQUIRE(paths.size() == 2);
     CHECK(paths[0] == "POST /api/board/game/aRena001/berserk HTTP/1.1");
@@ -665,6 +667,7 @@ TEST_CASE("Lichess Swiss: the user's teams, their Swiss tournaments, the next ro
     servers()           = Servers{};
     CHECK_FALSE(refused.value);
     CHECK(refused.status == 403);
+    CHECK(refused.net == NetError::Forbidden);
     REQUIRE(allowed.value);
     CHECK(allowed.value->front().name == "Rook Club");
     REQUIRE(of_team.value);
@@ -743,7 +746,8 @@ TEST_CASE("Lichess arenas: the standing waits its minute after a 429, a game's s
     REQUIRE(waitUntil([&] { return game.state(state, version) && state.full; }));
     const auto first = arenaOf("rap1d100");
     CHECK(first.status == 429);
-    CHECK(first.error == "Lichess asks to wait a minute: too many requests");
+    CHECK(first.net == NetError::RateLimited);
+    CHECK(describe(first) == "Lichess asks to wait a minute: too many requests");
     CHECK(HostGate::instance().pausedFor("127.0.0.1") > 0ms);
     // The game's moves come during the pause.
     CHECK(waitUntil([&] {
@@ -989,4 +993,56 @@ TEST_CASE("Lichess Swiss: kept in a database with its TRF, its crosstable made b
         REQUIRE_FALSE(name.empty());
         CHECK(points[name] == p.points);
     }
+}
+
+TEST_CASE("Lichess arenas and Swiss: each failure of their requests told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(arenaList().net == net);
+        CHECK(arenaOf("rap1d100").net == net);
+        CHECK(teamsOf("RS_Sample", "tok").net == net);
+        CHECK(teamSwisses("rook-club", "tok", 5).net == net);
+        CHECK(swissOf("club0001", "tok").net == net);
+        CHECK(swissResults("club0001").net == net);
+        CHECK(swissTrf("club0001").net == net);
+        CHECK(swissGames("club0001", "tok").net == net);
+        CHECK(joinArena("tok", "rap1d100").net == net);
+        CHECK(withdrawArena("tok", "rap1d100").net == net);
+        CHECK(joinSwiss("tok", "club0001").net == net);
+        CHECK(withdrawSwiss("tok", "club0001").net == net);
+        CHECK(berserk("tok", "aRena001").net == net);
+    }
+    // What Lichess has not: a tournament, in those words.
+    server.answer(404, R"({"error":"Not found"})");
+    CHECK(describe(arenaOf("rap1d100")) == "Lichess has no such tournament");
+    CHECK(describe(swissOf("club0001", {})) == "Lichess has no such tournament");
+    // An answer that is not JSON where JSON is read.
+    server.answer(200, "<html>not JSON</html>");
+    CHECK(arenaList().net == NetError::BadAnswer);
+    CHECK(arenaOf("rap1d100").net == NetError::BadAnswer);
+    CHECK(teamsOf("RS_Sample", "tok").net == NetError::BadAnswer);
+    CHECK(swissOf("club0001", "tok").net == NetError::BadAnswer);
+    pointNowhere();
+    CHECK(arenaList().net == NetError::Offline);
+    CHECK(describe(arenaOf("rap1d100")) == "Lichess cannot be reached");
+    CHECK(swissResults("club0001").net == NetError::Offline);
+    CHECK(joinArena("tok", "rap1d100").net == NetError::Offline);
+    pointAtPausedHost("lichess-arenas.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(arenaList(&cancel).net == NetError::Cancelled);
+    CHECK(swissGames("club0001", "tok", &cancel).net == NetError::Cancelled);
+    CHECK(joinArena("tok", "rap1d100", true, &cancel).net == NetError::Cancelled);
+    servers() = Servers{};
 }

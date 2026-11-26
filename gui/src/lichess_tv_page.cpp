@@ -85,7 +85,7 @@ std::string tvName(const std::string& name) {
     return name;
 }
 
-LichessTvPage::LichessTvPage(AppContext& app) : app_(app) {}
+LichessTvPage::LichessTvPage(TvContext& app) : app_(app) {}
 
 LichessTvPage::~LichessTvPage() = default;
 

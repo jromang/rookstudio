@@ -1,4 +1,4 @@
-// Lichess TV's module (#107), built and driven without App: an AppContext of the test's own answers what it asks of
+// Lichess TV's module (#107), built and driven without App: a context of the test's own answers what it asks of
 // the program, and Lichess is a server on this machine. Its --focus words and palette commands; a channel's games in
 // the mosaic, the user's own left out; the Board's game kept into a database at its end, then the channel's next game
 // on the Board in its place.
@@ -40,7 +40,7 @@ namespace {
 
 // What the module asks of App, answered by the test: the profile and its databases of a scratch folder, a mosaic and
 // a Board that only remember what they were told, the Lichess settings in memory.
-class FakeApp final : public AppContext {
+class FakeApp final : public TvContext {
    public:
     explicit FakeApp(const std::filesystem::path& profile) : profile_(profile), shelf_(jobs_, profile) {}
 

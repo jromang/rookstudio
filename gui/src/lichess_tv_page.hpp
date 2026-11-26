@@ -8,7 +8,7 @@
 // an account; never the user's own games. The game streams of this address, eight at most: the rounds followed take
 // one each, then the Board's game and those kept, then the mosaic shown (a channel's or the followed players').
 //
-// What it needs of the program around it, it asks of an AppContext (app_context.hpp): App's, or a test's.
+// What it needs of the program around it, it asks of its context (TvContext, app_context.hpp): App's, or a test's.
 
 #include <chrono>
 #include <cstddef>
@@ -44,7 +44,7 @@ class PlayersFollower;
 
 class LichessTvPage {
    public:
-    explicit LichessTvPage(AppContext& app);
+    explicit LichessTvPage(TvContext& app);
     ~LichessTvPage();
     LichessTvPage(const LichessTvPage&)            = delete;
     LichessTvPage& operator=(const LichessTvPage&) = delete;
@@ -118,7 +118,7 @@ class LichessTvPage {
     void loadKept();
     void saveKept();
 
-    AppContext& app_;
+    TvContext& app_;
     lichess::Answer<std::vector<lichess::TvRow>> tv_rows_;
     std::future<lichess::Answer<std::vector<lichess::TvRow>>> tv_rows_job_;
     std::chrono::steady_clock::time_point tv_rows_asked_{};

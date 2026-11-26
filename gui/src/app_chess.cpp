@@ -803,7 +803,48 @@ void App::handleChessDialog(const Dialogs::Answer& answer) {
         case Dialogs::Purpose::FideList:
             startFideList(std::filesystem::path(path));
             break;
-        default:  // fastchess-gui's, in handleDialogs()
+        // fastchess-gui's, answered by handleDialogs() before it calls this: named rather than a default, so that
+        // the compiler tells of a purpose added without its case in either function (-Wswitch).
+        case Dialogs::Purpose::AddEngine:
+        case Dialogs::Purpose::EngineCommand:
+        case Dialogs::Purpose::EngineDir:
+        case Dialogs::Purpose::Book:
+        case Dialogs::Purpose::Tablebases:
+        case Dialogs::Purpose::TablebasesFolder:
+        case Dialogs::Purpose::ExportGames:
+        case Dialogs::Purpose::ExportAll:
+        case Dialogs::Purpose::OpenTournament:
+        case Dialogs::Purpose::ExportStandings:
+        case Dialogs::Purpose::ImportEngineList:
+        case Dialogs::Purpose::ImportEngineFolder:
+        case Dialogs::Purpose::ImportRatingList:
+        case Dialogs::Purpose::ExportRatings:
+        case Dialogs::Purpose::ExportRatingHtml:
+        case Dialogs::Purpose::ExportRatingMarkdown:
+        case Dialogs::Purpose::ExportRatingPgn:
+        case Dialogs::Purpose::ImportRatingPgn:
+        case Dialogs::Purpose::ExportHeadToHead:
+        case Dialogs::Purpose::ExportOpenings:
+        case Dialogs::Purpose::AddBook:
+        case Dialogs::Purpose::BookFile:
+        case Dialogs::Purpose::SaveCleanBook:
+        case Dialogs::Purpose::Chess324Book:
+        case Dialogs::Purpose::Chess324SymmetricalBook:
+        case Dialogs::Purpose::BuildBookPgn:
+        case Dialogs::Purpose::BuildBookBin:
+        case Dialogs::Purpose::SuiteFile:
+        case Dialogs::Purpose::ExportSuiteCsv:
+        case Dialogs::Purpose::TournamentsFolder:
+        case Dialogs::Purpose::PgnOut:
+        case Dialogs::Purpose::ExportSubmission:
+        case Dialogs::Purpose::EngineOption:
+        case Dialogs::Purpose::ConsoleLog:
+        case Dialogs::Purpose::BoardPgn:
+        case Dialogs::Purpose::EngineLogo:
+        case Dialogs::Purpose::PieceFolder:
+        case Dialogs::Purpose::MachineKey:
+        case Dialogs::Purpose::MachineProgram:
+        case Dialogs::Purpose::MachineEngineBuild:
             break;
     }
 }

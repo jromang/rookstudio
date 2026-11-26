@@ -2,28 +2,36 @@
 
 // What a module of RookStudio's asks of the program around it (#107). A module holds an area of its own out of App
 // (its state, its poll(), its draw(), its palette commands and --focus words: Lichess TV, lichess_tv_page.hpp; the
-// arenas and Swiss tournaments, lichess_arenas_page.hpp; the Lichess bot, lichess_bot_page.hpp), and reaches the rest
-// through the facets below instead of App's members: the program (the frame, the profile and its databases, the jobs),
-// the pages it opens, the databases' pages, the Board, the mosaic its games show in, the Lichess settings, the user's
-// Lichess account and its link, the user's games on Lichess and the fair play their live game holds, the engines and
-// the cores, the Board taken by a game followed live, the tokens given up, the window. A module's context is the facets
-// it needs (TvContext, ArenasContext, BotContext); App answers them all (AppContext, by App::ModulesContext,
-// app_chess.cpp), and a test only those of the module it builds, with a fake of its own, without App.
+// arenas and Swiss tournaments, lichess_arenas_page.hpp; the Lichess bot, lichess_bot_page.hpp; the puzzles,
+// puzzles_page.hpp), and reaches the rest through the facets below instead of App's members: the program (the frame,
+// the profile and its databases, the jobs), the pages it opens, the databases' pages, the Board, the mosaic its games
+// show in, the Lichess settings, the user's Lichess account and its link, the user's games on Lichess and the fair play
+// their live game holds, the engines and the cores, the Board taken by a game followed live, the tokens given up, the
+// window, the Board taken by a training session (board_session.hpp), the Training page and its day's review, the
+// user's mistakes, the file dialogs. A module's context is the facets it needs (TvContext, ArenasContext, BotContext,
+// PuzzlesContext); App answers them all (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of
+// the module it builds, with a fake of its own, without App.
 //
 // Each method says what a module needs, in its words, not which member of App gives it. The facets hold only what the
-// modules out of App need now, and grow with those that follow (training): a facet a module does not ask for is none
-// of its fake's business.
+// modules out of App need now, and grow with those that follow (the other kinds of training): a facet a module does not
+// ask for is none of its fake's business.
 
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include <chess.hpp>
+
+#include "board_session.hpp"
+
 namespace fcg {
 
+struct BoardDecor;
 struct BookEntry;
 class CrosstableStore;
 class DatabaseShelf;
@@ -32,6 +40,7 @@ class JobGroup;
 struct LichessSettings;
 class PieceAtlas;
 struct ReplayGame;
+struct TrainingSettings;
 namespace lichess {
 struct Account;
 struct BoardState;
@@ -179,9 +188,11 @@ class Account {
     [[nodiscard]] virtual std::string scopeAsked() const = 0;
     virtual void askScope(const std::string& scope)      = 0;
     virtual void dropScopeAsk()                          = 0;
-    // The profile, none until read; read again when ten minutes old (nothing asked while scripted).
+    // The profile, none until read; read again when ten minutes old (nothing asked while scripted); asked once when
+    // none is known, for the puzzle rating it holds (#80), kept a day.
     [[nodiscard]] virtual const lichess::Profile* lichessProfile() const = 0;
     virtual void askLichessProfile()                                     = 0;
+    virtual void askLichessProfileOnce()                                 = 0;
 };
 
 // The game the user plays on the Board through Lichess's Board API (#84), as App holds it, for the frame: its id, the
@@ -291,6 +302,107 @@ class Window {
     virtual void raiseWindow() = 0;
 };
 
+// The Board taken by a training session (#76, #80–#82; board_session.hpp): one session at a time holds it, whatever its
+// kind; its positions are the session's, the moves the user plays on it go to the session (BoardSession), and the page
+// and its column are the session's, drawn with the Board's own parts; the analysis is cut while a question is asked; at
+// the session's end, the Board is given back as it was.
+class SessionBoard {
+   public:
+    virtual ~SessionBoard() = default;
+
+    // Why a session cannot start now (a game of the user's played on Lichess, a game played on the board), empty when
+    // it can.
+    [[nodiscard]] virtual std::string sessionLock() const = 0;
+    // The Board taken for a session: the session that holds it closed first (the day's review going on), the game it
+    // shows put among the recent games (Ctrl+Tab), an empty game titled `title` on it, in a view that holds the study's
+    // Board, without a way back to the page before; `tree`: the column at the Tree's tab rather than the notation's
+    // editing (the session's moves are no game). What the Board was, to give it back at the end.
+    virtual BoardTaken takeBoard(const std::string& title, bool tree) = 0;
+    // The Board given back at the session's end: the game put aside on it again (else a new game), the side below and
+    // the column's tab as they were, the session's position forgotten; the Training page shown (`to_training`), else
+    // the Board page.
+    virtual void giveBoardBack(const BoardTaken& taken, bool to_training) = 0;
+    // The session left because another game comes on the Board (BoardSession::sessionDropped()): the side below and
+    // the column's tab as they were, the session's position forgotten, the game put aside staying among the recent
+    // ones.
+    virtual void leaveBoard(const BoardTaken& taken) = 0;
+    // The Board page shown again, with the session ("Back to the series").
+    virtual void showSession() = 0;
+
+    // The position the Board shows: its game, at `ply`; a position of the session's (`game` at its last move, the
+    // user's selection, drag and typed move, the Board's history let go); a move played at the position shown, which
+    // is shown then; the side below.
+    [[nodiscard]] virtual const ReplayGame& sessionGame() const = 0;
+    [[nodiscard]] virtual int sessionPly() const                = 0;
+    virtual void showSessionGame(ReplayGame game)               = 0;
+    virtual void playSessionMove(chess::Move move)              = 0;
+    virtual void setFlip(bool flip)                             = 0;
+    // The piece the user picked up let go; the move they are typing let go (the question answered, or over).
+    virtual void dropPick()      = 0;
+    virtual void dropTypedMove() = 0;
+
+    // The page: its title and its guide's `?`, as the Board page's, the letters typed reaching the move field whatever
+    // the keyboard's layout; the Board's message (a refusal said there), when there is one.
+    virtual void beginSessionPage() = 0;
+    virtual void drawBoardMessage() = 0;
+    // The board, `size` wide: the position shown, its last move and the side below, `marks` (squares tinted, arrows)
+    // over it; the user's moves taken there when `moves` (a click, a drag, a promotion's piece), each given to the
+    // session (BoardSession::sessionMove()). In 3D when the appearance asks for it.
+    virtual void drawSessionBoard(float size, const BoardDecor& marks, bool moves) = 0;
+    // The Board's parts in the session's column: the move being typed (its field, played by Enter); the keys that begin
+    // one (its letters open the field); the tabs (the tree, the engines, the notes), back with the answer; the fair
+    // play's banner while a game of the user's is played on Lichess.
+    virtual void drawMoveField()      = 0;
+    virtual void moveKeys()           = 0;
+    virtual void drawBoardTabs()      = 0;
+    virtual void drawFairPlayBanner() = 0;
+    // The analysis of the position shown, once the answer is given: started or stopped; its key (Alt+A) pressed in
+    // this frame, the analysis then started or stopped (true).
+    virtual void analyse(bool on) = 0;
+    virtual bool analysisKey()    = 0;
+};
+
+// The Training page (#80, view_training_page.cpp) and the day's review it starts, "Review all" taking the kinds one
+// after the other (review_queue.hpp); the training's settings.
+class Training {
+   public:
+    virtual ~Training() = default;
+
+    // The training's settings (training.json): a right answer goes on by itself after advance_ms.
+    [[nodiscard]] virtual const TrainingSettings& trainingSettings() = 0;
+    // The Training page shown, at its part `part` (0 Today, 1 Puzzles…).
+    virtual void showTrainingPage(int part) = 0;
+    // What Enter starts on the Training page: the puzzles, once one of their choices was clicked, else the day's
+    // review.
+    virtual void setEnterStartsPuzzles(bool puzzles) = 0;
+    // The day's review: a session of its shown (its end goes on to the next kind, or back to the Training page); the
+    // next kind started (false when none is left); the review stopped, what it had left forgotten; at a session's end,
+    // its card that goes on or back to the Training page (`enter`: Enter goes on).
+    [[nodiscard]] virtual bool reviewRunning() const = 0;
+    virtual bool nextReview()                        = 0;
+    virtual void stopReview()                        = 0;
+    virtual void drawReviewNext(bool enter)          = 0;
+};
+
+// The user's mistakes as exercises (#81, mistakes.hpp): the kinds of their mistakes since `since` (a packed date,
+// packedDaysBefore()), counted, as their reviews' "To work on" says them.
+class Mistakes {
+   public:
+    virtual ~Mistakes() = default;
+
+    [[nodiscard]] virtual std::map<std::string, std::size_t> mistakeKinds(uint32_t since) = 0;
+};
+
+// The file dialogs a module opens, the file chosen given back to the module by App (App::handleChessDialog()).
+class FileDialogs {
+   public:
+    virtual ~FileDialogs() = default;
+
+    // Lichess's puzzle database downloaded before (lichess_db_puzzle.csv.zst), read into the puzzles' store
+    // (PuzzlesPage::startOffline()).
+    virtual void choosePuzzleFile() = 0;
+};
+
 }  // namespace context
 
 // What Lichess TV asks of the program (lichess_tv_page.hpp).
@@ -320,7 +432,17 @@ class BotContext : public virtual context::Program,
                    public virtual context::Tokens,
                    public virtual context::Window {};
 
+// What the puzzles ask of the program (puzzles_page.hpp).
+class PuzzlesContext : public virtual context::Program,
+                       public virtual context::SessionBoard,
+                       public virtual context::Training,
+                       public virtual context::Mistakes,
+                       public virtual context::FileDialogs,
+                       public virtual context::LinkedAccount,
+                       public virtual context::Account,
+                       public virtual context::FairPlay {};
+
 // What App answers: every module's context, each facet once.
-class AppContext : public TvContext, public ArenasContext, public BotContext {};
+class AppContext : public TvContext, public ArenasContext, public BotContext, public PuzzlesContext {};
 
 }  // namespace fcg

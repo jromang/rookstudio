@@ -29,6 +29,7 @@
 #include "assistant_service.hpp"
 #include "board_session.hpp"
 #include "board_text.hpp"
+#include "board_view.hpp"
 #include "chesscom.hpp"
 #include "fide_rating_list.hpp"
 #include "focus_words.hpp"
@@ -176,6 +177,17 @@ class App::ModulesContext final : public AppContext {
         return app_.lichess_profile_ ? &*app_.lichess_profile_ : nullptr;
     }
     void askLichessProfile() override { app_.askArenaProfile(); }
+    void askLichessProfileOnce() override {
+        // As the Home page reads it: kept a day, asked once when none is known (the puzzles' rating, #80).
+        if (!app_.lichess_account_) return;
+        app_.pollLichessProfile();
+        if (!app_.lichess_profile_ && !app_.lichess_profile_job_.valid() &&
+            app_.lichess_profile_asked_.time_since_epoch().count() == 0) {
+            app_.lichess_profile_asked_ = std::chrono::steady_clock::now();
+            app_.lichess_profile_job_   = std::async(
+                std::launch::async, [token = app_.lichess_account_->token] { return lichess::accountProfile(token); });
+        }
+    }
 
     // The user's games on Lichess.
     const std::vector<lichess::PlayingGame>& playingGames() const override { return app_.lichess_playing_; }
@@ -297,6 +309,161 @@ class App::ModulesContext final : public AppContext {
     // The window.
     void raiseWindow() override {
         if (app_.window_) SDL_RaiseWindow(app_.window_);
+    }
+
+    // The Board taken by a training session.
+    std::string sessionLock() const override { return app_.trainingLock(); }
+    BoardTaken takeBoard(const std::string& title, bool tree) override {
+        const bool chained = app_.review_running_;  // the day's review goes on (#80)
+        app_.closeBoardSession();
+        app_.review_running_ = chained;
+        auto& b              = app_.board_;
+        BoardTaken taken;
+        taken.flip = b.flip;
+        taken.tab  = app_.board_side_tab_;
+        // The game on the board goes among the recent games (Ctrl+Tab), given back after the session.
+        taken.aside = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
+        app_.toStudyBoard();
+        app_.openOnBoard(ReplayGame{}, 0, false, title, false);
+        app_.board_back_.reset();
+        if (tree && app_.board_side_tab_ == 0) app_.board_side_tab_ = 2;
+        return taken;
+    }
+    void giveBoardBack(const BoardTaken& taken, bool to_training) override {
+        app_.board_side_tab_    = taken.tab;
+        app_.forget_board_game_ = true;  // the session's position is no game to remember
+        if (taken.aside && !app_.recent_games_.empty())
+            app_.restoreRecentGame(0);
+        else
+            app_.newBoardGame();
+        app_.forget_board_game_ = false;
+        app_.board_.flip        = taken.flip;
+        app_.board_back_.reset();
+        app_.page_ = to_training ? Page::Training : Page::Board;
+    }
+    void leaveBoard(const BoardTaken& taken) override {
+        app_.board_.flip        = taken.flip;
+        app_.board_side_tab_    = taken.tab;
+        app_.forget_board_game_ = true;  // the game that comes takes the board; the one put aside stays a recent one
+    }
+    void showSession() override { app_.page_ = Page::Board; }
+    const ReplayGame& sessionGame() const override { return app_.board_.game; }
+    int sessionPly() const override { return app_.board_.ply; }
+    void showSessionGame(ReplayGame game) override {
+        auto& b    = app_.board_;
+        b.game     = std::move(game);
+        b.tree     = GameTree{b.game, {}};
+        b.line     = -1;
+        b.ply      = static_cast<int>(b.game.moves.size());
+        b.chess960 = false;
+        b.selected.reset();
+        b.promotion.reset();
+        b.preview.reset();
+        b.drag.reset();
+        b.drag_over.reset();
+        b.move_typed.reset();
+        b.move_error.clear();
+        b.comment_edit.reset();
+        b.undo.clear();
+        b.redo.clear();
+        b.changes     = {};
+        b.start_notes = {};
+        b.new_game    = true;
+    }
+    void playSessionMove(chess::Move move) override {
+        auto& b = app_.board_;
+        b.ply   = playOnGame(b.game, b.chess960, b.ply, move);
+        b.tree  = GameTree{b.game, {}};
+    }
+    void setFlip(bool flip) override { app_.board_.flip = flip; }
+    void dropPick() override { app_.board_.selected.reset(); }
+    void dropTypedMove() override { app_.board_.move_typed.reset(); }
+    void beginSessionPage() override {
+        ui::pageTitle(TR("Board"), app_.guideSection());
+        // The letters typed reach the move field whatever the keyboard's layout (see drawBoardPage).
+        if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
+            !SDL_TextInputActive(app_.window_))
+            SDL_StartTextInput(app_.window_);
+    }
+    void drawBoardMessage() override {
+        const auto& b = app_.board_;
+        if (b.message.empty()) return;
+        ImGui::PushStyleColor(ImGuiCol_Text, b.message_error ? ui::BAD : ui::MUTED);
+        ImGui::TextWrapped("%s", b.message.c_str());
+        ImGui::PopStyleColor();
+    }
+    void drawSessionBoard(float size, const BoardDecor& marks, bool moves) override {
+        auto& b          = app_.board_;
+        const auto board = boardAt(b.game, b.chess960, b.ply);
+        BoardDecor decor = marks;
+        decor.flipped    = b.flip;
+        decor.eval_white = -1.0f;  // no bar: no engine's word on the position
+        if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
+        decor.selected = moves ? b.selected : std::nullopt;
+        if (decor.selected)
+            for (const auto& m : movesFrom(board, *decor.selected)) decor.targets.push_back(shownTarget(m));
+        const bool dragging = moves && b.drag && b.drag->moved && b.selected == b.drag->from;
+        if (dragging) {
+            decor.lifted = b.drag->from;
+            if (b.drag_over &&
+                std::find(decor.targets.begin(), decor.targets.end(), *b.drag_over) != decor.targets.end())
+                decor.drop = b.drag_over;
+        }
+        const ImVec2 top = ImGui::GetCursorScreenPos();
+        if (appearance::current().board3d.on && app_.board3d_.available()) {
+            app_.board3d_.setMarks(Board3d::Marks::Off);
+            const auto input = app_.board3d_.draw(board, size, decor);
+            if (moves) app_.boardPointer(board, input.clicked, input.hovered, input.right_click);
+        } else {
+            if (!appearance::current().board3d.on) app_.board3d_.release();
+            drawBoard(app_.atlas_, board, size, decor);
+            const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
+            if (moves) {
+                const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
+                           right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+                app_.boardPointer(board, left ? hover : std::nullopt, hover, right);
+                if (dragging && b.drag) drawDraggedPiece(app_.atlas_, board.at(b.drag->from), size);
+            }
+        }
+        app_.drawPromotionPopup(board);
+    }
+    void drawMoveField() override { app_.drawMoveField(); }
+    void moveKeys() override { app_.boardMoveKeys(); }
+    void drawBoardTabs() override { app_.drawChessTabs(); }
+    void drawFairPlayBanner() override { app_.drawFairPlayBanner(); }
+    void analyse(bool on) override { app_.setBoardAnalysis(on); }
+    bool analysisKey() override {
+        if (!app_.boardKey()) return false;
+        app_.setBoardAnalysis(!app_.board_.analysing);
+        return true;
+    }
+
+    // The Training page and its day's review.
+    const TrainingSettings& trainingSettings() override { return app_.trainingSettings(); }
+    void showTrainingPage(int part) override {
+        app_.page_         = Page::Training;
+        app_.training_tab_ = part;
+    }
+    void setEnterStartsPuzzles(bool puzzles) override { app_.training_enter_puzzles_ = puzzles; }
+    bool reviewRunning() const override { return app_.review_running_; }
+    bool nextReview() override { return app_.nextReview(); }
+    void stopReview() override {
+        app_.review_running_ = false;
+        app_.review_chain_.clear();
+    }
+    void drawReviewNext(bool enter) override { app_.drawReviewNext(enter); }
+
+    // The user's mistakes.
+    std::map<std::string, std::size_t> mistakeKinds(uint32_t since) override {
+        std::map<std::string, std::size_t> kinds;
+        for (const auto* e : app_.mistakeExercises())
+            if (e->packed_date >= since) ++kinds[e->kind];
+        return kinds;
+    }
+
+    // The file dialogs.
+    void choosePuzzleFile() override {
+        app_.dialogs_.openFile(Dialogs::Purpose::OfflinePuzzlesFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
     }
 
    private:

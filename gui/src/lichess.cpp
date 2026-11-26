@@ -252,7 +252,9 @@ lichess::Response LichessRelay::Session::post(const std::string& path, const std
     auto asked         = lichess::request("POST", settings_.base + path, settings_.token);
     asked.content_type = type;
     asked.body         = body;
-    return lichess::send(asked);
+    // Sent at once, as it always was: not in the host's turns, which log every request (a push every few seconds
+    // would fill the log); the relay keeps its own minute after a 429.
+    return lichess::responseOf(asked, httpRequest(asked));
 }
 
 void LichessRelay::Session::save() { writeJson(settings_.dir / "lichess.json", target_); }

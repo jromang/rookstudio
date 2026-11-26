@@ -28,6 +28,7 @@
 #include "game_analysis.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "mistakes_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -1142,7 +1143,7 @@ void App::drawEngineGameEnd() {
             const auto& l = *tally.last_lost;
             line += " " + trf("The last lost, {}: {}.", ui::dayText(static_cast<std::time_t>(l.at)),
                               endingOf(l.final_fen, l.plies));
-            const auto& ex = mistakeRecord().exercises;
+            const auto& ex = mistakes_->mistakeRecord().exercises;
             if (std::any_of(ex.begin(), ex.end(), [&](const auto& e) { return e.second.game_key == l.key; }))
                 line += " " + std::string(TR("(It is in your exercises.)"));
         }

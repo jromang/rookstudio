@@ -14,11 +14,13 @@
 
 #include "app.hpp"
 #include "assistant_service.hpp"
+#include "guess_page.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
+#include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
 
@@ -291,42 +293,12 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
             TR("Training"), [this] { startReview(); });
     // The puzzles, their module's (#107): the Puzzles part, each theme's, the database's commands, the puzzles online.
     puzzles_->addCommands(add, where(Page::Training));
-    // Your mistakes as exercises, guessing the moves (#81).
-    add(TR("My mistakes"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_ = 2;
-    });
-    if (mistakeLock().empty()) {
-        const auto c = mistakeDayCounts();
-        if (c.due > 0)
-            add(trn("Review my mistakes · {} due", "Review my mistakes · {} due", c.due, ui::exactCount(c.due)),
-                TR("Training"), [this] { startReview(ReviewKind::Mistakes); });
-        if (c.due + c.today > 0)
-            add(trn("Exercises from my mistakes · {}", "Exercises from my mistakes · {}", c.due + c.today,
-                    ui::exactCount(c.due + c.today)),
-                TR("Training"), [this] {
-                    mistake_kind_.clear();
-                    startMistakes(false);
-                });
-    }
-    if (!mistake_unreviewed_.empty() && !mistake_reviews_)
-        add(trn("Review {} recent game of mine in the background", "Review {} recent games of mine in the background",
-                mistake_unreviewed_.size(), mistake_unreviewed_.size()),
-            TR("Training"), [this] { startMistakeReviews(); });
-    if (mistake_reviews_) add(TR("Cancel the reviews of my games"), TR("Training"), [this] { cancelMistakeReviews(); });
+    // Your mistakes as exercises, guessing the moves (#81), their modules' (#107): the part, the day's review of the
+    // mistakes, today's exercises, the games reviewed in the background; the user's names; the Board page's game, a
+    // random game.
+    mistakes_->addCommands(add, where(Page::Training));
     add(TR("Your names…"), TR("Settings"), page(Page::Settings));
-    add(TR("Guess the moves"), where(Page::Training), [this, go = page(Page::Training)] {
-        // The Board page's game, from the position shown; else the Training page's part.
-        if (page_ == Page::Board && !training_ && !puzzles_->onBoard() && !mistake_ && !guess_ &&
-            board_.ply < static_cast<int>(board_.game.moves.size()) && trainingLock().empty()) {
-            startGuessBoard();
-            return;
-        }
-        go();
-        training_tab_ = 3;
-    });
-    if (trainingLock().empty())
-        add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
+    guessing_->addCommands(add, where(Page::Training));
     // The endgames against the tables, the mates, board vision (#82).
     add(TR("Endgames"), where(Page::Training), [this, go = page(Page::Training)] {
         go();

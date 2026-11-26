@@ -33,13 +33,17 @@
 #include "chesscom.hpp"
 #include "fide_rating_list.hpp"
 #include "focus_words.hpp"
+#include "guess_page.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
+#include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
+#include "review_bridge.hpp"
+#include "review_runner.hpp"
 #include "twic.hpp"
 
 namespace fcg {
@@ -376,6 +380,18 @@ class App::ModulesContext final : public AppContext {
         b.ply   = playOnGame(b.game, b.chess960, b.ply, move);
         b.tree  = GameTree{b.game, {}};
     }
+    void replaySessionGame(ReplayGame game, int ply, bool chess960) override {
+        auto& b    = app_.board_;
+        b.game     = std::move(game);
+        b.tree     = GameTree{b.game, {}};
+        b.line     = -1;
+        b.ply      = ply;
+        b.chess960 = chess960;
+        b.selected.reset();
+        b.move_typed.reset();
+        b.new_game = true;
+    }
+    void showSessionPly(int ply) override { app_.board_.ply = ply; }
     void setFlip(bool flip) override { app_.board_.flip = flip; }
     void dropPick() override { app_.board_.selected.reset(); }
     void dropTypedMove() override { app_.board_.move_typed.reset(); }
@@ -441,11 +457,17 @@ class App::ModulesContext final : public AppContext {
 
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return app_.trainingSettings(); }
+    void setGuessTheory(bool on) override {
+        app_.trainingSettings().guess_theory = on;
+        app_.saveTrainingSettings();
+    }
     void showTrainingPage(int part) override {
         app_.page_         = Page::Training;
         app_.training_tab_ = part;
     }
+    bool trainingShown() const override { return app_.page_ == Page::Training; }
     void setEnterStartsPuzzles(bool puzzles) override { app_.training_enter_puzzles_ = puzzles; }
+    void reviewOnly(ReviewKind kind) override { app_.startReview(kind); }
     bool reviewRunning() const override { return app_.review_running_; }
     bool nextReview() override { return app_.nextReview(); }
     void stopReview() override {
@@ -454,18 +476,90 @@ class App::ModulesContext final : public AppContext {
     }
     void drawReviewNext(bool enter) override { app_.drawReviewNext(enter); }
 
-    // The user's mistakes.
+    // The user's mistakes, their module's.
     std::map<std::string, std::size_t> mistakeKinds(uint32_t since) override {
-        std::map<std::string, std::size_t> kinds;
-        for (const auto* e : app_.mistakeExercises())
-            if (e->packed_date >= since) ++kinds[e->kind];
-        return kinds;
+        return app_.mistakes_->mistakeKinds(since);
     }
 
     // The file dialogs.
     void choosePuzzleFile() override {
         app_.dialogs_.openFile(Dialogs::Purpose::OfflinePuzzlesFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
     }
+
+    // The user's names.
+    std::vector<std::string> userNames() const override { return app_.userNames(); }
+    void drawPlayerNames(const char* id) override { app_.drawPlayerNames(id); }
+
+    // The Board page's analysis.
+    const EngineEntry* analysisEngine() override { return app_.analysisEngine(); }
+    const AnalysisSettings& analysisSettings() override {
+        app_.loadBoardSettings();
+        return app_.board_.settings.analysis;
+    }
+
+    // Games reviewed as the Board page reviews a game.
+    const EngineEntry* engineNamed(const std::string& name) const override { return app_.engineNamed(name); }
+    std::unique_ptr<ReviewRunner> reviewInBackground(const EngineEntry& engine, const ReplayGame& game,
+                                                     int& processes) override {
+        // As the Board page reviews a game in the Chess space (#61, #63): nodes, one thread, an empty table each
+        // position, Lichess's evaluations kept offline taken as they are, the processes the tournaments leave.
+        app_.loadBoardSettings();
+        const auto& settings = app_.board_.settings;
+        ReviewRunner::Setup setup;
+        setup.engine       = engine;
+        setup.settings     = settings.analysis;
+        setup.game         = game;
+        setup.ceiling_ms   = settings.review_ceiling_ms;
+        setup.known        = app_.reviewKnown();
+        setup.reproducible = true;
+        processes          = reviewProcesses(std::max(1, settings.analysis.threads), app_.topology_.physical,
+                                             app_.topology_.logical, app_.tournamentCores());
+        setup.processes    = processes;
+        setup.second_line  = secondLines(game, false);
+        auto runner        = std::make_unique<ReviewRunner>();
+        runner->start(std::move(setup));
+        return runner;
+    }
+    int64_t reviewCeilingMs() override { return app_.board_.settings.review_ceiling_ms; }
+    bool boardAnalysing() const override { return app_.board_.analysing || app_.board_.reviewing(); }
+
+    // The repertoires.
+    std::array<std::unordered_set<uint64_t>, 2> repertoirePositions() override {
+        std::array<std::unordered_set<uint64_t>, 2> keys;
+        for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i) {
+            auto& set = keys[app_.repertoires().entries()[i].side == chess::Color::WHITE ? 0 : 1];
+            for (const auto& c : app_.trainingSummary(i).cards) set.insert(c.key);
+        }
+        return keys;
+    }
+
+    // Games opened on the Board from a session.
+    void openDatabaseGame(const std::string& pgn, const std::string& title, const std::filesystem::path& folder,
+                          const std::string& name, uint64_t id, int ply) override {
+        app_.readOnBoard(pgn, title);
+        BoardOrigin origin;
+        origin.folder      = folder;
+        origin.name        = name;
+        origin.id          = id;
+        app_.board_origin_ = std::move(origin);
+        app_.board_.ply    = std::min(ply, static_cast<int>(app_.board_.game.moves.size()));
+    }
+    void openGameOnBoard(ReplayGame game, int ply, std::string title) override {
+        app_.openOnBoard(std::move(game), ply, false, std::move(title), false);
+    }
+
+    // The Board's own game.
+    context::ShownGame shownGame() const override {
+        const auto& b = app_.board_;
+        std::optional<std::pair<std::filesystem::path, uint64_t>> origin;
+        if (app_.board_origin_) origin = std::make_pair(app_.board_origin_->folder, app_.board_origin_->id);
+        // As the guessing's part always asked (#81): an endgame's or a vision exercise's game counts as the Board's.
+        const bool session =
+            app_.training_ || app_.puzzles_->onBoard() || app_.mistakes_->onBoard() || app_.guessing_->onBoard();
+        return context::ShownGame{b.game, b.ply, b.chess960, b.title, std::move(origin), app_.page_ == Page::Board,
+                                  session};
+    }
+    int treeDatabase() const override { return app_.tree_db_; }
 
    private:
     // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.
@@ -479,21 +573,18 @@ class App::ModulesContext final : public AppContext {
     App& app_;
 };
 
-// A kind of training session still in App (#76, #81, #82): its session answers the Board's hooks with App's functions,
-// until the kind moves into a module of its own, as the puzzles did (puzzles_page.hpp).
+// A kind of training session still in App (#76, #82): its session answers the Board's hooks with App's functions,
+// until the kind moves into a module of its own, as the puzzles, the mistakes and the guessing did (puzzles_page.hpp,
+// mistakes_page.hpp, guess_page.hpp).
 class App::OwnSession final : public BoardSession {
    public:
-    enum class Kind { Training, Mistakes, Guess, Endgame, Vision };
+    enum class Kind { Training, Endgame, Vision };
     OwnSession(App& app, Kind kind) : app_(app), kind_(kind) {}
 
     void sessionMove(chess::Move move) override {
         switch (kind_) {
             case Kind::Training:
                 return app_.trainingAnswer(move);
-            case Kind::Mistakes:
-                return app_.mistakeAnswer(move);
-            case Kind::Guess:
-                return app_.guessAnswer(move);
             case Kind::Endgame:
                 return app_.endgameAnswer(move);
             case Kind::Vision:
@@ -504,10 +595,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.drawTrainingPage();
-            case Kind::Mistakes:
-                return app_.drawMistakePage();
-            case Kind::Guess:
-                return app_.drawGuessPage();
             case Kind::Endgame:
                 return app_.drawEndgamePage();
             case Kind::Vision:
@@ -518,10 +605,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.dropTraining();
-            case Kind::Mistakes:
-                return app_.dropMistakes();
-            case Kind::Guess:
-                return app_.dropGuess();
             case Kind::Endgame:
                 return app_.dropEndgame();
             case Kind::Vision:
@@ -532,10 +615,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.closeTraining(back);  // back to the Openings page, or the Training page in the review
-            case Kind::Mistakes:
-                return app_.closeMistakes(back);
-            case Kind::Guess:
-                return app_.closeGuess(back);
             case Kind::Endgame:
                 return app_.closeEndgame(back);
             case Kind::Vision:
@@ -547,11 +626,6 @@ class App::OwnSession final : public BoardSession {
             case Kind::Training:  // a question, or its cards being prepared
                 return app_.training_->phase == TrainingRun::Phase::Asking ||
                        app_.training_->phase == TrainingRun::Phase::Preparing;
-            case Kind::Mistakes:  // an exercise's question, its answer being judged
-                return app_.mistake_->phase == MistakeRun::Phase::Asking ||
-                       app_.mistake_->phase == MistakeRun::Phase::Checking;
-            case Kind::Guess:  // a guess, until the game's move is shown
-                return app_.guess_->phase != GuessRun::Phase::Shown && app_.guess_->phase != GuessRun::Phase::End;
             case Kind::Endgame:  // an endgame being played against the tables
                 return app_.endgame_->phase != EndgameRun::Phase::Done &&
                        app_.endgame_->phase != EndgameRun::Phase::End;
@@ -564,10 +638,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.training_->aside;
-            case Kind::Mistakes:
-                return app_.mistake_->aside;
-            case Kind::Guess:
-                return app_.guess_->aside;
             case Kind::Endgame:
                 return app_.endgame_->aside;
             case Kind::Vision:
@@ -579,10 +649,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return guide::topics::Training;
-            case Kind::Mistakes:
-                return guide::topics::Mistakes;
-            case Kind::Guess:
-                return guide::topics::GuessMoves;
             case Kind::Endgame:
                 return guide::topics::Endgames;
             case Kind::Vision:
@@ -602,9 +668,9 @@ void App::initChessModules() {
     arenas_           = std::make_unique<LichessArenasPage>(*modules_context_);
     bot_              = std::make_unique<LichessBotPage>(*modules_context_);
     puzzles_          = std::make_unique<PuzzlesPage>(*modules_context_);
+    mistakes_         = std::make_unique<MistakesPage>(*modules_context_);
+    guessing_         = std::make_unique<GuessPage>(*modules_context_);
     training_session_ = std::make_unique<OwnSession>(*this, OwnSession::Kind::Training);
-    mistake_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Mistakes);
-    guess_session_    = std::make_unique<OwnSession>(*this, OwnSession::Kind::Guess);
     endgame_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Endgame);
     vision_session_   = std::make_unique<OwnSession>(*this, OwnSession::Kind::Vision);
 }
@@ -614,8 +680,8 @@ void App::initChessModules() {
 BoardSession* App::boardSession() const {
     if (training_) return training_session_.get();
     if (puzzles_->onBoard()) return puzzles_.get();
-    if (mistake_) return mistake_session_.get();
-    if (guess_) return guess_session_.get();
+    if (mistakes_->onBoard()) return mistakes_.get();
+    if (guessing_->onBoard()) return guessing_.get();
     if (endgame_) return endgame_session_.get();
     if (vision_) return vision_session_.get();
     return nullptr;
@@ -648,9 +714,6 @@ const char* App::sessionGuideTopic() const {
     const auto* session = boardSession();
     return session ? session->guideTopic() : nullptr;
 }
-
-// The puzzles' hook in the guessing's part (#80), which does not include its module's header.
-bool App::puzzleSeriesOn() const { return puzzles_->onBoard(); }
 
 // The arenas' hooks in fastchess-gui's pages (#95), which do not include its module's header.
 bool App::arenaHoldsAids() const { return arenas_->holdsAids(); }
@@ -720,7 +783,8 @@ void App::pollChess() {
     pollTheory();              // the theory studies: read, read again when their files change (#77)
     pollTraining();            // a repertoire's training: its cards prepared, its first question (#76)
     puzzles_->poll();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
-    pollMistakes();            // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
+    mistakes_->poll();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
+    guessing_->poll();         // guessing the moves: a game drawn at random, the theory, the engine's searches (#81)
     pollEndgames();            // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
     pollEndgameCheck();        // a finished tournament's endgames against the tables (#94)
     pollEngineGame();          // a game against an engine: kept at each move, its end, a hint (#83)
@@ -929,13 +993,7 @@ bool App::applyChessFocusWord(const std::string& w) {
         page_         = Page::Training;
         training_tab_ = w == "training-mistakes" ? 2 : 3;
     });
-    words.on({"mistakes-session", "mistakes-review"}, [&] {
-        // A session of the exercises of the user's mistakes: today's, or the day's review of them alone (#81).
-        if (!startMistakes(w == "mistakes-review")) {
-            page_         = Page::Training;
-            training_tab_ = 2;
-        }
-    });
+    mistakes_->addFocusWords(words, w);  // a session of the user's mistakes: their module's (#81)
     words.on({"training-endgames", "training-vision"}, [&] {
         // The Training page's parts of #82: the endgames against the tables and the mates, board vision.
         page_         = Page::Training;
@@ -964,13 +1022,7 @@ bool App::applyChessFocusWord(const std::string& w) {
         else
             startHeadLines();
     });
-    words.on({"guess-board", "guess-random"}, [&] {
-        // Guessing the moves of the Board page's game from the position shown, or of a random game (#81).
-        if (w == "guess-board")
-            startGuessBoard();
-        else
-            (void)startGuessRandom();
-    });
+    guessing_->addFocusWords(words, w);  // guessing the moves of a game: its module's (#81)
     words.on({"board-analysis*"}, [&] {
         // The study Board's Analysis tab (#78); board-analysis=FILE[@PLY]: FILE on the board (at that ply once
         // read), analysed; board-analysis-menu[=FILE[@PLY]]: its "+ An engine" open too.

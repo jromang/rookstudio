@@ -1,22 +1,26 @@
-// Your mistakes as exercises (#81, mockup M12, board 2; mistakes.hpp): the user's names, the Training page's part "My
-// mistakes" (the exercises and their kinds, the games they come from, the latest games without a review reviewed in the
-// background), and a session on the Board page whose column becomes the exercise's, as the repertoires' training and
-// the puzzles do. The states of the mockup: the list, an exercise, the answer right or wrong, the end.
+// Your mistakes as exercises (#81, mockup M12, board 2), a module of its own out of App (#107; mistakes_page.hpp): the
+// Training page's part "My mistakes" (the exercises and their kinds, the games they come from, the latest games without
+// a review reviewed in the background), and a session on the Board page whose column becomes the exercise's, as the
+// repertoires' training and the puzzles do. The states of the mockup: the list, an exercise, the answer right or wrong,
+// the end.
 //
 // The keys of an exercise: a move played on the board, or typed (its letters open the move field); Alt+H a hint (the
 // piece to play), Space "I don't know", Escape stops. After the answer, Enter goes on (or tries again after a wrong
 // one), Alt+A the engine.
 
+#include "mistakes_page.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <ctime>
+#include <deque>
 #include <filesystem>
 #include <future>
 #include <set>
 #include <sstream>
+#include <utility>
 
-#include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
@@ -25,13 +29,15 @@
 #include <study/game_tree.hpp>
 #include <study/import.hpp>
 
-#include "app.hpp"
+#include "board_page.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "console.hpp"
+#include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "review_bridge.hpp"
+#include "training.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -220,80 +226,41 @@ std::string shortDate(const std::string& date) {
 
 }  // namespace
 
-// ---------------------------------------------------------------------------
-// The user's names
+MistakesPage::MistakesPage(MistakesContext& app) : app_(app) {}
 
-std::vector<std::string> App::userNames() const {
-    auto out = player_names_;
-    if (lichess_account_ && !lichess_account_->username.empty() && !isUserName(lichess_account_->username, out))
-        out.push_back(lichess_account_->username);
-    return out;
+MistakesPage::~MistakesPage() { cancelScan(); }
+
+bool MistakesPage::hidesAids() const {
+    // An exercise's question, its answer being judged.
+    return mistake_ && (mistake_->phase == MistakePhase::Asking || mistake_->phase == MistakePhase::Checking);
 }
 
-void App::setPlayerNames(std::vector<std::string> names) {
-    std::erase_if(names, [](const std::string& n) { return nameWords(n).empty(); });
-    player_names_ = std::move(names);
-    if (!options_.scripted) storage_.setPlayerNames(player_names_);
-    mistake_scan_checked_ = {};  // looked for again at once
-}
+const char* MistakesPage::guideTopic() const { return guide::topics::Mistakes; }
 
-void App::drawPlayerNames(const char* id) {
-    ImGui::PushID(id);
-    std::optional<std::size_t> remove;
-    for (std::size_t i = 0; i < player_names_.size(); ++i) {
-        const auto label = player_names_[i] + "  ×";
-        if (i > 0) ui::sameLineOrWrap(label.c_str());
-        if (chip(label.c_str(), false, fmt::format("name{}", i).c_str())) remove = i;
-        tip(TR("Click to take this name away."));
-    }
-    if (lichess_account_ && !lichess_account_->username.empty()) {
-        const auto label = trf("{} (Lichess)", lichess_account_->username);
-        if (!player_names_.empty()) ui::sameLineOrWrap(label.c_str());
-        ImGui::BeginDisabled();
-        (void)chip(label.c_str(), true, "lichess_name");
-        ImGui::EndDisabled();
-        tip(TR("The linked Lichess account's name counts by itself."));
-    }
-    if (remove) {
-        auto names = player_names_;
-        names.erase(names.begin() + static_cast<std::ptrdiff_t>(*remove));
-        setPlayerNames(std::move(names));
-    }
-    ImGui::SetNextItemWidth(px(260));
-    const bool entered =
-        ImGui::InputTextWithHint("##player_name", TR("A name you play under, then Enter"), player_name_input_.data(),
-                                 player_name_input_.size(), ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::SameLine();
-    const bool add = ImGui::Button(TR("Add##player_name"));
-    if ((entered || add) && !nameWords(player_name_input_.data()).empty()) {
-        auto names = player_names_;
-        names.emplace_back(player_name_input_.data());
-        setPlayerNames(std::move(names));
-        player_name_input_.fill(0);
-    }
-    ImGui::PopID();
+void MistakesPage::cancelScan() {
+    if (mistake_scan_job_) *mistake_scan_job_->cancel = true;
 }
 
 // ---------------------------------------------------------------------------
 // The exercises, looked for
 
-MistakeRecord& App::mistakeRecord() {
+MistakeRecord& MistakesPage::mistakeRecord() {
     if (!mistake_record_) mistake_record_ = readMistakeRecord(mistakesFolder());
     return *mistake_record_;
 }
 
-void App::saveMistakeRecord() {
-    if (options_.scripted || !mistake_record_) return;  // a run for captures leaves the profile as it was
+void MistakesPage::saveMistakeRecord() {
+    if (app_.scripted() || !mistake_record_) return;  // a run for captures leaves the profile as it was
     if (!writeMistakeRecord(mistakesFolder(), *mistake_record_))
         Console::instance().add(
             trf("The exercises of your mistakes could not be kept in {}", mistakesFolder().string()), true);
 }
 
-std::string App::mistakeScanKey() {
+std::string MistakesPage::mistakeScanKey() {
     std::string key = lang() == commentary::Lang::Fr ? "fr" : "en";
-    for (const auto& n : userNames()) key += "|" + n;
+    for (const auto& n : app_.userNames()) key += "|" + n;
     key += "#";
-    auto& s = shelf();
+    auto& s = app_.shelf();
     for (std::size_t i = 0; i < s.entries().size(); ++i) {
         const auto& e = s.entries()[i];
         if (e.source) continue;  // a tournament's games or a file read where it is: not the user's databases
@@ -301,20 +268,16 @@ std::string App::mistakeScanKey() {
         key += fmt::format("|{}:{}", e.folder.string(), db ? db->snapshot()->generation() : 0);
     }
     std::error_code ec;
-    const auto written = fs::last_write_time(storage_.root() / "analyses", ec);
+    const auto written = fs::last_write_time(app_.profileDir() / "analyses", ec);
     key += fmt::format("|{}", ec ? 0 : written.time_since_epoch().count());
     return key;
 }
 
-std::vector<const MistakeExercise*> App::mistakeExercises(const std::string* kind) {
+std::vector<const MistakeExercise*> MistakesPage::mistakeExercises(const std::string* kind) {
     // The positions the repertoires train, by side: trained on the Openings page, not here. Gathered once a frame.
-    if (mistake_keys_frame_ != ImGui::GetFrameCount()) {
-        mistake_keys_frame_ = ImGui::GetFrameCount();
-        for (auto& set : mistake_repertoire_keys_) set.clear();
-        for (std::size_t i = 0; i < repertoires().entries().size(); ++i) {
-            auto& set = mistake_repertoire_keys_[repertoires().entries()[i].side == chess::Color::WHITE ? 0 : 1];
-            for (const auto& c : trainingSummary(i).cards) set.insert(c.key);
-        }
+    if (mistake_keys_frame_ != app_.frame()) {
+        mistake_keys_frame_      = app_.frame();
+        mistake_repertoire_keys_ = app_.repertoirePositions();
     }
     std::vector<const MistakeExercise*> out;
     for (const auto& [key, e] : mistakeRecord().exercises) {
@@ -325,20 +288,86 @@ std::vector<const MistakeExercise*> App::mistakeExercises(const std::string* kin
     return out;
 }
 
-MistakeCounts App::mistakeDayCounts(const std::string* kind) {
-    return mistakeCounts(mistakeExercises(kind), trainingDay(epochNow()),
-                         static_cast<std::size_t>(std::max(0, trainingSettings().new_per_day)));
+std::map<std::string, std::size_t> MistakesPage::mistakeKinds(uint32_t since) {
+    std::map<std::string, std::size_t> kinds;
+    for (const auto* e : mistakeExercises())
+        if (e->packed_date >= since) ++kinds[e->kind];
+    return kinds;
 }
 
-void App::pollMistakes() {
+MistakeCounts MistakesPage::mistakeDayCounts(const std::string* kind) {
+    return mistakeCounts(mistakeExercises(kind), trainingDay(epochNow()),
+                         static_cast<std::size_t>(std::max(0, app_.trainingSettings().new_per_day)));
+}
+
+// ---------------------------------------------------------------------------
+// The day's review, the Home page, the palette, the --focus words
+
+ReviewCount MistakesPage::reviewCount() {
+    ReviewCount out;
+    out.kind       = ReviewKind::Mistakes;
+    const auto c   = mistakeDayCounts();
+    out.due        = c.due;
+    out.tomorrow   = c.tomorrow;
+    out.three_days = c.three_days;
+    out.answer_ms  = mistakeRecord().answer_ms;
+    return out;
+}
+
+bool MistakesPage::startReview() { return startMistakes(true); }
+
+void MistakesPage::drawHomeLine() {
+    if (!mistake_) return;
+    const auto& m    = *mistake_;
+    const auto label = m.phase != MistakeRun::Phase::End
+                           ? trf("Your mistakes: {} of {}", std::min(m.done + 1, m.total), m.total)
+                           : std::string(TR("Your mistakes"));
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Back to the session"))) app_.showSession();
+}
+
+void MistakesPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
+    add(TR("My mistakes"), training_view, [this] { app_.showTrainingPage(2); });
+    if (mistakeLock().empty()) {
+        const auto c = mistakeDayCounts();
+        if (c.due > 0)
+            add(trn("Review my mistakes · {} due", "Review my mistakes · {} due", c.due, ui::exactCount(c.due)),
+                TR("Training"), [this] { app_.reviewOnly(ReviewKind::Mistakes); });
+        if (c.due + c.today > 0)
+            add(trn("Exercises from my mistakes · {}", "Exercises from my mistakes · {}", c.due + c.today,
+                    ui::exactCount(c.due + c.today)),
+                TR("Training"), [this] {
+                    mistake_kind_.clear();
+                    startMistakes(false);
+                });
+    }
+    if (!mistake_unreviewed_.empty() && !mistake_reviews_)
+        add(trn("Review {} recent game of mine in the background", "Review {} recent games of mine in the background",
+                mistake_unreviewed_.size(), mistake_unreviewed_.size()),
+            TR("Training"), [this] { startMistakeReviews(); });
+    if (mistake_reviews_) add(TR("Cancel the reviews of my games"), TR("Training"), [this] { cancelMistakeReviews(); });
+}
+
+void MistakesPage::addFocusWords(FocusWords& words, const std::string& w) {
+    words.on({"mistakes-session", "mistakes-review"}, [&] {
+        // A session of the exercises of the user's mistakes: today's, or the day's review of them alone (#81).
+        if (!startMistakes(w == "mistakes-review")) app_.showTrainingPage(2);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// The exercises looked for, the games reviewed in the background, a session's answer judged
+
+void MistakesPage::poll() {
     const auto now = Clock::now();
     // Looked for again when what it looks at changed: on the Training page, every two seconds at most.
-    if (page_ == Page::Training && !mistake_scan_job_ && now - mistake_scan_checked_ >= std::chrono::seconds(2)) {
+    if (app_.trainingShown() && !mistake_scan_job_ && now - mistake_scan_checked_ >= std::chrono::seconds(2)) {
         mistake_scan_checked_ = now;
         auto key              = mistakeScanKey();
         if (key != mistake_scan_of_) {
             std::vector<MistakeSource> sources;
-            auto& s = shelf();
+            auto& s = app_.shelf();
             for (std::size_t i = 0; i < s.entries().size(); ++i) {
                 const auto& e = s.entries()[i];
                 if (e.source) continue;
@@ -347,8 +376,8 @@ void App::pollMistakes() {
             MistakeScanJob job;
             job.of = std::move(key);
             job.done =
-                std::async(std::launch::async, [sources = std::move(sources), names = userNames(),
-                                                analyses = storage_.root() / "analyses", before = mistakeRecord(),
+                std::async(std::launch::async, [sources = std::move(sources), names = app_.userNames(),
+                                                analyses = app_.profileDir() / "analyses", before = mistakeRecord(),
                                                 language = lang(), cancel = job.cancel] {
                     study::enterBackground();
                     return scanMistakes(sources, names, analyses, before, RECENT_GAMES, language, cancel.get());
@@ -394,14 +423,14 @@ void App::pollMistakes() {
         auto& r = *mistake_reviews_;
         // The Board page's own analysis and review have the machine meanwhile; a live game of the user's on Lichess
         // silences every engine (#48).
-        r.runner->setPaused(board_.analysing || board_.reviewing() || liveGameOn() != nullptr);
+        r.runner->setPaused(app_.boardAnalysing() || app_.liveGameOn());
         if (r.runner->state(r.state, r.version) && !r.state.running) {
             const auto& u = r.games[r.done];
             if (!r.state.error.empty()) {
                 r.error = r.state.error;
                 r.runner.reset();
             } else if (r.state.settled.complete(u.game.moves.size())) {
-                const auto analyses = storage_.root() / "analyses";
+                const auto analyses = app_.profileDir() / "analyses";
                 (void)saveReview(analyses, u.game, r.state.settled);
                 auto exercises = exercisesOf(u.game, r.state.settled, u.side, lang());
                 for (auto& e : exercises) {
@@ -449,27 +478,16 @@ void App::pollMistakes() {
             }
         }
     }
-    // A game drawn at random for guessing.
-    if (guess_pick_.valid() && guess_pick_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto pick = guess_pick_.get();
-        if (pick.game)
-            startGuess(std::move(*pick.game), pick.chess960, std::move(pick.title), guess_pick_side_, 0,
-                       std::make_pair(pick.folder, pick.id));
-        else
-            guess_error_ = pick.error == "none" ? TR("No game of this database passes the filter.")
-                                                : TR("No game long enough passes the filter.");
-    }
-    if (guess_) pollGuess();
 }
 
 // ---------------------------------------------------------------------------
 // The games without a review, reviewed in the background
 
-void App::startMistakeReviews() {
+void MistakesPage::startMistakeReviews() {
     if (mistake_reviews_ || mistake_unreviewed_.empty()) return;
-    const auto* engine = analysisEngine();
+    const auto* engine = app_.analysisEngine();
     if (!engine) {
-        boardToast(TR("No engine to review with: add one on the Engines page."));
+        app_.toast(TR("No engine to review with: add one on the Engines page."));
         return;
     }
     MistakeReviews r;
@@ -480,7 +498,7 @@ void App::startMistakeReviews() {
     startMistakeReview();
 }
 
-void App::startMistakeReview() {
+void MistakesPage::startMistakeReview() {
     auto& r = *mistake_reviews_;
     r.runner.reset();
     if (r.done >= r.games.size()) {
@@ -492,40 +510,26 @@ void App::startMistakeReview() {
         mistake_scan_checked_ = {};
         return;
     }
-    const auto it = std::find_if(engines_.begin(), engines_.end(), [&](const auto& e) { return e.name == r.engine; });
-    if (it == engines_.end()) {
+    const auto* engine = app_.engineNamed(r.engine);
+    if (!engine) {
         r.error = trf("{} is no longer in the library: add an engine on the Engines page.", r.engine);
         return;
     }
     // As the Board page reviews a game in the Chess space (#61, #63): nodes, one thread, an empty table each
     // position, Lichess's evaluations kept offline taken as they are, the processes the tournaments leave.
-    loadBoardSettings();
-    const auto& u = r.games[r.done];
-    ReviewRunner::Setup setup;
-    setup.engine       = *it;
-    setup.settings     = board_.settings.analysis;
-    setup.game         = u.game;
-    setup.ceiling_ms   = board_.settings.review_ceiling_ms;
-    setup.known        = reviewKnown();
-    setup.reproducible = true;
-    r.processes = reviewProcesses(std::max(1, board_.settings.analysis.threads), topology_.physical, topology_.logical,
-                                  tournamentCores());
-    setup.processes   = r.processes;
-    setup.second_line = secondLines(u.game, false);
-    r.runner          = std::make_unique<ReviewRunner>();
-    r.runner->start(std::move(setup));
+    r.runner       = app_.reviewInBackground(*engine, r.games[r.done].game, r.processes);
     r.state        = {};
     r.version      = 0;
     r.game_started = Clock::now();
 }
 
-void App::cancelMistakeReviews() {
+void MistakesPage::cancelMistakeReviews() {
     if (!mistake_reviews_) return;
     if (mistake_reviews_->runner) mistake_reviews_->runner->stop();
     mistake_reviews_.reset();
 }
 
-void App::drawMistakeReviewsCard() {
+void MistakesPage::drawMistakeReviewsCard() {
     if (mistake_reviews_) {
         auto& r = *mistake_reviews_;
         beginTinted("##mistake_reviews", ui::ACCENT);
@@ -542,7 +546,7 @@ void App::drawMistakeReviewsCard() {
             const auto n        = std::max<std::size_t>(1, r.state.done.size());
             const auto searched = static_cast<double>(std::count(r.state.done.begin(), r.state.done.end(), true)) /
                                   static_cast<double>(n);
-            const int passes    = reviewPasses(board_.settings.review_ceiling_ms);
+            const int passes    = reviewPasses(app_.reviewCeilingMs());
             part                = (static_cast<double>(r.state.pass) + searched) / std::max(1, passes);
         }
         ImGui::ProgressBar(static_cast<float>((static_cast<double>(r.done) + std::clamp(part, 0.0, 1.0)) /
@@ -558,8 +562,8 @@ void App::drawMistakeReviewsCard() {
                 for (std::size_t i = r.done; i < total; ++i) plies += static_cast<double>(r.games[i].game.moves.size());
                 left = " · " + trf("about {} left", ui::formatDuration(plies * r.seconds / r.plies_done));
             }
-            const bool live   = liveGameOn() != nullptr;
-            const bool paused = live || board_.analysing || board_.reviewing();
+            const bool live   = app_.liveGameOn();
+            const bool paused = live || app_.boardAnalysing();
             ImGui::TextDisabled(
                 "%s", (paused ? (live ? trf("In the background: {} of {} · waiting while one of your games is played "
                                             "on Lichess",
@@ -585,7 +589,7 @@ void App::drawMistakeReviewsCard() {
         trn("{} of your latest games has no review.", "{} of your latest games have no review.", n, n).c_str());
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("Reviewed, they give their exercises."));
-    const auto* engine = analysisEngine();
+    const auto* engine = app_.analysisEngine();
     if (primaryButton(trn("Review it · in the background", "Review them · in the background", n).c_str(),
                       engine != nullptr))
         startMistakeReviews();
@@ -608,7 +612,7 @@ void App::drawMistakeReviewsCard() {
 // ---------------------------------------------------------------------------
 // The Training page's part
 
-void App::drawTrainingMistakes() {
+void MistakesPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::Mistakes);
     bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
                  (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
@@ -617,7 +621,7 @@ void App::drawTrainingMistakes() {
         ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
         ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, owner);
     }
-    const auto names = userNames();
+    const auto names = app_.userNames();
     {
         std::string who;
         for (std::size_t i = 0; i < names.size() && i < 4; ++i) who += (who.empty() ? "“" : ", “") + names[i] + "”";
@@ -638,7 +642,7 @@ void App::drawTrainingMistakes() {
                    "where it plays is yours. A word is enough when it is yours alone; the linked Lichess account's "
                    "name counts by itself."),
                 true);
-        drawPlayerNames("training_names");
+        app_.drawPlayerNames("training_names");
         ImGui::PopTextWrapPos();
         endTinted();
         return;
@@ -779,15 +783,16 @@ void App::drawTrainingMistakes() {
 // ---------------------------------------------------------------------------
 // A session
 
-std::string App::mistakeLock() const { return trainingLock(); }
+std::string MistakesPage::mistakeLock() const { return app_.sessionLock(); }
 
-bool App::startMistakes(bool review, bool new_only) {
+bool MistakesPage::startMistakes(bool review, bool new_only) {
     if (!mistakeLock().empty()) return false;
     const auto day          = trainingDay(epochNow());
     const std::string* kind = review || mistake_kind_.empty() ? nullptr : &mistake_kind_;
     const auto list         = mistakeExercises(kind);
-    const auto counts = mistakeCounts(list, day, static_cast<std::size_t>(std::max(0, trainingSettings().new_per_day)));
-    const auto order  = mistakeOrder(list, day, review ? 0 : counts.today, !new_only);
+    const auto counts =
+        mistakeCounts(list, day, static_cast<std::size_t>(std::max(0, app_.trainingSettings().new_per_day)));
+    const auto order = mistakeOrder(list, day, review ? 0 : counts.today, !new_only);
     if (order.empty()) return false;
     auto run    = std::make_unique<MistakeRun>();
     run->review = review;
@@ -799,28 +804,22 @@ bool App::startMistakes(bool review, bool new_only) {
     return true;
 }
 
-void App::startMistakeRun(std::unique_ptr<MistakeRun> run) {
-    const bool chained = review_running_;
-    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
-    review_running_ = chained;
+void MistakesPage::startMistakeRun(std::unique_ptr<MistakeRun> run) {
     for (std::size_t i = 0; i < run->exercises.size(); ++i) run->queue.push_back(i);
     run->total = run->exercises.size();
-    run->flip  = board_.flip;
-    run->tab   = board_side_tab_;
-    // The game on the board goes among the recent games (Ctrl+Tab), given back after the session.
-    const auto& b = board_;
-    run->aside    = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
-    toStudyBoard();
-    openOnBoard(ReplayGame{}, 0, false, TR("Your mistakes"), false);
-    board_back_.reset();
-    if (board_side_tab_ == 0) board_side_tab_ = 2;  // with the answer, the tree rather than the notation's editing
-    run->started = Clock::now();
-    mistake_     = std::move(run);
+    // The Board taken, the session that holds it closed (the day's review going on): the game on the board goes among
+    // the recent games (Ctrl+Tab), given back after the session; with the answer, the tree rather than the notation's
+    // editing.
+    const auto taken = app_.takeBoard(TR("Your mistakes"), true);
+    run->aside       = taken.aside;
+    run->flip        = taken.flip;
+    run->tab         = taken.tab;
+    run->started     = Clock::now();
+    mistake_         = std::move(run);
     askMistake();
 }
 
-void App::showMistakePosition(const MistakeExercise& e, std::optional<chess::Move> then) {
-    auto& b = board_;
+void MistakesPage::showMistakePosition(const MistakeExercise& e, std::optional<chess::Move> then) {
     ReplayGame game;
     game.start_fen = e.start_fen;
     chess::Board board(e.start_fen.empty() ? std::string(chess::constants::STARTPOS) : e.start_fen);
@@ -837,27 +836,10 @@ void App::showMistakePosition(const MistakeExercise& e, std::optional<chess::Mov
         board.makeMove(m);
     }
     game.headers = {{"White", e.white}, {"Black", e.black}, {"Event", e.event}, {"Date", e.date}};
-    b.game       = std::move(game);
-    b.tree       = GameTree{b.game, {}};
-    b.line       = -1;
-    b.ply        = static_cast<int>(b.game.moves.size());
-    b.chess960   = false;
-    b.selected.reset();
-    b.promotion.reset();
-    b.preview.reset();
-    b.drag.reset();
-    b.drag_over.reset();
-    b.move_typed.reset();
-    b.move_error.clear();
-    b.comment_edit.reset();
-    b.undo.clear();
-    b.redo.clear();
-    b.changes     = {};
-    b.start_notes = {};
-    b.new_game    = true;
+    app_.showSessionGame(std::move(game));
 }
 
-void App::askMistake() {
+void MistakesPage::askMistake() {
     auto& r = *mistake_;
     if (r.queue.empty()) return finishMistakes(false);
     r.current = r.queue.front();
@@ -870,22 +852,22 @@ void App::askMistake() {
     r.phase       = MistakePhase::Asking;
     const auto& e = r.exercises[r.current];
     showMistakePosition(e);
-    board_.flip = e.side() == chess::Color::BLACK;
-    r.asked     = Clock::now();
+    app_.setFlip(e.side() == chess::Color::BLACK);
+    r.asked = Clock::now();
 }
 
-void App::mistakeAnswer(chess::Move move) {
+void MistakesPage::mistakeAnswer(chess::Move move) {
     auto& r = *mistake_;
-    if (r.phase != MistakePhase::Asking || liveGameOn()) return;
+    if (r.phase != MistakePhase::Asking || app_.liveGameOn()) return;
     const auto& e = r.exercises[r.current];
-    if (board_.ply != static_cast<int>(e.moves.size())) return;  // the question's position only
+    if (app_.sessionPly() != static_cast<int>(e.moves.size())) return;  // the question's position only
     const auto board = e.board();
     r.played         = chess::uci::moveToSan(board, move);
     r.played_move    = move;
     r.seconds        = since(r.asked);
     r.answered       = Clock::now();
     showMistakePosition(e, move);
-    board_.flip    = e.side() == chess::Color::BLACK;
+    app_.setFlip(e.side() == chess::Color::BLACK);
     const auto uci = chess::uci::moveToUci(move, false);
     r.check        = {};
     r.judge_used   = false;
@@ -911,11 +893,9 @@ void App::mistakeAnswer(chess::Move move) {
         return mistakeJudged();
     }
     // The review's engine at the review's settings: one thread, its table's size, its nodes, from an empty table.
-    const EngineEntry* engine = nullptr;
-    for (const auto& x : engines_)
-        if (x.name == e.engine) engine = &x;
-    r.judge_other = engine == nullptr;
-    if (!engine) engine = analysisEngine();
+    const EngineEntry* engine = app_.engineNamed(e.engine);
+    r.judge_other             = engine == nullptr;
+    if (!engine) engine = app_.analysisEngine();
     if (!engine) {
         r.check_error = TR("No engine to judge the move: add one on the Engines page.");
         r.phase       = MistakePhase::Wrong;
@@ -937,14 +917,14 @@ void App::mistakeAnswer(chess::Move move) {
     r.phase = MistakePhase::Checking;
 }
 
-void App::mistakeJudged() {
+void MistakesPage::mistakeJudged() {
     auto& r          = *mistake_;
     const bool right = r.check.right;
     if (!r.retry && !r.practice) mistakeGrade(right);
     r.phase = right ? MistakePhase::Right : MistakePhase::Wrong;
 }
 
-void App::mistakeGrade(bool right) {
+void MistakesPage::mistakeGrade(bool right) {
     auto& r        = *mistake_;
     auto& e        = r.exercises[r.current];
     const auto now = epochNow();
@@ -967,7 +947,7 @@ void App::mistakeGrade(bool right) {
         const auto ms    = static_cast<int64_t>(std::min(r.seconds, 600.0) * 1000);
         record.answer_ms = record.answer_ms > 0 ? (record.answer_ms * 7 + ms) / 8 : ms;
         saveMistakeRecord();
-        if (!options_.scripted) appendMistakeAnswer(mistakesFolder(), e.key, now, r.rating, ms, r.played);
+        if (!app_.scripted()) appendMistakeAnswer(mistakesFolder(), e.key, now, r.rating, ms, r.played);
     }
     if (!r.again) {
         r.outcomes.push_back({r.current, right, right ? std::string() : r.played});
@@ -975,19 +955,19 @@ void App::mistakeGrade(bool right) {
     }
 }
 
-void App::mistakeDontKnow() {
+void MistakesPage::mistakeDontKnow() {
     auto& r = *mistake_;
-    if (r.phase != MistakePhase::Asking || liveGameOn()) return;
+    if (r.phase != MistakePhase::Asking || app_.liveGameOn()) return;
     r.played.clear();
     r.seconds  = since(r.asked);
     r.answered = Clock::now();
     if (!r.retry && !r.practice) mistakeGrade(false);
     r.shown = true;
-    board_.move_typed.reset();
+    app_.dropTypedMove();
     r.phase = MistakePhase::Wrong;
 }
 
-void App::mistakeRetry() {
+void MistakesPage::mistakeRetry() {
     auto& r = *mistake_;
     if (r.phase != MistakePhase::Wrong) return;
     showMistakePosition(r.exercises[r.current]);
@@ -999,25 +979,25 @@ void App::mistakeRetry() {
     r.asked = Clock::now();
 }
 
-void App::mistakeNext() {
+void MistakesPage::mistakeNext() {
     auto& r = *mistake_;
     if (!r.queue.empty()) r.queue.pop_front();
     if (r.queue.empty()) return finishMistakes(false);
     askMistake();
 }
 
-void App::finishMistakes(bool stopped) {
+void MistakesPage::finishMistakes(bool stopped) {
     auto& r        = *mistake_;
     r.phase        = MistakePhase::End;
     r.stopped      = stopped;
     r.took         = since(r.started);
     r.missed_shown = -1;
     r.judge.stop();
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
 }
 
-void App::reviewMissedMistakes() {
+void MistakesPage::reviewMissedMistakes() {
     auto& r = *mistake_;
     std::deque<std::size_t> missed;
     for (const auto& o : r.outcomes)
@@ -1030,52 +1010,41 @@ void App::reviewMissedMistakes() {
     askMistake();
 }
 
-void App::closeMistakes(bool to_training) {
+void MistakesPage::closeMistakes(bool to_training) {
     if (!mistake_) return;
     if (to_training) {
-        review_running_ = false;
-        review_chain_.clear();
-        training_enter_puzzles_ = false;
+        app_.stopReview();
+        app_.setEnterStartsPuzzles(false);  // back on the page, Enter reviews again
     }
-    const bool aside = mistake_->aside, flip = mistake_->flip;
-    board_side_tab_ = mistake_->tab;
+    BoardTaken taken;
+    taken.aside = mistake_->aside;
+    taken.flip  = mistake_->flip;
+    taken.tab   = mistake_->tab;
     mistake_.reset();
-    forget_board_game_ = true;  // the session's position is no game to remember
-    if (aside && !recent_games_.empty())
-        restoreRecentGame(0);
-    else
-        newBoardGame();
-    forget_board_game_ = false;
-    board_.flip        = flip;
-    board_back_.reset();
-    page_ = to_training ? Page::Training : Page::Board;
+    app_.giveBoardBack(taken, to_training);  // the session's position is no game to remember
 }
 
-void App::dropMistakes() {
-    board_.flip     = mistake_->flip;
-    board_side_tab_ = mistake_->tab;
+void MistakesPage::dropMistakes() {
+    BoardTaken taken;
+    taken.aside = mistake_->aside;
+    taken.flip  = mistake_->flip;
+    taken.tab   = mistake_->tab;
     mistake_.reset();
-    review_running_ = false;
-    review_chain_.clear();
-    forget_board_game_ = true;
+    app_.stopReview();
+    app_.leaveBoard(taken);  // the game that comes takes the board; the one put aside stays among the recent ones
 }
 
-void App::openMistakeGame(const MistakeExercise& e) {
-    auto& s = shelf();
+void MistakesPage::openMistakeGame(const MistakeExercise& e) {
+    auto& s = app_.shelf();
     for (std::size_t i = 0; i < s.entries().size(); ++i) {
         if (s.entries()[i].folder != e.folder || s.entries()[i].source) continue;
         const auto db = s.open(i);
         if (!db) break;
         const auto snapshot = db->snapshot();
         if (e.game_id >= snapshot->games() || snapshot->deleted(e.game_id)) break;
-        readOnBoard(study::importedPgn(snapshot->game(e.game_id)),
-                    trf("{}, game {}", s.entries()[i].name, ui::exactCount(e.game_id + 1)));
-        BoardOrigin origin;
-        origin.folder = e.folder;
-        origin.name   = s.entries()[i].name;
-        origin.id     = e.game_id;
-        board_origin_ = std::move(origin);
-        board_.ply    = std::min(static_cast<int>(e.moves.size()), static_cast<int>(board_.game.moves.size()));
+        app_.openDatabaseGame(study::importedPgn(snapshot->game(e.game_id)),
+                              trf("{}, game {}", s.entries()[i].name, ui::exactCount(e.game_id + 1)), e.folder,
+                              s.entries()[i].name, e.game_id, static_cast<int>(e.moves.size()));
         return;
     }
     // Its database is gone: the game up to the mistake, as the exercise keeps it.
@@ -1092,13 +1061,13 @@ void App::openMistakeGame(const MistakeExercise& e) {
         game.moves.push_back(std::move(r));
     }
     const auto ply = static_cast<int>(game.moves.size());
-    openOnBoard(std::move(game), ply, false, gameLine(e), false);
+    app_.openGameOnBoard(std::move(game), ply, gameLine(e));
 }
 
 // ---------------------------------------------------------------------------
 // The Board page during a session
 
-void App::mistakeKeys() {
+void MistakesPage::mistakeKeys() {
     auto& r        = *mistake_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
@@ -1114,12 +1083,12 @@ void App::mistakeKeys() {
         case MistakePhase::Asking:
             if (escape) {
                 finishMistakes(true);
-            } else if (!liveGameOn()) {
+            } else if (!app_.liveGameOn()) {
                 if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_H)) r.hint = r.hinted = true;
                 if (plain && ImGui::IsKeyPressed(ImGuiKey_Space, false))
                     mistakeDontKnow();
                 else
-                    boardMoveKeys();
+                    app_.moveKeys();
             }
             break;
         case MistakePhase::Checking:
@@ -1134,17 +1103,17 @@ void App::mistakeKeys() {
                     mistakeNext();
                 else
                     mistakeRetry();
-            } else if (boardKey()) {
-                setBoardAnalysis(!board_.analysing);  // Alt+A: the engine, now that the answer is given
+            } else {
+                (void)app_.analysisKey();  // Alt+A: the engine, now that the answer is given
             }
             break;
         case MistakePhase::End: {
             const bool missed = !r.practice && std::any_of(r.outcomes.begin(), r.outcomes.end(),
                                                            [](const auto& o) { return !o.right; });
-            if (review_running_) {
+            if (app_.reviewRunning()) {
                 if (escape)
                     closeMistakes(true);
-                else if (enter && !nextReview())
+                else if (enter && !app_.nextReview())
                     closeMistakes(true);
             } else if (escape) {
                 closeMistakes(true);
@@ -1156,17 +1125,14 @@ void App::mistakeKeys() {
     }
 }
 
-void App::drawMistakePage() {
-    ui::pageTitle(TR("Board"), guideSection());
-    if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        !SDL_TextInputActive(window_))
-        SDL_StartTextInput(window_);
+void MistakesPage::drawMistakePage() {
+    app_.beginSessionPage();
     mistakeKeys();
     if (!mistake_) return;  // left by a key
     auto& r = *mistake_;
     // A right answer goes on by itself after a moment, unless the mouse is on it.
-    if (r.phase == MistakePhase::Right && trainingSettings().advance_ms > 0 && !r.hovered &&
-        since(r.answered) * 1000 >= trainingSettings().advance_ms + 1500) {
+    if (r.phase == MistakePhase::Right && app_.trainingSettings().advance_ms > 0 && !r.hovered &&
+        since(r.answered) * 1000 >= app_.trainingSettings().advance_ms + 1500) {
         mistakeNext();
         if (!mistake_) return;
     }
@@ -1231,18 +1197,17 @@ void App::drawMistakePage() {
     ImGui::EndChild();
 }
 
-void App::drawMistakeBoard(float size) {
-    auto& b          = board_;
+void MistakesPage::drawMistakeBoard(float size) {
     auto& r          = *mistake_;
-    const auto board = boardAt(b.game, b.chess960, b.ply);
-    BoardDecor decor;
-    decor.flipped    = b.flip;
-    decor.eval_white = -1.0f;  // no bar: no engine's word on the position
-    if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
+    const auto& game = app_.sessionGame();
+    const int ply    = app_.sessionPly();
+    std::optional<chess::Move> last_move;
+    if (ply > 0) last_move = game.moves[static_cast<std::size_t>(ply - 1)].move;
+    BoardDecor marks;  // the squares tinted and the arrows of the exercise's: the Board adds the rest
     const auto green         = markColour('G', true);
     const auto orange        = IM_COL32(236, 140, 52, 150);
     const MistakeExercise* e = r.phase != MistakePhase::End || r.missed_shown >= 0 ? &r.exercises[r.current] : nullptr;
-    const bool question      = e && b.ply == static_cast<int>(e->moves.size());
+    const bool question      = e && ply == static_cast<int>(e->moves.size());
     std::optional<chess::Move> best;
     if (e) {
         try {
@@ -1253,61 +1218,36 @@ void App::drawMistakeBoard(float size) {
     }
     switch (r.phase) {
         case MistakePhase::Asking:
-            if (r.hint && best) decor.tints.push_back({best->from(), markColour('B', true)});
+            if (r.hint && best) marks.tints.push_back({best->from(), markColour('B', true)});
             break;
         case MistakePhase::Checking:
             break;
         case MistakePhase::Right:
-            if (decor.last_move) {
-                decor.tints.push_back({decor.last_move->from(), green});
-                decor.tints.push_back({shownTarget(*decor.last_move), green});
+            if (last_move) {
+                marks.tints.push_back({last_move->from(), green});
+                marks.tints.push_back({displayedTarget(*last_move), green});
             }
             break;
         case MistakePhase::Wrong:
-            if (!question && decor.last_move) {  // the answer in orange
-                decor.tints.push_back({decor.last_move->from(), orange});
-                decor.tints.push_back({shownTarget(*decor.last_move), orange});
+            if (!question && last_move) {  // the answer in orange
+                marks.tints.push_back({last_move->from(), orange});
+                marks.tints.push_back({displayedTarget(*last_move), orange});
             }
-            if (best && r.check_error.empty()) decor.arrows.push_back({*best, markColour('G', false)});
+            if (best && r.check_error.empty()) marks.arrows.push_back({*best, markColour('G', false)});
             break;
         case MistakePhase::End:
-            if (best && question) decor.arrows.push_back({*best, markColour('G', false)});
+            if (best && question) marks.arrows.push_back({*best, markColour('G', false)});
             break;
     }
-    const bool moves = r.phase == MistakePhase::Asking && question && !liveGameOn();
-    decor.selected   = moves ? b.selected : std::nullopt;
-    if (decor.selected)
-        for (const auto& m : movesFrom(board, *decor.selected)) decor.targets.push_back(shownTarget(m));
-    const bool dragging = moves && b.drag && b.drag->moved && b.selected == b.drag->from;
-    if (dragging) {
-        decor.lifted = b.drag->from;
-        if (b.drag_over && std::find(decor.targets.begin(), decor.targets.end(), *b.drag_over) != decor.targets.end())
-            decor.drop = b.drag_over;
-    }
-    const ImVec2 top = ImGui::GetCursorScreenPos();
-    if (appearance::current().board3d.on && board3d_.available()) {
-        board3d_.setMarks(Board3d::Marks::Off);
-        const auto input = board3d_.draw(board, size, decor);
-        if (moves) boardPointer(board, input.clicked, input.hovered, input.right_click);
-    } else {
-        if (!appearance::current().board3d.on) board3d_.release();
-        drawBoard(atlas_, board, size, decor);
-        const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
-        if (moves) {
-            const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
-                       right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
-            boardPointer(board, left ? hover : std::nullopt, hover, right);
-            if (dragging && b.drag) drawDraggedPiece(atlas_, board.at(b.drag->from), size);
-        }
-    }
-    drawPromotionPopup(board);
+    const bool moves = r.phase == MistakePhase::Asking && question && !app_.liveGameOn();
+    app_.drawSessionBoard(size, marks, moves);
 }
 
-void App::drawMistakeColumn() {
+void MistakesPage::drawMistakeColumn() {
     auto& r = *mistake_;
     const ui::TopicRegion topic(guide::topics::Mistakes);
-    if (liveGameOn()) {  // fair play (#48): a live game on Lichess stops the session where it is
-        drawFairPlayBanner();
+    if (app_.liveGameOn()) {  // fair play (#48): a live game on Lichess stops the session where it is
+        app_.drawFairPlayBanner();
         if (ImGui::Button(TR("Stop · Esc"))) finishMistakes(true);
         return;
     }
@@ -1355,7 +1295,7 @@ void App::drawMistakeColumn() {
                 break;
             }
             wrapped(TR("The position before your move. Play on the board, or type the move and press Enter."), true);
-            drawMoveField();
+            app_.drawMoveField();
             if (ImGui::Button(TR("A hint · Alt+H"))) r.hint = r.hinted = true;
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", TR("H alone begins a move of the h-pawn: the hint is under Alt."));
@@ -1431,7 +1371,7 @@ void App::drawMistakeColumn() {
             if (primaryButton(TR("Next"))) mistakeNext();
             if (mistake_ && mistake_->phase == MistakePhase::Right) {
                 ImGui::SameLine(0, px(8));
-                const int advance = trainingSettings().advance_ms;
+                const int advance = app_.trainingSettings().advance_ms;
                 ImGui::TextDisabled(
                     "%s", advance > 0 ? trf("Enter, or on its own after {} s", (advance + 1500) / 1000.0).c_str()
                                       : TR("Enter"));
@@ -1515,11 +1455,11 @@ void App::drawMistakeColumn() {
     // With the answer, the tree and the engine come back.
     if (mistake_->phase == MistakePhase::Right || mistake_->phase == MistakePhase::Wrong) {
         ImGui::Separator();
-        drawChessTabs();
+        app_.drawBoardTabs();
     }
 }
 
-void App::drawMistakeEnd() {
+void MistakesPage::drawMistakeEnd() {
     auto& r              = *mistake_;
     const auto& outcomes = r.outcomes;
     std::size_t right    = 0;
@@ -1571,7 +1511,7 @@ void App::drawMistakeEnd() {
                 r.missed_shown = static_cast<int>(o->exercise);
                 r.current      = o->exercise;
                 showMistakePosition(e);
-                board_.flip = e.side() == chess::Color::BLACK;
+                app_.setFlip(e.side() == chess::Color::BLACK);
             }
             ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10),
                                      ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(said.c_str()).x));
@@ -1581,8 +1521,8 @@ void App::drawMistakeEnd() {
         ui::endCard();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
-    if (review_running_) {  // the day's review: the next kind, or back to the Training page
-        drawReviewNext(false);
+    if (app_.reviewRunning()) {  // the day's review: the next kind, or back to the Training page
+        app_.drawReviewNext(false);
         return;
     }
     if (!missed.empty() && !r.practice) {

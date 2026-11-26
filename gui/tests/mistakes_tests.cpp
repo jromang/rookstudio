@@ -1,7 +1,7 @@
 // Your mistakes as exercises and guessing the moves (#81): the user's names, the exercises a review gives, an answer
 // judged as the review judges a move, the cards kept in the profile and counted for the day, the user's games looked
-// for in their databases, a guess scored; and an answer searched at the review's settings by the mock engine finds
-// what the review found.
+// for in their databases, a guess scored, the profile's files read with their types checked (#136); and an answer
+// searched at the review's settings by the mock engine finds what the review found.
 
 #include <doctest/doctest.hpp>
 
@@ -11,11 +11,15 @@
 #include <map>
 #include <thread>
 
+#include <fmt/include/fmt/format.h>
+#include <json.hpp>
 #include <study/import.hpp>
 #include <study/store.hpp>
 
 #include "analysis.hpp"
 #include "board_text.hpp"
+#include "console.hpp"
+#include "game_analysis.hpp"
 #include "mistakes.hpp"
 #include "mock_engines.hpp"
 #include "review_runner.hpp"
@@ -437,6 +441,81 @@ TEST_CASE("mistakes: a guess scored 3, 2, 1 or 0, and the games guessed kept") {
     CHECK(last->points == 12);
     CHECK(last->max == 15);
     fs::remove_all(dir);
+}
+
+TEST_CASE("mistakes: a profile file with values of the wrong type keeps its readable entries, the rest said (#136)") {
+    const ScratchDir dir("mistakes-types");
+    const auto game = readGame(forkPgn());
+    auto found      = exercisesOf(game, forkReview(), chess::Color::BLACK, commentary::Lang::En);
+    REQUIRE(found.size() == 1);
+    MistakeRecord record;
+    putExercises(record, found[0].game_key, "sig", found);
+    record.answer_ms = 4200;
+    record.kept[77]  = {};
+    REQUIRE(writeMistakeRecord(dir, record));
+    const auto file = dir / "exercises.json";
+    const auto key  = fmt::format("{:016x}", found[0].key);
+    // Values of another type than the one written: a boolean for a number, a text for a number, a number for a text, a
+    // list for a number (an older or newer version, a hand edit). Each used to stop the program at launch.
+    auto j                                   = nlohmann::json::parse(test::readFile(file));
+    j["answer_ms"]                           = true;
+    j["exercises"]["0000000000000001"]       = j["exercises"][key];
+    j["exercises"]["0000000000000001"]["id"] = "seven";
+    j["games"]["other"]                      = {{"review", 5}};
+    j["kept"]["000000000000004d"]["since"]   = nlohmann::json::array({1});
+    const auto written                       = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    MistakeRecord back;
+    REQUIRE_NOTHROW(back = readMistakeRecord(dir));
+    // The readable entries kept: the exercise and its game; the others set aside, said, the file kept as it was.
+    REQUIRE(back.exercises.size() == 1);
+    CHECK(back.exercises.begin()->second.key == found[0].key);
+    CHECK(back.games.count(found[0].game_key) == 1);
+    CHECK(back.games.count("other") == 0);
+    CHECK(back.kept.empty());
+    CHECK(back.answer_ms == 0);
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("4 entries could not be read and were set aside") != std::string::npos);
+    CHECK(said[0].find("exercises/0000000000000001") != std::string::npos);
+    CHECK(said[0].find("exercises.json.unreadable") != std::string::npos);
+    CHECK(test::readFile(dir / "exercises.json.unreadable") == written);
+    // Written again, the record reads whole.
+    REQUIRE(writeMistakeRecord(dir, back));
+    const auto quiet = Console::instance().added();
+    CHECK(readMistakeRecord(dir).exercises.size() == 1);
+    CHECK(Console::instance().since(quiet).empty());
+    // A file cut short: kept aside, said; the exercises are found again from the reviews.
+    std::ofstream(file, std::ios::binary) << "{\"version\": 1, \"exercises\": {";
+    const auto cut = Console::instance().added();
+    CHECK(readMistakeRecord(dir).exercises.empty());
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(dir / "exercises.json.unreadable2"));
+
+    // The games guessed: a line of the wrong type left out, said; the last readable one given.
+    appendGuessRecord(dir, {100, "A – B", true, 31, 45, 9, 15, 0.42});
+    std::ofstream(dir / "games.jsonl", std::ios::binary | std::ios::app)
+        << R"({"at": 200, "title": "C – D", "points": "twelve", "max": 15})" << '\n';
+    const auto guessed = Console::instance().added();
+    const auto last    = lastGuessRecord(dir);
+    REQUIRE(last);
+    CHECK(last->title == "A – B");
+    said = Console::instance().since(guessed);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("1 line could not be read and was left out") != std::string::npos);
+
+    // A game's review whose key is not a text: no review, rather than an end of the program.
+    REQUIRE(saveReview(dir / "analyses", game, forkReview()));
+    const auto review = dir / "analyses" / (reviewKey(game) + ".json");
+    auto r            = nlohmann::json::parse(test::readFile(review));
+    r["key"]          = 5;
+    std::ofstream(review, std::ios::binary) << r.dump();
+    std::optional<GameReview> none;
+    REQUIRE_NOTHROW(none = loadReview(dir / "analyses", game));
+    CHECK_FALSE(none);
 }
 
 TEST_CASE("mistakes: an answer searched at the review's settings finds what the review found there") {

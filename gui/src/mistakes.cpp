@@ -17,6 +17,7 @@
 #include <study/query.hpp>
 
 #include "board_text.hpp"
+#include "console.hpp"
 #include "i18n.hpp"
 #include "portable.hpp"
 #include "review_bridge.hpp"
@@ -41,6 +42,19 @@ std::optional<uint64_t> keyOfHex(const std::string& text) {
 }
 
 std::string uciOf(const chess::Move& move) { return chess::uci::moveToUci(move, false); }
+
+// A copy of a profile file that did not read whole, beside it (".unreadable", then ".unreadable2"…): what was set aside
+// stays there when the file is written again; none when it could not be made.
+std::optional<fs::path> keptAside(const fs::path& file) {
+    std::error_code ec;
+    for (int n = 1; n < 100; ++n) {
+        const auto aside = fs::path(file).concat(n == 1 ? std::string(".unreadable") : fmt::format(".unreadable{}", n));
+        if (fs::exists(aside, ec)) continue;
+        if (fs::copy_file(file, aside, ec) && !ec) return aside;
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
 
 // A score as the profile keeps it: {"type": "cp" or "mate", "value": n}.
 nlohmann::json scoreJson(const fastchess::Score& score) {
@@ -489,29 +503,70 @@ bool MistakeRecord::giveBack(MistakeExercise& exercise) {
 
 MistakeRecord readMistakeRecord(const fs::path& folder) {
     MistakeRecord out;
-    const auto json = readJson<nlohmann::json>(folder / "exercises.json");
-    if (!json || !json->is_object()) return out;
-    out.answer_ms = json->value("answer_ms", int64_t{0});
+    const auto file = folder / "exercises.json";
+    const auto json = readJson<nlohmann::json>(file);
+    std::error_code ec;
+    if (!json || !json->is_object()) {
+        // There but unreadable (cut short, written by hand): kept aside, the exercises found again from the reviews.
+        if (fs::exists(file, ec)) {
+            const auto aside = keptAside(file);
+            Console::instance().add(aside ? trf("{} could not be read: kept as {}", file.string(), aside->string())
+                                          : trf("{} could not be read", file.string()),
+                                    true);
+        }
+        return out;
+    }
+    // An entry of another type than the one expected (written by another version, edited by hand) is set aside, the
+    // readable ones kept (#136): said in the console, the file as it was kept beside it, which the next save replaces.
+    std::vector<std::string> unread;
+    const auto entry = [&](const std::string& what, const auto& read) {
+        try {
+            read();
+        } catch (const std::exception&) {
+            unread.push_back(what);
+        }
+    };
+    entry("answer_ms", [&] { out.answer_ms = json->value("answer_ms", int64_t{0}); });
     if (const auto it = json->find("exercises"); it != json->end() && it->is_object())
         for (const auto& [hex, j] : it->items())
-            if (const auto key = keyOfHex(hex))
-                if (auto e = exerciseOf(*key, j)) out.exercises.emplace(*key, std::move(*e));
+            entry("exercises/" + hex, [&] {
+                if (const auto key = keyOfHex(hex))
+                    if (auto e = exerciseOf(*key, j)) out.exercises.emplace(*key, std::move(*e));
+            });
     if (const auto it = json->find("games"); it != json->end() && it->is_object()) {
         for (const auto& [game, j] : it->items()) {
             if (!j.is_object()) continue;
-            ScannedGame g;
-            g.review = j.value("review", std::string());
-            if (const auto keys = j.find("keys"); keys != j.end() && keys->is_array())
-                for (const auto& k : *keys)
-                    if (k.is_string())
-                        if (const auto key = keyOfHex(k.get<std::string>())) g.keys.push_back(*key);
-            out.games.emplace(game, std::move(g));
+            entry("games/" + game, [&] {
+                ScannedGame g;
+                g.review = j.value("review", std::string());
+                if (const auto keys = j.find("keys"); keys != j.end() && keys->is_array())
+                    for (const auto& k : *keys)
+                        if (k.is_string())
+                            if (const auto key = keyOfHex(k.get<std::string>())) g.keys.push_back(*key);
+                out.games.emplace(game, std::move(g));
+            });
         }
     }
     if (const auto it = json->find("kept"); it != json->end() && it->is_object())
         for (const auto& [hex, j] : it->items())
-            if (const auto key = keyOfHex(hex); key && j.is_object())
-                out.kept[*key] = {cardOf(j.value("card", nlohmann::json::object())), j.value("since", int64_t{0})};
+            entry("kept/" + hex, [&] {
+                if (const auto key = keyOfHex(hex); key && j.is_object()) {
+                    const KeptCard kept{cardOf(j.value("card", nlohmann::json::object())),
+                                        j.value("since", int64_t{0})};
+                    out.kept[*key] = kept;  // read whole first: nothing kept of an entry set aside
+                }
+            });
+    if (!unread.empty()) {
+        std::string what;
+        for (std::size_t i = 0; i < unread.size() && i < 5; ++i) what += (i > 0 ? ", " : "") + unread[i];
+        if (unread.size() > 5) what += ", …";
+        const auto aside = keptAside(file);
+        Console::instance().add(
+            trn("{}: {} entry could not be read and was set aside ({}); the file as it was is kept as {}",
+                "{}: {} entries could not be read and were set aside ({}); the file as it was is kept as {}",
+                unread.size(), file.string(), unread.size(), what, aside ? aside->string() : std::string("-")),
+            true);
+    }
     return out;
 }
 
@@ -797,22 +852,32 @@ void appendGuessRecord(const fs::path& folder, const GuessRecord& r) {
 }
 
 std::optional<GuessRecord> lastGuessRecord(const fs::path& folder) {
-    std::ifstream in(folder / "games.jsonl", std::ios::binary);
+    const auto file = folder / "games.jsonl";
+    std::ifstream in(file, std::ios::binary);
     std::optional<GuessRecord> out;
+    std::size_t unread = 0;  // lines of another type than expected (#136): left out, said in the console
     for (std::string line; std::getline(in, line);) {
         const auto j = nlohmann::json::parse(line, nullptr, false);
         if (j.is_discarded() || !j.is_object()) continue;
-        GuessRecord r;
-        r.at     = j.value("at", int64_t{0});
-        r.title  = j.value("title", std::string());
-        r.white  = j.value("white", true);
-        r.points = j.value("points", 0);
-        r.max    = j.value("max", 0);
-        r.same   = j.value("same", 0);
-        r.moves  = j.value("moves", 0);
-        r.loss   = j.value("loss", 0.0);
-        if (r.max > 0) out = r;
+        try {
+            GuessRecord r;
+            r.at     = j.value("at", int64_t{0});
+            r.title  = j.value("title", std::string());
+            r.white  = j.value("white", true);
+            r.points = j.value("points", 0);
+            r.max    = j.value("max", 0);
+            r.same   = j.value("same", 0);
+            r.moves  = j.value("moves", 0);
+            r.loss   = j.value("loss", 0.0);
+            if (r.max > 0) out = r;
+        } catch (const std::exception&) {
+            ++unread;
+        }
     }
+    if (unread > 0)
+        Console::instance().add(trn("{}: {} line could not be read and was left out",
+                                    "{}: {} lines could not be read and were left out", unread, file.string(), unread),
+                                true);
     return out;
 }
 

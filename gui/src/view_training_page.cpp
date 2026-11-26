@@ -15,6 +15,7 @@
 
 #include "app.hpp"
 #include "board_session.hpp"
+#include "endgames_page.hpp"
 #include "guess_page.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
@@ -130,8 +131,7 @@ std::string kindDue(ReviewKind kind, std::size_t n) {
 
 ReviewCount App::reviewCount(ReviewKind kind) {
     ReviewCount out;
-    out.kind       = kind;
-    const auto day = trainingDay(epochNow());
+    out.kind = kind;
     switch (kind) {
         case ReviewKind::Repertoire: {
             int64_t ms = 0, weight = 0;
@@ -154,14 +154,9 @@ ReviewCount App::reviewCount(ReviewKind kind) {
         case ReviewKind::Mistakes:  // #81, their module's (#107)
             out = mistakes_->reviewCount();
             break;
-        case ReviewKind::Endgames: {  // #82
-            const auto& r  = endgameRecord();
-            out.due        = endgameCardsDue(r, day.end);
-            out.tomorrow   = endgameCardsDue(r, day.end + study::fsrs::DAY) - out.due;
-            out.three_days = endgameCardsDue(r, day.end + 3 * study::fsrs::DAY) - out.due;
-            out.answer_ms  = r.answer_ms;
+        case ReviewKind::Endgames:  // #82, their module's (#107)
+            out = endgames_->reviewCount();
             break;
-        }
     }
     return out;
 }
@@ -187,7 +182,7 @@ bool App::startReviewOf(ReviewKind kind, std::size_t repertoire) {
         case ReviewKind::Mistakes:
             return mistakes_->startReview();
         case ReviewKind::Endgames:
-            return startEndgameReview();
+            return endgames_->startReview();
     }
     return false;
 }
@@ -378,7 +373,7 @@ void App::drawTraining() {
     else if (training_tab_ == 3)
         guessing_->drawPart();
     else if (training_tab_ == 4)
-        drawTrainingEndgames();
+        endgames_->drawPart();
     else if (training_tab_ == 5)
         vision_->drawPart();
     else
@@ -454,16 +449,9 @@ void App::drawTrainingToday() {
              last ? trf("the last: {} points of {}", last->points, last->max) : std::string(TR("not tried yet")), 3);
         // The second row (#82): the endgames against the tables, the mates, board vision.
         ImGui::Dummy(ImVec2(0, gap - ImGui::GetStyle().ItemSpacing.y));
-        {
-            const auto& all  = endgameCatalogue();
-            std::size_t done = 0;
-            for (const auto& e : all)
-                if (const auto it = endgameRecord().results.find(e.id);
-                    it != endgameRecord().results.end() && it->second.done > 0)
-                    ++done;
-            card("##training_kind_endgames", ui::Icon::Crown, TR("Endgames"),
-                 TR("Against the tables: win, or hold the draw."), trf("{} endgames · {} done", all.size(), done), 4);
-        }
+        card("##training_kind_endgames", ui::Icon::Crown, TR("Endgames"),
+             TR("Against the tables: win, or hold the draw."),
+             trf("{} endgames · {} done", endgameCatalogue().size(), endgames_->doneCount()), 4);
         ImGui::SameLine(0, gap);
         {
             const auto& mates = puzzles_->puzzleRecord().themes;
@@ -474,7 +462,7 @@ void App::drawTrainingToday() {
             const int before = training_tab_;
             card("##training_kind_mates", ui::Icon::Zap, TR("Mates"),
                  TR("Mates in 1 to 5 of the puzzles; Q, R, 2B, B+N against the tables."), stat, 4);
-            if (before != 4 && training_tab_ == 4) endgame_scroll_mates_ = true;  // to the part's mates
+            if (before != 4 && training_tab_ == 4) endgames_->showMates();  // to the part's mates
         }
         ImGui::SameLine(0, gap);
         {

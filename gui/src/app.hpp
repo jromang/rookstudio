@@ -48,7 +48,6 @@
 #include "dialogs.hpp"
 #include "dossier.hpp"
 #include "endgame_check.hpp"
-#include "endgames.hpp"
 #include "engine_changes.hpp"
 #include "engine_downloads.hpp"
 #include "engine_import.hpp"
@@ -129,6 +128,7 @@ namespace fcg {
 class AppContext;
 class AssistantService;
 class BoardSession;
+class EndgamesPage;
 class EngineOracle;
 class GuessPage;
 class LichessArenasPage;
@@ -1038,11 +1038,11 @@ class App {
 
     // The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, whatever its
     // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
-    // The kinds still in App answer through sessions of App's own (OwnSession, app_chess.cpp), made by
-    // initChessModules(); a kind in a module of its own is its own session (the puzzles', the mistakes', a game
-    // guessed, a vision exercise), and takes the Board through context::SessionBoard (app_context.hpp).
+    // The repertoires' training, still in App, answers through a session of App's own (OwnSession, app_chess.cpp), made
+    // by initChessModules(); a kind in a module of its own is its own session (the puzzles', the mistakes', a game
+    // guessed, an endgame, a vision exercise), and takes the Board through context::SessionBoard (app_context.hpp).
     class OwnSession;
-    std::unique_ptr<BoardSession> training_session_, endgame_session_;
+    std::unique_ptr<BoardSession> training_session_;
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
     // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
     // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
@@ -1062,74 +1062,30 @@ class App {
     void setPlayerNames(std::vector<std::string> names);
     void drawPlayerNames(const char* id);  // the names as chips, a field that adds one (Settings, the Training page)
 
-    // Endgames against the tablebases and the mates (#82, mockup M12, board 3; endgames.hpp, syzygy_download.hpp;
-    // view_endgames.cpp): the Training page's Endgames part, a session on the Board page, the endgames missed in the
-    // day's review.
-    std::optional<EndgameRecord> endgame_record_;
-    EndgameRecord& endgameRecord();
-    [[nodiscard]] std::filesystem::path endgamesFolder() const { return storage_.root() / "endgames"; }
-    void saveEndgameRecord();
-    // The tables of the disk: the setup's folders (Settings, the tournaments'), with the profile's own once it holds
-    // tables (the download); the most pieces they cover, read off the interface's thread.
+    // The Syzygy tables of the disk (#82; view_disk_tables.cpp): the setup's folders (Settings, the tournaments'), with
+    // the profile's own once it holds tables (the download); the most pieces they cover, read off the interface's
+    // thread. The Board's Endgames tab, its questions, a tournament's endgame check and the endgames
+    // (context::DiskTables) probe them.
     [[nodiscard]] std::string endgameTablesPaths();
     [[nodiscard]] int diskTablesPieces();
     std::string disk_tables_of_;  // the paths diskTablesPieces() checked itself, before the checks in the background
     int disk_tables_pieces_ = 0;
     [[nodiscard]] bool diskTablesLocked() const;  // a tournament plays in this process: its tables, not to be probed
-    // Why the position cannot be played against the tables now, empty when it can: the tables it needs.
-    [[nodiscard]] std::string endgameNeed(const std::string& fen);
+    // The tables of 3 to 5 pieces downloaded into the profile on the user's click (syzygy_download.hpp), the Endgames
+    // part's: what the folder holds, read again now and then; the tables loaded again as a piece count's files are all
+    // there; why the download last stopped; its end, polled each frame, the set offered to the tournaments once whole.
     std::unique_ptr<SyzygyDownload> syzygy_download_;
     std::optional<SyzygyDownload::State> syzygy_state_;
     std::chrono::steady_clock::time_point syzygy_state_at_{};
-    std::chrono::steady_clock::time_point syzygy_since_{};
-    uint64_t syzygy_from_       = 0;
     uint64_t syzygy_generation_ = 0;
     std::string syzygy_error_;
     const SyzygyDownload::State& syzygyState();
-    void startSyzygyDownload();
-    void pollEndgames();        // each frame: the download, the tables' answers, the tables' move, a blindfold game
-    std::string endgame_need_;  // the endgame whose tables are missing: the card says what it needs
-    int endgame_tables_choice_ = 0;      // 0 download the tables, 1 a folder already there, 2 Lichess's online
-    int endgame_selected_      = 0;      // the catalogue's endgame the arrows move over
-    bool endgame_keys_         = false;  // the arrows and Enter go to the catalogue: one of its endgames was clicked
-    bool endgame_scroll_mates_ = false;  // the page brought to its mates (the Today part's card)
-    std::string endgame_error_;
-    void drawTrainingEndgames();
-    void drawEndgameCatalogue(bool& enter);
-    void drawEndgameTablesCard(bool& enter);  // the tables missing: download them, a folder, Lichess's online
-    void drawSyzygyDownloadCard();
-    void drawEndgamesFromGames();
-    void drawMatesCard();
-    [[nodiscard]] std::vector<EndgameTask> gameEndgames();  // the user's mistakes in positions of 7 pieces or fewer
-    [[nodiscard]] std::string endgameState(const EndgameEntry& entry);  // "done in 9 (the tables: 7)", "5 pieces"…
-    std::unique_ptr<EndgameRun> endgame_;
-    void leaveEndgameQuestions();  // the questions to Lichess of a session left: cancelled, parked in jobs_
-    [[nodiscard]] std::string endgameLock() const;  // why a session cannot start, empty when it can
-    bool startEndgame(const EndgameEntry& entry);
-    bool startEndgameReview();
-    bool startGameEndgames();
-    void startEndgameRun(std::unique_ptr<EndgameRun> run);
-    void beginEndgameTask();
-    void showEndgamePosition();  // the task's start and its moves on the board
-    void askEndgameTables();     // the tables' answer for the board's position: the disk's at once, Lichess's coming
-    void endgameAnswered();      // an answer came: a move kept judged, the tables' move
-    void endgameAnswer(chess::Move move);
-    void endgameJudge(chess::Move move);
-    void endgameTablesMove();
-    void endgameTakeBack();
-    void endgameRestart();
-    void endgameContinue();
-    void endgameSeeWin();
-    void endgameNext();
-    void endgameEnded(EndgameOutcome outcome);
-    void finishEndgames(bool stopped);
-    void closeEndgame(bool to_training);
-    void dropEndgame();
-    void endgameKeys();
-    void drawEndgamePage();
-    void drawEndgameBoard(float size);
-    void drawEndgameColumn();
-    void drawEndgameEnd();
+    void pollTablesDownload();
+    // Endgames against the tablebases and the mates (#82, mockup M12, board 3), a module of its own
+    // (endgames_page.hpp, #107), made by initChessModules(): the Training page's part "Endgames" (what answers, the
+    // catalogue, the endgames of the user's games, the mates of Lichess's puzzles), an endgame on the Board page, the
+    // endgames missed in the day's review. The Training page, the day's review and the Home page reach it directly.
+    std::unique_ptr<EndgamesPage> endgames_;
     // Board vision (#82, mockup M12, board 3), a module of its own (vision_page.hpp, #107), made by
     // initChessModules(): the Training page's part "Vision", the coordinates, a game played blindfold against the Play
     // page's opponent, a line read in one's head, each a session on the Board page; the records in vision.json. The

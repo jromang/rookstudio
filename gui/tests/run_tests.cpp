@@ -14,17 +14,18 @@
 #include <core/globals/globals.hpp>
 #include <engine/uci_engine.hpp>
 
-#include "../../tournament/tests/own_temp.hpp"
-#include "../../tournament/tests/self_path.hpp"
 #include "app.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "headless.hpp"
 #include "net.hpp"
+#include "own_temp.hpp"
 #include "proc_tree.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 #include "storage.hpp"
 #include "suite_run.hpp"
+#include "test_modes.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -1259,9 +1260,28 @@ TEST_CASE("EPD suite runs: every engine on every position, the totals, CSV and s
 }
 
 #ifdef _WIN32
+namespace {
+
+// What the engine of the next test case starts, the program in its --job-child mode: it reads nothing and leaves the
+// console it was given, so that only its job can end it. Once it runs, it writes its id to the file given (whole, by a
+// rename), and it ends on its own after a minute.
+int jobChild(const std::vector<std::string>& args) {
+    if (args.empty()) return 2;
+    FreeConsole();
+    const std::string& file = args[0];
+    std::ofstream(file + ".tmp") << GetCurrentProcessId();
+    MoveFileExA((file + ".tmp").c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING);
+    Sleep(60000);
+    return 0;
+}
+
+[[maybe_unused]] const bool job_child_mode = fcg::test::addMode("--job-child", jobChild);
+
+}  // namespace
+
 TEST_CASE("on Windows, what an engine starts is in the engine's job and ends with it") {
     // A .bat that starts the engine: cmd.exe is the process started, the engine its child. The engine is this program
-    // (see main.cpp), which reads nothing, leaves its console and tells once it runs: the random mover, found as soon
+    // (jobChild above), which reads nothing, leaves its console and tells once it runs: the random mover, found as soon
     // as cmd.exe created it, could still be starting when cmd.exe was killed, attached to the console cmd.exe owned
     // and reading the input cmd.exe passed on, and once ended with it on GitHub's runners (#111).
     std::error_code ec;

@@ -16,12 +16,12 @@
 #include <fmt/include/fmt/format.h>
 #include <core/config/config.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "engine_downloads.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "scripted_server.hpp"
+#include "self_path.hpp"
 #include "zip.hpp"
 
 using namespace fcg;

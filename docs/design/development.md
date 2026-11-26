@@ -14,5 +14,11 @@
 - The user guide is `docs/guide.md` and its translations `docs/guide.<code>.md`, embedded in the program too.
   `tools/guide_sync.py` lists the translated sections missing or older than the English text, and `--stamp` marks
   them up to date once translated; a test fails while one is. [help.md](help.md) describes the guide and the help.
+- `tests/support` is what the four test programs share (`fcg_test_support`, each links it): one main, which runs a
+  mode the tests start a program in (the book adapter, the WinBoard adapter...) or its test cases in a temporary
+  folder of the process's own (`own_temp.hpp`); and headers of the standard library and doctest only:
+  `sourcePath()`, the sources' folder (where `FCG_SOURCE_DIR` points in the environment, else where they were
+  compiled), `ScratchDir`, a folder of a test's own removed with it, `waitUntil()`, `readFile()`, and in
+  `mock_engines.hpp` the mock engines, always built with the tests: a test case without one fails, it does not skip.
 - The fastchess hooks are listed in the README. `make` in `app/` still builds and tests the upstream command line
   tool.

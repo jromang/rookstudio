@@ -11,9 +11,9 @@
 #include <mutex>
 #include <thread>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "game_analysis.hpp"
 #include "review_runner.hpp"
+#include "self_path.hpp"
 #include "storage.hpp"
 
 using namespace fcg;

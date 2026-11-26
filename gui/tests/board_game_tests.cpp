@@ -13,10 +13,10 @@
 
 #include <tour/pgn_index.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "board_game.hpp"
 #include "board_text.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

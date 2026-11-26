@@ -8,9 +8,9 @@
 #include <filesystem>
 #include <thread>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "board_page.hpp"
 #include "engine_client.hpp"
+#include "self_path.hpp"
 #include "side_by_side.hpp"
 #include "storage.hpp"
 

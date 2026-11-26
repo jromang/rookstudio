@@ -10,8 +10,8 @@
 
 #    include <assistant/protocol.hpp>
 
-#    include "../../tournament/tests/self_path.hpp"
 #    include "assistant_process.hpp"
+#    include "self_path.hpp"
 
 using namespace fcg;
 using namespace std::chrono_literals;

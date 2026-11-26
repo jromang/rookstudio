@@ -9,12 +9,12 @@
 #include <memory>
 #include <thread>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "child_process.hpp"
 #include "console.hpp"
 #include "local_socket.hpp"
 #include "remote_run.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 #include "storage.hpp"
 
 #ifdef _WIN32

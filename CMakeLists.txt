@@ -183,6 +183,19 @@ target_compile_definitions(fcg_tournament PRIVATE FCG_PRODUCT_NAME="${FCG_PRODUC
                                                   FCG_PROGRAM_NAME="${FCG_PROGRAM_NAME}")
 
 if(FCG_BUILD_TESTS)
+    # What the test programs share (tests/support), each one linking it: their main, compiled into each, which runs a
+    # mode the tests start the program in, or its test cases in a temporary folder of the process's own; and headers
+    # that carry their definitions, of the standard library and doctest only: the sources' folder, folders of a test's
+    # own, the mock engines, waits bounded by what they await. FCG_SOURCE_DIR is where the sources were compiled, which
+    # sourcePath() reads unless FCG_SOURCE_DIR in the environment says where they are (the CI's tests on another
+    # machine); FCG_TEST_PROGRAM the program's name.
+    add_library(fcg_test_support INTERFACE)
+    target_sources(fcg_test_support INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tests/support/test_main.cpp)
+    target_include_directories(fcg_test_support INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tests/support)
+    target_compile_definitions(fcg_test_support INTERFACE FCG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+                                                          FCG_TEST_PROGRAM="$<TARGET_PROPERTY:NAME>")
+    target_link_libraries(fcg_test_support INTERFACE fcg_tournament)
+
     # fastchess' own mock engine, so the integration tests play real (random) games.
     add_executable(fcg_random_mover ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/mock/random_mover.cpp)
     target_include_directories(fcg_random_mover PRIVATE ${FC_APP}/third_party)
@@ -193,7 +206,7 @@ if(FCG_BUILD_TESTS)
 
     file(GLOB FCG_TOURNAMENT_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/*.cpp)
     add_executable(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES})
-    target_link_libraries(fcg-tournament-tests PRIVATE fcg_tournament)
+    target_link_libraries(fcg-tournament-tests PRIVATE fcg_tournament fcg_test_support)
     add_dependencies(fcg-tournament-tests fcg_random_mover)
     target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
                                                               FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
@@ -263,10 +276,7 @@ target_link_libraries(fcg_study PUBLIC fcg_tournament PRIVATE fcg_zstd fcg_zlib 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_STUDY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/tests/*.cpp)
     add_executable(fcg-study-tests ${FCG_STUDY_TEST_SOURCES})
-    target_include_directories(fcg-study-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests)
-    target_link_libraries(fcg-study-tests PRIVATE fcg_study)
-    # Its files (compressed games) read from the sources, or from FCG_SOURCE_DIR (the CI's tests on another machine).
-    target_compile_definitions(fcg-study-tests PRIVATE FCG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(fcg-study-tests PRIVATE fcg_study fcg_test_support)
     if(WIN32)
         target_link_options(fcg-study-tests PRIVATE -static -static-libgcc -static-libstdc++)
     endif()
@@ -494,10 +504,8 @@ endif()
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_COMMENTARY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/tests/*.cpp)
     add_executable(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES})
-    target_include_directories(fcg-commentary-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests)
     # fcg_study reads the compressed reference files.
-    target_link_libraries(fcg-commentary-tests PRIVATE fcg_commentary fcg_study)
-    target_compile_definitions(fcg-commentary-tests PRIVATE FCG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(fcg-commentary-tests PRIVATE fcg_commentary fcg_study fcg_test_support)
     if(WIN32)
         target_link_options(fcg-commentary-tests PRIVATE -static -static-libgcc -static-libstdc++)
     endif()
@@ -877,7 +885,7 @@ if(FCG_BUILD_GUI)
         add_executable(fastchess-gui-tests ${FCG_TEST_SOURCES})
         # Mbed TLS too: the SSH tests play the server's part with its cryptography. And the libssh2 backend's
         # functions, which they call directly.
-        target_link_libraries(fastchess-gui-tests PRIVATE fcg_lib mbedtls fcg_libssh2)
+        target_link_libraries(fastchess-gui-tests PRIVATE fcg_lib mbedtls fcg_libssh2 fcg_test_support)
         target_include_directories(fastchess-gui-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa)
         target_include_directories(fastchess-gui-tests SYSTEM PRIVATE ${libssh2_SOURCE_DIR}/src)
         # A WinBoard engine for the tests of the adapter.
@@ -902,8 +910,7 @@ if(FCG_BUILD_GUI)
         add_dependencies(fastchess-gui-tests fcg_random_mover fcg_wb_mover fastchess-gui)
         target_compile_definitions(fastchess-gui-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
                                                               FCG_WB_MOVER="$<TARGET_FILE_NAME:fcg_wb_mover>"
-                                                              FCG_GUI_PROGRAM="$<TARGET_FILE:fastchess-gui>"
-                                                              FCG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+                                                              FCG_GUI_PROGRAM="$<TARGET_FILE:fastchess-gui>")
         if(WIN32)
             target_link_options(fastchess-gui-tests PRIVATE -static -static-libgcc -static-libstdc++)
         endif()

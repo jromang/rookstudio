@@ -13,8 +13,8 @@
 #    include <string>
 #    include <thread>
 
-#    include "../../tournament/tests/self_path.hpp"
 #    include "assistant_service.hpp"
+#    include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

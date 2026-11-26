@@ -32,10 +32,10 @@
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "assistant_process.hpp"
 #include "opening_report.hpp"
 #include "repertoires.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

@@ -15,11 +15,11 @@
 #include <tour/pgn_book.hpp>
 #include <tour/polyglot.hpp>
 
-#include "../../tournament/tests/own_temp.hpp"
 #include "../../tournament/tests/polyglot_writer.hpp"
-#include "../../tournament/tests/self_path.hpp"
 #include "book_jobs.hpp"
+#include "own_temp.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

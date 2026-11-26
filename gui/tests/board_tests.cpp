@@ -9,12 +9,12 @@
 
 #include <engine/uci_engine.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "analysis.hpp"
 #include "board_page.hpp"
 #include "board_text.hpp"
 #include "engine_client.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

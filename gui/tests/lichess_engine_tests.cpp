@@ -22,13 +22,13 @@
 #include <chess.hpp>
 #include <json.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_engine.hpp"
 #include "scripted_server.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 using namespace fcg::lichess;

@@ -23,13 +23,13 @@
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "assistant_notes.hpp"
 #include "assistant_service.hpp"
 #include "board_page.hpp"
 #include "explained.hpp"
 #include "pgn_store.hpp"
 #include "review_bridge.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

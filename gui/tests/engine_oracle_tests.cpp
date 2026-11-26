@@ -6,8 +6,8 @@
 
 #include <commentary/position.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "engine_oracle.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 

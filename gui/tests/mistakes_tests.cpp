@@ -14,11 +14,11 @@
 #include <study/import.hpp>
 #include <study/store.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "analysis.hpp"
 #include "board_text.hpp"
 #include "mistakes.hpp"
 #include "review_runner.hpp"
+#include "self_path.hpp"
 #include "training.hpp"
 
 using namespace fcg;

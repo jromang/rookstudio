@@ -16,13 +16,13 @@
 #include <fmt/include/fmt/format.h>
 #include <core/config/config.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "engine_downloads.hpp"
 #include "engine_versions.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "scripted_server.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 using namespace fcg::catalogue;

@@ -11,11 +11,12 @@
 #include <core/config/config.hpp>
 #include <engine/uci_engine.hpp>
 
-#include "../../tournament/tests/own_temp.hpp"
-#include "../../tournament/tests/self_path.hpp"
 #include "engines.hpp"
+#include "own_temp.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 #include "suite_run.hpp"
+#include "test_modes.hpp"
 #include "wb2uci.hpp"
 
 using namespace fcg;
@@ -23,6 +24,10 @@ namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 
 namespace {
+
+// The program's --wb2uci mode: the tests start their WinBoard engines through it, as the program does (engine_client,
+// tour/book_adapter), here and in the tests of the books, the analysis and the tournaments.
+[[maybe_unused]] const bool wb2uci_mode = fcg::test::addMode("--wb2uci", wb2uci::run);
 
 struct Wire {
     std::vector<std::string> gui;     // what the adapter told the GUI

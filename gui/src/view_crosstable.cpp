@@ -164,22 +164,20 @@ const App::TournamentsKept* App::tournamentsOf(std::size_t database, bool start)
     const auto it       = tournament_lists_.find(folder);
     const bool current  = it != tournament_lists_.end() && it->second.generation == snapshot->generation();
     if (!current && start) {
-        const bool running = db_tournaments_job_ && db_tournaments_job_->folder == folder &&
-                             db_tournaments_job_->generation == snapshot->generation();
+        const auto* job    = dbTournamentsJob();
+        const bool running = job && job->folder == folder && job->generation == snapshot->generation();
         if (!running) {
-            if (db_tournaments_job_ && db_tournaments_job_->folder == folder) *db_tournaments_job_->cancel = true;
-            if (!db_tournaments_job_ || db_tournaments_job_->folder == folder) {
-                if (db_tournaments_job_) db_tournaments_job_->done.wait();  // cancelled: stops within a moment
-                DbTournamentsJob job;
-                job.folder     = folder;
-                job.generation = snapshot->generation();
-                job.snapshot   = snapshot;
-                job.started    = std::chrono::steady_clock::now();
-                job.done = std::async(std::launch::async, [snapshot, progress = job.progress, cancel = job.cancel] {
+            if (!job || job->folder == folder) {
+                // The list of an older snapshot of the database cancelled and parked: it stops within a moment, out of
+                // sight (#105).
+                auto& made      = db_tournaments_job_.start([snapshot](TaskState<DbTournamentsState>& list) {
                     study::enterBackground();  // a tournament beside it loses no time
-                    return study::listTournaments(snapshot, *progress, *cancel);
+                    return study::listTournaments(snapshot, list.progress, list.cancel);
                 });
-                db_tournaments_job_ = std::move(job);
+                made.folder     = folder;
+                made.generation = snapshot->generation();
+                made.snapshot   = snapshot;
+                made.started    = std::chrono::steady_clock::now();
             } else if (std::find(tournaments_wanted_.begin(), tournaments_wanted_.end(), folder) ==
                        tournaments_wanted_.end()) {
                 tournaments_wanted_.push_back(folder);
@@ -191,17 +189,17 @@ const App::TournamentsKept* App::tournamentsOf(std::size_t database, bool start)
 }
 
 void App::pollTournaments() {
-    if (db_tournaments_job_ &&
-        db_tournaments_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto list = db_tournaments_job_->done.get();
+    if (db_tournaments_job_.ready()) {
+        auto& made = db_tournaments_job_.state();
+        auto list  = db_tournaments_job_.take();
         if (!list.cancelled) {
             TournamentsKept kept;
-            kept.generation = db_tournaments_job_->generation;
-            kept.snapshot   = db_tournaments_job_->snapshot;
-            kept.list       = std::make_shared<const study::TournamentList>(std::move(list));
-            tournament_lists_[db_tournaments_job_->folder] = std::move(kept);
+            kept.generation                = made.generation;
+            kept.snapshot                  = made.snapshot;
+            kept.list                      = std::make_shared<const study::TournamentList>(std::move(list));
+            tournament_lists_[made.folder] = std::move(kept);
         }
-        db_tournaments_job_.reset();
+        made.snapshot.reset();  // held by the list kept, if any
     }
     // A tournament asked for at launch (--focus crosstable=WORDS), once its database's list is made.
     if (crosstable_request_ && db_selected_ >= 0 && db_selected_ < static_cast<int>(shelf().entries().size())) {
@@ -219,7 +217,7 @@ void App::pollTournaments() {
         }
     }
     // The next list asked for.
-    if (!db_tournaments_job_ && !tournaments_wanted_.empty()) {
+    if (db_tournaments_job_.idle() && !tournaments_wanted_.empty()) {
         const auto folder = tournaments_wanted_.front();
         tournaments_wanted_.erase(tournaments_wanted_.begin());
         auto& s = shelf();
@@ -246,7 +244,8 @@ void App::drawTournamentList(std::size_t database) {
     ImGui::SameLine(0, px(14));
     if (drawListSwitch()) return;
     const auto* kept   = tournamentsOf(database, true);
-    const bool running = db_tournaments_job_ && db_tournaments_job_->folder == entry.folder;
+    const auto* job    = dbTournamentsJob();
+    const bool running = job && job->folder == entry.folder;
     if (kept) {
         const auto n = kept->list->tournaments.size();
         ImGui::SameLine(0, px(12));
@@ -260,18 +259,17 @@ void App::drawTournamentList(std::size_t database) {
     }
     // Made in the background (R18): its progress, Cancel.
     if (running) {
-        const auto& job   = *db_tournaments_job_;
-        const auto total  = job.progress->total.load();
-        const float share = total ? static_cast<float>(job.progress->done.load()) / static_cast<float>(total) : 0.0f;
-        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - job.started).count();
+        const auto total  = job->progress.total.load();
+        const float share = total ? static_cast<float>(job->progress.done.load()) / static_cast<float>(total) : 0.0f;
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - job->started).count();
         ImGui::TextDisabled("%s", kept ? TR("Listing its tournaments again: the list below is the previous one.")
                                        : TR("Listing its tournaments…"));
         ImGui::ProgressBar(std::min(1.0f, share), ImVec2(-px(110), 0),
                            fmt::format("{} % · {}", static_cast<int>(share * 100), ui::formatDuration(secs)).c_str());
         ImGui::SameLine();
         if (ImGui::Button(TR("Cancel"))) {
-            *db_tournaments_job_->cancel = true;
-            db_tournaments_              = false;
+            db_tournaments_job_.cancel();
+            db_tournaments_ = false;
             return;
         }
     }
@@ -553,8 +551,8 @@ void App::leaveCrosstable() {
     // Reading a large tournament's games, or looking for its missing ones in the other databases, takes a while.
     if (c.cancel) *c.cancel = true;
     if (c.look_cancel) *c.look_cancel = true;
-    graveyard_.park(std::move(c.job));
-    graveyard_.park(std::move(c.looking));
+    jobs_.park(std::move(c.job));
+    jobs_.park(std::move(c.looking));
     crosstable_.reset();
 }
 
@@ -568,7 +566,7 @@ void App::startCrosstable() {
     if (!db) return;
     if (c.job.valid()) {  // read again: the reading under way ends out of sight (#98)
         *c.cancel = true;
-        graveyard_.park(std::move(c.job));
+        jobs_.park(std::move(c.job));
     }
     const auto snapshot = db->snapshot();
     c.snapshot          = snapshot;
@@ -1179,7 +1177,7 @@ void App::drawStudyCrosstable() {
         if (ImGui::SmallButton(TR("Look for them in your other databases"))) {
             if (c.looking.valid()) {  // asked again: the search under way ends out of sight (#98)
                 *c.look_cancel = true;
-                graveyard_.park(std::move(c.looking));
+                jobs_.park(std::move(c.looking));
             }
             c.asked.clear();
             for (const auto& m : t.missing)

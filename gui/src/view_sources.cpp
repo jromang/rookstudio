@@ -874,7 +874,7 @@ void App::startMonthReading(const std::string& source) {
         storage_.root() / "sources" / "lichess" /
         fmt::format("{}-{}-{}{}.json", month, f.min_elo, f.bullet ? "bullet" : "nobullet", local ? "-file" : "");
     if (month_run_ && month_run_->source == source && month_run_->filter == f) run.from = month_run_->from;
-    month_reading_ = std::make_unique<lichess::MonthReading>();
+    month_reading_ = std::make_unique<lichess::MonthReading>(jobs_);
     month_reading_->start(source, db, f, run.state);
     month_run_ = std::move(run);
     month_stopped_.clear();

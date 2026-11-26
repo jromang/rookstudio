@@ -69,7 +69,7 @@ const std::vector<std::pair<std::string, std::string>>& gameFiles() {
 }  // namespace
 
 DatabaseShelf& App::shelf() {
-    if (!shelf_) shelf_ = std::make_unique<DatabaseShelf>(storage_.root());
+    if (!shelf_) shelf_ = std::make_unique<DatabaseShelf>(jobs_, storage_.root());
     return *shelf_;
 }
 
@@ -171,7 +171,7 @@ void App::pollDatabases() {
     const auto file  = job->file.filename().string();
     const auto path  = job->file;
     const auto index = job->index;
-    const auto read = job->progress.bytes.load(), total = job->progress.total_bytes;
+    const auto read = job->progress.bytes.load(), total = job->progress.total_bytes.load();
     if (const auto report = shelf_->finishedImport()) {
         // The games already there from another source, the same game with other headers (M13, board 1).
         auto found = shelf_->takeImportDuplicates();
@@ -866,7 +866,7 @@ void App::drawDatabases() {
             const double seconds =
                 std::max(0.001, std::chrono::duration<double>(std::chrono::steady_clock::now() - job->started).count());
             const auto bytes = job->progress.bytes.load(), games = job->progress.games.load();
-            const auto total = job->progress.total_bytes;
+            const auto total = job->progress.total_bytes.load();
             const float share =
                 total ? static_cast<float>(static_cast<double>(bytes) / static_cast<double>(total)) : 0.0f;
             ImGui::ProgressBar(share, ImVec2(-1, 0),

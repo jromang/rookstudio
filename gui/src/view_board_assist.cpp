@@ -374,8 +374,8 @@ void App::commentBoardMove() {
     auto tables  = review && reviewTables() ? review_tables_ : boardPositionTables();
     job.texts    = std::async(std::launch::async,
                               [review, ply = static_cast<std::size_t>(b.ply), fen = job.targets.front().fen, before_fen,
-                               played, service = assistant_.get(), cancel = job.cancel, oracle = oracle_,
-                               done = job.done, tables, l = lang(), letters = letters()]() {
+                               played, service = assistant_, cancel = job.cancel, oracle = oracle_, done = job.done,
+                               tables, l = lang(), letters = letters()]() {
                                std::vector<std::string> out(1);
                                CancellableModel model(*service, cancel);  // cancelled, it asks nothing more (#98)
                                if (review) {
@@ -449,7 +449,8 @@ void App::commentKeyMoments() {
     job.total = static_cast<int>(wanted.size());
     job.basis = commentBasis(true);
     // With the model, its comments (the template's where it has nothing better); without it, the template's.
-    AssistantService* model = assistant_->installed() ? assistant_.get() : nullptr;
+    std::shared_ptr<AssistantService> model;
+    if (assistant_->installed()) model = assistant_;
     job.texts = std::async(std::launch::async, [review, wanted, model, oracle = oracle_, done = job.done,
                                                 tables = reviewTables() ? review_tables_ : nullptr, cancel = job.cancel,
                                                 l = lang(), letters = letters()]() {
@@ -715,7 +716,7 @@ void App::writeStory(bool again) {
     job.total                = static_cast<int>(job.templ.size());
     const std::string result = b.tree.main.result.empty() ? "*" : b.tree.main.result;
     commentary::Players players{b.tree.main.header("White"), b.tree.main.header("Black")};
-    job.story  = std::async(std::launch::async, [review, model = assistant_.get(), result, players, round = job.round,
+    job.story  = std::async(std::launch::async, [review, model = assistant_, result, players, round = job.round,
                                                  tables = reviewTables() ? review_tables_ : nullptr, l = lang(),
                                                  letters = letters(), cancel = job.cancel, done = job.done]() {
         std::string error;

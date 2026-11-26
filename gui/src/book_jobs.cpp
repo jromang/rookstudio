@@ -1,6 +1,5 @@
 #include "book_jobs.hpp"
 
-#include <chrono>
 #include <system_error>
 
 #include "i18n.hpp"
@@ -8,13 +7,6 @@
 namespace fcg {
 
 namespace fs = std::filesystem;
-
-PgnBookJobs::~PgnBookJobs() {
-    if (job_) {
-        *job_->cancel = true;
-        job_->result.wait();
-    }
-}
 
 PgnBookJobs::Status PgnBookJobs::want(const std::string& pgn, int depth, bool chess960) {
     const Key key{pgn, tour::pgnBookPlies(depth), chess960};
@@ -42,10 +34,10 @@ PgnBookJobs::Status PgnBookJobs::want(const std::string& pgn, int depth, bool ch
             book.status.stats = cached->stats;
         }
     }
-    if (job_ && job_->key == key && book.status.state == Status::State::Queued) {
+    if (!job_.idle() && job_.state().key == key && book.status.state == Status::State::Queued) {
         auto status     = book.status;
         status.state    = Status::State::Preparing;
-        status.progress = *job_->progress;
+        status.progress = job_.state().progress;
         return status;
     }
     return book.status;
@@ -58,17 +50,18 @@ void PgnBookJobs::retry(const std::string& pgn, int depth, bool chess960) {
 
 std::vector<PgnBookJobs::Ended> PgnBookJobs::poll() {
     std::vector<Ended> ended;
-    if (job_ && job_->result.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto& book = books_[job_->key];
+    if (job_.ready()) {
+        const auto& job = job_.state();
+        auto& book      = books_[job.key];
         // Its result stands for the file as it was read; the file changed since, the cache is looked at again.
-        const bool same = book.known && book.size == job_->size && book.time == job_->time;
+        const bool same = book.known && book.size == job.size && book.time == job.time;
         try {
-            const auto prepared = job_->result.get();
+            const auto prepared = job_.take();
             if (same) {
                 book.status       = {};
                 book.status.state = Status::State::Ready;
                 book.status.stats = prepared.stats;
-                ended.push_back({job_->key.pgn, job_->key.plies, book.status});
+                ended.push_back({job.key.pgn, job.key.plies, book.status});
             } else {
                 book.known = false;
             }
@@ -79,83 +72,68 @@ std::vector<PgnBookJobs::Ended> PgnBookJobs::poll() {
                 book.status       = {};
                 book.status.state = Status::State::Failed;
                 book.status.error = e.what();
-                ended.push_back({job_->key.pgn, job_->key.plies, book.status});
+                ended.push_back({job.key.pgn, job.key.plies, book.status});
             } else {
                 book.known = false;
             }
         }
-        job_.reset();
     }
 
     // Nobody asked for it since the last poll: its depth changed, or it is no longer chosen.
-    if (job_ && books_[job_->key].asked < frame_) *job_->cancel = true;
+    if (!job_.idle() && books_[job_.state().key].asked < frame_) job_.cancel();
 
-    if (!job_) {
+    if (job_.idle()) {
         for (const auto& [key, book] : books_) {
             if (book.asked < frame_ || !book.known || book.status.state != Status::State::Queued) continue;
-            Job job;
-            job.key      = key;
-            job.size     = book.size;
-            job.time     = book.time;
-            job.progress = std::make_shared<std::atomic<double>>(0.0);
-            job.cancel   = std::make_shared<std::atomic_bool>(false);
-            job.result   = std::async(std::launch::async, [key, progress = job.progress, cancel = job.cancel] {
+            auto& job = job_.start([key](TaskState<Converting>& converting) {
                 return tour::preparePgnBook(key.pgn, key.plies, key.chess960, [&](double share) {
-                    *progress = share;
-                    return !*cancel;
+                    converting.progress = share;
+                    return !converting.cancel;
                 });
             });
-            job_         = std::move(job);
+            job.key   = key;
+            job.size  = book.size;
+            job.time  = book.time;
             break;
         }
     }
 
     // Those not asked for in a while are forgotten: a depth dragged through many values leaves many behind.
     for (auto it = books_.begin(); it != books_.end();) {
-        const bool running = job_ && job_->key == it->first;
+        const bool running = !job_.idle() && job_.state().key == it->first;
         it                 = !running && it->second.asked + 600 < frame_ ? books_.erase(it) : std::next(it);
     }
     ++frame_;
     return ended;
 }
 
-PolyglotBuild::~PolyglotBuild() {
-    if (job_) {
-        *job_->cancel = true;
-        job_->result.wait();
-    }
-}
-
 bool PolyglotBuild::start(const std::string& pgn, const std::string& bin, const tour::PgnBookOptions& options) {
-    if (job_) return false;
-    Job job;
-    job.pgn      = pgn;
-    job.bin      = bin;
-    job.options  = options;
-    job.progress = std::make_shared<std::atomic<double>>(0.0);
-    job.cancel   = std::make_shared<std::atomic_bool>(false);
-    job.result   = std::async(std::launch::async, [pgn, bin, options, progress = job.progress, cancel = job.cancel] {
+    if (busy()) return false;
+    auto& job   = job_.start([pgn, bin, options](TaskState<Building>& building) {
         return tour::pgnToPolyglot(pgn, bin, options, [&](double share) {
-            *progress = share;
-            return !*cancel;
+            building.progress = share;
+            return !building.cancel;
         });
     });
-    job_         = std::move(job);
+    job.pgn     = pgn;
+    job.bin     = bin;
+    job.options = options;
     return true;
 }
 
 void PolyglotBuild::cancel() {
-    if (job_) *job_->cancel = true;
+    if (busy()) job_.cancel();
 }
 
 std::optional<PolyglotBuild::Ended> PolyglotBuild::poll() {
-    if (!job_ || job_->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return std::nullopt;
+    if (!job_.ready()) return std::nullopt;
+    const auto& job = job_.state();
     Ended ended;
-    ended.pgn     = job_->pgn;
-    ended.bin     = job_->bin;
-    ended.options = job_->options;
+    ended.pgn     = job.pgn;
+    ended.bin     = job.bin;
+    ended.options = job.options;
     try {
-        ended.stats = job_->result.get();
+        ended.stats = job_.take();
     } catch (const tour::BookCancelled&) {
         ended.cancelled = true;
     } catch (const tour::EmptyPgnBook& e) {
@@ -165,7 +143,6 @@ std::optional<PolyglotBuild::Ended> PolyglotBuild::poll() {
     } catch (const std::exception& e) {
         ended.error = e.what();
     }
-    job_.reset();
     return ended;
 }
 

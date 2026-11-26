@@ -61,10 +61,10 @@
 #include "fide_cards.hpp"
 #include "fide_rating_list.hpp"
 #include "game_graph.hpp"
-#include "graveyard.hpp"
 #include "guide_view.hpp"
 #include "home.hpp"
 #include "https.hpp"
+#include "jobs.hpp"
 #include "layout.hpp"
 #include "lichess_account.hpp"
 #include "lichess_arenas.hpp"
@@ -306,6 +306,14 @@ class App {
         Count      // none: the sheet of the views is shown in place of the page
     };
     enum class Tab { Overview, Standings, Bracket, Schedule, Live, Games, Openings, Broadcast };
+
+    // The background jobs (jobs.hpp, #105): those of App's pages, the shelf's and the background readings', cancelled
+    // at once by ~App, every window hidden; the futures of tasks whose result nobody wants (a pasted link put away, a
+    // crosstable left, an endgame's questions, a token replaced to revoke), parked, let go of once a frame when they
+    // ended and waited for at the end of ~App. Declared first: gone last, after every job, so that a job destroyed
+    // with App parks its task here, and the group waits for it. The tasks hold what they use (their state, a
+    // shared_ptr to the assistant), never App's members.
+    JobGroup jobs_;
 
     // The views (#43, mockup M6; views.hpp, view_views.cpp): one to three sets of pages of the user's, switched at the
     // top of the rail (Ctrl+1 to Ctrl+3), each with its rail and the Board it shows, in place of the two spaces.
@@ -1239,11 +1247,7 @@ class App {
     [[nodiscard]] std::vector<EndgameTask> gameEndgames();  // the user's mistakes in positions of 7 pieces or fewer
     [[nodiscard]] std::string endgameState(const EndgameEntry& entry);  // "done in 9 (the tables: 7)", "5 pieces"…
     std::unique_ptr<EndgameRun> endgame_;
-    // The questions to Lichess of a session left, cancelled, ending out of sight (a future of std::async waits for its
-    // task when it goes).
-    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_left_;
-    std::vector<std::future<lichess::Answer<std::vector<std::string>>>> endgame_lines_left_;
-    void leaveEndgameQuestions();
+    void leaveEndgameQuestions();  // the questions to Lichess of a session left: cancelled, parked in jobs_
     [[nodiscard]] std::string endgameLock() const;  // why a session cannot start, empty when it can
     bool startEndgame(const EndgameEntry& entry);
     bool startEndgameReview();
@@ -1829,7 +1833,9 @@ class App {
     };
     std::unique_ptr<LichessLink> lichess_link_;
     std::future<std::string> lichess_unlink_;
-    std::vector<std::future<std::string>> lichess_revokes_;  // tokens replaced by a link made again
+    // A token no longer used (replaced by a link made again, one the bot refused) revoked in the background: parked in
+    // jobs_, a failure said in the console, waited for at quit.
+    void revokeToken(std::string token);
     // A scope a feature needs and the token lacks (#45): asked on the Lichess page, the M4 way, before going on.
     struct LichessScopeAsk {
         std::string scope;
@@ -2035,10 +2041,9 @@ class App {
         bool keep_menu         = false;
     };
     std::optional<SwissPlay> swiss_play_;
-    std::vector<std::function<bool()>> tour_jobs_left_;  // requests of a tournament put aside, until they end
-    void dropTour();                                     // the tournament followed, its requests left to end
-    void dropArena();                                    // the arena chosen
-    void dropSwiss();                                    // the Swiss chosen
+    void dropTour();                // the tournament followed, its requests left to end (parked in jobs_)
+    void dropArena();               // the arena chosen
+    void dropSwiss();               // the Swiss chosen
     int online_part_      = -1;     // the "On Lichess" part: 0 its games, 1 the tournaments; -1 not read yet
     bool tour_part_swiss_ = false;  // the Tournaments part shows the Swiss chosen last, not the arena
     void pollLichessArenas();
@@ -2170,14 +2175,13 @@ class App {
     // made in the background and kept for their snapshot; each crosstable's system, tie-breaks and results set by hand
     // are kept in the profile.
     bool db_tournaments_ = false;  // the game list shows the database's tournaments
-    struct DbTournamentsJob {
+    // A list being made: its database's folder and the snapshot it reads (App's), the games gone through.
+    struct DbTournamentsState {
         std::filesystem::path folder;
         uint64_t generation = 0;
         std::shared_ptr<const study::Snapshot> snapshot;
-        std::shared_ptr<study::TournamentProgress> progress = std::make_shared<study::TournamentProgress>();
-        std::shared_ptr<std::atomic<bool>> cancel           = std::make_shared<std::atomic<bool>>(false);
         std::chrono::steady_clock::time_point started;
-        std::future<study::TournamentList> done;
+        study::TournamentProgress progress;
     };
     struct TournamentsKept {
         uint64_t generation = 0;
@@ -2185,7 +2189,11 @@ class App {
         std::shared_ptr<const study::TournamentList> list;
     };
     std::map<std::filesystem::path, TournamentsKept> tournament_lists_;
-    std::optional<DbTournamentsJob> db_tournaments_job_;
+    Job<study::TournamentList, DbTournamentsState> db_tournaments_job_{jobs_};
+    // The list being made, none when none is.
+    [[nodiscard]] const DbTournamentsState* dbTournamentsJob() const {
+        return db_tournaments_job_.idle() ? nullptr : &db_tournaments_job_.state();
+    }
     std::vector<std::filesystem::path> tournaments_wanted_;  // lists asked for (Ctrl+K), made one after another
     std::size_t tournament_row_ = 0;
     std::array<char, 128> tournament_filter_{};
@@ -2652,7 +2660,6 @@ class App {
         EngineEntry engine;  // as it runs: here, or on its machine
     };
     std::map<std::string, LichessService> services_;               // by engine, those in service
-    std::vector<std::future<void>> retired_services_;              // stopped, their threads ending
     std::map<std::string, lichess::ServiceStatus> service_ended_;  // why a service ended by itself, by engine
     bool offers_resumed_ = false;                                  // those in service at the last close, started
     bool offers_dirty_   = false;                                  // today's counts to write
@@ -3102,7 +3109,8 @@ class App {
     // What the assistant's comments written in this session rest on, by their text: said when one is hovered (R9).
     std::map<std::string, std::vector<std::string>> assistant_basis_;
     [[nodiscard]] std::vector<std::string> commentBasis(bool from_review);
-    std::unique_ptr<AssistantService> assistant_;
+    // Shared with the tasks that ask it (a comment, a story, an answer), which may outlive App's other members.
+    std::shared_ptr<AssistantService> assistant_;
 
     // The engine picker (#59, mockup M9; view_engine_picker.cpp): the strongest engines from their authors' GitHub
     // releases, the build this processor runs downloaded, checked, started and added to the library; the card that
@@ -3346,9 +3354,6 @@ class App {
         std::optional<EndgameCheckSummary> summary;
     };
     std::unique_ptr<EndgameCheckRun> endgame_check_;
-    // The jobs of a check closed while they ran, kept until they end: a future's end would wait for them.
-    std::vector<std::future<lichess::Answer<lichess::Tablebase>>> endgame_check_asking_left_;
-    std::vector<std::future<EndgameCheckGames>> endgame_check_reading_left_;
     void startEndgameCheck(const std::filesystem::path& dir);
     void closeEndgameCheck();
     void pollEndgameCheck();
@@ -3410,14 +3415,9 @@ class App {
         std::future<std::pair<std::vector<commentary::StoryPassage>, std::string>> story;
     };
     std::optional<StoryJob> story_job_;
-    // An opening report's jobs let go (a report made again, another opened), cancelled and kept until they end: the
-    // summary's uses the assistant, which goes after them (#91).
-    struct ReportLeftover {
-        std::shared_ptr<void> hold;
-        std::function<bool()> ready;
-    };
-    std::vector<ReportLeftover> report_leftovers_;
-    void leaveReportJobs();  // the opening report's running jobs cancelled and kept until they end
+    // An opening report's jobs let go (a report made again, another opened): cancelled and parked in jobs_ until they
+    // end (#91, #105).
+    void leaveReportJobs();
     std::vector<commentary::StoryPassage> model_story_;
     std::string model_story_of_;      // the review it was written for
     std::string model_story_error_;   // why the model gave no answer
@@ -3704,7 +3704,7 @@ class App {
     // those of its conversion (pgn_books_).
     const std::string& ownBookCheck(const std::string& path);
     // The participants' PGN books turned into Polyglot books, in the background.
-    PgnBookJobs pgn_books_;
+    PgnBookJobs pgn_books_{jobs_};
     // At each frame: the PGN books of the setup are wanted (prepared as soon as chosen or loaded), the conversions
     // move on, and those that ended say so in the console.
     void pollOwnBooks();
@@ -3845,7 +3845,7 @@ class App {
     // profile; then the book made from them, out of an evaluation, a depth, the plies and a number.
     bool evaluated_suite_shown_ = false;
     EvaluatedSuiteOptions evaluated_suite_;
-    EvalsReading evals_reading_;
+    EvalsReading evals_reading_{jobs_};
     std::optional<EvalsFolder> evals_folder_;  // what the profile holds, read again when a reading stops
     std::optional<std::vector<EvaluatedPosition>> evaluated_positions_;
     std::future<std::vector<EvaluatedPosition>> evaluated_job_;  // what the profile kept, read off the frame
@@ -3860,7 +3860,7 @@ class App {
     void drawEvaluatedSuite();
     void writeEvaluatedSuiteBook(std::string path);
     std::string book_build_error_;   // why the last build failed, shown in the form
-    PolyglotBuild book_build_;
+    PolyglotBuild book_build_{jobs_};
 
     // engines
     void refreshPrograms();
@@ -4214,12 +4214,10 @@ class App {
         std::future<CtgDone> done;
     };
     std::optional<CtgJob> ctg_job_;
-    std::vector<std::future<CtgDone>> ctg_abandoned_;         // cancelled, still ending
     std::map<std::string, study::CtgSummary> ctg_summaries_;  // by book, this session
     std::map<std::string, std::string> ctg_failed_;           // a book that could not be read, and why
     std::string ctg_said_, ctg_said_of_;                      // the last check's or copy's report, and its book
-    std::vector<std::future<std::shared_ptr<tour::BookScan>>> abandoned_scans_;  // cancelled, still ending
-    std::shared_ptr<const tour::BookScan> book_scan_;                            // of book book_scan_index_
+    std::shared_ptr<const tour::BookScan> book_scan_;         // of book book_scan_index_
     int book_scan_index_ = -1;
     std::string book_scan_error_;
     int book_show_ = 0;  // 0 every opening, 1 those with a problem
@@ -4796,11 +4794,6 @@ class App {
     void chooseRemote(const std::string& path);
     bool scroll_to_machines_    = false;  // asked from the command palette
     int machines_scroll_frames_ = 0;      // the frames it was asked on
-
-    // The futures of tasks cancelled whose result nobody wants (a pasted link put away, a crosstable left, the
-    // questions of a game left): let go of once a frame when they ended, the others waited for at the end of ~App,
-    // every window hidden (#98). Declared last: gone before what their tasks use (assistant_).
-    Graveyard graveyard_;
 };
 
 }  // namespace fcg

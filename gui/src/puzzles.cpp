@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <utility>
 
 #include <json.hpp>
 
@@ -121,14 +122,9 @@ study::Puzzle puzzleOf(const nlohmann::json& j) {
 // ---------------------------------------------------------------------------
 // The store
 
-OfflinePuzzles::OfflinePuzzles(fs::path folder) : folder_(std::move(folder)) {
+OfflinePuzzles::OfflinePuzzles(JobGroup& jobs, fs::path folder) : folder_(std::move(folder)), job_(jobs) {
     study::tidyPuzzleFolder(folder_);  // a store being written when the program stopped, older ones
     reload();
-}
-
-OfflinePuzzles::~OfflinePuzzles() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
 }
 
 std::shared_ptr<const study::PuzzleStore> OfflinePuzzles::store() const {
@@ -165,7 +161,7 @@ void OfflinePuzzles::reload() {
         st.source        = j->value("source", "");
         const auto state = j->value("state", nlohmann::json::object());
         st.kept          = state.value("kept", uint64_t{0});
-    } else if (!busy_ && fs::exists(build(), ec)) {
+    } else if (!busy() && fs::exists(build(), ec)) {
         fs::remove_all(build(), ec);  // a preparation stopped before its first place was kept: nothing to go on from
     }
     std::lock_guard lock(mutex_);
@@ -175,89 +171,72 @@ void OfflinePuzzles::reload() {
 }
 
 void OfflinePuzzles::start(std::string source) {
-    if (busy_) return;
-    if (thread_.joinable()) thread_.join();
+    if (job_.ready() && remove_when_ended_) (void)finished();  // the removal asked for during the last one, first
+    if (busy()) return;
     if (const auto st = state(); st.stopped && st.source != source) forgetStopped();
-    busy_   = true;
-    cancel_ = false;
-    {
-        std::lock_guard lock(mutex_);
-        finished_.reset();
-    }
-    progress_.bytes   = 0;
-    progress_.size    = 0;
-    progress_.resumed = false;
-    progress_.lines   = 0;
-    progress_.kept    = 0;
-    progress_.writing = false;
-    progress_.written = 0;
-    progress_.total   = 0;
-    thread_           = std::thread([this, source = std::move(source)] {
-        std::string error;
-        try {
-            run(source);
-        } catch (const std::exception& e) {
-            error = e.what();
-        }
-        {
-            std::lock_guard lock(mutex_);
-            if (!finished_) finished_ = error.empty() ? std::string("stopped") : error;
-        }
-        busy_ = false;
-    });
-}
-
-void OfflinePuzzles::run(std::string source) {
-    std::error_code ec;
-    fs::create_directories(build(), ec);
-    StoreConsumer consumer(folder_, progress_);
     ZstdReadingOptions o;
     o.checkpoint_every = checkpoint_every_;
     o.retry_wait       = retry_wait_;
     o.on_saved         = on_saved_;
-    auto why           = readZstd(source, build() / "reading.json", consumer, progress_, cancel_, o);
-    if (why.empty()) fs::remove_all(build(), ec);  // the store made: its files and its state are gone
-    std::lock_guard lock(mutex_);
-    finished_ = std::move(why);
+    // The task holds what it reads and what it tells: it may outlive this object, parked.
+    job_.start([source = std::move(source), folder = folder_, o](TaskState<Progress>& job) -> std::string {
+        try {
+            const auto build = folder / "build";
+            std::error_code ec;
+            fs::create_directories(build, ec);
+            StoreConsumer consumer(folder, job);
+            auto why = readZstd(source, build / "reading.json", consumer, job, job.cancel, o);
+            if (why.empty()) fs::remove_all(build, ec);  // the store made: its files and its state are gone
+            return why;
+        } catch (const std::exception& e) {
+            const std::string why = e.what();
+            return why.empty() ? std::string("stopped") : why;
+        }
+    });
 }
 
 std::optional<std::string> OfflinePuzzles::finished() {
-    if (busy_) return std::nullopt;
-    std::optional<std::string> out;
+    if (!job_.ready()) return std::nullopt;
+    auto out = job_.take();
+    if (std::exchange(remove_when_ended_, false)) {
+        removeNow();
+        return std::nullopt;  // cancelled by the removal
+    }
     {
         std::lock_guard lock(mutex_);
-        out = std::move(finished_);
-        finished_.reset();
+        if (out.empty()) store_.reset();  // the store it replaced, closed before it is removed
     }
-    if (out) {
-        if (thread_.joinable()) thread_.join();
-        {
-            std::lock_guard lock(mutex_);
-            if (out->empty()) store_.reset();  // the store it replaced, closed before it is removed
-        }
-        if (out->empty()) study::tidyPuzzleFolder(folder_);
-        reload();
-    }
+    if (out.empty()) study::tidyPuzzleFolder(folder_);
+    reload();
     return out;
 }
 
 void OfflinePuzzles::remove() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
     {
         std::lock_guard lock(mutex_);
         store_.reset();
-        finished_.reset();
         ++generation_;
     }
+    if (busy()) {
+        job_.cancel();
+        remove_when_ended_ = true;
+        std::lock_guard lock(mutex_);
+        state_ = {};
+        return;
+    }
+    job_.drop();  // a result not taken: forgotten
+    remove_when_ended_ = false;
+    removeNow();
+}
+
+void OfflinePuzzles::removeNow() {
     std::error_code ec;
     fs::remove_all(folder_, ec);
     reload();
 }
 
 void OfflinePuzzles::forgetStopped() {
-    if (busy_) return;
-    if (thread_.joinable()) thread_.join();
+    if (busy()) return;
     std::error_code ec;
     fs::remove_all(build(), ec);
     reload();

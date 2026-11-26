@@ -7,14 +7,14 @@
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
-#include <future>
 #include <map>
-#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include <tour/pgn_book.hpp>
+
+#include "jobs.hpp"
 
 namespace fcg {
 
@@ -40,8 +40,8 @@ class PgnBookJobs {
         Status status;  // Ready or Failed
     };
 
-    PgnBookJobs() = default;
-    ~PgnBookJobs();  // a conversion in flight is cancelled, and waited for
+    // A conversion in flight when it goes is cancelled and parked in `jobs` (#105).
+    explicit PgnBookJobs(JobGroup& jobs) : job_(jobs) {}
     PgnBookJobs(const PgnBookJobs&)            = delete;
     PgnBookJobs& operator=(const PgnBookJobs&) = delete;
 
@@ -60,7 +60,7 @@ class PgnBookJobs {
     std::vector<Ended> poll();
 
     // A conversion is in flight.
-    [[nodiscard]] bool busy() const noexcept { return job_.has_value(); }
+    [[nodiscard]] bool busy() const noexcept { return !job_.idle(); }
 
    private:
     struct Key {
@@ -76,17 +76,16 @@ class PgnBookJobs {
         Status status;
         uint64_t asked = 0;  // the frame it was last asked for
     };
-    struct Job {
+    // The conversion in flight: its book and the file it reads as it was at its start (the window's), the share read.
+    struct Converting {
         Key key;
-        uintmax_t size = 0;  // the file it reads, as it was at its start
+        uintmax_t size = 0;
         std::filesystem::file_time_type time{};
-        std::shared_ptr<std::atomic<double>> progress;
-        std::shared_ptr<std::atomic_bool> cancel;
-        std::future<tour::PreparedBook> result;
+        std::atomic<double> progress{0.0};
     };
 
     std::map<Key, Book> books_;
-    std::optional<Job> job_;
+    Job<tour::PreparedBook, Converting> job_;
     uint64_t frame_ = 1;
 };
 
@@ -105,8 +104,8 @@ class PolyglotBuild {
         bool cancelled = false;
     };
 
-    PolyglotBuild() = default;
-    ~PolyglotBuild();  // a build in flight is cancelled, and waited for
+    // A build in flight when it goes is cancelled and parked in `jobs` (#105).
+    explicit PolyglotBuild(JobGroup& jobs) : job_(jobs) {}
     PolyglotBuild(const PolyglotBuild&)            = delete;
     PolyglotBuild& operator=(const PolyglotBuild&) = delete;
 
@@ -115,26 +114,25 @@ class PolyglotBuild {
     // Asks the build in flight to stop: it ends at its next progress report, and poll() gives it as cancelled.
     void cancel();
 
-    [[nodiscard]] bool busy() const noexcept { return job_.has_value(); }
-    [[nodiscard]] bool cancelling() const noexcept { return job_ && *job_->cancel; }
+    [[nodiscard]] bool busy() const noexcept { return !job_.idle(); }
+    [[nodiscard]] bool cancelling() const noexcept { return busy() && job_.cancelled(); }
     // The share of the PGN file read, 0 to 1.
-    [[nodiscard]] double progress() const noexcept { return job_ ? job_->progress->load() : 0.0; }
-    [[nodiscard]] std::string bin() const { return job_ ? job_->bin : std::string(); }
-    [[nodiscard]] std::string pgn() const { return job_ ? job_->pgn : std::string(); }
+    [[nodiscard]] double progress() const noexcept { return busy() ? job_.state().progress.load() : 0.0; }
+    [[nodiscard]] std::string bin() const { return busy() ? job_.state().bin : std::string(); }
+    [[nodiscard]] std::string pgn() const { return busy() ? job_.state().pgn : std::string(); }
 
     // At each frame: the build that ended, once.
     std::optional<Ended> poll();
 
    private:
-    struct Job {
+    // The build in flight: what it reads and writes, with what options (the window's), the share read.
+    struct Building {
         std::string pgn;
         std::string bin;
         tour::PgnBookOptions options;
-        std::shared_ptr<std::atomic<double>> progress;
-        std::shared_ptr<std::atomic_bool> cancel;
-        std::future<tour::PgnBookStats> result;
+        std::atomic<double> progress{0.0};
     };
-    std::optional<Job> job_;
+    Job<tour::PgnBookStats, Building> job_;
 };
 
 }  // namespace fcg

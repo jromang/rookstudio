@@ -331,15 +331,6 @@ std::string dateOf(int64_t seconds) {
     return text;
 }
 
-// A job's future kept until it ends, its end looked at without waiting.
-template <typename Leftovers, typename T>
-void leave(Leftovers& into, std::future<T>& job) {
-    if (!job.valid()) return;
-    auto held       = std::make_shared<std::future<T>>(std::move(job));
-    const auto* raw = held.get();
-    into.push_back({held, [raw] { return raw->wait_for(std::chrono::seconds(0)) == std::future_status::ready; }});
-}
-
 }  // namespace
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -350,9 +341,9 @@ void App::leaveReportJobs() {
     auto& r = *opening_report_;
     for (auto* c : {r.cancel.get(), r.evals_cancel.get(), r.summary_cancel.get()})
         if (c) *c = true;
-    leave(report_leftovers_, r.job);
-    leave(report_leftovers_, r.evals_job);
-    leave(report_leftovers_, r.summary_job);
+    jobs_.park(std::move(r.job));
+    jobs_.park(std::move(r.evals_job));
+    jobs_.park(std::move(r.summary_job));
 }
 
 void App::openOpeningReport(Page over) {
@@ -487,7 +478,6 @@ void App::askReportLichess(int source) {
 }
 
 void App::pollOpeningReport() {
-    std::erase_if(report_leftovers_, [](const ReportLeftover& l) { return l.ready(); });
     if (!opening_report_) return;
     auto& r = *opening_report_;
     // Another page shown (the rail, a command): the report steps aside.
@@ -610,13 +600,15 @@ void App::pollOpeningReport() {
             view.rows                = &r.rows;
             view.evals               = &r.evals;
             const auto figures       = summaryFigures(view, lang());
-            commentary::Model* model = storyWithoutModel().empty() ? assistant_.get() : nullptr;
+            // Shared with its task, which may outlive App's other members (#105).
+            std::shared_ptr<commentary::Model> model;
+            if (storyWithoutModel().empty()) model = assistant_;
             r.summary_total          = static_cast<int>(commentary::summaryTopics(figures).size());
             r.summary_cancel         = std::make_shared<std::atomic<bool>>(false);
             r.summary_done           = std::make_shared<std::atomic<int>>(0);
             r.summary_job = std::async(std::launch::async, [model, figures, l = lang(), round = r.round,
                                                             cancel = r.summary_cancel, done = r.summary_done] {
-                return writeSummary(model, figures, l, round, *cancel, *done);
+                return writeSummary(model.get(), figures, l, round, *cancel, *done);
             });
         }
     }

@@ -22,7 +22,6 @@
 #include <set>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include <chess.hpp>
@@ -31,6 +30,7 @@
 #include <study/puzzles.hpp>
 #include <study/training.hpp>
 
+#include "jobs.hpp"
 #include "zstd_reading.hpp"
 
 namespace fcg {
@@ -60,8 +60,8 @@ class OfflinePuzzles {
         std::string source;
     };
 
-    explicit OfflinePuzzles(std::filesystem::path folder);
-    ~OfflinePuzzles();  // cancels and waits
+    // A preparation under way when it goes is cancelled and parked in `jobs` (#105).
+    OfflinePuzzles(JobGroup& jobs, std::filesystem::path folder);
     OfflinePuzzles(const OfflinePuzzles&)            = delete;
     OfflinePuzzles& operator=(const OfflinePuzzles&) = delete;
 
@@ -74,12 +74,14 @@ class OfflinePuzzles {
     // A preparation: the database read from `source` (an http(s) address, else a file). One cut short goes on, unless
     // its source was another: then it starts again. The store there answers until the new one replaces it.
     void start(std::string source);
-    [[nodiscard]] bool busy() const noexcept { return busy_; }
-    void cancel() noexcept { cancel_ = true; }
-    [[nodiscard]] const Progress& progress() const noexcept { return progress_; }
+    [[nodiscard]] bool busy() const noexcept { return job_.running(); }
+    void cancel() noexcept { job_.cancel(); }
+    [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
     // Once a preparation has stopped: empty when it went to its end, else why it stopped ("cancelled" for Cancel).
     [[nodiscard]] std::optional<std::string> finished();
-    // The store removed, a preparation under way cancelled first. The user's own puzzles stay (another folder).
+    // The store removed, a preparation under way cancelled first: no store at once; the files go once it ended, at the
+    // finished() that sees its end (it writes in the folder until then), and it is not said. The user's own puzzles
+    // stay (another folder).
     void remove();
     // A preparation cut short forgotten, its files removed; the store, if any, stays.
     void forgetStopped();
@@ -90,22 +92,20 @@ class OfflinePuzzles {
     void setOnSaved(std::function<void()> f) { on_saved_ = std::move(f); }
 
    private:
-    void run(std::string source);
     void reload();
+    void removeNow();  // the folder removed, nothing preparing in it
     [[nodiscard]] std::filesystem::path build() const { return folder_ / "build"; }
 
     std::filesystem::path folder_;
     mutable std::mutex mutex_;
     std::shared_ptr<const study::PuzzleStore> store_;
     State state_;
-    std::thread thread_;
-    std::atomic<bool> busy_{false}, cancel_{false};
-    Progress progress_;
-    std::optional<std::string> finished_;
     std::atomic<uint64_t> generation_{0};
+    bool remove_when_ended_  = false;  // remove() during a preparation
     double checkpoint_every_ = 5;
     std::chrono::milliseconds retry_wait_{2000};
     std::function<void()> on_saved_;
+    Job<std::string, Progress> job_;
 };
 
 // ---------------------------------------------------------------------------

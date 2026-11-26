@@ -95,7 +95,8 @@ TEST_CASE("Lichess month: its games read from a file, those kept added; cut shor
     const auto whole = rawFrame(pgn.substr(0, a)) + rawFrame(pgn.substr(a, b - a)) + rawFrame(pgn.substr(b));
     const auto file  = dir / "month.pgn.zst";
     auto db          = study::Database::create(dir / "Month.fcgdb");
-    lichess::MonthReading reading;
+    JobGroup jobs;
+    lichess::MonthReading reading(jobs);
     ZstdReadingOptions options;
     options.checkpoint_every = 0;
     reading.setOptions(options);

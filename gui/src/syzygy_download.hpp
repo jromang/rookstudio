@@ -10,13 +10,13 @@
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
-#include <mutex>
+#include <memory>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "https.hpp"
+#include "jobs.hpp"
 
 namespace fcg {
 
@@ -50,36 +50,30 @@ class SyzygyDownload {
         bool complete     = false;
     };
 
-    // `files`: those of the set, the tests' few in place of the 290.
-    explicit SyzygyDownload(std::filesystem::path folder, std::string base_url = syzygy345Url(),
+    // `files`: those of the set, the tests' few in place of the 290. A download under way when it goes is cancelled
+    // and parked in `jobs` (#105).
+    explicit SyzygyDownload(JobGroup& jobs, std::filesystem::path folder, std::string base_url = syzygy345Url(),
                             std::vector<SyzygyFile> files = syzygy345Files());
-    ~SyzygyDownload();  // cancels and waits
     SyzygyDownload(const SyzygyDownload&)            = delete;
     SyzygyDownload& operator=(const SyzygyDownload&) = delete;
 
     [[nodiscard]] const std::filesystem::path& folder() const noexcept { return folder_; }
     [[nodiscard]] State state() const;  // reads the folder: names and sizes, the marks of the files not checked yet
     void start();                       // the files missing, one after the other
-    [[nodiscard]] bool busy() const noexcept { return busy_; }
-    void cancel() noexcept { cancel_ = true; }
-    [[nodiscard]] const Progress& progress() const noexcept { return progress_; }
+    [[nodiscard]] bool busy() const noexcept { return job_.running(); }
+    void cancel() noexcept { job_.cancel(); }
+    [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
     // Once stopped: empty when every file is there, else why ("cancelled" for Cancel).
     [[nodiscard]] std::optional<std::string> finished();
     // Changes when a piece count's files are all there: the tables to be loaded again.
-    [[nodiscard]] uint64_t generation() const noexcept { return generation_; }
+    [[nodiscard]] uint64_t generation() const noexcept { return *generation_; }
 
    private:
-    void run();
-
     std::filesystem::path folder_;
     std::string base_url_;
     std::vector<SyzygyFile> files_;
-    std::thread thread_;
-    std::atomic<bool> busy_{false}, cancel_{false};
-    Progress progress_;
-    mutable std::mutex mutex_;
-    std::optional<std::string> finished_;
-    std::atomic<uint64_t> generation_{0};
+    std::shared_ptr<std::atomic<uint64_t>> generation_ = std::make_shared<std::atomic<uint64_t>>(0);  // the task's too
+    Job<std::string, Progress> job_;
 };
 
 }  // namespace fcg

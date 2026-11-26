@@ -249,7 +249,7 @@ void App::askQuestion(const std::string& text, const std::string& asked_text, st
     q.answer =
         std::async(std::launch::async,
                    [question = asked_text.empty() ? text : asked_text, fen = q.fen, earlier_fen, previous,
-                    earlier_previous, line = std::move(line), bases = q.bases, lang, service = assistant_.get(),
+                    earlier_previous, line = std::move(line), bases = q.bases, lang, service = assistant_,
                     cancel = q.cancel, oracle = oracle_, tables = boardPositionTables()]() -> QuestionResult {
                        QuestionResult r;
                        if (*cancel) return r;  // left before it began: nobody reads it
@@ -323,7 +323,7 @@ void App::pollQuestions() {
 void App::leaveQuestions() {
     for (auto& q : questions_) {
         *q.cancel = true;
-        graveyard_.park(std::move(q.answer));
+        jobs_.park(std::move(q.answer));
     }
     questions_.clear();
 }

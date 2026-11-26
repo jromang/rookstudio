@@ -109,7 +109,8 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
 
     // Cut in the middle of KPvK.rtbw: the files before it are there and checked, KPvK's part kept.
     cut_at = 3000;
-    SyzygyDownload download(folder, base, set);
+    JobGroup jobs;
+    SyzygyDownload download(jobs, folder, base, set);
     CHECK(download.state().files == 0);
     CHECK(download.state().ready == 0);
     download.start();

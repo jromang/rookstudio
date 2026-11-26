@@ -152,14 +152,84 @@ bool syzygyFileValid(const fs::path& file) {
 
 const char* syzygy345Url() { return "https://tablebase.lichess.ovh/tables/standard/3-4-5/"; }
 
-SyzygyDownload::SyzygyDownload(fs::path folder, std::string base_url, std::vector<SyzygyFile> files)
-    : folder_(std::move(folder)), base_url_(std::move(base_url)), files_(std::move(files)) {
-    if (!base_url_.empty() && base_url_.back() != '/') base_url_ += '/';
+namespace {
+
+// The files of `files` missing in `folder` downloaded from `base_url`, one after the other: empty when every file is
+// there, else why it stopped ("cancelled" for Cancel). On the download's thread, holding all it uses.
+std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, const std::vector<SyzygyFile>& files,
+                           std::atomic<uint64_t>& generation, TaskState<SyzygyDownload::Progress>& job) {
+    auto& progress = static_cast<SyzygyDownload::Progress&>(job);
+    std::string why;
+    uint64_t done     = 0;
+    std::size_t count = 0;
+    // What is there already counts, checked.
+    std::vector<const SyzygyFile*> todo;
+    for (const auto& f : files) {
+        std::error_code ec;
+        const auto path = folder / f.name;
+        if (fs::is_regular_file(path, ec) && syzygyFileValid(path)) {
+            done += fs::file_size(path, ec);
+            ++count;
+        } else {
+            todo.push_back(&f);
+        }
+    }
+    // The most pieces whose files are all there, those of `todo` from `next` on still missing.
+    const auto readyBefore = [&](std::size_t next) {
+        const int first = next < todo.size() ? syzygyFilePieces(todo[next]->name) : 6;
+        return first <= 3 ? 0 : first - 1;
+    };
+    progress.done   = done;
+    progress.files  = count;
+    progress.ready  = readyBefore(0);
+    const auto host = hostOf(base_url);
+    for (std::size_t i = 0; i < todo.size(); ++i) {
+        if (job.cancel) {
+            why = "cancelled";
+            break;
+        }
+        const auto& f          = *todo[i];
+        progress.current.bytes = 0;
+        progress.current.size  = 0;
+        Download got;
+        {
+            // One request at a time to the host, as Lichess asks: the online tables' questions wait between files.
+            const auto turn = HostGate::instance().turn(host, &job.cancel);
+            if (!turn.owns_lock()) {
+                why = "cancelled";
+                break;
+            }
+            got = httpDownload(base_url + f.name, folder / f.name, &progress.current, &job.cancel);
+        }
+        if (!got.ok) {
+            why = got.error.empty() ? std::string("the download stopped") : got.error;
+            break;
+        }
+        if (!syzygyFileValid(folder / f.name)) {
+            std::error_code ec;
+            fs::remove(folder / f.name, ec);
+            why = std::string(f.name) + ": not a Syzygy table";
+            break;
+        }
+        std::error_code ec;
+        done += fs::file_size(folder / f.name, ec);
+        progress.current.bytes = 0;
+        progress.done          = done;
+        progress.files         = ++count;
+        const int ready        = readyBefore(i + 1);
+        if (ready != progress.ready) {
+            progress.ready = ready;
+            ++generation;
+        }
+    }
+    return why;
 }
 
-SyzygyDownload::~SyzygyDownload() {
-    cancel_ = true;
-    if (thread_.joinable()) thread_.join();
+}  // namespace
+
+SyzygyDownload::SyzygyDownload(JobGroup& jobs, fs::path folder, std::string base_url, std::vector<SyzygyFile> files)
+    : folder_(std::move(folder)), base_url_(std::move(base_url)), files_(std::move(files)), job_(jobs) {
+    if (!base_url_.empty() && base_url_.back() != '/') base_url_ += '/';
 }
 
 SyzygyDownload::State SyzygyDownload::state() const {
@@ -181,92 +251,15 @@ SyzygyDownload::State SyzygyDownload::state() const {
 }
 
 void SyzygyDownload::start() {
-    if (busy_) return;
-    if (thread_.joinable()) thread_.join();
-    cancel_ = false;
-    busy_   = true;
-    {
-        std::lock_guard lock(mutex_);
-        finished_.reset();
-    }
-    thread_ = std::thread([this] { run(); });
+    if (busy()) return;
+    // The task holds what it reads and what it tells: it may outlive this object, parked.
+    job_.start([folder = folder_, base_url = base_url_, files = files_, generation = generation_](
+                   TaskState<Progress>& job) { return downloadSyzygy(folder, base_url, files, *generation, job); });
 }
 
 std::optional<std::string> SyzygyDownload::finished() {
-    if (busy_) return std::nullopt;
-    std::lock_guard lock(mutex_);
-    return std::exchange(finished_, std::nullopt);
-}
-
-void SyzygyDownload::run() {
-    std::string why;
-    uint64_t done     = 0;
-    std::size_t files = 0;
-    // What is there already counts, checked.
-    std::vector<const SyzygyFile*> todo;
-    for (const auto& f : files_) {
-        std::error_code ec;
-        const auto path = folder_ / f.name;
-        if (fs::is_regular_file(path, ec) && syzygyFileValid(path)) {
-            done += fs::file_size(path, ec);
-            ++files;
-        } else {
-            todo.push_back(&f);
-        }
-    }
-    // The most pieces whose files are all there, those of `todo` from `next` on still missing.
-    const auto readyBefore = [&](std::size_t next) {
-        const int first = next < todo.size() ? syzygyFilePieces(todo[next]->name) : 6;
-        return first <= 3 ? 0 : first - 1;
-    };
-    progress_.done  = done;
-    progress_.files = files;
-    progress_.ready = readyBefore(0);
-    const auto host = hostOf(base_url_);
-    for (std::size_t i = 0; i < todo.size(); ++i) {
-        if (cancel_) {
-            why = "cancelled";
-            break;
-        }
-        const auto& f           = *todo[i];
-        progress_.current.bytes = 0;
-        progress_.current.size  = 0;
-        Download got;
-        {
-            // One request at a time to the host, as Lichess asks: the online tables' questions wait between files.
-            const auto turn = HostGate::instance().turn(host, &cancel_);
-            if (!turn.owns_lock()) {
-                why = "cancelled";
-                break;
-            }
-            got = httpDownload(base_url_ + f.name, folder_ / f.name, &progress_.current, &cancel_);
-        }
-        if (!got.ok) {
-            why = got.error.empty() ? std::string("the download stopped") : got.error;
-            break;
-        }
-        if (!syzygyFileValid(folder_ / f.name)) {
-            std::error_code ec;
-            fs::remove(folder_ / f.name, ec);
-            why = std::string(f.name) + ": not a Syzygy table";
-            break;
-        }
-        std::error_code ec;
-        done += fs::file_size(folder_ / f.name, ec);
-        progress_.current.bytes = 0;
-        progress_.done          = done;
-        progress_.files         = ++files;
-        const int ready         = readyBefore(i + 1);
-        if (ready != progress_.ready) {
-            progress_.ready = ready;
-            ++generation_;
-        }
-    }
-    {
-        std::lock_guard lock(mutex_);
-        finished_ = why;
-    }
-    busy_ = false;
+    if (!job_.ready()) return std::nullopt;
+    return job_.take();
 }
 
 }  // namespace fcg

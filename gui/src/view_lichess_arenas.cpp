@@ -270,40 +270,30 @@ std::string App::arenaTimeLeft() const {
 
 bool App::tourMosaicShown() const { return tour_follow_ && broadcast_round_ == tour_follow_->key; }
 
-namespace {
-
-// A request under way kept until it ends, out of sight: a future of std::async waits for its task when destroyed.
-template <typename T>
-void leave(std::vector<std::function<bool()>>& left, std::future<T>& job) {
-    if (!job.valid()) return;
-    auto held = std::make_shared<std::future<T>>(std::move(job));
-    left.push_back([held] { return held->wait_for(std::chrono::seconds(0)) == std::future_status::ready; });
-}
-
-}  // namespace
-
+// A tournament's requests under way parked until they end, out of sight: a future of std::async waits for its task when
+// destroyed.
 void App::dropTour() {
     if (!tour_follow_) return;
-    leave(tour_jobs_left_, tour_follow_->arena_job);
-    leave(tour_jobs_left_, tour_follow_->swiss_job);
-    leave(tour_jobs_left_, tour_follow_->status_job);
+    jobs_.park(std::move(tour_follow_->arena_job));
+    jobs_.park(std::move(tour_follow_->swiss_job));
+    jobs_.park(std::move(tour_follow_->status_job));
     tour_follow_.reset();  // its streams closed
 }
 
 void App::dropArena() {
     if (!arena_play_) return;
-    leave(tour_jobs_left_, arena_play_->job);
-    leave(tour_jobs_left_, arena_play_->join_job);
-    leave(tour_jobs_left_, arena_play_->pause_job);
+    jobs_.park(std::move(arena_play_->job));
+    jobs_.park(std::move(arena_play_->join_job));
+    jobs_.park(std::move(arena_play_->pause_job));
     arena_play_.reset();
 }
 
 void App::dropSwiss() {
     if (!swiss_play_) return;
-    leave(tour_jobs_left_, swiss_play_->job);
-    leave(tour_jobs_left_, swiss_play_->join_job);
-    leave(tour_jobs_left_, swiss_play_->pause_job);
-    leave(tour_jobs_left_, swiss_play_->keep_job);
+    jobs_.park(std::move(swiss_play_->job));
+    jobs_.park(std::move(swiss_play_->join_job));
+    jobs_.park(std::move(swiss_play_->pause_job));
+    jobs_.park(std::move(swiss_play_->keep_job));
     swiss_play_.reset();
 }
 
@@ -335,7 +325,6 @@ void App::pollLichessArenas() {
         return status == 429 ? now + HostGate::instance().pausedFor(apiHost()) : now;
     };
 
-    std::erase_if(tour_jobs_left_, [](const auto& ended) { return ended(); });
     // The permission to read the user's teams granted: its question goes (#45's card).
     if (lichess_scope_ask_ && lichess_scope_ask_->scope == lichess::SCOPE_TEAM_READ && linked && !lichess_link_ &&
         lichess_account_->has(lichess::SCOPE_TEAM_READ))

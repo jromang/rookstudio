@@ -313,8 +313,7 @@ void App::keepBotAccount(const lichess::Account& account) {
     }
     // Another account than the last one: its games and words stay, its account's facts follow.
     if (bot_account_ && bot_account_->token != account.token && !bot_account_->token.empty()) {
-        const auto previous = bot_account_->token;
-        lichess_revokes_.push_back(std::async(std::launch::async, [previous] { return lichess::revoke(previous); }));
+        revokeToken(bot_account_->token);
     }
     bot_account_ = account;
 }
@@ -510,8 +509,7 @@ void App::pollBot() {
             bot_unanswered_ = c.status == 0 && !lichess::linkRefused(c.error);
             bot_error_      = c.error.empty() ? std::string(TR("Lichess did not answer")) : c.error;
             if (c.linked && c.account) {
-                const auto token = c.account->token;
-                lichess_revokes_.push_back(std::async(std::launch::async, [token] { return lichess::revoke(token); }));
+                revokeToken(c.account->token);
             }
             return;
         }
@@ -523,8 +521,7 @@ void App::pollBot() {
             bot_candidate_ = c.facts;
             bot_verdict_   = verdict;
             if (c.linked) {
-                const auto token = c.account->token;
-                lichess_revokes_.push_back(std::async(std::launch::async, [token] { return lichess::revoke(token); }));
+                revokeToken(c.account->token);
             }
             return;
         }

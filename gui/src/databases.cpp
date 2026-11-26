@@ -134,7 +134,8 @@ DamageSummary damageSummary(const study::CheckReport& report, const study::Snaps
     return out;
 }
 
-DatabaseShelf::DatabaseShelf(fs::path profile) : profile_(std::move(profile)) {
+DatabaseShelf::DatabaseShelf(JobGroup& jobs, fs::path profile)
+    : jobs_(jobs), profile_(std::move(profile)), import_(jobs), tree_job_(jobs) {
     std::ifstream in(listFile(profile_), std::ios::binary);
     if (in) {
         try {
@@ -151,17 +152,7 @@ DatabaseShelf::DatabaseShelf(fs::path profile) : profile_(std::move(profile)) {
     open_.resize(entries_.size());
     errors_.resize(entries_.size());
     facts_.resize(entries_.size());
-    links_.resize(entries_.size());
-}
-
-DatabaseShelf::~DatabaseShelf() {
-    // Cancelled first, then waited for: an opening tree's build too, which would otherwise run to its end (#98). The
-    // tasks use their job's fields until they end.
-    cancelAll();
-    if (import_ && import_->done.valid()) import_->done.wait();
-    if (tree_job_ && tree_job_->done.valid()) tree_job_->done.wait();
-    for (auto& link : links_)
-        if (link.refresh.valid()) link.refresh.wait();
+    for (std::size_t i = 0; i < entries_.size(); ++i) links_.emplace_back(jobs_);
 }
 
 void DatabaseShelf::save() const {
@@ -190,8 +181,8 @@ std::size_t DatabaseShelf::create(const std::string& wanted) {
     open_.insert(open_.begin() + own, std::move(db));
     errors_.insert(errors_.begin() + own, std::string());
     facts_.insert(facts_.begin() + own, CachedFacts{});
-    links_.insert(links_.begin() + own, Link{});
-    if (import_ && import_->index >= static_cast<std::size_t>(own)) ++import_->index;
+    links_.insert(links_.begin() + own, Link(jobs_));
+    if (auto* job = import(); job && job->index >= static_cast<std::size_t>(own)) ++job->index;
     save();
     return static_cast<std::size_t>(own);
 }
@@ -210,28 +201,26 @@ std::size_t DatabaseShelf::add(const fs::path& folder) {
     open_.insert(open_.begin() + own, nullptr);
     errors_.insert(errors_.begin() + own, std::string());
     facts_.insert(facts_.begin() + own, CachedFacts{});
-    links_.insert(links_.begin() + own, Link{});
-    if (import_ && import_->index >= static_cast<std::size_t>(own)) ++import_->index;
+    links_.insert(links_.begin() + own, Link(jobs_));
+    if (auto* job = import(); job && job->index >= static_cast<std::size_t>(own)) ++job->index;
     save();
     return static_cast<std::size_t>(own);
 }
 
 void DatabaseShelf::remove(std::size_t index) {
     if (index >= entries_.size() || entries_[index].source) return;
-    if (import_ && import_->index == index) {
-        import_->cancel = true;
-        if (import_->done.valid()) import_->done.wait();
-        import_.reset();
-    } else if (import_ && import_->index > index) {
-        --import_->index;
-    }
-    // Its opening tree's build is cancelled and kept until it ends, for no database: one build at a time, and its task
-    // uses its job. Those of the databases after it, running or asked for, follow their database (#101).
-    if (tree_job_ && tree_job_->index == index) {
-        tree_job_->cancel = true;
-        tree_job_->index  = TreeJob::REMOVED;
-    } else if (tree_job_ && tree_job_->index != TreeJob::REMOVED && tree_job_->index > index) {
-        --tree_job_->index;
+    // Its import is cancelled and parked: its task ends on its own, holding the database (#105).
+    if (auto* job = import(); job && job->index == index)
+        import_.drop();
+    else if (job && job->index > index)
+        --job->index;
+    // Its opening tree's build is cancelled and kept until it ends, for no database: one build at a time. Those of
+    // the databases after it, running or asked for, follow their database (#101).
+    if (!tree_job_.idle() && tree_job_.state().index == index) {
+        tree_job_.cancel();
+        tree_job_.state().index = TreeJob::REMOVED;
+    } else if (!tree_job_.idle() && tree_job_.state().index != TreeJob::REMOVED && tree_job_.state().index > index) {
+        --tree_job_.state().index;
     }
     if (tree_again_ && *tree_again_ == index)
         tree_again_.reset();
@@ -248,12 +237,32 @@ void DatabaseShelf::remove(std::size_t index) {
 
 void DatabaseShelf::discard(std::size_t index) {
     if (index >= entries_.size() || entries_[index].source) return;
-    const auto folder = entries_[index].folder;
+    const auto folder    = entries_[index].folder;
+    const auto* job      = import();
+    const bool importing = job && job->index == index;  // its task holds the database, and may still write there
+    const std::weak_ptr<study::Database> held = open_[index];
     trees_.erase(folder);
     remove(index);  // closed: its lock let go
+    if (importing) {
+        // The import, parked, holds the database: its folder goes once the task let go of it (removeDiscarded()).
+        discarded_.push_back({folder, held});
+        return;
+    }
     std::error_code ec;
     fs::remove_all(folder, ec);
 }
+
+void DatabaseShelf::removeDiscarded() {
+    // Tried again while something still maps their files (Windows refuses to remove them then).
+    std::erase_if(discarded_, [](const Discarded& d) {
+        if (!d.db.expired()) return false;
+        std::error_code ec;
+        fs::remove_all(d.folder, ec);
+        return !ec;
+    });
+}
+
+DatabaseShelf::~DatabaseShelf() { removeDiscarded(); }
 
 void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::LinkedSource>>& sources) {
     // The user's own first, as they are; then the sources, those listed already keeping what they hold.
@@ -262,6 +271,7 @@ void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::Li
     std::vector<std::string> errors;
     std::vector<CachedFacts> facts;
     std::vector<Link> links;
+    links.reserve(entries_.size() + sources.size());
     for (std::size_t i = 0; i < entries_.size(); ++i) {
         if (entries_[i].source) continue;
         entries.push_back(std::move(entries_[i]));
@@ -288,16 +298,10 @@ void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::Li
             open.emplace_back();
             errors.emplace_back();
             facts.emplace_back();
-            links.emplace_back();
+            links.emplace_back(jobs_);
         }
     }
-    // Those no longer listed: their refresh stopped.
-    for (std::size_t i = 0; i < entries_.size(); ++i) {
-        if (i < links_.size() && links_[i].refresh.valid()) {
-            if (links_[i].cancel) *links_[i].cancel = true;
-            links_[i].refresh.wait();
-        }
-    }
+    // Those no longer listed go with links_: their refresh cancelled and parked, never waited for.
     entries_ = std::move(entries);
     open_    = std::move(open);
     errors_  = std::move(errors);
@@ -308,21 +312,20 @@ void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::Li
 void DatabaseShelf::refresh(std::size_t index) {
     if (index >= entries_.size() || !entries_[index].source) return;
     auto& link = links_[index];
-    if (link.refreshed || link.refresh.valid()) return;
+    if (link.refreshed || !link.refresh.idle()) return;
     if (!open(index) || !link.db) return;
     link.refreshed = true;
-    link.cancel    = std::make_shared<std::atomic<bool>>(false);
-    link.refresh   = std::async(std::launch::async, [db = link.db, cancel = link.cancel] {
+    link.refresh.start([db = link.db](TaskState<>& job) {
         study::enterBackground();
-        return db->refresh(*cancel);
+        return db->refresh(job.cancel);
     });
 }
 
 bool DatabaseShelf::refreshing(std::size_t index) {
-    if (index >= links_.size() || !links_[index].refresh.valid()) return false;
+    if (index >= links_.size() || links_[index].refresh.idle()) return false;
     auto& link = links_[index];
-    if (link.refresh.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return true;
-    const auto done = link.refresh.get();
+    if (link.refresh.running()) return true;
+    const auto done = link.refresh.take();
     if (!done.error.empty()) errors_[index] = done.error;
     facts_[index].generation = ~uint64_t{0};
     if (done.rebuilt) open_[index] = link.db->database();  // a database read again from the start
@@ -397,7 +400,7 @@ std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t i
                 auto tree = study::Tree::open(entries_[index].folder);
                 if (tree && !tree->stale(*snapshot))
                     cached.tree = std::move(tree);
-                else if (tree && !(tree_job_ && tree_job_->index == index) && tree_again_ != index)
+                else if (tree && !(!tree_job_.idle() && tree_job_.state().index == index) && tree_again_ != index)
                     rebuildTree(index);  // a game saved or deleted since: built again in the background
             } catch (const std::exception&) {
             }
@@ -408,55 +411,53 @@ std::optional<DatabaseShelf::TreeSource> DatabaseShelf::treeSource(std::size_t i
 
 bool DatabaseShelf::startImport(std::size_t index, const fs::path& file, const std::string& password,
                                 std::vector<uint64_t> forget) {
-    if (import_ || index >= entries_.size() || entries_[index].source) return false;
+    if (!import_.idle() || index >= entries_.size() || entries_[index].source) return false;
     const auto db = open(index);
     if (!db || db->readOnly()) return false;
-    import_               = std::make_unique<Import>();
-    import_->index        = index;
-    import_->file         = file;
-    import_->started      = std::chrono::steady_clock::now();
-    import_->games_before = db->snapshot()->games();
-    Import* job           = import_.get();
-    job->done             = std::async(std::launch::async, [db, job, password, forget = std::move(forget)] {
+    const auto games_before = db->snapshot()->games();
+    // The task holds the database and what it tells: removed meanwhile, the database is let go once it ended.
+    auto& state   = import_.start([db, file, password, forget = std::move(forget), games_before](Import& job) {
         study::enterBackground();
         study::ChessBaseOptions chessbase;
         chessbase.password = password;
-        const auto report = study::importInto(*db, job->file, study::ImportOptions{}, job->progress, job->cancel, false,
-                                              std::size_t{1} << 18, chessbase, forget);
+        ImportDone done;
+        done.report = study::importInto(*db, file, study::ImportOptions{}, job.progress, job.cancel, false,
+                                        std::size_t{1} << 18, chessbase, forget);
         // The new spellings of the players of the table of names join them by themselves (M13, board 1); then the
         // same games come from another source: told in the report, merged on a click.
-        if (!job->cancel && report.added > 0) {
+        if (!job.cancel && done.report.added > 0) {
             try {
-                if (auto table = study::joinNewSpellings(*db->snapshot(), job->games_before))
+                if (auto table = study::joinNewSpellings(*db->snapshot(), games_before))
                     db->setPlayers(std::move(*table));
             } catch (const std::exception&) {
             }
-            job->looking = true;
-            job->duplicates =
-                study::findDuplicates(db->snapshot(), job->games_before, job->duplicates_progress, job->cancel);
+            job.looking     = true;
+            done.duplicates = study::findDuplicates(db->snapshot(), games_before, job.duplicates_progress, job.cancel);
         }
         // The opening tree of every game committed, a cancelled import's too, unless the import was cancelled.
-        if (!job->cancel && report.added > 0) {
-            job->building = true;
-            study::buildTree(*db, *db->snapshot(), study::TreeOptions{}, job->tree, job->cancel);
+        if (!job.cancel && done.report.added > 0) {
+            job.building = true;
+            study::buildTree(*db, *db->snapshot(), study::TreeOptions{}, job.tree, job.cancel);
         }
-        return report;
+        return done;
     });
+    state.index   = index;
+    state.file    = file;
+    state.started = std::chrono::steady_clock::now();
     return true;
 }
 
 std::optional<study::DatabaseImport> DatabaseShelf::finishedImport() {
-    if (!import_ || !import_->done.valid()) return std::nullopt;
-    if (import_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return std::nullopt;
-    auto report = import_->done.get();
-    if (import_->index < facts_.size()) facts_[import_->index].generation = ~uint64_t{0};  // its tree now
-    import_duplicates_ = std::move(import_->duplicates);
-    import_.reset();
-    return report;
+    if (!import_.ready()) return std::nullopt;
+    const auto index = import_.state().index;
+    auto done        = import_.take();
+    if (index < facts_.size()) facts_[index].generation = ~uint64_t{0};  // its tree now
+    import_duplicates_ = std::move(done.duplicates);
+    return std::move(done.report);
 }
 
 void DatabaseShelf::cancelImport() {
-    if (import_) import_->cancel = true;
+    if (!import_.idle()) import_.cancel();
 }
 
 void DatabaseShelf::keepReadOnlyCurrent() {
@@ -465,7 +466,10 @@ void DatabaseShelf::keepReadOnlyCurrent() {
     const bool try_ = now - read_only_tried_ >= std::chrono::seconds(5);
     if (!read && !try_) return;
     if (read) read_only_read_ = now;
-    if (try_) read_only_tried_ = now;
+    if (try_) {
+        read_only_tried_ = now;
+        removeDiscarded();
+    }
     for (std::size_t i = 0; i < open_.size() && i < entries_.size(); ++i) {
         if (!open_[i] || !open_[i]->readOnly() || entries_[i].source) continue;
         if (try_) {
@@ -483,31 +487,29 @@ void DatabaseShelf::keepReadOnlyCurrent() {
 void DatabaseShelf::rebuildTree(std::size_t index) {
     if (index >= entries_.size() || entries_[index].source) return;
     if (const auto db = open(index); !db || db->readOnly()) return;  // the other program builds it
-    if (import_ || tree_job_) {  // after it: a build running started from the snapshot before this edit
+    if (!import_.idle() || !tree_job_.idle()) {  // after it: a build running started from the snapshot before this edit
         tree_again_ = index;
         return;
     }
     const auto db = open(index);
     if (!db) return;
-    tree_job_        = std::make_unique<TreeJob>();
-    tree_job_->index = index;
-    TreeJob* job     = tree_job_.get();
-    job->done        = std::async(std::launch::async, [db, job] {
+    auto& state = tree_job_.start([db](TreeJob& job) {
         study::enterBackground();
-        return study::buildTree(*db, *db->snapshot(), study::TreeOptions{}, job->progress, job->cancel);
+        return study::buildTree(*db, *db->snapshot(), study::TreeOptions{}, job.progress, job.cancel);
     });
+    state.index = index;
 }
 
 bool DatabaseShelf::pollTreeJob() {
     bool ended = false;
-    if (tree_job_ && tree_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        (void)tree_job_->done.get();
-        if (tree_job_->index < facts_.size()) facts_[tree_job_->index].generation = ~uint64_t{0};  // its tree now
-        if (tree_job_->index < entries_.size()) trees_.erase(entries_[tree_job_->index].folder);
-        tree_job_.reset();
+    if (tree_job_.ready()) {
+        const auto index = tree_job_.state().index;
+        (void)tree_job_.take();
+        if (index < facts_.size()) facts_[index].generation = ~uint64_t{0};  // its tree now
+        if (index < entries_.size()) trees_.erase(entries_[index].folder);
         ended = true;
     }
-    if (!tree_job_ && !import_ && tree_again_) {
+    if (tree_job_.idle() && import_.idle() && tree_again_) {
         const auto index = *tree_again_;
         tree_again_.reset();
         rebuildTree(index);
@@ -516,15 +518,15 @@ bool DatabaseShelf::pollTreeJob() {
 }
 
 void DatabaseShelf::cancelTreeJob() {
-    if (tree_job_) tree_job_->cancel = true;
+    if (!tree_job_.idle()) tree_job_.cancel();
     tree_again_.reset();
 }
 
 void DatabaseShelf::cancelAll() {
-    if (import_) import_->cancel = true;
+    cancelImport();
     cancelTreeJob();
     for (auto& link : links_)
-        if (link.cancel) *link.cancel = true;
+        if (!link.refresh.idle()) link.refresh.cancel();
 }
 
 }  // namespace fcg

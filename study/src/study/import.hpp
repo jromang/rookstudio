@@ -70,7 +70,7 @@ struct ImportOptions {
 struct ImportProgress {
     std::atomic<uint64_t> bytes{0};  // of the file read so far
     std::atomic<uint64_t> games{0};
-    uint64_t total_bytes = 0;  // the file's size
+    std::atomic<uint64_t> total_bytes{0};  // the file's size, read by the window as the import sets it
 };
 
 struct ImportReport {

@@ -263,8 +263,8 @@ void App::pollLichessTv() {
         if (a.value) {
             tv_rows_ = std::move(a);
         } else {  // the rows of before stay, the failure said
-            tv_rows_.error  = a.error.empty() ? std::string("Lichess did not answer") : a.error;
-            tv_rows_.status = a.status;
+            static_cast<lichess::Failure&>(tv_rows_) = a;
+            if (!tv_rows_.failed()) tv_rows_.net = lichess::NetError::Offline;  // nothing, and no word why
         }
     }
     const bool card_shown = ImGui::GetFrameCount() - tv_card_drawn_ < 3;
@@ -329,7 +329,7 @@ void App::pollLichessTv() {
                 return;  // the rest at the next frame, with the new game
             }
             ++t.tries;
-            t.error   = a.value ? std::string() : a.error;
+            t.error   = a.value ? std::string() : lichess::describe(a);
             t.next_at = now + 3s;
         }
         // Lichess chooses the channel's next featured game within seconds: asked again every 3 s, another of the
@@ -349,9 +349,9 @@ void App::pollLichessTv() {
         if (a.value) {
             tv_listed_    = std::move(*a.value);
             tv_listed_of_ = of;
-            tv_list_error_.clear();
+            tv_list_error_ = {};
         } else {
-            tv_list_error_ = a.error;
+            tv_list_error_ = a;
         }
     }
     if (channel.empty()) {  // asked afresh when it opens again
@@ -442,9 +442,11 @@ void App::drawLichessTvCard() {
     ImGui::TextDisabled("%s", TR("· each channel's featured game"));
     const auto own = ownLichessIds();
     if (!tv_rows_.value) {
-        ImGui::TextDisabled("%s", tv_rows_.error.empty()
-                                      ? TR("Asking Lichess…")
-                                      : trf("Lichess cannot be reached from here: {}.", tv_rows_.error).c_str());
+        ImGui::TextDisabled("%s",
+                            !tv_rows_.failed() ? TR("Asking Lichess…")
+                            : tv_rows_.net == lichess::NetError::Offline
+                                ? TR("Lichess cannot be reached from here.")
+                                : trf("Lichess cannot be reached from here: {}.", lichess::describe(tv_rows_)).c_str());
     } else {
         const auto ai = [](const lichess::TvPlayer& p) { return trf("Lichess AI, level {}", p.ai); };
         float name_w  = 0;
@@ -510,9 +512,10 @@ void App::drawLichessTvCard() {
             }
             ImGui::EndTable();
         }
-        if (!tv_rows_.error.empty())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("Lichess: {}. The list shown was read earlier.", tv_rows_.error).c_str());
+        if (tv_rows_.failed())
+            ImGui::TextColored(
+                ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                trf("Lichess: {}. The list shown was read earlier.", lichess::describe(tv_rows_)).c_str());
     }
     ImGui::TextDisabled("%s", TR("The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again "
                                  "when the card shows, at most once every 30 s."));

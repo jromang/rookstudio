@@ -1878,7 +1878,7 @@ class App {
     std::unique_ptr<lichess::PlayersFollower> tv_follower_;  // the mosaic's games, the Board's, those kept
     lichess::TvList tv_listed_;  // the mosaic's channel: its featured game and games, as Lichess listed them last
     std::string tv_listed_of_;   // that channel
-    std::string tv_list_error_;
+    lichess::Failure tv_list_error_;
     std::future<std::pair<std::string, lichess::Answer<lichess::TvList>>> tv_list_job_;
     std::string tv_list_asked_of_;  // the channel asked last, and when
     std::chrono::steady_clock::time_point tv_list_asked_at_{};

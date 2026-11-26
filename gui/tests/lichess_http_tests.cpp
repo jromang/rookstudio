@@ -10,6 +10,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -95,13 +96,19 @@ TEST_CASE("Lichess HTTP: the user's words for each kind, by what was asked") {
     CHECK(describe(NetError::NotFound, Asked::Player) == "Lichess has no account of that name");
     CHECK(describe(NetError::NotFound, Asked::FidePlayer) == "Lichess has no such FIDE player");
     CHECK(describe(NetError::NotFound, Asked::Page) == "Lichess has nothing at this address");
+    CHECK(describe(NetError::NotFound, Asked::Tournament) == "Lichess has no such tournament");
+    CHECK(describe(NetError::NotFound, Asked::BroadcastTour) == "Lichess has no such tournament");
+    CHECK(describe(NetError::NotFound, Asked::BroadcastRound) == "Lichess has no such round");
     // Who may read what a link names: the same words for 401 and 403.
     for (const auto net : {NetError::Unauthorized, NetError::Forbidden}) {
         CHECK(describe(net, Asked::Page) == "Lichess refuses it: private, or for another account");
         CHECK(describe(net, Asked::Broadcast) == "Lichess refuses this without an account allowed to read broadcasts");
+        CHECK(describe(net, Asked::BroadcastRound) == describe(net, Asked::Broadcast));
+        CHECK(describe(net, Asked::BroadcastTour) == describe(net, Asked::Broadcast));
         CHECK(describe(net, Asked::Bookmarks) == "Lichess's bookmarks need a linked account");
     }
     CHECK(describe(NetError::Forbidden, Asked::Engines) == "the token may not register engines (engine:write)");
+    CHECK(describe(NetError::Forbidden, Asked::Tournament) == describe(NetError::Forbidden));
     CHECK(describe(NetError::BadAnswer, Asked::Engines) ==
           "Lichess's answer could not be read: the external engine API may have changed");
     // A link: the user's no (no status: it came through the browser), a code Lichess did not take, its own error.
@@ -242,4 +249,37 @@ TEST_CASE("Lichess HTTP: a failure taken from another request's answer") {
     CHECK(second.net == NetError::RateLimited);
     CHECK(second.status == 429);
     CHECK(second.said == "Too many requests");
+}
+
+TEST_CASE("Lichess HTTP: a host's outage logged once, when it starts, and again after it answered") {
+    const auto port   = freePort();
+    const auto nobody = fmt::format("http://127.0.0.1:{}", port);
+    // The outage's lines: "GET <address>: <the network's words>", apart from the line of each request sent.
+    const auto outages = [&](uint64_t from) {
+        int n = 0;
+        for (const auto& line : Console::instance().since(from))
+            if (line.rfind("GET " + nobody + "/", 0) == 0 && line.find(": ") != std::string::npos) ++n;
+        return n;
+    };
+    auto from = Console::instance().added();
+    for (int i = 0; i < 3; ++i) CHECK(send(request("GET", nobody + "/tv")).net == NetError::Offline);
+    CHECK(send(request("GET", nobody + "/explorer")).net == NetError::Offline);  // the same host
+    CHECK(outages(from) == 1);
+    // A cancelled request learns nothing of the host.
+    HostGate::instance().setPause(60s);
+    HostGate::instance().tooMany("127.0.0.1");
+    std::atomic<bool> cancel{true};
+    CHECK(send(request("GET", nobody + "/tv"), &cancel).net == NetError::Cancelled);
+    HostGate::instance().setPause(50ms);
+    HostGate::instance().tooMany("127.0.0.1");
+    // It answers (a refusal is an answer): the next outage is logged again.
+    {
+        ScriptedServer server(port, [](const std::string&, net::TcpConnection& c) { answer(c, 503, "{}"); });
+        REQUIRE(server.ok());
+        CHECK(send(request("GET", nobody + "/tv")).net == NetError::Server);
+    }
+    from = Console::instance().added();
+    CHECK(send(request("GET", nobody + "/tv")).net == NetError::Offline);
+    CHECK(send(request("GET", nobody + "/tv")).net == NetError::Offline);
+    CHECK(outages(from) == 1);
 }

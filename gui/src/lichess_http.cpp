@@ -1,5 +1,8 @@
 #include "lichess_http.hpp"
 
+#include <mutex>
+#include <set>
+
 #include <fmt/include/fmt/format.h>
 
 #include "console.hpp"
@@ -40,6 +43,8 @@ std::string describe(NetError net, Asked asked, int status, std::string_view sai
             case Asked::Page:
                 return TR("Lichess refuses it: private, or for another account");
             case Asked::Broadcast:
+            case Asked::BroadcastRound:
+            case Asked::BroadcastTour:
                 return TR("Lichess refuses this without an account allowed to read broadcasts");
             case Asked::Bookmarks:
                 return TR("Lichess's bookmarks need a linked account");
@@ -76,6 +81,11 @@ std::string describe(NetError net, Asked asked, int status, std::string_view sai
                     return TR("Lichess has no account of that name");
                 case Asked::FidePlayer:
                     return TR("Lichess has no such FIDE player");
+                case Asked::Tournament:
+                case Asked::BroadcastTour:
+                    return TR("Lichess has no such tournament");
+                case Asked::BroadcastRound:
+                    return TR("Lichess has no such round");
                 case Asked::Page:
                 case Asked::Broadcast:
                 case Asked::Bookmarks:
@@ -166,16 +176,53 @@ HttpRequest withJson(HttpRequest request, const nlohmann::json& body) {
     return request;
 }
 
+namespace {
+
+// The hosts (with their port) that gave no answer to the last request sent to them: an outage is logged when it
+// starts, not at each try of what asks again and again meanwhile (the TV card, the explorer).
+std::mutex g_unanswered_mutex;
+std::set<std::string> g_unanswered;
+
+// "lichess.org", "127.0.0.1:4000": what is between the scheme and the path.
+std::string hostOf(std::string_view url) {
+    const auto scheme = url.find("://");
+    const auto from   = scheme == std::string_view::npos ? 0 : scheme + 3;
+    const auto end    = url.find_first_of("/?#", from);
+    return std::string(url.substr(from, end == std::string_view::npos ? std::string_view::npos : end - from));
+}
+
+// Whether `host` answered until now, its outage starting: it is marked unanswered.
+bool outageStarts(const std::string& host) {
+    std::lock_guard lock(g_unanswered_mutex);
+    return g_unanswered.insert(host).second;
+}
+
+void answered(const std::string& host) {
+    std::lock_guard lock(g_unanswered_mutex);
+    g_unanswered.erase(host);
+}
+
+}  // namespace
+
 Response responseOf(const HttpRequest& request, HttpResult result) {
     Response out;
     out.asked_for = request.method + " " + request.url;
     out.status    = result.status;
     out.net       = netErrorOf(result);
-    if (out.net == NetError::Offline) {
+    if (out.net == NetError::Cancelled) {
+        // nothing to say, nothing learnt of the host
+    } else if (result.status == 0) {  // no answer: the host's outage logged once, when it starts
         out.detail = result.error.empty() ? std::string("no answer") : result.error;
-        Console::instance().add(fmt::format("{}: {}", out.asked_for, out.detail), true, "network");
-    } else if (out.net != NetError::None && out.net != NetError::Cancelled) {
-        out.said = lichessWords(result.body);
+        if (outageStarts(hostOf(request.url)))
+            Console::instance().add(fmt::format("{}: {}", out.asked_for, out.detail), true, "network");
+    } else {
+        answered(hostOf(request.url));
+        if (out.net == NetError::Offline) {  // an answer cut short: each time
+            out.detail = result.error;
+            Console::instance().add(fmt::format("{}: {}", out.asked_for, out.detail), true, "network");
+        } else if (out.net != NetError::None) {
+            out.said = lichessWords(result.body);
+        }
     }
     out.body = std::move(result.body);
     out.head = std::move(result.head);

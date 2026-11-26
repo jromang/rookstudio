@@ -1,12 +1,17 @@
 // Endgames against the tablebases (#82): the catalogue's starts as the tables say them, a move judged by the outcome it
-// leaves, the tables' answer, how a game ends by its goal, the record and its cards.
+// leaves, the tables' answer, how a game ends by its goal, the record and its cards, read with their types checked
+// (#136).
 #include <doctest/doctest.hpp>
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <set>
 #include <string>
 
+#include <json.hpp>
+
+#include "console.hpp"
 #include "endgames.hpp"
 #include "tablebases.hpp"
 #include "test_support.hpp"
@@ -332,4 +337,56 @@ TEST_CASE("endgames: the record and the positions missed, kept in the profile") 
     CHECK(endgameRating(true, true, false) == study::fsrs::Rating::Again);
     CHECK(endgameRating(false, false, false) == study::fsrs::Rating::Again);
     fs::remove_all(folder);
+}
+
+TEST_CASE("endgames: a record with values of the wrong type keeps its readable entries, the rest said (#136)") {
+    const test::ScratchDir dir("endgames-types");
+    const int64_t now = 1'800'000'000;
+    EndgameRecord record;
+    record.results["queen"] = {3, 2, true, 9, 7, now, false};
+    record.results["rook"]  = {1, 1, false, 0, 0, now, true};
+    const auto task         = taskOf(*endgameEntry("opposition"));
+    const auto card =
+        missedEndgameCard(task, "8/4k3/8/3KP3/8/8/8/8 w - - 0 1", now, trainingDayEnd(now), trainingScheduler());
+    record.cards[positionKey(card.fen)] = card;
+    record.cards["other"]               = card;
+    record.answer_ms                    = 42000;
+    REQUIRE(writeEndgameRecord(dir, record));
+    const auto file = dir / "record.json";
+    // Values of another type than the one written: a boolean for a number, a text for a number, a number for a text (an
+    // older or newer version, a hand edit). Each used to stop the program as soon as the record was read.
+    auto j                       = nlohmann::json::parse(test::readFile(file));
+    j["answer_ms"]               = "slow";
+    j["results"]["rook"]["last"] = true;
+    j["cards"]["other"]["fen"]   = 7;
+    const auto written           = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    EndgameRecord back;
+    REQUIRE_NOTHROW(back = readEndgameRecord(dir));
+    // The readable entries kept; the others set aside, said, the file kept as it was.
+    CHECK(back.results.size() == 1);
+    CHECK(back.results.at("queen") == record.results.at("queen"));
+    REQUIRE(back.cards.size() == 1);
+    CHECK(back.cards.begin()->second == card);
+    CHECK(back.answer_ms == 0);
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("3 entries could not be read and were set aside") != std::string::npos);
+    CHECK(said[0].find("answer_ms, results/rook, cards/other") != std::string::npos);
+    CHECK(said[0].find("record.json.unreadable") != std::string::npos);
+    CHECK(test::readFile(dir / "record.json.unreadable") == written);
+    // Written again, the record reads whole.
+    REQUIRE(writeEndgameRecord(dir, back));
+    const auto quiet = Console::instance().added();
+    CHECK(readEndgameRecord(dir).results.size() == 1);
+    CHECK(Console::instance().since(quiet).empty());
+    // A file cut short: kept aside, said, rather than replaced in silence by the next save.
+    std::ofstream(file, std::ios::binary) << "{\"version\": 1, \"results\": {";
+    const auto cut = Console::instance().added();
+    CHECK(readEndgameRecord(dir).results.empty());
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(dir / "record.json.unreadable2"));
 }

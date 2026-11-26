@@ -1,11 +1,16 @@
 // Board vision (#82): the coordinates, what a blindfold board shows, "Where is…?", a line read in one's head, the
-// records.
+// records, read with their types checked (#136).
 #include <doctest/doctest.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <set>
 #include <sstream>
 
+#include <json.hpp>
+
+#include "console.hpp"
+#include "test_support.hpp"
 #include "vision.hpp"
 
 using namespace fcg;
@@ -132,4 +137,51 @@ TEST_CASE("vision: the records kept in the profile") {
     REQUIRE(writeVisionRecord(profile, r));
     CHECK(readVisionRecord(profile) == r);
     fs::remove_all(profile);
+}
+
+TEST_CASE("vision: records with values of the wrong type keep the readable ones, the rest said (#136)") {
+    const test::ScratchDir profile("vision-types");
+    VisionRecord r;
+    r.coordinates["find-white"] = 27;
+    r.lines                     = 10;
+    r.lines_right               = 7;
+    r.blind                     = 2;
+    r.where                     = 5;
+    r.where_right               = 4;
+    REQUIRE(writeVisionRecord(profile, r));
+    const auto file = profile / "vision.json";
+    // A text for a count, a list for another (an older or newer version, a hand edit): each used to stop the program
+    // as soon as the records were read.
+    auto j             = nlohmann::json::parse(test::readFile(file));
+    j["lines"]         = "ten";
+    j["where_right"]   = nlohmann::json::array({4});
+    const auto written = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    VisionRecord back;
+    REQUIRE_NOTHROW(back = readVisionRecord(profile));
+    // The readable counts kept; the others set aside, said, the file kept as it was.
+    CHECK(back.coordinates == r.coordinates);
+    CHECK(back.lines == 0);
+    CHECK(back.lines_right == 7);
+    CHECK(back.blind == 2);
+    CHECK(back.where == 5);
+    CHECK(back.where_right == 0);
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("2 entries could not be read and were set aside (lines, where_right)") != std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // Written again, the records read whole.
+    REQUIRE(writeVisionRecord(profile, back));
+    const auto quiet = Console::instance().added();
+    CHECK(readVisionRecord(profile) == back);
+    CHECK(Console::instance().since(quiet).empty());
+    // A file cut short: kept aside, said, rather than replaced in silence by the next save.
+    std::ofstream(file, std::ios::binary) << "{\"version\": 1, \"coordinates\": {";
+    const auto cut = Console::instance().added();
+    CHECK(readVisionRecord(profile) == VisionRecord{});
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

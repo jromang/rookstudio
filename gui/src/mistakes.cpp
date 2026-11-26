@@ -20,6 +20,7 @@
 #include "console.hpp"
 #include "i18n.hpp"
 #include "portable.hpp"
+#include "profile_entries.hpp"
 #include "review_bridge.hpp"
 #include "storage.hpp"
 
@@ -42,19 +43,6 @@ std::optional<uint64_t> keyOfHex(const std::string& text) {
 }
 
 std::string uciOf(const chess::Move& move) { return chess::uci::moveToUci(move, false); }
-
-// A copy of a profile file that did not read whole, beside it (".unreadable", then ".unreadable2"…): what was set aside
-// stays there when the file is written again; none when it could not be made.
-std::optional<fs::path> keptAside(const fs::path& file) {
-    std::error_code ec;
-    for (int n = 1; n < 100; ++n) {
-        const auto aside = fs::path(file).concat(n == 1 ? std::string(".unreadable") : fmt::format(".unreadable{}", n));
-        if (fs::exists(aside, ec)) continue;
-        if (fs::copy_file(file, aside, ec) && !ec) return aside;
-        return std::nullopt;
-    }
-    return std::nullopt;
-}
 
 // A score as the profile keeps it: {"type": "cp" or "mate", "value": n}.
 nlohmann::json scoreJson(const fastchess::Score& score) {
@@ -505,27 +493,15 @@ MistakeRecord readMistakeRecord(const fs::path& folder) {
     MistakeRecord out;
     const auto file = folder / "exercises.json";
     const auto json = readJson<nlohmann::json>(file);
-    std::error_code ec;
     if (!json || !json->is_object()) {
         // There but unreadable (cut short, written by hand): kept aside, the exercises found again from the reviews.
-        if (fs::exists(file, ec)) {
-            const auto aside = keptAside(file);
-            Console::instance().add(aside ? trf("{} could not be read: kept as {}", file.string(), aside->string())
-                                          : trf("{} could not be read", file.string()),
-                                    true);
-        }
+        sayUnreadableFile(file);
         return out;
     }
     // An entry of another type than the one expected (written by another version, edited by hand) is set aside, the
     // readable ones kept (#136): said in the console, the file as it was kept beside it, which the next save replaces.
-    std::vector<std::string> unread;
-    const auto entry = [&](const std::string& what, const auto& read) {
-        try {
-            read();
-        } catch (const std::exception&) {
-            unread.push_back(what);
-        }
-    };
+    ProfileEntries entries(file);
+    const auto entry = [&](const std::string& what, const auto& read) { entries.entry(what, read); };
     entry("answer_ms", [&] { out.answer_ms = json->value("answer_ms", int64_t{0}); });
     if (const auto it = json->find("exercises"); it != json->end() && it->is_object())
         for (const auto& [hex, j] : it->items())
@@ -556,17 +532,7 @@ MistakeRecord readMistakeRecord(const fs::path& folder) {
                     out.kept[*key] = kept;  // read whole first: nothing kept of an entry set aside
                 }
             });
-    if (!unread.empty()) {
-        std::string what;
-        for (std::size_t i = 0; i < unread.size() && i < 5; ++i) what += (i > 0 ? ", " : "") + unread[i];
-        if (unread.size() > 5) what += ", …";
-        const auto aside = keptAside(file);
-        Console::instance().add(
-            trn("{}: {} entry could not be read and was set aside ({}); the file as it was is kept as {}",
-                "{}: {} entries could not be read and were set aside ({}); the file as it was is kept as {}",
-                unread.size(), file.string(), unread.size(), what, aside ? aside->string() : std::string("-")),
-            true);
-    }
+    entries.sayUnread();
     return out;
 }
 

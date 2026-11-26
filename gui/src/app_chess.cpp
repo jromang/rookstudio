@@ -40,6 +40,8 @@
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
 #include "puzzles_page.hpp"
+#include "review_bridge.hpp"
+#include "review_runner.hpp"
 #include "twic.hpp"
 
 namespace fcg {
@@ -376,6 +378,18 @@ class App::ModulesContext final : public AppContext {
         b.ply   = playOnGame(b.game, b.chess960, b.ply, move);
         b.tree  = GameTree{b.game, {}};
     }
+    void replaySessionGame(ReplayGame game, int ply, bool chess960) override {
+        auto& b    = app_.board_;
+        b.game     = std::move(game);
+        b.tree     = GameTree{b.game, {}};
+        b.line     = -1;
+        b.ply      = ply;
+        b.chess960 = chess960;
+        b.selected.reset();
+        b.move_typed.reset();
+        b.new_game = true;
+    }
+    void showSessionPly(int ply) override { app_.board_.ply = ply; }
     void setFlip(bool flip) override { app_.board_.flip = flip; }
     void dropPick() override { app_.board_.selected.reset(); }
     void dropTypedMove() override { app_.board_.move_typed.reset(); }
@@ -441,11 +455,17 @@ class App::ModulesContext final : public AppContext {
 
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return app_.trainingSettings(); }
+    void setGuessTheory(bool on) override {
+        app_.trainingSettings().guess_theory = on;
+        app_.saveTrainingSettings();
+    }
     void showTrainingPage(int part) override {
         app_.page_         = Page::Training;
         app_.training_tab_ = part;
     }
+    bool trainingShown() const override { return app_.page_ == Page::Training; }
     void setEnterStartsPuzzles(bool puzzles) override { app_.training_enter_puzzles_ = puzzles; }
+    void reviewOnly(ReviewKind kind) override { app_.startReview(kind); }
     bool reviewRunning() const override { return app_.review_running_; }
     bool nextReview() override { return app_.nextReview(); }
     void stopReview() override {
@@ -466,6 +486,80 @@ class App::ModulesContext final : public AppContext {
     void choosePuzzleFile() override {
         app_.dialogs_.openFile(Dialogs::Purpose::OfflinePuzzlesFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
     }
+
+    // The user's names.
+    std::vector<std::string> userNames() const override { return app_.userNames(); }
+    void drawPlayerNames(const char* id) override { app_.drawPlayerNames(id); }
+
+    // The Board page's analysis.
+    const EngineEntry* analysisEngine() override { return app_.analysisEngine(); }
+    const AnalysisSettings& analysisSettings() override {
+        app_.loadBoardSettings();
+        return app_.board_.settings.analysis;
+    }
+
+    // Games reviewed as the Board page reviews a game.
+    const EngineEntry* engineNamed(const std::string& name) const override { return app_.engineNamed(name); }
+    std::unique_ptr<ReviewRunner> reviewInBackground(const EngineEntry& engine, const ReplayGame& game,
+                                                     int& processes) override {
+        // As the Board page reviews a game in the Chess space (#61, #63): nodes, one thread, an empty table each
+        // position, Lichess's evaluations kept offline taken as they are, the processes the tournaments leave.
+        app_.loadBoardSettings();
+        const auto& settings = app_.board_.settings;
+        ReviewRunner::Setup setup;
+        setup.engine       = engine;
+        setup.settings     = settings.analysis;
+        setup.game         = game;
+        setup.ceiling_ms   = settings.review_ceiling_ms;
+        setup.known        = app_.reviewKnown();
+        setup.reproducible = true;
+        processes          = reviewProcesses(std::max(1, settings.analysis.threads), app_.topology_.physical,
+                                             app_.topology_.logical, app_.tournamentCores());
+        setup.processes    = processes;
+        setup.second_line  = secondLines(game, false);
+        auto runner        = std::make_unique<ReviewRunner>();
+        runner->start(std::move(setup));
+        return runner;
+    }
+    int64_t reviewCeilingMs() override { return app_.board_.settings.review_ceiling_ms; }
+    bool boardAnalysing() const override { return app_.board_.analysing || app_.board_.reviewing(); }
+
+    // The repertoires.
+    std::array<std::unordered_set<uint64_t>, 2> repertoirePositions() override {
+        std::array<std::unordered_set<uint64_t>, 2> keys;
+        for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i) {
+            auto& set = keys[app_.repertoires().entries()[i].side == chess::Color::WHITE ? 0 : 1];
+            for (const auto& c : app_.trainingSummary(i).cards) set.insert(c.key);
+        }
+        return keys;
+    }
+
+    // Games opened on the Board from a session.
+    void openDatabaseGame(const std::string& pgn, const std::string& title, const std::filesystem::path& folder,
+                          const std::string& name, uint64_t id, int ply) override {
+        app_.readOnBoard(pgn, title);
+        BoardOrigin origin;
+        origin.folder      = folder;
+        origin.name        = name;
+        origin.id          = id;
+        app_.board_origin_ = std::move(origin);
+        app_.board_.ply    = std::min(ply, static_cast<int>(app_.board_.game.moves.size()));
+    }
+    void openGameOnBoard(ReplayGame game, int ply, std::string title) override {
+        app_.openOnBoard(std::move(game), ply, false, std::move(title), false);
+    }
+
+    // The Board's own game.
+    context::ShownGame shownGame() const override {
+        const auto& b = app_.board_;
+        std::optional<std::pair<std::filesystem::path, uint64_t>> origin;
+        if (app_.board_origin_) origin = std::make_pair(app_.board_origin_->folder, app_.board_origin_->id);
+        // As the guessing's part always asked (#81): an endgame's or a vision exercise's game counts as the Board's.
+        const bool session = app_.training_ || app_.puzzles_->onBoard() || app_.mistake_ || app_.guess_;
+        return context::ShownGame{b.game, b.ply, b.chess960, b.title, std::move(origin), app_.page_ == Page::Board,
+                                  session};
+    }
+    int treeDatabase() const override { return app_.tree_db_; }
 
    private:
     // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.

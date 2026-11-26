@@ -3,26 +3,33 @@
 // What a module of RookStudio's asks of the program around it (#107). A module holds an area of its own out of App
 // (its state, its poll(), its draw(), its palette commands and --focus words: Lichess TV, lichess_tv_page.hpp; the
 // arenas and Swiss tournaments, lichess_arenas_page.hpp; the Lichess bot, lichess_bot_page.hpp; the puzzles,
-// puzzles_page.hpp), and reaches the rest through the facets below instead of App's members: the program (the frame,
-// the profile and its databases, the jobs), the pages it opens, the databases' pages, the Board, the mosaic its games
-// show in, the Lichess settings, the user's Lichess account and its link, the user's games on Lichess and the fair play
-// their live game holds, the engines and the cores, the Board taken by a game followed live, the tokens given up, the
-// window, the Board taken by a training session (board_session.hpp), the Training page and its day's review, the
-// user's mistakes, the file dialogs. A module's context is the facets it needs (TvContext, ArenasContext, BotContext,
-// PuzzlesContext); App answers them all (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of
-// the module it builds, with a fake of its own, without App.
+// puzzles_page.hpp; the user's mistakes as exercises, mistakes_page.hpp; guessing the moves of a game, guess_page.hpp),
+// and reaches the rest through the facets below instead of App's members: the program (the frame, the profile and its
+// databases, the jobs), the pages it opens, the databases' pages, the Board, the mosaic its games show in, the Lichess
+// settings, the user's Lichess account and its link, the user's games on Lichess and the fair play their live game
+// holds, the engines and the cores, the Board taken by a game followed live, the tokens given up, the window, the Board
+// taken by a training session (board_session.hpp) and a game replayed on it, the Training page and its day's review,
+// the user's mistakes, the file dialogs, the user's names, the analysis engine, the games reviewed in the background,
+// the repertoires' positions, the games opened on the Board from a session, the Board's own game. A module's context
+// is the facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext, MistakesContext, GuessContext); App
+// answers them all (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of the module it builds,
+// with a fake of its own, without App.
 //
 // Each method says what a module needs, in its words, not which member of App gives it. The facets hold only what the
 // modules out of App need now, and grow with those that follow (the other kinds of training): a facet a module does not
 // ask for is none of its fake's business.
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <chess.hpp>
@@ -31,6 +38,8 @@
 
 namespace fcg {
 
+enum class ReviewKind;
+struct AnalysisSettings;
 struct BoardDecor;
 struct BookEntry;
 class CrosstableStore;
@@ -40,6 +49,7 @@ class JobGroup;
 struct LichessSettings;
 class PieceAtlas;
 struct ReplayGame;
+class ReviewRunner;
 struct TrainingSettings;
 namespace lichess {
 struct Account;
@@ -362,30 +372,46 @@ class SessionBoard {
     virtual bool analysisKey()    = 0;
 };
 
+// A game replayed on the Board taken by a session (a game guessed, #81): `game` shown at `ply`, in Chess960 or not,
+// the user's selection and typed move let go; the ply shown moved in it (the end's arrows, a costly move clicked).
+class SessionReplay {
+   public:
+    virtual ~SessionReplay() = default;
+
+    virtual void replaySessionGame(ReplayGame game, int ply, bool chess960) = 0;
+    virtual void showSessionPly(int ply)                                    = 0;
+};
+
 // The Training page (#80, view_training_page.cpp) and the day's review it starts, "Review all" taking the kinds one
 // after the other (review_queue.hpp); the training's settings.
 class Training {
    public:
     virtual ~Training() = default;
 
-    // The training's settings (training.json): a right answer goes on by itself after advance_ms.
+    // The training's settings (training.json): a right answer goes on by itself after advance_ms; whether the moves of
+    // theory pass by themselves in a game guessed, changed and saved at once.
     [[nodiscard]] virtual const TrainingSettings& trainingSettings() = 0;
-    // The Training page shown, at its part `part` (0 Today, 1 Puzzles…).
-    virtual void showTrainingPage(int part) = 0;
+    virtual void setGuessTheory(bool on)                             = 0;
+    // The Training page shown, at its part `part` (0 Today, 1 Puzzles, 2 My mistakes, 3 Guess the moves…); whether it
+    // is the page shown.
+    virtual void showTrainingPage(int part)          = 0;
+    [[nodiscard]] virtual bool trainingShown() const = 0;
     // What Enter starts on the Training page: the puzzles, once one of their choices was clicked, else the day's
     // review.
     virtual void setEnterStartsPuzzles(bool puzzles) = 0;
-    // The day's review: a session of its shown (its end goes on to the next kind, or back to the Training page); the
-    // next kind started (false when none is left); the review stopped, what it had left forgotten; at a session's end,
-    // its card that goes on or back to the Training page (`enter`: Enter goes on).
+    // The day's review: started for one kind alone ("Only my mistakes"); a session of its shown (its end goes on to
+    // the next kind, or back to the Training page); the next kind started (false when none is left); the review
+    // stopped, what it had left forgotten; at a session's end, its card that goes on or back to the Training page
+    // (`enter`: Enter goes on).
+    virtual void reviewOnly(ReviewKind kind)         = 0;
     [[nodiscard]] virtual bool reviewRunning() const = 0;
     virtual bool nextReview()                        = 0;
     virtual void stopReview()                        = 0;
     virtual void drawReviewNext(bool enter)          = 0;
 };
 
-// The user's mistakes as exercises (#81, mistakes.hpp): the kinds of their mistakes since `since` (a packed date,
-// packedDaysBefore()), counted, as their reviews' "To work on" says them.
+// The user's mistakes as exercises (#81, their module's, mistakes_page.hpp): the kinds of their mistakes since `since`
+// (a packed date, packedDaysBefore()), counted, as their reviews' "To work on" says them.
 class Mistakes {
    public:
     virtual ~Mistakes() = default;
@@ -401,6 +427,95 @@ class FileDialogs {
     // Lichess's puzzle database downloaded before (lichess_db_puzzle.csv.zst), read into the puzzles' store
     // (PuzzlesPage::startOffline()).
     virtual void choosePuzzleFile() = 0;
+};
+
+// The user's names (Settings › Your names, #81): a game where one of them plays is the user's; the linked Lichess
+// account's name counts by itself.
+class Names {
+   public:
+    virtual ~Names() = default;
+
+    // The user's names, with the linked Lichess account's.
+    [[nodiscard]] virtual std::vector<std::string> userNames() const = 0;
+    // The names as Settings shows them: a chip each (a click takes it away), the Lichess account's, a field that adds
+    // one; `id` tells this place's apart from the others.
+    virtual void drawPlayerNames(const char* id) = 0;
+};
+
+// The Board page's analysis (#78), whose engine the training takes: the engine chosen for it, else the first of the
+// library that works (none without any); its settings (its threads, the size of its table).
+class Analysis {
+   public:
+    virtual ~Analysis() = default;
+
+    [[nodiscard]] virtual const EngineEntry* analysisEngine()        = 0;
+    [[nodiscard]] virtual const AnalysisSettings& analysisSettings() = 0;
+};
+
+// Games reviewed as the Board page reviews a game (#61, #63): the library's engine a review was made with, by its name
+// (none when it is no longer there); a game reviewed in the background as the Board page reviews one in the Chess space
+// (the analysis's settings, a number of nodes a position from an empty table, Lichess's evaluations kept offline taken
+// as they are, the engine processes the tournaments leave, the engine's second line where a move can be the only one),
+// its runner started, the processes it searches with in `processes`; the time a position takes at a review's last pass
+// (Settings), which tells how many passes it makes; whether the Board page analyses or reviews a game now (the machine
+// is its meanwhile).
+class Reviews {
+   public:
+    virtual ~Reviews() = default;
+
+    [[nodiscard]] virtual const EngineEntry* engineNamed(const std::string& name) const = 0;
+
+    [[nodiscard]] virtual std::unique_ptr<ReviewRunner> reviewInBackground(const EngineEntry& engine,
+                                                                           const ReplayGame& game, int& processes) = 0;
+
+    [[nodiscard]] virtual int64_t reviewCeilingMs()   = 0;
+    [[nodiscard]] virtual bool boardAnalysing() const = 0;
+};
+
+// The repertoires (the Openings page, #76): the positions their training asks, by the side that trains them (0 White,
+// 1 Black). Trained there, they are not asked as the user's mistakes.
+class Repertoires {
+   public:
+    virtual ~Repertoires() = default;
+
+    [[nodiscard]] virtual std::array<std::unordered_set<uint64_t>, 2> repertoirePositions() = 0;
+};
+
+// A game opened on the Board from a session (the game an exercise comes from, #81): the session that holds the Board
+// left there, its answers kept; at `ply` (its last move at most), said by `title`.
+class GamesOnBoard {
+   public:
+    virtual ~GamesOnBoard() = default;
+
+    // A game of a database, read from its PGN: the game `id` of the database `name` of `folder`, which Ctrl+S replaces.
+    virtual void openDatabaseGame(const std::string& pgn, const std::string& title, const std::filesystem::path& folder,
+                                  const std::string& name, uint64_t id, int ply) = 0;
+    // A game of no database's.
+    virtual void openGameOnBoard(ReplayGame game, int ply, std::string title) = 0;
+};
+
+// The game on the Board, which a game guessed may start from (#81, "The Board page's game"): its moves, the ply shown,
+// Chess960, its title (empty: none), the game of a database it is (its folder and number); whether the Board page is
+// the page shown; whether a session of the repertoires, the puzzles, the mistakes or a game guessed holds the Board
+// (an endgame's and a vision exercise's games count as the Board's own).
+struct ShownGame {
+    const ReplayGame& game;
+    int ply;
+    bool chess960;
+    const std::string& title;
+    std::optional<std::pair<std::filesystem::path, uint64_t>> origin;
+    bool page;
+    bool session;
+};
+
+// The Board's own game, and the database its Tree tab reads (-1: none chosen there), whose theory a game guessed passes
+// by itself.
+class BoardGame {
+   public:
+    virtual ~BoardGame() = default;
+
+    [[nodiscard]] virtual ShownGame shownGame() const = 0;
+    [[nodiscard]] virtual int treeDatabase() const    = 0;
 };
 
 }  // namespace context
@@ -442,7 +557,32 @@ class PuzzlesContext : public virtual context::Program,
                        public virtual context::Account,
                        public virtual context::FairPlay {};
 
+// What the user's mistakes as exercises ask of the program (mistakes_page.hpp).
+class MistakesContext : public virtual context::Program,
+                        public virtual context::SessionBoard,
+                        public virtual context::Training,
+                        public virtual context::FairPlay,
+                        public virtual context::Names,
+                        public virtual context::Analysis,
+                        public virtual context::Reviews,
+                        public virtual context::Repertoires,
+                        public virtual context::GamesOnBoard {};
+
+// What guessing the moves of a game asks of the program (guess_page.hpp).
+class GuessContext : public virtual context::Program,
+                     public virtual context::SessionBoard,
+                     public virtual context::SessionReplay,
+                     public virtual context::Training,
+                     public virtual context::FairPlay,
+                     public virtual context::Analysis,
+                     public virtual context::BoardGame {};
+
 // What App answers: every module's context, each facet once.
-class AppContext : public TvContext, public ArenasContext, public BotContext, public PuzzlesContext {};
+class AppContext : public TvContext,
+                   public ArenasContext,
+                   public BotContext,
+                   public PuzzlesContext,
+                   public MistakesContext,
+                   public GuessContext {};
 
 }  // namespace fcg

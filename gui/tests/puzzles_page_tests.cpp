@@ -112,8 +112,11 @@ class FakeApp final : public PuzzlesContext {
 
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
+    void setGuessTheory(bool) override {}
     void showTrainingPage(int part) override { training_part = part; }
+    bool trainingShown() const override { return training_part >= 0; }
     void setEnterStartsPuzzles(bool puzzles) override { enter_puzzles = puzzles; }
+    void reviewOnly(ReviewKind) override {}
     bool reviewRunning() const override { return false; }
     bool nextReview() override { return false; }
     void stopReview() override { ++review_stopped; }

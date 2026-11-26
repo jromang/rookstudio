@@ -26,6 +26,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "live.hpp"
+#include "mistakes_page.hpp"
 #include "review_bridge.hpp"
 #include "training.hpp"
 #include "ui.hpp"
@@ -273,8 +274,8 @@ void App::visitJudged() {
     // A wrong answer: a card of the day's queue, the position before the game's move, the engine's move to find.
     if (v.verdict.wrong)
         if (auto exercise = visitExercise(board_.game, v.analysis, p)) {
-            addVisitCard(mistakeRecord(), std::move(*exercise), epochNow(), trainingScheduler());
-            saveMistakeRecord();
+            addVisitCard(mistakes_->mistakeRecord(), std::move(*exercise), epochNow(), trainingScheduler());
+            mistakes_->saveMistakeRecord();
             v.card = true;
         }
     v.results.push_back(

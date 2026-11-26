@@ -8,6 +8,7 @@
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "lichess_tv_page.hpp"
+#include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 
 #include <algorithm>
@@ -180,7 +181,7 @@ App::~App() {
     if (review_tables_job_) *review_tables_job_->cancel = true;  // the tables of a review, within a quarter of a second
     if (story_job_) *story_job_->cancel = true;                  // the story by the model, at its next passage (#62)
     leaveReportJobs();  // an opening report's: waited for while the assistant is still there (#91)
-    if (mistake_scan_job_) *mistake_scan_job_->cancel = true;    // the user's games looked for, at the next game (#81)
+    mistakes_->cancelScan();  // the user's games looked for, at the next game (#81)
     // A read or a check may be waiting on a hung engine, up to a minute or two: its engine is ended, so that its
     // thread ends at once.
     if (probe_.valid() || check_.valid()) {

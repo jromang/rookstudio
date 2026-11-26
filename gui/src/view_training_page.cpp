@@ -18,6 +18,7 @@
 #include "guess_page.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
 
@@ -149,14 +150,9 @@ ReviewCount App::reviewCount(ReviewKind kind) {
         case ReviewKind::Puzzles:  // their module's (#107)
             out = puzzles_->reviewCount();
             break;
-        case ReviewKind::Mistakes: {  // #81
-            const auto c   = mistakeDayCounts();
-            out.due        = c.due;
-            out.tomorrow   = c.tomorrow;
-            out.three_days = c.three_days;
-            out.answer_ms  = mistakeRecord().answer_ms;
+        case ReviewKind::Mistakes:  // #81, their module's (#107)
+            out = mistakes_->reviewCount();
             break;
-        }
         case ReviewKind::Endgames: {  // #82
             const auto& r  = endgameRecord();
             out.due        = endgameCardsDue(r, day.end);
@@ -188,7 +184,7 @@ bool App::startReviewOf(ReviewKind kind, std::size_t repertoire) {
         case ReviewKind::Puzzles:
             return puzzles_->startReview();
         case ReviewKind::Mistakes:
-            return startMistakes(true);
+            return mistakes_->startReview();
         case ReviewKind::Endgames:
             return startEndgameReview();
     }
@@ -377,7 +373,7 @@ void App::drawTraining() {
     if (training_tab_ == 1)
         puzzles_->drawPart();
     else if (training_tab_ == 2)
-        drawTrainingMistakes();
+        mistakes_->drawPart();
     else if (training_tab_ == 3)
         guessing_->drawPart();
     else if (training_tab_ == 4)
@@ -438,7 +434,7 @@ void App::drawTrainingToday() {
              1);
         ImGui::SameLine(0, gap);
         {
-            const auto all = mistakeExercises();
+            const auto all = mistakes_->mistakeExercises();
             const auto c   = mistakeCounts(all, trainingDay(epochNow()), 0);
             card("##training_kind_mistakes", ui::Icon::Target, TR("My mistakes"),
                  TR("Your reviewed games' mistakes, turned into exercises."),

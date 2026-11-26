@@ -25,6 +25,7 @@
 #include "board_view.hpp"
 #include "guess_page.hpp"
 #include "i18n.hpp"
+#include "mistakes_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -1230,17 +1231,9 @@ void App::drawTrainingHome() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
     }
-    // A session of exercises, a game guessed (#81).
-    if (mistake_) {
-        const auto& m    = *mistake_;
-        const auto label = m.phase != MistakeRun::Phase::End
-                               ? trf("Your mistakes: {} of {}", std::min(m.done + 1, m.total), m.total)
-                               : std::string(TR("Your mistakes"));
-        ImGui::TextUnformatted(label.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
-    }
-    guessing_->drawHomeLine();  // its module's (#107)
+    // A session of exercises, a game guessed (#81): their modules' (#107).
+    mistakes_->drawHomeLine();
+    guessing_->drawHomeLine();
     // An endgame against the tables, a vision exercise (#82).
     if (endgame_) {
         const auto& r = *endgame_;

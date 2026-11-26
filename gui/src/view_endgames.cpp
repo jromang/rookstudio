@@ -28,6 +28,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "machines.hpp"
+#include "mistakes_page.hpp"
 #include "online_cache.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
@@ -345,7 +346,7 @@ void App::pollEndgames() {
 
 std::vector<EndgameTask> App::gameEndgames() {
     std::vector<EndgameTask> out;
-    for (const auto* e : mistakeExercises()) {
+    for (const auto* e : mistakes_->mistakeExercises()) {
         const auto board = e->board();
         if (piecesOf(board) > 7 || !board.castlingRights().isEmpty()) continue;
         EndgameTask t;

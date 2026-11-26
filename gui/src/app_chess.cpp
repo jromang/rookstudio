@@ -40,6 +40,7 @@
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
+#include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "review_bridge.hpp"
 #include "review_runner.hpp"
@@ -475,12 +476,9 @@ class App::ModulesContext final : public AppContext {
     }
     void drawReviewNext(bool enter) override { app_.drawReviewNext(enter); }
 
-    // The user's mistakes.
+    // The user's mistakes, their module's.
     std::map<std::string, std::size_t> mistakeKinds(uint32_t since) override {
-        std::map<std::string, std::size_t> kinds;
-        for (const auto* e : app_.mistakeExercises())
-            if (e->packed_date >= since) ++kinds[e->kind];
-        return kinds;
+        return app_.mistakes_->mistakeKinds(since);
     }
 
     // The file dialogs.
@@ -556,7 +554,8 @@ class App::ModulesContext final : public AppContext {
         std::optional<std::pair<std::filesystem::path, uint64_t>> origin;
         if (app_.board_origin_) origin = std::make_pair(app_.board_origin_->folder, app_.board_origin_->id);
         // As the guessing's part always asked (#81): an endgame's or a vision exercise's game counts as the Board's.
-        const bool session = app_.training_ || app_.puzzles_->onBoard() || app_.mistake_ || app_.guessing_->onBoard();
+        const bool session =
+            app_.training_ || app_.puzzles_->onBoard() || app_.mistakes_->onBoard() || app_.guessing_->onBoard();
         return context::ShownGame{b.game, b.ply, b.chess960, b.title, std::move(origin), app_.page_ == Page::Board,
                                   session};
     }
@@ -574,20 +573,18 @@ class App::ModulesContext final : public AppContext {
     App& app_;
 };
 
-// A kind of training session still in App (#76, #81, #82): its session answers the Board's hooks with App's functions,
-// until the kind moves into a module of its own, as the puzzles and the guessing did (puzzles_page.hpp,
-// guess_page.hpp).
+// A kind of training session still in App (#76, #82): its session answers the Board's hooks with App's functions,
+// until the kind moves into a module of its own, as the puzzles, the mistakes and the guessing did (puzzles_page.hpp,
+// mistakes_page.hpp, guess_page.hpp).
 class App::OwnSession final : public BoardSession {
    public:
-    enum class Kind { Training, Mistakes, Endgame, Vision };
+    enum class Kind { Training, Endgame, Vision };
     OwnSession(App& app, Kind kind) : app_(app), kind_(kind) {}
 
     void sessionMove(chess::Move move) override {
         switch (kind_) {
             case Kind::Training:
                 return app_.trainingAnswer(move);
-            case Kind::Mistakes:
-                return app_.mistakeAnswer(move);
             case Kind::Endgame:
                 return app_.endgameAnswer(move);
             case Kind::Vision:
@@ -598,8 +595,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.drawTrainingPage();
-            case Kind::Mistakes:
-                return app_.drawMistakePage();
             case Kind::Endgame:
                 return app_.drawEndgamePage();
             case Kind::Vision:
@@ -610,8 +605,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.dropTraining();
-            case Kind::Mistakes:
-                return app_.dropMistakes();
             case Kind::Endgame:
                 return app_.dropEndgame();
             case Kind::Vision:
@@ -622,8 +615,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.closeTraining(back);  // back to the Openings page, or the Training page in the review
-            case Kind::Mistakes:
-                return app_.closeMistakes(back);
             case Kind::Endgame:
                 return app_.closeEndgame(back);
             case Kind::Vision:
@@ -635,9 +626,6 @@ class App::OwnSession final : public BoardSession {
             case Kind::Training:  // a question, or its cards being prepared
                 return app_.training_->phase == TrainingRun::Phase::Asking ||
                        app_.training_->phase == TrainingRun::Phase::Preparing;
-            case Kind::Mistakes:  // an exercise's question, its answer being judged
-                return app_.mistake_->phase == MistakeRun::Phase::Asking ||
-                       app_.mistake_->phase == MistakeRun::Phase::Checking;
             case Kind::Endgame:  // an endgame being played against the tables
                 return app_.endgame_->phase != EndgameRun::Phase::Done &&
                        app_.endgame_->phase != EndgameRun::Phase::End;
@@ -650,8 +638,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return app_.training_->aside;
-            case Kind::Mistakes:
-                return app_.mistake_->aside;
             case Kind::Endgame:
                 return app_.endgame_->aside;
             case Kind::Vision:
@@ -663,8 +649,6 @@ class App::OwnSession final : public BoardSession {
         switch (kind_) {
             case Kind::Training:
                 return guide::topics::Training;
-            case Kind::Mistakes:
-                return guide::topics::Mistakes;
             case Kind::Endgame:
                 return guide::topics::Endgames;
             case Kind::Vision:
@@ -684,9 +668,9 @@ void App::initChessModules() {
     arenas_           = std::make_unique<LichessArenasPage>(*modules_context_);
     bot_              = std::make_unique<LichessBotPage>(*modules_context_);
     puzzles_          = std::make_unique<PuzzlesPage>(*modules_context_);
+    mistakes_         = std::make_unique<MistakesPage>(*modules_context_);
     guessing_         = std::make_unique<GuessPage>(*modules_context_);
     training_session_ = std::make_unique<OwnSession>(*this, OwnSession::Kind::Training);
-    mistake_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Mistakes);
     endgame_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Endgame);
     vision_session_   = std::make_unique<OwnSession>(*this, OwnSession::Kind::Vision);
 }
@@ -696,7 +680,7 @@ void App::initChessModules() {
 BoardSession* App::boardSession() const {
     if (training_) return training_session_.get();
     if (puzzles_->onBoard()) return puzzles_.get();
-    if (mistake_) return mistake_session_.get();
+    if (mistakes_->onBoard()) return mistakes_.get();
     if (guessing_->onBoard()) return guessing_.get();
     if (endgame_) return endgame_session_.get();
     if (vision_) return vision_session_.get();
@@ -799,7 +783,7 @@ void App::pollChess() {
     pollTheory();              // the theory studies: read, read again when their files change (#77)
     pollTraining();            // a repertoire's training: its cards prepared, its first question (#76)
     puzzles_->poll();          // Lichess's puzzles: a preparation's end, the batch online's requests (#80)
-    pollMistakes();            // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
+    mistakes_->poll();         // the user's mistakes: looked for, their games reviewed, a session's engine (#81)
     guessing_->poll();         // guessing the moves: a game drawn at random, the theory, the engine's searches (#81)
     pollEndgames();            // the endgames: the tables' answers and moves, the tables' download, vision's game (#82)
     pollEndgameCheck();        // a finished tournament's endgames against the tables (#94)
@@ -1009,13 +993,7 @@ bool App::applyChessFocusWord(const std::string& w) {
         page_         = Page::Training;
         training_tab_ = w == "training-mistakes" ? 2 : 3;
     });
-    words.on({"mistakes-session", "mistakes-review"}, [&] {
-        // A session of the exercises of the user's mistakes: today's, or the day's review of them alone (#81).
-        if (!startMistakes(w == "mistakes-review")) {
-            page_         = Page::Training;
-            training_tab_ = 2;
-        }
-    });
+    mistakes_->addFocusWords(words, w);  // a session of the user's mistakes: their module's (#81)
     words.on({"training-endgames", "training-vision"}, [&] {
         // The Training page's parts of #82: the endgames against the tables and the mates, board vision.
         page_         = Page::Training;

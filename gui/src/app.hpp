@@ -83,7 +83,6 @@
 #include "live.hpp"
 #include "machine_jobs.hpp"
 #include "machine_run.hpp"
-#include "mistakes.hpp"
 #include "model.hpp"
 #include "notice.hpp"
 #include "offline_evals.hpp"
@@ -136,6 +135,7 @@ class GuessPage;
 class LichessArenasPage;
 class LichessBotPage;
 class LichessTvPage;
+class MistakesPage;
 class PuzzlesPage;
 struct CommentaryReview;
 
@@ -1027,18 +1027,22 @@ class App {
     // the endgames' mates reach it directly.
     std::unique_ptr<PuzzlesPage> puzzles_;
 
-    // Guessing the moves (#81, mockup M12, board 2): a module of its own (guess_page.hpp, #107), made by
-    // initChessModules(): the Training page's part "Guess the moves", a game guessed on the Board page (a training
-    // session, below). The Training page and the Home page reach it directly.
+    // Your mistakes as exercises and guessing the moves (#81, mockup M12, board 2), each a module of its own
+    // (mistakes_page.hpp, guess_page.hpp, #107), made by initChessModules(): the exercises the user's reviewed games
+    // give, looked for in the background, their games without a review reviewed in the background, the Training page's
+    // part "My mistakes", a session of exercises on the Board page; a game guessed on the Board page, the part "Guess
+    // the moves". The Training page, the day's review, the Home page, the endgames of the user's games, a guided
+    // visit's card (#94) and the Play page's games reach them directly.
+    std::unique_ptr<MistakesPage> mistakes_;
     std::unique_ptr<GuessPage> guessing_;
 
     // The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, whatever its
     // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
     // The kinds still in App answer through sessions of App's own (OwnSession, app_chess.cpp), made by
-    // initChessModules(); a kind in a module of its own is its own session (the puzzles', a game guessed), and takes
-    // the Board through context::SessionBoard (app_context.hpp).
+    // initChessModules(); a kind in a module of its own is its own session (the puzzles', the mistakes', a game
+    // guessed), and takes the Board through context::SessionBoard (app_context.hpp).
     class OwnSession;
-    std::unique_ptr<BoardSession> training_session_, mistake_session_, endgame_session_, vision_session_;
+    std::unique_ptr<BoardSession> training_session_, endgame_session_, vision_session_;
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
     // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
     // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
@@ -1050,83 +1054,13 @@ class App {
     void closeBoardSession();
     [[nodiscard]] const char* sessionGuideTopic() const;
 
-    // Your mistakes as exercises (#81, mockup M12, board 2; mistakes.hpp, view_mistakes.cpp). The user's names
-    // (Settings › Your names, and the linked Lichess account's); the exercises their reviewed games give, looked for in
-    // the background when the databases, the names or the reviews change; the latest of their games without a review
-    // reviewed in the background; a session of exercises on the Board page.
+    // The user's names (Settings › Your names, and the linked Lichess account's, #81; view_names.cpp): a game where
+    // one of them plays is the user's (the mistakes' exercises, a player's dossier, an opening report, the Play page).
     std::vector<std::string> player_names_;  // settings.json "player_names"
     std::array<char, 96> player_name_input_{};
     [[nodiscard]] std::vector<std::string> userNames() const;  // the user's, with the linked Lichess account's
     void setPlayerNames(std::vector<std::string> names);
     void drawPlayerNames(const char* id);  // the names as chips, a field that adds one (Settings, the Training page)
-    std::optional<MistakeRecord> mistake_record_;
-    MistakeRecord& mistakeRecord();
-    [[nodiscard]] std::filesystem::path mistakesFolder() const { return storage_.root() / "mistakes"; }
-    void saveMistakeRecord();
-    struct MistakeScanJob {
-        std::string of;
-        std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
-        std::future<MistakeScan> done;
-    };
-    std::optional<MistakeScanJob> mistake_scan_job_;
-    std::string mistake_scan_of_;  // what the last scan looked at: the names, the databases, the reviews
-    std::chrono::steady_clock::time_point mistake_scan_checked_{};
-    bool mistake_scanned_       = false;  // a scan came back this session
-    std::size_t mistake_games_  = 0;      // the user's games it found
-    std::size_t mistake_judged_ = 0;      // of them, with a review
-    std::vector<UnreviewedGame> mistake_unreviewed_;
-    [[nodiscard]] std::string mistakeScanKey();
-    void pollMistakes();  // each frame: the scan, the background reviews, a session's judge and engine
-    // The exercises asked: those of the record but a position of a repertoire of the same side (trained on the
-    // Openings page); of `kind` when it is given.
-    [[nodiscard]] std::vector<const MistakeExercise*> mistakeExercises(const std::string* kind = nullptr);
-    [[nodiscard]] MistakeCounts mistakeDayCounts(const std::string* kind = nullptr);
-    std::string mistake_kind_;     // the kind chosen on the page ("" every kind)
-    int mistake_keys_frame_ = -1;  // the frame the repertoires' positions were gathered in, by side
-    std::unordered_set<uint64_t> mistake_repertoire_keys_[2];
-    // The user's latest games without a review, reviewed one after the other in the background as the Board page
-    // reviews a game: its engine, its processes beside the tournaments, its passes; their exercises come game by game.
-    struct MistakeReviews {
-        std::vector<UnreviewedGame> games;
-        std::size_t done = 0;
-        std::unique_ptr<ReviewRunner> runner;
-        ReviewRunner::State state;
-        uint64_t version = 0;
-        std::chrono::steady_clock::time_point started, game_started;
-        double plies_done = 0, seconds = 0;  // what the games done took, for the time left
-        int processes = 1;
-        std::string engine;
-        std::string error;
-    };
-    std::optional<MistakeReviews> mistake_reviews_;
-    void startMistakeReviews();
-    void cancelMistakeReviews();
-    void startMistakeReview();  // the next game's
-    // A session on the Board page.
-    std::unique_ptr<MistakeRun> mistake_;
-    [[nodiscard]] std::string mistakeLock() const;           // why a session cannot start, empty when it can
-    bool startMistakes(bool review, bool new_only = false);  // the page's choice; false when nothing is to be asked
-    void startMistakeRun(std::unique_ptr<MistakeRun> run);
-    void askMistake();
-    void showMistakePosition(const MistakeExercise& e, std::optional<chess::Move> then = std::nullopt);
-    void mistakeAnswer(chess::Move move);
-    void mistakeJudged();  // the search after the answer is back: right or wrong
-    void mistakeGrade(bool right);
-    void mistakeDontKnow();
-    void mistakeRetry();
-    void mistakeNext();
-    void finishMistakes(bool stopped);
-    void reviewMissedMistakes();  // "Review them now": the missed ones again, nothing graded
-    void closeMistakes(bool to_training);
-    void dropMistakes();                             // another game came on the board: the session left where it is
-    void openMistakeGame(const MistakeExercise& e);  // the game it comes from, at the mistake
-    void mistakeKeys();
-    void drawMistakePage();
-    void drawMistakeBoard(float size);
-    void drawMistakeColumn();
-    void drawMistakeEnd();
-    void drawTrainingMistakes();    // the Training page's part
-    void drawMistakeReviewsCard();  // the games without a review, reviewed in the background
 
     // Endgames against the tablebases, mates, board vision (#82, mockup M12, board 3; endgames.hpp, vision.hpp,
     // syzygy_download.hpp; view_endgames.cpp, view_vision.cpp): the Training page's Endgames and Vision parts, a

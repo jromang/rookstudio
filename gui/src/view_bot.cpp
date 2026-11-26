@@ -564,8 +564,7 @@ void App::pollBot() {
         if (!ready(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
-        bot_online_error_ =
-            r.status == 0 ? trf("{}: Lichess cannot be reached ({})", c.what, r.error) : trf("{}: {}", c.what, r.error);
+        bot_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
         if (!c.accepted.empty() && c.accepted == bot_accepted_) bot_accepted_.clear();  // not to be played
     }
     std::erase_if(bot_calls_, [](const auto& c) { return !c.reply.valid(); });

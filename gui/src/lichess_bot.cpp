@@ -465,8 +465,9 @@ void BotGame::run() {
                 update([&](State& st) { st.error.clear(); });
                 break;
             }
-            if (r.status != 0) {  // refused: the stream says why (the game over, a takeback); tried again later
-                update([&](State& st) { st.error = trf("Lichess refused the move {}: {}", *move, r.error); });
+            if (r.net != NetError::Offline && r.net != NetError::Cancelled) {
+                // Refused: the stream says why (the game over, a takeback); tried again later.
+                update([&](State& st) { st.error = trf("Lichess refused the move {}: {}", *move, describe(r)); });
                 move_at = Clock::now() + std::chrono::seconds(1);
                 break;
             }

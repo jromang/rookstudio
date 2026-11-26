@@ -579,14 +579,14 @@ void App::pollLichessArenas() {
                 a.error.clear();
                 a.asked = {};  // its page asked again at once: the user's rank
             } else {
-                a.error = r.status == 0 ? trf("Lichess cannot be reached ({})", r.error) : r.error;
+                a.error = lichess::describe(r);
                 if (r.status == 429) a.waits_until = pause(429);
                 if (!a.quiet_join) a.seat.pause();
             }
         }
         if (ready(a.pause_job)) {
             const auto r = a.pause_job.get();
-            if (!r.ok) a.error = r.status == 0 ? trf("Lichess cannot be reached ({})", r.error) : r.error;
+            if (!r.ok) a.error = lichess::describe(r);
             if (a.quit_after) {
                 a.quit_after      = false;
                 quit_online_said_ = true;
@@ -677,7 +677,7 @@ void App::pollLichessArenas() {
                 s.error.clear();
                 s.asked = {};
             } else {
-                s.error = r.status == 0 ? trf("Lichess cannot be reached ({})", r.error) : r.error;
+                s.error = lichess::describe(r);
             }
         }
         if (ready(s.pause_job)) {
@@ -685,7 +685,7 @@ void App::pollLichessArenas() {
             if (r.ok)
                 s.joined = false;
             else
-                s.error = r.error;
+                s.error = lichess::describe(r);
         }
         if (s.join_pending && linked && !lichess_link_ && lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
             s.join_pending = false;

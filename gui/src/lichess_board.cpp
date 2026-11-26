@@ -25,59 +25,21 @@ int64_t intOf(const nlohmann::json& j, const char* key, int64_t otherwise = 0) {
 // The API's segment of a game's endpoints.
 const char* apiName(PlayApi api) { return api == PlayApi::Bot ? "bot" : "board"; }
 
-std::string refusal(int status, const std::string& error) {
-    return status == 0     ? (error.empty() ? std::string("Lichess did not answer") : error)
-           : status == 401 ? std::string("Lichess refused the token")
-           : status == 403 ? std::string("the token may not do it")
-           : status == 404 ? std::string("Lichess does not know it")
-           : status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                           : fmt::format("Lichess answered {}", status);
-}
-
-// Lichess's own words, when its answer gives some: {"error": "..."}, or a form's {"global": ["..."]}.
-std::string reasonOf(std::string_view body) {
-    const auto j = nlohmann::json::parse(body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return {};
-    if (const auto it = j.find("error"); it != j.end()) {
-        if (it->is_string()) return it->get<std::string>();
-        if (it->is_object())  // {"error": {"field": ["what"]}}
-            for (const auto& [field, what] : it->items())
-                if (what.is_array() && !what.empty() && what[0].is_string()) return what[0].get<std::string>();
-    }
-    if (const auto it = j.find("global"); it != j.end() && it->is_array() && !it->empty() && (*it)[0].is_string())
-        return (*it)[0].get<std::string>();
-    return {};
-}
-
-std::string whyNot(int status, std::string_view body, const std::string& error) {
-    auto reason = reasonOf(body);
-    return reason.empty() ? refusal(status, error) : reason;
-}
-
 using Fields = std::vector<std::pair<std::string, std::string>>;
 
-HttpRequest postRequest(const std::string& path, const std::string& token, const Fields& fields, int timeout_s) {
-    HttpRequest request;
-    request.url       = servers().api + path;
-    request.method    = "POST";
-    request.token     = token;
-    request.timeout_s = timeout_s;
-    if (!fields.empty()) {
-        request.content_type = "application/x-www-form-urlencoded";
-        request.body         = formEncode(fields);
-    }
-    return request;
+// A POST of the API with the token, its form `fields` when there are some, asking for `accept`.
+HttpRequest postRequest(const std::string& path, const std::string& token, const Fields& fields, int timeout_s,
+                        const char* accept = "application/json") {
+    auto asked      = request("POST", servers().api + path, token, accept);
+    asked.timeout_s = timeout_s;
+    return fields.empty() ? asked : withForm(std::move(asked), fields);
 }
 
 Reply post(const std::string& path, const std::string& token, const Fields& fields, const std::atomic<bool>* cancel,
            int timeout_s = 15) {
-    auto request = postRequest(path, token, fields, timeout_s);
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
     Reply out;
-    out.status = r.status;
-    out.ok     = r.status == 200;
-    if (!out.ok) out.error = whyNot(r.status, r.body, r.error);
+    static_cast<Failure&>(out) = send(postRequest(path, token, fields, timeout_s), cancel);
+    out.ok                     = !out.failed();
     return out;
 }
 
@@ -248,9 +210,9 @@ Seek::~Seek() {
     if (thread_.joinable()) thread_.join();
 }
 
-std::string Seek::error() const {
+Failure Seek::failure() const {
     std::lock_guard lock(mutex_);
-    return error_;
+    return failure_;
 }
 
 std::string Seek::id() const {
@@ -268,18 +230,16 @@ void Seek::run() {
     addClock(fields, ask_.clock, true);
     if (ask_.rating_min > 0 && ask_.rating_max > ask_.rating_min)
         fields.emplace_back("ratingRange", fmt::format("{}-{}", ask_.rating_min, ask_.rating_max));
-    const auto fail = [&](std::string why) {
+    const auto fail = [&](const Failure& why) {
         std::lock_guard lock(mutex_);
-        error_  = std::move(why);
-        closed_ = Clock::now();
-        state_  = State::Failed;
+        failure_ = why;
+        closed_  = Clock::now();
+        state_   = State::Failed;
     };
     // By correspondence: one request, the seek's id in its answer.
     if (ask_.clock.days > 0) {
-        auto request = postRequest("/api/board/seek", token_, fields, 20);
-        request.headers.emplace_back("Accept", "application/json");
-        const auto r = politeRequest(request, &stop_);
-        if (r.status != 200) return fail(whyNot(r.status, r.body, r.error));
+        const auto r = send(postRequest("/api/board/seek", token_, fields, 20), &stop_);
+        if (r.failed()) return fail(r);
         const auto j = nlohmann::json::parse(r.body, nullptr, false);
         std::lock_guard lock(mutex_);
         if (!j.is_discarded() && j.is_object()) id_ = textOf(j, "id");
@@ -288,9 +248,8 @@ void Seek::run() {
         return;
     }
     // In real time: the request held open while the seek lives; Lichess closes it when someone takes it.
-    auto request = postRequest("/api/board/seek", token_, fields, 20);
-    request.headers.emplace_back("Accept", "application/x-ndjson");
-    int status = 0;
+    const auto asked = postRequest("/api/board/seek", token_, fields, 20, "application/x-ndjson");
+    int status       = 0;
     std::string body;
     HttpStream stream;
     stream.on_head = [&](int s, std::string_view) {
@@ -302,17 +261,18 @@ void Seek::run() {
         if (status != 200 && body.size() < 4096) body.append(data);
         return !stop_;
     };
-    stream.cancel     = &stop_;
-    stream.idle_s     = 60;  // Lichess sends an empty line now and then
-    const auto result = politeStream(request, stream);
+    stream.cancel = &stop_;
+    stream.idle_s = 60;  // Lichess sends an empty line now and then
+    auto result   = politeStream(asked, stream);
     if (stop_) {
         std::lock_guard lock(mutex_);
         closed_ = Clock::now();
         state_  = State::Closed;
         return;
     }
-    if (status != 200) return fail(whyNot(status, body, result.error));
-    if (!result.error.empty()) return fail("the connection to Lichess broke: " + result.error);
+    result.body  = std::move(body);  // a refusal's, with Lichess's words
+    const auto r = responseOf(asked, std::move(result));
+    if (r.failed()) return fail(r);  // refused, or cut
     std::lock_guard lock(mutex_);
     closed_ = Clock::now();
     state_  = State::Closed;
@@ -339,9 +299,9 @@ std::string ChallengeOut::done() const {
     return done_;
 }
 
-std::string ChallengeOut::error() const {
+Failure ChallengeOut::failure() const {
     std::lock_guard lock(mutex_);
-    return error_;
+    return failure_;
 }
 
 void ChallengeOut::cancel() { stop_ = true; }
@@ -361,10 +321,10 @@ void ChallengeOut::run() {
     addClock(fields, ask_.clock, false);
     if (live) fields.emplace_back("keepAliveStream", "true");
     const auto path = "/api/challenge/" + urlEncode(ask_.user);
-    const auto fail = [&](std::string why) {
+    const auto fail = [&](const Failure& why) {
         std::lock_guard lock(mutex_);
-        error_ = std::move(why);
-        state_ = State::Failed;
+        failure_ = why;
+        state_   = State::Failed;
     };
     const auto take = [&](const nlohmann::json& j) {
         const auto* c = challengeOf(j);
@@ -390,11 +350,9 @@ void ChallengeOut::run() {
         state_ = State::Done;
     };
     if (!live) {
-        auto request = postRequest(path, token_, fields, 20);
-        request.headers.emplace_back("Accept", "application/json");
-        const auto r = politeRequest(request, &stop_);
-        if (stop_ && r.status == 0) return cancelled();
-        if (r.status != 200) return fail(whyNot(r.status, r.body, r.error));
+        const auto r = send(postRequest(path, token_, fields, 20), &stop_);
+        if (stop_ && (r.net == NetError::Cancelled || r.net == NetError::Offline)) return cancelled();
+        if (r.failed()) return fail(r);
         const auto j = nlohmann::json::parse(r.body, nullptr, false);
         if (!j.is_discarded()) take(j);
         state_ = State::Waiting;
@@ -402,9 +360,8 @@ void ChallengeOut::run() {
         while (!stop_) std::this_thread::sleep_for(std::chrono::milliseconds(50));
         return cancelled();
     }
-    auto request = postRequest(path, token_, fields, 20);
-    request.headers.emplace_back("Accept", "application/x-ndjson");
-    int status = 0;
+    const auto asked = postRequest(path, token_, fields, 20, "application/x-ndjson");
+    int status       = 0;
     std::string body;
     LineSplitter lines([&](std::string_view line) {
         const auto j = nlohmann::json::parse(line, nullptr, false);
@@ -424,18 +381,23 @@ void ChallengeOut::run() {
         }
         return lines.feed(data) && !stop_;
     };
-    stream.cancel     = &stop_;
-    stream.idle_s     = 60;
-    const auto result = politeStream(request, stream);
+    stream.cancel = &stop_;
+    stream.idle_s = 60;
+    auto result   = politeStream(asked, stream);
     if (status == 200) (void)lines.flush();
     if (stop_ && (settled_ || done().empty())) return cancelled();
-    if (status != 200) return fail(whyNot(status, body, result.error));
+    result.body = std::move(body);  // a refusal's, with Lichess's words
+    auto r      = responseOf(asked, std::move(result));
+    if (status != 200 && r.failed()) return fail(r);  // refused, or no answer
     if (done().empty()) {
         // The request broke before Lichess said anything: the challenge expires on its own; called back to be sure.
         const auto id = this->id();
         if (!id.empty()) (void)post(fmt::format("/api/challenge/{}/cancel", urlEncode(id)), token_, {}, nullptr, 5);
-        return fail(result.error.empty() ? std::string("Lichess closed the challenge")
-                                         : "the connection to Lichess broke: " + result.error);
+        if (!r.failed()) {  // closed without a word: as good as cut
+            r.net    = NetError::Offline;
+            r.detail = "Lichess closed the challenge before saying how it ended";
+        }
+        return fail(r);
     }
     state_ = State::Done;
 }
@@ -445,28 +407,18 @@ void ChallengeOut::run() {
 
 Answer<std::vector<ChatLine>> boardChatLines(const std::string& token, const std::string& game,
                                              const std::atomic<bool>* cancel, PlayApi api) {
-    Answer<std::vector<ChatLine>> out;
-    HttpRequest request;
-    request.url    = fmt::format("{}/api/{}/game/{}/chat", servers().api, apiName(api), urlEncode(game));
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    out.status   = r.status;
-    if (r.status != 200) {
-        out.error = whyNot(r.status, r.body, r.error);
-        return out;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_array()) {
-        out.error = "Lichess's answer could not be read";
-        return out;
-    }
-    std::vector<ChatLine> lines;
-    for (const auto& line : j)
-        if (line.is_object()) lines.push_back({"player", textOf(line, "user"), textOf(line, "text")});
-    out.value = std::move(lines);
-    return out;
+    auto a = call<std::vector<ChatLine>>(
+        request("GET", fmt::format("{}/api/{}/game/{}/chat", servers().api, apiName(api), urlEncode(game)), token),
+        [](const nlohmann::json& j) -> std::optional<std::vector<ChatLine>> {
+            if (!j.is_array()) return std::nullopt;
+            std::vector<ChatLine> lines;
+            for (const auto& line : j)
+                if (line.is_object()) lines.push_back({"player", textOf(line, "user"), textOf(line, "text")});
+            return lines;
+        },
+        cancel);
+    a.asked = Asked::Game;
+    return a;
 }
 
 int64_t BoardState::clockNow(bool white, Clock::time_point now) const {
@@ -599,11 +551,9 @@ void GameStream::run() {
         // The players' chat so far: what the stream says after it opens is added to it.
         if (auto chat = boardChatLines(token_, id_, &stop_, api_); chat.value)
             update([&](BoardState& st) { st.chat = std::move(*chat.value); });
-        HttpRequest request;
-        request.url    = fmt::format("{}/api/{}/game/stream/{}", servers().api, apiName(api_), urlEncode(id_));
-        request.method = "GET";
-        request.token  = token_;
-        request.headers.emplace_back("Accept", "application/x-ndjson");
+        const auto asked =
+            request("GET", fmt::format("{}/api/{}/game/stream/{}", servers().api, apiName(api_), urlEncode(id_)),
+                    token_, "application/x-ndjson");
         int status = 0;
         LineSplitter lines([&](std::string_view line) {
             std::lock_guard lock(mutex_);
@@ -617,33 +567,33 @@ void GameStream::run() {
                 update([](BoardState& st) {
                     st.connected = true;
                     st.tries     = 0;
-                    st.error.clear();
+                    st.failure   = {};
                 });
                 breaks = 0;
             }
             return s == 200;
         };
-        stream.on_data    = [&](std::string_view data) { return lines.feed(data) && !stop_; };
-        stream.cancel     = &stop_;
-        stream.idle_s     = 30;  // Lichess sends an empty line now and then
-        const auto result = politeStream(request, stream);
+        stream.on_data = [&](std::string_view data) { return lines.feed(data) && !stop_; };
+        stream.cancel  = &stop_;
+        stream.idle_s  = 30;  // Lichess sends an empty line now and then
+        auto result    = politeStream(asked, stream);
         if (status == 200) (void)lines.flush();
         if (stop_) break;
+        auto broke  = responseOf(asked, std::move(result));
+        broke.asked = Asked::Game;
+        // Lichess does not know the game, or refuses the token: it will not come back.
+        const bool refused =
+            broke.net == NetError::NotFound || broke.net == NetError::Unauthorized || broke.net == NetError::Forbidden;
         bool ended = false;
         update([&](BoardState& st) {
             st.connected = false;
-            if (status == 404) {
-                st.ended = true;
-                st.error = "Lichess does not know this game";
-            } else if (status == 401 || status == 403) {
-                st.ended = true;
-                st.error = "Lichess refused the token";
+            if (refused) {
+                st.ended   = true;
+                st.failure = broke;
             } else if (st.over()) {
                 st.ended = true;
             } else {
-                st.error = status != 200 && status != 0 ? fmt::format("Lichess answered {}", status)
-                           : result.error.empty()       ? std::string("the stream ended")
-                                                        : result.error;
+                st.failure = broke;  // none when Lichess closed it
             }
             ended = st.ended;
         });

@@ -11,6 +11,7 @@
 #include <study/store.hpp>
 
 #include "lichess_month.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -58,12 +59,7 @@ std::string month(int games, int& kept) {
 }
 
 bool waitIdle(const lichess::MonthReading& reading) {
-    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(60);
-    while (reading.busy()) {
-        if (std::chrono::steady_clock::now() > until) return false;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    return true;
+    return test::waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60));
 }
 
 }  // namespace

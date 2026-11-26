@@ -9,7 +9,6 @@
 #include <fstream>
 #include <map>
 #include <mutex>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -73,13 +72,6 @@ struct FakeGitHub {
     std::vector<std::string> asked;
     ScriptedServer server;
 };
-
-std::string readFile(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    std::ostringstream out;
-    out << in.rdbuf();
-    return out.str();
-}
 
 std::string mover() { return readFile(selfPath().parent_path() / FCG_RANDOM_MOVER); }
 

@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "jobs.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace std::chrono_literals;
@@ -31,12 +32,7 @@ struct Gate {
 // Waits for `done`, a minute at most: false when it did not come.
 template <typename F>
 bool waitFor(F&& done) {
-    const auto give_up = std::chrono::steady_clock::now() + 60s;
-    while (!done()) {
-        if (std::chrono::steady_clock::now() > give_up) return false;
-        std::this_thread::sleep_for(1ms);
-    }
-    return true;
+    return test::waitUntil(std::forward<F>(done), 60s);
 }
 
 // A task's wait until it is asked to stop, a minute at most: whether it was.

@@ -17,6 +17,7 @@
 #include <tour/runner.hpp>
 
 #include "self_path.hpp"
+#include "test_support.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -27,6 +28,7 @@
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::waitUntil;
 
 namespace {
 
@@ -294,16 +296,6 @@ struct Concurrency final : fastchess::observer::GameObserver {
     std::map<int, bool> gpu_slots;
 };
 
-template <typename F>
-bool waitUntil(F done, std::chrono::milliseconds timeout = 30s) {
-    const auto end = std::chrono::steady_clock::now() + timeout;
-    while (std::chrono::steady_clock::now() < end) {
-        if (done()) return true;
-        std::this_thread::sleep_for(2ms);
-    }
-    return false;
-}
-
 }  // namespace
 
 TEST_CASE("runner: an allowance changed while it plays holds games back or starts them, never interrupting one") {
@@ -326,7 +318,7 @@ TEST_CASE("runner: an allowance changed while it plays holds games back or start
     runner.setAllowance(one);
     std::thread thread([&] { runner.start(); });
 
-    REQUIRE(waitUntil([&] { return state->results().size() >= 3; }));
+    REQUIRE(waitUntil([&] { return state->results().size() >= 3; }, 30s));
     {
         std::lock_guard<std::mutex> lock(watch.mutex);  // the runner's threads write it
         CHECK(watch.most == 1);
@@ -337,7 +329,7 @@ TEST_CASE("runner: an allowance changed while it plays holds games back or start
     Allowance four = one;
     four.threads   = 4;
     runner.setAllowance(four);
-    CHECK(waitUntil([&] { return watch.now() >= 3; }));
+    CHECK(waitUntil([&] { return watch.now() >= 3; }, 30s));
     CHECK(runner.inFlight().threads <= 4);
 
     // Back to one: the games in flight end as they go, and none starts until one game is left.

@@ -15,6 +15,7 @@
 #include "engine_client.hpp"
 #include "run.hpp"
 #include "self_path.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -53,13 +54,12 @@ EngineEntry mover() {
 // Polls the analyser until `done` or 10 seconds.
 template <typename F>
 bool pollUntil(Analyser& a, F done) {
-    const auto until = std::chrono::steady_clock::now() + 10s;
-    while (std::chrono::steady_clock::now() < until) {
-        a.poll();
-        if (done()) return true;
-        std::this_thread::sleep_for(5ms);
-    }
-    return false;
+    return test::waitUntil(
+        [&] {
+            a.poll();
+            return done();
+        },
+        10s);
 }
 
 }  // namespace

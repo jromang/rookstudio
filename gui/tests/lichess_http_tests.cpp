@@ -128,6 +128,22 @@ TEST_CASE("Lichess HTTP: the user's words for each kind, by what was asked") {
     own.error = "a study's name has 2 to 100 characters";
     CHECK(own.failed());
     CHECK(describe(own) == "a study's name has 2 to 100 characters");
+    // A line of its own names Lichess once: Lichess's own words said as its.
+    CHECK(describeAlone(kept) == "Lichess has no such study, or it is private");
+    CHECK(describeAlone(own) == "a study's name has 2 to 100 characters");
+    Failure refused;
+    refused.net    = NetError::Server;
+    refused.status = 400;
+    refused.said   = "This tournament is finished";
+    CHECK(describeAlone(refused) == "Lichess refuses: “This tournament is finished”");
+    refused.said.clear();
+    refused.status = 503;
+    CHECK(describeAlone(refused) == "Lichess answered 503");
+    // Nothing shown in its place: the network's failure said alone, the others with their words.
+    Failure offline;
+    offline.net = NetError::Offline;
+    CHECK(gaveNothing(offline) == "Lichess cannot be reached from here.");
+    CHECK(gaveNothing(refused) == "Lichess gave nothing (Lichess answered 503).");
 }
 
 TEST_CASE("Lichess HTTP: one request builder, a form or JSON for its body") {

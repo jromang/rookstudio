@@ -112,6 +112,18 @@ std::string describe(const Failure& failure) {
     return describe(failure.net, failure.asked, failure.status, failure.said);
 }
 
+std::string describeAlone(const Failure& failure) {
+    const auto words = describe(failure);
+    if (failure.net == NetError::Server && !failure.said.empty() && words == failure.said)
+        return trf("Lichess refuses: “{}”", words);
+    return words;
+}
+
+std::string gaveNothing(const Failure& failure) {
+    if (failure.net == NetError::Offline) return TR("Lichess cannot be reached from here.");
+    return trf("Lichess gave nothing ({}).", describe(failure));
+}
+
 NetError netErrorOf(const HttpResult& r) {
     if (r.error == "cancelled") return NetError::Cancelled;  // https.hpp's word for a request `cancel` stopped
     if (r.status == 0) return NetError::Offline;

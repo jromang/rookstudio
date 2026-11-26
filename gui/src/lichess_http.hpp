@@ -94,6 +94,12 @@ template <typename T>
                                    std::string_view said = {});
 // The same for a failure as it was kept; a problem of the program's own (`error`) in its own words.
 [[nodiscard]] std::string describe(const Failure& failure);
+// The same for a line of its own, which names Lichess once: describe()'s words, Lichess's own quoted after "Lichess
+// refuses: ".
+[[nodiscard]] std::string describeAlone(const Failure& failure);
+// Why nothing is shown where Lichess's answer would be, as a sentence: "Lichess cannot be reached from here." when no
+// answer came, else "Lichess gave nothing (…)." with describe()'s words.
+[[nodiscard]] std::string gaveNothing(const Failure& failure);
 
 // The kind of failure an HTTP result is: None for a whole 2xx; Cancelled when the program stopped it.
 [[nodiscard]] NetError netErrorOf(const HttpResult& result);

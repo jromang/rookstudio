@@ -1896,7 +1896,7 @@ class App {
         int tries = 0;              // the next game asked again since it ended
         std::chrono::steady_clock::time_point next_at{};
         std::future<lichess::Answer<lichess::TvNext>> next;
-        std::string error;  // why the next game did not come
+        lichess::Failure error;  // why the next game did not come
     };
     std::optional<BoardTv> board_tv_;
     struct TvKept {

@@ -51,6 +51,11 @@ struct Sampler {
     Sampler& operator=(const Sampler&) = delete;
 };
 
+// llama.cpp b12556 deprecates llama_batch and llama_decode for llama_batch_ext and llama_process, whose reading of
+// the logits its header still lists as to do: the batch and its decoding kept here, alone, without their warnings,
+// until a version tag has the new interface whole.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 struct Batch {
     llama_batch b;
     explicit Batch(int32_t size) : b(llama_batch_init(size, 0, 1)) {}
@@ -65,7 +70,10 @@ struct Batch {
         b.logits[b.n_tokens]    = logits;
         ++b.n_tokens;
     }
+    // Its tokens through the model; false when they do not decode.
+    [[nodiscard]] bool decode(llama_context* ctx) { return llama_decode(ctx, b) == 0; }
 };
+#pragma GCC diagnostic pop
 
 // The token `pick` chooses among the logits of the batch's `index`th token, the grammar applied first when given.
 std::optional<llama_token> choose(llama_context* ctx, int32_t index, llama_sampler* pick, llama_sampler* grammar) {
@@ -254,7 +262,7 @@ std::optional<commentary::Generation> Generator::generate(const commentary::Requ
     Batch batch(static_cast<int32_t>(n_ctx));
     for (std::size_t i = 0; i < tokens.size(); ++i)
         batch.add(tokens[i], static_cast<llama_pos>(i), i + 1 == tokens.size());
-    if (llama_decode(ctx.get(), batch.b) != 0) return fail("the prompt does not decode");
+    if (!batch.decode(ctx.get())) return fail("the prompt does not decode");
 
     std::optional<Sampler> grammar;
     if (request.grammar) {
@@ -291,7 +299,7 @@ std::optional<commentary::Generation> Generator::generate(const commentary::Requ
         batch.b.n_tokens = 0;
         batch.add(*token, position, true);
         ++position;
-        if (llama_decode(ctx.get(), batch.b) != 0) return fail("a token does not decode");
+        if (!batch.decode(ctx.get())) return fail("a token does not decode");
     }
     commentary::Generation g;
     g.text          = trim(bytes);

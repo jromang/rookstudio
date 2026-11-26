@@ -206,7 +206,7 @@ void App::pollEnginePicker() {
         const auto profile = storage_.root();
         if (auto kept = catalogue::keptReleases(profile, id)) {
             e->pick     = catalogue::pickBuild(*engine, *kept, cpu());
-            e->releases = catalogue::Releases{std::move(*kept)};
+            e->releases = catalogue::Releases(std::move(*kept));
             if (e->install_when_known) {
                 e->install_when_known = false;
                 installPicked(*e, e->keep_old);
@@ -650,7 +650,7 @@ void App::drawFirstEngineCard(const char* why) {
     if (gaia && engine && !gaia->releases) {
         if (auto kept = catalogue::keptReleases(storage_.root(), "gaia", std::chrono::hours(24 * 30))) {
             gaia->pick     = catalogue::pickBuild(*engine, *kept, cpu());
-            gaia->releases = catalogue::Releases{std::move(*kept)};
+            gaia->releases = catalogue::Releases(std::move(*kept));
             gaia->asked    = true;
         }
     }

@@ -14,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <json.hpp>
@@ -37,6 +38,8 @@ enum class GitHubFailure {
 };
 
 struct Releases {
+    Releases() = default;
+    explicit Releases(std::vector<Release> answered) : list(std::move(answered)) {}
     std::vector<Release> list;  // what GitHub answered
     GitHubFailure failure = GitHubFailure::None;  // why there is no answer
     int status            = 0;                    // GitHub's, for Refused

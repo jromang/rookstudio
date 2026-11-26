@@ -94,11 +94,6 @@ std::string database(int fillers, std::size_t frame, int cp, int& lines) {
     return out;
 }
 
-std::string readAll(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), {}};
-}
-
 }  // namespace
 
 TEST_CASE("evaluations: the positions of the named lines and one move off them, by the shortest way") {
@@ -449,5 +444,4 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         CHECK(why->find("cut short") != std::string::npos);
     }
     CHECK(evalsFolder(folder).stopped_at > 0);
-    (void)readAll;
 }

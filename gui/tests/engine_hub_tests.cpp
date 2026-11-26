@@ -23,33 +23,18 @@
 #include "net.hpp"
 #include "ssh_client.hpp"
 #include "ssh_server.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
 
-// Waits until `done()`, as long as `limit` at most: what is awaited, not a fixed sleep.
-template <typename F>
-bool waitFor(F done, std::chrono::milliseconds limit = 20s) {
-    const auto until = Clock::now() + limit;
-    while (!done()) {
-        if (Clock::now() > until) return false;
-        std::this_thread::sleep_for(10ms);
-    }
-    return true;
-}
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-hub-" + name);
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-    fs::create_directories(dir);
-    return dir;
-}
+using fcg::test::waitUntil;
 
 // A profile with one Linux machine on the test server's port, tested or not (its host key known).
 Machine writeMachine(const fs::path& profile, uint16_t port) {
@@ -196,11 +181,11 @@ class TestRelay {
         return shared_->err;
     }
     bool saw(const std::string& text, std::chrono::milliseconds limit = 20s) const {
-        return waitFor([&] { return out().find(text) != std::string::npos; }, limit);
+        return waitUntil([&] { return out().find(text) != std::string::npos; }, limit);
     }
     // Its exit code once it ended, within `limit`; nullopt while it runs.
     std::optional<int> exit(std::chrono::milliseconds limit = 20s) {
-        if (!waitFor([&] { return shared_->code != RUNNING; }, limit)) return std::nullopt;
+        if (!waitUntil([&] { return shared_->code != RUNNING; }, limit)) return std::nullopt;
         thread_.join();
         return shared_->code.load();
     }
@@ -309,8 +294,8 @@ TEST_CASE("Machines: an engine's command quotes each argument, its process id fi
 }
 
 TEST_CASE("Engine hub: an engine played through a relay, after its machine was tested; never one not allowed") {
-    const auto profile = freshDir("relay");
-    const auto port    = test::freePort();
+    const ScratchDir profile("relay");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root = profile;
     server_options.exec = engines;
@@ -330,7 +315,7 @@ TEST_CASE("Engine hub: an engine played through a relay, after its machine was t
         CHECK(*code == 1);
         CHECK(relay.err().find("never been tested") != std::string::npos);
         CHECK(server.commands().empty());
-        CHECK(waitFor([&] {
+        CHECK(waitUntil([&] {
             const auto states = hub.machines();
             return states.size() == 1 && states[0].error_kind == SshError::Kind::HostKey;
         }));
@@ -347,7 +332,7 @@ TEST_CASE("Engine hub: an engine played through a relay, after its machine was t
         CHECK(relay.saw("readyok"));
         CHECK(relay.out().find("4242") == std::string::npos);
         CHECK(relay.out().rfind("id name Mock 1.0\n", 0) == 0);
-        CHECK(waitFor([&] {
+        CHECK(waitUntil([&] {
             const auto states = hub.machines();
             return states.size() == 1 && states[0].name == "test-box" && states[0].engines == 1 &&
                    states[0].error.empty();
@@ -356,7 +341,7 @@ TEST_CASE("Engine hub: an engine played through a relay, after its machine was t
         const auto code = relay.exit();
         REQUIRE(code);
         CHECK(*code == 0);
-        CHECK(waitFor([&] { return hub.machines()[0].engines == 0; }));
+        CHECK(waitUntil([&] { return hub.machines()[0].engines == 0; }));
     }
 
     SUBCASE("an engine the hub was not told about, or a relay without the secret, is refused") {
@@ -380,8 +365,8 @@ TEST_CASE("Engine hub: an engine played through a relay, after its machine was t
 }
 
 TEST_CASE("Engine hub: twelve engines on two connections of ten channels; idle connections closed") {
-    const auto profile = freshDir("pool");
-    const auto port    = test::freePort();
+    const ScratchDir profile("pool");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root         = profile;
     server_options.exec         = engines;
@@ -389,7 +374,7 @@ TEST_CASE("Engine hub: twelve engines on two connections of ten channels; idle c
     ssh::MockServer server(port, server_options);
     const auto machine = writeMachine(profile, port);
     testMachine(profile, machine);
-    REQUIRE(waitFor([&] { return server.live == 0; }));
+    REQUIRE(waitUntil([&] { return server.live == 0; }));
     const int before = server.connections;
 
     auto options       = hubOptions(profile);
@@ -406,21 +391,21 @@ TEST_CASE("Engine hub: twelve engines on two connections of ten channels; idle c
     for (auto& r : relays) CHECK(r->saw("uciok"));
     CHECK(server.connections - before == 2);
     CHECK(server.refused_channels == 0);
-    CHECK(waitFor([&] {
+    CHECK(waitUntil([&] {
         const auto states = hub.machines();
         return states.size() == 1 && states[0].connections == 2 && states[0].engines == 12;
     }));
 
     for (auto& r : relays) r->send("quit\n");
     for (auto& r : relays) CHECK(r->exit() == std::optional<int>(0));
-    CHECK(waitFor([&] { return server.live == 0; }));  // closed once idle
-    CHECK(waitFor([&] { return hub.machines()[0].connections == 0; }));
+    CHECK(waitUntil([&] { return server.live == 0; }));  // closed once idle
+    CHECK(waitUntil([&] { return hub.machines()[0].connections == 0; }));
     fs::remove_all(profile);
 }
 
 TEST_CASE("Engine hub: a relay that goes has its engine ended there, by its process id") {
-    const auto profile = freshDir("end");
-    const auto port    = test::freePort();
+    const ScratchDir profile("end");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root = profile;
     server_options.exec = engines;
@@ -446,15 +431,15 @@ TEST_CASE("Engine hub: a relay that goes has its engine ended there, by its proc
         }
         return false;
     };
-    CHECK(waitFor(ended));
+    CHECK(waitUntil(ended));
     hub.reset();  // the test server's engine does not die of it: the relay ends with the hub
     CHECK(relay.exit() == std::optional<int>(1));
     fs::remove_all(profile);
 }
 
 TEST_CASE("Engine hub: a cut ends the relays and says which; a machine that stops answering is cut too") {
-    const auto profile = freshDir("cut");
-    const auto port    = test::freePort();
+    const ScratchDir profile("cut");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root = profile;
     server_options.exec = engines;
@@ -483,7 +468,7 @@ TEST_CASE("Engine hub: a cut ends the relays and says which; a machine that stop
         CHECK(b.exit() == std::optional<int>(1));
         CHECK(a.err().find("test-box") != std::string::npos);
         std::vector<EngineHub::Cut> cuts;
-        REQUIRE(waitFor([&] {
+        REQUIRE(waitUntil([&] {
             auto more = hub.takeCuts();
             cuts.insert(cuts.end(), more.begin(), more.end());
             return !cuts.empty();
@@ -497,7 +482,7 @@ TEST_CASE("Engine hub: a cut ends the relays and says which; a machine that stop
         TestRelay c(relay::keyOf(mock), hub.environment());
         c.send("uci\n");
         CHECK(c.saw("uciok"));
-        CHECK(waitFor([&] { return hub.machines()[0].error.empty(); }));
+        CHECK(waitUntil([&] { return hub.machines()[0].error.empty(); }));
     }
 
     SUBCASE("a machine that stops answering") {
@@ -507,7 +492,7 @@ TEST_CASE("Engine hub: a cut ends the relays and says which; a machine that stop
         server.freeze(true);
         CHECK(a.exit() == std::optional<int>(1));
         CHECK(a.err().find("stopped answering") != std::string::npos);
-        CHECK(waitFor([&] { return !hub.takeCuts().empty(); }));
+        CHECK(waitUntil([&] { return !hub.takeCuts().empty(); }));
         server.freeze(false);
     }
     fs::remove_all(profile);

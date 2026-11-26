@@ -20,6 +20,7 @@
 #include <tour/pgn_book.hpp>
 #include <tour/runner.hpp>
 
+#include "mock_engines.hpp"
 #include "own_temp.hpp"
 #include "polyglot_writer.hpp"
 #include "self_path.hpp"
@@ -70,7 +71,7 @@ struct Adapter {
     }
 };
 
-std::string randomMover() { return (self().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 // Sets an environment variable of the processes started from now on; nullptr removes it.
 void setEnv(const char* name, const char* value) {
@@ -458,10 +459,6 @@ TEST_CASE("own book: the randomness chooses the moves, from the best one only to
 }
 
 TEST_CASE("own book adapter: its processes draw their own book moves, from the same seed and the same position") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     // The first game of a process, as after every restart of the engine, and in each concurrent game: eight
     // processes give one same move out of twenty about once in 10^10.
     const auto book = wideBook();
@@ -478,10 +475,6 @@ TEST_CASE("own book adapter: its processes draw their own book moves, from the s
 }
 
 TEST_CASE("own book adapter: what the engine writes after its bestmove, in the same write, reaches the GUI in order") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     // Its info line, its bestmove, an info string and a readyok in one write: they come in one read.
     const ScopedEnv after_bestmove("FCG_MOCK_AFTER_BESTMOVE", "after the bestmove");
     AdapterProcess adapter(wideBook());
@@ -617,10 +610,6 @@ TEST_CASE("own book: a tournament with one is of version 3, which the versions b
 }
 
 TEST_CASE("own book: in a tournament, its moves come from the book, its engine plays the rest") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     const auto previous = book_adapter;
     book_adapter        = self().string();
 
@@ -670,10 +659,6 @@ TEST_CASE("own book: in a tournament, its moves come from the book, its engine p
 }
 
 TEST_CASE("own book: with the engine restarted for every game, each game draws its own book line") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     const auto previous = book_adapter;
     book_adapter        = self().string();
 
@@ -701,10 +686,6 @@ TEST_CASE("own book: with the engine restarted for every game, each game draws i
 }
 
 TEST_CASE("own book: a PGN book plays for its participant, turned into a Polyglot book first") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     const auto previous_adapter = book_adapter;
     const auto previous_cache   = book_cache_dir;
     const auto dir              = fs::temp_directory_path() / "fcg-own-book-pgn";

@@ -12,50 +12,22 @@
 #include <tour/start_failures.hpp>
 #include <tour/state.hpp>
 
+#include "test_support.hpp"
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-replica-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
+using fcg::test::roundRobin;
 
-TournamentSpec roundRobin(int players, int cycles) {
-    TournamentSpec spec;
-    spec.format = Format::RoundRobin;
-    spec.cycles = cycles;
-    for (int i = 0; i < players; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = std::string(1, char('A' + i));
-        spec.participants.push_back(p);
-    }
-    return spec;
-}
-
-fastchess::MatchData data(const GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData d(chess::constants::STARTPOS);
-    const auto w  = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto b  = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    d.players     = {fastchess::MatchData::PlayerInfo(task.white, w), fastchess::MatchData::PlayerInfo(task.black, b)};
-    d.termination = fastchess::MatchTermination::NORMAL;
-    d.duration    = "00:00:01";
-    return d;
-}
-
+// Plays `n` games (all of them when n < 0), White winning, drawing and losing in turn: how many were played.
 int play(TournamentState& state, int n) {
-    int played = 0;
-    while (n < 0 || played < n) {
-        const auto task = state.claimNext();
-        if (!task) break;
-        state.complete(*task, data(*task, played % 3 == 0 ? "1-0" : played % 3 == 1 ? "1/2-1/2" : "0-1"));
-        ++played;
-    }
-    return played;
+    return fcg::test::play(state, n, [](const GameTask&, int played) {
+        return played % 3 == 0 ? "1-0" : played % 3 == 1 ? "1/2-1/2" : "0-1";
+    });
 }
 
 // The journal lines the writer wrote, as its listener told them.
@@ -115,8 +87,8 @@ void checkSame(const TournamentState& writer, const TournamentState& copy) {
 }  // namespace
 
 TEST_CASE("replica: a read-only copy follows the journal lines of the program playing the tournament") {
-    const auto dir = freshDir("follow");
-    auto writer    = TournamentState::create(dir, roundRobin(4, 1));
+    const ScratchDir dir("follow");
+    auto writer = TournamentState::create(dir, roundRobin(4, 1));
     Lines lines;
     writer->setJournalListener(lines.listener());
 
@@ -161,8 +133,8 @@ TEST_CASE("replica: a read-only copy follows the journal lines of the program pl
 }
 
 TEST_CASE("replica: an undone edit is not followed: the copy is opened again, and holds what the writer holds") {
-    const auto dir = freshDir("undo");
-    auto writer    = TournamentState::create(dir, roundRobin(4, 1));
+    const ScratchDir dir("undo");
+    auto writer = TournamentState::create(dir, roundRobin(4, 1));
     Lines lines;
     writer->setJournalListener(lines.listener());
     auto copy = TournamentState::open(dir, true);

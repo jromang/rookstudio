@@ -21,18 +21,13 @@
 #include "portable.hpp"
 #include "sound.hpp"
 #include "storage.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() /
-                     (name + "-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-    fs::create_directories(dir);
-    return dir;
-}
 
 void write(const fs::path& file, const std::string& text) {
     std::ofstream out(file, std::ios::binary | std::ios::trunc);
@@ -141,7 +136,7 @@ TEST_CASE("appearance: colours as #rrggbbaa, and the settings in settings.json")
     CHECK(odd == appearance::Settings{});
 
     // Kept in the profile, the folder relative to the program's in the portable mode.
-    const auto root = freshDir("fcg-appearance-profile");
+    const ScratchDir root("fcg-appearance-profile");
     {
         Storage storage(root);
         CHECK(storage.appearance() == appearance::Settings{});
@@ -183,7 +178,7 @@ TEST_CASE("appearance: the piece sets built in, each drawable, in the order of t
 }
 
 TEST_CASE("appearance: a folder of pieces, and what is wrong with it said by file") {
-    const auto dir = freshDir("fcg-appearance-pieces");
+    const ScratchDir dir("fcg-appearance-pieces");
     std::string error;
 
     // Missing: the default pieces, and why.
@@ -297,7 +292,7 @@ TEST_CASE("logos: a copy in the profile under a safe name, read back for the win
     CHECK(logos::fileName("Stock fish 17/x64 «dev»", "abd", "pic.JPEG") != name);  // another picture, another name
     CHECK(logos::fileName("«»", "abc", "p.png").rfind("engine-", 0) == 0);
 
-    const auto dir     = freshDir("fcg-logos");
+    const ScratchDir dir("fcg-logos");
     const auto folder  = dir / "profile" / "logos";
     const auto png     = dir / "mine.png";
     const auto svg     = dir / "mine.svg";

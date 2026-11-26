@@ -10,15 +10,14 @@
 
 #    include <assistant/protocol.hpp>
 
-#    include "../../tournament/tests/self_path.hpp"
 #    include "assistant_process.hpp"
+#    include "mock_engines.hpp"
+#    include "self_path.hpp"
 
 using namespace fcg;
 using namespace std::chrono_literals;
 
 namespace {
-
-std::string mock() { return (test::selfPath().parent_path() / FCG_MOCK_ASSISTANT).string(); }
 
 commentary::Request asked(std::string text, uint32_t seed = 1, float temperature = 0.0f, bool grammar = true) {
     commentary::Request r;
@@ -64,7 +63,7 @@ TEST_CASE("assistant: requests and answers go one JSON object per line, whatever
 TEST_CASE("assistant: the child loads its model, then answers requests one after the other") {
     AssistantProcess assistant;
     std::string error;
-    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 99, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "commentary.gguf", 99, error, 30s), error);
     CHECK(assistant.running());
     CHECK(assistant.devices() == "Mock GPU");
     const auto first = assistant.generate(asked("A novelty."), &error);
@@ -89,7 +88,7 @@ TEST_CASE("assistant: the child loads its model, then answers requests one after
 TEST_CASE("assistant: a model that does not load says why") {
     AssistantProcess assistant;
     std::string error;
-    CHECK_FALSE(assistant.start(mock(), "missing", 0, error, 30s));
+    CHECK_FALSE(assistant.start(test::mockAssistant(), "missing", 0, error, 30s));
     CHECK(error == "missing: the model does not load");
     CHECK_FALSE(assistant.running());
     CHECK_FALSE(assistant.start((test::selfPath().parent_path() / "no-such-program").string(), "x", 0, error, 30s));
@@ -98,18 +97,18 @@ TEST_CASE("assistant: a model that does not load says why") {
 TEST_CASE("assistant: a child that fails or hangs is told apart, and a new one starts") {
     AssistantProcess assistant;
     std::string error;
-    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "commentary.gguf", 0, error, 30s), error);
     // Its driver failed: the process is gone.
     CHECK_FALSE(assistant.generate(asked("crash"), &error));
     CHECK(error == "the assistant ended");
     CHECK_FALSE(assistant.running());
     // A new start begins anew; one that hangs is ended once its time is up.
-    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "commentary.gguf", 0, error, 30s), error);
     assistant.answer_within = 300ms;
     CHECK_FALSE(assistant.generate(asked("hang"), &error));
     CHECK(error == "the assistant did not answer in time");
     CHECK_FALSE(assistant.running());
-    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "commentary.gguf", 0, error, 30s), error);
     assistant.answer_within = 30s;
     CHECK(assistant.generate(asked("Fine again."), &error));
 }
@@ -118,11 +117,11 @@ TEST_CASE("assistant: a GPU that fails leaves the model on the CPU") {
     AssistantProcess assistant;
     std::string error;
     // The driver fails while the model loads: started again on the CPU.
-    REQUIRE_MESSAGE(assistant.start(mock(), "gpu-load-crash", 99, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "gpu-load-crash", 99, error, 30s), error);
     CHECK(assistant.gpuFailed());
     CHECK(assistant.devices() == "Mock (scripted)");
     // It fails while it answers: on the CPU since, and the request answered all the same.
-    REQUIRE_MESSAGE(assistant.start(mock(), "gpu-crash", 99, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "gpu-crash", 99, error, 30s), error);
     CHECK_FALSE(assistant.gpuFailed());
     const auto answered = assistant.generate(asked("A novelty."), &error);
     REQUIRE_MESSAGE(answered, error);
@@ -130,7 +129,7 @@ TEST_CASE("assistant: a GPU that fails leaves the model on the CPU") {
     CHECK(assistant.gpuFailed());
     CHECK(assistant.running());
     // On the CPU from the start, a crash is told as it is.
-    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "commentary.gguf", 0, error, 30s), error);
     CHECK_FALSE(assistant.generate(asked("crash"), &error));
     CHECK(error == "the assistant ended");
     CHECK_FALSE(assistant.gpuFailed());
@@ -140,7 +139,7 @@ TEST_CASE("assistant: the program's comment comes from the child's text, held to
     // A move with nothing for the model to explain gets the template's comment, the child not asked.
     AssistantProcess assistant;
     std::string error;
-    REQUIRE_MESSAGE(assistant.start(mock(), "commentary.gguf", 0, error, 30s), error);
+    REQUIRE_MESSAGE(assistant.start(test::mockAssistant(), "commentary.gguf", 0, error, 30s), error);
     auto before = commentary::Position::initial();
     for (const auto* uci : {"e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4", "f3d4", "g8f6", "b1c3"})
         before.playUnchecked(*before.parseUci(uci));

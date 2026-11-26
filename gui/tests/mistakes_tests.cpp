@@ -14,28 +14,23 @@
 #include <study/import.hpp>
 #include <study/store.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "analysis.hpp"
 #include "board_text.hpp"
 #include "mistakes.hpp"
+#include "mock_engines.hpp"
 #include "review_runner.hpp"
+#include "test_support.hpp"
 #include "training.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::ScratchDir;
 
 namespace {
 
 fastchess::Score cp(int64_t v) { return {fastchess::ScoreType::CP, v}; }
 fastchess::Score mate(int64_t v) { return {fastchess::ScoreType::MATE, v}; }
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
 
 // Black to move, its knight on d4 forking the king and the rook from c2; the game went 23…Be6?? 24.Nxd4 instead.
 constexpr const char* FORK_FEN = "r1bq1rk1/ppp2ppp/3p4/8/3nP3/4QN2/PP1B1PPP/R3K2R b KQ - 0 23";
@@ -80,7 +75,7 @@ GameReview forkReview(uint64_t nodes = passNodes(2)) {
     return r;
 }
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 void setEnv(const char* name, const char* value) {
 #ifdef _WIN32
@@ -225,7 +220,7 @@ TEST_CASE("mistakes: an answer is right as the review's best, or within 0.3 pawn
 }
 
 TEST_CASE("mistakes: the exercises and their cards kept in the profile, counted and ordered for the day") {
-    const auto dir  = freshDir("mistakes-record");
+    const ScratchDir dir("mistakes-record");
     const auto game = readGame(forkPgn());
     auto found      = exercisesOf(game, forkReview(), chess::Color::BLACK, commentary::Lang::En);
     REQUIRE(found.size() == 1);
@@ -331,7 +326,7 @@ TEST_CASE("mistakes: a game's exercises replaced by its new review's, their card
 }
 
 TEST_CASE("mistakes: the user's games looked for in their databases, the reviewed ones giving their exercises") {
-    const auto dir      = freshDir("mistakes-scan");
+    const ScratchDir dir("mistakes-scan");
     {  // the database and its snapshots closed before the folder goes: Windows removes no file still mapped
         const auto analyses = dir / "analyses";
         fs::create_directories(analyses);
@@ -431,7 +426,7 @@ TEST_CASE("mistakes: a guess scored 3, 2, 1 or 0, and the games guessed kept") {
     CHECK(guessPoints(false, scorePawns(mate(2)), scorePawns(mate(4))) == 2);
     CHECK(guessPoints(false, scorePawns(mate(2)), scorePawns(cp(500))) == 0);
 
-    const auto dir = freshDir("guess-record");
+    const ScratchDir dir("guess-record");
     CHECK_FALSE(lastGuessRecord(dir));
     appendGuessRecord(dir, {100, "A – B", true, 31, 45, 9, 15, 0.42});
     appendGuessRecord(dir, {200, "C – D", false, 12, 15, 3, 5, 0.1});
@@ -445,7 +440,6 @@ TEST_CASE("mistakes: a guess scored 3, 2, 1 or 0, and the games guessed kept") {
 }
 
 TEST_CASE("mistakes: an answer searched at the review's settings finds what the review found there") {
-    if (!fs::is_regular_file(randomMover())) return;
     // The mock remembers its searches since the last ucinewgame, as a hash table would: a search that does not start
     // from an empty table finds something else.
     ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");

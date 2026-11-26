@@ -7,43 +7,24 @@
 
 #include <tour/state.hpp>
 
+#include "test_support.hpp"
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::ScratchDir;
 
 namespace {
 
 TournamentSpec roundRobin(int players) {
-    TournamentSpec spec;
-    spec.name   = "start failures";
-    spec.format = Format::RoundRobin;
-    for (int i = 0; i < players; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = "E" + std::to_string(i);
-        spec.participants.push_back(p);
-    }
-    return spec;
-}
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-" + name);
-    fs::remove_all(dir);
-    return dir;
+    return fcg::test::SpecBuilder(Format::RoundRobin).name("start failures").players(players, "E");
 }
 
 bool involves(const GameTask& task, int id) { return task.encounter.first == id || task.encounter.second == id; }
 
 // A drawn game as fastchess would report it, without moves.
-fastchess::MatchData drawn(const GameTask& task) {
-    fastchess::MatchData data(chess::constants::STARTPOS);
-    data.players     = {fastchess::MatchData::PlayerInfo(task.white, chess::GameResult::DRAW),
-                        fastchess::MatchData::PlayerInfo(task.black, chess::GameResult::DRAW)};
-    data.termination = fastchess::MatchTermination::NORMAL;
-    data.reason      = "test";
-    data.duration    = "00:00:02";
-    return data;
-}
+fastchess::MatchData drawn(const GameTask& task) { return fcg::test::fakeGame(task, "1/2-1/2"); }
 
 }  // namespace
 
@@ -151,7 +132,7 @@ TEST_CASE("start failures: one last try of each failed engine when nothing else 
 }
 
 TEST_CASE("start failures: the games of an engine set aside are passed over, and come first once it can play") {
-    const auto dir = freshDir("start-failures-claims");
+    const ScratchDir dir("start-failures-claims");
     std::set<uint64_t> passed;
     {
         auto state = TournamentState::create(dir, roundRobin(4));
@@ -204,7 +185,8 @@ TEST_CASE("start failures: the games of an engine set aside are passed over, and
 }
 
 TEST_CASE("start failures: a participant withdrawn or replaced is forgotten") {
-    auto state = TournamentState::create(freshDir("start-failures-withdrawn"), roundRobin(3));
+    const ScratchDir dir("start-failures-withdrawn");
+    auto state = TournamentState::create(dir, roundRobin(3));
     auto& f    = state->startFailures();
     f.failed(2, 0, "E2", "no such file", StartFailures::Clock::now());
     f.failed(1, 1, "E1", "no such file", StartFailures::Clock::now());

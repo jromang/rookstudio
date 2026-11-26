@@ -18,6 +18,7 @@
 #include "https.hpp"
 #include "scripted_server.hpp"
 #include "syzygy_download.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace fcg::test;
@@ -25,15 +26,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-std::string readAll(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-fs::path tables3() {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "gui" / "tests" / "data" / "syzygy3";
-}
+fs::path tables3() { return test::sourcePath() / "gui" / "tests" / "data" / "syzygy3"; }
 
 }  // namespace
 
@@ -83,7 +76,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
             std::lock_guard lock(mutex);
             asked.push_back(name + (range ? " " + *range : std::string()));
         }
-        std::string content = readAll(tables3() / name);
+        std::string content = readFile(tables3() / name);
         if (content.empty()) {
             c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
             return;
@@ -135,7 +128,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     CHECK(state.ready == 5);  // every file of the set is there: nothing of 4 or 5 pieces is missing from it
     CHECK(download.generation() > generation);
     CHECK(download.progress().bytes() == state.bytes);
-    for (const auto& n : names) CHECK(readAll(folder / n) == readAll(tables3() / n));
+    for (const auto& n : names) CHECK(readFile(folder / n) == readFile(tables3() / n));
     {
         std::lock_guard lock(mutex);
         CHECK(std::find(asked.begin(), asked.end(), "KPvK.rtbw bytes=3000-") != asked.end());

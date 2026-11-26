@@ -23,11 +23,11 @@
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "assistant_notes.hpp"
 #include "assistant_service.hpp"
 #include "board_page.hpp"
 #include "explained.hpp"
+#include "mock_engines.hpp"
 #include "pgn_store.hpp"
 #include "review_bridge.hpp"
 
@@ -218,7 +218,7 @@ TEST_CASE("every move explained: the assistant's scripted model refused by the c
     const auto profile = fs::temp_directory_path() / "explained-assistant";
     fs::remove_all(profile);
     fs::create_directories(profile);
-    AssistantService service(profile, (test::selfPath().parent_path() / FCG_MOCK_ASSISTANT).string());
+    AssistantService service(profile, test::mockAssistant());
     std::ofstream(profile / "commentary.gguf") << "model";
     auto settings       = service.settings();
     settings.model_file = (profile / "commentary.gguf").string();

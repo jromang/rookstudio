@@ -6,8 +6,9 @@
 
 #include <commentary/position.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "engine_oracle.hpp"
+#include "mock_engines.hpp"
+#include "self_path.hpp"
 
 using namespace fcg;
 
@@ -16,7 +17,7 @@ namespace {
 EngineEntry mockEngine() {
     EngineEntry e;
     e.name = "mock";
-    e.cmd  = (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string();
+    e.cmd  = fcg::test::randomMover();
     return e;
 }
 

@@ -19,15 +19,15 @@
 #include <study/import.hpp>
 #include <study/store.hpp>
 
+#include "test_support.hpp"
+
 namespace fcg::test {
 
 using namespace fcg::study;
 namespace fs = std::filesystem;
 
-inline fs::path data(const std::string& name) {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "study" / "tests" / "data" / name;
-}
+// A file of the study's test data, in the sources.
+inline fs::path data(const std::string& name) { return sourcePath() / "study" / "tests" / "data" / name; }
 
 struct Spec {
     std::string moves;
@@ -148,9 +148,5 @@ inline std::string movetext(const std::vector<std::string>& line) {
     return text;
 }
 
-inline std::string fileText(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 }  // namespace fcg::test

@@ -9,12 +9,13 @@
 #include <memory>
 #include <thread>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "child_process.hpp"
 #include "console.hpp"
 #include "local_socket.hpp"
+#include "mock_engines.hpp"
 #include "remote_run.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 #include "storage.hpp"
 
 #ifdef _WIN32
@@ -27,7 +28,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 // The program a tournament plays in: where the build put it, else beside the tests (copied to another machine).
 std::string guiProgram() {
     const fs::path built(FCG_GUI_PROGRAM);
@@ -137,10 +138,6 @@ struct Harness {
 }  // namespace
 
 TEST_CASE("remote: a tournament in a process of its own; its copy follows; pause, edits, allowance, stop when idle") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     const ScopedEnv mock_move_ms("FCG_MOCK_MOVE_MS", "2");
     const auto profile = fs::temp_directory_path() / "fcg-remote-tests";
     const auto setup   = roundRobin(3, 4);
@@ -257,10 +254,6 @@ TEST_CASE("remote: a tournament in a process of its own; its copy follows; pause
 }
 
 TEST_CASE("remote: a game ended by the operator, then the window going away stops the tournament, resumable") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     const ScopedEnv mock_move_ms("FCG_MOCK_MOVE_MS", "30");
     const auto profile = fs::temp_directory_path() / "fcg-remote-tests-end";
     auto setup         = roundRobin(2, 2);
@@ -320,10 +313,6 @@ TEST_CASE("remote: a game ended by the operator, then the window going away stop
 }
 
 TEST_CASE("remote: a tournament on its socket plays on without the window, which connects to it again") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     const ScopedEnv mock_move_ms("FCG_MOCK_MOVE_MS", "15");
     const auto profile = fs::temp_directory_path() / "fcg-remote-tests-detach";
     // Long enough to play on until the window connects again, however slowly the processes start on a busy machine

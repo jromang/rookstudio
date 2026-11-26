@@ -1,7 +1,7 @@
 #pragma once
 
-// A server on this machine whose answers a test writes, a connection at a time on threads of its own, and waits
-// bounded by what they await.
+// A server on this machine whose answers a test writes, a connection at a time on threads of its own; and waits
+// bounded by what they await (test_support.hpp).
 
 #include <atomic>
 #include <chrono>
@@ -13,21 +13,11 @@
 #include <vector>
 
 #include "net.hpp"
+#include "test_support.hpp"  // waitUntil()
 
 namespace fcg::test {
 
 using namespace std::chrono_literals;
-
-// True once `done()` is, false if it is not within `limit`: what a wait is bounded by is what it awaits.
-template <typename F>
-inline bool waitUntil(F&& done, std::chrono::milliseconds limit = 20s) {
-    const auto deadline = std::chrono::steady_clock::now() + limit;
-    while (!done()) {
-        if (std::chrono::steady_clock::now() > deadline) return false;
-        std::this_thread::sleep_for(2ms);
-    }
-    return true;
-}
 
 // Each connection served on a thread of its own by `serve`, given the request's head: it writes what it wants,
 // waiting where it wants. Counts the connections served at once.

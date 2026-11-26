@@ -3,9 +3,12 @@
 // The tests' files in a folder of the test program's own, under the system's temporary folder: what the tests take
 // from std::filesystem::temp_directory_path(), and what the programs they start take, inheriting it. Two runs of the
 // tests at once, or test cases run in processes of their own at the same time, then never share a folder of the same
-// name. Removed when the tests end.
+// name. Removed when the tests end. Without it, the program ends at once, saying why: in the system's folder, shared,
+// what the tests leave and look for would clash with the other processes'.
 
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <system_error>
@@ -27,33 +30,38 @@ class OwnTempDir {
         namespace fs = std::filesystem;
         std::error_code ec;
         const auto system = fs::temp_directory_path(ec);
-        if (ec) return;
+        if (ec) fail("the system's temporary folder is unknown", ec);
 #ifdef _WIN32
         dir_ = system / ("fcg-tests-" + std::to_string(_getpid()));
 #else
         dir_ = system / ("fcg-tests-" + std::to_string(getpid()));
 #endif
         fs::remove_all(dir_, ec);  // left by an earlier process of the same id, ended before it could remove it
-        if (!fs::create_directories(dir_, ec)) {
-            dir_.clear();
-            return;
-        }
+        if (!ec) fs::create_directories(dir_, ec);
+        if (ec || !fs::is_directory(dir_)) fail(dir_.string() + " cannot be made empty", ec);
 #ifdef _WIN32
         // GetTempPath() reads TMP, then TEMP.
-        _wputenv_s(L"TMP", dir_.c_str());
-        _wputenv_s(L"TEMP", dir_.c_str());
+        if (_wputenv_s(L"TMP", dir_.c_str()) != 0 || _wputenv_s(L"TEMP", dir_.c_str()) != 0) {
+            fail("TMP and TEMP cannot be set", {});
+        }
 #else
-        setenv("TMPDIR", dir_.c_str(), 1);
+        if (setenv("TMPDIR", dir_.c_str(), 1) != 0) fail("TMPDIR cannot be set", {});
 #endif
     }
     ~OwnTempDir() {
         std::error_code ec;
-        if (!dir_.empty()) std::filesystem::remove_all(dir_, ec);
+        std::filesystem::remove_all(dir_, ec);
     }
     OwnTempDir(const OwnTempDir&)            = delete;
     OwnTempDir& operator=(const OwnTempDir&) = delete;
 
    private:
+    [[noreturn]] static void fail(const std::string& what, const std::error_code& ec) {
+        std::fprintf(stderr, "No temporary folder of the tests' own: %s%s%s.\n", what.c_str(), ec ? ": " : "",
+                     ec ? ec.message().c_str() : "");
+        std::exit(EXIT_FAILURE);
+    }
+
     std::filesystem::path dir_;
 };
 

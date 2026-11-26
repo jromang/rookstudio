@@ -11,8 +11,11 @@
 #include <tour/state.hpp>
 #include <tour/unbalanced.hpp>
 
+#include "test_support.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -41,12 +44,6 @@ const char* const POSITIONS[] = {"rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b
                                  "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
                                  "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
                                  "rnbqkbnr/pppppppp/8/8/7P/8/PPPPPPP1/RNBQKBNR b KQkq - 0 1"};
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-unbalanced-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
 
 TournamentSpec bookMatch(const fs::path& dir, uint64_t games, bool replace) {
     const auto book = dir.parent_path() / (dir.filename().string() + ".epd");
@@ -152,7 +149,7 @@ TEST_CASE("unbalanced opening: both engines beyond the score for their first mov
 }
 
 TEST_CASE("unbalanced opening: flagged when the game ends, in the journal, the results unchanged; by opening") {
-    const auto dir    = freshDir("flag");
+    const ScratchDir dir("flag");
     auto state        = TournamentState::create(dir, bookMatch(dir, 4, false));
     const auto first  = playPair(*state, 300, -300);  // White far ahead in both games
     const auto second = playPair(*state, 30, -10);
@@ -186,7 +183,7 @@ TEST_CASE("unbalanced opening: flagged when the game ends, in the journal, the r
 }
 
 TEST_CASE("unbalanced opening: the pair voided and played again from another opening, at most three times") {
-    const auto dir = freshDir("replace");
+    const ScratchDir dir("replace");
     {
         auto state = TournamentState::create(dir, bookMatch(dir, 4, true));
         // The first pair, from the book's first position: White far ahead. Voided, its statistics not reported.
@@ -243,9 +240,9 @@ TEST_CASE("unbalanced opening: the pair voided and played again from another ope
 TEST_CASE("locked colours: each game of a pair from an opening of its own, kept on reopening, both replaced") {
     const auto starts = [](const GameTask& t, const char* fen) { return t.opening.fen_epd.rfind(fen, 0) == 0; };
     {
-        const auto dir = freshDir("locked");
-        auto spec      = bookMatch(dir, 4, false);
-        spec.colours   = Colours::AWhite;
+        const ScratchDir dir("locked");
+        auto spec    = bookMatch(dir, 4, false);
+        spec.colours = Colours::AWhite;
         {
             auto state = TournamentState::create(dir, spec);
             // The book in order, two positions an encounter, A with White in each game.
@@ -277,9 +274,9 @@ TEST_CASE("locked colours: each game of a pair from an opening of its own, kept 
     }
 
     // Unbalanced, the pair is played again from two openings of the end of the book, one for each game.
-    const auto dir = freshDir("locked-replace");
-    auto spec      = bookMatch(dir, 4, true);
-    spec.colours   = Colours::BWhite;
+    const ScratchDir dir("locked-replace");
+    auto spec    = bookMatch(dir, 4, true);
+    spec.colours = Colours::BWhite;
     {
         auto state = TournamentState::create(dir, spec);
         (void)playPair(*state, 300, -300);
@@ -298,7 +295,7 @@ TEST_CASE("locked colours: each game of a pair from an opening of its own, kept 
 }
 
 TEST_CASE("unbalanced opening: the rule kept in tournament.json, nothing when it is off") {
-    const auto dir   = freshDir("json");
+    const ScratchDir dir("json");
     auto spec        = bookMatch(dir, 4, true);
     nlohmann::json j = spec;
     auto back        = j.get<TournamentSpec>();

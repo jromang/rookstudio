@@ -14,17 +14,19 @@
 #include <core/globals/globals.hpp>
 #include <engine/uci_engine.hpp>
 
-#include "../../tournament/tests/own_temp.hpp"
-#include "../../tournament/tests/self_path.hpp"
 #include "app.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "headless.hpp"
+#include "mock_engines.hpp"
 #include "net.hpp"
+#include "own_temp.hpp"
 #include "proc_tree.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 #include "storage.hpp"
 #include "suite_run.hpp"
+#include "test_modes.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -43,8 +45,7 @@ namespace {
 // The test binary.
 fs::path self() { return fcg::test::selfPath(); }
 
-// The mock engine is built next to the test binary.
-std::string randomMover() { return (self().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 // Sets (or, with nullptr, removes) a variable of the environment, which the mock engine reads.
 void setEnv(const char* name, const char* value) {
@@ -138,11 +139,6 @@ std::vector<EngineEntry> randomEngines() {
 }  // namespace
 
 TEST_CASE("pause lets running games finish and starts no new one; stop when idle ends the run") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests";
     fcg::test::removeAll(root);
 
@@ -198,11 +194,6 @@ TEST_CASE("pause lets running games finish and starts no new one; stop when idle
 }
 
 TEST_CASE("an engine whose file name has a space is the one started, not the program named like its first word") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     if (!fastchess::config::TournamentConfig)
         fastchess::config::TournamentConfig = std::make_unique<fastchess::config::Tournament>();
 
@@ -228,10 +219,6 @@ TEST_CASE("an engine whose file name has a space is the one started, not the pro
 }
 
 TEST_CASE("the engine check runs fastchess' UCI compliance steps, and stops at the first that fails") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     if (!fastchess::config::TournamentConfig)
         fastchess::config::TournamentConfig = std::make_unique<fastchess::config::Tournament>();
 
@@ -411,11 +398,6 @@ TEST_CASE("the check sends the engine's options, and a failed read or check show
 #endif
 
 TEST_CASE("a match stopped abruptly is offered for resume and ends with exactly its games") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-resume";
     fcg::test::removeAll(root);
     const auto topology = topologyFromCores({{0, 0}, {0, 1}, {0, 2}, {0, 3}});
@@ -492,10 +474,6 @@ TEST_CASE("a match stopped abruptly is offered for resume and ends with exactly 
 }
 
 TEST_CASE("the games of a new setup's tournament have in their PGN every field the charts of the Games tab read") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     const auto setEnv = [](const char* name, const char* value) {
 #ifdef _WIN32
         _putenv_s(name, value ? value : "");
@@ -541,11 +519,6 @@ TEST_CASE("the games of a new setup's tournament have in their PGN every field t
 }
 
 TEST_CASE("a round robin of three engines plays every pairing and shows every name") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-rr";
     fcg::test::removeAll(root);
 
@@ -587,11 +560,6 @@ TEST_CASE("a round robin of three engines plays every pairing and shows every na
 
 #ifndef _WIN32
 TEST_CASE("an engine that cannot start: the other games go on through the controller, Try again brings it back") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-cannot-start";
     fs::remove_all(root);
     fs::create_directories(root);
@@ -678,10 +646,6 @@ TEST_CASE("a match with B always White plays every game with B as White; other f
     rr.participants = {{"random-a"}, {"random-b"}};
     CHECK(buildRun(rr, randomEngines(), topology, root).spec.colours == tour::Colours::Alternate);
 
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     {  // The harness keeps the journal open: Windows removes the folder only once it is closed.
         Harness h;
         REQUIRE(h.run.start(setup, randomEngines(), topology, root).empty());
@@ -701,11 +665,6 @@ TEST_CASE("a match with B always White plays every game with B as White; other f
 }
 
 TEST_CASE("a finished round robin extended by a cycle resumes to play exactly the new games") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-edit";
     fcg::test::removeAll(root);
     auto engines = randomEngines();
@@ -749,11 +708,6 @@ TEST_CASE("a finished round robin extended by a cycle resumes to play exactly th
 }
 
 TEST_CASE("headless: a setup file becomes a tournament played to the end; the queue is stored") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto profile = fs::temp_directory_path() / "fcg-run-tests-headless";
     fcg::test::removeAll(profile);
     fs::create_directories(profile);
@@ -789,11 +743,6 @@ TEST_CASE("headless: a setup file becomes a tournament played to the end; the qu
 }
 
 TEST_CASE("headless: the processor use of each game is kept in processor.tsv, as the window keeps it") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     // Each move takes a few milliseconds, so that the engines' thinking lasts long enough to be measured.
     const ScopedEnv mock_move_ms("FCG_MOCK_MOVE_MS", "3");
     // Without a broadcast (no observer of the games but the one measuring), and with one (the window's observer).
@@ -836,11 +785,6 @@ TEST_CASE("headless: the processor use of each game is kept in processor.tsv, as
 }
 
 TEST_CASE("a Swiss and a knockout are played to the end through the GUI's controller") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-swiss";
     fcg::test::removeAll(root);
     auto engines = randomEngines();
@@ -877,11 +821,6 @@ TEST_CASE("a Swiss and a knockout are played to the end through the GUI's contro
 }
 
 TEST_CASE("the engines' search output reaches the live view while they think") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-lines";
     fcg::test::removeAll(root);
 
@@ -910,11 +849,6 @@ TEST_CASE("the engines' search output reaches the live view while they think") {
 }
 
 TEST_CASE("a game ended by the operator while it is played counts with their result, and the match goes on") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-end-game";
     fs::remove_all(root);
 
@@ -960,11 +894,6 @@ TEST_CASE("a game ended by the operator while it is played counts with their res
 }
 
 TEST_CASE("headless: the tournament is broadcast over TLCS and as live files") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto profile = fs::temp_directory_path() / "fcg-run-tests-headless-broadcast";
     fcg::test::removeAll(profile);
     fs::create_directories(profile);
@@ -1038,11 +967,6 @@ TEST_CASE("headless: the tournament is broadcast over TLCS and as live files") {
 }
 
 TEST_CASE("quick test: ten games against the engine itself, then a report on its health and its clock") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
-
     const auto root = fs::temp_directory_path() / "fcg-run-tests-quick";
     fcg::test::removeAll(root);
 
@@ -1068,10 +992,6 @@ TEST_CASE("quick test: ten games against the engine itself, then a report on its
 }
 
 TEST_CASE("a read or a check interrupted for a start ends at once instead of waiting for a slow engine") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     if (!fastchess::config::TournamentConfig)
         fastchess::config::TournamentConfig = std::make_unique<fastchess::config::Tournament>();
     // The engine takes 20 s to answer uci, like one loading a large network.
@@ -1156,10 +1076,6 @@ TEST_CASE("a read or a check interrupted for a start ends at once instead of wai
 
 #ifndef _WIN32
 TEST_CASE("a process tree is ended only from a child of ours not reaped yet, never from a pid that may be reused") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     // fastchess reaps an engine that ended when it next looks at it (alive()), and takes it off the process list
     // only later: meanwhile its pid may be given to another process, which must not be signalled.
     fastchess::engine::process::Process process;
@@ -1193,10 +1109,6 @@ TEST_CASE("a process tree is ended only from a child of ours not reaped yet, nev
 #endif
 
 TEST_CASE("EPD suite runs: every engine on every position, the totals, CSV and saved runs") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available on this platform, skipped");
-        return;
-    }
     if (!fastchess::config::TournamentConfig)
         fastchess::config::TournamentConfig = std::make_unique<fastchess::config::Tournament>();
 
@@ -1259,9 +1171,28 @@ TEST_CASE("EPD suite runs: every engine on every position, the totals, CSV and s
 }
 
 #ifdef _WIN32
+namespace {
+
+// What the engine of the next test case starts, the program in its --job-child mode: it reads nothing and leaves the
+// console it was given, so that only its job can end it. Once it runs, it writes its id to the file given (whole, by a
+// rename), and it ends on its own after a minute.
+int jobChild(const std::vector<std::string>& args) {
+    if (args.empty()) return 2;
+    FreeConsole();
+    const std::string& file = args[0];
+    std::ofstream(file + ".tmp") << GetCurrentProcessId();
+    MoveFileExA((file + ".tmp").c_str(), file.c_str(), MOVEFILE_REPLACE_EXISTING);
+    Sleep(60000);
+    return 0;
+}
+
+[[maybe_unused]] const bool job_child_mode = fcg::test::addMode("--job-child", jobChild);
+
+}  // namespace
+
 TEST_CASE("on Windows, what an engine starts is in the engine's job and ends with it") {
     // A .bat that starts the engine: cmd.exe is the process started, the engine its child. The engine is this program
-    // (see main.cpp), which reads nothing, leaves its console and tells once it runs: the random mover, found as soon
+    // (jobChild above), which reads nothing, leaves its console and tells once it runs: the random mover, found as soon
     // as cmd.exe created it, could still be starting when cmd.exe was killed, attached to the console cmd.exe owned
     // and reading the input cmd.exe passed on, and once ended with it on GitHub's runners (#111).
     std::error_code ec;

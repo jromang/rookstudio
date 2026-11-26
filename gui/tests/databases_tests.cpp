@@ -14,18 +14,13 @@
 #include <study/chessbase.hpp>
 
 #include "databases.hpp"
+#include "test_support.hpp"
 
 namespace fs = std::filesystem;
 using namespace fcg;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
 
 // `count` short games, each its own.
 fs::path pgnFile(const fs::path& dir, int count) {
@@ -40,10 +35,7 @@ fs::path pgnFile(const fs::path& dir, int count) {
 }
 
 // The study's test data: archives of our own test games.
-fs::path studyData(const std::string& name) {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "study" / "tests" / "data" / name;
-}
+fs::path studyData(const std::string& name) { return test::sourcePath() / "study" / "tests" / "data" / name; }
 
 std::optional<study::DatabaseImport> imported(DatabaseShelf& shelf) {
     std::optional<study::DatabaseImport> report;
@@ -56,8 +48,8 @@ std::optional<study::DatabaseImport> imported(DatabaseShelf& shelf) {
 }  // namespace
 
 TEST_CASE("databases: made, added, removed, and listed again from databases.json") {
-    const auto profile = freshDir("shelf-profile");
-    std::size_t made   = 0;
+    const ScratchDir profile("shelf-profile");
+    std::size_t made = 0;
     {
         JobGroup jobs;
         DatabaseShelf shelf(jobs, profile);
@@ -93,7 +85,7 @@ TEST_CASE("databases: made, added, removed, and listed again from databases.json
 }
 
 TEST_CASE("databases: an import in the background, then the database's opening tree built") {
-    const auto profile = freshDir("shelf-import");
+    const ScratchDir profile("shelf-import");
     JobGroup jobs;
     DatabaseShelf shelf(jobs, profile);
     const auto index = shelf.create("Test");
@@ -122,7 +114,7 @@ TEST_CASE("databases: an import in the background, then the database's opening t
 }
 
 TEST_CASE("databases: a cancelled import keeps what was committed") {
-    const auto profile = freshDir("shelf-cancel");
+    const ScratchDir profile("shelf-cancel");
     JobGroup jobs;
     DatabaseShelf shelf(jobs, profile);
     const auto index = shelf.create("Test");
@@ -137,11 +129,11 @@ TEST_CASE("databases: a cancelled import keeps what was committed") {
 }
 
 TEST_CASE("databases: at quit, the import, the tree being built and the one asked for after it are cancelled") {
-    const auto profile = freshDir("shelf-quit");
+    const ScratchDir profile("shelf-quit");
     JobGroup jobs;
-    auto shelf         = std::make_unique<DatabaseShelf>(jobs, profile);
-    const auto first   = shelf->create("First");
-    const auto second  = shelf->create("Second");
+    auto shelf        = std::make_unique<DatabaseShelf>(jobs, profile);
+    const auto first  = shelf->create("First");
+    const auto second = shelf->create("Second");
     REQUIRE(shelf->startImport(first, pgnFile(profile, 40)));
     REQUIRE(imported(*shelf));
     // A tree being built, another asked for after it, an import beside them (#98).
@@ -171,7 +163,7 @@ TEST_CASE("databases: at quit, the import, the tree being built and the one aske
 }
 
 TEST_CASE("databases: a database removed, the tree builds of the others keep their database; its own is cancelled") {
-    const auto profile = freshDir("shelf-remove-tree");
+    const ScratchDir profile("shelf-remove-tree");
     JobGroup jobs;
     DatabaseShelf shelf(jobs, profile);
     const auto a       = shelf.create("A");
@@ -224,7 +216,7 @@ TEST_CASE("databases: a database removed, the tree builds of the others keep the
 }
 
 TEST_CASE("databases: a database removed during its import: the import parked, the database let go once it ended") {
-    const auto profile = freshDir("shelf-remove-import");
+    const ScratchDir profile("shelf-remove-import");
     JobGroup jobs;
     DatabaseShelf shelf(jobs, profile);
     const auto index  = shelf.create("Imported");
@@ -249,7 +241,7 @@ TEST_CASE("databases: a database removed during its import: the import parked, t
 }
 
 TEST_CASE("databases: a database discarded during its import: its folder removed once the import let go of it") {
-    const auto profile = freshDir("shelf-discard-import");
+    const ScratchDir profile("shelf-discard-import");
     JobGroup jobs;
     fs::path folder;
     {
@@ -267,8 +259,8 @@ TEST_CASE("databases: a database discarded during its import: its folder removed
 }
 
 TEST_CASE("databases: the linked databases no longer listed: their refreshes parked, never waited for") {
-    const auto profile = freshDir("shelf-linked-dropped");
-    const auto file    = pgnFile(profile, 2000);
+    const ScratchDir profile("shelf-linked-dropped");
+    const auto file = pgnFile(profile, 2000);
     JobGroup jobs;
     DatabaseShelf shelf(jobs, profile);
     shelf.setLinked({{"games.pgn", study::LinkedSource{study::LinkedSource::Kind::PgnFile, file}}});
@@ -302,8 +294,8 @@ TEST_CASE("databases: the quick filter's words, a year, an ECO code and a result
 }
 
 TEST_CASE("databases: a PGN file read as a database without a copy, after the user's own") {
-    const auto profile = freshDir("shelf-linked");
-    const auto file    = pgnFile(profile, 25);
+    const ScratchDir profile("shelf-linked");
+    const auto file = pgnFile(profile, 25);
     {
         JobGroup jobs;
         DatabaseShelf shelf(jobs, profile);
@@ -334,7 +326,7 @@ TEST_CASE("databases: a PGN file read as a database without a copy, after the us
 }
 
 TEST_CASE("databases: an archive's wrong password, a file that is no text: nothing imported, the database discarded") {
-    const auto profile = freshDir("shelf-refused");
+    const ScratchDir profile("shelf-refused");
     JobGroup jobs;
     DatabaseShelf shelf(jobs, profile);
     // Archives of our own test games, enciphered with this password.
@@ -395,8 +387,8 @@ fs::path numberedGames(const fs::path& file, int from, int count) {
 }  // namespace
 
 TEST_CASE("databases: a database whose segment no longer reads opens with the others; what its maintenance says") {
-    const auto profile = freshDir("shelf-damaged");
-    const auto second  = numberedGames(profile / "second.pgn", 10, 10);
+    const ScratchDir profile("shelf-damaged");
+    const auto second = numberedGames(profile / "second.pgn", 10, 10);
     fs::path folder;
     std::string segment;
     {

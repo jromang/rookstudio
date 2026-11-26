@@ -29,6 +29,7 @@
 #include "online_cache.hpp"
 #include "scripted_server.hpp"
 #include "tablebases.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace fcg::test;
@@ -42,13 +43,8 @@ constexpr const char* AFTER_RXH7  = "6k1/7R/8/5P2/6P1/r7/6K1/8 b - - 0 1";
 constexpr const char* OP1_DRAW    = "8/p4k2/4p3/4P3/3K4/8/PR6/6r1 w - - 0 1";
 constexpr const char* OP1_CURSED  = "R7/8/8/8/7q/2K1B2p/7P/2Bk4 w - - 0 1";
 
-fs::path sourceDir() {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR);
-}
-
 std::string fixture(const char* name) {
-    std::ifstream in(sourceDir() / "gui" / "tests" / "data" / "tablebase" / name, std::ios::binary);
+    std::ifstream in(test::sourcePath() / "gui" / "tests" / "data" / "tablebase" / name, std::ios::binary);
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
@@ -268,7 +264,7 @@ TEST_CASE("endgames tab: the profile's answers read before any request, an unkno
 }
 
 TEST_CASE("endgames tab: the disk's tables answer as Lichess does, their line followed to the end") {
-    const auto root = sourceDir();
+    const auto root = test::sourcePath();
 #ifdef _WIN32
     const char* separator = ";";
 #else

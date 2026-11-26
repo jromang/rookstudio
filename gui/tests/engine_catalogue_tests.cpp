@@ -13,6 +13,7 @@
 #include <json.hpp>
 
 #include "engine_catalogue.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace fcg::catalogue;
@@ -67,10 +68,7 @@ const CpuFeatures ARM_PC = [] {
 }();
 
 std::map<std::string, std::vector<Release>> recorded() {
-    // Read where the sources were compiled, or where FCG_SOURCE_DIR points (the CI's tests on another machine).
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    const std::filesystem::path root(env ? env : FCG_SOURCE_DIR);
-    std::ifstream in(root / "gui" / "tests" / "data" / "engine_releases.json", std::ios::binary);
+    std::ifstream in(test::sourcePath() / "gui" / "tests" / "data" / "engine_releases.json", std::ios::binary);
     REQUIRE(in);
     const auto j = nlohmann::json::parse(in);
     std::map<std::string, std::vector<Release>> out;

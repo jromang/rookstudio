@@ -17,15 +17,14 @@
 #include <commentary/position.hpp>
 #include <study/sources.hpp>
 
+#include "test_support.hpp"
+
 using namespace fcg::commentary;
 namespace fs = std::filesystem;
 
 namespace {
 
-fs::path data(const std::string& name) {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "commentary" / "tests" / "data" / name;
-}
+fs::path data(const std::string& name) { return fcg::test::sourcePath() / "commentary" / "tests" / "data" / name; }
 
 std::vector<nlohmann::json> readLines(const fs::path& file) {
     std::string text;

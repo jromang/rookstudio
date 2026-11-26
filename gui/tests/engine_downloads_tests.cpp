@@ -9,18 +9,17 @@
 #include <fstream>
 #include <map>
 #include <mutex>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
 #include <core/config/config.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "engine_downloads.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
+#include "mock_engines.hpp"
 #include "scripted_server.hpp"
 #include "zip.hpp"
 
@@ -74,14 +73,7 @@ struct FakeGitHub {
     ScriptedServer server;
 };
 
-std::string readFile(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    std::ostringstream out;
-    out << in.rdbuf();
-    return out.str();
-}
-
-std::string mover() { return readFile(selfPath().parent_path() / FCG_RANDOM_MOVER); }
+std::string mover() { return readFile(randomMover()); }
 
 // A ustar header, its checksum made.
 std::string tarHeader(const std::string& name, uint64_t size, char type) {
@@ -257,7 +249,7 @@ TEST_CASE("engine downloads: a program downloaded, checked against its hash, mad
     github.set("/download/" + name, program);
     const auto engine = testEngine(name);
     Pick pick;
-    pick.choices = {choiceOf(github, name, program, sha256File(selfPath().parent_path() / FCG_RANDOM_MOVER))};
+    pick.choices = {choiceOf(github, name, program, sha256File(randomMover()))};
 
     const auto result = installEngine(profile.path, engine, pick);
     REQUIRE_MESSAGE(result.ok, result.error);

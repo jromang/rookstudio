@@ -8,6 +8,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include "report.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -121,17 +122,11 @@ TEST_CASE("report: the system named") {
 }
 
 TEST_CASE("report: the form's field ids are those the address fills") {
-#ifdef FCG_SOURCE_DIR
-    const auto form_file = fs::path(FCG_SOURCE_DIR) / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml";
-    if (!fs::is_regular_file(form_file)) {
-        MESSAGE("the sources are not on this machine (tests copied elsewhere), skipped");
-        return;
-    }
+    const auto form_file = test::sourcePath() / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml";
     std::ifstream in(form_file);
     REQUIRE(in);
     const std::string form((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     for (const char* id : {"version", "system", "log", "seen"}) {
         CHECK_MESSAGE(form.find(fmt::format("id: {}\n", id)) != std::string::npos, id);
     }
-#endif
 }

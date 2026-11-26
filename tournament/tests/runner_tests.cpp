@@ -22,8 +22,9 @@
 
 #include <tour/runner.hpp>
 
+#include "mock_engines.hpp"
 #include "own_temp.hpp"
-#include "self_path.hpp"
+#include "test_support.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -35,10 +36,11 @@
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::readFile;
 
 namespace {
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 TournamentSpec spec(Format format, int players, int cycles, uint64_t max_games = 0) {
     TournamentSpec s;
@@ -125,11 +127,6 @@ struct ScopedEnv {
     const char* name_;
 };
 
-std::string readFile(const fs::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-}
-
 std::size_t countOf(const std::string& text, const std::string& what) {
     std::size_t n = 0;
     for (auto pos = text.find(what); pos != std::string::npos; pos = text.find(what, pos + 1)) ++n;
@@ -167,11 +164,6 @@ std::size_t countGames(const fs::path& pgn) {
 }  // namespace
 
 TEST_CASE("runner: a round robin plays every encounter, both colours, once") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-rr";
     fcg::test::removeAll(dir);
     auto s                = spec(Format::RoundRobin, 4, 2);
@@ -214,11 +206,6 @@ TEST_CASE("runner: a round robin plays every encounter, both colours, once") {
 }
 
 TEST_CASE("runner: a match stopped abruptly resumes to exactly its number of games") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-resume";
     fcg::test::removeAll(dir);
 
@@ -256,11 +243,6 @@ TEST_CASE("runner: a match stopped abruptly resumes to exactly its number of gam
 }
 
 TEST_CASE("runner: a game whose pair partner was played before leaves no pair open in the pause gate") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-lone";
     fcg::test::removeAll(dir);
     auto state = TournamentState::create(dir, spec(Format::Match, 2, 1, 2));
@@ -283,11 +265,6 @@ TEST_CASE("runner: a game whose pair partner was played before leaves no pair op
 
 #ifndef _WIN32
 TEST_CASE("runner: an engine that fails to start once is tried again, and the tournament goes on") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-retry";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -312,11 +289,6 @@ TEST_CASE("runner: an engine that fails to start once is tried again, and the to
 }
 
 TEST_CASE("runner: a game whose engine fails to start is given up quietly once its participant is withdrawn") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-withdrawn";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -355,11 +327,6 @@ TEST_CASE("runner: a game whose engine fails to start is given up quietly once i
 }
 
 TEST_CASE("runner: a pause holds the next try of an engine that failed to start, without using it up") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-retry-pause";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -414,11 +381,6 @@ TEST_CASE("runner: a pause holds the next try of an engine that failed to start,
 }
 
 TEST_CASE("runner: \"stop when idle\" gives up at once a game whose engine waits for its next try") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-retry-idle";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -456,11 +418,6 @@ TEST_CASE("runner: \"stop when idle\" gives up at once a game whose engine waits
 }
 
 TEST_CASE("runner: an engine whose game was given up while it failed to start is started anew for its next game") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-retry-anew";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -500,11 +457,6 @@ TEST_CASE("runner: an engine whose game was given up while it failed to start is
 }
 
 TEST_CASE("runner: a round robin of more engines than games at a time starts each engine once") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-starts";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -532,11 +484,6 @@ TEST_CASE("runner: a round robin of more engines than games at a time starts eac
 }
 
 TEST_CASE("runner: an engine that cannot start has its games set aside; the tournament stops once only they are left") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-set-aside";
     fs::remove_all(dir);
     fs::create_directories(dir);
@@ -590,11 +537,6 @@ TEST_CASE("runner: an engine that cannot start has its games set aside; the tour
 }
 
 TEST_CASE("runner: an engine set aside is tried again when asked, and its games are played once it starts") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-back";
     fs::remove_all(dir);
     fs::create_directories(dir);
@@ -639,11 +581,6 @@ TEST_CASE("runner: an engine set aside is tried again when asked, and its games 
 }
 
 TEST_CASE("runner: set to, an engine that cannot start stops the tournament once its tries are used up") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-stop-at-once";
     fs::remove_all(dir);
     fs::create_directories(dir);
@@ -673,11 +610,6 @@ TEST_CASE("runner: set to, an engine that cannot start stops the tournament once
 #endif
 
 TEST_CASE("engine start: an engine slow to start fails in the usual time, and starts within its own timeout") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     // The usual timeouts, short for the test: 1.5 s for uciok and for the isready of a new game, enough for an engine
     // to start on a machine busy with other tests.
     fastchess::atomic::stop                              = false;
@@ -721,11 +653,6 @@ TEST_CASE("engine start: an engine slow to start fails in the usual time, and st
 }
 
 TEST_CASE("runner: the start timeout of a participant reaches its engine, and is kept in tournament.json") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-start-timeout";
     fcg::test::removeAll(dir);
     fs::create_directories(dir);
@@ -754,11 +681,6 @@ TEST_CASE("runner: the start timeout of a participant reaches its engine, and is
 }
 
 TEST_CASE("runner: engine logs, of every game when asked, with both directions of both engines") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-logs";
     fcg::test::removeAll(dir);
     auto s           = spec(Format::Match, 2, 1, 4);
@@ -778,11 +700,6 @@ TEST_CASE("runner: engine logs, of every game when asked, with both directions o
 }
 
 TEST_CASE("runner: engine logs keep the engines' error output, marked apart, even more than a pipe holds") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-stderr";
     fcg::test::removeAll(dir);
     auto s           = spec(Format::Match, 2, 1, 2);
@@ -816,11 +733,6 @@ TEST_CASE("runner: engine logs keep the engines' error output, marked apart, eve
 }
 
 TEST_CASE("runner: an engine's last words on its error output, before it ends, are all in the engine log") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-last-words";
     fcg::test::removeAll(dir);
     auto s           = spec(Format::Match, 2, 1, 1);
@@ -869,10 +781,6 @@ struct MockProcess {
 }  // namespace
 
 TEST_CASE("engine process: what an engine wrote on its error output before it ended is read before its end") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     using fastchess::engine::process::Status;
 
     // About 50 KB on its error output at once, then the engine ends, all before anything is read: its end (that
@@ -894,10 +802,6 @@ TEST_CASE("engine process: what an engine wrote on its error output before it en
 }
 
 TEST_CASE("engine process: what an engine wrote on its error output before the line awaited comes with it") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     using fastchess::engine::process::Status;
 
     // "on stderr: <move> ..." longer than a read takes at once, then its bestmove, all before anything is read:
@@ -1089,11 +993,6 @@ TEST_CASE("engine log: a quiet engine's lines deep in the game are left out with
 
 #ifndef _WIN32
 TEST_CASE("runner: a game the operator ends while it is played counts with their result; the next game plays") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
-
     const auto dir = fs::temp_directory_path() / "fcg-tour-runner-end";
     fs::remove_all(dir);
     auto s                   = spec(Format::Match, 2, 1, 2);

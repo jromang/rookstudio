@@ -11,16 +11,15 @@
 #include <tour/submission.hpp>
 #include <tour/teams.hpp>
 
+#include "test_support.hpp"
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::readFile;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-team-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
 
 // Team A: the first `a` participants (A1, A2...), team B: the next `b` (B1...); ids are not indexes.
 TournamentSpec teamSpec(int a, int b, bool boards, int cycles = 1) {
@@ -39,23 +38,7 @@ TournamentSpec teamSpec(int a, int b, bool boards, int cycles = 1) {
     return spec;
 }
 
-fastchess::MatchData gameData(const GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData data(chess::constants::STARTPOS);
-    const auto white = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto black = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    data.players     = {fastchess::MatchData::PlayerInfo(task.white, white),
-                        fastchess::MatchData::PlayerInfo(task.black, black)};
-    data.termination = fastchess::MatchTermination::NORMAL;
-    data.reason      = "test";
-    data.duration    = "00:00:02";
-    return data;
-}
-
-std::string readAll(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
+using fcg::test::fakeGame;
 
 GameResult game(uint32_t encounter, int g, int white, int black, const std::string& result) {
     GameResult r;
@@ -265,7 +248,7 @@ TEST_CASE("team standings: points, score, the Elo of the team's score, the cross
 }
 
 TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the standings from the results") {
-    const auto dir  = freshDir("resume");
+    const ScratchDir dir("resume");
     auto spec       = teamSpec(2, 2, false, 2);
     spec.team_names = {"Old", "New"};
 
@@ -279,10 +262,10 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
             claimed.push_back(*task);
         }
         // Four games recorded, the fifth running when the program stops.
-        for (int i = 0; i < 4; ++i) state->complete(claimed[static_cast<std::size_t>(i)], gameData(claimed[i], "1-0"));
+        for (int i = 0; i < 4; ++i) state->complete(claimed[static_cast<std::size_t>(i)], fakeGame(claimed[i], "1-0"));
     }
 
-    const auto pgn = readAll(dir / "teams.pgn");
+    const auto pgn = readFile(dir / "teams.pgn");
     CHECK(pgn.find("[WhiteTeam \"Old\"]") != std::string::npos);
     CHECK(pgn.find("[BlackTeam \"New\"]") != std::string::npos);
     CHECK(pgn.find("[WhiteTeam \"New\"]") != std::string::npos);
@@ -301,7 +284,7 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
     for (const auto& r : state->results()) numbers.insert(r.number());
     for (auto task = next; task; task = state->claimNext()) {
         CHECK(numbers.insert(task->number()).second);
-        state->complete(*task, gameData(*task, "1/2-1/2"));
+        state->complete(*task, fakeGame(*task, "1/2-1/2"));
     }
     CHECK(numbers.size() == 16);
     CHECK(state->finished());
@@ -325,11 +308,12 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
 
 TEST_CASE("team match edits: a replacement takes the team and the board, a newcomer the team it is given") {
     SUBCASE("board by board") {
-        auto state = TournamentState::create(freshDir("edit-boards"), teamSpec(2, 2, true, 2));
+        const ScratchDir dir("edit-boards");
+        auto state = TournamentState::create(dir, teamSpec(2, 2, true, 2));
         // Board 1's first game played, then B2 (23) replaced.
         auto first = state->claimNext();
         REQUIRE(first);
-        state->complete(*first, gameData(*first, "1-0"));
+        state->complete(*first, fakeGame(*first, "1-0"));
 
         Edit replace;
         replace.kind        = Edit::Kind::ReplaceParticipant;
@@ -371,7 +355,8 @@ TEST_CASE("team match edits: a replacement takes the team and the board, a newco
         CHECK(rows[3].encounter.first == 21);  // and A2 in even ones
     }
     SUBCASE("every engine against every engine of the other team") {
-        auto state = TournamentState::create(freshDir("edit-all"), teamSpec(2, 2, false, 1));
+        const ScratchDir dir("edit-all");
+        auto state = TournamentState::create(dir, teamSpec(2, 2, false, 1));
         Edit add;
         add.kind        = Edit::Kind::AddParticipant;
         add.engine.name = "A3";

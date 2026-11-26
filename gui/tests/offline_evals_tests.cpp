@@ -24,6 +24,7 @@ using fcg::test::ScriptedServer;
 using fcg::test::waitUntil;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::readFile;
 
 namespace {
 
@@ -127,11 +128,6 @@ void checkFound(const OfflineEvals& evals, const Position& p) {
     CHECK(e->mate == p.mate);
     CHECK(e->depth == p.depth);
     CHECK(e->best == p.best);
-}
-
-std::string readFile(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), {}};
 }
 
 std::size_t indexes(const fs::path& folder) {

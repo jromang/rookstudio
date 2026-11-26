@@ -9,49 +9,28 @@
 #include <tour/state.hpp>
 #include <tour/summary.hpp>
 
+#include "test_support.hpp"
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-pair-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
-
-TournamentSpec field(Format format, int players) {
-    TournamentSpec spec;
-    spec.format = format;
-    for (int i = 0; i < players; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = "P" + std::to_string(i);
-        spec.participants.push_back(p);
-    }
-    return spec;
-}
+// `players` participants named P0, P1...: the lower the number, the stronger.
+TournamentSpec field(Format format, int players) { return fcg::test::SpecBuilder(format).players(players, "P"); }
 
 // The stronger participant (lower id) wins every game; equal results otherwise when `draws`.
-fastchess::MatchData data(const GameTask& task, bool draws) {
-    using chess::GameResult;
-    fastchess::MatchData d(chess::constants::STARTPOS);
+const char* resultOf(const GameTask& task, bool draws) {
     const bool white_stronger = std::stoi(task.white.name.substr(1)) < std::stoi(task.black.name.substr(1));
-    const auto w              = draws ? GameResult::DRAW : white_stronger ? GameResult::WIN : GameResult::LOSE;
-    const auto b              = draws ? GameResult::DRAW : white_stronger ? GameResult::LOSE : GameResult::WIN;
-    d.players     = {fastchess::MatchData::PlayerInfo(task.white, w), fastchess::MatchData::PlayerInfo(task.black, b)};
-    d.termination = fastchess::MatchTermination::NORMAL;
-    d.duration    = "00:00:01";
-    return d;
+    return draws ? "1/2-1/2" : white_stronger ? "1-0" : "0-1";
 }
 
+fastchess::MatchData data(const GameTask& task, bool draws) { return fcg::test::fakeGame(task, resultOf(task, draws)); }
+
 int playAll(TournamentState& state, bool draws = false) {
-    int n = 0;
-    while (auto task = state.claimNext()) {
-        state.complete(*task, data(*task, draws));
-        REQUIRE(++n < 10000);
-    }
-    return n;
+    return fcg::test::playAll(state, [draws](const GameTask& task, int) { return resultOf(task, draws); });
 }
 
 }  // namespace
@@ -93,8 +72,8 @@ TEST_CASE("pairing: Swiss round 1 is top half against bottom half; no rematch; b
 TEST_CASE("Swiss: rounds paired as results come, no rematch, byes, resumable") {
     auto spec      = field(Format::Swiss, 7);
     spec.rounds    = 5;
-    const auto dir = freshDir("swiss");
-    auto state     = TournamentState::create(dir, spec);
+    const ScratchDir dir("swiss");
+    auto state = TournamentState::create(dir, spec);
     CHECK(state->totalGames() == 5u * 3u * 2u);
 
     // Half a tournament, then a reopen.
@@ -142,7 +121,8 @@ TEST_CASE("Swiss: rounds paired as results come, no rematch, byes, resumable") {
 TEST_CASE("Knockout: winners go through, the top seed wins, tied matches get tiebreaks") {
     auto spec   = field(Format::Knockout, 6);
     spec.cycles = 1;
-    auto state  = TournamentState::create(freshDir("ko"), spec);
+    const ScratchDir dir("ko");
+    auto state = TournamentState::create(dir, spec);
 
     playAll(*state);
     CHECK(state->finished());
@@ -153,7 +133,8 @@ TEST_CASE("Knockout: winners go through, the top seed wins, tied matches get tie
     CHECK(state->results().size() == 5u * 2u);  // 5 matches of one pair of games
 
     // Every game drawn: each match goes to tiebreaks, then the higher seed after ten.
-    auto drawn = TournamentState::create(freshDir("ko-draws"), field(Format::Knockout, 2));
+    const ScratchDir drawn_dir("ko-draws");
+    auto drawn = TournamentState::create(drawn_dir, field(Format::Knockout, 2));
     playAll(*drawn, true);
     CHECK(drawn->finished());
     CHECK(drawn->results().size() == 2u * 11u);  // the match and ten tiebreak pairs
@@ -162,7 +143,8 @@ TEST_CASE("Knockout: winners go through, the top seed wins, tied matches get tie
 TEST_CASE("Knockout: the tied matches of a round all get their tiebreak at once") {
     auto spec   = field(Format::Knockout, 4);
     spec.cycles = 1;
-    auto state  = TournamentState::create(freshDir("ko-tied"), spec);
+    const ScratchDir dir("ko-tied");
+    auto state = TournamentState::create(dir, spec);
     for (int i = 0; i < 4; ++i) {
         const auto task = state->claimNext();
         REQUIRE(task);
@@ -179,7 +161,8 @@ TEST_CASE("Knockout: the tied matches of a round all get their tiebreak at once"
 TEST_CASE("Knockout: after ten tiebreaks the better seed goes through, wherever its place in the bracket") {
     auto spec   = field(Format::Knockout, 8);
     spec.cycles = 1;
-    auto state  = TournamentState::create(freshDir("ko-seed"), spec);
+    const ScratchDir dir("ko-seed");
+    auto state = TournamentState::create(dir, spec);
 
     // Round 1: P7 knocks out the top seed P0, the stronger wins elsewhere. Round 2: P7 and P3 draw everything.
     int n = 0;
@@ -202,7 +185,7 @@ TEST_CASE("summaries: a knockout is won in its final, not on points; a Swiss cou
     // As above: P3 goes through after ten tiebreaks with P7, with the most points, then loses the final to P1.
     auto spec      = field(Format::Knockout, 8);
     spec.cycles    = 1;
-    const auto dir = freshDir("ko-summary");
+    const ScratchDir dir("ko-summary");
     {
         auto state = TournamentState::create(dir, spec);
         int n      = 0;
@@ -225,7 +208,7 @@ TEST_CASE("summaries: a knockout is won in its final, not on points; a Swiss cou
     // Seven players, five rounds: P0 wins every game and is first; the byes are in the points.
     auto swiss      = field(Format::Swiss, 7);
     swiss.rounds    = 5;
-    const auto sdir = freshDir("swiss-summary");
+    const ScratchDir sdir("swiss-summary");
     {
         auto state = TournamentState::create(sdir, swiss);
         playAll(*state);
@@ -242,7 +225,8 @@ TEST_CASE("summaries: a knockout is won in its final, not on points; a Swiss cou
 TEST_CASE("Knockout: a player knocked out has no game left at once, while the round goes on") {
     auto spec   = field(Format::Knockout, 4);
     spec.cycles = 1;
-    auto state  = TournamentState::create(freshDir("ko-left"), spec);
+    const ScratchDir dir("ko-left");
+    auto state = TournamentState::create(dir, spec);
     CHECK(state->enginesLeft() == std::set<std::string>{"P0", "P1", "P2", "P3"});
 
     // Plays the two games of the next encounter; returns its players.
@@ -282,7 +266,8 @@ TEST_CASE("Knockout: a player knocked out has no game left at once, while the ro
 TEST_CASE("Swiss: every player has games left until the last round, then those with a game of it to play") {
     auto spec   = field(Format::Swiss, 5);
     spec.rounds = 2;
-    auto state  = TournamentState::create(freshDir("swiss-left"), spec);
+    const ScratchDir dir("swiss-left");
+    auto state = TournamentState::create(dir, spec);
     CHECK(state->enginesLeft().size() == 5u);
 
     const auto playGames = [&](int n) {

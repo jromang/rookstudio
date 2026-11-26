@@ -9,17 +9,13 @@
 
 #include "endgames.hpp"
 #include "tablebases.hpp"
+#include "test_support.hpp"
 #include "training.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
 
 namespace {
-
-fs::path sourceDir() {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR);
-}
 
 std::string joined(std::initializer_list<fs::path> dirs) {
 #ifdef _WIN32
@@ -34,7 +30,7 @@ std::string joined(std::initializer_list<fs::path> dirs) {
 
 // The 3-piece tables with their DTZ files (ours), and fastchess' WDL tables of 4 pieces.
 std::string tables34() {
-    const auto root = sourceDir();
+    const auto root = test::sourcePath();
     return joined({root / "gui" / "tests" / "data" / "syzygy3", root / "app" / "tests" / "data" / "syzygy_wdl4"});
 }
 
@@ -137,7 +133,7 @@ TEST_CASE("endgames: a move that turns the win into a draw, and the moves that k
 
     // Without the DTZ tables (fastchess' 3-piece WDL files), the same judgement from the WDL tables alone.
     forgetSyzygy();
-    const auto wdl = probeDiskTables(start, (sourceDir() / "app" / "tests" / "data" / "syzygy_wdl3").string());
+    const auto wdl = probeDiskTables(start, (test::sourcePath() / "app" / "tests" / "data" / "syzygy_wdl3").string());
     REQUIRE(wdl);
     CHECK(wdl->outcome == lichess::Outcome::Win);
     CHECK_FALSE(wdl->dtz);

@@ -17,8 +17,11 @@
 
 #include <study/puzzles.hpp>
 
+#include "test_support.hpp"
+
 using namespace fcg::study;
 namespace fs = std::filesystem;
+using fcg::test::readFile;
 
 namespace {
 
@@ -144,11 +147,6 @@ std::map<std::string, uint32_t> numbersOf(const PuzzleStore& store) {
     std::map<std::string, uint32_t> out;
     for (uint32_t k = 0; k < store.size(); ++k) out[store.idOf(k)] = k;
     return out;
-}
-
-std::string bytesOf(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
 
 }  // namespace
@@ -307,7 +305,7 @@ TEST_CASE("puzzles: a reading cut short goes on from its mark, and gives the sam
     for (std::size_t i = 700; i < lines.size(); ++i) builder.line(lines[i]);
     const auto store = nextPuzzleStore(folder);
     REQUIRE(builder.finish(store, "2026-11-01") == "");
-    CHECK(bytesOf(store) == bytesOf(whole));
+    CHECK(readFile(store) == readFile(whole));
     // The build's files gone; a state of files that no longer exist cannot be gone on with.
     PuzzleBuilder again(folder / "build");
     again.restore(state);

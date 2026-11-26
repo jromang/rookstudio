@@ -8,18 +8,13 @@
 
 #include "portable.hpp"
 #include "storage.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path tempDir(const char* name) {
-    auto dir = fs::temp_directory_path() /
-               fmt::format("fcg-tests-{}-{}", name, std::chrono::steady_clock::now().time_since_epoch().count());
-    fs::create_directories(dir);
-    return fs::absolute(dir).lexically_normal();
-}
 
 // The portable mode on for the time of a test: it is the program's, global.
 struct PortableBase {
@@ -84,7 +79,7 @@ TEST_CASE("portable: tablebase folders, a list") {
 }
 
 TEST_CASE("portable: the marker beside the program, or beside the macOS bundle") {
-    const auto dir = tempDir("portable-marker");
+    const ScratchDir dir("portable-marker");
     const auto exe = dir / "fastchess-gui";
     CHECK(portable::detect(exe).empty());
     std::ofstream(dir / portable::MARKER).put('\n');
@@ -99,11 +94,11 @@ TEST_CASE("portable: the marker beside the program, or beside the macOS bundle")
 }
 
 TEST_CASE("portable: the profile's files keep relative paths, and the folder can move") {
-    const auto program = tempDir("portable-program");
+    const ScratchDir program("portable-program");
     const auto data    = program / portable::DATA_FOLDER;
     const auto engine  = (program / "engines" / "sf" / "stockfish").string();
     const auto book    = (program / "books" / "8moves.epd").string();
-    const auto outside = (program.parent_path() / "elsewhere.pgn").string();
+    const auto outside = (program.path().parent_path() / "elsewhere.pgn").string();
     {
         const PortableBase on(program);
         const Storage storage(data);
@@ -155,7 +150,7 @@ TEST_CASE("portable: the profile's files keep relative paths, and the folder can
     }
 
     // The folder copied elsewhere: the paths follow.
-    const auto moved = tempDir("portable-moved");
+    const ScratchDir moved("portable-moved");
     fs::remove(moved);  // copied as a whole: Windows does not copy a folder into one that exists
     fs::copy(program, moved, fs::copy_options::recursive);
     {
@@ -169,7 +164,7 @@ TEST_CASE("portable: the profile's files keep relative paths, and the folder can
 
     // Not portable: the files are as they always were, absolute paths read as they are.
     {
-        const auto plain = tempDir("portable-off");
+        const ScratchDir plain("portable-off");
         const Storage storage(plain);
         EngineEntry e;
         e.name = "Stockfish";

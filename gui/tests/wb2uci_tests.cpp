@@ -11,11 +11,13 @@
 #include <core/config/config.hpp>
 #include <engine/uci_engine.hpp>
 
-#include "../../tournament/tests/own_temp.hpp"
-#include "../../tournament/tests/self_path.hpp"
 #include "engines.hpp"
+#include "mock_engines.hpp"
+#include "own_temp.hpp"
 #include "run.hpp"
+#include "self_path.hpp"
 #include "suite_run.hpp"
+#include "test_modes.hpp"
 #include "wb2uci.hpp"
 
 using namespace fcg;
@@ -23,6 +25,10 @@ namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 
 namespace {
+
+// The program's --wb2uci mode: the tests start their WinBoard engines through it, as the program does (engine_client,
+// tour/book_adapter), here and in the tests of the books, the analysis and the tournaments.
+[[maybe_unused]] const bool wb2uci_mode = fcg::test::addMode("--wb2uci", wb2uci::run);
 
 struct Wire {
     std::vector<std::string> gui;     // what the adapter told the GUI
@@ -289,12 +295,8 @@ TEST_CASE("wb2uci: a rejected move sets the engine up again; resignation on the 
 }
 
 TEST_CASE("wb2uci: tournaments of WinBoard engines (protocol 1 and 2) and a UCI engine, through the adapter") {
-    const auto wb  = (self().parent_path() / FCG_WB_MOVER).string();
-    const auto uci = (self().parent_path() / FCG_RANDOM_MOVER).string();
-    if (!fs::is_regular_file(wb) || !fs::is_regular_file(uci)) {
-        MESSAGE("mock engines not available on this platform, skipped");
-        return;
-    }
+    const auto wb                     = test::wbMover();
+    const auto uci                    = test::randomMover();
     fastchess::engine::xboard_adapter = self().string();
 
     const auto root = fs::temp_directory_path() / "fcg-wb2uci-tests";
@@ -360,11 +362,7 @@ TEST_CASE("wb2uci: tournaments of WinBoard engines (protocol 1 and 2) and a UCI 
 }
 
 TEST_CASE("wb2uci: what the engine writes after its move, in the same write, reaches the GUI in order") {
-    const auto wb = (self().parent_path() / FCG_WB_MOVER).string();
-    if (!fs::is_regular_file(wb)) {
-        MESSAGE("mock engine not available on this platform, skipped");
-        return;
-    }
+    const auto wb = test::wbMover();
     // The adapter as fastchess-gui starts it, this program in its --wb2uci mode, with an engine that answers a ping
     // only with its next move: its thinking, its move, a telluser and its pong in one write.
     using fastchess::engine::process::Status;
@@ -396,12 +394,8 @@ TEST_CASE("wb2uci: what the engine writes after its move, in the same write, rea
 }
 
 TEST_CASE("wb2uci: an engine added without a protocol is found out to be a WinBoard engine, and read") {
-    const auto wb  = (self().parent_path() / FCG_WB_MOVER).string();
-    const auto uci = (self().parent_path() / FCG_RANDOM_MOVER).string();
-    if (!fs::is_regular_file(wb) || !fs::is_regular_file(uci)) {
-        MESSAGE("mock engines not available on this platform, skipped");
-        return;
-    }
+    const auto wb                     = test::wbMover();
+    const auto uci                    = test::randomMover();
     fastchess::engine::xboard_adapter = self().string();
 
     EngineEntry e;
@@ -461,11 +455,7 @@ TEST_CASE("wb2uci: Chess960: variant fischerandom, X-FEN, castling as O-O to the
 }
 
 TEST_CASE("wb2uci: a Chess960 tournament of WinBoard engines through the adapter") {
-    const auto wb = (self().parent_path() / FCG_WB_MOVER).string();
-    if (!fs::is_regular_file(wb)) {
-        MESSAGE("mock engine not available on this platform, skipped");
-        return;
-    }
+    const auto wb                     = test::wbMover();
     fastchess::engine::xboard_adapter = self().string();
 
     const auto root = fs::temp_directory_path() / "fcg-wb2uci-960" / "run";
@@ -530,11 +520,7 @@ TEST_CASE("wb2uci: a Chess960 tournament of WinBoard engines through the adapter
 }
 
 TEST_CASE("wb2uci: a test suite with WinBoard engines (protocol 1 and 2), White and Black to move") {
-    const auto wb = (self().parent_path() / FCG_WB_MOVER).string();
-    if (!fs::is_regular_file(wb)) {
-        MESSAGE("mock engines not available on this platform, skipped");
-        return;
-    }
+    const auto wb                     = test::wbMover();
     fastchess::engine::xboard_adapter = self().string();
     if (!fastchess::config::TournamentConfig)
         fastchess::config::TournamentConfig = std::make_unique<fastchess::config::Tournament>();

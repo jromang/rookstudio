@@ -9,20 +9,20 @@
 #include <fstream>
 #include <map>
 #include <mutex>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
 #include <core/config/config.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "engine_downloads.hpp"
 #include "engine_versions.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
+#include "mock_engines.hpp"
 #include "scripted_server.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace fcg::catalogue;
@@ -168,11 +168,8 @@ TEST_CASE("engine versions: a deleted version a tournament asks for again, downl
         fastchess::config::TournamentConfig->startup_time = ENGINE_STARTUP_TIME;
     }
     Profile profile;
-    const auto mover_path = selfPath().parent_path() / FCG_RANDOM_MOVER;
-    std::ifstream in(mover_path, std::ios::binary);
-    std::ostringstream data;
-    data << in.rdbuf();
-    const auto program = data.str();
+    const auto mover_path = randomMover();
+    const auto program    = readFile(mover_path);
     REQUIRE_FALSE(program.empty());
 #ifdef _WIN32
     const std::string name = "sample-engine.exe";

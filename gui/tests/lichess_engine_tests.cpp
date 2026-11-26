@@ -22,12 +22,12 @@
 #include <chess.hpp>
 #include <json.hpp>
 
-#include "../../tournament/tests/self_path.hpp"
 #include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_engine.hpp"
+#include "mock_engines.hpp"
 #include "scripted_server.hpp"
 
 using namespace fcg;
@@ -60,7 +60,7 @@ struct ScopedEnv {
 EngineEntry mover(const std::string& name = "Sample Engine 1.0") {
     EngineEntry e;
     e.name     = name;
-    e.cmd      = (selfPath().parent_path() / FCG_RANDOM_MOVER).string();
+    e.cmd      = randomMover();
     e.protocol = "uci";
     return e;
 }

@@ -16,8 +16,11 @@
 
 #include <study/evals_index.hpp>
 
+#include "test_support.hpp"
+
 using namespace fcg::study;
 namespace fs = std::filesystem;
+using fcg::test::readFile;
 
 namespace {
 
@@ -113,11 +116,6 @@ nlohmann::json feed(EvalsBuilder& builder, const std::vector<std::string>& lines
         }
     }
     return saved;
-}
-
-std::string readFile(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), {}};
 }
 
 struct Dump {

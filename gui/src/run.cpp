@@ -164,6 +164,27 @@ std::string timestamp() {
     return stamp;
 }
 
+// The name of the PGN book a Polyglot book's lines are written to in the tournament folder: <book>-<N>plies.pgn, or
+// with a number after it when that is the name of one of the folder's PGN files of games, which are named after the
+// tournament (namePgnFiles()): a tournament named after its book would otherwise append its games to its openings.
+std::string polyglotPgnName(const MatchSetup& setup, const std::string& book, int plies) {
+    tour::TournamentSpec named;
+    named.name = setup.name.empty() ? defaultTournamentName(setup) : setup.name;
+    tour::namePgnFiles(named);
+    // Letter case aside, as Windows and macOS name files.
+    const auto lower = [](std::string s) {
+        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    };
+    const auto taken = [&](const std::string& file) {
+        return lower(file) == lower(named.pgnFile()) || lower(file) == lower(named.chessbasePgnFile());
+    };
+    const auto stem = fmt::format("{}-{}plies", fs::path(book).stem().string(), plies);
+    auto file       = stem + ".pgn";
+    for (int n = 2; taken(file); ++n) file = fmt::format("{}-{}.pgn", stem, n);
+    return file;
+}
+
 }  // namespace
 
 std::string limitText(const fastchess::Limit& limit) {
@@ -576,9 +597,11 @@ BuiltRun buildRun(const MatchSetup& setup, const std::vector<EngineEntry>& engin
         book_random = true;
     }
 
-    // A Polyglot book becomes the positions its lines lead to, kept in the tournament folder. In random order, they
-    // are written in the order they are drawn, the likelier lines (by their moves' weights, as the randomness makes
-    // them) the sooner, from the tournament's seed: then played in that order.
+    // A Polyglot book becomes the PGN book of its lines, kept in the tournament folder: each line's moves from the
+    // initial position, which fastchess plays as book moves, marked {book} in the games' PGN, as a PGN book's. In
+    // random order, they are written in the order they are drawn, the likelier lines (by their moves' weights, as the
+    // randomness makes them) the sooner, from the tournament's seed: then played in that order. (A tournament of an
+    // earlier version keeps the EPD book of the positions the lines lead to that it was given, and plays from it.)
     auto book_plies      = setup.book_plies;
     const int randomness = std::clamp(setup.book_randomness, -tour::RANDOMNESS_LIMIT, tour::RANDOMNESS_LIMIT);
     std::string polyglot = {};
@@ -590,16 +613,16 @@ BuiltRun buildRun(const MatchSetup& setup, const std::vector<EngineEntry>& engin
         walk.randomness = randomness;
         std::error_code ec;
         fs::create_directories(run_dir, ec);
-        const auto epd = run_dir / fmt::format("{}-{}plies.epd", fs::path(book).stem().string(), walk.plies);
+        const auto pgn = run_dir / polyglotPgnName(setup, book, walk.plies);
         try {
-            (void)tour::polyglotToEpd(book, epd, walk, book_random ? std::optional<uint64_t>(t.seed) : std::nullopt);
+            (void)tour::polyglotToPgn(book, pgn, walk, book_random ? std::optional<uint64_t>(t.seed) : std::nullopt);
         } catch (const std::exception& e) {
             throw fastchess_exception(e.what());
         }
         polyglot       = book;
         polyglot_plies = walk.plies;
-        book           = epd.string();
-        book_plies     = -1;
+        book           = pgn.string();
+        book_plies     = -1;     // every move of the lines
         book_random    = false;  // drawn in order already
     }
 

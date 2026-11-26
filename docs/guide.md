@@ -3110,16 +3110,18 @@ PGN book, the starting index and the random seed (0 = a new order for every tour
 twice, with colours reversed (in a match whose *Colours* are locked, each game from an opening of its own).
 
 A Polyglot book is followed from the initial position to a depth (8 plies unless set), leaving out the moves that
-weigh less than a tenth of the best one of their position; the positions reached are written once to
-`<book>-<N>plies.epd` in the tournament folder and played like an EPD book. In random order they are written in the
-order they are drawn, each once: a line comes the sooner the likelier it is, by the weights of its moves, so that a
-tournament that plays only part of the book plays its main lines first; the seed draws the same order again. In
-sequential order they keep the order of the book. *Randomness* (−100 to 100, 0 by default) says how the weights
-count, as Polyglot and Cute Chess choose a book move: 0 the weights as they are, −100 the best move of each position
-only (one line, unless several share the best weight), 100 every move alike (the rare moves come back); in between,
-−50 squares the weights and 50 takes their square roots. It chooses the moves of the participants' own books too, and
-is shown for them even with an EPD or PGN book; the summary says it, and the line under the standings copies gives
-the book with its depth and, for a Polyglot book, this randomness.
+weigh less than a tenth of the best one of their position; its lines (one for each position reached, the first that
+reaches it) are written once to `<book>-<N>plies.pgn` in the tournament folder and played like a PGN book: every game
+starts from the initial position, and its PGN has the book's moves, marked `{book}`. In random order they are written
+in the order they are drawn, each once: a line comes the sooner the likelier it is, by the weights of its moves, so
+that a tournament that plays only part of the book plays its main lines first; the seed draws the same order again.
+In sequential order they keep the order of the book. A tournament started by an earlier version, which wrote the
+positions reached to `<book>-<N>plies.epd`, goes on playing from them. *Randomness* (−100 to 100, 0 by default) says
+how the weights count, as Polyglot and Cute Chess choose a book move: 0 the weights as they are, −100 the best move
+of each position only (one line, unless several share the best weight), 100 every move alike (the rare moves come
+back); in between, −50 squares the weights and 50 takes their square roots. It chooses the moves of the participants'
+own books too, and is shown for them even with an EPD or PGN book; the summary says it, and the line under the
+standings copies gives the book with its depth and, for a Polyglot book, this randomness.
 
 In a round robin, a gauntlet, a Swiss or a team match, *The same opening for every pair of a round* gives every game
 pair of a round the same opening (board by board, a cycle is one round: every board plays the same opening), the next

@@ -28,6 +28,28 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+# The x86-64 level the code aims at, on Linux and Windows. Ubuntu 26.04's gcc aims at x86-64-v3 (AVX2, FMA) by
+# default: its builds then stop on the processors of before 2013, which the releases before ran on. x86-64-v2 (SSE4.2,
+# POPCNT: every x86-64 processor since 2009, an Intel Sandy Bridge included) unless told otherwise; empty, the
+# compiler's own (a build for this machine alone). Set before anything is added, so that the dependencies' sources
+# aim at it too; llama.cpp's CPU variants add their own instructions on top.
+set(FCG_X86_64_LEVEL "x86-64-v2" CACHE STRING "-march of the x86-64 builds on Linux and Windows; empty: the compiler's")
+if(FCG_X86_64_LEVEL AND NOT APPLE AND NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    string(APPEND CMAKE_C_FLAGS " -march=${FCG_X86_64_LEVEL} -mtune=generic")
+    string(APPEND CMAKE_CXX_FLAGS " -march=${FCG_X86_64_LEVEL} -mtune=generic")
+endif()
+# The startup files of a newer glibc may ask for more than the code does in their GNU property note (Ubuntu 26.04's
+# Scrt1.o asks for x86-64-v3), which the linker carries into every program: the loader then refuses an older processor
+# ("CPU ISA level is lower than required"). A shipped program's note removed after its link.
+function(fcg_drop_isa_note target)
+    if(FCG_X86_64_LEVEL AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_OBJCOPY
+       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+        add_custom_command(TARGET ${target} POST_BUILD
+                           COMMAND ${CMAKE_OBJCOPY} --remove-section=.note.gnu.property $<TARGET_FILE:${target}>
+                           VERBATIM)
+    endif()
+endfunction()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ccache, when installed: a file compiled once with the same flags, in this build folder or another, is not compiled
@@ -160,6 +182,7 @@ endif()
 add_executable(fastchess ${FC_APP}/src/main.cpp)
 target_link_libraries(fastchess PRIVATE fastchess_core)
 set_target_properties(fastchess PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+fcg_drop_isa_note(fastchess)
 if(WIN32)
     target_link_options(fastchess PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
@@ -867,6 +890,7 @@ if(FCG_BUILD_GUI)
         set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME rookstudio)
     endif()
     target_link_libraries(fastchess-gui PRIVATE fcg_lib)
+    fcg_drop_isa_note(fastchess-gui)
     if(WIN32)
         target_link_options(fastchess-gui PRIVATE -static -static-libgcc -static-libstdc++)
     endif()

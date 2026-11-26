@@ -339,6 +339,7 @@ with its notes: `rookstudio-<version>-linux-x86_64.tar.gz`, `rookstudio-<version
 `rookstudio-<version>-macos-universal.zip`, with `SHA256SUMS.txt` to check them. Unpack the archive and keep its files
 together: the assistant's runtime (llama.cpp) is in libraries beside the program.
 
+- Windows and Linux: an x86-64 processor of 2009 or later (x86-64-v2: SSE4.2 and POPCNT; an Intel Sandy Bridge does).
 - Windows: 64-bit Windows 10 version 1903 (May 2019) or newer. No installer, nothing else to install: run
   `rookstudio.exe`. The program is not signed, so SmartScreen may ask first (*More info*, *Run anyway*).
 - Linux: x86-64, glibc 2.38 or newer (Ubuntu 24.04, Debian 13, Fedora 39, RHEL 10 or later), X11 or Wayland. OpenGL 3.2

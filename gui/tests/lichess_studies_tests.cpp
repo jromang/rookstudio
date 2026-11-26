@@ -5,6 +5,7 @@
 #include <doctest/doctest.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <mutex>
 #include <string>
@@ -15,6 +16,7 @@
 #include <study/pgn_reader.hpp>
 #include <study/store.hpp>
 
+#include "answering_server.hpp"
 #include "assistant_notes.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
@@ -188,6 +190,7 @@ TEST_CASE("Lichess studies: a user's list, its private ones with a token allowed
     const auto nobody = userStudies("nobody_here", "");
     CHECK_FALSE(nobody.value);
     CHECK(nobody.status == 404);
+    CHECK(describe(nobody) == "Lichess has no account of that name");
     const auto seen = lichess.requests();
     REQUIRE(seen.size() == 3);
     CHECK(seen[0].method == "GET");
@@ -264,7 +267,8 @@ TEST_CASE("Lichess studies: a study made and a chapter imported, the visibility 
     const auto refused = createStudy("Mes parties", Visibility::Public, "reader");
     CHECK_FALSE(refused.value);
     CHECK(refused.status == 403);
-    CHECK(refused.error == "Missing scope");
+    CHECK(refused.net == NetError::Forbidden);
+    CHECK(describe(refused) == "the token may not do it: one more permission is needed");
     const auto too_short = createStudy("M", Visibility::Public, "writer");  // refused here, nothing asked
     CHECK_FALSE(too_short.value);
 
@@ -329,7 +333,7 @@ TEST_CASE("Lichess studies: a full study is not offered, and a game sent into on
     r.chapters      = 63;
     const auto took = importChapter("FullStdy", r.chapter, "writer");
     CHECK_FALSE(took.value);
-    CHECK(took.error == "This study has too many chapters");
+    CHECK(describe(took) == "This study has too many chapters");
     r.study         = "AbCdEfGh";
     r.chapters      = 12;
     const auto sent = sendToStudy(r, "writer");
@@ -380,7 +384,8 @@ TEST_CASE("Lichess studies: a chapter's moves and tags sent again") {
     REQUIRE(updateChapterTags("AbCdEfGh", "Chap0042", tags, "writer").value);
     const auto gone = updateChapterMoves("AbCdEfGh", "Gone0000", pgn, "writer");
     CHECK_FALSE(gone.value);
-    CHECK(gone.error == "Chapter not found");
+    CHECK(gone.net == NetError::Server);
+    CHECK(describe(gone) == "Chapter not found");
     const auto seen = lichess.requests();
     REQUIRE(seen.size() == 3);
     CHECK((seen[0].method + " " + seen[0].path) == "POST /api/study/AbCdEfGh/Chap0042/moves");
@@ -539,4 +544,49 @@ TEST_CASE("Lichess studies: what the profile keeps") {
     std::vector<int64_t> made = {1000, 90000, 100000};
     CHECK(madeToday(made, 100000 + 3600) == 2);
     CHECK(made.size() == 2);
+}
+
+TEST_CASE("Lichess studies: each failure of a study's requests told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(std::chrono::milliseconds(50));
+    ChapterSent chapter;
+    chapter.pgn = "[Event \"Club\"]\n\n1. e4 *\n";
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, R"({"error":"No such token"})", NetError::Unauthorized},
+          Case{403, R"({"error":"Missing scope"})", NetError::Forbidden}, Case{404, "{}", NetError::NotFound},
+          Case{429, "{}", NetError::RateLimited}, Case{500, "<html>Internal error</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(userStudies("rs_sample_0000", "reader").net == net);
+        CHECK(studyText("AbCdEfGh", "reader").net == net);
+        CHECK(studyModified("AbCdEfGh", "reader").net == net);
+        CHECK(createStudy("Mes parties", Visibility::Private, "writer").net == net);
+        CHECK(importChapter("AbCdEfGh", chapter, "writer").net == net);
+        CHECK(updateChapterMoves("AbCdEfGh", "Chap0042", chapter.pgn, "writer").net == net);
+        CHECK(deleteChapter("AbCdEfGh", "Chap0042", "writer").net == net);
+    }
+    // What a 404 means for each: no such study, no such chapter any more.
+    server.answer(404, "{}");
+    CHECK(describe(studyText("AbCdEfGh", "")) == "Lichess has no such study, or it is private");
+    CHECK(describe(updateChapterTags("AbCdEfGh", "Gone0000", "", "writer")) == "Lichess has no such chapter any more");
+    // An answer that cannot be read; a study made without its id.
+    server.answer(200, "<html>not JSON</html>");
+    CHECK(createStudy("Mes parties", Visibility::Private, "writer").net == NetError::BadAnswer);
+    CHECK(importChapter("AbCdEfGh", chapter, "writer").net == NetError::BadAnswer);
+    server.answer(200, R"({"name":"Mes parties"})");
+    CHECK(createStudy("Mes parties", Visibility::Private, "writer").net == NetError::BadAnswer);
+    // Nothing listens; cancelled in a pause.
+    pointNowhere();
+    CHECK(studyText("AbCdEfGh", "").net == NetError::Offline);
+    CHECK(createStudy("Mes parties", Visibility::Private, "writer").net == NetError::Offline);
+    pointAtPausedHost("lichess-studies.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(userStudies("rs_sample_0000", "", &cancel).net == NetError::Cancelled);
+    CHECK(studyModified("AbCdEfGh", "", &cancel).net == NetError::Cancelled);
 }

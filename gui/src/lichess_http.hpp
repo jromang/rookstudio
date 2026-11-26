@@ -41,7 +41,9 @@ enum class Asked {
     Anything,    // the words that fit any request
     Link,        // an account's link: its code exchanged, its name asked
     Game,        // a game
-    Study,       // a study or one of its chapters
+    Study,       // a study, or a chapter to read
+    Chapter,     // a chapter of the user's study, to change or delete
+    Player,      // a player's account (their studies)
     FidePlayer,  // a FIDE player's card
     Page,        // a page of lichess.org a link names (a study, a game…)
     Broadcast,   // a broadcast a link names
@@ -111,6 +113,7 @@ using Form = std::vector<std::pair<std::string, std::string>>;
 // What a request gave once sent: its failure's kind (none for a 2xx), its status and Lichess's words, and its body.
 struct Response : Failure {
     std::string body;
+    std::string head;       // the status line and the headers, as they came (httpHeader() reads one)
     std::string asked_for;  // the method and the address, for the log
 };
 // `request` sent politely: in its host's turn (one request at a time), once the host's pause after a 429 is over;

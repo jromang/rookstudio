@@ -70,6 +70,10 @@ std::string describe(NetError net, Asked asked, int status, std::string_view sai
                     return TR("Lichess has no such game");
                 case Asked::Study:
                     return TR("Lichess has no such study, or it is private");
+                case Asked::Chapter:
+                    return TR("Lichess has no such chapter any more");
+                case Asked::Player:
+                    return TR("Lichess has no account of that name");
                 case Asked::FidePlayer:
                     return TR("Lichess has no such FIDE player");
                 case Asked::Page:
@@ -174,6 +178,7 @@ Response responseOf(const HttpRequest& request, HttpResult result) {
         out.said = lichessWords(result.body);
     }
     out.body = std::move(result.body);
+    out.head = std::move(result.head);
     return out;
 }
 

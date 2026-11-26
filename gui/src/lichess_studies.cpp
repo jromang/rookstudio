@@ -28,51 +28,17 @@ namespace {
 
 constexpr const char* STATE_FILE = "lichess-studies.json";
 
-// Lichess's reason, when its answer gives one: {"error": "..."}.
-std::string reasonOf(const HttpResult& r) {
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (!j.is_discarded() && j.is_object()) {
-        if (j.contains("error") && j["error"].is_string()) return j["error"].get<std::string>();
-        if (j.contains("global") && j["global"].is_array() && !j["global"].empty() && j["global"][0].is_string())
-            return j["global"][0].get<std::string>();
-    }
-    return {};
+// A form posted to Lichess's API with the token.
+Response post(const std::string& path, const std::string& token, const Form& fields, const std::atomic<bool>* cancel) {
+    return send(withForm(request("POST", servers().api + path, token), fields), cancel);
 }
 
-// Why a request gave nothing, in words.
-std::string refusal(const HttpResult& r, const char* missing = "Lichess has no such study, or it is private") {
-    if (const auto reason = reasonOf(r); !reason.empty() && r.status >= 400 && r.status != 429) return reason;
-    switch (r.status) {
-        case 0:
-            return r.error.empty() ? std::string("Lichess did not answer") : r.error;
-        case 401:
-            return "Lichess refused the token: link the account again";
-        case 403:
-            return "the token may not do it: one more permission is needed";
-        case 404:
-            return missing;
-        case 429:
-            return "Lichess asks to wait a minute: too many requests";
-        default:
-            return fmt::format("Lichess answered {}", r.status);
-    }
-}
-
-HttpRequest request(const std::string& method, std::string url, const std::string& token, const char* accept) {
-    HttpRequest r;
-    r.method = method;
-    r.url    = std::move(url);
-    r.token  = token;
-    r.headers.emplace_back("Accept", accept);
-    return r;
-}
-
-HttpResult post(const std::string& path, const std::string& token, const Form& fields,
-                const std::atomic<bool>* cancel) {
-    auto r         = request("POST", servers().api + path, token, "application/json");
-    r.content_type = "application/x-www-form-urlencoded";
-    r.body         = formEncode(fields);
-    return politeRequest(r, cancel);
+// A request's answer that holds nothing to read: its failure, worded for what was asked.
+Answer<bool> done(const Response& r, Asked asked) {
+    auto a  = failedWith<bool>(r);
+    a.asked = asked;
+    if (!r.failed()) a.value = true;
+    return a;
 }
 
 std::string tagOf(std::string_view pgn, std::string_view name) {
@@ -177,17 +143,13 @@ std::vector<StudyInfo> parseStudyList(std::string_view ndjson) {
 
 Answer<std::vector<StudyInfo>> userStudies(const std::string& username, const std::string& token,
                                            const std::atomic<bool>* cancel) {
-    Answer<std::vector<StudyInfo>> a;
-    auto r       = request("GET", fmt::format("{}/api/study/by/{}", servers().api, urlEncode(username)), token,
-                           "application/x-ndjson");
-    r.timeout_s  = 60;  // Lichess streams them, a few dozen a second
-    const auto h = politeRequest(r, cancel);
-    a.status     = h.status;
-    if (h.status != 200) {
-        a.error = refusal(h, "Lichess has no account of that name");
-        return a;
-    }
-    a.value = parseStudyList(h.body);
+    auto asked      = request("GET", fmt::format("{}/api/study/by/{}", servers().api, urlEncode(username)), token,
+                              "application/x-ndjson");
+    asked.timeout_s = 60;  // Lichess streams them, a few dozen a second
+    const auto r    = send(asked, cancel);
+    auto a          = failedWith<std::vector<StudyInfo>>(r);
+    a.asked         = Asked::Player;
+    if (!r.failed()) a.value = parseStudyList(r.body);
     return a;
 }
 
@@ -220,35 +182,29 @@ std::vector<StudyChapter> parseStudyPgn(std::string_view pgn) {
 
 Answer<StudyText> studyText(const std::string& id, const std::string& token, bool whole,
                             const std::atomic<bool>* cancel) {
-    Answer<StudyText> a;
     const auto query = whole ? "clocks=true&comments=true&variations=true&orientation=true"
                              : "clocks=false&comments=false&variations=false";
-    auto r           = request("GET", fmt::format("{}/api/study/{}.pgn?{}", servers().api, urlEncode(id), query), token,
+    auto asked       = request("GET", fmt::format("{}/api/study/{}.pgn?{}", servers().api, urlEncode(id), query), token,
                                "application/x-chess-pgn");
-    r.timeout_s      = 60;
-    const auto h     = politeRequest(r, cancel);
-    a.status         = h.status;
-    if (h.status != 200) {
-        a.error = refusal(h);
-        return a;
-    }
+    asked.timeout_s  = 60;
+    const auto r     = send(asked, cancel);
+    auto a           = failedWith<StudyText>(r);
+    a.asked          = Asked::Study;
+    if (r.failed()) return a;
     StudyText t;
-    t.pgn      = h.body;
-    t.modified = httpHeader(h.head, "Last-Modified").value_or("");
+    t.pgn      = r.body;
+    t.modified = httpHeader(r.head, "Last-Modified").value_or("");
     a.value    = std::move(t);
     return a;
 }
 
 Answer<std::string> studyModified(const std::string& id, const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    const auto h = politeRequest(
-        request("HEAD", fmt::format("{}/api/study/{}.pgn", servers().api, urlEncode(id)), token, "*/*"), cancel);
-    a.status = h.status;
-    if (h.status != 200 && h.status != 204) {
-        a.error = refusal(h);
-        return a;
-    }
-    const auto modified = httpHeader(h.head, "Last-Modified");
+    const auto r =
+        send(request("HEAD", fmt::format("{}/api/study/{}.pgn", servers().api, urlEncode(id)), token, "*/*"), cancel);
+    auto a  = failedWith<std::string>(r);
+    a.asked = Asked::Study;
+    if (r.failed()) return a;
+    const auto modified = httpHeader(r.head, "Last-Modified");
     if (!modified || modified->empty()) {
         a.error = "Lichess did not say when it changed";
         return a;
@@ -339,24 +295,12 @@ Form newStudyForm(const std::string& name, Visibility visibility) {
 
 Answer<std::string> createStudy(const std::string& name, Visibility visibility, const std::string& token,
                                 const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    if (!studyNameOk(name)) {
-        a.error = "a study's name has 2 to 100 characters";
-        return a;
-    }
-    const auto h = post("/api/study", token, newStudyForm(name, visibility), cancel);
-    a.status     = h.status;
-    if (h.status != 200) {
-        a.error = refusal(h);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(h.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object() || !j.contains("id") || !j["id"].is_string()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    a.value = j["id"].get<std::string>();
-    return a;
+    if (!studyNameOk(name)) return failedWith<std::string>(Failure::own("a study's name has 2 to 100 characters"));
+    return readAnswer<std::string>(post("/api/study", token, newStudyForm(name, visibility), cancel),
+                                   [](const nlohmann::json& j) -> std::optional<std::string> {
+                                       if (const auto id = textOf(j, "id"); !id.empty()) return id;
+                                       return std::nullopt;
+                                   });
 }
 
 Form chapterForm(const ChapterSent& chapter) {
@@ -369,71 +313,54 @@ Form chapterForm(const ChapterSent& chapter) {
 
 Answer<std::vector<ChapterMade>> importChapter(const std::string& study, const ChapterSent& chapter,
                                                const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::vector<ChapterMade>> a;
-    const auto h = post(fmt::format("/api/study/{}/import-pgn", urlEncode(study)), token, chapterForm(chapter), cancel);
-    a.status     = h.status;
-    if (h.status != 200) {
-        a.error = refusal(h);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(h.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    std::vector<ChapterMade> made;
-    if (j.contains("chapters") && j["chapters"].is_array()) {
-        for (const auto& c : j["chapters"]) {
-            if (!c.is_object() || !c.contains("id") || !c["id"].is_string()) continue;
-            made.push_back({c["id"].get<std::string>(), c.value("name", std::string())});
+    const auto r = post(fmt::format("/api/study/{}/import-pgn", urlEncode(study)), token, chapterForm(chapter), cancel);
+    std::string words;  // Lichess's, when it made none
+    auto a  = readAnswer<std::vector<ChapterMade>>(r, [&](const nlohmann::json& j) {
+        if (!j.is_object()) throw std::runtime_error("not an object");
+        std::vector<ChapterMade> made;
+        if (j.contains("chapters") && j["chapters"].is_array()) {
+            for (const auto& c : j["chapters"]) {
+                if (!c.is_object() || !c.contains("id") || !c["id"].is_string()) continue;
+                made.push_back({c["id"].get<std::string>(), c.value("name", std::string())});
+            }
+        }
+        words = textOf(j, "error");
+        return made;
+    });
+    a.asked = Asked::Study;
+    if (a.value && a.value->empty()) {  // taken, but no chapter made: Lichess's words, else the program's
+        a.value.reset();
+        if (!words.empty()) {
+            a.net  = NetError::Server;
+            a.said = words;
+        } else {
+            a.error = "Lichess made no chapter of it";
         }
     }
-    if (made.empty()) {
-        a.error = j.contains("error") && j["error"].is_string() ? j["error"].get<std::string>()
-                                                                : std::string("Lichess made no chapter of it");
-        return a;
-    }
-    a.value = std::move(made);
     return a;
 }
-
-namespace {
-
-Answer<bool> done(const HttpResult& h, const char* missing) {
-    Answer<bool> a;
-    a.status = h.status;
-    if (h.status < 200 || h.status >= 300) {
-        a.error = refusal(h, missing);
-        return a;
-    }
-    a.value = true;
-    return a;
-}
-
-}  // namespace
 
 Answer<bool> updateChapterMoves(const std::string& study, const std::string& chapter, const std::string& pgn,
                                 const std::string& token, const std::atomic<bool>* cancel) {
     return done(post(fmt::format("/api/study/{}/{}/moves", urlEncode(study), urlEncode(chapter)), token, {{"pgn", pgn}},
                      cancel),
-                "Lichess has no such chapter any more");
+                Asked::Chapter);
 }
 
 Answer<bool> updateChapterTags(const std::string& study, const std::string& chapter, const std::string& tags,
                                const std::string& token, const std::atomic<bool>* cancel) {
     return done(post(fmt::format("/api/study/{}/{}/tags", urlEncode(study), urlEncode(chapter)), token, {{"pgn", tags}},
                      cancel),
-                "Lichess has no such chapter any more");
+                Asked::Chapter);
 }
 
 Answer<bool> deleteChapter(const std::string& study, const std::string& chapter, const std::string& token,
                            const std::atomic<bool>* cancel) {
     return done(
-        politeRequest(
-            request("DELETE", fmt::format("{}/api/study/{}/{}", servers().api, urlEncode(study), urlEncode(chapter)),
-                    token, "application/json"),
-            cancel),
-        "Lichess has no such chapter any more");
+        send(request("DELETE", fmt::format("{}/api/study/{}/{}", servers().api, urlEncode(study), urlEncode(chapter)),
+                     token),
+             cancel),
+        Asked::Chapter);
 }
 
 // ---------------------------------------------------------------------------
@@ -515,11 +442,7 @@ Answer<SendResult> sendToStudy(const SendRequest& r, const std::string& token, c
     int chapters = r.chapters;
     if (r.study.empty()) {
         const auto made = createStudy(r.new_name, r.visibility, token, cancel);
-        a.status        = made.status;
-        if (!made.value) {
-            a.error = made.error;
-            return a;
-        }
+        if (!made.value) return failedWith<SendResult>(made);
         out.study   = *made.value;
         out.created = true;
         chapters    = 1;  // the empty one Lichess makes with it
@@ -537,9 +460,8 @@ Answer<SendResult> sendToStudy(const SendRequest& r, const std::string& token, c
         }
     }
     const auto chapter = importChapter(out.study, r.chapter, token, cancel);
-    a.status           = chapter.status;
+    static_cast<Failure&>(a) = chapter;
     if (!chapter.value) {
-        a.error = chapter.error;
         if (out.created) a.value = out;  // the study is there, empty
         return a;
     }

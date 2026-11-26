@@ -91,6 +91,8 @@ TEST_CASE("Lichess HTTP: the user's words for each kind, by what was asked") {
     // What Lichess may not have.
     CHECK(describe(NetError::NotFound, Asked::Game) == "Lichess has no such game");
     CHECK(describe(NetError::NotFound, Asked::Study) == "Lichess has no such study, or it is private");
+    CHECK(describe(NetError::NotFound, Asked::Chapter) == "Lichess has no such chapter any more");
+    CHECK(describe(NetError::NotFound, Asked::Player) == "Lichess has no account of that name");
     CHECK(describe(NetError::NotFound, Asked::FidePlayer) == "Lichess has no such FIDE player");
     CHECK(describe(NetError::NotFound, Asked::Page) == "Lichess has nothing at this address");
     // Who may read what a link names: the same words for 401 and 403.

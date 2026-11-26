@@ -54,13 +54,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
       topology_(topology),
       options_(std::move(options)),
       dialogs_(window) {
-    // A test's Lichess (--focus lichess-api=http://127.0.0.1:PORT), in place before anything asks lichess.org: the
-    // games in progress are asked at the first frame, before the focus words are read.
-    if (const auto& w = options_.focus_window; w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
-        const auto comma   = w.find(',');
-        const auto base    = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
-        lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
-    }
+    initChessServers();  // before anything asks Lichess (app_chess.cpp)
     software_at_launch_  = storage_.softwareRendering();
     engines_             = storage_.loadEngines();
     books_               = storage_.loadBooks();

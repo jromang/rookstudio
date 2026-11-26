@@ -4011,6 +4011,9 @@ class App {
     void handleDialogs();
     // RookStudio's parts of frame() and handleDialogs(), out of them (app_chess.cpp, #108): the polls of its pages and
     // jobs; its --focus words, tried before fastchess-gui's (false: the word is not one of them); its dialogs' files.
+    // The servers outside before the first frame: none for scripted screenshots, a test's Lichess when the focus
+    // word names one.
+    void initChessServers();
     void pollChess();
     [[nodiscard]] bool applyChessFocusWord(const std::string& w);
     void handleChessDialog(const Dialogs::Answer& answer);

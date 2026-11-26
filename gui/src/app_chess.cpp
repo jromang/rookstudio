@@ -21,11 +21,36 @@
 
 #include "assistant_service.hpp"
 #include "board_text.hpp"
+#include "chesscom.hpp"
+#include "fide_rating_list.hpp"
 #include "focus_words.hpp"
 #include "i18n.hpp"
+#include "lichess_months.hpp"
 #include "lichess_tv.hpp"
+#include "twic.hpp"
 
 namespace fcg {
+
+void App::initChessServers() {
+    // Scripted screenshots ask nothing of the internet (AppOptions::scripted): Lichess, its database, TWIC, chess.com
+    // and FIDE pointed at a port of this machine where nothing listens, before anything asks them; a focus word puts a
+    // test's server in place of one (lichess-api=, lichess-database=, twic-server=, chesscom-server=, fide-server=).
+    if (options_.scripted) {
+        const std::string nowhere = "http://127.0.0.1:9";
+        lichess::servers() = lichess::Servers{nowhere, nowhere + "/tb", nowhere + "/explorer", nowhere + "/engine"};
+        lichess::setDatabaseServer(nowhere);
+        twic::setServer(nowhere);
+        chesscom::setServer(nowhere);
+        fide::setServer(nowhere + "/players_list.zip");
+    }
+    // A test's Lichess (--focus lichess-api=http://127.0.0.1:PORT), in place before anything asks lichess.org: the
+    // games in progress are asked at the first frame, before the focus words are read.
+    if (const auto& w = options_.focus_window; w.rfind("lichess-api=http://127.0.0.1:", 0) == 0) {
+        const auto comma   = w.find(',');
+        const auto base    = w.substr(12, comma == std::string::npos ? std::string::npos : comma - 12);
+        lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
+    }
+}
 
 void App::pollChess() {
     pollLichess();             // a link, a sync, the broadcasts: whatever page shows

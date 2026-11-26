@@ -8,6 +8,7 @@
 
 #include "board_page.hpp"
 #include "board_text.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -207,13 +208,8 @@ TEST_CASE("clocks: from [%clk] when the game has them, else rebuilt from the tim
 }
 
 TEST_CASE("tablebases: each position's result, with fastchess' 3-piece tables") {
-    // The sources where FCG_SOURCE_DIR points (the CI's tests on another machine), or where they were compiled.
-    const char* env   = std::getenv("FCG_SOURCE_DIR");
-    const auto tables = fs::path(env ? env : FCG_SOURCE_DIR) / "app" / "tests" / "data" / "syzygy_wdl3";
-    if (!fs::is_directory(tables)) {
-        MESSAGE("the sources are not on this machine (tests copied elsewhere), skipped");
-        return;
-    }
+    const auto tables = test::sourcePath() / "app" / "tests" / "data" / "syzygy_wdl3";
+    REQUIRE(fs::is_directory(tables));
     ReplayGame game;
     game.start_fen = "8/8/8/8/8/8/1Q6/K6k w - - 0 1";
     chess::Board board(game.start_fen);

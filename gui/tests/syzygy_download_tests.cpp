@@ -18,6 +18,7 @@
 #include "https.hpp"
 #include "scripted_server.hpp"
 #include "syzygy_download.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace fcg::test;
@@ -30,10 +31,7 @@ std::string readAll(const fs::path& file) {
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
-fs::path tables3() {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "gui" / "tests" / "data" / "syzygy3";
-}
+fs::path tables3() { return test::sourcePath() / "gui" / "tests" / "data" / "syzygy3"; }
 
 }  // namespace
 

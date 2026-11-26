@@ -14,6 +14,7 @@
 #include <study/chessbase.hpp>
 
 #include "databases.hpp"
+#include "test_support.hpp"
 
 namespace fs = std::filesystem;
 using namespace fcg;
@@ -40,10 +41,7 @@ fs::path pgnFile(const fs::path& dir, int count) {
 }
 
 // The study's test data: archives of our own test games.
-fs::path studyData(const std::string& name) {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "study" / "tests" / "data" / name;
-}
+fs::path studyData(const std::string& name) { return test::sourcePath() / "study" / "tests" / "data" / name; }
 
 std::optional<study::DatabaseImport> imported(DatabaseShelf& shelf) {
     std::optional<study::DatabaseImport> report;

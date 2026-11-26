@@ -25,10 +25,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-fs::path data(const std::string& name) {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "study" / "tests" / "data" / name;
-}
+using fcg::test::data;
 
 std::vector<ImportedGame> fixtureGames() {
     std::vector<ImportedGame> games;

@@ -9,6 +9,7 @@
 #include <string>
 
 #include "logo.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -38,8 +39,7 @@ TEST_CASE("logo: the Windows icon is the logo drawn (FCG_UPDATE_ICON=1 writes it
     CHECK(ico[2] == 1);  // an icon
     CHECK(ico[4] == 8);  // 8 images
 
-    const char* env     = std::getenv("FCG_SOURCE_DIR");
-    const fs::path path = fs::path(env ? env : FCG_SOURCE_DIR) / "gui" / "win" / "fastchess-gui.ico";
+    const fs::path path = test::sourcePath() / "gui" / "win" / "fastchess-gui.ico";
     const char* update  = std::getenv("FCG_UPDATE_ICON");
     if (update && std::string(update) == "1") {
         std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(ico.data()), ico.size());
@@ -73,8 +73,7 @@ TEST_CASE("logo: the macOS icon is the logo drawn (FCG_UPDATE_ICON=1 writes it)"
     CHECK(at == icns.size());
     CHECK(images == 10);
 
-    const char* env     = std::getenv("FCG_SOURCE_DIR");
-    const fs::path path = fs::path(env ? env : FCG_SOURCE_DIR) / "gui" / "mac" / "fastchess-gui.icns";
+    const fs::path path = test::sourcePath() / "gui" / "mac" / "fastchess-gui.icns";
     const char* update  = std::getenv("FCG_UPDATE_ICON");
     if (update && std::string(update) == "1") {
         std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(icns.data()), icns.size());

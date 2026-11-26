@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "tablebases.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -145,11 +146,11 @@ TEST_CASE("Syzygy checks: off the UI thread, the last result kept by path") {
 }
 
 TEST_CASE("Syzygy verdict: the side to move's result, with the DTZ when its tables are there") {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    const auto root = fs::path(env ? env : FCG_SOURCE_DIR);
+    const auto root = test::sourcePath();
     const auto both = (root / "gui" / "tests" / "data" / "syzygy3").string();  // WDL and DTZ, three pieces
     const auto wdl  = (root / "app" / "tests" / "data" / "syzygy_wdl3").string();
-    if (!fs::is_directory(both) || !fs::is_directory(wdl)) return;
+    REQUIRE(fs::is_directory(both));
+    REQUIRE(fs::is_directory(wdl));
     const auto lock = lockSyzygy();
 
     // King and queen against king: White to move wins, Black to move loses; the DTZ counts the half-moves to the

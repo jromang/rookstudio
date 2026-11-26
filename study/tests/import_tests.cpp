@@ -15,15 +15,14 @@
 #include <study/pgn_reader.hpp>
 #include <study/scan_board.hpp>
 
+#include "test_support.hpp"
+
 using namespace fcg::study;
 namespace fs = std::filesystem;
 
 namespace {
 
-fs::path data(const std::string& name) {
-    const char* env = std::getenv("FCG_SOURCE_DIR");
-    return fs::path(env ? env : FCG_SOURCE_DIR) / "study" / "tests" / "data" / name;
-}
+fs::path data(const std::string& name) { return fcg::test::sourcePath() / "study" / "tests" / "data" / name; }
 
 struct Imported {
     std::vector<ImportedGame> games;

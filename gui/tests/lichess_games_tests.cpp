@@ -16,6 +16,7 @@
 #include <chess.hpp>
 #include <study/store.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_games.hpp"
@@ -139,7 +140,7 @@ TEST_CASE("Lichess games: an account's games brought in, then those played since
     SyncProgress progress;
     std::atomic<bool> cancel{false};
     const auto first = syncGames(*db, "Me", "", progress, cancel, 50);
-    CHECK_MESSAGE(first.error.empty(), first.error);
+    CHECK_MESSAGE(!first.failed(), describe(first));
     CHECK(first.read == 120);
     CHECK(first.added == 120);
     CHECK(first.duplicates == 0);
@@ -161,7 +162,7 @@ TEST_CASE("Lichess games: an account's games brought in, then those played since
         for (auto& g : lichessGames(5, 120, 2)) lichess.games.push_back(std::move(g));
     }
     const auto second = syncGames(*db, "me", "", progress, cancel, 50);  // a name is the same whatever its case
-    CHECK_MESSAGE(second.error.empty(), second.error);
+    CHECK_MESSAGE(!second.failed(), describe(second));
     CHECK(lichess.lastPath() ==
           fmt::format("/api/games/user/me?clocks=true&evals=true&opening=true&sort=dateAsc&since={}",
                       state->since - 60000));
@@ -190,7 +191,7 @@ TEST_CASE("Lichess games: a cancel keeps what was committed, and the next sync b
     const auto stopped = syncGames(*db, "Me", "", progress, cancel, 50);
     stopper.join();
     CHECK(stopped.cancelled);
-    CHECK(stopped.error.empty());
+    CHECK_FALSE(stopped.failed());
     const auto kept = db->snapshot()->games();
     CHECK(kept >= 100);
     CHECK(kept < 400);
@@ -202,7 +203,7 @@ TEST_CASE("Lichess games: a cancel keeps what was committed, and the next sync b
     lichess.slow    = false;
     cancel          = false;
     const auto rest = syncGames(*db, "Me", "", progress, cancel, 50);
-    CHECK_MESSAGE(rest.error.empty(), rest.error);
+    CHECK_MESSAGE(!rest.failed(), describe(rest));
     CHECK(db->snapshot()->games() == 400);
     CHECK(rest.duplicates == 2);
 }
@@ -213,7 +214,8 @@ TEST_CASE("Lichess games: an account Lichess does not have") {
     SyncProgress progress;
     std::atomic<bool> cancel{false};
     const auto r = syncGames(*db, "Nobody", "", progress, cancel);
-    CHECK(r.error == "Lichess has no account named Nobody");
+    CHECK(r.net == NetError::NotFound);
+    CHECK(describe(r) == "Lichess has no account of that name");
     CHECK_FALSE(loadSyncState(db->folder()));
 }
 
@@ -230,7 +232,7 @@ TEST_CASE("Lichess games: the speeds and the moment asked for, and the new games
     filters.perf_types = perfTypes(1);
     filters.since      = lichess.games[4].start;  // a year back, a date: the games from then on
     const auto first   = syncGames(*db, "Me", "", progress, cancel, 50, filters);
-    CHECK_MESSAGE(first.error.empty(), first.error);
+    CHECK_MESSAGE(!first.failed(), describe(first));
     CHECK(lichess.lastPath() == fmt::format("/api/games/user/Me?clocks=true&evals=true&opening=true&sort=dateAsc"
                                             "&perfType=blitz,rapid,classical,chess960&since={}",
                                             filters.since));
@@ -250,7 +252,7 @@ TEST_CASE("Lichess games: the speeds and the moment asked for, and the new games
     REQUIRE(counter.ok());
     servers().api    = fmt::format("http://127.0.0.1:{}", port);
     const auto count = countNewGames(db->folder(), "Me", "", filters);
-    REQUIRE_MESSAGE(count.value, count.error);
+    REQUIRE_MESSAGE(count.value, describe(count));
     CHECK(*count.value == 3);
     CHECK(asked == fmt::format("/api/games/user/Me?moves=false&tags=false&max=1000"
                                "&perfType=blitz,rapid,classical,chess960&since={}",
@@ -258,4 +260,51 @@ TEST_CASE("Lichess games: the speeds and the moment asked for, and the new games
     // A database without Lichess's games: nothing asked.
     auto other = emptyDatabase("lichess-none");
     CHECK_FALSE(countNewGames(other->folder(), "Me", "", filters).value);
+}
+
+TEST_CASE("Lichess games: each failure of a sync and of the new games' count told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    auto db = emptyDatabase("lichess-sync-failures");
+    SyncProgress progress;
+    std::atomic<bool> cancel{false};
+    // A database that holds an account's games, for the count.
+    Export lichess(lichessGames(3, 0, 1));
+    REQUIRE_FALSE(syncGames(*db, "Me", "", progress, cancel).failed());
+    const auto base = server.base();
+    servers()       = Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        const auto report = syncGames(*db, "Me", "tok", progress, cancel);
+        CHECK(report.net == net);
+        CHECK(report.added == 0);
+        CHECK(countNewGames(db->folder(), "Me", "tok", {}).net == net);
+    }
+    // The database the games would go to holds another account's: the program's own words.
+    const auto other = syncGames(*db, "Someone", "tok", progress, cancel);
+    CHECK(describe(other) == "this database holds Me's games");
+    CHECK(other.net == NetError::None);
+    pointNowhere();
+    const auto nobody = syncGames(*db, "Me", "tok", progress, cancel);
+    CHECK(nobody.net == NetError::Offline);
+    CHECK(describe(nobody) == "Lichess cannot be reached");
+    CHECK(countNewGames(db->folder(), "Me", "tok", {}).net == NetError::Offline);
+    // Cancelled: nothing to say.
+    pointAtPausedHost("lichess-games.invalid");
+    cancel             = true;
+    const auto stopped = syncGames(*db, "Me", "tok", progress, cancel);
+    CHECK(stopped.cancelled);
+    CHECK_FALSE(stopped.failed());
+    CHECK(countNewGames(db->folder(), "Me", "tok", {}, &cancel).net == NetError::Cancelled);
+    servers() = Servers{};
 }

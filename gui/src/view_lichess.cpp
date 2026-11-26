@@ -553,11 +553,11 @@ void App::drawLichessGames() {
         }
         if (lichess_sync_report_) {
             const auto& r = *lichess_sync_report_;
-            if (!r.error.empty())
+            if (r.failed())
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                    trf("Stopped: {}. The games received are in the database; Sync goes on from the "
                                        "next one.",
-                                       r.error)
+                                       lichess::describe(r))
                                        .c_str());
             else
                 ImGui::TextUnformatted(trf("Done: {} new games{}.", ui::exactCount(r.added),

@@ -2100,7 +2100,7 @@ class App {
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<lichess::SyncProgress> progress;
         std::future<lichess::SyncReport> sync;
-        std::string error;
+        lichess::Failure error;  // why their games did not come: Lichess's, or the database's own words
         std::future<lichess::Answer<lichess::Profile>> profile_job;
         std::optional<lichess::Profile> profile;
         lichess::Failure profile_error;

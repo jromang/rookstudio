@@ -112,12 +112,9 @@ SyncReport syncGames(study::Database& db, const std::string& username, const std
     }
     SyncState state{before ? before->username : username, before ? before->since : 0};  // the name as first written
 
-    HttpRequest request;
-    request.url       = exportUrl(username, filters, askedSince(state, filters), true);
-    request.method    = "GET";
-    request.token     = token;
-    request.timeout_s = 60;
-    request.headers.emplace_back("Accept", "application/x-chess-pgn");
+    auto asked      = request("GET", exportUrl(username, filters, askedSince(state, filters), true), token,
+                              "application/x-chess-pgn");
+    asked.timeout_s = 60;
 
     std::string pending;  // what came of the games not read yet
     std::vector<study::ImportedGame> batch;
@@ -154,12 +151,8 @@ SyncReport syncGames(study::Database& db, const std::string& username, const std
         return batch.size() < commit_games || commit();
     };
 
-    int status = 0;
     HttpStream stream;
-    stream.on_head = [&](int s, std::string_view) {
-        status = s;
-        return s == 200;
-    };
+    stream.on_head = [](int s, std::string_view) { return s == 200; };
     // Every game but the last that came is whole: another starts after it.
     stream.on_data = [&](std::string_view data) {
         pending.append(data);
@@ -171,12 +164,12 @@ SyncReport syncGames(study::Database& db, const std::string& username, const std
         }
         return !cancel;
     };
-    stream.cancel     = &cancel;
-    stream.idle_s     = 60;
-    const auto result = politeStream(request, stream);
+    stream.cancel    = &cancel;
+    stream.idle_s    = 60;
+    const auto broke = responseOf(asked, politeStream(asked, stream));
 
     report.cancelled = cancel;
-    const bool whole = status == 200 && result.error.empty() && !report.cancelled && refused.empty();
+    const bool whole = !broke.failed() && !report.cancelled && refused.empty();
     if (whole) {
         for (const auto piece : study::splitGames(pending))
             if (!take(piece)) break;
@@ -184,13 +177,9 @@ SyncReport syncGames(study::Database& db, const std::string& username, const std
     commit();
     if (!refused.empty()) {
         report.error = "the database could not take the games: " + refused;
-    } else if (status != 200 && !report.cancelled) {
-        report.error = status == 0     ? (result.error.empty() ? std::string("Lichess did not answer") : result.error)
-                       : status == 404 ? fmt::format("Lichess has no account named {}", username)
-                       : status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                                       : fmt::format("Lichess answered {}", status);
-    } else if (!whole && !report.cancelled) {
-        report.error = result.error.empty() ? std::string("the games stopped coming") : result.error;
+    } else if (!whole && !report.cancelled) {  // refused by Lichess, or the network cut it
+        static_cast<Failure&>(report) = broke;
+        report.asked                  = Asked::Player;
     }
     return report;
 }
@@ -198,40 +187,25 @@ SyncReport syncGames(study::Database& db, const std::string& username, const std
 Answer<uint64_t> countNewGames(const std::filesystem::path& database, const std::string& username,
                                const std::string& token, const SyncFilters& filters, const std::atomic<bool>* cancel,
                                uint64_t most) {
-    Answer<uint64_t> out;
     const auto state = loadSyncState(database);
-    if (!state) {
-        out.error = "the database holds no Lichess games";
-        return out;
-    }
+    if (!state) return failedWith<uint64_t>(Failure::own("the database holds no Lichess games"));
     // The games after the latest one held: from its start on, itself left out (it comes again within the minute).
-    HttpRequest request;
-    request.url = exportUrl(username, filters, state->since + 1000, false);
-    request.url.replace(request.url.find("max=1000"), 8, fmt::format("max={}", most));
-    request.method    = "GET";
-    request.token     = token;
-    request.timeout_s = 30;
-    request.headers.emplace_back("Accept", "application/x-ndjson");
-    uint64_t lines = 0;
-    int status     = 0;
+    auto url = exportUrl(username, filters, state->since + 1000, false);
+    url.replace(url.find("max=1000"), 8, fmt::format("max={}", most));
+    auto asked      = request("GET", url, token, "application/x-ndjson");
+    asked.timeout_s = 30;
+    uint64_t lines  = 0;
     HttpStream stream;
-    stream.on_head = [&](int s, std::string_view) {
-        status = s;
-        return s == 200;
-    };
+    stream.on_head = [](int s, std::string_view) { return s == 200; };
     stream.on_data = [&](std::string_view data) {
         lines += static_cast<uint64_t>(std::count(data.begin(), data.end(), '\n'));
         return !(cancel && *cancel);
     };
-    stream.cancel     = cancel;
-    stream.idle_s     = 30;
-    const auto result = politeStream(request, stream);
-    out.status        = status;
-    if (status == 200 && result.error.empty())
-        out.value = lines;
-    else
-        out.error = status == 0 ? (result.error.empty() ? std::string("Lichess did not answer") : result.error)
-                                : fmt::format("Lichess answered {}", status);
+    stream.cancel = cancel;
+    stream.idle_s = 30;
+    auto out      = failedWith<uint64_t>(responseOf(asked, politeStream(asked, stream)));
+    out.asked     = Asked::Player;
+    if (!out.failed()) out.value = lines;
     return out;
 }
 

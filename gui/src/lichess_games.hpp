@@ -29,10 +29,11 @@ struct SyncProgress {
     std::atomic<uint64_t> games{0};  // read so far
 };
 
-struct SyncReport {
+// What a sync read and added; why it stopped early (Failure: Lichess's refusal or the network, a player's 404 as
+// Lichess having no account of that name; the database's refusal in its own words). The games committed before stay.
+struct SyncReport : Failure {
     uint64_t read = 0, added = 0, duplicates = 0, damaged = 0;
     bool cancelled = false;
-    std::string error;  // why it stopped early; the games committed before stay
 };
 
 // What is asked of Lichess's export (M4, board 3): the speeds and variants, by Lichess's perf types

@@ -58,7 +58,7 @@ void App::startPrep(const std::string& opponent) {
         if (p.index == SIZE_MAX) p.index = s.create(name);
         if (!(lichess_sync_ && lichess_sync_->index == p.index)) db = s.open(p.index);
     } catch (const std::exception& e) {
-        p.error = e.what();
+        p.error = lichess::Failure::own(e.what());
     }
     // A year of their blitz, rapid and classical games (what Lichess's export is asked: their name and these filters).
     if (db) {
@@ -93,7 +93,7 @@ void App::pollPrep() {
     }
     if (ready(p.sync)) {
         const auto report = p.sync.get();
-        if (!report.error.empty() && !report.cancelled) p.error = report.error;
+        if (report.failed() && !report.cancelled) p.error = report;
         if (report.added > 0 && p.index < shelf().entries().size()) shelf().rebuildTree(p.index);
         ++p.synced;
     }

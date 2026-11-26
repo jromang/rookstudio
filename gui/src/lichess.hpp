@@ -23,6 +23,7 @@
 
 #include "broadcast.hpp"
 #include "https.hpp"
+#include "lichess_http.hpp"
 
 namespace fcg {
 
@@ -87,12 +88,15 @@ class LichessRelay {
         std::string base = "https://lichess.org";
         std::string description;  // a new broadcast's, before "Engine games played with RookStudio."
     };
+    // What failed last: the broadcast or a round made, the games pushed.
+    enum class Step { None, Broadcast, Round, Push };
     struct Status {
         bool running = false;
         std::string url;
-        std::string error;
-        std::string last_push;  // "20:15:03"
-        std::size_t games = 0;  // pushed so far
+        Step failed = Step::None;  // None while all goes well
+        lichess::Failure error;    // why: no answer, Lichess's refusal, or the program's own words
+        std::string last_push;     // "20:15:03"
+        std::size_t games = 0;     // pushed so far
     };
 
     LichessRelay() = default;
@@ -119,5 +123,8 @@ class LichessRelay {
     std::shared_ptr<Session> session_;
     std::thread thread_;
 };
+
+// What failed last, translated ("The games could not be pushed to Lichess: …"); empty while all goes well.
+[[nodiscard]] std::string relayError(const LichessRelay::Status& status);
 
 }  // namespace fcg

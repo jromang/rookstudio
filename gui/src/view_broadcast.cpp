@@ -456,9 +456,9 @@ void App::drawLichess(bool& changed) {
     ui::topic(guide::topics::Lichess);
 
     const auto status = broadcaster_.lichess();
-    if (!status.error.empty()) {
+    if (const auto failed = relayError(status); !failed.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ui::BAD);
-        ImGui::TextWrapped("%s", status.error.c_str());
+        ImGui::TextWrapped("%s", failed.c_str());
         ImGui::PopStyleColor();
     }
     if (status.running) {

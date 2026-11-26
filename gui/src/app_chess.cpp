@@ -27,10 +27,12 @@
 
 #include "app_context.hpp"
 #include "assistant_service.hpp"
+#include "board_session.hpp"
 #include "board_text.hpp"
 #include "chesscom.hpp"
 #include "fide_rating_list.hpp"
 #include "focus_words.hpp"
+#include "guide.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
@@ -309,11 +311,189 @@ class App::ModulesContext final : public AppContext {
     App& app_;
 };
 
+// A kind of training session still in App (#76, #80–#82): its session answers the Board's hooks with App's functions,
+// until the kind moves into a module of its own.
+class App::OwnSession final : public BoardSession {
+   public:
+    enum class Kind { Training, Puzzles, Mistakes, Guess, Endgame, Vision };
+    OwnSession(App& app, Kind kind) : app_(app), kind_(kind) {}
+
+    void sessionMove(chess::Move move) override {
+        switch (kind_) {
+            case Kind::Training:
+                return app_.trainingAnswer(move);
+            case Kind::Puzzles:
+                return app_.puzzleAnswer(move);
+            case Kind::Mistakes:
+                return app_.mistakeAnswer(move);
+            case Kind::Guess:
+                return app_.guessAnswer(move);
+            case Kind::Endgame:
+                return app_.endgameAnswer(move);
+            case Kind::Vision:
+                return app_.visionAnswer(move);
+        }
+    }
+    void drawSessionPage() override {
+        switch (kind_) {
+            case Kind::Training:
+                return app_.drawTrainingPage();
+            case Kind::Puzzles:
+                return app_.drawPuzzlePage();
+            case Kind::Mistakes:
+                return app_.drawMistakePage();
+            case Kind::Guess:
+                return app_.drawGuessPage();
+            case Kind::Endgame:
+                return app_.drawEndgamePage();
+            case Kind::Vision:
+                return app_.drawVisionPage();
+        }
+    }
+    void sessionDropped() override {
+        switch (kind_) {
+            case Kind::Training:
+                return app_.dropTraining();
+            case Kind::Puzzles:
+                return app_.dropPuzzles();
+            case Kind::Mistakes:
+                return app_.dropMistakes();
+            case Kind::Guess:
+                return app_.dropGuess();
+            case Kind::Endgame:
+                return app_.dropEndgame();
+            case Kind::Vision:
+                return app_.dropVision();
+        }
+    }
+    void closeSession(bool back) override {
+        switch (kind_) {
+            case Kind::Training:
+                return app_.closeTraining(back);  // back to the Openings page, or the Training page in the review
+            case Kind::Puzzles:
+                return app_.closePuzzles(back);
+            case Kind::Mistakes:
+                return app_.closeMistakes(back);
+            case Kind::Guess:
+                return app_.closeGuess(back);
+            case Kind::Endgame:
+                return app_.closeEndgame(back);
+            case Kind::Vision:
+                return app_.closeVision(back);
+        }
+    }
+    bool hidesAids() const override {
+        switch (kind_) {
+            case Kind::Training:  // a question, or its cards being prepared
+                return app_.training_->phase == TrainingRun::Phase::Asking ||
+                       app_.training_->phase == TrainingRun::Phase::Preparing;
+            case Kind::Puzzles:  // a puzzle's question, its opponent's reply coming
+                return app_.puzzle_->phase == PuzzleRun::Phase::Asking ||
+                       app_.puzzle_->phase == PuzzleRun::Phase::Reply;
+            case Kind::Mistakes:  // an exercise's question, its answer being judged
+                return app_.mistake_->phase == MistakeRun::Phase::Asking ||
+                       app_.mistake_->phase == MistakeRun::Phase::Checking;
+            case Kind::Guess:  // a guess, until the game's move is shown
+                return app_.guess_->phase != GuessRun::Phase::Shown && app_.guess_->phase != GuessRun::Phase::End;
+            case Kind::Endgame:  // an endgame being played against the tables
+                return app_.endgame_->phase != EndgameRun::Phase::Done &&
+                       app_.endgame_->phase != EndgameRun::Phase::End;
+            case Kind::Vision:
+                return app_.vision_->phase != VisionRun::Phase::End;
+        }
+        return false;
+    }
+    bool keptAside() const override {
+        switch (kind_) {
+            case Kind::Training:
+                return app_.training_->aside;
+            case Kind::Puzzles:
+                return app_.puzzle_->aside;
+            case Kind::Mistakes:
+                return app_.mistake_->aside;
+            case Kind::Guess:
+                return app_.guess_->aside;
+            case Kind::Endgame:
+                return app_.endgame_->aside;
+            case Kind::Vision:
+                return app_.vision_->aside;
+        }
+        return false;
+    }
+    const char* guideTopic() const override {
+        switch (kind_) {
+            case Kind::Training:
+                return guide::topics::Training;
+            case Kind::Puzzles:
+                return guide::topics::Puzzles;
+            case Kind::Mistakes:
+                return guide::topics::Mistakes;
+            case Kind::Guess:
+                return guide::topics::GuessMoves;
+            case Kind::Endgame:
+                return guide::topics::Endgames;
+            case Kind::Vision:
+                return guide::topics::Vision;
+        }
+        return guide::topics::Board;
+    }
+
+   private:
+    App& app_;
+    Kind kind_;
+};
+
 void App::initChessModules() {
-    modules_context_ = std::make_unique<ModulesContext>(*this);
-    tv_              = std::make_unique<LichessTvPage>(*modules_context_);
-    arenas_          = std::make_unique<LichessArenasPage>(*modules_context_);
-    bot_             = std::make_unique<LichessBotPage>(*modules_context_);
+    modules_context_  = std::make_unique<ModulesContext>(*this);
+    tv_               = std::make_unique<LichessTvPage>(*modules_context_);
+    arenas_           = std::make_unique<LichessArenasPage>(*modules_context_);
+    bot_              = std::make_unique<LichessBotPage>(*modules_context_);
+    training_session_ = std::make_unique<OwnSession>(*this, OwnSession::Kind::Training);
+    puzzle_session_   = std::make_unique<OwnSession>(*this, OwnSession::Kind::Puzzles);
+    mistake_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Mistakes);
+    guess_session_    = std::make_unique<OwnSession>(*this, OwnSession::Kind::Guess);
+    endgame_session_  = std::make_unique<OwnSession>(*this, OwnSession::Kind::Endgame);
+    vision_session_   = std::make_unique<OwnSession>(*this, OwnSession::Kind::Vision);
+}
+
+// The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, asked in the order
+// the Board's hooks asked the kinds before.
+BoardSession* App::boardSession() const {
+    if (training_) return training_session_.get();
+    if (puzzle_) return puzzle_session_.get();
+    if (mistake_) return mistake_session_.get();
+    if (guess_) return guess_session_.get();
+    if (endgame_) return endgame_session_.get();
+    if (vision_) return vision_session_.get();
+    return nullptr;
+}
+
+bool App::drawBoardSession() {
+    auto* session = boardSession();
+    // A guided visit (#94) started during an endgame or a vision exercise shows over their page, as it always did.
+    if (!session || (visit_ && (endgame_ || vision_))) return false;
+    session->drawSessionPage();
+    return true;
+}
+
+bool App::boardSessionMove(chess::Move move) {
+    auto* session = boardSession();
+    if (!session) return false;
+    session->sessionMove(move);
+    return true;
+}
+
+void App::leaveBoardSession() {
+    if (auto* session = boardSession()) session->sessionDropped();
+}
+
+void App::closeBoardSession() {
+    if (auto* session = boardSession()) session->closeSession(false);
+}
+
+const char* App::sessionGuideTopic() const {
+    const auto* session = boardSession();
+    return session ? session->guideTopic() : nullptr;
 }
 
 // The arenas' hooks in fastchess-gui's pages (#95), which do not include its module's header.

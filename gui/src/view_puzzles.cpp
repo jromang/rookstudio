@@ -221,13 +221,8 @@ bool App::startPuzzleReview() {
 }
 
 void App::startPuzzleRun(std::unique_ptr<PuzzleRun> run) {
-    if (training_) closeTraining(false);
     const bool chained = review_running_;
-    if (puzzle_) closePuzzles(false);
-    if (mistake_) closeMistakes(false);  // a session of exercises, a game guessed (#81)
-    if (guess_) closeGuess(false);
-    if (endgame_) closeEndgame(false);  // an endgame against the tables, a vision exercise (#82)
-    if (vision_) closeVision(false);
+    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #81, #82)
     review_running_ = chained;
     for (std::size_t i = 0; i < run->puzzles.size(); ++i) run->queue.push_back(i);
     run->total        = run->puzzles.size();

@@ -74,12 +74,7 @@ const char* App::guideSection() const {
                 return guide::topics::OpeningReport;
             // A game against an engine (#83).
             if (engine_game_) return guide::topics::EngineGame;
-            if (training_) return Training;  // a session of the repertoire's training (#76)
-            if (puzzle_) return Puzzles;     // a series of puzzles (#80)
-            if (mistake_) return Mistakes;   // a session of exercises, a game guessed (#81)
-            if (guess_) return GuessMoves;
-            if (endgame_) return Endgames;  // an endgame against the tables, a vision exercise (#82)
-            if (vision_) return Vision;
+            if (const char* topic = sessionGuideTopic()) return topic;  // a training session (#76, #80–#82)
             if (!chessBoard()) return Board;
             switch (board_side_tab_) {
                 case 0:

@@ -132,6 +132,7 @@ namespace fcg {
 
 class AppContext;
 class AssistantService;
+class BoardSession;
 class EngineOracle;
 class LichessArenasPage;
 class LichessBotPage;
@@ -1092,6 +1093,24 @@ class App {
     bool online_dashboard_asked_ = false;
     void askOnlineBatch();
     void sendOnlineResults();
+
+    // The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, whatever its
+    // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
+    // The kinds still in App answer through sessions of App's own (OwnSession, app_chess.cpp), made by
+    // initChessModules(); a kind in a module of its own is its own session.
+    class OwnSession;
+    std::unique_ptr<BoardSession> training_session_, puzzle_session_, mistake_session_, guess_session_,
+        endgame_session_, vision_session_;
+    [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
+    // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
+    // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
+    // another game on the Board, the session left there; another session starting, the one that holds the Board
+    // closed, the Board page staying; the guide's section of its page (none when no session holds the Board).
+    bool drawBoardSession();
+    bool boardSessionMove(chess::Move move);
+    void leaveBoardSession();
+    void closeBoardSession();
+    [[nodiscard]] const char* sessionGuideTopic() const;
 
     // Your mistakes as exercises and guessing the moves (#81, mockup M12, board 2; mistakes.hpp, view_mistakes.cpp,
     // view_guess.cpp). The user's names (Settings › Your names, and the linked Lichess account's); the exercises their

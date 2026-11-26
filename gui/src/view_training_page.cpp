@@ -17,6 +17,7 @@
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include "app.hpp"
+#include "board_session.hpp"
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
@@ -299,10 +300,7 @@ std::string App::reviewNextLabel() {
 
 void App::drawReviewNext(bool enter) {
     const auto back = [this] {
-        if (training_) closeTraining(true);
-        if (puzzle_) closePuzzles(true);
-        if (mistake_) closeMistakes(true);
-        if (endgame_) closeEndgame(true);
+        if (auto* session = boardSession()) session->closeSession(true);
         review_running_ = false;
         review_chain_.clear();
         page_ = Page::Training;

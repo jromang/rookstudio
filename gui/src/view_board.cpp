@@ -194,13 +194,8 @@ int App::tournamentThreads() const {
 }
 
 void App::openOnBoard(ReplayGame game, int ply, bool chess960, std::string title, bool analyse) {
-    if (training_) dropTraining();  // another game on the board: the session ends there, its answers kept (#76)
-    if (puzzle_) dropPuzzles();     // so does a series of puzzles (#80)
-    if (mistake_) dropMistakes();   // a session of exercises, a game guessed (#81)
-    if (guess_) dropGuess();
-    if (endgame_) dropEndgame();  // an endgame against the tables, a vision exercise (#82)
-    if (vision_) dropVision();
-    rememberBoardGame();            // its changes and undo history go with it
+    leaveBoardSession();  // another game on the board: a training session ends there, its answers kept (#76, #80–#82)
+    rememberBoardGame();  // its changes and undo history go with it
     // The questions were about the game left: those still being answered stop at their next request, out of sight;
     // so do the comments being written, which go nowhere.
     leaveQuestions();
@@ -847,13 +842,8 @@ void App::boardPointer(const chess::Board& board, std::optional<chess::Square> p
 
 void App::drawBoardPage() {
     loadBoardSettings();
-    if (training_) return drawTrainingPage();  // a session of the repertoire's training: the column is its (#76)
-    if (puzzle_) return drawPuzzlePage();      // a series of puzzles: the column is the puzzle's (#80)
-    if (mistake_) return drawMistakePage();    // a session of exercises, a game guessed (#81)
-    if (guess_) return drawGuessPage();
-    if (visit_) return drawVisitPage();      // the guided visit of the key moments (#94)
-    if (endgame_) return drawEndgamePage();  // an endgame against the tables, a vision exercise (#82)
-    if (vision_) return drawVisionPage();
+    if (drawBoardSession()) return;      // a training session holds the Board: the page is its (#76, #80–#82)
+    if (visit_) return drawVisitPage();  // the guided visit of the key moments (#94)
     auto& b = board_;
 
     ui::pageTitle(TR("Board"), guideSection());

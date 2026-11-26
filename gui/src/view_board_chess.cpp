@@ -29,12 +29,7 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 }  // namespace
 
 void App::boardPlayAsked(chess::Move move) {
-    if (training_) return trainingAnswer(move);  // the answer to the training's question (#76)
-    if (puzzle_) return puzzleAnswer(move);      // to the puzzle's (#80)
-    if (mistake_) return mistakeAnswer(move);    // to the exercise's, the guess (#81)
-    if (guess_) return guessAnswer(move);
-    if (endgame_) return endgameAnswer(move);  // to the endgame's, the vision's (#82)
-    if (vision_) return visionAnswer(move);
+    if (boardSessionMove(move)) return;               // the answer to a training session's question (#76, #80–#82)
     if (visit_) return visitAnswer(move);             // the answer to the guided visit's question (#94)
     if (onlineShown()) return onlineMoveAsked(move);  // a game on Lichess: sent, waiting for Enter or its turn (#84)
     if (botShown()) {                                 // the Lichess bot's game: its engine plays it (#85)

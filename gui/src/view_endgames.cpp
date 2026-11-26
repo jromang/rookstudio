@@ -852,13 +852,8 @@ bool App::startGameEndgames() {
 }
 
 void App::startEndgameRun(std::unique_ptr<EndgameRun> run) {
-    if (training_) closeTraining(false);
     const bool chained = review_running_;
-    if (puzzle_) closePuzzles(false);
-    if (mistake_) closeMistakes(false);
-    if (guess_) closeGuess(false);
-    if (endgame_) closeEndgame(false);
-    if (vision_) closeVision(false);
+    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
     review_running_ = chained;
     endgame_error_.clear();
     run->flip     = board_.flip;

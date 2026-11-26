@@ -20,6 +20,7 @@
 #include <study/game_tree.hpp>
 
 #include "app.hpp"
+#include "board_session.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "i18n.hpp"
@@ -252,16 +253,9 @@ std::string App::trainingLock() const {
 }
 
 bool App::trainingHidesAids() const {
-    if (puzzle_ && (puzzle_->phase == PuzzleRun::Phase::Asking || puzzle_->phase == PuzzleRun::Phase::Reply))
-        return true;  // a puzzle's question (#80)
-    if (mistake_ && (mistake_->phase == MistakeRun::Phase::Asking || mistake_->phase == MistakeRun::Phase::Checking))
-        return true;  // an exercise's question, a guess (#81)
-    if (guess_ && guess_->phase != GuessRun::Phase::Shown && guess_->phase != GuessRun::Phase::End) return true;
-    // An endgame played against the tables, a vision exercise (#82).
-    if (endgame_ && endgame_->phase != EndgameRun::Phase::Done && endgame_->phase != EndgameRun::Phase::End)
-        return true;
-    if (vision_ && vision_->phase != VisionRun::Phase::End) return true;
-    return training_ && (training_->phase == Ask::Asking || training_->phase == Ask::Preparing);
+    // The question of the training session that holds the Board, whatever its kind (#76, #80–#82).
+    const auto* session = boardSession();
+    return session && session->hidesAids();
 }
 
 std::string App::trainingListLine(std::size_t index) {
@@ -415,12 +409,7 @@ void App::drawTrainingCard(std::size_t index) {
 
 void App::startTraining(std::size_t index, TrainingRun::Kind kind) {
     if (!trainingLock().empty() || index >= repertoires().entries().size()) return;
-    if (training_) closeTraining(false);
-    if (puzzle_) closePuzzles(false);  // a series of puzzles left where it is, its answers kept (#80)
-    if (mistake_) closeMistakes(false);  // a session of exercises, a game guessed (#81)
-    if (guess_) closeGuess(false);
-    if (endgame_) closeEndgame(false);  // an endgame against the tables, a vision exercise (#82)
-    if (vision_) closeVision(false);
+    closeBoardSession();  // the session that holds the Board left where it is, its answers kept (#80–#82)
     const auto& e  = repertoires().entries()[index];
     auto run       = std::make_unique<TrainingRun>();
     run->kind      = kind;
@@ -1226,7 +1215,7 @@ void App::drawTrainingEnd() {
 // The Home page
 
 bool App::trainingDue() {
-    if (training_ || puzzle_ || mistake_ || guess_ || endgame_ || vision_) return true;
+    if (boardSession()) return true;  // a training session holds the Board (#76, #80–#82)
     return reviewDay().due() > 0;  // the day's review, every kind (#80)
 }
 

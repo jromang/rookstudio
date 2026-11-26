@@ -171,8 +171,7 @@ std::string App::playLock() const {
         return TR(
             "One of your games is being played live on Lichess: no game against an engine meanwhile (fair "
             "play).");
-    if (training_ || puzzle_ || mistake_ || guess_ || endgame_ || vision_)
-        return TR("Once the exercise on the Board is over.");
+    if (boardSession()) return TR("Once the exercise on the Board is over.");  // a training session (#76, #80–#82)
     if (engine_game_ && !engine_game_->over) return TR("A game against an engine is being played on the Board.");
     if (board_.match && board_.match_state.running) return TR("Once the game played on the board is over.");
     return {};
@@ -468,8 +467,7 @@ void App::resumeEngineGame() {
     if (!engine_game_ || !engine_game_->waiting) return;
     auto& g = *engine_game_;
     play_error_.clear();
-    if (liveGameOn() || training_ || puzzle_ || mistake_ || guess_ || endgame_ || vision_ ||
-        (board_.match && board_.match_state.running)) {
+    if (liveGameOn() || boardSession() || (board_.match && board_.match_state.running)) {
         boardToast(TR("The game waits: something else is being played on the Board."));
         return;
     }

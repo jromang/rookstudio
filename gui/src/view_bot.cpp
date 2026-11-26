@@ -259,7 +259,7 @@ lichess::BotPlay App::botPlay() const {
 
 void App::startBotLink() {
     if (bot_link_ || bot_check_.valid()) return;
-    bot_error_.clear();
+    bot_error_      = {};
     bot_unanswered_ = false;
     auto link       = std::make_unique<BotLink>();
     link->cancel    = std::make_shared<std::atomic<bool>>(false);
@@ -294,7 +294,7 @@ void App::checkBotToken(std::string token) {
     token.erase(0, token.find_first_not_of(" \t\r\n"));
     token.erase(token.find_last_not_of(" \t\r\n") + 1);
     if (token.empty()) return;
-    bot_error_.clear();
+    bot_error_      = {};
     bot_unanswered_ = false;
     bot_check_      = std::async(std::launch::async, [token] { return lichess::checkBotToken(token); });
 }
@@ -303,7 +303,7 @@ void App::keepBotAccount(const lichess::Account& account) {
     try {
         lichess::saveAccount(storage_.root(), account, lichess::BOT_ACCOUNT_FILE);
     } catch (const std::exception& e) {
-        bot_error_ = e.what();
+        bot_error_ = lichess::Failure::own(e.what());
         return;
     }
     // Another account than the last one: its games and words stay, its account's facts follow.
@@ -323,7 +323,7 @@ void App::forgetBotAccount() {
     botSettings().facts = {};
     saveBotSettings();
     bot_step_ = BotStep::Card;
-    bot_error_.clear();
+    bot_error_ = {};
 }
 
 // ---------------------------------------------------------------------------
@@ -502,7 +502,8 @@ void App::pollBot() {
         if (!c.account || !c.facts) {
             if (c.net == lichess::NetError::Cancelled) return;
             bot_unanswered_ = c.status == 0 && !lichess::linkRefused(c);
-            bot_error_      = c.failed() ? lichess::describe(c) : std::string(TR("Lichess did not answer"));
+            bot_error_      = c;
+            if (!bot_error_.failed()) bot_error_.net = lichess::NetError::Offline;  // nothing, and no word why
             if (c.linked && c.account) {
                 revokeToken(c.account->token);
             }
@@ -542,11 +543,11 @@ void App::pollBot() {
             botSettings().upgraded_at = static_cast<int64_t>(std::time(nullptr));
             saveBotSettings();
             bot_step_ = BotStep::Card;
-            bot_error_.clear();
+            bot_error_ = {};
             std::fill(bot_confirm_.begin(), bot_confirm_.end(), '\0');
         } else {
             bot_unanswered_ = r.status == 0;
-            bot_error_      = lichess::describe(r);
+            bot_error_      = r;
             bot_step_       = BotStep::Account;
             // Refused: the account looked at again, what Lichess saw in it then said.
             if (r.status != 0 && bot_account_ && !bot_check_.valid())
@@ -869,7 +870,7 @@ void App::drawBotIntro(const EngineEntry& e) {
 void App::drawBotSteps() {
     const auto* f = bot_facts_ ? &*bot_facts_ : nullptr;
     const bool shown_refusal =
-        bot_candidate_.has_value() || (f && !f->bot() && f->games > 0) || (!bot_error_.empty() && !bot_link_);
+        bot_candidate_.has_value() || (f && !f->bot() && f->games > 0) || (bot_error_.failed() && !bot_link_);
     // 1: an account of its own, made on lichess.org.
     const bool linked = bot_account_.has_value();
     ImGui::Spacing();
@@ -967,7 +968,7 @@ void App::drawBotSteps() {
     if (ImGui::SmallButton(TR("Close##bot_steps"))) {
         bot_step_ = BotStep::Card;
         bot_setup_engine_.clear();
-        if (!bot_account_) bot_error_.clear();
+        if (!bot_account_) bot_error_ = {};
     }
 }
 
@@ -1013,9 +1014,9 @@ void App::drawBotRefusal() {
         create = other = true;
     } else if (bot_unanswered_) {
         coloured(TR("Lichess did not answer: nothing changed, try again."), ui::WARN);
-        if (!bot_error_.empty()) ImGui::TextDisabled("%s", bot_error_.c_str());
-    } else if (!bot_error_.empty()) {
-        coloured(trf("Lichess refuses: {}", bot_error_), ui::WARN);
+        if (bot_error_.failed()) ImGui::TextDisabled("%s", lichess::describe(bot_error_).c_str());
+    } else if (bot_error_.failed()) {
+        coloured(lichess::describeAlone(bot_error_), ui::WARN);
         wrapped(TR("Nothing changed on the account."), true);
         other = true;
     }
@@ -1070,7 +1071,7 @@ void App::drawBotConfirm() {
     const bool busy    = bot_upgrade_.valid();
     if (primaryButton(busy ? TR("Asking Lichess…") : TR("Make it a bot"), matches && !busy, ui::BAD) ||
         (enter && matches && !busy)) {
-        bot_error_.clear();
+        bot_error_      = {};
         bot_unanswered_ = false;
         bot_upgrade_ =
             std::async(std::launch::async, [token = bot_account_->token] { return lichess::upgradeToBot(token); });

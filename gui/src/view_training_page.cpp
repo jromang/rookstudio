@@ -575,7 +575,8 @@ void App::pollPuzzles() {
             online_error_ = lichess::describe(answer);
             // Kept: sent again by itself in a minute, unless Lichess refused the token. The last send that went
             // through stays said as it was.
-            if (answer.status != 401 && answer.status != 403) online_retry_ = Clock::now() + std::chrono::seconds(61);
+            if (answer.net != lichess::NetError::Unauthorized && answer.net != lichess::NetError::Forbidden)
+                online_retry_ = Clock::now() + std::chrono::seconds(61);
         }
     }
     // A batch done and not taken yet (a 429, a cut, the program closed meanwhile): sent again.

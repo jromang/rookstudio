@@ -305,7 +305,7 @@ void App::pollEndgames() {
             keepTablebase(storage_.root(), r.asking_fen, *answer.value);
             r.answers[r.asking_fen] = *answer.value;
             r.waiting.clear();
-            r.waiting_status = 0;
+            r.waiting_net = lichess::NetError::None;
             if (r.asking_fen == askedBoard(r).getFen()) {
                 r.answer     = std::move(*answer.value);
                 r.answer_fen = r.asking_fen;
@@ -316,8 +316,9 @@ void App::pollEndgames() {
             r.waiting        = answer.value      ? std::string(TR("Lichess's tables do not know this position."))
                                : answer.failed() ? lichess::describe(answer)
                                                  : std::string(TR("no answer"));
-            r.waiting_status = answer.status;
-            r.retry_at       = Clock::now() + std::chrono::seconds(answer.status == 429 ? 61 : RETRY_SECONDS);
+            r.waiting_net    = answer.net;
+            r.retry_at =
+                Clock::now() + std::chrono::seconds(answer.net == lichess::NetError::RateLimited ? 61 : RETRY_SECONDS);
         }
         if (!endgame_) return;
         // An answer for a position left meanwhile (a move taken back): the board's own asked now.
@@ -1737,10 +1738,9 @@ void App::drawEndgameColumn() {
     } else if (!r.waiting.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::WARN));
         ImGui::TextWrapped("%s",
-                           (r.waiting_status == 429
-                                ? trf("Lichess asks to wait a minute ({}): your moves are kept, the judging goes on "
-                                      "by itself.",
-                                      r.waiting)
+                           (r.waiting_net == lichess::NetError::RateLimited
+                                ? std::string(TR("Lichess asks to wait a minute: your moves are kept, the judging goes "
+                                                 "on by itself."))
                                 : trf("Lichess's tables do not answer ({}): your moves are kept, the judging goes "
                                       "on when the network comes back.",
                                       r.waiting))

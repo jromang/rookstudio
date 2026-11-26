@@ -216,7 +216,7 @@ struct EndgameRun {
     std::string asking_fen;
     std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);  // the session left
     std::string waiting;
-    int waiting_status = 0;
+    lichess::NetError waiting_net = lichess::NetError::None;  // its kind: a 429 waits a minute
     std::chrono::steady_clock::time_point retry_at{};
     std::string missing;  // the tables a position needs and nothing gives ("" none)
     // A move of the user's played before the tables' answer came: judged when it comes.

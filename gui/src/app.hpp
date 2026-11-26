@@ -2534,7 +2534,7 @@ class App {
     // The account as last checked, the check under way, the refusal said.
     std::optional<lichess::BotAccountFacts> bot_facts_;
     std::future<lichess::BotTokenCheck> bot_check_;  // a token pasted, checked
-    std::string bot_error_;                          // why the last link, check or upgrade gave nothing
+    lichess::Failure bot_error_;                     // why the last link, check or upgrade gave nothing
     bool bot_unanswered_ = false;                    // Lichess did not answer: nothing changed, to try again
     // An account refused before it was kept (the user's own, closed, a token that may not play), and why.
     std::optional<lichess::BotAccountFacts> bot_candidate_;

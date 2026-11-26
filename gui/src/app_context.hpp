@@ -2,16 +2,17 @@
 
 // What a module of RookStudio's asks of the program around it (#107). A module holds an area of its own out of App
 // (its state, its poll(), its draw(), its palette commands and --focus words: Lichess TV, lichess_tv_page.hpp; the
-// arenas and Swiss tournaments, lichess_arenas_page.hpp), and reaches the rest through the facets below instead of
-// App's members: the program (the frame, the profile and its databases, the jobs), the pages it opens, the databases'
-// pages, the Board, the mosaic its games show in, the Lichess settings, the user's Lichess account, the user's games on
-// Lichess. A module's context is the facets it needs (TvContext, ArenasContext); App answers them all (AppContext, by
-// App::ModulesContext, app_chess.cpp), and a test only those of the module it builds, with a fake of its own, without
-// App.
+// arenas and Swiss tournaments, lichess_arenas_page.hpp; the Lichess bot, lichess_bot_page.hpp), and reaches the rest
+// through the facets below instead of App's members: the program (the frame, the profile and its databases, the jobs),
+// the pages it opens, the databases' pages, the Board, the mosaic its games show in, the Lichess settings, the user's
+// Lichess account and its link, the user's games on Lichess and the fair play their live game holds, the engines and
+// the cores, the Board taken by a game followed live, the tokens given up, the window. A module's context is the facets
+// it needs (TvContext, ArenasContext, BotContext); App answers them all (AppContext, by App::ModulesContext,
+// app_chess.cpp), and a test only those of the module it builds, with a fake of its own, without App.
 //
 // Each method says what a module needs, in its words, not which member of App gives it. The facets hold only what the
-// modules out of App need now, and grow with those that follow (the bot, training): a facet a module does not ask for
-// is none of its fake's business.
+// modules out of App need now, and grow with those that follow (training): a facet a module does not ask for is none
+// of its fake's business.
 
 #include <cstddef>
 #include <cstdint>
@@ -23,10 +24,13 @@
 
 namespace fcg {
 
+struct BookEntry;
 class CrosstableStore;
 class DatabaseShelf;
+struct EngineEntry;
 class JobGroup;
 struct LichessSettings;
+class PieceAtlas;
 struct ReplayGame;
 namespace lichess {
 struct Account;
@@ -150,13 +154,21 @@ class Lichess {
     [[nodiscard]] virtual std::vector<std::string> ownLichessIds() = 0;
 };
 
-// The user's Lichess account (#45): its token and what it may do, a link made again to ask for more, the question the
-// Lichess page's card asks; the account's profile (#46), the user's figures.
+// The user's own Lichess account (#45): its name, its token and what it may do; none while no account is linked. A
+// module of another account keeps apart from it (the bot's, #85).
+class LinkedAccount {
+   public:
+    virtual ~LinkedAccount() = default;
+
+    [[nodiscard]] virtual const lichess::Account* lichessAccount() const = 0;
+};
+
+// The link of the user's Lichess account (#45): a link made again to ask for more, the question the Lichess page's card
+// asks; the account's profile (#46), the user's figures.
 class Account {
    public:
     virtual ~Account() = default;
 
-    [[nodiscard]] virtual const lichess::Account* lichessAccount() const = 0;  // none while no account is linked
     // A link under way: Lichess's page open in the browser, its answer awaited; why the last link failed.
     [[nodiscard]] virtual bool lichessLinking() const                      = 0;
     [[nodiscard]] virtual const lichess::Failure& lichessLinkError() const = 0;
@@ -182,17 +194,24 @@ struct OnlineGame {
     const lichess::BoardState& state;
 };
 
-// The user's games on Lichess: those in progress (#48) and the lock they hold, the one played on the Board (#84), the
-// Play page's settings of them, those that ended and were kept (#49).
+// Fair play (#48): a live game of the user's is being played on Lichess, or held between two (an arena's, #95): every
+// aid is locked, and a module shows no engine's search (the bot's, #85).
+class FairPlay {
+   public:
+    virtual ~FairPlay() = default;
+
+    [[nodiscard]] virtual bool liveGameOn() const = 0;
+};
+
+// The user's games on Lichess: those in progress (#48), the one played on the Board (#84), the Play page's settings of
+// them, those that ended and were kept (#49).
 class Playing {
    public:
     virtual ~Playing() = default;
 
     [[nodiscard]] virtual const std::vector<lichess::PlayingGame>& playingGames() const = 0;
     [[nodiscard]] virtual std::optional<OnlineGame> onlineGame() const                  = 0;
-    // A live game of the user's is being played, or held between two (fair play, #48): every aid locked.
-    [[nodiscard]] virtual bool liveGameOn() const = 0;
-    virtual void backToOnlineGame()               = 0;
+    virtual void backToOnlineGame()                                                     = 0;
     // The opponent of the game on the Board, as said there: "Partner_3 (1836)".
     [[nodiscard]] virtual std::string onlineOpponent() const = 0;
     // A request about the game on the Board, made with the token; refused, said where the user plays, as `what`.
@@ -211,6 +230,67 @@ class Playing {
     virtual void closeAnyway() = 0;
 };
 
+// The engines: the library's, its books, the tables the tournaments give them; the cores of this computer the
+// tournaments leave (the core budget); the Engines page.
+class Engines {
+   public:
+    virtual ~Engines() = default;
+
+    // The library's engines and books (the Engines and Books pages).
+    [[nodiscard]] virtual const std::vector<EngineEntry>& engines() const = 0;
+    [[nodiscard]] virtual const std::vector<BookEntry>& books() const     = 0;
+    // The tournaments' tables (their engines' SyzygyPath; empty: none).
+    [[nodiscard]] virtual std::string tournamentTables() const = 0;
+    // A tournament plays on this computer (not on a machine of Settings > Machines); the cores of the budget that the
+    // tournaments and the window's engines leave free.
+    [[nodiscard]] virtual bool tournamentPlaysHere() const = 0;
+    [[nodiscard]] virtual int freeCores() const            = 0;
+    // The engine whose card the Engines page shows (none: another page, or no card); the Engines page shown, the card
+    // of the library's engine `engine` selected when given (-1: none), the engines marked several at once let go when
+    // `alone`.
+    [[nodiscard]] virtual const EngineEntry* engineShown() const       = 0;
+    virtual void showEngineCard(std::optional<int> engine, bool alone) = 0;
+};
+
+// The Board, taken by a game played elsewhere and followed move by move (the Lichess bot's, #85), and how it writes and
+// draws a game.
+class LiveBoard {
+   public:
+    virtual ~LiveBoard() = default;
+
+    // The Board takes such a game: the one it showed goes among the recent games with its changes, its edits, analysis
+    // and selection let go, the user's own game on Lichess goes on out of sight; an empty game from the start, titled
+    // `title`, followed at its last move.
+    virtual void takeBoard(const std::string& title) = 0;
+    // Its game as it goes on (`chess960`: in that variant), at its last move unless the user went back in it; its
+    // title, once known (empty: as it was); the side below, when `flip` is given.
+    virtual void updateBoard(ReplayGame game, bool chess960, const std::string& title, std::optional<bool> flip) = 0;
+    // The Board page, in a view that holds the Board (the study's, when the view shown holds none), without a way back
+    // to the page before.
+    virtual void showLiveBoard() = 0;
+    // A move in SAN as the Board writes it (in the Chess space, its pieces' letters in the reader's language); the
+    // pieces the boards are drawn with.
+    [[nodiscard]] virtual std::string boardSan(std::string san) const = 0;
+    [[nodiscard]] virtual const PieceAtlas& pieces() const            = 0;
+};
+
+// The Lichess tokens given up (one replaced by another, one RookStudio received for an account it refuses): revoked in
+// the background, a failure said in the console, waited for at the end.
+class Tokens {
+   public:
+    virtual ~Tokens() = default;
+
+    virtual void revokeToken(std::string token) = 0;
+};
+
+// The window: back in front of the others (the browser, once Lichess answered there).
+class Window {
+   public:
+    virtual ~Window() = default;
+
+    virtual void raiseWindow() = 0;
+};
+
 }  // namespace context
 
 // What Lichess TV asks of the program (lichess_tv_page.hpp).
@@ -226,10 +306,21 @@ class ArenasContext : public virtual context::Program,
                       public virtual context::Databases,
                       public virtual context::Mosaic,
                       public virtual context::Lichess,
+                      public virtual context::LinkedAccount,
                       public virtual context::Account,
+                      public virtual context::FairPlay,
                       public virtual context::Playing {};
 
+// What the Lichess bot asks of the program (lichess_bot_page.hpp).
+class BotContext : public virtual context::Program,
+                   public virtual context::Engines,
+                   public virtual context::LiveBoard,
+                   public virtual context::LinkedAccount,
+                   public virtual context::FairPlay,
+                   public virtual context::Tokens,
+                   public virtual context::Window {};
+
 // What App answers: every module's context, each facet once.
-class AppContext : public TvContext, public ArenasContext {};
+class AppContext : public TvContext, public ArenasContext, public BotContext {};
 
 }  // namespace fcg

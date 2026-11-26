@@ -11,12 +11,15 @@
 #include <fstream>
 #include <future>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <string_view>
 
+#include <SDL3/SDL.h>
 #include <imgui.h>
 
 #include <study/evals_index.hpp>
+#include <study/game_tree.hpp>
 #include <study/import.hpp>
 #include <study/patterns.hpp>
 #include <tour/files.hpp>
@@ -177,7 +180,6 @@ class App::ModulesContext final : public AppContext {
         const auto& g = *app_.online_game_;
         return context::OnlineGame{g.id, g.white, g.shown, g.ended, g.state};
     }
-    bool liveGameOn() const override { return app_.liveGameOn() != nullptr; }
     void backToOnlineGame() override { app_.backToOnlineGame(); }
     std::string onlineOpponent() const override { return app_.onlineOpponent(); }
     void onlineCall(std::string what, std::function<lichess::Reply(const std::string& token)> call) override {
@@ -209,6 +211,88 @@ class App::ModulesContext final : public AppContext {
     void closeAnyway() override {
         app_.quit_online_said_ = true;
         app_.requestQuit();
+    }
+
+    // Fair play.
+    bool liveGameOn() const override { return app_.liveGameOn() != nullptr; }
+
+    // The engines.
+    const std::vector<EngineEntry>& engines() const override { return app_.engines_; }
+    const std::vector<BookEntry>& books() const override { return app_.books_; }
+    std::string tournamentTables() const override { return app_.setup_.tb_paths; }
+    bool tournamentPlaysHere() const override {
+        return std::any_of(app_.runs_.begin(), app_.runs_.end(), [](const auto& r) {
+            return r.run->remote() && r.run->running() && r.machine_id.empty() && r.run->tournament();
+        });
+    }
+    int freeCores() const override { return app_.freeCores(); }
+    const EngineEntry* engineShown() const override {
+        const int i = app_.selected_engine_;
+        if (app_.page_ != Page::Engines || i < 0 || i >= static_cast<int>(app_.engines_.size())) return nullptr;
+        return &app_.engines_[static_cast<std::size_t>(i)];
+    }
+    void showEngineCard(std::optional<int> engine, bool alone) override {
+        app_.page_ = Page::Engines;
+        if (engine) app_.selected_engine_ = *engine;
+        if (alone) app_.engine_marked_.clear();
+    }
+
+    // The Board taken by a game followed live.
+    void takeBoard(const std::string& title) override {
+        auto& b = app_.board_;
+        app_.rememberBoardGame();
+        app_.board_origin_.reset();
+        b.undo.clear();
+        b.redo.clear();
+        b.start_notes = {};
+        b.comment_edit.reset();
+        b.changes  = {};
+        b.watching = false;
+        b.selected.reset();
+        b.move_typed.reset();
+        b.preview.reset();
+        b.pgn.reset();
+        if (b.analysing) app_.setBoardAnalysis(false);
+        b.game           = ReplayGame{};
+        b.game.start_fen = std::string(chess::constants::STARTPOS);
+        b.tree           = GameTree{b.game, {}};
+        b.line           = -1;
+        b.ply            = INT32_MAX;
+        b.chess960       = false;
+        b.title          = title;
+        b.message.clear();
+        if (app_.online_game_) app_.online_game_->shown = false;
+        ++app_.board_game_serial_;
+    }
+    void updateBoard(ReplayGame game, bool chess960, const std::string& title, std::optional<bool> flip) override {
+        auto& b = app_.board_;
+        // The board follows the game, unless the user went back in it.
+        const bool at_end = b.line >= 0 || b.ply >= static_cast<int>(b.game.moves.size());
+        b.game            = std::move(game);
+        b.tree            = GameTree{b.game, {}};
+        b.line            = -1;
+        b.chess960        = chess960;
+        if (at_end) b.ply = static_cast<int>(b.game.moves.size());
+        b.ply = std::clamp(b.ply, 0, static_cast<int>(b.game.moves.size()));
+        if (!title.empty()) b.title = title;
+        if (flip) b.flip = *flip;
+    }
+    void showLiveBoard() override {
+        if (!app_.views_.empty() && !app_.view().holds(views::PageId::Board))
+            app_.toStudyBoard();
+        else
+            app_.page_ = Page::Board;
+        app_.board_back_.reset();
+    }
+    std::string boardSan(std::string san) const override { return app_.boardSan(std::move(san)); }
+    const PieceAtlas& pieces() const override { return app_.atlas_; }
+
+    // The tokens given up.
+    void revokeToken(std::string token) override { app_.revokeToken(std::move(token)); }
+
+    // The window.
+    void raiseWindow() override {
+        if (app_.window_) SDL_RaiseWindow(app_.window_);
     }
 
    private:

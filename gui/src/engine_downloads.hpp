@@ -26,11 +26,26 @@ namespace fcg::catalogue {
 
 inline constexpr std::string_view GITHUB_API = "https://api.github.com";
 
+// Why GitHub gave no releases (#106): kinds of its own, GitHub not being Lichess (its limit is a 403 with words in its
+// body, its 404 a repository), worded at the interface with describe().
+enum class GitHubFailure {
+    None,
+    Offline,       // no answer: no network, GitHub down or too slow (the network's words go to the log)
+    RateLimited,   // its limit of requests without an account (60 an hour) is reached
+    NoRepository,  // 404: GitHub has no such repository
+    Refused,       // another status (`status`)
+};
+
 struct Releases {
     std::vector<Release> list;  // what GitHub answered
-    std::string error;          // why there is no answer
-    bool limited = false;       // GitHub refused: its limit of requests without an account (60 an hour) is reached
+    GitHubFailure failure = GitHubFailure::None;  // why there is no answer
+    int status            = 0;                    // GitHub's, for Refused
+    std::string repo;                             // the repository asked, for the words
+    [[nodiscard]] bool failed() const noexcept { return failure != GitHubFailure::None; }
+    [[nodiscard]] bool limited() const noexcept { return failure == GitHubFailure::RateLimited; }
 };
+// Why GitHub gave no releases, translated: a phrase without a final stop that names GitHub; none has no words.
+[[nodiscard]] std::string describe(const Releases& releases);
 
 // The engine's releases: its latest; when that one is not the engine's or has no file for this machine, its 20
 // latest (a second request). `api`: GitHub's API, a test's server otherwise. Blocks for up to 40 seconds.

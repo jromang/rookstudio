@@ -21,6 +21,7 @@
 #include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
+#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -379,7 +380,7 @@ void App::drawTraining() {
     else if (training_tab_ == 4)
         drawTrainingEndgames();
     else if (training_tab_ == 5)
-        drawTrainingVision();
+        vision_->drawPart();
     else
         drawTrainingToday();
     ImGui::EndChild();
@@ -477,7 +478,7 @@ void App::drawTrainingToday() {
         }
         ImGui::SameLine(0, gap);
         {
-            const auto& v = visionRecord();
+            const auto& v = vision_->visionRecord();
             int best      = 0;
             for (const auto& [key, n] : v.coordinates) best = std::max(best, n);
             card("##training_kind_vision", ui::Icon::Grid, TR("Vision"),

@@ -32,6 +32,7 @@
 #include "online_cache.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
+#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -293,7 +294,7 @@ void App::pollEndgames() {
             forgetSyzygy();
         }
     }
-    if (vision_) pollVision();
+    vision_->poll();  // board vision's: the coordinates' thirty seconds, the blindfold game (vision_page.hpp)
     const auto ready = [](auto& f) {
         return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     };

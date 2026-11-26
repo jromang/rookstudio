@@ -111,7 +111,6 @@
 #include "twic.hpp"
 #include "ui.hpp"
 #include "views.hpp"
-#include "vision.hpp"
 #include "visit.hpp"
 
 #include <tour/book_scan.hpp>
@@ -137,6 +136,7 @@ class LichessBotPage;
 class LichessTvPage;
 class MistakesPage;
 class PuzzlesPage;
+class VisionPage;
 struct CommentaryReview;
 
 class EngineHub;
@@ -1040,9 +1040,9 @@ class App {
     // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
     // The kinds still in App answer through sessions of App's own (OwnSession, app_chess.cpp), made by
     // initChessModules(); a kind in a module of its own is its own session (the puzzles', the mistakes', a game
-    // guessed), and takes the Board through context::SessionBoard (app_context.hpp).
+    // guessed, a vision exercise), and takes the Board through context::SessionBoard (app_context.hpp).
     class OwnSession;
-    std::unique_ptr<BoardSession> training_session_, endgame_session_, vision_session_;
+    std::unique_ptr<BoardSession> training_session_, endgame_session_;
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
     // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
     // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
@@ -1062,9 +1062,9 @@ class App {
     void setPlayerNames(std::vector<std::string> names);
     void drawPlayerNames(const char* id);  // the names as chips, a field that adds one (Settings, the Training page)
 
-    // Endgames against the tablebases, mates, board vision (#82, mockup M12, board 3; endgames.hpp, vision.hpp,
-    // syzygy_download.hpp; view_endgames.cpp, view_vision.cpp): the Training page's Endgames and Vision parts, a
-    // session of each on the Board page, the endgames missed in the day's review.
+    // Endgames against the tablebases and the mates (#82, mockup M12, board 3; endgames.hpp, syzygy_download.hpp;
+    // view_endgames.cpp): the Training page's Endgames part, a session on the Board page, the endgames missed in the
+    // day's review.
     std::optional<EndgameRecord> endgame_record_;
     EndgameRecord& endgameRecord();
     [[nodiscard]] std::filesystem::path endgamesFolder() const { return storage_.root() / "endgames"; }
@@ -1130,33 +1130,11 @@ class App {
     void drawEndgameBoard(float size);
     void drawEndgameColumn();
     void drawEndgameEnd();
-    // Board vision.
-    std::optional<VisionRecord> vision_record_;
-    VisionRecord& visionRecord();
-    void saveVisionRecord();
-    CoordMode vision_mode_ = CoordMode::Find;
-    CoordSide vision_side_ = CoordSide::White;
-    Hidden vision_hidden_  = Hidden::All;
-    int vision_colour_     = 0;  // blindfold: 0 White, 1 Black, 2 at random; its engine is the Play page's (#83)
-    int vision_enter_      = 0;  // what Enter starts on the page: 0 the coordinates, 1 blindfold, 2 the lines
-    std::string vision_error_;
-    std::unique_ptr<VisionRun> vision_;
-    void drawTrainingVision();
-    void startCoordinates();
-    void startBlindfold();
-    void startHeadLines();
-    void startVisionRun(std::unique_ptr<VisionRun> run);
-    void visionAnswer(chess::Move move);
-    void visionSquare(chess::Square square);  // a square clicked: the coordinates, "Where is…?"
-    void visionNextSquare();
-    void finishVision(bool stopped);
-    void closeVision(bool to_training);
-    void dropVision();
-    void pollVision();
-    void visionKeys();
-    void drawVisionPage();
-    void drawVisionBoard(float size);
-    void drawVisionColumn();
+    // Board vision (#82, mockup M12, board 3), a module of its own (vision_page.hpp, #107), made by
+    // initChessModules(): the Training page's part "Vision", the coordinates, a game played blindfold against the Play
+    // page's opponent, a line read in one's head, each a session on the Board page; the records in vision.json. The
+    // Training page and the Home page reach it directly.
+    std::unique_ptr<VisionPage> vision_;
 
     // Playing against an engine (#83, mockup M12, board 4; engine_play.hpp, view_play.cpp): the Play page's choice
     // (play.json: the engine, its strength, its openings, the user's colour and clock, a handicap); the game on the

@@ -23,6 +23,7 @@
 #include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
+#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -334,22 +335,8 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
                     startSyzygyDownload();
                 });
     }
-    add(TR("Vision"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_ = 5;
-    });
-    if (trainingLock().empty()) {
-        add(TR("Coordinates: find the square"), TR("Training"), [this] {
-            vision_mode_ = CoordMode::Find;
-            startCoordinates();
-        });
-        add(TR("Coordinates: name the square"), TR("Training"), [this] {
-            vision_mode_ = CoordMode::Name;
-            startCoordinates();
-        });
-        add(TR("Blindfold against an engine"), TR("Training"), [this] { startBlindfold(); });
-        add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
-    }
+    // Board vision, its module's (#107): the part, the coordinates, blindfold, a line read in one's head.
+    vision_->addCommands(add, where(Page::Training));
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The practical moves against a human of a level (#94), in the Analysis tab.
     add(board_.settings.practical ? TR("Practical moves: off") : TR("Practical moves against a human of a level"),

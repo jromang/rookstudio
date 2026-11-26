@@ -27,6 +27,7 @@
 #include "i18n.hpp"
 #include "mistakes_page.hpp"
 #include "ui.hpp"
+#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -1234,7 +1235,7 @@ void App::drawTrainingHome() {
     // A session of exercises, a game guessed (#81): their modules' (#107).
     mistakes_->drawHomeLine();
     guessing_->drawHomeLine();
-    // An endgame against the tables, a vision exercise (#82).
+    // An endgame against the tables (#82).
     if (endgame_) {
         const auto& r = *endgame_;
         const auto label =
@@ -1245,11 +1246,7 @@ void App::drawTrainingHome() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Back to the endgame"))) page_ = Page::Board;
     }
-    if (vision_) {
-        ImGui::TextUnformatted(TR("Board vision"));
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Back to the exercise"))) page_ = Page::Board;
-    }
+    vision_->drawHomeLine();  // a vision exercise (#82), its module's (#107)
     // The day's review (#80): one count for every kind, a click reviewing them all.
     drawReviewHome();
 }

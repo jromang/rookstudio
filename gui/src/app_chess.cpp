@@ -14,11 +14,14 @@
 #include <string>
 #include <string_view>
 
+#include <imgui.h>
+
 #include <study/evals_index.hpp>
 #include <study/import.hpp>
 #include <study/patterns.hpp>
 #include <tour/files.hpp>
 
+#include "app_context.hpp"
 #include "assistant_service.hpp"
 #include "board_text.hpp"
 #include "chesscom.hpp"
@@ -30,6 +33,75 @@
 #include "twic.hpp"
 
 namespace fcg {
+
+// What RookStudio's modules ask of App (app_context.hpp, #107), answered with App's members.
+class App::ModulesContext final : public AppContext {
+   public:
+    explicit ModulesContext(App& app) : app_(app) {}
+
+    int frame() const override { return ImGui::GetFrameCount(); }
+    bool scripted() const override { return app_.options_.scripted; }
+    std::filesystem::path profileDir() const override { return app_.storage_.root(); }
+    DatabaseShelf& shelf() override { return app_.shelf(); }
+    void toast(const std::string& text) override { app_.boardToast(text); }
+
+    void showLichessPage() override {
+        app_.page_ = Page::Lichess;
+        app_.broadcast_round_.clear();
+    }
+    void showBoardPage() override { app_.page_ = Page::Board; }
+    void toStudyBoard() override { app_.toStudyBoard(); }
+
+    std::string boardTitle() const override { return app_.board_.title; }
+    std::string boardFollows() const override {
+        return app_.board_broadcast_ ? app_.board_broadcast_->url : std::string();
+    }
+    void followOnBoard(ReplayGame game, std::string title, std::string mosaic, std::string url, uint64_t version,
+                       bool in_place) override {
+        const auto page = app_.page_;
+        const auto back = app_.board_back_;
+        const int ply   = static_cast<int>(game.moves.size());
+        app_.openOnBoard(std::move(game), ply, false, std::move(title), false);
+        BoardBroadcast follow;
+        follow.round          = std::move(mosaic);
+        follow.url            = std::move(url);
+        follow.version        = version;
+        app_.board_broadcast_ = std::move(follow);
+        if (in_place) {  // the board changes its game where it is
+            app_.page_       = page;
+            app_.board_back_ = back;
+        }
+    }
+
+    const std::string& mosaicShown() const override { return app_.broadcast_round_; }
+    void openMosaic(const std::string& key) override { app_.openBroadcastMosaic(key); }
+    bool boardBackToMosaic() const override { return app_.boardBackToMosaic(); }
+    void backToMosaic() override { app_.backToMosaic(); }
+    void setMosaicEngine(const std::string& engine) override {
+        if (app_.lichess_.broadcast_engine != engine) {
+            app_.lichess_.broadcast_engine = engine;
+            for (auto& b : app_.broadcast_boards_) b.analyser.reset();  // started again with it
+            app_.saveLichessSettings();
+        }
+    }
+    GameStreams gameStreams() const override {
+        GameStreams streams;
+        streams.rounds  = app_.followed_rounds_.size();
+        streams.players = app_.players_follower_ ? app_.players_follower_->open() : 0;
+        streams.tour    = app_.tour_follow_ && app_.tour_follow_->follower ? app_.tour_follow_->follower->open() : 0;
+        return streams;
+    }
+    void setPlayersQuota(std::size_t streams) override { app_.players_quota_ = streams; }
+
+    LichessSettings& lichessSettings() override { return app_.lichess_; }
+    void saveLichessSettings() override { app_.saveLichessSettings(); }
+    std::vector<std::string> ownLichessIds() override { return app_.ownLichessIds(); }
+
+   private:
+    App& app_;
+};
+
+void App::initChessModules() { modules_context_ = std::make_unique<ModulesContext>(*this); }
 
 void App::initChessServers() {
     // Scripted screenshots ask nothing of the internet (AppOptions::scripted): Lichess, its database, TWIC, chess.com

@@ -1,5 +1,6 @@
 #include "app.hpp"
 
+#include "app_context.hpp"
 #include "assistant_service.hpp"
 #include "engine_hub.hpp"
 
@@ -55,6 +56,7 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
       options_(std::move(options)),
       dialogs_(window) {
     initChessServers();  // before anything asks Lichess (app_chess.cpp)
+    initChessModules();  // RookStudio's areas out of App, each a module (app_chess.cpp, #107)
     software_at_launch_  = storage_.softwareRendering();
     engines_             = storage_.loadEngines();
     books_               = storage_.loadBooks();

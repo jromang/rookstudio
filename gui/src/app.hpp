@@ -133,6 +133,7 @@ struct SDL_Window;
 
 namespace fcg {
 
+class AppContext;
 class AssistantService;
 class EngineOracle;
 struct CommentaryReview;
@@ -314,6 +315,11 @@ class App {
     // with App parks its task here, and the group waits for it. The tasks hold what they use (their state, a
     // shared_ptr to the assistant), never App's members.
     JobGroup jobs_;
+    // RookStudio's areas out of App, each a module of its own (#107), and what they ask of App (app_context.hpp),
+    // answered by ModulesContext (app_chess.cpp). Made first, by initChessModules(); declared before the modules, gone
+    // after them.
+    class ModulesContext;
+    std::unique_ptr<AppContext> modules_context_;
 
     // The views (#43, mockup M6; views.hpp, view_views.cpp): one to three sets of pages of the user's, switched at the
     // top of the rail (Ctrl+1 to Ctrl+3), each with its rail and the Board it shows, in place of the two spaces.
@@ -4012,8 +4018,9 @@ class App {
     // RookStudio's parts of frame() and handleDialogs(), out of them (app_chess.cpp, #108): the polls of its pages and
     // jobs; its --focus words, tried before fastchess-gui's (false: the word is not one of them); its dialogs' files.
     // The servers outside before the first frame: none for scripted screenshots, a test's Lichess when the focus
-    // word names one.
+    // word names one. RookStudio's modules and their context, made before anything else of the constructor (#107).
     void initChessServers();
+    void initChessModules();
     void pollChess();
     [[nodiscard]] bool applyChessFocusWord(const std::string& w);
     void handleChessDialog(const Dialogs::Answer& answer);

@@ -32,12 +32,10 @@ std::optional<PuzzleGlicko> glickoOf(const nlohmann::json& j) {
     return g;
 }
 
-// Why a request gave nothing, in the words of the page.
-std::string whyNot(const HttpResult& r) {
-    if (r.status == 0) return r.error.empty() ? std::string("Lichess did not answer") : r.error;
-    if (r.status == 401 || r.status == 403) return "Lichess refused the token";
-    if (r.status == 429) return "Lichess asks to wait a minute: too many requests";
-    return fmt::format("Lichess answered {}", r.status);
+// An object of Lichess's read by `read`; none when the answer is not an object.
+template <typename T, typename Read>
+auto objectOf(Read read) {
+    return [read](const nlohmann::json& j) { return j.is_object() ? std::optional<T>(read(j)) : std::nullopt; };
 }
 
 std::string query(const std::string& angle) {
@@ -159,55 +157,20 @@ PuzzleSolved readPuzzleSolved(const nlohmann::json& j) {
 
 Answer<PuzzleBatch> puzzleBatch(const std::string& token, const std::string& angle, int nb,
                                 const std::string& difficulty, const std::atomic<bool>* cancel) {
-    Answer<PuzzleBatch> a;
-    HttpRequest request;
-    request.url    = fmt::format("{}?nb={}&difficulty={}", query(angle), std::clamp(nb, 1, PUZZLE_BATCH),
+    const auto url = fmt::format("{}?nb={}&difficulty={}", query(angle), std::clamp(nb, 1, PUZZLE_BATCH),
                                  urlEncode(difficulty.empty() ? std::string("normal") : difficulty));
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = whyNot(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    a.value = readPuzzleBatch(j);
-    return a;
+    return call<PuzzleBatch>(request("GET", url, token), objectOf<PuzzleBatch>(readPuzzleBatch), cancel);
 }
 
 Answer<PuzzleSolved> solvePuzzles(const std::string& token, const std::string& angle,
                                   const std::vector<PuzzleSolution>& solutions, int nb, const std::string& difficulty,
                                   const std::atomic<bool>* cancel) {
-    Answer<PuzzleSolved> a;
     auto list = nlohmann::json::array();
     for (const auto& s : solutions) list.push_back({{"id", s.id}, {"win", s.win}, {"rated", s.rated}});
-    HttpRequest request;
-    request.url          = fmt::format("{}?nb={}&difficulty={}", query(angle), std::clamp(nb, 0, PUZZLE_BATCH),
-                                       urlEncode(difficulty.empty() ? std::string("normal") : difficulty));
-    request.method       = "POST";
-    request.token        = token;
-    request.content_type = "application/json";
-    request.body         = nlohmann::json{{"solutions", std::move(list)}}.dump();
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = whyNot(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    a.value = readPuzzleSolved(j);
-    return a;
+    const auto url = fmt::format("{}?nb={}&difficulty={}", query(angle), std::clamp(nb, 0, PUZZLE_BATCH),
+                                 urlEncode(difficulty.empty() ? std::string("normal") : difficulty));
+    return call<PuzzleSolved>(withJson(request("POST", url, token), {{"solutions", std::move(list)}}),
+                              objectOf<PuzzleSolved>(readPuzzleSolved), cancel);
 }
 
 PuzzleDashboard readPuzzleDashboard(const nlohmann::json& j) {
@@ -231,25 +194,9 @@ PuzzleDashboard readPuzzleDashboard(const nlohmann::json& j) {
 }
 
 Answer<PuzzleDashboard> puzzleDashboard(const std::string& token, int days, const std::atomic<bool>* cancel) {
-    Answer<PuzzleDashboard> a;
-    HttpRequest request;
-    request.url    = fmt::format("{}/api/puzzle/dashboard/{}", servers().api, std::max(1, days));
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = whyNot(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    a.value = readPuzzleDashboard(j);
-    return a;
+    return call<PuzzleDashboard>(
+        request("GET", fmt::format("{}/api/puzzle/dashboard/{}", servers().api, std::max(1, days)), token),
+        objectOf<PuzzleDashboard>(readPuzzleDashboard), cancel);
 }
 
 void OnlineBatch::answer(const std::string& id, bool win) {

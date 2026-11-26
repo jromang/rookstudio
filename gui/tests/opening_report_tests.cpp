@@ -33,9 +33,9 @@
 #include <study/tree.hpp>
 
 #include "assistant_process.hpp"
+#include "mock_engines.hpp"
 #include "opening_report.hpp"
 #include "repertoires.hpp"
-#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -290,8 +290,7 @@ TEST_CASE("opening report: the summary written in the assistant's child process,
     // The fake model answers each request with what it was asked: the checker refuses it, the templates' stands.
     AssistantProcess process;
     std::string error;
-    REQUIRE_MESSAGE(
-        process.start((test::selfPath().parent_path() / FCG_MOCK_ASSISTANT).string(), "model.gguf", 0, error), error);
+    REQUIRE_MESSAGE(process.start(test::mockAssistant(), "model.gguf", 0, error), error);
     commentary::SummaryFigures f;
     f.after = "10…Nf8";
     f.games = 4812;

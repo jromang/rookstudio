@@ -17,6 +17,7 @@
 
 #include "../../tournament/tests/polyglot_writer.hpp"
 #include "book_jobs.hpp"
+#include "mock_engines.hpp"
 #include "own_temp.hpp"
 #include "run.hpp"
 #include "self_path.hpp"
@@ -75,11 +76,10 @@ TEST_CASE("own book: a book that cannot play for an engine is told, and the tour
     std::ofstream(junk, std::ios::binary) << "not a book";
     CHECK_FALSE(ownBookProblem(junk.string()).empty());
 
-    // The start refuses it, naming the participant.
-    const auto mover = (self().parent_path() / FCG_RANDOM_MOVER).string();
-    if (fs::is_regular_file(mover)) {
+    // The start refuses it, naming the participant (its controller gone before the folder).
+    {
         std::vector<EngineEntry> engines(1);
-        engines[0].name = "random", engines[0].cmd = mover;
+        engines[0].name = "random", engines[0].cmd = test::randomMover();
         MatchSetup setup;
         setup.engine_a         = "random";
         setup.engine_b         = "random";
@@ -199,12 +199,8 @@ TEST_CASE("own book: the setup, its templates and the tournament keep each parti
 }
 
 TEST_CASE("own book: a round robin with the same engine twice and a WinBoard engine, each with a book of its own") {
-    const auto wb  = (self().parent_path() / FCG_WB_MOVER).string();
-    const auto uci = (self().parent_path() / FCG_RANDOM_MOVER).string();
-    if (!fs::is_regular_file(wb) || !fs::is_regular_file(uci)) {
-        MESSAGE("mock engines not available on this platform, skipped");
-        return;
-    }
+    const auto wb                     = test::wbMover();
+    const auto uci                    = test::randomMover();
     fastchess::engine::xboard_adapter = self().string();
     tour::book_adapter                = self().string();
 
@@ -360,11 +356,7 @@ TEST_CASE("own book: a PGN book is prepared in the background while it is asked 
 }
 
 TEST_CASE("own book: a match with a PGN book of its own, prepared by the start when the window did not") {
-    const auto uci = (self().parent_path() / FCG_RANDOM_MOVER).string();
-    if (!fs::is_regular_file(uci)) {
-        MESSAGE("mock engine not available on this platform, skipped");
-        return;
-    }
+    const auto uci      = test::randomMover();
     tour::book_adapter  = self().string();
     const auto previous = tour::book_cache_dir;
     const auto root     = fs::temp_directory_path() / "fcg-own-book-pgn-match";
@@ -537,11 +529,7 @@ TEST_CASE("Polyglot build: a book built from a PGN file in the background with i
 }
 
 TEST_CASE("own book: a withdrawn participant's PGN book, deleted since, does not hold the resume") {
-    const auto uci = (self().parent_path() / FCG_RANDOM_MOVER).string();
-    if (!fs::is_regular_file(uci)) {
-        MESSAGE("mock engine not available on this platform, skipped");
-        return;
-    }
+    const auto uci      = test::randomMover();
     tour::book_adapter  = self().string();
     const auto previous = tour::book_cache_dir;
     const auto root     = fs::temp_directory_path() / "fcg-own-book-pgn-withdrawn";

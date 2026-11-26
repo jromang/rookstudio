@@ -17,8 +17,8 @@
 #include "analysis.hpp"
 #include "board_text.hpp"
 #include "mistakes.hpp"
+#include "mock_engines.hpp"
 #include "review_runner.hpp"
-#include "self_path.hpp"
 #include "training.hpp"
 
 using namespace fcg;
@@ -80,7 +80,7 @@ GameReview forkReview(uint64_t nodes = passNodes(2)) {
     return r;
 }
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 void setEnv(const char* name, const char* value) {
 #ifdef _WIN32
@@ -445,7 +445,6 @@ TEST_CASE("mistakes: a guess scored 3, 2, 1 or 0, and the games guessed kept") {
 }
 
 TEST_CASE("mistakes: an answer searched at the review's settings finds what the review found there") {
-    if (!fs::is_regular_file(randomMover())) return;
     // The mock remembers its searches since the last ucinewgame, as a hash table would: a search that does not start
     // from an empty table finds something else.
     ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");

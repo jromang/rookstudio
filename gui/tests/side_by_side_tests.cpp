@@ -10,7 +10,7 @@
 
 #include "board_page.hpp"
 #include "engine_client.hpp"
-#include "self_path.hpp"
+#include "mock_engines.hpp"
 #include "side_by_side.hpp"
 #include "storage.hpp"
 
@@ -20,7 +20,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 // Sets a variable of the environment for as long as it lives.
 struct ScopedEnv {
@@ -246,7 +246,6 @@ TEST_CASE("analysis side by side: the engines and their own settings kept in boa
 }
 
 TEST_CASE("analysis side by side: three mock engines search together, each with its share of the threads") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     const int before = boardThreads();
     std::vector<EngineEntry> entries(3);

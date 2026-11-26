@@ -31,4 +31,8 @@ inline std::string randomMover() { return mockEngine(FCG_RANDOM_MOVER); }
 inline std::string wbMover() { return mockEngine(FCG_WB_MOVER); }
 #endif
 
+#ifdef FCG_MOCK_ASSISTANT
+inline std::string mockAssistant() { return mockEngine(FCG_MOCK_ASSISTANT); }
+#endif
+
 }  // namespace fcg::test

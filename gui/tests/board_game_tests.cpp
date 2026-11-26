@@ -15,8 +15,8 @@
 
 #include "board_game.hpp"
 #include "board_text.hpp"
+#include "mock_engines.hpp"
 #include "run.hpp"
-#include "self_path.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -24,7 +24,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string mockEngine() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 void setVar(const char* name, const char* value) {
 #ifdef _WIN32
@@ -40,7 +40,7 @@ void setVar(const char* name, const char* value) {
 EngineEntry engine(const std::string& name, int threads = 1) {
     EngineEntry e;
     e.name     = name;
-    e.cmd      = mockEngine();
+    e.cmd      = randomMover();
     e.protocol = "uci";
     if (threads > 1) e.options.emplace_back("Threads", std::to_string(threads));
     return e;
@@ -94,7 +94,6 @@ fs::path freshDir(const char* name) {
 }  // namespace
 
 TEST_CASE("board game: a pair of games with the colours reversed, every move legal, both in the PGN file") {
-    if (!fs::is_regular_file(mockEngine())) return;
     const auto dir = freshDir("fcg-board-game");
     const auto pgn = dir / "games.pgn";
 
@@ -149,7 +148,6 @@ TEST_CASE("board game: a pair of games with the colours reversed, every move leg
 }
 
 TEST_CASE("board game: an engine that thinks past its clock loses on time; a stop ends the game without a result") {
-    if (!fs::is_regular_file(mockEngine())) return;
     const auto dir = freshDir("fcg-board-game-time");
     BoardMatchSetup setup;
     setup.first        = "Slow";
@@ -202,7 +200,6 @@ TEST_CASE("board game: an engine that thinks past its clock loses on time; a sto
 }
 
 TEST_CASE("board game: the user against an engine, their moves at their turn only, the engine's scores kept back") {
-    if (!fs::is_regular_file(mockEngine())) return;
     const auto dir = freshDir("fcg-board-game-human");
     BoardMatchSetup setup;
     setup.first        = "You";
@@ -274,7 +271,6 @@ TEST_CASE("board game: the user against an engine, their moves at their turn onl
 }
 
 TEST_CASE("board game: against the engine of the Play page, its openings first, moves taken back, a draw declined") {
-    if (!fs::is_regular_file(mockEngine())) return;
     const auto dir = freshDir("fcg-board-game-play");
     BoardMatchSetup setup;
     setup.first        = "You";
@@ -370,7 +366,6 @@ TEST_CASE("board game: against the engine of the Play page, its openings first, 
 }
 
 TEST_CASE("board game: a game resumed where it was left; a draw taken once 20 moves are played") {
-    if (!fs::is_regular_file(mockEngine())) return;
     const auto dir = freshDir("fcg-board-game-resume");
     // 40 plies played at random from the start, none ending the game.
     ReplayGame so_far;

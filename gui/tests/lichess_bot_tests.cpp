@@ -21,8 +21,8 @@
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_bot.hpp"
+#include "mock_engines.hpp"
 #include "scripted_server.hpp"
-#include "self_path.hpp"
 
 using namespace fcg;
 using namespace fcg::lichess;
@@ -31,7 +31,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string mockEngine() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 struct Seen {
     std::string line, path, authorization, body;
@@ -344,7 +344,6 @@ TEST_CASE("Lichess bot: the account asked, the upgrade, Lichess's refusal") {
 }
 
 TEST_CASE("Lichess bot: a game played by the engine through the Bot API, its words, a draw and a takeback declined") {
-    if (!std::filesystem::is_regular_file(mockEngine())) return;
     FakeGame game;
     const auto port = freePort();
     ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
@@ -404,7 +403,7 @@ TEST_CASE("Lichess bot: a game played by the engine through the Bot API, its wor
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     BotPlay play;
     play.engine.name     = "Mock";
-    play.engine.cmd      = mockEngine();
+    play.engine.cmd      = randomMover();
     play.engine.protocol = "uci";
     play.greeting        = "Good game!";
     play.thanks          = "Thank you for the game!";
@@ -539,7 +538,7 @@ TEST_CASE("Lichess bot: the victory claimed once the opponent left long enough")
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     BotPlay play;
     play.engine.name = "Mock";
-    play.engine.cmd  = mockEngine();
+    play.engine.cmd  = randomMover();
     play.thanks      = "Thank you for the game!";
     {
         BotGame bot("bot-token", "gBot0003", "RS_SampleBot", true, play);

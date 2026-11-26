@@ -19,8 +19,8 @@
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
+#include "mock_engines.hpp"
 #include "scripted_server.hpp"
-#include "self_path.hpp"
 #include "zip.hpp"
 
 using namespace fcg;
@@ -73,7 +73,7 @@ struct FakeGitHub {
     ScriptedServer server;
 };
 
-std::string mover() { return readFile(selfPath().parent_path() / FCG_RANDOM_MOVER); }
+std::string mover() { return readFile(randomMover()); }
 
 // A ustar header, its checksum made.
 std::string tarHeader(const std::string& name, uint64_t size, char type) {
@@ -249,7 +249,7 @@ TEST_CASE("engine downloads: a program downloaded, checked against its hash, mad
     github.set("/download/" + name, program);
     const auto engine = testEngine(name);
     Pick pick;
-    pick.choices = {choiceOf(github, name, program, sha256File(selfPath().parent_path() / FCG_RANDOM_MOVER))};
+    pick.choices = {choiceOf(github, name, program, sha256File(randomMover()))};
 
     const auto result = installEngine(profile.path, engine, pick);
     REQUIRE_MESSAGE(result.ok, result.error);

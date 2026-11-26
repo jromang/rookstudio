@@ -12,8 +12,8 @@
 #include <thread>
 
 #include "game_analysis.hpp"
+#include "mock_engines.hpp"
 #include "review_runner.hpp"
-#include "self_path.hpp"
 #include "storage.hpp"
 
 using namespace fcg;
@@ -22,7 +22,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 void setEnv(const char* name, const char* value) {
 #ifdef _WIN32
@@ -167,7 +167,6 @@ TEST_CASE("continuous analysis: several analyses kept with a game, and one as th
 }
 
 TEST_CASE("continuous analysis: the mock engine searches every position at each pass, until the ceiling") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     const int before = boardThreads();
 
@@ -222,7 +221,6 @@ TEST_CASE("continuous analysis: the mock engine searches every position at each 
 }
 
 TEST_CASE("continuous analysis: stopped, it keeps the passes it completed") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     ReviewRunner runner;
     ReviewRunner::Setup setup;
@@ -253,7 +251,6 @@ TEST_CASE("continuous analysis: stopped, it keeps the passes it completed") {
 }
 
 TEST_CASE("continuous analysis: an analysis waits at a pass for the others, then goes on") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     ReviewRunner runner;
     ReviewRunner::Setup setup;
@@ -290,7 +287,6 @@ TEST_CASE("continuous analysis: an analysis waits at a pass for the others, then
 }
 
 TEST_CASE("continuous analysis: positions known deep enough already are taken as they are, the others searched") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     // The start and the positions after the first two moves known, as Lichess's evaluations kept offline give them.
     const auto game = shortGame();
@@ -415,7 +411,6 @@ void checkSame(const GameReview& a, const GameReview& b) {
 TEST_CASE(
     "the Chess space's review: each position for a number of nodes from an empty hash, the same whatever the "
     "order, the processes, a stop") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     ScopedEnv hash("FCG_MOCK_HASH", "1");  // what a search finds depends on the searches made before it
     CHECK(passNodes(0) == FIRST_PASS_NODES);
@@ -489,7 +484,6 @@ TEST_CASE(
 }
 
 TEST_CASE("the Chess space's review: the engine's second line where it is asked for, two lines searched") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     std::vector<int> asked;
     std::mutex mutex;

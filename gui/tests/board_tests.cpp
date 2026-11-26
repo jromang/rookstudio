@@ -13,8 +13,8 @@
 #include "board_page.hpp"
 #include "board_text.hpp"
 #include "engine_client.hpp"
+#include "mock_engines.hpp"
 #include "run.hpp"
-#include "self_path.hpp"
 #include "test_support.hpp"
 
 using namespace fcg;
@@ -23,7 +23,7 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 void setEnv(const char* name, const char* value) {
 #ifdef _WIN32
@@ -65,7 +65,6 @@ bool pollUntil(Analyser& a, F done) {
 }  // namespace
 
 TEST_CASE("engine client: a process of its own, off fastchess' list, that answers and ends") {
-    if (!fs::is_regular_file(randomMover())) return;
     const int before = engineProcesses();
 
     EngineProcess p;
@@ -185,7 +184,6 @@ TEST_CASE("analysis: info lines into MultiPV lines") {
 }
 
 TEST_CASE("analysis: the mock engine analyses positions one after the other, with several lines") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     const int before = boardThreads();
 
@@ -233,7 +231,6 @@ TEST_CASE("analysis: the mock engine analyses positions one after the other, wit
 }
 
 TEST_CASE("analysis: the positions of a game searched one after the other, as its analysis move by move does") {
-    if (!fs::is_regular_file(randomMover())) return;
     ScopedEnv env("FCG_MOCK_ANALYSIS", "1");
     ReplayGame game;
     game.start_fen = std::string(chess::constants::STARTPOS);

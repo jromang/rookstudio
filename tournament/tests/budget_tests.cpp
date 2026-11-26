@@ -16,7 +16,7 @@
 #include <tour/budget.hpp>
 #include <tour/runner.hpp>
 
-#include "self_path.hpp"
+#include "mock_engines.hpp"
 #include "test_support.hpp"
 
 #ifdef _WIN32
@@ -201,7 +201,7 @@ TEST_CASE("budget: memory and GPUs are shared like the cores") {
 
 namespace {
 
-std::string randomMover() { return (fcg::test::selfPath().parent_path() / FCG_RANDOM_MOVER).string(); }
+using fcg::test::randomMover;
 
 void setEnv(const char* name, const char* value) {
 #ifdef _WIN32
@@ -299,10 +299,6 @@ struct Concurrency final : fastchess::observer::GameObserver {
 }  // namespace
 
 TEST_CASE("runner: an allowance changed while it plays holds games back or starts them, never interrupting one") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     const auto dir = fs::temp_directory_path() / "fcg-tour-budget-runner";
     fs::remove_all(dir);
     auto state = TournamentState::create(dir, randomSpec(Format::Match, 2, 4, 36));
@@ -352,10 +348,6 @@ TEST_CASE("runner: an allowance changed while it plays holds games back or start
 }
 
 TEST_CASE("runner: games wait for memory, and no more GPU engines play at once than the allowance's GPUs") {
-    if (!fs::is_regular_file(randomMover())) {
-        MESSAGE("random mover not available, skipped");
-        return;
-    }
     const ScopedEnv move_ms("FCG_MOCK_MOVE_MS", "1");
 
     SUBCASE("memory") {

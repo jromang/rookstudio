@@ -126,7 +126,17 @@ jobs:
           files="build/rookstudio build/fastchess $(find build -maxdepth 1 -name '*.so' ! -name 'libggml-cpu-*' | sort)"
           for f in $files; do echo "$f: $(readelf -n "$f" | grep -E 'x86 ISA (needed|used)' | tr -s ' ' | tr '\n' ';')"; done
           beyond=$(for f in $files; do readelf -n "$f" | grep -E 'x86 ISA needed:.*x86-64-v[34]' | sed "s|^|$f: |"; done || true)
-          if [ -n "$beyond" ]; then echo "Asking for more than x86-64-v2:"; echo "$beyond"; exit 1; fi
+          if [ -n "$beyond" ]; then
+            echo "Asking for more than x86-64-v2:"; echo "$beyond"
+            # Where it comes from: what the linker put in with the build's own objects and libraries.
+            for f in $(gcc -print-file-name=Scrt1.o) $(gcc -print-file-name=crt1.o) $(gcc -print-file-name=crti.o) \
+                     $(gcc -print-file-name=crtbeginS.o) $(gcc -print-file-name=libc_nonshared.a) \
+                     $(g++ -print-file-name=libstdc++.a) $(gcc -print-libgcc-file-name) \
+                     $(gcc -print-file-name=libgcc_eh.a) $(find build -maxdepth 1 -name '*.a' | sort); do
+              echo "$f: $(readelf -n "$f" 2>/dev/null | grep -oE 'x86 ISA needed:.*' | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+            done
+            exit 1
+          fi
 
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py): they mostly wait, so two per

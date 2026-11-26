@@ -60,8 +60,8 @@ struct Failure {
     int status   = 0;  // HTTP's, 0 without an answer
     Asked asked  = Asked::Anything;
     std::string said;    // Lichess's own words when it refused ({"error": "…"}), shown as they are
-    std::string error;   // a problem of the program's own, in words (no port to listen on, a name too long), or the
-                         // words of a module that does not give a NetError yet; empty for the network's failures
+    std::string error;   // a problem of the program's own, in words (no port to listen on, a name too long, a
+                         // database that refused the games); empty for Lichess's and the network's failures
     std::string detail;  // the network's or the reader's words, for the log and the tests: never shown
     [[nodiscard]] bool failed() const noexcept { return net != NetError::None || !error.empty(); }
     // A problem of the program's own, in its words.

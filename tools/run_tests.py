@@ -3,7 +3,7 @@
 
 The tests mostly wait (for engines, servers, timeouts): run one after the other they keep a processor busy a tenth of
 the time. Here they run side by side, the slowest of the last run started first; each process has its temporary
-folder and its ports of its own (tournament/tests/own_temp.hpp, gui/tests/free_ports.hpp).
+folder and its ports of its own (tests/support/own_temp.hpp, gui/tests/free_ports.hpp).
 
     tools/run_tests.py build
     tools/run_tests.py build/fastchess-gui-tests build/fcg-tournament-tests
@@ -15,9 +15,10 @@ builds them), so that the check target and the workflows run the programs CMake 
 The options that follow the programs are given to doctest to choose the test cases (-tc, -ts, -sf, their -e forms...).
 The time each test case took is kept next to its program (<program>.durations.json) for the next run's order.
 
-A test case that cannot run here (a mock engine, a window, the internet missing) skips itself: it passes, and says why
-in a doctest MESSAGE ending with ", skipped" (or ", skipped: " and details). The summary lists those test cases;
---no-skips makes them fail the run.
+A test case that cannot run here (a window, the internet missing) skips itself: it passes, and says why in a doctest
+MESSAGE ending with ", skipped" (or ", skipped: " and details). The summary lists those test cases; --no-skips makes
+them fail the run. What is always there (the mock engines, built with the tests; the sources) is no reason to skip:
+a test case without it fails.
 """
 
 import argparse

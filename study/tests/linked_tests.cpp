@@ -14,6 +14,7 @@
 #include <study/store.hpp>
 #include <tour/state.hpp>
 
+#include "../../tournament/tests/tour_fixtures.hpp"
 #include "test_games.hpp"
 
 using namespace fcg::study;
@@ -110,23 +111,6 @@ TEST_CASE("linked: a compressed file is read again only when it changes") {
     CHECK_FALSE(r.rebuilt);
 }
 
-namespace {
-
-fastchess::MatchData played(const fcg::tour::GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData data(chess::constants::STARTPOS);
-    const auto white = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto black = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    data.players     = {fastchess::MatchData::PlayerInfo(task.white, white),
-                        fastchess::MatchData::PlayerInfo(task.black, black)};
-    data.termination = fastchess::MatchTermination::NORMAL;
-    data.reason      = "test";
-    data.duration    = "00:00:02";
-    return data;
-}
-
-}  // namespace
-
 TEST_CASE("linked: a tournament, its games as they finish, a game voided") {
     using namespace fcg::tour;
     const auto dir = fs::temp_directory_path() / "linked-tournament";
@@ -146,7 +130,7 @@ TEST_CASE("linked: a tournament, its games as they finish, a game voided") {
         for (int i = 0; i < n; ++i) {
             const auto task = state->claimNext();
             REQUIRE(task);
-            state->complete(*task, played(*task, i % 3 == 0 ? "1-0" : i % 3 == 1 ? "0-1" : "1/2-1/2"));
+            state->complete(*task, fakeGame(*task, i % 3 == 0 ? "1-0" : i % 3 == 1 ? "0-1" : "1/2-1/2"));
         }
     };
     play(4);

@@ -9,6 +9,8 @@
 #include <tour/state.hpp>
 #include <tour/summary.hpp>
 
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 
@@ -20,38 +22,19 @@ fs::path freshDir(const std::string& name) {
     return dir;
 }
 
-TournamentSpec field(Format format, int players) {
-    TournamentSpec spec;
-    spec.format = format;
-    for (int i = 0; i < players; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = "P" + std::to_string(i);
-        spec.participants.push_back(p);
-    }
-    return spec;
-}
+// `players` participants named P0, P1...: the lower the number, the stronger.
+TournamentSpec field(Format format, int players) { return fcg::test::SpecBuilder(format).players(players, "P"); }
 
 // The stronger participant (lower id) wins every game; equal results otherwise when `draws`.
-fastchess::MatchData data(const GameTask& task, bool draws) {
-    using chess::GameResult;
-    fastchess::MatchData d(chess::constants::STARTPOS);
+const char* resultOf(const GameTask& task, bool draws) {
     const bool white_stronger = std::stoi(task.white.name.substr(1)) < std::stoi(task.black.name.substr(1));
-    const auto w              = draws ? GameResult::DRAW : white_stronger ? GameResult::WIN : GameResult::LOSE;
-    const auto b              = draws ? GameResult::DRAW : white_stronger ? GameResult::LOSE : GameResult::WIN;
-    d.players     = {fastchess::MatchData::PlayerInfo(task.white, w), fastchess::MatchData::PlayerInfo(task.black, b)};
-    d.termination = fastchess::MatchTermination::NORMAL;
-    d.duration    = "00:00:01";
-    return d;
+    return draws ? "1/2-1/2" : white_stronger ? "1-0" : "0-1";
 }
 
+fastchess::MatchData data(const GameTask& task, bool draws) { return fcg::test::fakeGame(task, resultOf(task, draws)); }
+
 int playAll(TournamentState& state, bool draws = false) {
-    int n = 0;
-    while (auto task = state.claimNext()) {
-        state.complete(*task, data(*task, draws));
-        REQUIRE(++n < 10000);
-    }
-    return n;
+    return fcg::test::playAll(state, [draws](const GameTask& task, int) { return resultOf(task, draws); });
 }
 
 }  // namespace

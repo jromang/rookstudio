@@ -12,6 +12,8 @@
 #include <tour/start_failures.hpp>
 #include <tour/state.hpp>
 
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 
@@ -23,39 +25,13 @@ fs::path freshDir(const std::string& name) {
     return dir;
 }
 
-TournamentSpec roundRobin(int players, int cycles) {
-    TournamentSpec spec;
-    spec.format = Format::RoundRobin;
-    spec.cycles = cycles;
-    for (int i = 0; i < players; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = std::string(1, char('A' + i));
-        spec.participants.push_back(p);
-    }
-    return spec;
-}
+using fcg::test::roundRobin;
 
-fastchess::MatchData data(const GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData d(chess::constants::STARTPOS);
-    const auto w  = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto b  = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    d.players     = {fastchess::MatchData::PlayerInfo(task.white, w), fastchess::MatchData::PlayerInfo(task.black, b)};
-    d.termination = fastchess::MatchTermination::NORMAL;
-    d.duration    = "00:00:01";
-    return d;
-}
-
+// Plays `n` games (all of them when n < 0), White winning, drawing and losing in turn: how many were played.
 int play(TournamentState& state, int n) {
-    int played = 0;
-    while (n < 0 || played < n) {
-        const auto task = state.claimNext();
-        if (!task) break;
-        state.complete(*task, data(*task, played % 3 == 0 ? "1-0" : played % 3 == 1 ? "1/2-1/2" : "0-1"));
-        ++played;
-    }
-    return played;
+    return fcg::test::play(state, n, [](const GameTask&, int played) {
+        return played % 3 == 0 ? "1-0" : played % 3 == 1 ? "1/2-1/2" : "0-1";
+    });
 }
 
 // The journal lines the writer wrote, as its listener told them.

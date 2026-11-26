@@ -11,6 +11,8 @@
 #include <tour/submission.hpp>
 #include <tour/teams.hpp>
 
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 
@@ -39,18 +41,7 @@ TournamentSpec teamSpec(int a, int b, bool boards, int cycles = 1) {
     return spec;
 }
 
-fastchess::MatchData gameData(const GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData data(chess::constants::STARTPOS);
-    const auto white = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto black = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    data.players     = {fastchess::MatchData::PlayerInfo(task.white, white),
-                        fastchess::MatchData::PlayerInfo(task.black, black)};
-    data.termination = fastchess::MatchTermination::NORMAL;
-    data.reason      = "test";
-    data.duration    = "00:00:02";
-    return data;
-}
+using fcg::test::fakeGame;
 
 std::string readAll(const fs::path& file) {
     std::ifstream in(file, std::ios::binary);
@@ -279,7 +270,7 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
             claimed.push_back(*task);
         }
         // Four games recorded, the fifth running when the program stops.
-        for (int i = 0; i < 4; ++i) state->complete(claimed[static_cast<std::size_t>(i)], gameData(claimed[i], "1-0"));
+        for (int i = 0; i < 4; ++i) state->complete(claimed[static_cast<std::size_t>(i)], fakeGame(claimed[i], "1-0"));
     }
 
     const auto pgn = readAll(dir / "teams.pgn");
@@ -301,7 +292,7 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
     for (const auto& r : state->results()) numbers.insert(r.number());
     for (auto task = next; task; task = state->claimNext()) {
         CHECK(numbers.insert(task->number()).second);
-        state->complete(*task, gameData(*task, "1/2-1/2"));
+        state->complete(*task, fakeGame(*task, "1/2-1/2"));
     }
     CHECK(numbers.size() == 16);
     CHECK(state->finished());
@@ -329,7 +320,7 @@ TEST_CASE("team match edits: a replacement takes the team and the board, a newco
         // Board 1's first game played, then B2 (23) replaced.
         auto first = state->claimNext();
         REQUIRE(first);
-        state->complete(*first, gameData(*first, "1-0"));
+        state->complete(*first, fakeGame(*first, "1-0"));
 
         Edit replace;
         replace.kind        = Edit::Kind::ReplaceParticipant;

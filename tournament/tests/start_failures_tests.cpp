@@ -7,6 +7,8 @@
 
 #include <tour/state.hpp>
 
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
@@ -14,16 +16,7 @@ using namespace std::chrono_literals;
 namespace {
 
 TournamentSpec roundRobin(int players) {
-    TournamentSpec spec;
-    spec.name   = "start failures";
-    spec.format = Format::RoundRobin;
-    for (int i = 0; i < players; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = "E" + std::to_string(i);
-        spec.participants.push_back(p);
-    }
-    return spec;
+    return fcg::test::SpecBuilder(Format::RoundRobin).name("start failures").players(players, "E");
 }
 
 fs::path freshDir(const std::string& name) {
@@ -35,15 +28,7 @@ fs::path freshDir(const std::string& name) {
 bool involves(const GameTask& task, int id) { return task.encounter.first == id || task.encounter.second == id; }
 
 // A drawn game as fastchess would report it, without moves.
-fastchess::MatchData drawn(const GameTask& task) {
-    fastchess::MatchData data(chess::constants::STARTPOS);
-    data.players     = {fastchess::MatchData::PlayerInfo(task.white, chess::GameResult::DRAW),
-                        fastchess::MatchData::PlayerInfo(task.black, chess::GameResult::DRAW)};
-    data.termination = fastchess::MatchTermination::NORMAL;
-    data.reason      = "test";
-    data.duration    = "00:00:02";
-    return data;
-}
+fastchess::MatchData drawn(const GameTask& task) { return fcg::test::fakeGame(task, "1/2-1/2"); }
 
 }  // namespace
 

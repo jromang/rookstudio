@@ -20,5 +20,7 @@
   `sourcePath()`, the sources' folder (where `FCG_SOURCE_DIR` points in the environment, else where they were
   compiled), `ScratchDir`, a folder of a test's own removed with it, `waitUntil()`, `readFile()`, and in
   `mock_engines.hpp` the mock engines, always built with the tests: a test case without one fails, it does not skip.
+  The tournaments of the tests, played without engines, come from `tournament/tests/tour_fixtures.hpp`
+  (`SpecBuilder`, `roundRobin()`, `fakeGame()`, `play()`, `playAll()`).
 - The fastchess hooks are listed in the README. `make` in `app/` still builds and tests the upstream command line
   tool.

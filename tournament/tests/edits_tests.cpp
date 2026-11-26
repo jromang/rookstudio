@@ -15,6 +15,8 @@
 #include <tour/submission.hpp>
 #include <tour/summary.hpp>
 
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 
@@ -26,42 +28,10 @@ fs::path freshDir(const std::string& name) {
     return dir;
 }
 
-fastchess::EngineConfiguration engine(const std::string& name) {
-    fastchess::EngineConfiguration e;
-    e.name = name;
-    return e;
-}
-
-TournamentSpec roundRobin(int players, int cycles) {
-    TournamentSpec spec;
-    spec.format = Format::RoundRobin;
-    spec.cycles = cycles;
-    for (int i = 0; i < players; ++i) spec.participants.push_back({i, engine(std::string(1, char('A' + i)))});
-    return spec;
-}
-
-fastchess::MatchData data(const GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData d(chess::constants::STARTPOS);
-    const auto w  = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto b  = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    d.players     = {fastchess::MatchData::PlayerInfo(task.white, w), fastchess::MatchData::PlayerInfo(task.black, b)};
-    d.termination = fastchess::MatchTermination::NORMAL;
-    d.duration    = "00:00:01";
-    return d;
-}
-
-// Plays `n` games (all White wins), or everything when n < 0. Returns the games played.
-int play(TournamentState& state, int n, const std::string& result = "1-0") {
-    int played = 0;
-    while (n < 0 || played < n) {
-        const auto task = state.claimNext();
-        if (!task) break;
-        state.complete(*task, data(*task, result));
-        ++played;
-    }
-    return played;
-}
+using fcg::test::engineNamed;
+using fcg::test::fakeGame;
+using fcg::test::play;
+using fcg::test::roundRobin;
 
 std::multiset<std::pair<int, int>> pairings(const TournamentState& state) {
     std::multiset<std::pair<int, int>> out;
@@ -84,7 +54,7 @@ TEST_CASE("edit: a participant added with catch-up meets everyone in every cycle
 
     Edit add;
     add.kind     = Edit::Kind::AddParticipant;
-    add.engine   = engine("D");
+    add.engine   = engineNamed("D");
     add.catch_up = true;
 
     const auto impact = state->preview(add);
@@ -118,7 +88,7 @@ TEST_CASE("edit: a participant added with catch-up meets everyone in every cycle
         const auto task = state->claimNext();
         REQUIRE(task);
         d_soon |= task->white.name == "D" || task->black.name == "D";
-        state->complete(*task, data(*task, "1/2-1/2"));
+        state->complete(*task, fakeGame(*task, "1/2-1/2"));
     }
     CHECK(d_soon);
 
@@ -148,7 +118,7 @@ TEST_CASE("edit: without catch-up, the newcomer only plays the cycles not starte
 
     Edit add;
     add.kind     = Edit::Kind::AddParticipant;
-    add.engine   = engine("D");
+    add.engine   = engineNamed("D");
     add.catch_up = false;
     state->applyEdit(add);
     CHECK(state->totalGames() == 18u + 3u * 2u * 2u);  // cycles 2 and 3 only
@@ -162,7 +132,7 @@ TEST_CASE("edit: a replaced participant's games are played again by its successo
     Edit replace;
     replace.kind        = Edit::Kind::ReplaceParticipant;
     replace.participant = 1;
-    replace.engine      = engine("B2");
+    replace.engine      = engineNamed("B2");
     const auto impact   = state->preview(replace);
     CHECK(impact.error.empty());
     CHECK(impact.replayed == 4);  // B played 2 encounters, 4 games
@@ -194,10 +164,10 @@ TEST_CASE("edit: a game of a replaced participant still being played is not reco
     Edit replace;
     replace.kind        = Edit::Kind::ReplaceParticipant;
     replace.participant = old_id;
-    replace.engine      = engine("New");
+    replace.engine      = engineNamed("New");
     state->applyEdit(replace);
 
-    CHECK_FALSE(state->complete(*task, data(*task, "1-0")).kept);
+    CHECK_FALSE(state->complete(*task, fakeGame(*task, "1-0")).kept);
     play(*state, -1);
     CHECK(state->finished());
 
@@ -222,7 +192,7 @@ TEST_CASE("state: the engines left are those with a game to play, of active part
     const auto first = state->claimNext();
     REQUIRE(first);
     const int opponent = first->encounter.first == 0 ? first->encounter.second : first->encounter.first;
-    state->complete(*first, data(*first, "1-0"));
+    state->complete(*first, fakeGame(*first, "1-0"));
     CHECK(state->enginesLeft().size() == 4u);  // the second game of the pair is still to play
     // Claimed, it is still to play: the runner thread that claimed it has not taken the engines yet, and a game
     // ending on another thread meanwhile must not have their idle processes ended.
@@ -230,7 +200,7 @@ TEST_CASE("state: the engines left are those with a game to play, of active part
     REQUIRE(second);
     CHECK(second->encounter.index == first->encounter.index);
     CHECK(state->enginesLeft().size() == 4u);
-    state->complete(*second, data(*second, "1-0"));
+    state->complete(*second, fakeGame(*second, "1-0"));
     auto left = state->enginesLeft();
     CHECK(left.size() == 3u);
     CHECK_FALSE(left.count(std::string(1, char('A' + opponent))));
@@ -258,7 +228,7 @@ TEST_CASE("edit: a game of a withdrawn participant still being played is not rec
     withdraw.participant = task->encounter.first;
     state->applyEdit(withdraw);
 
-    CHECK_FALSE(state->complete(*task, data(*task, "1-0")).kept);
+    CHECK_FALSE(state->complete(*task, fakeGame(*task, "1-0")).kept);
     CHECK(state->results().empty());
 }
 
@@ -277,7 +247,7 @@ TEST_CASE("edit: withdrawing a participant whose game was the last running finis
         state->applyEdit(withdraw);
         CHECK_FALSE(state->finished());  // its game is still being played
 
-        CHECK_FALSE(state->complete(*task, data(*task, "1-0")).kept);
+        CHECK_FALSE(state->complete(*task, fakeGame(*task, "1-0")).kept);
         CHECK(state->finished());
         CHECK(state->finishReason() == "complete");
     }
@@ -380,7 +350,7 @@ TEST_CASE("edit: voided games are played again, or dropped") {
     REQUIRE(task);
     CHECK(task->encounter.index == 0);
     CHECK(task->game == 1);
-    state->complete(*task, data(*task, "0-1"));
+    state->complete(*task, fakeGame(*task, "0-1"));
     CHECK(state->finished());
 
     Edit drop;
@@ -398,12 +368,12 @@ TEST_CASE("edit: voided games are played again, or dropped") {
 TEST_CASE("edit: a match only accepts voided games") {
     TournamentSpec spec;
     spec.format       = Format::Match;
-    spec.participants = {{0, engine("A")}, {1, engine("B")}};
+    spec.participants = {{0, engineNamed("A")}, {1, engineNamed("B")}};
     auto state        = TournamentState::create(freshDir("match"), spec);
 
     Edit add;
     add.kind   = Edit::Kind::AddParticipant;
-    add.engine = engine("C");
+    add.engine = engineNamed("C");
     CHECK_FALSE(state->preview(add).error.empty());
     CHECK_THROWS(state->applyEdit(add));
 }
@@ -426,7 +396,7 @@ TEST_CASE("edit: the last change is undone until the next game starts, and stays
     CHECK(state->canUndo());
 
     // The running game finishes (it is kept), then the change is undone.
-    state->complete(*running, data(*running, "1-0"));
+    state->complete(*running, fakeGame(*running, "1-0"));
     CHECK(state->canUndo());
     state->undoEdit();
     CHECK_FALSE(state->canUndo());
@@ -486,7 +456,7 @@ TEST_CASE("edit: other threads read the spec from a snapshot that edits, and und
     CHECK(state->specSnapshot() == before);  // shared until the next change
     Edit add;
     add.kind   = Edit::Kind::AddParticipant;
-    add.engine = engine("E");
+    add.engine = engineNamed("E");
     state->applyEdit(add);
     const auto added = state->specSnapshot();
     CHECK(before->participants.size() == 4);
@@ -504,7 +474,7 @@ TEST_CASE("edit: other threads read the spec from a snapshot that edits, and und
         while (const auto task = state->claimNext()) {
             const auto spec = state->specSnapshot();
             if (!spec->participant(task->encounter.first) || !spec->participant(task->encounter.second)) ++unknown;
-            state->complete(*task, data(*task, "1-0"));
+            state->complete(*task, fakeGame(*task, "1-0"));
         }
         over = true;
     });
@@ -537,7 +507,7 @@ TEST_CASE("programs: rebuilt, missing and new programs are noticed when the tour
 
     Edit add;
     add.kind       = Edit::Kind::AddParticipant;
-    add.engine     = engine("D");
+    add.engine     = engineNamed("D");
     add.engine.cmd = write("D", "build 1 of D");
     add.elo        = 3100;
     state->applyEdit(add);
@@ -696,7 +666,7 @@ TEST_CASE("edit: a result is set on a game that counts, to another result") {
     TournamentSpec spec;
     spec.format       = Format::Match;
     spec.max_games    = 4;
-    spec.participants = {{0, engine("A")}, {1, engine("B")}};
+    spec.participants = {{0, engineNamed("A")}, {1, engineNamed("B")}};
     auto match        = TournamentState::create(freshDir("set-result-match"), spec);
     play(*match, 2);
     CHECK(match->preview(setResult(0, 1, "0-1")).error.empty());
@@ -717,12 +687,12 @@ KnockoutRound knockoutRound(const std::string& name) {
     TournamentSpec spec;
     spec.format = Format::Knockout;
     spec.cycles = 1;
-    for (int i = 0; i < 4; ++i) spec.participants.push_back({i, engine("P" + std::to_string(i))});
+    for (int i = 0; i < 4; ++i) spec.participants.push_back({i, engineNamed("P" + std::to_string(i))});
     KnockoutRound out{TournamentState::create(freshDir(name), spec), {}};
     for (const auto* result : {"1-0", "0-1", "1/2-1/2"}) {
         const auto task = out.state->claimNext();
         REQUIRE(task);
-        out.state->complete(*task, data(*task, result));
+        out.state->complete(*task, fakeGame(*task, result));
     }
     const auto last = out.state->claimNext();
     REQUIRE(last);
@@ -739,7 +709,7 @@ TEST_CASE("edit: in a knockout, a result set while its round is played decides t
     {
         auto round = knockoutRound("ko-set-result");
         round.state->applyEdit(setResult(1, 0, "1-0", "a hang"));
-        round.state->complete(round.last, data(round.last, "1-0"));
+        round.state->complete(round.last, fakeGame(round.last, "1-0"));
         CHECK(resultOf(round.state->results(), 2).result == "1-0");
         CHECK(round.state->brackets().size() == 1);
         const auto rows = round.state->scheduleRows();
@@ -752,7 +722,7 @@ TEST_CASE("edit: in a knockout, a result set while its round is played decides t
         auto round      = knockoutRound("ko-set-result-late");
         const auto edit = setResult(1, 0, "1-0");
         CHECK(round.state->preview(edit).error.empty());
-        round.state->complete(round.last, data(round.last, "1-0"));
+        round.state->complete(round.last, fakeGame(round.last, "1-0"));
         const auto brackets = round.state->brackets();
         REQUIRE(brackets.count(2));
         CHECK(brackets.at(2) == std::vector<std::vector<int>>{{0, 2}});
@@ -777,7 +747,7 @@ TEST_CASE("edit: in a knockout, a result set as the round's last game ends on an
         std::atomic<bool> made{true};
         std::thread game([&] {
             start();
-            round.state->complete(round.last, data(round.last, "1-0"));
+            round.state->complete(round.last, fakeGame(round.last, "1-0"));
         });
         std::thread edit([&] {
             start();
@@ -848,7 +818,7 @@ TEST_CASE("edit: games lost to an engine's broken connection voided and played a
     bool again = false;
     while (auto task = state->claimNext()) {
         if (task->number() == 1) again = true;
-        state->complete(*task, data(*task, "1/2-1/2"));
+        state->complete(*task, fakeGame(*task, "1/2-1/2"));
     }
     CHECK(again);
 

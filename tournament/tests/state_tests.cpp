@@ -24,6 +24,8 @@
 #include <tour/state.hpp>
 #include <tour/summary.hpp>
 
+#include "tour_fixtures.hpp"
+
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 
@@ -36,32 +38,10 @@ fs::path freshDir(const std::string& name) {
 }
 
 TournamentSpec matchSpec(uint64_t max_games = 0) {
-    TournamentSpec spec;
-    spec.name      = "test";
-    spec.format    = Format::Match;
-    spec.max_games = max_games;
-    for (int i = 0; i < 2; ++i) {
-        Participant p;
-        p.id          = i;
-        p.engine.name = i == 0 ? "A" : "B";
-        spec.participants.push_back(p);
-    }
-    return spec;
+    return fcg::test::SpecBuilder(Format::Match).name("test").maxGames(max_games).players(2);
 }
 
-// A finished game as fastchess would report it, without moves.
-fastchess::MatchData gameData(const GameTask& task, const std::string& result) {
-    using chess::GameResult;
-    fastchess::MatchData data(chess::constants::STARTPOS);
-    const auto white = result == "1-0" ? GameResult::WIN : result == "0-1" ? GameResult::LOSE : GameResult::DRAW;
-    const auto black = result == "1-0" ? GameResult::LOSE : result == "0-1" ? GameResult::WIN : GameResult::DRAW;
-    data.players     = {fastchess::MatchData::PlayerInfo(task.white, white),
-                        fastchess::MatchData::PlayerInfo(task.black, black)};
-    data.termination = fastchess::MatchTermination::NORMAL;
-    data.reason      = "test";
-    data.duration    = "00:00:02";
-    return data;
-}
+using fcg::test::fakeGame;
 
 std::string readAll(const fs::path& file) {
     std::ifstream in(file, std::ios::binary);
@@ -130,13 +110,13 @@ TEST_CASE("state: pairs are played back to back, results survive a reopen, PGN o
         CHECK(claimed[2].encounter.index == 1);
 
         // Encounter 0 complete (A wins both), encounter 1 half played, game 3 still "running" at the crash.
-        const auto r0 = state->complete(claimed[0], gameData(claimed[0], "1-0"));
+        const auto r0 = state->complete(claimed[0], fakeGame(claimed[0], "1-0"));
         CHECK_FALSE(r0.pair);
-        const auto r1 = state->complete(claimed[1], gameData(claimed[1], "0-1"));
+        const auto r1 = state->complete(claimed[1], fakeGame(claimed[1], "0-1"));
         REQUIRE(r1.pair);
         CHECK(r1.pair->wins == 2);
         CHECK(r1.pair->penta_WW == 1);
-        state->complete(claimed[2], gameData(claimed[2], "1/2-1/2"));
+        state->complete(claimed[2], fakeGame(claimed[2], "1/2-1/2"));
 
         const auto stats = state->pairStats(0, 1);
         CHECK(stats.wins == 2);
@@ -167,7 +147,7 @@ TEST_CASE("state: pairs are played back to back, results survive a reopen, PGN o
     std::set<uint64_t> numbers;
     for (const auto& r : state->results()) numbers.insert(r.number());
     for (auto task = next; task; task = state->claimNext()) {
-        const auto rec = state->complete(*task, gameData(*task, "1/2-1/2"));
+        const auto rec = state->complete(*task, fakeGame(*task, "1/2-1/2"));
         CHECK(numbers.insert(rec.result.number()).second);
     }
     CHECK(numbers.size() == 10);
@@ -201,7 +181,7 @@ TEST_CASE("state: a released game is played again first") {
     REQUIRE(c);
     CHECK(c->number() == a->number());
     const auto before = state->version();
-    state->complete(*c, gameData(*c, "1-0"));
+    state->complete(*c, fakeGame(*c, "1-0"));
     CHECK(state->version() > before);
 }
 
@@ -232,10 +212,10 @@ TEST_CASE("state: a match with locked colours gives the same engine White in bot
             }
 
             // White wins both: the engine with White won the pair, the other lost it.
-            const auto r0 = state->complete(*g0, gameData(*g0, "1-0"));
+            const auto r0 = state->complete(*g0, fakeGame(*g0, "1-0"));
             CHECK(r0.result.white == white_id);
             CHECK(r0.result.black == 1 - white_id);
-            const auto r1 = state->complete(*g1, gameData(*g1, "1-0"));
+            const auto r1 = state->complete(*g1, fakeGame(*g1, "1-0"));
             CHECK(r1.result.white == white_id);
             REQUIRE(r1.pair);
             CHECK(r1.pair->penta_WW + r1.pair->penta_LL == 1);
@@ -297,7 +277,7 @@ TEST_CASE("summaries: kept between two listings, read again when the journal cha
 
     const auto task = state->claimNext();
     REQUIRE(task);
-    state->complete(*task, gameData(*task, "1-0"));
+    state->complete(*task, fakeGame(*task, "1-0"));
     list = cache.list(root);
     REQUIRE(list.size() == 1);
     CHECK(list[0].played == 1);
@@ -317,7 +297,7 @@ TEST_CASE("summaries: a match's score, A first; a round robin's standings, the l
         while (auto task = state->claimNext()) {
             const bool b_white = task->white.name == "B";
             const auto result  = i++ == 1 ? (b_white ? "0-1" : "1-0") : (b_white ? "1-0" : "0-1");
-            state->complete(*task, gameData(*task, result));
+            state->complete(*task, fakeGame(*task, result));
         }
     }
     auto summary = summarize(root / "20260101-000000 match");
@@ -340,7 +320,7 @@ TEST_CASE("summaries: a match's score, A first; a round robin's standings, the l
         auto state = TournamentState::create(root / "20260101-000001 rr", spec);
         while (auto task = state->claimNext()) {
             const auto result = task->white.name == "C" ? "0-1" : task->black.name == "C" ? "1-0" : "1/2-1/2";
-            state->complete(*task, gameData(*task, result));
+            state->complete(*task, fakeGame(*task, result));
         }
     }
     summary = summarize(root / "20260101-000001 rr");
@@ -369,7 +349,7 @@ TEST_CASE("state: the SPRT ends a match and the verdict is journaled") {
         while (auto task = state->claimNext()) {
             const bool a_white = task->white.name == "A";
             const auto result  = task->game == 0 ? (a_white ? "1-0" : "0-1") : "1/2-1/2";
-            state->complete(*task, gameData(*task, result));
+            state->complete(*task, fakeGame(*task, result));
             REQUIRE(++played < 5000);
         }
         CHECK(state->finished());
@@ -426,7 +406,7 @@ TEST_CASE("state: a damaged journal line is skipped with a warning, the tourname
     {
         auto state      = TournamentState::create(dir, matchSpec(4));
         const auto task = state->claimNext();
-        state->complete(*task, gameData(*task, "1-0"));
+        state->complete(*task, fakeGame(*task, "1-0"));
     }
     {
         std::ofstream out(dir / "journal.jsonl", std::ios::binary | std::ios::app);
@@ -445,7 +425,7 @@ TEST_CASE("state: a PGN file that lost its end is filled up, new games do not la
         auto state = TournamentState::create(dir, matchSpec(4));
         for (int i = 0; i < 2; ++i) {
             const auto task = state->claimNext();
-            state->complete(*task, gameData(*task, "1-0"));
+            state->complete(*task, fakeGame(*task, "1-0"));
         }
         end = state->results().back().pgn.end();
     }
@@ -456,7 +436,7 @@ TEST_CASE("state: a PGN file that lost its end is filled up, new games do not la
     REQUIRE(state->warnings().size() == 1);
     CHECK(state->warnings()[0].find("10 bytes") != std::string::npos);
     const auto task = state->claimNext();
-    const auto rec  = state->complete(*task, gameData(*task, "1-0"));
+    const auto rec  = state->complete(*task, fakeGame(*task, "1-0"));
     CHECK(rec.result.pgn.offset == end);
     CHECK(readSpan(dir / "test.pgn", rec.result.pgn)->find("[Event ") == 0);
 }
@@ -466,7 +446,7 @@ TEST_CASE("state: one program at a time writes a tournament folder; others can r
     auto state     = TournamentState::create(dir, matchSpec(4));
     {
         const auto task = state->claimNext();
-        state->complete(*task, gameData(*task, "1-0"));
+        state->complete(*task, fakeGame(*task, "1-0"));
     }
 
     // The same program may open it again (the window resumes the tournament it shows).
@@ -516,7 +496,7 @@ TEST_CASE("state: a tournament looked at lets go of its folder for the process t
     auto state     = TournamentState::create(dir, matchSpec(4));
     {
         const auto task = state->claimNext();
-        state->complete(*task, gameData(*task, "1-0"));
+        state->complete(*task, fakeGame(*task, "1-0"));
     }
     state.reset();
     // Opened to look at it, as the window does: it holds the folder.
@@ -561,7 +541,7 @@ TEST_CASE("state: a game claimed before the folder was let go of and ended after
     const auto journal = readAll(dir / "journal.jsonl");
     const auto pgn     = readAll(dir / "test.pgn");
     state->letGo();
-    CHECK_THROWS_AS(state->complete(*task, gameData(*task, "1-0")), std::logic_error);
+    CHECK_THROWS_AS(state->complete(*task, fakeGame(*task, "1-0")), std::logic_error);
     CHECK(state->results().empty());
     CHECK(readAll(dir / "journal.jsonl") == journal);
     CHECK(readAll(dir / "test.pgn") == pgn);
@@ -629,7 +609,7 @@ TEST_CASE("state: a tournament folder from elsewhere cannot make the program wri
     // A finished tournament whose games wait for its PGN file: tournament.json changed to point elsewhere.
     {
         auto state = TournamentState::create(dir, matchSpec(2));
-        while (auto task = state->claimNext()) state->complete(*task, gameData(*task, "1-0"));
+        while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1-0"));
         REQUIRE(state->finished());
     }
     auto json       = nlohmann::json::parse(readAll(dir / "tournament.json"));
@@ -670,7 +650,7 @@ TEST_CASE("state: the PV warnings of a game are kept with its result, by ply") {
         auto state = TournamentState::create(dir, matchSpec(2));
         auto task  = state->claimNext();
         REQUIRE(task);
-        auto data = gameData(*task, "1-0");
+        auto data = fakeGame(*task, "1-0");
         for (const auto* move : {"e2e4", "e7e5", "g1f3"}) data.moves.emplace_back(move);
         data.moves[1].pv_warnings = {"Warning; Illegal PV move - move e5e4 from B"};
         data.moves[2].pv_warnings = {"Warning; Incomplete mating PV - from A", "Warning; Too long mating PV - from A"};
@@ -730,7 +710,7 @@ TEST_CASE("state: one opening per round, the next of the book for each round, ke
             auto task = state.claimNext();
             REQUIRE(task);
             by_round[task->encounter.round].insert(task->opening.fen_epd);
-            state.complete(*task, gameData(*task, "1/2-1/2"));
+            state.complete(*task, fakeGame(*task, "1/2-1/2"));
         }
     };
     {
@@ -759,7 +739,7 @@ TEST_CASE("state: one opening per round, the next of the book for each round, ke
         auto task = plain->claimNext();
         REQUIRE(task);
         if (task->encounter.round == 1) first_round.insert(task->opening.fen_epd);
-        plain->complete(*task, gameData(*task, "1/2-1/2"));
+        plain->complete(*task, fakeGame(*task, "1/2-1/2"));
     }
     CHECK(first_round.size() == 2);
 }
@@ -802,19 +782,19 @@ TEST_CASE("state: the PGN file of the user's gets the games in schedule order, a
         for (int i = 0; i < 4; ++i) t.push_back(*state->claimNext());
 
         // Games 1 and 3 end first: they wait for game 0.
-        state->complete(t[1], gameData(t[1], "1-0"));
-        state->complete(t[3], gameData(t[3], "1-0"));
+        state->complete(t[1], fakeGame(t[1], "1-0"));
+        state->complete(t[3], fakeGame(t[3], "1-0"));
         CHECK(gamesOf(out).size() == 1);
 
         // Game 0 lets game 1 out; game 3 still waits for game 2, which the stop interrupts.
-        state->complete(t[0], gameData(t[0], "1-0"));
+        state->complete(t[0], fakeGame(t[0], "1-0"));
         CHECK(gamesOf(out).size() == 3);
         CHECK(state->pgnOutError().empty());
     }
 
     auto state = TournamentState::open(dir);
     CHECK(gamesOf(out).size() == 3);  // nothing written twice, game 3 held still
-    while (auto task = state->claimNext()) state->complete(*task, gameData(*task, "1/2-1/2"));
+    while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
     CHECK(state->finished());
 
     auto games = gamesOf(out);
@@ -836,7 +816,7 @@ TEST_CASE("state: the PGN file of the user's gets a game held there with the res
         auto state        = TournamentState::create(dir, spec);
         const auto first  = *state->claimNext();
         const auto second = *state->claimNext();
-        state->complete(second, gameData(second, "1-0"));  // held: game 0 is not over
+        state->complete(second, fakeGame(second, "1-0"));  // held: game 0 is not over
 
         Edit set;
         set.kind   = Edit::Kind::SetResult;
@@ -844,7 +824,7 @@ TEST_CASE("state: the PGN file of the user's gets a game held there with the res
         set.result = "0-1";
         set.why    = "an illegal move the GUI missed";
         state->applyEdit(set);
-        state->complete(first, gameData(first, "1/2-1/2"));
+        state->complete(first, fakeGame(first, "1/2-1/2"));
     }
     const auto text = readAll(out);
     CHECK(gamesOf(out).size() == 2);
@@ -870,7 +850,7 @@ TEST_CASE("state: a write to the user's PGN file cut by a crash is completed wit
         auto state        = TournamentState::create(dir, spec);
         const auto first  = *state->claimNext();
         const auto second = *state->claimNext();
-        state->complete(second, gameData(second, "1-0"));
+        state->complete(second, fakeGame(second, "1-0"));
         Edit set;
         set.kind   = Edit::Kind::SetResult;
         set.games  = {{second.encounter.index, second.game}};
@@ -878,7 +858,7 @@ TEST_CASE("state: a write to the user's PGN file cut by a crash is completed wit
         state->applyEdit(set);
         // The write stops after 100 bytes, as a power cut would leave it.
         appendSharedCut = [](std::size_t) -> std::size_t { return 100; };
-        state->complete(first, gameData(first, "0-1"));
+        state->complete(first, fakeGame(first, "0-1"));
         appendSharedCut = nullptr;
         CHECK_FALSE(state->pgnOutError().empty());
     }
@@ -908,14 +888,14 @@ TEST_CASE("state: the PGN file of the user's gets what is left when the tourname
     auto first  = state->claimNext();
     auto second = state->claimNext();  // runs until the end
     REQUIRE(second);
-    state->complete(*first, gameData(*first, "1/2-1/2"));
+    state->complete(*first, fakeGame(*first, "1/2-1/2"));
     CHECK_FALSE(state->pgnOutError().empty());
 
     fs::remove_all(out);
     int played = 1;
     while (auto task = state->claimNext()) {
         const bool a_white = task->white.name == "A";
-        state->complete(*task, gameData(*task, task->game == 0 ? (a_white ? "1-0" : "0-1") : "1/2-1/2"));
+        state->complete(*task, fakeGame(*task, task->game == 0 ? (a_white ? "1-0" : "0-1") : "1/2-1/2"));
         REQUIRE(++played < 5000);
     }
     CHECK(state->finishReason() == "sprt_h1");
@@ -940,7 +920,7 @@ TEST_CASE("state: a write to the PGN file of the user's that fails partway is co
             // The first write stops after `cut` bytes (a disk full).
             appendSharedCut = [cut](std::size_t) { return cut; };
             auto first      = state->claimNext();
-            state->complete(*first, gameData(*first, "1-0"));
+            state->complete(*first, fakeGame(*first, "1-0"));
             appendSharedCut = nullptr;
             CHECK_FALSE(state->pgnOutError().empty());
             CHECK(fs::file_size(out) == cut);
@@ -948,7 +928,7 @@ TEST_CASE("state: a write to the PGN file of the user's that fails partway is co
             // The next write completes what the first left, then writes the game that ended meanwhile: no game cut
             // off before another.
             auto second = state->claimNext();
-            state->complete(*second, gameData(*second, "0-1"));
+            state->complete(*second, fakeGame(*second, "0-1"));
             CHECK(state->pgnOutError().empty());
             CHECK(gamesOf(out).size() == 2);
             CHECK(readAll(out) == readAll(dir / "test.pgn"));
@@ -957,7 +937,7 @@ TEST_CASE("state: a write to the PGN file of the user's that fails partway is co
         // Nothing is left to settle when the tournament is opened again.
         auto state = TournamentState::open(dir);
         CHECK(readAll(out) == readAll(dir / "test.pgn"));
-        while (auto task = state->claimNext()) state->complete(*task, gameData(*task, "1/2-1/2"));
+        while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
         CHECK(gamesOf(out).size() == 4);
         CHECK(readAll(out) == readAll(dir / "test.pgn"));
     }
@@ -971,7 +951,7 @@ TEST_CASE("state: a replayed game goes to the PGN file of the user's when it end
 
     for (int i = 0; i < 2; ++i) {
         auto task = state->claimNext();
-        state->complete(*task, gameData(*task, "1-0"));
+        state->complete(*task, fakeGame(*task, "1-0"));
     }
     Edit edit;
     edit.kind  = Edit::Kind::VoidGames;
@@ -984,9 +964,9 @@ TEST_CASE("state: a replayed game goes to the PGN file of the user's when it end
     auto next = state->claimNext();
     REQUIRE(next);
     CHECK(next->number() == 2);
-    state->complete(*next, gameData(*next, "1-0"));
+    state->complete(*next, fakeGame(*next, "1-0"));
     CHECK(gamesOf(dir / "all.pgn").size() == 3);  // game 0 was written once already: it holds nothing
-    state->complete(*replay, gameData(*replay, "0-1"));
+    state->complete(*replay, fakeGame(*replay, "0-1"));
 
     const std::vector<std::pair<std::string, std::string>> expected = {{"1", "A"}, {"1", "B"}, {"2", "A"}, {"1", "A"}};
     CHECK(gamesOf(dir / "all.pgn") == expected);
@@ -1012,7 +992,7 @@ TEST_CASE("state: a tournament does not let go of its folder while it records a 
     });
     const auto task = state->claimNext();
     REQUIRE(task);
-    std::thread recorder([&] { state->complete(*task, gameData(*task, "1-0")); });
+    std::thread recorder([&] { state->complete(*task, fakeGame(*task, "1-0")); });
     bool reached = false;
     {
         std::unique_lock<std::mutex> lock(mutex);
@@ -1054,14 +1034,14 @@ TEST_CASE("state: the PGN file of the user's is written again after a write ende
     });
     const auto first = state->claimNext();
     REQUIRE(first);
-    CHECK_THROWS_AS(state->complete(*first, gameData(*first, "1-0")), Unexpected);
+    CHECK_THROWS_AS(state->complete(*first, fakeGame(*first, "1-0")), Unexpected);
     state->setJournalListener({});
     CHECK(gamesOf(out).empty());
 
     // The next game's write is not held back: both games go, in their order.
     const auto second = state->claimNext();
     REQUIRE(second);
-    state->complete(*second, gameData(*second, "0-1"));
+    state->complete(*second, fakeGame(*second, "0-1"));
     CHECK(state->pgnOutError().empty());
     CHECK(gamesOf(out).size() == 2);
     CHECK(readAll(out) == readAll(dir / "test.pgn"));
@@ -1087,7 +1067,7 @@ TEST_CASE("state: games recorded by many threads at once resume exactly, each ga
                 for (int i = 0; state->results().size() < 60; ++i) {
                     const auto task = state->claimNext();
                     if (!task) break;
-                    state->complete(*task, gameData(*task, (i + t) % 3 == 0 ? "1-0" : "1/2-1/2"));
+                    state->complete(*task, fakeGame(*task, (i + t) % 3 == 0 ? "1-0" : "1/2-1/2"));
                 }
             });
         }
@@ -1120,7 +1100,7 @@ TEST_CASE("state: games recorded by many threads at once resume exactly, each ga
     for (const auto& r : after) CHECK(numbers.insert(r.number()).second);
     while (auto task = state->claimNext()) {
         CHECK(numbers.insert(task->number()).second);
-        state->complete(*task, gameData(*task, "0-1"));
+        state->complete(*task, fakeGame(*task, "0-1"));
     }
     CHECK(state->finished());
     CHECK(numbers.size() == 100);
@@ -1155,7 +1135,7 @@ TEST_CASE("state: game text whose journal line a crash lost, in the middle of th
         auto state = TournamentState::create(dir, matchSpec(6));
         for (int i = 0; i < 3; ++i) {
             const auto task = state->claimNext();
-            state->complete(*task, gameData(*task, "1-0"));
+            state->complete(*task, fakeGame(*task, "1-0"));
         }
     }
     const auto size    = fs::file_size(dir / "test.pgn");
@@ -1191,7 +1171,7 @@ TEST_CASE("state: game text whose journal line a crash lost, in the middle of th
     }
 
     // Game 1 is played again; at the end every game is there once.
-    while (auto task = state->claimNext()) state->complete(*task, gameData(*task, "1/2-1/2"));
+    while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
     CHECK(state->finished());
     CHECK(countGames(dir / "test.pgn") == 6);
     CHECK(countGames(dir / "test-chessbase.pgn") == 6);
@@ -1222,7 +1202,7 @@ TEST_CASE("state: games dropped by an edit while their text was written leave no
                         std::lock_guard<std::mutex> lock(mutex);
                         running.insert(game);
                     }
-                    state->complete(*task, gameData(*task, "1-0"));
+                    state->complete(*task, fakeGame(*task, "1-0"));
                     std::lock_guard<std::mutex> lock(mutex);
                     running.erase(game);
                 }
@@ -1274,7 +1254,7 @@ TEST_CASE("state: a crash in the middle of a write to the PGN file of the user's
         auto state = TournamentState::create(dir, spec);
         for (int i = 0; i < 2; ++i) {
             const auto task = state->claimNext();
-            state->complete(*task, gameData(*task, "1-0"));
+            state->complete(*task, fakeGame(*task, "1-0"));
         }
     }
     const auto full = readAll(out);
@@ -1321,7 +1301,7 @@ TEST_CASE("state: a crash in the middle of a write to the PGN file of the user's
     CHECK(readAll(out) == expected);
 
     // The rest of the games follow, each once.
-    while (auto task = state->claimNext()) state->complete(*task, gameData(*task, "1/2-1/2"));
+    while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
     CHECK(state->finished());
     const auto text = readAll(out);
     REQUIRE(text.size() > expected.size());
@@ -1404,7 +1384,7 @@ TEST_CASE("state: a new tournament writes its games to <name>.pgn, kept when it 
         for (int i = 0; i < 2; ++i) {
             const auto task = state->claimNext();
             REQUIRE(task);
-            state->complete(*task, gameData(*task, "1-0"));
+            state->complete(*task, fakeGame(*task, "1-0"));
         }
     }
     CHECK(countGames(dir / (file + ".pgn")) == 2);
@@ -1423,7 +1403,7 @@ TEST_CASE("state: a new tournament writes its games to <name>.pgn, kept when it 
     auto state = TournamentState::open(dir);
     CHECK(state->spec().name == "Another name");
     CHECK(state->pgnPath() == dir / (file + ".pgn"));
-    while (const auto task = state->claimNext()) state->complete(*task, gameData(*task, "1/2-1/2"));
+    while (const auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
     CHECK(state->finished());
     REQUIRE(state->results().size() == 4);
     for (const auto& r : state->results()) {
@@ -1473,7 +1453,7 @@ TEST_CASE("state: a tournament of an earlier version keeps games.pgn; the game d
         for (int i = 0; i < 2; ++i) {
             const auto task = state->claimNext();
             REQUIRE(task);
-            state->complete(*task, gameData(*task, "1-0"));
+            state->complete(*task, fakeGame(*task, "1-0"));
         }
     }
     makeOld(old_dir);
@@ -1484,7 +1464,7 @@ TEST_CASE("state: a tournament of an earlier version keeps games.pgn; the game d
         CHECK(state->pgnPath() == old_dir / "games.pgn");
         CHECK(state->chessbasePgnPath() == old_dir / "games-chessbase.pgn");
         CHECK(state->warnings().empty());
-        while (const auto task = state->claimNext()) state->complete(*task, gameData(*task, "0-1"));
+        while (const auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "0-1"));
         CHECK(state->results().size() == 4);
         for (const auto& r : state->results()) CHECK(readSpan(state->pgnPath(), r.pgn)->find("[Event ") == 0);
     }

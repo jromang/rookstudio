@@ -35,11 +35,6 @@ namespace {
 namespace fs = std::filesystem;
 using Clock  = std::chrono::steady_clock;
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 int intOf(const nlohmann::json& j, const char* key, int otherwise = 0) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_integer() ? it->get<int>() : otherwise;

@@ -16,19 +16,9 @@ namespace fcg::lichess {
 
 namespace {
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 int intOf(const nlohmann::json& j, const char* key, int otherwise = 0) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_integer() ? it->get<int>() : otherwise;
-}
-
-bool boolOf(const nlohmann::json& j, const char* key, bool otherwise = false) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_boolean() ? it->get<bool>() : otherwise;
 }
 
 // A variant's key, whether Lichess writes it as {"key": ...} or as the key itself.

@@ -35,11 +35,6 @@ std::optional<int> intOf(const nlohmann::json& j, const char* key) {
     return it->get<int>();
 }
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 uint64_t countOf(const nlohmann::json& j, const char* key) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_unsigned()  ? it->get<uint64_t>()

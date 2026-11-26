@@ -17,11 +17,6 @@ namespace {
 std::atomic<int64_t> g_first_retry_ms{5000};
 std::atomic<int64_t> g_most_retry_ms{60000};
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 int64_t numberOf(const nlohmann::json& j, const char* key) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_integer() ? it->get<int64_t>() : 0;

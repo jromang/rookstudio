@@ -15,11 +15,6 @@ namespace {
 constexpr std::array<std::string_view, 8> CHANNELS = {"best",      "bullet",      "blitz", "rapid",
                                                       "classical", "ultraBullet", "bot",   "computer"};
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 std::string lower(std::string_view text) {
     std::string out(text);
     for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));

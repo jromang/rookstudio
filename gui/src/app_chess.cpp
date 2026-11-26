@@ -28,6 +28,7 @@
 #include "fide_rating_list.hpp"
 #include "focus_words.hpp"
 #include "i18n.hpp"
+#include "lichess_arenas_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
 #include "twic.hpp"
@@ -136,7 +137,7 @@ class App::ModulesContext final : public AppContext {
         streams.rounds  = app_.followed_rounds_.size();
         streams.players = app_.players_follower_ ? app_.players_follower_->open() : 0;
         streams.tv      = app_.tv_->streams();
-        streams.tour    = app_.tour_follow_ && app_.tour_follow_->follower ? app_.tour_follow_->follower->open() : 0;
+        streams.tour    = app_.arenas_->streams();
         return streams;
     }
     void setPlayersQuota(std::size_t streams) override { app_.players_quota_ = streams; }
@@ -225,7 +226,12 @@ class App::ModulesContext final : public AppContext {
 void App::initChessModules() {
     modules_context_ = std::make_unique<ModulesContext>(*this);
     tv_              = std::make_unique<LichessTvPage>(*modules_context_);
+    arenas_          = std::make_unique<LichessArenasPage>(*modules_context_);
 }
+
+// The arenas' hooks in fastchess-gui's pages (#95), which do not include its module's header.
+bool App::arenaHoldsAids() const { return arenas_->holdsAids(); }
+void App::drawSwissNotice() { arenas_->drawSwissNotice(); }
 
 // Lichess TV's hooks in fastchess-gui's pages (#86), which do not include its module's header.
 bool App::tvOnBoard() const { return tv_->onBoard(); }
@@ -759,38 +765,9 @@ bool App::applyChessFocusWord(const std::string& w) {
     });
     // Lichess TV's, its module's (#86): lichess-tv, tv-mosaic=CHANNEL, tv-board=CHANNEL:ID.
     tv_->addFocusWords(words, w);
-    words.on({"lichess-tournaments"}, [&] {  // the Lichess page scrolled to its card of tournaments (#95)
-        page_ = Page::Lichess;
-        broadcast_round_.clear();
-        arena_card_y_ = -2;
-    });
-    words.on({"arena-mosaic=*", "swiss-mosaic=*", "play-arena=*", "play-swiss=*"}, [&] {
-        // arena-mosaic=ID[@NAME], swiss-mosaic=ID[@NAME]: a tournament followed in the mosaic;
-        // play-arena=ID[@NAME], play-swiss=ID[@NAME]: the Play page's Tournaments part on it (#95), with
-        // lichess-api= before them.
-        const auto eq   = w.find('=');
-        const auto kind = w.substr(0, eq);
-        const auto spec = w.substr(eq + 1);
-        const auto at   = spec.find('@');
-        const auto id   = spec.substr(0, at);
-        const auto name = at == std::string::npos ? std::string() : spec.substr(at + 1);
-        if (kind == "arena-mosaic" || kind == "swiss-mosaic") {
-            followTournament(id, name, kind == "swiss-mosaic");
-        } else if (kind == "play-arena") {
-            chooseArena(id, name);
-        } else {
-            lichess::SwissInfo s;
-            s.id   = id;
-            s.name = name;
-            chooseSwiss(s);
-            swiss_play_->info = {};  // asked of Lichess
-        }
-    });
-    words.on({"play-tournaments"}, [&] {  // the Play page's "On Lichess › Tournaments" part (#95)
-        page_        = Page::Play;
-        play_part_   = 1;
-        online_part_ = 1;
-    });
+    // The arenas', their module's (#95): lichess-tournaments, arena-mosaic=, swiss-mosaic=, play-arena=, play-swiss=,
+    // play-tournaments.
+    arenas_->addFocusWords(words, w);
     words.on({"board-to-study=*"}, [&] {  // board-to-study=FILE: on the Board, sent to a study (#79)
         std::ifstream in(w.substr(15), std::ios::binary);
         const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());

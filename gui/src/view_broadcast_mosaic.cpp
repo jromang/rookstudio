@@ -22,6 +22,8 @@
 #include "console.hpp"
 #include "home.hpp"
 #include "i18n.hpp"
+#include "lichess_arenas_page.hpp"
+#include "lichess_tv.hpp"
 #include "lichess_tv_page.hpp"
 #include "live.hpp"
 #include "online_cache.hpp"
@@ -93,7 +95,7 @@ bool App::boardBackToMosaic() const {
     const auto& key = board_broadcast_->round;
     if (isTvMosaic(key)) return lichess::isTvChannel(key.substr(lichess::TV_MOSAIC.size()));
     if (key == lichess::PLAYERS_MOSAIC) return true;
-    if (isTourMosaic(key)) return tour_follow_ && tour_follow_->key == key;  // a tournament followed (#95)
+    if (isTourMosaic(key)) return arenas_->followed() && arenas_->followedKey() == key;  // a tournament followed (#95)
     return std::any_of(followed_rounds_.begin(), followed_rounds_.end(), [&](const auto& f) { return f.key() == key; });
 }
 
@@ -113,7 +115,7 @@ void App::pollBroadcastBoards() {
         if (f.key() == broadcast_round_) round = &f;
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
     const bool tv      = !tv_->channelShown().empty();                 // a channel of Lichess TV's (#86)
-    const bool tour    = tourMosaicShown();                            // a tournament of Lichess's (#95)
+    const bool tour    = arenas_->followedShown();                     // a tournament of Lichess's (#95)
     if (!round && !players && !tv && !tour) {
         broadcast_boards_.clear();
         if (!broadcast_round_.empty()) broadcast_round_.clear();  // no longer followed: the page itself again
@@ -126,24 +128,8 @@ void App::pollBroadcastBoards() {
         } else if (players) {
             if (players_follower_) games = players_follower_->games();
         } else if (tour) {
-            // The first eight's games in the order of their places; a game that ended keeps its tile until the one
-            // taking its place has come, so that the tiles do not move (as Lichess TV's).
-            auto& f = *tour_follow_;
-            if (f.follower) {
-                const auto all  = f.follower->games();
-                const auto find = [&](const std::string& url) {
-                    return std::find_if(all.begin(), all.end(), [&](const auto& g) { return g.url == url; });
-                };
-                std::vector<std::string> slots;
-                for (std::size_t i = 0; i < f.places.size(); ++i) {
-                    const auto url     = fmt::format("https://lichess.org/{}", f.places[i]);
-                    const bool kept_on = find(url) == all.end() && i < f.slots.size() && find(f.slots[i]) != all.end();
-                    slots.push_back(kept_on ? f.slots[i] : url);
-                }
-                f.slots = std::move(slots);
-                for (const auto& url : f.slots)
-                    if (const auto it = find(url); it != all.end()) games.push_back(*it);
-            }
+            // The first eight's games in the order of their places, not those that went (#95).
+            games = arenas_->mosaicGames();
         } else {
             // The channel's games in the order of their places, not the Board's game nor those kept (#86).
             games = tv_->mosaicGames();
@@ -177,7 +163,7 @@ void App::pollBroadcastBoards() {
         }
         // A channel's tiles in the order of their places: a game that ended gives its place to another.
         if (tv || tour) {
-            const auto& order = tour ? tour_follow_->slots : tv_->slots();
+            const auto& order = tour ? arenas_->slots() : tv_->slots();
             const auto place  = [&](const BroadcastBoard& b) {
                 return std::find(order.begin(), order.end(), b.url) - order.begin();
             };
@@ -570,7 +556,7 @@ void App::drawBroadcastMosaic() {
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
     const auto channel = tv_->channelShown();                          // a channel of Lichess TV's (#86)
     const bool tv      = !channel.empty();
-    const bool tour    = tourMosaicShown();  // a tournament of Lichess's (#95)
+    const bool tour    = arenas_->followedShown();  // a tournament of Lichess's (#95)
     if (!round && !players && !tv && !tour) return;
     if (round) mosaic_round_ = round->key();
     // Its sources (mockup M12, board 7): the rounds followed, the followed players, Lichess TV.
@@ -611,19 +597,17 @@ void App::drawBroadcastMosaic() {
         return;
     }
     if (source(TR("Lichess tournaments"), tour,
-               tour_follow_ ? TR("The tournament you follow: its standing, the games of its first eight.")
-                            : TR("No tournament followed: the Lichess page lists them."))) {
-        if (tour_follow_) {
-            openBroadcastMosaic(tour_follow_->key);
-        } else {
-            broadcast_round_.clear();  // the page, its card of the tournaments
-            arena_card_y_ = -2;
-        }
+               arenas_->followed() ? TR("The tournament you follow: its standing, the games of its first eight.")
+                                   : TR("No tournament followed: the Lichess page lists them."))) {
+        if (arenas_->followed())
+            openBroadcastMosaic(arenas_->followedKey());
+        else
+            arenas_->showCard();  // the page, its card of the tournaments
         return;
     }
     if (tour) {
-        drawTourMosaicHead();
-        if (!tour_follow_) return;  // stopped following
+        arenas_->drawMosaicHead();
+        if (!arenas_->followed()) return;  // stopped following
     } else if (tv) {
         // Its channels, as chips; the games it follows, Lichess's limit, the fair play.
         for (const auto key : lichess::tvChannels()) {
@@ -785,29 +769,7 @@ void App::drawBroadcastMosaic() {
     }
 
     if (broadcast_boards_.empty() && tour) {
-        const auto& f       = *tour_follow_;
-        const bool started  = f.swiss ? f.swiss_info.value && f.swiss_info.value->state != lichess::TourState::Created
-                                      : f.arena.value && f.arena.value->info.state != lichess::TourState::Created;
-        const bool finished = f.swiss ? f.swiss_info.value && f.swiss_info.value->state == lichess::TourState::Finished
-                                      : f.arena.value && f.arena.value->info.state == lichess::TourState::Finished;
-        ImGui::PushTextWrapPos();
-        if (f.quota == 0)
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("Lichess lets an address follow {} games at once: the rounds and the players "
-                                   "followed take them all now.",
-                                   lichess::MOST_GAME_STREAMS)
-                                   .c_str());
-        else
-            ImGui::TextDisabled("%s", finished   ? TR("It is over: its standing stays.")
-                                      : !started ? TR("It has not started: the games of its first eight come here when "
-                                                      "it does.")
-                                      : f.swiss ? TR("No game of its first eight now: the next round's games come here "
-                                                     "as it starts, three moves late.")
-                                                : TR("None of its first eight plays now: their games come here as they "
-                                                     "start, three moves late."));
-        ImGui::PopTextWrapPos();
-        ImGui::Dummy(ImVec2(0, px(6)));
-        drawTourStanding();
+        arenas_->drawMosaicEmpty();  // why none of its games shows, its standing
         return;
     }
     if (broadcast_boards_.empty()) {
@@ -980,7 +942,7 @@ void App::drawBroadcastMosaic() {
         ImGui::Dummy(ImVec2(0, px(6)));
     }
     if (tour) {
-        drawTourStanding();  // its standing, its players' sheets
+        arenas_->drawStanding();  // its standing, its players' sheets
     } else {
         ui::beginCard("broadcast_round");
         ImGui::TextUnformatted(tv ? TR("The channel's games") : players ? TR("Their games") : TR("The round"));

@@ -26,6 +26,7 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "lichess_arenas_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -181,7 +182,7 @@ const lichess::PlayingGame* App::liveGameOn() const {
         online_game_->state.live())
         return &online_game_->playing;
     // In an arena from here: its aids stay locked between two games, until Pause (#95, point 18).
-    if (arenaHoldsAids()) return &arena_play_->waiting;
+    if (arenaHoldsAids()) return &arenas_->waiting();
     return nullptr;
 }
 
@@ -265,14 +266,14 @@ void App::drawFairPlayBanner(bool whole_game) {
     ImGui::SameLine();
     ImGui::BeginGroup();
     ImGui::PushTextWrapPos(0.0f);
-    if (arena_play_ && !g->tournament.empty() && g->tournament == arena_play_->id) {
+    if (arenas_->isArenaGame(g->tournament)) {
         // An arena's game, or the arena between two (#95): the reports too, Pause gives them back.
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tone), "%s",
                            g->id.empty() ? TR("In the arena: the aids stay locked between two games")
                                          : TR("Arena game live: the aids are locked"));
         ImGui::TextDisabled("%s", TR("The engine, the tree, the cloud, the tables, the assistant and the reports. "
                                      "Between two games too, while you are in the arena: “Pause” gives them back."));
-        if (arena_play_->seat.in() && ImGui::SmallButton(TR("Pause · Alt+P##fair_play"))) pauseArena();
+        if (arenas_->inArena() && ImGui::SmallButton(TR("Pause · Alt+P##fair_play"))) arenas_->pauseArena();
     } else if (g->live()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(tone), "%s",
                            TR("One of your games is being played on Lichess: the aids are locked"));
@@ -410,9 +411,9 @@ void App::finishLichessGame(const lichess::PlayingGame& game) {
     f.game = game;
     f.base = name;
     // An arena's game played from here (#95): kept now, its review offered at the arena's end.
-    if (arena_play_ && game.tournament.empty() && online_game_ && online_game_->id == game.id)
+    if (arenas_->arenaChosen() && game.tournament.empty() && online_game_ && online_game_->id == game.id)
         f.game.tournament = online_game_->state.tournament;  // the stream named it, the list did not
-    f.held = arena_play_ && !f.game.tournament.empty() && f.game.tournament == arena_play_->id;
+    f.held = arenas_->isArenaGame(f.game.tournament);
     std::shared_ptr<study::Database> db;
     try {
         if (!index) index = s.create(name);

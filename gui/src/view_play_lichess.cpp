@@ -19,6 +19,8 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "lichess_arenas.hpp"
+#include "lichess_arenas_page.hpp"
 #include "sound.hpp"
 #include "ui.hpp"
 
@@ -321,8 +323,7 @@ void App::onlineEvent(const lichess::GameEvent& e) {
             const bool resumed =
                 !online_resume_checked_ && !onlineSettings().playing.empty() && onlineSettings().playing == g.id;
             // A game of the arena or the Swiss the user is in from here (#95): it opens by itself.
-            const bool tournament = (arena_play_ && !g.tournament.empty() && g.tournament == arena_play_->id) ||
-                                    (swiss_play_ && !g.swiss.empty() && g.swiss == swiss_play_->id);
+            const bool tournament = arenas_->isArenaGame(g.tournament) || arenas_->isSwissGame(g.swiss);
             // It takes the Board, unless a live game is being played there (Lichess pairs one at a time); a
             // correspondence game shown there gives way, still among the games in progress.
             if ((accepted || challenged || sought || resumed || tournament) && lichess::playableHere(g)) {
@@ -938,7 +939,7 @@ void App::drawPlayLichess() {
         ImGui::TextDisabled("·");
         ImGui::SameLine(0, px(8));
         part(TR("Tournaments"), 1);
-        if (arena_play_ && arena_play_->seat.in() && online_part_ == 0) {
+        if (arenas_->inArena() && online_part_ == 0) {
             ImGui::SameLine(0, px(10));
             ImGui::AlignTextToFramePadding();
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", TR("· in an arena"));
@@ -946,7 +947,7 @@ void App::drawPlayLichess() {
     }
     if (online_part_ == 1) {
         drawIncomingChallenges(false);
-        drawPlayTournaments();
+        arenas_->drawPlayTournaments();
         return;
     }
     // Enter: a challenge received taken first, else the seek.
@@ -1457,12 +1458,9 @@ void App::drawOnlineGameCard() {
     }
     ImGui::PopFont();
     // A tournament's game (#95): the arena's line (rank, points, the streak, the time left, Pause); a Swiss's round.
-    const bool arena = arena_play_ && !s.tournament.empty() && s.tournament == arena_play_->id;
-    if (arena) drawArenaLine(true);
-    if (!s.swiss.empty() && swiss_play_ && s.swiss == swiss_play_->id && swiss_play_->info.value)
-        ImGui::TextDisabled("%s", trf("{} · round {} of {}", swiss_play_->name, swiss_play_->info.value->round,
-                                      swiss_play_->info.value->rounds)
-                                      .c_str());
+    const bool arena = arenas_->isArenaGame(s.tournament);
+    if (arena) arenas_->drawArenaLine(true);
+    arenas_->drawGameRound(s.swiss);
     // The connection cut: the clock runs on Lichess meanwhile; tried again by itself.
     if (!s.connected) {
         ImGui::PopTextWrapPos();
@@ -1580,7 +1578,7 @@ void App::drawOnlineGameCard() {
     // Berserk in an arena that allows it (#95): before the user's first move only.
     if ((og.white ? s.black_berserk : s.white_berserk) && arena)
         ImGui::TextDisabled("%s", trf("{} went berserk: half their clock.", them.name).c_str());
-    if (arena && arena_play_->state.value && arena_play_->state.value->info.berserkable) {
+    if (arena && arenas_->berserkable()) {
         const bool done   = og.white ? s.white_berserk : s.black_berserk;
         const bool can    = lichess::berserkAllowed(true, s, og.white);
         const char* label = done  ? TR("Berserk: half your clock, a point more if you win")
@@ -1664,7 +1662,7 @@ void App::drawOnlineGameCard() {
     ImGui::PopTextWrapPos();
     endTinted();
     // The arena's game before, at its end (#95).
-    if (arena && !arena_play_->last_game.empty() && arena_play_->last_game != og.id) drawArenaGameBefore();
+    if (arena && !arenas_->lastGame().empty() && arenas_->lastGame() != og.id) arenas_->drawArenaGameBefore();
 }
 
 void App::drawOnlineChat() {
@@ -1723,12 +1721,12 @@ void App::drawOnlineGameEnd() {
     const bool won   = !s.winner.empty() && (s.winner == "white") == og.white;
     const bool lost  = !s.winner.empty() && !won;
     // An arena's game (#95): its line, the game before at its end; the next one comes by itself.
-    if (arena_play_ && !s.tournament.empty() && s.tournament == arena_play_->id) {
-        drawArenaLine(true);
-        drawArenaGameBefore();
-        if (arena_play_ && arena_play_->seat.isOver())
-            drawArenaOver(false);  // its end: rank, points, the games and their review
-        else if (arena_play_ && !arena_play_->seat.in() && ImGui::SmallButton(TR("Close##arena_game")))
+    if (arenas_->isArenaGame(s.tournament)) {
+        arenas_->drawArenaLine(true);
+        arenas_->drawArenaGameBefore();
+        if (arenas_->arenaOver())
+            arenas_->drawArenaOver(false);  // its end: rank, points, the games and their review
+        else if (arenas_->arenaChosen() && !arenas_->inArena() && ImGui::SmallButton(TR("Close##arena_game")))
             closeOnlineGame();
         return;
     }
@@ -1775,12 +1773,7 @@ void App::drawOnlineGameEnd() {
     const auto clock = onlineSettings().seekClock();
     if (lichess::tournamentGame(s)) {
         if (primaryButton(TR("Back to the tournament##online_end"))) {
-            if (swiss_play_ && s.swiss == swiss_play_->id && swiss_play_->info.value)
-                chooseSwiss(*swiss_play_->info.value);
-            else if (arena_play_)
-                chooseArena(arena_play_->id, arena_play_->name);
-            else
-                page_ = Page::Play;
+            if (!arenas_->backToTournament(s.swiss)) page_ = Page::Play;
             ImGui::PopTextWrapPos();
             endTinted();
             return;
@@ -1916,7 +1909,7 @@ void App::drawQuitOnline() {
         if (arenaHoldsAids())
             ImGui::TextUnformatted(trf("You are in the arena “{}”: closed, RookStudio no longer joins you again and "
                                        "Lichess pairs you no more; your points stay.",
-                                       arena_play_->name)
+                                       arenas_->arenaName())
                                        .c_str());
         ImGui::PopTextWrapPos();
     }
@@ -1925,9 +1918,7 @@ void App::drawQuitOnline() {
     ImGui::SameLine();
     if (arenaHoldsAids()) {
         if (ImGui::Button(TR("Pause and close"))) {
-            pauseArena();  // RookStudio closes once Lichess took the pause, or after a few seconds
-            arena_play_->quit_after = true;
-            arena_play_->quit_asked = ImGui::GetTime();
+            arenas_->pauseAndClose();  // RookStudio closes once Lichess took the pause, or after a few seconds
             ImGui::CloseCurrentPopup();
         }
     } else if (ImGui::Button(TR("Close anyway"))) {

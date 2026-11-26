@@ -136,6 +136,7 @@ namespace fcg {
 class AppContext;
 class AssistantService;
 class EngineOracle;
+class LichessTvPage;
 struct CommentaryReview;
 
 class EngineHub;
@@ -1865,76 +1866,25 @@ class App {
     int lichess_players_drawn_        = -1000;  // the frame that drew their card last
     bool lichess_players_then_mosaic_ = false;  // the permission granted, their mosaic opens
     std::unique_ptr<lichess::PlayersFollower> players_follower_;
+    std::size_t players_quota_ = 0;  // the game streams it may hold now, as Lichess TV shares them out (#86)
     std::array<char, 40> lichess_add_player_{};
     [[nodiscard]] std::vector<std::string> followedPlayers() const;  // once each, never the user's own account
     void pollFollowedPlayers();
     void drawFollowedPlayers();  // the Lichess page's card
     void openPlayersMosaic(bool asked = false);
-    // Lichess TV (#86, mockup M12, board 7; lichess_tv.hpp, view_lichess_tv.cpp): its channels on the Lichess page,
-    // each with its featured game, read again while the card shows, every 30 s at most; a channel's games in the
-    // broadcasts' mosaic ("tv:<channel>"), a third source beside the rounds and the followed players, a finished game
-    // giving its place to another; a game on the Board, which goes on to the channel's next featured game when it ends,
-    // unless the user stays on it, and goes into a database at its end when kept. Without an account; never the user's
-    // own games. The game streams of this address, eight at most: the rounds followed take one each, then the Board's
-    // game and those kept, then the mosaic shown (a channel's or the followed players').
-    lichess::Answer<std::vector<lichess::TvRow>> tv_rows_;
-    std::future<lichess::Answer<std::vector<lichess::TvRow>>> tv_rows_job_;
-    std::chrono::steady_clock::time_point tv_rows_asked_{};
-    int tv_card_drawn_ = -1000;                              // the frame that drew the card last
-    std::unique_ptr<lichess::PlayersFollower> tv_follower_;  // the mosaic's games, the Board's, those kept
-    lichess::TvList tv_listed_;  // the mosaic's channel: its featured game and games, as Lichess listed them last
-    std::string tv_listed_of_;   // that channel
-    lichess::Failure tv_list_error_;
-    std::future<std::pair<std::string, lichess::Answer<lichess::TvList>>> tv_list_job_;
-    std::string tv_list_asked_of_;  // the channel asked last, and when
-    std::chrono::steady_clock::time_point tv_list_asked_at_{};
-    std::vector<std::string> tv_places_;  // the mosaic's games, in the order of its tiles
-    std::vector<std::string> tv_slots_;   // its tiles: a place's game, or the one it replaces until it comes (URLs)
-    std::set<std::string> tv_over_;       // the games known to have ended, or that could not be read
-    std::map<std::string, std::chrono::steady_clock::time_point> tv_over_since_;  // when: a result shown 5 s
-    std::size_t tv_quota_ = 0, players_quota_ = 0;  // the game streams each follower may hold now
-    std::size_t tv_room_ = 0;                       // of them, the mosaic's
-    struct BoardTv {
-        std::string channel, game;  // the game the Board follows, its channel
-        bool featured = false;      // the channel's featured game when it was taken
-        bool stay     = false;      // "Stay on this game": not on to the next one at its end
-        std::string clock;          // "3+0"
-        int tries = 0;              // the next game asked again since it ended
-        std::chrono::steady_clock::time_point next_at{};
-        std::future<lichess::Answer<lichess::TvNext>> next;
-        lichess::Failure error;  // why the next game did not come
-    };
-    std::optional<BoardTv> board_tv_;
-    struct TvKept {
-        std::string id, title;
-        std::string folder;  // the database's
-        std::string base;    // its name, as said
-    };
-    std::vector<TvKept> tv_kept_;  // games that go into a database at their end, kept in the profile until then
-    std::map<std::string, std::string> tv_stored_;  // those that went this session: their id, the database's name
-    bool tv_kept_loaded_ = false;
-    bool tv_keep_menu_   = false;  // the databases offered to keep the Board's game
-    [[nodiscard]] static bool isTvMosaic(std::string_view key) { return key.rfind(lichess::TV_MOSAIC, 0) == 0; }
-    [[nodiscard]] std::string tvChannelShown() const;  // the channel of the mosaic open, empty when it is none
-    [[nodiscard]] static const char* tvChannelName(std::string_view key);  // "Blitz", in the reader's language
-    [[nodiscard]] std::vector<std::string> ownLichessIds();  // the user's account and their bot's, lowercase
+    // Lichess TV (#86, mockup M12, board 7): a module of its own (lichess_tv_page.hpp, #107), made by
+    // initChessModules(): its card on the Lichess page, a channel's games in the broadcasts' mosaic ("tv:<channel>"), a
+    // game on the Board that goes on to the channel's next one, the games kept, the game streams it shares out.
+    std::unique_ptr<LichessTvPage> tv_;
+    // Its hooks in fastchess-gui's pages, which do not include its header (app_chess.cpp): the Board follows a game of
+    // a channel, leaves it for another game; the Board's card; an engine's line.
+    [[nodiscard]] bool tvOnBoard() const;
+    void leaveTvBoard();
+    void drawTvBoardCard();
+    void drawTvEngineLine(const EngineEntry& e);  // on an engine's card: the Bots and Computer channels in the mosaic
     // A side as the tiles and the Board name it: Lichess's AI by its level, else as the PGN does.
     [[nodiscard]] static std::string tvName(const std::string& name);
-    void pollLichessTv();
-    void drawLichessTvCard();
-    void openTvMosaic(const std::string& channel);
-    // The Board follows a game of a channel: its moves as they come; `known`, what is known of it already, else what
-    // the follower has (nothing yet: the board fills as Lichess sends it).
-    void followTvOnBoard(const std::string& channel, const std::string& game, bool featured, const std::string& title,
-                         const std::string& clock, const ReplayGame* known = nullptr, uint64_t version = 0);
-    void drawTvBoardCard();
-    void drawTvKeepMenu();
-    void drawTvEngineLine(const EngineEntry& e);  // on an engine's card: the Bots and Computer channels in the mosaic
-    void followTvFeatured(const std::string& channel);  // its featured game on the Board, the card's rows known
-    void keepTvGame(const std::string& folder, const std::string& name);  // the Board's game, at its end
-    void storeTvGame(const TvKept& kept, const std::string& pgn);         // into its database, now
-    void loadTvKept();
-    void saveTvKept();
+    [[nodiscard]] std::vector<std::string> ownLichessIds();  // the user's account and their bot's, lowercase
     // Back to the mosaic the Board's game came from: its round, the followed players, a channel.
     void backToMosaic();
     [[nodiscard]] bool boardBackToMosaic() const;  // the Board's game came from a mosaic still there

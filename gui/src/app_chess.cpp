@@ -29,7 +29,7 @@
 #include "focus_words.hpp"
 #include "i18n.hpp"
 #include "lichess_months.hpp"
-#include "lichess_tv.hpp"
+#include "lichess_tv_page.hpp"
 #include "twic.hpp"
 
 namespace fcg {
@@ -101,7 +101,17 @@ class App::ModulesContext final : public AppContext {
     App& app_;
 };
 
-void App::initChessModules() { modules_context_ = std::make_unique<ModulesContext>(*this); }
+void App::initChessModules() {
+    modules_context_ = std::make_unique<ModulesContext>(*this);
+    tv_              = std::make_unique<LichessTvPage>(*modules_context_);
+}
+
+// Lichess TV's hooks in fastchess-gui's pages (#86), which do not include its module's header.
+bool App::tvOnBoard() const { return tv_->onBoard(); }
+void App::leaveTvBoard() { tv_->leaveBoard(); }
+void App::drawTvBoardCard() { tv_->drawBoardCard(); }
+void App::drawTvEngineLine(const EngineEntry& e) { tv_->drawEngineLine(e.name); }
+std::string App::tvName(const std::string& name) { return fcg::tvName(name); }
 
 void App::initChessServers() {
     // Scripted screenshots ask nothing of the internet (AppOptions::scripted): Lichess, its database, TWIC, chess.com
@@ -626,10 +636,8 @@ bool App::applyChessFocusWord(const std::string& w) {
             studies_.shown = studies_.opened = true;
         }
     });
-    words.on({"lichess-tv"}, [&] {  // the Lichess page, its card of Lichess TV's channels (#86)
-        page_ = Page::Lichess;
-        broadcast_round_.clear();
-    });
+    // Lichess TV's, its module's (#86): lichess-tv, tv-mosaic=CHANNEL, tv-board=CHANNEL:ID.
+    tv_->addFocusWords(words, w);
     words.on({"lichess-tournaments"}, [&] {  // the Lichess page scrolled to its card of tournaments (#95)
         page_ = Page::Lichess;
         broadcast_round_.clear();
@@ -661,16 +669,6 @@ bool App::applyChessFocusWord(const std::string& w) {
         page_        = Page::Play;
         play_part_   = 1;
         online_part_ = 1;
-    });
-    words.on({"tv-mosaic=*"}, [&] {  // tv-mosaic=CHANNEL: a channel of Lichess TV in the mosaic (#86)
-        openTvMosaic(w.substr(10));
-    });
-    words.on({"tv-board=*"}, [&] {
-        // tv-board=CHANNEL:ID: a game of a channel of Lichess TV followed on the Board, as its featured game (#86).
-        const auto spec  = w.substr(9);
-        const auto colon = spec.find(':');
-        if (colon != std::string::npos && lichess::isTvChannel(spec.substr(0, colon)))
-            followTvOnBoard(spec.substr(0, colon), spec.substr(colon + 1), true, spec.substr(colon + 1), {});
     });
     words.on({"board-to-study=*"}, [&] {  // board-to-study=FILE: on the Board, sent to a study (#79)
         std::ifstream in(w.substr(15), std::ios::binary);

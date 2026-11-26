@@ -22,6 +22,7 @@
 #include "console.hpp"
 #include "home.hpp"
 #include "i18n.hpp"
+#include "lichess_tv_page.hpp"
 #include "live.hpp"
 #include "online_cache.hpp"
 #include "pgn_store.hpp"
@@ -87,12 +88,31 @@ void App::openBroadcastMosaic(const std::string& round_id) {
     page_            = Page::Lichess;  // its view, or the view shown
 }
 
+bool App::boardBackToMosaic() const {
+    if (!board_broadcast_) return false;
+    const auto& key = board_broadcast_->round;
+    if (isTvMosaic(key)) return lichess::isTvChannel(key.substr(lichess::TV_MOSAIC.size()));
+    if (key == lichess::PLAYERS_MOSAIC) return true;
+    if (isTourMosaic(key)) return tour_follow_ && tour_follow_->key == key;  // a tournament followed (#95)
+    return std::any_of(followed_rounds_.begin(), followed_rounds_.end(), [&](const auto& f) { return f.key() == key; });
+}
+
+void App::backToMosaic() {
+    if (!boardBackToMosaic()) return;
+    const auto key = board_broadcast_->round;
+    if (isTvMosaic(key))
+        tv_->openMosaic(key.substr(lichess::TV_MOSAIC.size()));
+    else
+        openBroadcastMosaic(key);
+    board_back_.reset();
+}
+
 void App::pollBroadcastBoards() {
     const FollowedRound* round = nullptr;
     for (const auto& f : followed_rounds_)
         if (f.key() == broadcast_round_) round = &f;
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
-    const bool tv      = !tvChannelShown().empty();                    // a channel of Lichess TV's (#86)
+    const bool tv      = !tv_->channelShown().empty();                 // a channel of Lichess TV's (#86)
     const bool tour    = tourMosaicShown();                            // a tournament of Lichess's (#95)
     if (!round && !players && !tv && !tour) {
         broadcast_boards_.clear();
@@ -124,22 +144,9 @@ void App::pollBroadcastBoards() {
                 for (const auto& url : f.slots)
                     if (const auto it = find(url); it != all.end()) games.push_back(*it);
             }
-        } else if (tv_follower_) {
-            // The channel's games in the order of their places, not the Board's game nor those kept; a game that ended
-            // keeps its tile until the one taking its place has come, so that the tiles do not move.
-            const auto all  = tv_follower_->games();
-            const auto find = [&](const std::string& url) {
-                return std::find_if(all.begin(), all.end(), [&](const auto& g) { return g.url == url; });
-            };
-            std::vector<std::string> slots;
-            for (std::size_t i = 0; i < tv_places_.size(); ++i) {
-                const auto url     = fmt::format("https://lichess.org/{}", tv_places_[i]);
-                const bool kept_on = find(url) == all.end() && i < tv_slots_.size() && find(tv_slots_[i]) != all.end();
-                slots.push_back(kept_on ? tv_slots_[i] : url);
-            }
-            tv_slots_ = std::move(slots);
-            for (const auto& url : tv_slots_)
-                if (const auto it = find(url); it != all.end()) games.push_back(*it);
+        } else {
+            // The channel's games in the order of their places, not the Board's game nor those kept (#86).
+            games = tv_->mosaicGames();
         }
         if (players || tv || tour)  // a game no longer followed leaves the mosaic
             std::erase_if(broadcast_boards_, [&](const auto& b) {
@@ -170,7 +177,7 @@ void App::pollBroadcastBoards() {
         }
         // A channel's tiles in the order of their places: a game that ended gives its place to another.
         if (tv || tour) {
-            const auto& order = tour ? tour_follow_->slots : tv_slots_;
+            const auto& order = tour ? tour_follow_->slots : tv_->slots();
             const auto place  = [&](const BroadcastBoard& b) {
                 return std::find(order.begin(), order.end(), b.url) - order.begin();
             };
@@ -287,8 +294,8 @@ void App::pollBroadcastBoards() {
             }
         }
         // A game of Lichess TV's the mosaic does not show (another channel's, or the mosaic closed): from its follower.
-        if (!game && isTvMosaic(board_broadcast_->round) && tv_follower_) {
-            for (const auto& g : tv_follower_->games()) {
+        if (!game && isTvMosaic(board_broadcast_->round)) {
+            for (const auto& g : tv_->games()) {
                 if (g.url != board_broadcast_->url || g.version == board_broadcast_->version) continue;
                 auto replay = parseReplay(g.pgn);
                 if (!replay) continue;
@@ -519,11 +526,11 @@ void App::drawBroadcastStandings() {
 
 void App::followBroadcastOnBoard(const BroadcastBoard& game) {
     // A channel's game (#86): the Board goes on to the channel's next one when it ends.
-    if (const auto channel = tvChannelShown(); !channel.empty()) {
+    if (const auto channel = tv_->channelShown(); !channel.empty()) {
         const auto id = game.url.substr(game.url.rfind('/') + 1);
-        followTvOnBoard(channel, id, id == tv_listed_.featured,
-                        fmt::format("{} – {}", tvName(game.white), tvName(game.black)),
-                        lichess::tvClockText(game.game.header("TimeControl")), &game.game, game.version);
+        tv_->followOnBoard(channel, id, id == tv_->featured(),
+                           fmt::format("{} – {}", tvName(game.white), tvName(game.black)),
+                           lichess::tvClockText(game.game.header("TimeControl")), &game.game, game.version);
         return;
     }
     openOnBoard(game.game, static_cast<int>(game.game.moves.size()), false,
@@ -561,7 +568,7 @@ void App::drawBroadcastMosaic() {
         return;
     }
     const bool players = broadcast_round_ == lichess::PLAYERS_MOSAIC;  // the followed players' games (#50)
-    const auto channel = tvChannelShown();                             // a channel of Lichess TV's (#86)
+    const auto channel = tv_->channelShown();                          // a channel of Lichess TV's (#86)
     const bool tv      = !channel.empty();
     const bool tour    = tourMosaicShown();  // a tournament of Lichess's (#95)
     if (!round && !players && !tv && !tour) return;
@@ -600,7 +607,7 @@ void App::drawBroadcastMosaic() {
         return;
     }
     if (source(TR("Lichess TV"), tv, TR("The games of a channel of Lichess TV."))) {
-        openTvMosaic(lichess_.tv_channel);
+        tv_->openMosaic(lichess_.tv_channel);
         return;
     }
     if (source(TR("Lichess tournaments"), tour,
@@ -630,7 +637,7 @@ void App::drawBroadcastMosaic() {
             ImGui::PopStyleColor(2);
             ImGui::PopStyleVar(2);
             if (clicked && !on) {
-                openTvMosaic(std::string(key));
+                tv_->openMosaic(std::string(key));
                 return;
             }
         }
@@ -641,9 +648,9 @@ void App::drawBroadcastMosaic() {
         state = "· " + state;
         ui::sameLineOrWrap(ImGui::CalcTextSize(state.c_str()).x);
         ImGui::TextDisabled("%s", state.c_str());
-        if (tv_list_error_.failed()) {
+        if (tv_->listError().failed()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("· %s", lichess::describeAlone(tv_list_error_).c_str());
+            ImGui::TextDisabled("· %s", lichess::describeAlone(tv_->listError()).c_str());
         }
     } else if (players) {
         const auto live = std::count_if(broadcast_boards_.begin(), broadcast_boards_.end(),
@@ -804,14 +811,14 @@ void App::drawBroadcastMosaic() {
         return;
     }
     if (broadcast_boards_.empty()) {
-        if (tv && tv_room_ == 0)  // the rounds and the players followed hold the streams Lichess allows
+        if (tv && tv_->room() == 0)  // the rounds and the players followed hold the streams Lichess allows
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                trf("Lichess lets an address follow {} games at once: the rounds and the players "
                                    "followed take them all now.",
                                    lichess::MOST_GAME_STREAMS)
                                    .c_str());
-        else if (tv && tv_list_error_.failed() && tv_listed_of_ != channel)
-            ImGui::TextDisabled("%s", lichess::gaveNothing(tv_list_error_).c_str());
+        else if (tv && tv_->listError().failed() && tv_->listedOf() != channel)
+            ImGui::TextDisabled("%s", lichess::gaveNothing(tv_->listError()).c_str());
         else
             ImGui::TextDisabled("%s", tv        ? TR("No game of the channel has come yet: they appear as Lichess "
                                                      "lists them, three moves late.")

@@ -3,6 +3,7 @@
 #include "app_context.hpp"
 #include "assistant_service.hpp"
 #include "engine_hub.hpp"
+#include "lichess_tv_page.hpp"
 
 #include <algorithm>
 #include <cstdio>

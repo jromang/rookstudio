@@ -4,6 +4,7 @@
 // decided (R16).
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <ctime>
 #include <string>
@@ -20,6 +21,7 @@
 #include "lichess_account.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
+#include "lichess_tv_page.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
 
@@ -32,6 +34,11 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 template <typename T>
 bool ready(const std::future<T>& f) {
     return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
+std::string lower(std::string text) {
+    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return text;
 }
 
 // A day as the page says it: "18 November 2026".
@@ -62,6 +69,17 @@ void App::loadLichess() {
 }
 
 void App::saveLichessSettings() { (void)writeJson(storage_.root() / "lichess.json", lichess_); }
+
+std::vector<std::string> App::ownLichessIds() {
+    loadBot();  // the user's bot (#85) is theirs too
+    std::vector<std::string> out;
+    for (const auto* a : {lichess_account_ ? &*lichess_account_ : nullptr, bot_account_ ? &*bot_account_ : nullptr}) {
+        if (!a) continue;
+        const auto id = lower(a->username);
+        if (!id.empty() && std::find(out.begin(), out.end(), id) == out.end()) out.push_back(id);
+    }
+    return out;
+}
 
 void App::revokeToken(std::string token) {
     jobs_.park(std::async(std::launch::async, [token = std::move(token)] { return lichess::revoke(token); }),
@@ -131,7 +149,7 @@ void App::pollLichess() {
         lichess_broadcasts_      = lichess_broadcasts_job_.get();
         lichess_broadcasts_time_ = std::chrono::steady_clock::now();
     }
-    pollLichessTv();        // Lichess TV: its card, a channel's games, the Board's game, those kept (#86)
+    tv_->poll();            // Lichess TV: its card, a channel's games, the Board's game, those kept (#86)
     pollLichessArenas();    // Lichess's tournaments: the card, one followed, one played, a Swiss (#95)
     pollBroadcastBoards();  // the mosaic's games, their engines, the game the board follows
 }
@@ -940,7 +958,7 @@ void App::drawLichessPage() {
     }
     drawLichessArenasCard();  // Lichess's arenas and the user's teams' Swiss tournaments (#95)
     ImGui::Dummy(ImVec2(0, px(8)));
-    drawLichessTvCard();  // Lichess TV's channels (#86)
+    tv_->drawCard();  // Lichess TV's channels (#86)
     ImGui::Dummy(ImVec2(0, px(8)));
     drawFollowedPlayers();  // the players followed live (#50)
     ImGui::Dummy(ImVec2(0, px(8)));

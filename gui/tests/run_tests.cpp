@@ -13,7 +13,11 @@
 #include <core/config/config.hpp>
 #include <core/globals/globals.hpp>
 #include <engine/uci_engine.hpp>
+#include <tour/by_opening.hpp>
+#include <tour/polyglot.hpp>
+#include <tour/standings.hpp>
 
+#include "../../tournament/tests/polyglot_writer.hpp"
 #include "app.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
@@ -27,6 +31,7 @@
 #include "storage.hpp"
 #include "suite_run.hpp"
 #include "test_modes.hpp"
+#include "test_support.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -134,6 +139,26 @@ std::vector<EngineEntry> randomEngines() {
     engines[1].name = "random-b";
     engines[1].cmd  = randomMover();
     return engines;
+}
+
+std::size_t countOf(const std::string& text, const std::string& what) {
+    std::size_t n = 0;
+    for (auto pos = text.find(what); pos != std::string::npos; pos = text.find(what, pos + 1)) ++n;
+    return n;
+}
+
+// A Polyglot book of two lines of four plies, 1. e4 e5 2. Nf3 Nc6 and 1. d4 d5 2. c4 e6, written to `path`.
+fs::path writeTwoLines(const fs::path& path) {
+    using fcg::test::polyglotKey;
+    fcg::test::writePolyglot(path, {{polyglotKey(""), "e2e4", 1},
+                                    {polyglotKey(""), "d2d4", 1},
+                                    {polyglotKey("e2e4"), "e7e5", 1},
+                                    {polyglotKey("e2e4 e7e5"), "g1f3", 1},
+                                    {polyglotKey("e2e4 e7e5 g1f3"), "b8c6", 1},
+                                    {polyglotKey("d2d4"), "d7d5", 1},
+                                    {polyglotKey("d2d4 d7d5"), "c2c4", 1},
+                                    {polyglotKey("d2d4 d7d5 c2c4"), "e7e6", 1}});
+    return path;
 }
 
 }  // namespace
@@ -660,6 +685,134 @@ TEST_CASE("a match with B always White plays every game with B as White; other f
         REQUIRE_FALSE(h.stats.empty());
         const auto& s = h.stats.back();
         CHECK(s.penta_WW + s.penta_WD + s.penta_WL + s.penta_DD + s.penta_LD + s.penta_LL == 2);
+    }
+    fcg::test::removeAll(root);
+}
+
+TEST_CASE("a Polyglot book's lines are played from the initial position, their moves marked {book} in every PGN") {
+    const auto root = fs::temp_directory_path() / "fcg-run-tests-polyglot";
+    fcg::test::removeAll(root);
+    fs::create_directories(root);
+    const auto bin = writeTwoLines(root / "lines.bin");
+
+    auto setup             = randomSetup(4);
+    setup.book             = bin.string();
+    setup.book_plies       = 4;
+    setup.book_random      = false;  // in the order of the book
+    setup.maxmoves_enabled = true;   // short games: they are about their first moves
+    setup.maxmoves         = 20;
+    setup.pgn_out          = (root / "all.pgn").string();
+    setup.export_style     = PgnStyle::ChessBase;
+
+    {  // The harness keeps the journal open: Windows removes the folder only once it is closed.
+        Harness h;
+        REQUIRE(h.run.start(setup, randomEngines(), topologyFromCores({{0, 0}, {0, 1}}), root / "runs").empty());
+        REQUIRE(h.waitFinished());
+        CHECK(h.run.error().empty());
+        REQUIRE(h.games.size() == 4);
+
+        const auto* t = h.run.tournament();
+        REQUIRE(t);
+        const auto& spec = t->spec();
+        CHECK(spec.conditions.opening.format == fastchess::FormatType::PGN);
+        CHECK(fs::path(spec.conditions.opening.file) == t->dir() / "lines-4plies.pgn");
+        CHECK(spec.polyglot_book == bin.string());
+        CHECK(spec.polyglot_plies == 4);
+
+        // Each line twice, colours reversed, from the initial position: no FEN tag, the book's four moves marked, in
+        // both files of the folder and in the file of every game, here in the ChessBase style.
+        for (const auto& file : {t->pgnPath(), t->chessbasePgnPath(), fs::path(setup.pgn_out)}) {
+            CAPTURE(file.string());
+            const auto text = fcg::test::readFile(file);
+            CHECK(countOf(text, "[Event ") == 4);
+            CHECK(countOf(text, "[FEN ") == 0);
+            CHECK(countOf(text, "[SetUp ") == 0);
+            CHECK(countOf(text, "{book}") == 16);
+            CHECK(countOf(text, "\n\n1. e4 {book} e5 {book} 2. Nf3 {book} Nc6 {book}") == 2);
+            CHECK(countOf(text, "\n\n1. d4 {book} d5 {book} 2. c4 {book} e6 {book}") == 2);
+        }
+        CHECK(countOf(fcg::test::readFile(setup.pgn_out), "[%emt ") > 0);
+        // The journal keeps each opening as its moves from the initial position.
+        const auto openings = t->gameOpenings();
+        CHECK(openings.size() == 4);
+        for (const auto& [number, opening] : openings) {
+            CHECK(opening.fen_epd == chess::constants::STARTPOS);
+            CHECK(opening.moves.size() == 4);
+        }
+        // The Openings tab tells the lines apart by the positions they lead to, each with its pair and its name.
+        const auto by = tour::resultsByOpening(t->results(), openings, false);
+        REQUIRE(by.size() == 2);
+        std::set<std::string> positions;
+        for (const auto& o : by) {
+            positions.insert(o.fen);
+            CHECK(o.games == 2);
+            CHECK(o.pairs == 1);
+            CHECK(o.moves.size() == 4);
+            CHECK_FALSE(o.eco.empty());
+        }
+        CHECK(positions == std::set<std::string>{"r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -",
+                                                 "rnbqkbnr/ppp2ppp/4p3/3p4/2PP4/8/PP2PPPP/RNBQKBNR w KQkq -"});
+        // The line under the standings names the Polyglot book, not the file made of it.
+        CHECK(tour::bookText(spec) == "lines.bin (4 plies, moves by weight)");
+    }
+    fcg::test::removeAll(root);
+}
+
+TEST_CASE("a tournament an earlier version played from a Polyglot book's positions, an EPD book, resumes from them") {
+    const auto root = fs::temp_directory_path() / "fcg-run-tests-polyglot-epd";
+    fcg::test::removeAll(root);
+    fs::create_directories(root);
+    const auto bin      = writeTwoLines(root / "lines.bin");
+    const auto topology = topologyFromCores({{0, 0}, {0, 1}});
+
+    // As those versions made it: the positions the lines lead to, in <book>-<N>plies.epd in the tournament folder.
+    // Games of random moves, as in the resume above: they end as draws after 30 moves.
+    auto setup             = randomSetup(40);
+    setup.book             = bin.string();
+    setup.book_plies       = 4;
+    setup.book_random      = false;
+    setup.maxmoves_enabled = true;
+    setup.maxmoves         = 30;
+    const auto dir         = root / "runs" / "earlier";
+    auto spec              = buildRun(setup, randomEngines(), topology, dir).spec;
+    fs::remove(spec.conditions.opening.file);
+    const auto epd = dir / "lines-4plies.epd";
+    tour::PolyglotWalk walk;
+    walk.plies = 4;
+    REQUIRE(tour::polyglotToEpd(bin, epd, walk) == 2);
+    spec.conditions.opening.file   = epd.string();
+    spec.conditions.opening.format = fastchess::FormatType::EPD;
+    (void)tour::TournamentState::create(dir, spec);
+
+    {  // Played in part, stopped at once (the games running are lost, as when the program is killed)...
+        Harness h;
+        REQUIRE(h.run.resume(dir).empty());
+        REQUIRE(h.waitFor([&] { return h.games.size() >= 4; }));
+        h.run.stopNow();
+        REQUIRE(h.waitFinished());
+    }
+    {  // ...then resumed to its end, from the same book.
+        Harness h;
+        REQUIRE(h.run.resume(dir).empty());
+        REQUIRE(h.waitFinished());
+        CHECK(h.run.error().empty());
+        const auto* t = h.run.tournament();
+        REQUIRE(t);
+        CHECK(t->finished());
+        CHECK(t->spec().conditions.opening.file == epd.string());
+        CHECK(t->results().size() == 40);
+
+        // Every game from one of the two positions, twenty times each: a FEN tag, no book move.
+        const auto text = fcg::test::readFile(t->pgnPath());
+        CHECK(countOf(text, "[Event ") == 40);
+        CHECK(countOf(text, "{book}") == 0);
+        std::ifstream positions(epd);
+        int read = 0;
+        for (std::string position; std::getline(positions, position); ++read) {
+            CAPTURE(position);
+            CHECK(countOf(text, "[FEN \"" + position + " 0 1\"]") == 20);
+        }
+        CHECK(read == 2);
     }
     fcg::test::removeAll(root);
 }

@@ -117,9 +117,8 @@ void App::pollOfflineEvals() {
         offline_evals_update_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         const auto size  = offline_evals_update_.get();
         const auto state = offline_evals_->state();
-        if (!size.error.empty()) {
-            offline_evals_note_ =
-                trf("database.lichess.org does not answer ({}): the evaluations kept stay.", size.error);
+        if (size.failed()) {
+            offline_evals_note_ = trf("The evaluations kept stay: {}.", lichess::describe(size));
         } else if (!size.date.empty() && size.date == state.date) {
             offline_evals_note_ = trf("Already the latest file, of {}.", size.date);
         } else {

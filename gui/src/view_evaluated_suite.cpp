@@ -131,7 +131,7 @@ void App::drawEvaluatedSuite() {
                     evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(LICHESS_EVALS_URL); });
             }
         } else {
-            if (evals_size_ && evals_size_->error.empty()) {
+            if (evals_size_ && !evals_size_->failed()) {
                 ImGui::TextUnformatted(
                     (evals_size_->date.empty()
                          ? trf("Lichess's evaluations database: {}.", formatBytes(evals_size_->bytes))
@@ -140,7 +140,7 @@ void App::drawEvaluatedSuite() {
                         .c_str());
             } else if (evals_size_) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Its size is not known: {}", evals_size_->error).c_str());
+                                   trf("Its size is not known: {}", lichess::describe(*evals_size_)).c_str());
             } else {
                 ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its size…"));
             }
@@ -149,7 +149,7 @@ void App::drawEvaluatedSuite() {
                                          "stopped."));
             ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file, nothing else."));
             ImGui::Spacing();
-            const auto label = evals_size_ && evals_size_->error.empty()
+            const auto label = evals_size_ && !evals_size_->failed()
                                    ? trf("Download and read ({})", formatBytes(evals_size_->bytes))
                                    : std::string(TR("Download and read"));
             if (ImGui::Button(label.c_str())) startEvalsReading(LICHESS_EVALS_URL);

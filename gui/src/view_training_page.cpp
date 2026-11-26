@@ -500,9 +500,8 @@ void App::pollPuzzles() {
             offline_puzzles_update_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             const auto size  = offline_puzzles_update_.get();
             const auto state = offline_puzzles_->state();
-            if (!size.error.empty())
-                offline_puzzles_note_ =
-                    trf("database.lichess.org does not answer ({}): the puzzles kept stay.", size.error);
+            if (size.failed())
+                offline_puzzles_note_ = trf("The puzzles kept stay: {}.", lichess::describe(size));
             else if (!size.date.empty() && size.date == state.date)
                 offline_puzzles_note_ = trf("Already the latest file, of {}.", size.date);
             else

@@ -45,10 +45,13 @@ class FakeApp final : public TvContext {
     explicit FakeApp(const std::filesystem::path& profile) : profile_(profile), shelf_(jobs_, profile) {}
 
     int frame() const override { return frame_; }
+    double seconds() const override { return 0; }
+    bool shortcutPressed(int) const override { return false; }
     bool scripted() const override { return false; }
     std::filesystem::path profileDir() const override { return profile_; }
     DatabaseShelf& shelf() override { return shelf_; }
     void toast(const std::string& text) override { toasts.push_back(text); }
+    JobGroup& jobs() override { return jobs_; }
 
     void showLichessPage() override {
         ++lichess_page;
@@ -56,6 +59,9 @@ class FakeApp final : public TvContext {
     }
     void showBoardPage() override { ++board_page; }
     void toStudyBoard() override { ++board_page; }
+    void showPlayTournaments(bool) override {}
+    bool playTournamentsShown() const override { return false; }
+    bool homeShown() const override { return false; }
 
     std::string boardTitle() const override { return board.title; }
     std::string boardFollows() const override { return board.url; }
@@ -71,7 +77,9 @@ class FakeApp final : public TvContext {
     }
 
     const std::string& mosaicShown() const override { return mosaic; }
+    int mosaicDrawn() const override { return frame_; }
     void openMosaic(const std::string& key) override { mosaic = key; }
+    void closeMosaic() override { mosaic.clear(); }
     bool boardBackToMosaic() const override { return !board.mosaic.empty(); }
     void backToMosaic() override { mosaic = board.mosaic; }
     void setMosaicEngine(const std::string& engine) override { settings.broadcast_engine = engine; }

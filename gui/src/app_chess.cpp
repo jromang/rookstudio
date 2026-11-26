@@ -39,19 +39,60 @@ class App::ModulesContext final : public AppContext {
    public:
     explicit ModulesContext(App& app) : app_(app) {}
 
+    // The program.
     int frame() const override { return ImGui::GetFrameCount(); }
+    double seconds() const override { return ImGui::GetTime(); }
+    bool shortcutPressed(int chord) const override {
+        return !ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(chord);
+    }
     bool scripted() const override { return app_.options_.scripted; }
     std::filesystem::path profileDir() const override { return app_.storage_.root(); }
     DatabaseShelf& shelf() override { return app_.shelf(); }
     void toast(const std::string& text) override { app_.boardToast(text); }
+    JobGroup& jobs() override { return app_.jobs_; }
 
+    // The pages.
     void showLichessPage() override {
         app_.page_ = Page::Lichess;
         app_.broadcast_round_.clear();
     }
     void showBoardPage() override { app_.page_ = Page::Board; }
     void toStudyBoard() override { app_.toStudyBoard(); }
+    void showPlayTournaments(bool kept) override {
+        app_.online_part_ = 1;
+        if (kept) {
+            app_.onlineSettings().part = 1;
+            app_.saveOnlineSettings();
+        }
+        app_.play_part_ = 1;
+        if (kept) {
+            app_.playSettings().part = 1;
+            app_.savePlaySettings();
+        }
+        app_.page_ = Page::Play;
+    }
+    bool playTournamentsShown() const override {
+        return app_.page_ == Page::Play && app_.play_part_ == 1 && app_.online_part_ == 1;
+    }
+    bool homeShown() const override { return app_.page_ == Page::ChessHome; }
 
+    // The databases' pages.
+    CrosstableStore& crosstables() override { return app_.crosstableStore(); }
+    void showDatabaseGames(std::size_t database, const std::string& filter) override {
+        app_.db_selected_ = static_cast<int>(database);
+        app_.db_list_     = true;
+        std::snprintf(app_.db_filter_.data(), app_.db_filter_.size(), "%s", filter.c_str());
+        app_.page_ = Page::Databases;
+    }
+    void openCrosstable(std::size_t database, const std::string& tournament, const std::string& base) override {
+        app_.db_selected_        = static_cast<int>(database);
+        app_.db_list_            = true;
+        app_.db_tournaments_     = true;
+        app_.page_               = Page::Databases;
+        app_.crosstable_request_ = std::make_pair(tournament, base);
+    }
+
+    // The Board.
     std::string boardTitle() const override { return app_.board_.title; }
     std::string boardFollows() const override {
         return app_.board_broadcast_ ? app_.board_broadcast_->url : std::string();
@@ -73,8 +114,14 @@ class App::ModulesContext final : public AppContext {
         }
     }
 
+    // The mosaic.
     const std::string& mosaicShown() const override { return app_.broadcast_round_; }
+    int mosaicDrawn() const override { return app_.broadcast_drawn_; }
     void openMosaic(const std::string& key) override { app_.openBroadcastMosaic(key); }
+    void closeMosaic() override {
+        app_.broadcast_round_.clear();
+        app_.broadcast_boards_.clear();
+    }
     bool boardBackToMosaic() const override { return app_.boardBackToMosaic(); }
     void backToMosaic() override { app_.backToMosaic(); }
     void setMosaicEngine(const std::string& engine) override {
@@ -88,16 +135,90 @@ class App::ModulesContext final : public AppContext {
         GameStreams streams;
         streams.rounds  = app_.followed_rounds_.size();
         streams.players = app_.players_follower_ ? app_.players_follower_->open() : 0;
+        streams.tv      = app_.tv_->streams();
         streams.tour    = app_.tour_follow_ && app_.tour_follow_->follower ? app_.tour_follow_->follower->open() : 0;
         return streams;
     }
     void setPlayersQuota(std::size_t streams) override { app_.players_quota_ = streams; }
 
+    // Lichess's settings.
     LichessSettings& lichessSettings() override { return app_.lichess_; }
     void saveLichessSettings() override { app_.saveLichessSettings(); }
     std::vector<std::string> ownLichessIds() override { return app_.ownLichessIds(); }
 
+    // The Lichess account.
+    const lichess::Account* lichessAccount() const override {
+        return app_.lichess_account_ ? &*app_.lichess_account_ : nullptr;
+    }
+    bool lichessLinking() const override { return app_.lichess_link_ != nullptr; }
+    const lichess::Failure& lichessLinkError() const override { return app_.lichess_error_; }
+    void startLichessLink(std::vector<std::string> scopes, std::string username) override {
+        app_.startLichessLink(std::move(scopes), std::move(username));
+    }
+    std::string scopeAsked() const override {
+        return app_.lichess_scope_ask_ ? app_.lichess_scope_ask_->scope : std::string();
+    }
+    void askScope(const std::string& scope) override {
+        LichessScopeAsk ask;
+        ask.scope               = scope;
+        app_.lichess_scope_ask_ = ask;
+    }
+    void dropScopeAsk() override { app_.lichess_scope_ask_.reset(); }
+    const lichess::Profile* lichessProfile() const override {
+        return app_.lichess_profile_ ? &*app_.lichess_profile_ : nullptr;
+    }
+    void askLichessProfile() override { app_.askArenaProfile(); }
+
+    // The user's games on Lichess.
+    const std::vector<lichess::PlayingGame>& playingGames() const override { return app_.lichess_playing_; }
+    std::optional<context::OnlineGame> onlineGame() const override {
+        if (!app_.online_game_) return std::nullopt;
+        const auto& g = *app_.online_game_;
+        return context::OnlineGame{g.id, g.white, g.shown, g.ended, g.state};
+    }
+    bool liveGameOn() const override { return app_.liveGameOn() != nullptr; }
+    void backToOnlineGame() override { app_.backToOnlineGame(); }
+    std::string onlineOpponent() const override { return app_.onlineOpponent(); }
+    void onlineCall(std::string what, std::function<lichess::Reply(const std::string& token)> call) override {
+        app_.onlineCall(std::move(what), std::move(call));
+    }
+    lichess::OnlinePlaySettings& onlineSettings() override { return app_.onlineSettings(); }
+    void saveOnlineSettings() override { app_.saveOnlineSettings(); }
+    std::size_t heldGames(const std::string& tournament) const override { return held(tournament).size(); }
+    bool lastHeldArrived(const std::string& tournament) const override {
+        const auto games = held(tournament);
+        return !games.empty() && games.back()->got && !games.back()->got->pgn.empty();
+    }
+    void reviewLastHeld(const std::string& tournament) override {
+        const auto games = held(tournament);
+        if (games.empty()) return;
+        auto* last = games.back();
+        for (auto* f : games) {
+            f->held = false;
+            if (f != last) f->done = true;
+        }
+        app_.reviewFinishedGame(*last);
+    }
+    void letGoHeld(const std::string& tournament) override {
+        for (auto* f : held(tournament)) {
+            f->held = false;
+            f->done = true;
+        }
+    }
+    void closeAnyway() override {
+        app_.quit_online_said_ = true;
+        app_.requestQuit();
+    }
+
    private:
+    // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.
+    std::vector<FinishedGame*> held(const std::string& tournament) const {
+        std::vector<FinishedGame*> out;
+        for (auto& f : app_.lichess_finished_)
+            if (f.held && f.game.tournament == tournament) out.push_back(&f);
+        return out;
+    }
+
     App& app_;
 };
 

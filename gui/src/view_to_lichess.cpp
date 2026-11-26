@@ -104,7 +104,7 @@ void App::pollToLichess() {
                 ImGui::SetClipboardText(answer.value->c_str());
                 Console::instance().add(trf("The game is on Lichess, its address copied: {}", *answer.value));
             } else {
-                to_lichess_->error = answer.error;
+                to_lichess_->error = lichess::describe(answer);
             }
         }
     }
@@ -115,14 +115,14 @@ void App::pollToLichess() {
             if (answer.value)
                 to_lichess_->challenge = std::move(answer.value);
             else
-                to_lichess_->error = answer.error;
+                to_lichess_->error = lichess::describe(answer);
         }
     }
     if (lichess_bookmark_job_.valid() && lichess_bookmark_job_.wait_for(0s) == std::future_status::ready) {
         const auto answer = lichess_bookmark_job_.get();
         if (to_lichess_ && to_lichess_->kind == ToLichess::Kind::Bookmark) {
             to_lichess_->busy = false;
-            if (!answer.value) to_lichess_->error = answer.error;
+            if (!answer.value) to_lichess_->error = lichess::describe(answer);
         }
         if (answer.value) Console::instance().add(TR("The game is in your bookmarks on Lichess"));
     }

@@ -53,13 +53,13 @@ void App::pollFideCards() {
             fideCards().save();
             a.shown = std::move(got.value);
         } else {
-            a.error = got.error;
+            a.error = lichess::describe(got);
         }
     }
     if (a.search.valid() && a.search.wait_for(0s) == std::future_status::ready) {
         auto got = a.search.get();
         if (!got.value) {
-            a.error = got.error;
+            a.error = lichess::describe(got);
         } else if (auto match = lichess::fideMatch(*got.value, a.name)) {
             fideCards().keep(*match, a.name);
             fideCards().save();

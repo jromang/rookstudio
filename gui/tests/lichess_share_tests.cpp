@@ -2,12 +2,15 @@
 // bookmarked; what each sends.
 #include <doctest/doctest.hpp>
 
+#include <atomic>
+#include <chrono>
 #include <mutex>
 #include <string>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_share.hpp"
@@ -17,6 +20,8 @@ using namespace fcg;
 using namespace fcg::lichess;
 using fcg::test::requestPath;
 using fcg::test::ScriptedServer;
+using namespace fcg::test;
+using namespace std::chrono_literals;
 
 namespace {
 
@@ -110,7 +115,8 @@ TEST_CASE("lichess share: a game imported without an account, a position played 
     // Lichess's reason when it refuses.
     const auto refused = openChallenge(fen, true, {5, 3, 0});
     CHECK_FALSE(refused.value);
-    CHECK(refused.error == "Invalid position for chess960");
+    CHECK(refused.net == NetError::Server);
+    CHECK(describe(refused) == "Invalid position for chess960");
     // Bookmarked: the game's id with the token; refused without the permission.
     const auto marked = bookmarkGame("game0001", "allowed");
     REQUIRE(marked.value);
@@ -118,6 +124,7 @@ TEST_CASE("lichess share: a game imported without an account, a position played 
     const auto denied = bookmarkGame("game0001", "other");
     CHECK_FALSE(denied.value);
     CHECK(denied.status == 403);
+    CHECK(describe(denied) == "the token may not do it: one more permission is needed");
     servers().api = before;
 
     std::lock_guard lock(mutex);
@@ -137,4 +144,38 @@ TEST_CASE("lichess share: a game imported without an account, a position played 
     CHECK(seen[4].line == "POST /bookmark/game0001?v=true HTTP/1.1");
     CHECK(seen[4].authorization == "Bearer allowed");
     CHECK(seen[4].body.empty());
+}
+
+TEST_CASE("Lichess from the Board: each failure of a share, a challenge or a bookmark told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    const std::string fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, R"({"error":"No such token"})", NetError::Unauthorized},
+          Case{403, R"({"error":"Missing scope"})", NetError::Forbidden}, Case{404, "{}", NetError::NotFound},
+          Case{429, "{}", NetError::RateLimited}, Case{500, "<html>Internal error</html>", NetError::Server},
+          Case{200, "<html>not JSON</html>", NetError::BadAnswer},
+          Case{200, R"({"status":"created"})", NetError::BadAnswer}}) {
+        CAPTURE(status);
+        CAPTURE(body);
+        server.answer(status, body);
+        CHECK(importGame("1. e4 *").net == net);
+        CHECK(openChallenge(fen, false, {5, 3, 0}).net == net);
+        // A bookmark reads no body: any 2xx is taken.
+        CHECK(bookmarkGame("game0001", "allowed").net == (status == 200 ? NetError::None : net));
+    }
+    pointNowhere();
+    CHECK(importGame("1. e4 *").net == NetError::Offline);
+    CHECK(bookmarkGame("game0001", "allowed").net == NetError::Offline);
+    pointAtPausedHost("lichess-share.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(importGame("1. e4 *", &cancel).net == NetError::Cancelled);
+    CHECK(openChallenge(fen, false, {5, 3, 0}, &cancel).net == NetError::Cancelled);
+    CHECK(bookmarkGame("game0001", "allowed", true, &cancel).net == NetError::Cancelled);
 }

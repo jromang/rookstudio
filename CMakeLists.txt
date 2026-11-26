@@ -322,11 +322,12 @@ if(FCG_ASSISTANT)
     # The release the prototype's commentary model was made and measured with (llama-cpp-2 0.1.161 vendors it), as
     # shared libraries whose backends ggml loads at run time: the program links no GPU library, and starts where one is
     # missing. The CPU backend in every variant x86-64 processors need, the best one chosen at run time.
-    # b12556: the first build with the fix of a crafted model's out-of-bounds write (CVE-2026-133710: hrm_text's
-    # loader), which any GGUF the user chooses could reach; back to a version tag once one has it (v1.0.0 has not).
+    # b12604: the first build with the fixes of a crafted model's out-of-bounds write (CVE-2026-133710: hrm_text's
+    # loader, which any GGUF the user chooses could reach) and of a grammar's repetition whose maximum is below its
+    # minimum (CVE-2026-137057); back to a version tag once one has them (v1.0.0 has not).
     FetchContent_Declare(llama
         GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
-        GIT_TAG b12556
+        GIT_TAG b12604
         GIT_SHALLOW TRUE)
     set(FCG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS ON)

@@ -146,14 +146,14 @@
       "type": "library",
       "bom-ref": "fetchcontent:llama",
       "name": "llama.cpp",
-      "version": "b12556",
+      "version": "b12604",
       "description": "The assistant's language model runtime, with ggml 1.0.0: shared libraries, the backends loaded at run time, run in a child process of the program.",
-      "purl": "pkg:github/ggml-org/llama.cpp@b12556",
+      "purl": "pkg:github/ggml-org/llama.cpp@b12604",
       "licenses": [{ "license": { "id": "MIT" } }],
       "externalReferences": [{ "type": "vcs", "url": "https://github.com/ggml-org/llama.cpp.git" }],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "b12556" },
-        { "name": "fastchess-gui:commit", "value": "50518b64c6f2191a116d2760042f106c4b3387d7" }
+        { "name": "fastchess-gui:pin", "value": "b12604" },
+        { "name": "fastchess-gui:commit", "value": "46eb1742db6d2caec1bfa848c5702b1bdcc815e5" }
       ]
     },
     {

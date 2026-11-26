@@ -51,9 +51,9 @@ struct Sampler {
     Sampler& operator=(const Sampler&) = delete;
 };
 
-// llama.cpp b12556 deprecates llama_batch and llama_decode for llama_batch_ext and llama_process, whose reading of
-// the logits its header still lists as to do: the batch and its decoding kept here, alone, without their warnings,
-// until a version tag has the new interface whole.
+// llama.cpp b12556 and later deprecate llama_batch and llama_decode for llama_batch_ext and llama_process, whose
+// reading of the logits their header still lists as to do: the batch and its decoding kept here, alone, without
+// their warnings, until a version tag has the new interface whole.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 struct Batch {

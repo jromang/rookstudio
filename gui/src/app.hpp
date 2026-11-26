@@ -2648,7 +2648,7 @@ class App {
         std::string engine;
         enum class Kind { Register, Update, Withdraw } kind = Kind::Register;
         std::future<lichess::Answer<lichess::ExternalEngine>> result;
-        std::future<std::string> withdrawn;
+        std::future<lichess::Failure> withdrawn;
         lichess::OfferedEngine offer;  // what it registers, its secret drawn
     };
     std::vector<OfferCall> offer_calls_;

@@ -349,7 +349,7 @@ TEST_CASE("external engine: registered with the token, its secret kept readable 
     r.provider_secret = newProviderSecret();
     const auto logged = Console::instance().added();
     const auto got    = registerEngine(TOKEN, r);
-    REQUIRE_MESSAGE(got.value, got.error);
+    REQUIRE_MESSAGE(got.value, describe(got));
     CHECK(got.value->id == "eei_Sample000001");
     CHECK(got.value->user_id == "rs_sample");
     CHECK(got.value->max_threads == 6);
@@ -365,7 +365,9 @@ TEST_CASE("external engine: registered with the token, its secret kept readable 
     const auto refused = registerEngine("lip_Other", r);
     CHECK_FALSE(refused.value);
     CHECK(refused.status == 401);
-    CHECK(refused.error.find(r.provider_secret) == std::string::npos);
+    CHECK(refused.net == NetError::Unauthorized);
+    CHECK(describe(refused).find(r.provider_secret) == std::string::npos);
+    CHECK(refused.said.find(r.provider_secret) == std::string::npos);
 
     // What the profile keeps, readable and writable by its owner alone.
     const auto profile = fs::temp_directory_path() / "external-engine-profile";
@@ -720,12 +722,13 @@ TEST_CASE("external engine: stop, resume, withdraw, and the service resumed at t
         REQUIRE(waitUntil([&] { return lichess.pollCount() > after_stop; }));
     }
     // Withdrawn: one request with the token; the registration gone, its secret unused.
-    CHECK(withdrawEngine(TOKEN, o.id).empty());
+    CHECK_FALSE(withdrawEngine(TOKEN, o.id).failed());
     CHECK(lichess.withdrawn);
     const auto gone = engineRegistration(TOKEN, o.id);
     CHECK_FALSE(gone.value);
-    CHECK(gone.error.empty());
+    CHECK_FALSE(gone.failed());
     CHECK(gone.status == 404);
+    CHECK_FALSE(withdrawEngine(TOKEN, o.id).failed());  // gone already: nothing wrong
     fs::remove_all(profile);
 }
 
@@ -737,6 +740,7 @@ TEST_CASE("external engine: the secret refused (401), a changed API, an engine w
         EngineService service(setupFor(lichess, nullptr, nullptr));
         REQUIRE(waitUntil([&] { return service.ended(); }));
         CHECK(service.status().state == ServiceState::Refused);
+        CHECK(service.status().failure.net == NetError::Unauthorized);
     }
     {
         FakeLichess lichess;
@@ -763,6 +767,7 @@ TEST_CASE("external engine: the secret refused (401), a changed API, an engine w
         EngineService service(setupFor(lichess, nullptr, nullptr));
         REQUIRE(waitUntil([&] { return service.ended(); }));
         CHECK(service.status().state == ServiceState::EngineFailed);
+        CHECK(service.status().chess960_missing);
         CHECK(service.status().error.find("Chess960") != std::string::npos);
         REQUIRE(lichess.answered().size() == 1);
         CHECK(lichess.answered()[0].lines == std::vector<std::string>{"bestmove (none)"});
@@ -831,10 +836,111 @@ TEST_CASE("external engine: offline, it waits for the network and resumes by its
     EngineService service(setup);
     // Nothing listens: offline, asked again by itself.
     REQUIRE(waitUntil([&] { return service.status().state == ServiceState::Offline; }));
+    CHECK(service.status().failure.net == NetError::Offline);
+    CHECK(describe(service.status().failure) == "Lichess cannot be reached");
     CHECK_FALSE(service.ended());
     // The network back: it waits for work again.
     FakeLichess lichess(port);
     REQUIRE(waitUntil([&] { return lichess.pollCount() >= 1; }));
     REQUIRE(waitUntil([&] { return service.status().state == ServiceState::Waiting; }));
+    servers() = Servers{};
+}
+
+TEST_CASE("external engine: too many requests, or the work host in trouble: offline, asked again by itself") {
+    ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");
+    {
+        // A 429: the host's pause, then waiting for work again.
+        HostGate::instance().setPause(400ms);
+        FakeLichess lichess;
+        lichess.push(429, R"({"error":"Too many requests"})");
+        EngineService service(setupFor(lichess, nullptr, nullptr));
+        REQUIRE(waitUntil([&] { return service.status().failure.net == NetError::RateLimited; }));
+        CHECK(service.status().state == ServiceState::Offline);
+        REQUIRE(waitUntil([&] { return service.status().state == ServiceState::Waiting; }));
+        CHECK_FALSE(service.status().failure.failed());
+        HostGate::instance().setPause(60s);
+    }
+    {
+        // A 503: Lichess in trouble, asked again later.
+        FakeLichess lichess;
+        lichess.push(503, "<html>down</html>");
+        auto setup  = setupFor(lichess, nullptr, nullptr);
+        setup.retry = {60s};  // stopped meanwhile: the wait ends with it
+        EngineService service(setup);
+        REQUIRE(waitUntil([&] { return service.status().state == ServiceState::Offline; }));
+        CHECK(service.status().failure.net == NetError::Server);
+        CHECK(service.status().failure.status == 503);
+        CHECK(describe(service.status().failure) == "Lichess answered 503");
+        CHECK_FALSE(service.ended());
+    }
+}
+
+TEST_CASE("external engine: each failure of the registration's requests told by its kind") {
+    std::mutex mutex;
+    std::pair<int, std::string> next{200, "{}"};  // what the server answers next
+    const auto port = freePort();
+    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+        std::pair<int, std::string> now;
+        {
+            std::lock_guard lock(mutex);
+            now = next;
+        }
+        c.sendAll(reply(now.first, now.second));
+    });
+    REQUIRE(server.ok());
+    servers().api = fmt::format("http://127.0.0.1:{}", port);
+    HostGate::instance().setPause(50ms);
+    const auto answering = [&](int status, std::string body) {
+        std::lock_guard lock(mutex);
+        next = {status, std::move(body)};
+    };
+    EngineRegistration r;
+    r.name                       = "Sample Engine 1.0 (RookStudio)";
+    r.provider_secret            = "SampleSecret0123456789abcdefABCDEF0123456789xyzw";
+    constexpr const char* UNREAD = "Lichess's answer could not be read: the external engine API may have changed";
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+        const char* words;
+    };
+    for (const auto& [status, body, net, words] :
+         {Case{403, R"({"error":"Missing scope"})", NetError::Forbidden,
+               "the token may not register engines (engine:write)"},
+          Case{400, R"({"error":{"name":["Too long"]}})", NetError::Server, "name: Too long"},
+          Case{429, "{}", NetError::RateLimited, "Lichess asks to wait a minute: too many requests"},
+          Case{503, "<html>down</html>", NetError::Server, "Lichess answered 503"},
+          Case{200, "<html>not JSON</html>", NetError::BadAnswer, UNREAD},
+          Case{200, R"({"name":"no id"})", NetError::BadAnswer, UNREAD}}) {
+        CAPTURE(status);
+        CAPTURE(body);
+        answering(status, body);
+        const auto registered = registerEngine(TOKEN, r);
+        CHECK_FALSE(registered.value);
+        CHECK(registered.net == net);
+        CHECK(describe(registered) == words);
+        CHECK(updateEngine(TOKEN, "eei_Sample000001", r).net == net);
+        CHECK(listEngines(TOKEN).net == net);
+        // A withdrawal reads no body: a 200 is taken.
+        CHECK(withdrawEngine(TOKEN, "eei_Sample000001").net == (status == 200 ? NetError::None : net));
+    }
+    // A registration Lichess would refuse: not sent, in the program's words.
+    auto bad        = r;
+    bad.max_threads = 0;
+    const auto own  = registerEngine(TOKEN, bad);
+    CHECK(own.net == NetError::None);
+    CHECK(own.failed());
+    CHECK(describe(own) == registrationProblem(bad));
+    // Nothing listens: no answer.
+    servers().api = fmt::format("http://127.0.0.1:{}", freePort());
+    CHECK(registerEngine(TOKEN, r).net == NetError::Offline);
+    CHECK(withdrawEngine(TOKEN, "eei_Sample000001").net == NetError::Offline);
+    // Cancelled while the host pauses after a 429: nothing sent.
+    HostGate::instance().setPause(60s);
+    HostGate::instance().tooMany("lichess-engines.invalid");
+    servers().api = "http://lichess-engines.invalid";
+    std::atomic<bool> cancel{true};
+    CHECK(registerEngine(TOKEN, r, &cancel).net == NetError::Cancelled);
+    CHECK(listEngines(TOKEN, &cancel).net == NetError::Cancelled);
     servers() = Servers{};
 }

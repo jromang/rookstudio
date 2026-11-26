@@ -1,4 +1,5 @@
 #include "visit.hpp"
+#include "visit_cards.hpp"
 
 #include <algorithm>
 

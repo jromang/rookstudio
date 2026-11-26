@@ -20,6 +20,7 @@
 #include "review_bridge.hpp"
 #include "training.hpp"
 #include "visit.hpp"
+#include "visit_cards.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;

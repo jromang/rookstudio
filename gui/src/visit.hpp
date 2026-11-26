@@ -17,7 +17,6 @@
 #include <study/fsrs.hpp>
 
 #include "game_analysis.hpp"
-#include "mistakes.hpp"
 #include "pgn_store.hpp"
 
 namespace fcg {
@@ -46,17 +45,6 @@ struct VisitVerdict {
     bool wrong = true;
 };
 [[nodiscard]] VisitVerdict judgeVisitAnswer(bool engine_move, double best_pawns, double answer_pawns, bool dont_know);
-
-// The card a wrong answer becomes: an exercise of the position before the game's move `ply` (the game's move leading to
-// position `ply`), the review's best move to find, as the exercises of the user's mistakes are; marked a visit's, kept
-// whatever the scans of the user's games find. None when the review does not name a legal best move there.
-[[nodiscard]] std::optional<MistakeExercise> visitExercise(const ReplayGame& game, const GameReview& review,
-                                                           std::size_t ply);
-
-// Puts it in the record as a card of the day's queue: graded Again now, back within the day; an exercise of the same
-// position already there keeps its own and its card gets the grade.
-void addVisitCard(MistakeRecord& record, MistakeExercise exercise, int64_t now,
-                  const study::fsrs::Scheduler& scheduler);
 
 // "Why not?" (#94, point 16): the question the Questions' Compare action reads without the model, `asked` set against
 // `reference` (UCI moves of `before`), in the assistant's language and letters: "Why not 5…Nxd5 rather than 5…Na5?",

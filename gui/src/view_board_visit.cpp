@@ -31,6 +31,7 @@
 #include "training.hpp"
 #include "ui.hpp"
 #include "visit.hpp"
+#include "visit_cards.hpp"
 
 namespace fcg {
 

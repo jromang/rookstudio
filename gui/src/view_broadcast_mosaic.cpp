@@ -128,7 +128,7 @@ void App::pollBroadcastBoards() {
         } else if (players) {
             if (players_follower_) games = players_follower_->games();
         } else if (tour) {
-            // The first eight's games in the order of their places, not those that went (#95).
+            // The first eight's games in the order of their places, a game that ended keeping its tile (#95).
             games = arenas_->mosaicGames();
         } else {
             // The channel's games in the order of their places, not the Board's game nor those kept (#86).

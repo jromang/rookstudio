@@ -82,10 +82,10 @@ class LichessArenasPage {
     // The Play page's "On Lichess › Tournaments" part: the arena or the Swiss chosen last, else those to play.
     void drawPlayTournaments();
     // The arena the user plays from here, on the Board's card of its games and elsewhere: whether a game is of it, or
-    // of the Swiss chosen; whether one is chosen; the user in it, or it over; its name, the last game played in it from
-    // here, whether it allows berserk; its line (rank of so many, points, the streak, the time left, Pause); the game
-    // before, at its end; the arena over (rank, points, its games, their review); the pause; the pause, then RookStudio
-    // closed once Lichess took it (or after a few seconds).
+    // of the Swiss chosen; whether one is chosen; the user in it, or it over; its name and the last game played in it
+    // from here (while one is chosen); whether it allows berserk; its line (rank of so many, points, the streak, the
+    // time left, Pause); the game before, at its end; the arena over (rank, points, its games, their review); the
+    // pause; the pause, then RookStudio closed once Lichess took it (or after a few seconds).
     [[nodiscard]] bool isArenaGame(const std::string& tournament) const;
     [[nodiscard]] bool isSwissGame(const std::string& swiss) const;
     [[nodiscard]] bool arenaChosen() const { return arena_play_.has_value(); }
@@ -105,7 +105,7 @@ class LichessArenasPage {
     bool backToTournament(const std::string& swiss);
 
     // Fair play (point 18): in the arena from here, between two games too, until Pause, every aid stays locked; what
-    // the lock holds between two games.
+    // the lock holds between two games, while it holds them.
     [[nodiscard]] bool holdsAids() const;
     [[nodiscard]] const lichess::PlayingGame& waiting() const;
 

@@ -1,10 +1,12 @@
-// Lichess TV (#86, mockup M12, board 7): the Lichess page's card (each channel's featured game, read again while it
-// shows, every 30 s at most; the variants' channels left out), a channel's games in the broadcasts' mosaic (a third
-// source: the same tiles, an engine of the user's per game, a finished game giving its place to another of the
-// channel), and a game on the Board, which goes on to the channel's next featured game when it ends unless the user
-// stays on it, and goes into a database of theirs at its end when kept. No account; never the user's own games (their
-// linked account's, their bot's), even featured; the game streams of this address shared with the rounds and the
-// followed players, eight at most, as Lichess allows. Nothing is kept by itself.
+// Lichess TV (#86, mockup M12, board 7), its module out of App (#107): the Lichess page's card (each channel's
+// featured game, read again while it shows, every 30 s at most; the variants' channels left out), a channel's games in
+// the broadcasts' mosaic (a third source: the same tiles, an engine of the user's per game, a finished game giving its
+// place to another of the channel), and a game on the Board, which goes on to the channel's next featured game when it
+// ends unless the user stays on it, and goes into a database of theirs at its end when kept. No account; never the
+// user's own games (their linked account's, their bot's), even featured; the game streams of this address shared with
+// the rounds and the followed players, eight at most, as Lichess allows. Nothing is kept by itself.
+
+#include "lichess_tv_page.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -12,13 +14,16 @@
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 
-#include <study/game_tree.hpp>
 #include <study/import.hpp>
 
-#include "app.hpp"
 #include "console.hpp"
+#include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "lichess_broadcasts.hpp"
+#include "lichess_players.hpp"
+#include "lichess_settings.hpp"
+#include "pgn_store.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
 
@@ -33,11 +38,6 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 template <typename T>
 bool ready(const std::future<T>& f) {
     return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
 }
 
 std::string gameUrl(const std::string& id) { return fmt::format("https://lichess.org/{}", id); }
@@ -68,7 +68,7 @@ ImU32 mix(ImU32 a, ImU32 b, float t) {
 
 }  // namespace
 
-const char* App::tvChannelName(std::string_view key) {
+const char* tvChannelName(std::string_view key) {
     if (key == "best") return TR("Top rated");
     if (key == "bullet") return TR("Bullet");
     if (key == "blitz") return TR("Blitz");
@@ -80,39 +80,41 @@ const char* App::tvChannelName(std::string_view key) {
     return "";
 }
 
-std::string App::tvName(const std::string& name) {
+std::string tvName(const std::string& name) {
     if (const int level = lichess::aiLevelOf(name); level > 0) return trf("Lichess AI, level {}", level);
     return name;
 }
 
-std::string App::tvChannelShown() const {
-    if (!isTvMosaic(broadcast_round_)) return {};
-    const auto channel = broadcast_round_.substr(lichess::TV_MOSAIC.size());
+LichessTvPage::LichessTvPage(AppContext& app) : app_(app) {}
+
+LichessTvPage::~LichessTvPage() = default;
+
+std::string LichessTvPage::channelShown() const {
+    const auto& shown = app_.mosaicShown();
+    if (!isTvMosaic(shown)) return {};
+    const auto channel = shown.substr(lichess::TV_MOSAIC.size());
     return lichess::isTvChannel(channel) ? channel : std::string();
 }
 
-std::vector<std::string> App::ownLichessIds() {
-    loadBot();  // the user's bot (#85) is theirs too
-    std::vector<std::string> out;
-    for (const auto* a : {lichess_account_ ? &*lichess_account_ : nullptr, bot_account_ ? &*bot_account_ : nullptr}) {
-        if (!a) continue;
-        const auto id = lower(a->username);
-        if (!id.empty() && std::find(out.begin(), out.end(), id) == out.end()) out.push_back(id);
-    }
-    return out;
+std::size_t LichessTvPage::streams() const { return tv_follower_ ? tv_follower_->open() : 0; }
+
+std::vector<lichess::BroadcastGame> LichessTvPage::games() const {
+    return tv_follower_ ? tv_follower_->games() : std::vector<lichess::BroadcastGame>{};
 }
 
-void App::openTvMosaic(const std::string& channel) {
+void LichessTvPage::openMosaic(const std::string& channel) {
     if (!lichess::isTvChannel(channel)) return;
-    if (lichess_.tv_channel != channel) {
-        lichess_.tv_channel = channel;
-        saveLichessSettings();
+    auto& settings = app_.lichessSettings();
+    if (settings.tv_channel != channel) {
+        settings.tv_channel = channel;
+        app_.saveLichessSettings();
     }
-    openBroadcastMosaic(std::string(lichess::TV_MOSAIC) + channel);
+    app_.openMosaic(std::string(lichess::TV_MOSAIC) + channel);
 }
 
-void App::followTvOnBoard(const std::string& channel, const std::string& game, bool featured, const std::string& title,
-                          const std::string& clock, const ReplayGame* known, uint64_t version) {
+void LichessTvPage::followOnBoard(const std::string& channel, const std::string& game, bool featured,
+                                  const std::string& title, const std::string& clock, const ReplayGame* known,
+                                  uint64_t version, bool in_place) {
     // What the follower has of it already, else nothing yet: the board fills as Lichess sends it.
     ReplayGame replay;
     const auto url = gameUrl(game);
@@ -126,13 +128,7 @@ void App::followTvOnBoard(const std::string& channel, const std::string& game, b
                     version = g.version;
                 }
     }
-    const int ply = static_cast<int>(replay.moves.size());
-    openOnBoard(std::move(replay), ply, false, title, false);
-    BoardBroadcast follow;
-    follow.round     = std::string(lichess::TV_MOSAIC) + channel;
-    follow.url       = url;
-    follow.version   = version;
-    board_broadcast_ = std::move(follow);
+    app_.followOnBoard(std::move(replay), title, std::string(lichess::TV_MOSAIC) + channel, url, version, in_place);
     BoardTv tv;
     tv.channel  = channel;
     tv.game     = game;
@@ -141,29 +137,31 @@ void App::followTvOnBoard(const std::string& channel, const std::string& game, b
     board_tv_   = std::move(tv);
 }
 
-bool App::boardBackToMosaic() const {
-    if (!board_broadcast_) return false;
-    const auto& key = board_broadcast_->round;
-    if (isTvMosaic(key)) return lichess::isTvChannel(key.substr(lichess::TV_MOSAIC.size()));
-    if (key == lichess::PLAYERS_MOSAIC) return true;
-    if (isTourMosaic(key)) return tour_follow_ && tour_follow_->key == key;  // a tournament followed (#95)
-    return std::any_of(followed_rounds_.begin(), followed_rounds_.end(), [&](const auto& f) { return f.key() == key; });
+std::vector<lichess::BroadcastGame> LichessTvPage::mosaicGames() {
+    std::vector<lichess::BroadcastGame> games;
+    if (!tv_follower_) return games;
+    // The channel's games in the order of their places, not the Board's game nor those kept; a game that ended keeps
+    // its tile until the one taking its place has come, so that the tiles do not move.
+    const auto all  = tv_follower_->games();
+    const auto find = [&](const std::string& url) {
+        return std::find_if(all.begin(), all.end(), [&](const auto& g) { return g.url == url; });
+    };
+    std::vector<std::string> slots;
+    for (std::size_t i = 0; i < tv_places_.size(); ++i) {
+        const auto url     = fmt::format("https://lichess.org/{}", tv_places_[i]);
+        const bool kept_on = find(url) == all.end() && i < tv_slots_.size() && find(tv_slots_[i]) != all.end();
+        slots.push_back(kept_on ? tv_slots_[i] : url);
+    }
+    tv_slots_ = std::move(slots);
+    for (const auto& url : tv_slots_)
+        if (const auto it = find(url); it != all.end()) games.push_back(*it);
+    return games;
 }
 
-void App::backToMosaic() {
-    if (!boardBackToMosaic()) return;
-    const auto key = board_broadcast_->round;
-    if (isTvMosaic(key))
-        openTvMosaic(key.substr(lichess::TV_MOSAIC.size()));
-    else
-        openBroadcastMosaic(key);
-    board_back_.reset();
-}
-
-void App::loadTvKept() {
+void LichessTvPage::loadKept() {
     if (tv_kept_loaded_) return;
     tv_kept_loaded_ = true;
-    const auto json = readJson<nlohmann::json>(storage_.root() / "lichess-tv.json");
+    const auto json = readJson<nlohmann::json>(app_.profileDir() / "lichess-tv.json");
     if (!json || !json->is_object()) return;
     if (const auto it = json->find("kept"); it != json->end() && it->is_array())
         for (const auto& k : *it) {
@@ -177,16 +175,16 @@ void App::loadTvKept() {
         }
 }
 
-void App::saveTvKept() {
-    if (options_.scripted) return;
+void LichessTvPage::saveKept() {
+    if (app_.scripted()) return;
     auto kept = nlohmann::json::array();
     for (const auto& k : tv_kept_)
         kept.push_back({{"id", k.id}, {"title", k.title}, {"folder", k.folder}, {"base", k.base}});
-    (void)writeJson(storage_.root() / "lichess-tv.json", nlohmann::json{{"kept", kept}});
+    (void)writeJson(app_.profileDir() / "lichess-tv.json", nlohmann::json{{"kept", kept}});
 }
 
-void App::storeTvGame(const TvKept& kept, const std::string& pgn) {
-    auto& s           = shelf();
+void LichessTvPage::storeGame(const TvKept& kept, const std::string& pgn) {
+    auto& s           = app_.shelf();
     std::size_t index = s.entries().size();
     for (std::size_t i = 0; i < s.entries().size(); ++i)
         if (!s.entries()[i].source && s.entries()[i].folder == std::filesystem::path(kept.folder)) index = i;
@@ -210,21 +208,21 @@ void App::storeTvGame(const TvKept& kept, const std::string& pgn) {
         s.rebuildTree(index);
         tv_stored_[kept.id] = s.entries()[index].name;
         Console::instance().add(trf("Lichess TV: {} kept in “{}”.", kept.title, s.entries()[index].name), false);
-        boardToast(trf("{} kept in “{}”", kept.title, s.entries()[index].name));
+        app_.toast(trf("{} kept in “{}”", kept.title, s.entries()[index].name));
     } catch (const std::exception& e) {
         Console::instance().add(trf("Lichess TV: {} could not be kept: {}", kept.title, e.what()), true);
     }
 }
 
-void App::keepTvGame(const std::string& folder, const std::string& name) {
+void LichessTvPage::keepGame(const std::string& folder, const std::string& name) {
     if (!board_tv_) return;
     TvKept kept;
     kept.id     = board_tv_->game;
-    kept.title  = board_.title;
+    kept.title  = app_.boardTitle();
     kept.folder = folder;
     kept.base   = name;
     if (kept.folder.empty()) {  // "Lichess TV", made when missing
-        auto& s = shelf();
+        auto& s = app_.shelf();
         try {
             std::size_t index = s.entries().size();
             for (std::size_t i = 0; i < s.entries().size(); ++i)
@@ -233,29 +231,29 @@ void App::keepTvGame(const std::string& folder, const std::string& name) {
             kept.folder = s.entries()[index].folder.string();
             kept.base   = s.entries()[index].name;
         } catch (const std::exception& e) {
-            boardToast(e.what());
+            app_.toast(e.what());
             return;
         }
     }
-    lichess_.tv_keep_base = kept.folder;
-    saveLichessSettings();
+    app_.lichessSettings().tv_keep_base = kept.folder;
+    app_.saveLichessSettings();
     std::erase_if(tv_kept_, [&](const auto& k) { return k.id == kept.id; });
     // Ended already: kept now.
     if (tv_follower_)
         for (const auto& g : tv_follower_->games())
             if (g.url == gameUrl(kept.id) && g.result != "*" && !g.result.empty()) {
-                storeTvGame(kept, g.pgn);
+                storeGame(kept, g.pgn);
                 return;
             }
     tv_kept_.push_back(std::move(kept));
-    saveTvKept();
+    saveKept();
 }
 
-void App::pollLichessTv() {
+void LichessTvPage::poll() {
     using namespace std::chrono_literals;
     const auto now = Clock::now();
-    loadTvKept();
-    const auto own = ownLichessIds();
+    loadKept();
+    const auto own = app_.ownLichessIds();
 
     // The card's answer; asked again while it shows, every 30 s at most.
     if (ready(tv_rows_job_)) {
@@ -267,7 +265,7 @@ void App::pollLichessTv() {
             if (!tv_rows_.failed()) tv_rows_.net = lichess::NetError::Offline;  // nothing, and no word why
         }
     }
-    const bool card_shown = ImGui::GetFrameCount() - tv_card_drawn_ < 3;
+    const bool card_shown = app_.frame() - tv_card_drawn_ < 3;
     if (card_shown && !tv_rows_job_.valid() &&
         (tv_rows_asked_.time_since_epoch().count() == 0 || now - tv_rows_asked_ >= 30s)) {
         tv_rows_asked_ = now;
@@ -286,7 +284,7 @@ void App::pollLichessTv() {
     };
 
     // The Board's game left for another one, or changed by the user: it is no longer followed.
-    if (board_tv_ && (!board_broadcast_ || board_broadcast_->url != gameUrl(board_tv_->game))) board_tv_.reset();
+    if (board_tv_ && app_.boardFollows() != gameUrl(board_tv_->game)) board_tv_.reset();
 
     // The games kept: into their database once they end; one that could not be read is asked again, as is the Board's.
     for (std::size_t i = 0; i < tv_kept_.size();) {
@@ -298,8 +296,8 @@ void App::pollLichessTv() {
             const auto kept = k;
             const auto pgn  = g->pgn;
             tv_kept_.erase(tv_kept_.begin() + static_cast<std::ptrdiff_t>(i));
-            saveTvKept();
-            storeTvGame(kept, pgn);
+            saveKept();
+            storeGame(kept, pgn);
             continue;
         }
         if (over.count(k.id) && tv_follower_) tv_follower_->again(k.id);
@@ -320,12 +318,8 @@ void App::pollLichessTv() {
                 };
                 const auto title = fmt::format("{} – {}", side(next.white), side(next.black));
                 // The page and the way back stay as they are: the board changes its game where it is.
-                const auto page    = page_;
-                const auto back    = board_back_;
                 const auto channel = t.channel;
-                followTvOnBoard(channel, next.game, next.featured, title, next.clock);
-                page_       = page;
-                board_back_ = back;
+                followOnBoard(channel, next.game, next.featured, title, next.clock, nullptr, 0, true);
                 return;  // the rest at the next frame, with the new game
             }
             ++t.tries;
@@ -343,12 +337,12 @@ void App::pollLichessTv() {
 
     // The mosaic's channel: its games asked when it opens, when one of them ends (every 10 s at most), and every 30 s
     // while there is room for more.
-    const auto channel = tvChannelShown();
+    const auto channel = channelShown();
     if (ready(tv_list_job_)) {
         auto [of, a] = tv_list_job_.get();
         if (a.value) {
-            tv_listed_    = std::move(*a.value);
-            tv_listed_of_ = of;
+            tv_listed_     = std::move(*a.value);
+            tv_listed_of_  = of;
             tv_list_error_ = {};
         } else {
             tv_list_error_ = a;
@@ -364,22 +358,23 @@ void App::pollLichessTv() {
     }
 
     // The game streams of this address: eight, a round followed taking one; the Board's game and those kept first.
-    const std::size_t total = followed_rounds_.size() >= lichess::MOST_GAME_STREAMS
-                                  ? 0
-                                  : lichess::MOST_GAME_STREAMS - followed_rounds_.size();
+    const auto others = app_.gameStreams();
+    const std::size_t total =
+        others.rounds >= lichess::MOST_GAME_STREAMS ? 0 : lichess::MOST_GAME_STREAMS - others.rounds;
     std::vector<std::string> fixed;  // the Board's game and those kept, going on
     if (board_tv_ && !ended(board_tv_->game) && !over.count(board_tv_->game)) fixed.push_back(board_tv_->game);
     for (const auto& k : tv_kept_)
         if (!over.count(k.id) && std::find(fixed.begin(), fixed.end(), k.id) == fixed.end()) fixed.push_back(k.id);
     const std::size_t held        = std::min(fixed.size(), total);
-    const bool players            = broadcast_round_ == lichess::PLAYERS_MOSAIC;
-    const std::size_t players_has = players_follower_ ? players_follower_->open() : 0;
+    const bool players            = app_.mosaicShown() == lichess::PLAYERS_MOSAIC;
+    const std::size_t players_has = others.players;
     const std::size_t tv_has      = tv_follower_ ? tv_follower_->open() : 0;
     // A tournament's games followed (#95) take theirs too.
-    const std::size_t tour_has = tour_follow_ && tour_follow_->follower ? tour_follow_->follower->open() : 0;
+    const std::size_t tour_has = others.tour;
     tv_quota_ =
         std::min(channel.empty() ? held : total, total > players_has + tour_has ? total - players_has - tour_has : 0);
-    players_quota_ = std::min(players ? total - held : 0, total > tv_has + tour_has ? total - tv_has - tour_has : 0);
+    app_.setPlayersQuota(
+        std::min(players ? total - held : 0, total > tv_has + tour_has ? total - tv_has - tour_has : 0));
     std::size_t outside = 0;  // of the fixed ones, those not in the mosaic's places
     for (const auto& id : fixed)
         if (std::find(tv_places_.begin(), tv_places_.end(), id) == tv_places_.end()) ++outside;
@@ -430,8 +425,8 @@ void App::pollLichessTv() {
     tv_follower_->watch(wanted, tv_quota_);
 }
 
-void App::drawLichessTvCard() {
-    tv_card_drawn_ = ImGui::GetFrameCount();
+void LichessTvPage::drawCard() {
+    tv_card_drawn_ = app_.frame();
     const ui::TopicRegion topic(guide::topics::LichessTv);
     ui::beginCard("lichess_tv");
     ImGui::PushTextWrapPos();
@@ -440,7 +435,7 @@ void App::drawLichessTvCard() {
     ImGui::TextUnformatted(TR("Lichess TV"));
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("· each channel's featured game"));
-    const auto own = ownLichessIds();
+    const auto own = app_.ownLichessIds();
     if (!tv_rows_.value) {
         ImGui::TextDisabled("%s", tv_rows_.failed() ? lichess::gaveNothing(tv_rows_).c_str() : TR("Asking Lichess…"));
     } else {
@@ -487,7 +482,7 @@ void App::drawLichessTvCard() {
                     ImGui::TextUnformatted(lichess::tvSide(p, {}, true).c_str());
                 }
                 ImGui::TableNextColumn();
-                if (ImGui::SmallButton(TR("The mosaic"))) openTvMosaic(f.channel);
+                if (ImGui::SmallButton(TR("The mosaic"))) openMosaic(f.channel);
                 tip(
                     trf("The channel's games in progress in the mosaic, each analysed by your engine: {} at most "
                         "from this address.",
@@ -495,10 +490,10 @@ void App::drawLichessTvCard() {
                 ImGui::SameLine();
                 ImGui::BeginDisabled(mine);
                 if (ImGui::SmallButton(TR("The Board"))) {
-                    toStudyBoard();
+                    app_.toStudyBoard();
                     const auto clock = lichess::tvClockText(g.initial, g.increment);
-                    followTvOnBoard(f.channel, f.game, true,
-                                    g.id.empty() ? f.user : fmt::format("{} – {}", white, black), clock);
+                    followOnBoard(f.channel, f.game, true, g.id.empty() ? f.user : fmt::format("{} – {}", white, black),
+                                  clock);
                 }
                 ImGui::EndDisabled();
                 tip(mine ? TR("Your own game: it is never shown here (fair play).")
@@ -520,14 +515,15 @@ void App::drawLichessTvCard() {
     ui::endCard();
 }
 
-void App::drawTvKeepMenu() {
+void LichessTvPage::drawKeepMenu() {
     constexpr const char* kId = "##tv_keep";
     if (tv_keep_menu_) {
         tv_keep_menu_ = false;
         ImGui::OpenPopup(kId);
     }
     if (!ImGui::BeginPopup(kId)) return;
-    auto& s                = shelf();
+    auto& s                = app_.shelf();
+    const auto& keep_base  = app_.lichessSettings().tv_keep_base;
     const std::string name = "Lichess TV";
     // A game over goes into the database at once, one in progress at its end.
     bool ended = false;
@@ -541,9 +537,7 @@ void App::drawTvKeepMenu() {
         if (!s.entries()[i].source) order.push_back(i);
     std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
         const auto rank = [&](std::size_t i) {
-            return s.entries()[i].folder == std::filesystem::path(lichess_.tv_keep_base) ? 0
-                   : s.entries()[i].name == name                                         ? 1
-                                                                                         : 2;
+            return s.entries()[i].folder == std::filesystem::path(keep_base) ? 0 : s.entries()[i].name == name ? 1 : 2;
         };
         return rank(a) < rank(b);
     });
@@ -554,7 +548,7 @@ void App::drawTvKeepMenu() {
         const auto& e = s.entries()[i];
         ImGui::PushID(static_cast<int>(i));
         if (ImGui::Selectable(e.name.c_str(), false, 0, ImVec2(px(300), 0))) chosen = {e.folder.string(), e.name};
-        if (e.folder == std::filesystem::path(lichess_.tv_keep_base)) {
+        if (e.folder == std::filesystem::path(keep_base)) {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", TR("where you kept the last one"));
         }
@@ -567,10 +561,10 @@ void App::drawTvKeepMenu() {
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) ImGui::CloseCurrentPopup();
     if (chosen) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
-    if (chosen) keepTvGame(chosen->first, chosen->second);
+    if (chosen) keepGame(chosen->first, chosen->second);
 }
 
-void App::drawTvBoardCard() {
+void LichessTvPage::drawBoardCard() {
     if (!board_tv_) return;
     auto& t = *board_tv_;
     const ui::TopicRegion topic(guide::topics::LichessTv);
@@ -642,18 +636,18 @@ void App::drawTvBoardCard() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Don't keep it"))) {
             tv_kept_.erase(kept);
-            saveTvKept();
+            saveKept();
         }
     } else {
         if (ImGui::SmallButton(TR("Keep this game…"))) tv_keep_menu_ = true;
         tip(ended ? TR("Into a database of your choice, now.") : TR("Into a database of your choice, at its end."));
-        drawTvKeepMenu();
+        drawKeepMenu();
         ImGui::SameLine();
         ImGui::TextDisabled(
             "%s", ended ? TR("in a database of your choice") : TR("in a database of your choice, at its end"));
     }
-    if (boardBackToMosaic()) {
-        if (ImGui::SmallButton(TR("Back to the mosaic · Esc"))) backToMosaic();
+    if (app_.boardBackToMosaic()) {
+        if (ImGui::SmallButton(TR("Back to the mosaic · Esc"))) app_.backToMosaic();
     }
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
@@ -661,11 +655,7 @@ void App::drawTvBoardCard() {
     ImGui::PopStyleColor(2);
 }
 
-}  // namespace fcg
-
-namespace fcg {
-
-void App::drawTvEngineLine(const EngineEntry& e) {
+void LichessTvPage::drawEngineLine(const std::string& engine) {
     // The Bots and Computer channels interest the tests too (M12, board 7): Lichess's best bots, this engine beside
     // them, in the mosaic.
     const ui::TopicRegion topic(guide::topics::LichessTv);
@@ -675,29 +665,25 @@ void App::drawTvEngineLine(const EngineEntry& e) {
     for (const char* key : {"bot", "computer"}) {
         ImGui::SameLine();
         if (ImGui::SmallButton(fmt::format("{}##tv_engine_{}", tvChannelName(key), key).c_str())) {
-            if (lichess_.broadcast_engine != e.name) {
-                lichess_.broadcast_engine = e.name;
-                for (auto& b : broadcast_boards_) b.analyser.reset();  // started again with it
-                saveLichessSettings();
-            }
-            openTvMosaic(key);
+            app_.setMosaicEngine(engine);
+            openMosaic(key);
         }
         tip(std::string_view(key) == "bot"
                 ? trf("The games of Lichess TV's Bots channel in the mosaic, each analysed by {} on your machine; no "
                       "account needed.",
-                      e.name)
+                      engine)
                 : trf("The games of Lichess TV's Computer channel, players against Lichess's AI, in the mosaic, each "
                       "analysed by {} on your machine; no account needed.",
-                      e.name));
+                      engine));
     }
     const char* summary = TR("Lichess's best bots, or players against its AI, this engine analysing each game");
     ui::sameLineOrWrap(ImGui::CalcTextSize(summary).x);
     ImGui::TextDisabled("%s", summary);
 }
 
-void App::followTvFeatured(const std::string& channel) {
+void LichessTvPage::followFeatured(const std::string& channel) {
     if (!tv_rows_.value) return;
-    const auto own = ownLichessIds();
+    const auto own = app_.ownLichessIds();
     for (const auto& row : *tv_rows_.value) {
         if (row.featured.channel != channel) continue;
         const auto& g = row.game;
@@ -707,11 +693,51 @@ void App::followTvFeatured(const std::string& channel) {
         const auto side = [](const lichess::TvPlayer& p) {
             return p.ai > 0 ? trf("Lichess AI, level {}", p.ai) : p.name;
         };
-        followTvOnBoard(channel, row.featured.game, true,
-                        g.id.empty() ? row.featured.user : fmt::format("{} – {}", side(g.white), side(g.black)),
-                        lichess::tvClockText(g.initial, g.increment));
+        followOnBoard(channel, row.featured.game, true,
+                      g.id.empty() ? row.featured.user : fmt::format("{} – {}", side(g.white), side(g.black)),
+                      lichess::tvClockText(g.initial, g.increment));
         return;
     }
+}
+
+void LichessTvPage::addCommands(const PaletteAdd& add, const std::string& lichess_view) {
+    add(TR("Lichess TV"), lichess_view, [this] {
+        app_.showLichessPage();  // the page itself, where its card is
+    });
+    for (const auto key : lichess::tvChannels()) {
+        add(trf("Lichess TV: {} in the mosaic", tvChannelName(key)), "Lichess",
+            [this, k = std::string(key)] { openMosaic(k); });
+        if (tv_rows_.value)
+            add(trf("Lichess TV: {} on the Board", tvChannelName(key)), "Lichess",
+                [this, k = std::string(key)] { followFeatured(k); });
+    }
+    if (board_tv_) {
+        add(board_tv_->stay ? TR("Lichess TV: go on to the channel's next game") : TR("Lichess TV: stay on this game"),
+            TR("Board"), [this] {
+                if (board_tv_) board_tv_->stay = !board_tv_->stay;
+            });
+        add(TR("Lichess TV: keep this game…"), TR("Board"), [this] {
+            app_.showBoardPage();
+            tv_keep_menu_ = true;
+        });
+    }
+}
+
+void LichessTvPage::addFocusWords(FocusWords& words, const std::string& word) {
+    const auto& w = word;
+    words.on({"lichess-tv"}, [&] {  // the Lichess page, its card of Lichess TV's channels (#86)
+        app_.showLichessPage();
+    });
+    words.on({"tv-mosaic=*"}, [&] {  // tv-mosaic=CHANNEL: a channel of Lichess TV in the mosaic (#86)
+        openMosaic(w.substr(10));
+    });
+    words.on({"tv-board=*"}, [&] {
+        // tv-board=CHANNEL:ID: a game of a channel of Lichess TV followed on the Board, as its featured game (#86).
+        const auto spec  = w.substr(9);
+        const auto colon = spec.find(':');
+        if (colon != std::string::npos && lichess::isTvChannel(spec.substr(0, colon)))
+            followOnBoard(spec.substr(0, colon), spec.substr(colon + 1), true, spec.substr(colon + 1), {});
+    });
 }
 
 }  // namespace fcg

@@ -1,0 +1,425 @@
+// Lichess TV's module (#107), built and driven without App: an AppContext of the test's own answers what it asks of
+// the program, and Lichess is a server on this machine. Its --focus words and palette commands; a channel's games in
+// the mosaic, the user's own left out; the Board's game kept into a database at its end, then the channel's next game
+// on the Board in its place.
+#include <doctest/doctest.hpp>
+
+#include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <fmt/include/fmt/format.h>
+#include <json.hpp>
+
+#include <study/game.hpp>
+
+#include "app_context.hpp"
+#include "databases.hpp"
+#include "focus_words.hpp"
+#include "free_ports.hpp"
+#include "jobs.hpp"
+#include "lichess_broadcasts.hpp"
+#include "lichess_settings.hpp"
+#include "lichess_tv_page.hpp"
+#include "scripted_server.hpp"
+#include "test_support.hpp"
+
+using namespace fcg;
+using namespace fcg::test;
+
+namespace {
+
+// What the module asks of App, answered by the test: the profile and its databases of a scratch folder, a mosaic and
+// a Board that only remember what they were told, the Lichess settings in memory.
+class FakeApp final : public AppContext {
+   public:
+    explicit FakeApp(const std::filesystem::path& profile) : profile_(profile), shelf_(jobs_, profile) {}
+
+    int frame() const override { return frame_; }
+    bool scripted() const override { return false; }
+    std::filesystem::path profileDir() const override { return profile_; }
+    DatabaseShelf& shelf() override { return shelf_; }
+    void toast(const std::string& text) override { toasts.push_back(text); }
+
+    void showLichessPage() override {
+        ++lichess_page;
+        mosaic.clear();
+    }
+    void showBoardPage() override { ++board_page; }
+    void toStudyBoard() override { ++board_page; }
+
+    std::string boardTitle() const override { return board.title; }
+    std::string boardFollows() const override { return board.url; }
+    void followOnBoard(ReplayGame game, std::string title, std::string mosaic_key, std::string url, uint64_t version,
+                       bool in_place) override {
+        board.title    = std::move(title);
+        board.mosaic   = std::move(mosaic_key);
+        board.url      = std::move(url);
+        board.version  = version;
+        board.in_place = in_place;
+        board.moves    = game.moves.size();
+        ++board.games;
+    }
+
+    const std::string& mosaicShown() const override { return mosaic; }
+    void openMosaic(const std::string& key) override { mosaic = key; }
+    bool boardBackToMosaic() const override { return !board.mosaic.empty(); }
+    void backToMosaic() override { mosaic = board.mosaic; }
+    void setMosaicEngine(const std::string& engine) override { settings.broadcast_engine = engine; }
+    GameStreams gameStreams() const override { return streams; }
+    void setPlayersQuota(std::size_t quota) override { players_quota = quota; }
+
+    LichessSettings& lichessSettings() override { return settings; }
+    void saveLichessSettings() override { ++settings_saved; }
+    std::vector<std::string> ownLichessIds() override { return own; }
+
+    // What the module was told, and what the test sets.
+    struct Board {
+        std::string title, mosaic, url;
+        uint64_t version  = 0;
+        bool in_place     = false;
+        std::size_t moves = 0;
+        int games         = 0;  // the games put on it
+    } board;
+    std::string mosaic;
+    GameStreams streams;
+    std::size_t players_quota = 99;
+    LichessSettings settings;
+    int settings_saved = 0, lichess_page = 0, board_page = 0;
+    std::vector<std::string> toasts, own;
+    int frame_ = 0;
+
+   private:
+    std::filesystem::path profile_;
+    JobGroup jobs_;
+    DatabaseShelf shelf_;  // after its jobs: gone before them
+};
+
+std::string reply(int status, const std::string& body, const char* type = "application/json") {
+    return fmt::format("HTTP/1.1 {} X\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", status,
+                       type, body.size(), body);
+}
+const char* const STREAM_HEAD =
+    "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
+std::string chunk(const std::string& data) { return fmt::format("{:x}\r\n{}\r\n", data.size(), data); }
+const char* const LAST_CHUNK = "0\r\n\r\n";
+
+// A game of the NDJSON exports.
+std::string gameLine(const std::string& id, const std::string& white, const std::string& black) {
+    const auto side = [](const std::string& name) {
+        std::string id = name;
+        for (auto& c : id) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return nlohmann::json{{"user", {{"name", name}, {"id", id}}}, {"rating", 2500}};
+    };
+    const nlohmann::json j = {{"id", id},
+                              {"rated", true},
+                              {"variant", "standard"},
+                              {"speed", "blitz"},
+                              {"status", "started"},
+                              {"players", {{"white", side(white)}, {"black", side(black)}}},
+                              {"clock", {{"initial", 180}, {"increment", 2}, {"totalTime", 260}}}};
+    return j.dump() + "\n";
+}
+
+// Lichess on this machine: the channels (blitz's featured game `featured`), the blitz channel's games, the games by
+// their ids, each game's PGN and its stream, open until the test ends the game.
+class FakeLichess {
+   public:
+    struct Game {
+        std::string white, black;
+    };
+    explicit FakeLichess(std::map<std::string, Game> games)
+        : games_(std::move(games)),
+          port_(freePort()),
+          server_(port_, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
+        const auto base    = fmt::format("http://127.0.0.1:{}", port_);
+        lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
+    }
+    ~FakeLichess() {
+        quit_              = true;
+        lichess::servers() = lichess::Servers{};
+    }
+    FakeLichess(const FakeLichess&)            = delete;
+    FakeLichess& operator=(const FakeLichess&) = delete;
+
+    [[nodiscard]] bool ok() const { return server_.ok(); }
+    void setFeatured(const std::string& id) {
+        std::lock_guard lock(mutex_);
+        featured_ = id;
+    }
+    void setChannel(std::vector<std::string> ids) {
+        std::lock_guard lock(mutex_);
+        channel_ = std::move(ids);
+    }
+    void end(const std::string& id) {
+        std::lock_guard lock(mutex_);
+        ended_.insert(id);
+    }
+    [[nodiscard]] int streamsOpen() const { return streams_; }
+
+   private:
+    [[nodiscard]] bool ended(const std::string& id) {
+        std::lock_guard lock(mutex_);
+        return ended_.count(id) > 0;
+    }
+    std::string pgn(const std::string& id) {
+        const auto& g   = games_.at(id);
+        const bool over = ended(id);
+        return fmt::format(
+            "[Event \"rated blitz game\"]\n[Site \"https://lichess.org/{}\"]\n[White \"{}\"]\n[Black \"{}\"]\n"
+            "[Result \"{}\"]\n[TimeControl \"180+2\"]\n\n1. e4 e5 2. Nf3 Nc6 {}\n",
+            id, g.white, g.black, over ? "1-0" : "*", over ? "3. Bc4 Nf6 4. Ng5 d5 1-0" : "*");
+    }
+    void serve(const std::string& head, net::TcpConnection& c) {
+        const auto body = requestBody(head, c);
+        const auto path = requestPath(head);
+        const auto id   = path.substr(path.rfind('/') + 1).substr(0, 8);
+        if (path == "/api/tv/channels") {
+            std::lock_guard lock(mutex_);
+            const nlohmann::json channels = {{"blitz",
+                                              {{"user", {{"name", "Player_E"}, {"id", "player_e"}}},
+                                               {"rating", 2500},
+                                               {"gameId", featured_},
+                                               {"color", "white"}}}};
+            c.sendAll(reply(200, channels.dump()));
+        } else if (path.rfind("/api/tv/blitz?", 0) == 0) {
+            std::string out;
+            std::vector<std::string> listed;
+            {
+                std::lock_guard lock(mutex_);
+                listed = channel_;
+            }
+            for (const auto& g : listed) out += gameLine(g, games_.at(g).white, games_.at(g).black);
+            c.sendAll(reply(200, out, "application/x-ndjson"));
+        } else if (path.rfind("/api/games/export/_ids", 0) == 0) {
+            std::string out;
+            for (const auto& [g, sides] : games_)
+                if (body.find(g) != std::string::npos) out += gameLine(g, sides.white, sides.black);
+            c.sendAll(reply(200, out, "application/x-ndjson"));
+        } else if (path.rfind("/game/export/", 0) == 0 && games_.count(id)) {
+            c.sendAll(reply(200, pgn(id), "application/x-chess-pgn"));
+        } else if (path.rfind("/api/stream/game/", 0) == 0 && games_.count(id)) {
+            ++streams_;
+            c.sendAll(std::string(STREAM_HEAD) +
+                      chunk(fmt::format(R"({{"id": "{}", "status": {{"id": 20, "name": "started"}}}})", id) + "\n"));
+            while (!ended(id) && !quit_) {
+                if (!c.sendAll(chunk("\n"), 500)) break;  // the follower left
+                (void)c.readUntil("\x01never", 1, 20);
+            }
+            if (ended(id))
+                c.sendAll(chunk(fmt::format(R"({{"id": "{}", "status": {{"id": 30, "name": "mate"}}}})", id) + "\n") +
+                          LAST_CHUNK);
+            --streams_;
+        } else {
+            c.sendAll(reply(404, "{}"));
+        }
+    }
+
+    const std::map<std::string, Game> games_;
+    std::mutex mutex_;
+    std::string featured_ = "game0003";
+    std::vector<std::string> channel_;
+    std::set<std::string> ended_;
+    std::atomic<int> streams_{0};
+    std::atomic<bool> quit_{false};
+    uint16_t port_;
+    ScriptedServer server_;  // last: stopped first, its threads using what is above
+};
+
+struct Entry {
+    std::string label, where;
+    std::function<void()> run;
+};
+std::vector<Entry> commands(LichessTvPage& tv) {
+    std::vector<Entry> out;
+    tv.addCommands(
+        [&](std::string label, std::string where, std::function<void()> run) {
+            out.push_back({std::move(label), std::move(where), std::move(run)});
+        },
+        "Chess");
+    return out;
+}
+std::vector<std::string> labels(const std::vector<Entry>& entries) {
+    std::vector<std::string> out;
+    for (const auto& e : entries) out.push_back(e.label);
+    return out;
+}
+const Entry* entry(const std::vector<Entry>& entries, const std::string& label) {
+    for (const auto& e : entries)
+        if (e.label == label) return &e;
+    return nullptr;
+}
+bool applied(LichessTvPage& tv, const std::string& word) {
+    FocusWords words(word);
+    tv.addFocusWords(words, word);
+    return words.applied();
+}
+
+}  // namespace
+
+TEST_CASE("Lichess TV's module without App: its --focus words and its palette commands") {
+    const ScratchDir profile("tv-module");
+    FakeApp app(profile);
+    LichessTvPage tv(app);
+
+    // Its words, and only those: the others are left to the entries after it.
+    app.mosaic = "players";
+    CHECK(applied(tv, "lichess-tv"));
+    CHECK(app.lichess_page == 1);
+    CHECK(app.mosaic.empty());  // the page itself, where its card is
+    CHECK(applied(tv, "tv-mosaic=blitz"));
+    CHECK(app.mosaic == "tv:blitz");
+    CHECK(app.settings.tv_channel == "blitz");  // the one shown last, saved
+    CHECK(app.settings_saved == 1);
+    CHECK(tv.channelShown() == "blitz");
+    CHECK(applied(tv, "tv-mosaic=chess960"));  // a variant's channel: its word, but nothing opens
+    CHECK(app.mosaic == "tv:blitz");
+    for (const auto* other :
+         {"lichess-tvx", "lichess", "lichess-tournaments", "tv-mosaic", "tv-board", "arena-mosaic=x"})
+        CHECK_FALSE(applied(tv, other));
+    CHECK_FALSE(tv.onBoard());
+    CHECK(applied(tv, "tv-board=blitz:game0003"));
+    CHECK(tv.onBoard());
+    CHECK(app.board.url == "https://lichess.org/game0003");
+    CHECK(app.board.mosaic == "tv:blitz");  // the way back
+    CHECK(app.board.title == "game0003");
+    CHECK_FALSE(app.board.in_place);
+    CHECK(applied(tv, "tv-board=atomic:game0004"));  // not a channel shown: the Board keeps its game
+    CHECK(app.board.games == 1);
+
+    // Its commands: the card, each channel in the mosaic (none on the Board before the card read them), the Board's
+    // game.
+    auto listed = commands(tv);
+    REQUIRE(listed.size() == 1 + 8 + 2);
+    CHECK(listed[0].label == "Lichess TV");
+    CHECK(listed[0].where == "Chess");  // the view the Lichess page is in
+    CHECK(listed[1].label == "Lichess TV: Top rated in the mosaic");
+    CHECK(listed[8].label == "Lichess TV: Computer in the mosaic");
+    CHECK(listed[9].label == "Lichess TV: stay on this game");
+    CHECK(listed[9].where == "Board");
+    CHECK(listed[10].label == "Lichess TV: keep this game…");
+    entry(listed, "Lichess TV: Bots in the mosaic")->run();
+    CHECK(app.mosaic == "tv:bot");
+    entry(listed, "Lichess TV: stay on this game")->run();
+    listed = commands(tv);
+    CHECK(entry(listed, "Lichess TV: go on to the channel's next game") != nullptr);
+    CHECK(entry(listed, "Lichess TV: stay on this game") == nullptr);
+    entry(listed, "Lichess TV: keep this game…")->run();
+    CHECK(app.board_page == 1);
+    entry(listed, "Lichess TV")->run();
+    CHECK(app.lichess_page == 2);
+    CHECK(app.mosaic.empty());
+
+    // Another game on the Board: the channel's is no longer followed, its commands go.
+    tv.leaveBoard();
+    CHECK_FALSE(tv.onBoard());
+    CHECK(labels(commands(tv)).size() == 1 + 8);
+}
+
+TEST_CASE("Lichess TV's module without App: a channel's games in the mosaic, never the user's own") {
+    FakeLichess lichess({{"game0003", {"Player_A", "RS_Sample"}},
+                         {"game0013", {"Player_C", "Player_D"}},
+                         {"game0014", {"Player_E", "Player_F"}}});
+    REQUIRE(lichess.ok());
+    lichess.setChannel({"game0003", "game0013", "game0014"});
+    const ScratchDir profile("tv-module");
+    FakeApp app(profile);
+    app.own = {"rs_sample"};  // the featured game is the user's: never shown
+    {
+        LichessTvPage tv(app);
+        tv.openMosaic("blitz");
+        const auto urls = [&] {
+            std::vector<std::string> out;
+            for (const auto& g : tv.mosaicGames()) out.push_back(g.url);
+            return out;
+        };
+        REQUIRE(waitUntil([&] {
+            tv.poll();
+            return urls().size() == 2;
+        }));
+        CHECK(urls() == std::vector<std::string>{"https://lichess.org/game0013", "https://lichess.org/game0014"});
+        CHECK(tv.slots() == urls());
+        CHECK(tv.listedOf() == "blitz");
+        CHECK(tv.featured() == "game0003");
+        CHECK_FALSE(tv.listError().failed());
+        CHECK(tv.room() == 8);          // the address's eight streams, none taken by the others
+        CHECK(app.players_quota == 0);  // the followed players' mosaic is not the one shown
+        REQUIRE(waitUntil([&] { return lichess.streamsOpen() == 2 && tv.streams() == 2; }));
+        const auto games = tv.mosaicGames();
+        CHECK(games[0].white == "Player_C");
+        CHECK(games[0].result == "*");
+
+        // The rounds followed take theirs: fewer left to the channel.
+        app.streams.rounds = 7;
+        tv.poll();
+        CHECK(tv.room() == 1);
+
+        // The mosaic closed: its games stop.
+        app.mosaic.clear();
+        tv.poll();
+        CHECK(tv.slots().empty());
+        CHECK(tv.streams() == 0);
+        REQUIRE(waitUntil([&] { return lichess.streamsOpen() == 0; }));
+    }
+}
+
+TEST_CASE("Lichess TV's module without App: the Board's game kept at its end, then the channel's next one") {
+    FakeLichess lichess({{"game0003", {"Player_E", "Player_F"}}, {"game0021", {"Player_G", "Player_H"}}});
+    REQUIRE(lichess.ok());
+    const ScratchDir profile("tv-module");
+    FakeApp app(profile);
+    {
+        LichessTvPage tv(app);
+        tv.followOnBoard("blitz", "game0003", true, "Player_E – Player_F", "3+2");
+        REQUIRE(tv.onBoard());
+        tv.poll();  // as App's frames do before anything is drawn: the games kept before read from the profile
+        // Kept into "Lichess TV", made for it, at its end; in the profile until then.
+        tv.keepGame({}, "Lichess TV");
+        REQUIRE(app.shelf().entries().size() == 1);
+        CHECK(app.shelf().entries()[0].name == "Lichess TV");
+        CHECK(app.settings.tv_keep_base == app.shelf().entries()[0].folder.string());
+        const auto kept = nlohmann::json::parse(readFile(profile / "lichess-tv.json"));
+        REQUIRE(kept["kept"].size() == 1);
+        CHECK(kept["kept"][0]["id"] == "game0003");
+        CHECK(kept["kept"][0]["title"] == "Player_E – Player_F");
+
+        // Followed while it goes on.
+        REQUIRE(waitUntil([&] {
+            tv.poll();
+            return lichess.streamsOpen() == 1;
+        }));
+        CHECK(app.players_quota == 0);
+
+        // It ends: into its database, and the Board on to the channel's next featured game, where it is.
+        lichess.setFeatured("game0021");
+        lichess.end("game0003");
+        REQUIRE(waitUntil([&] {
+            tv.poll();
+            return app.board.url == "https://lichess.org/game0021";
+        }));
+        CHECK(app.shelf().facts(0).games == 1);
+        REQUIRE(app.toasts.size() == 1);
+        CHECK(app.toasts[0] == "Player_E – Player_F kept in “Lichess TV”");
+        CHECK(nlohmann::json::parse(readFile(profile / "lichess-tv.json"))["kept"].empty());
+        CHECK(app.board.title == "Player_G – Player_H");
+        CHECK(app.board.mosaic == "tv:blitz");
+        CHECK(app.board.in_place);  // the page and the way back stay as they are
+        CHECK(tv.onBoard());
+        // Its game followed in its turn.
+        REQUIRE(waitUntil([&] {
+            tv.poll();
+            const auto games = tv.games();
+            return std::any_of(games.begin(), games.end(),
+                               [](const auto& g) { return g.url == "https://lichess.org/game0021"; });
+        }));
+    }
+}

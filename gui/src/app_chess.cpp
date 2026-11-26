@@ -14,11 +14,14 @@
 #include <string>
 #include <string_view>
 
+#include <imgui.h>
+
 #include <study/evals_index.hpp>
 #include <study/import.hpp>
 #include <study/patterns.hpp>
 #include <tour/files.hpp>
 
+#include "app_context.hpp"
 #include "assistant_service.hpp"
 #include "board_text.hpp"
 #include "chesscom.hpp"
@@ -26,10 +29,89 @@
 #include "focus_words.hpp"
 #include "i18n.hpp"
 #include "lichess_months.hpp"
-#include "lichess_tv.hpp"
+#include "lichess_tv_page.hpp"
 #include "twic.hpp"
 
 namespace fcg {
+
+// What RookStudio's modules ask of App (app_context.hpp, #107), answered with App's members.
+class App::ModulesContext final : public AppContext {
+   public:
+    explicit ModulesContext(App& app) : app_(app) {}
+
+    int frame() const override { return ImGui::GetFrameCount(); }
+    bool scripted() const override { return app_.options_.scripted; }
+    std::filesystem::path profileDir() const override { return app_.storage_.root(); }
+    DatabaseShelf& shelf() override { return app_.shelf(); }
+    void toast(const std::string& text) override { app_.boardToast(text); }
+
+    void showLichessPage() override {
+        app_.page_ = Page::Lichess;
+        app_.broadcast_round_.clear();
+    }
+    void showBoardPage() override { app_.page_ = Page::Board; }
+    void toStudyBoard() override { app_.toStudyBoard(); }
+
+    std::string boardTitle() const override { return app_.board_.title; }
+    std::string boardFollows() const override {
+        return app_.board_broadcast_ ? app_.board_broadcast_->url : std::string();
+    }
+    void followOnBoard(ReplayGame game, std::string title, std::string mosaic, std::string url, uint64_t version,
+                       bool in_place) override {
+        const auto page = app_.page_;
+        const auto back = app_.board_back_;
+        const int ply   = static_cast<int>(game.moves.size());
+        app_.openOnBoard(std::move(game), ply, false, std::move(title), false);
+        BoardBroadcast follow;
+        follow.round          = std::move(mosaic);
+        follow.url            = std::move(url);
+        follow.version        = version;
+        app_.board_broadcast_ = std::move(follow);
+        if (in_place) {  // the board changes its game where it is
+            app_.page_       = page;
+            app_.board_back_ = back;
+        }
+    }
+
+    const std::string& mosaicShown() const override { return app_.broadcast_round_; }
+    void openMosaic(const std::string& key) override { app_.openBroadcastMosaic(key); }
+    bool boardBackToMosaic() const override { return app_.boardBackToMosaic(); }
+    void backToMosaic() override { app_.backToMosaic(); }
+    void setMosaicEngine(const std::string& engine) override {
+        if (app_.lichess_.broadcast_engine != engine) {
+            app_.lichess_.broadcast_engine = engine;
+            for (auto& b : app_.broadcast_boards_) b.analyser.reset();  // started again with it
+            app_.saveLichessSettings();
+        }
+    }
+    GameStreams gameStreams() const override {
+        GameStreams streams;
+        streams.rounds  = app_.followed_rounds_.size();
+        streams.players = app_.players_follower_ ? app_.players_follower_->open() : 0;
+        streams.tour    = app_.tour_follow_ && app_.tour_follow_->follower ? app_.tour_follow_->follower->open() : 0;
+        return streams;
+    }
+    void setPlayersQuota(std::size_t streams) override { app_.players_quota_ = streams; }
+
+    LichessSettings& lichessSettings() override { return app_.lichess_; }
+    void saveLichessSettings() override { app_.saveLichessSettings(); }
+    std::vector<std::string> ownLichessIds() override { return app_.ownLichessIds(); }
+
+   private:
+    App& app_;
+};
+
+void App::initChessModules() {
+    modules_context_ = std::make_unique<ModulesContext>(*this);
+    tv_              = std::make_unique<LichessTvPage>(*modules_context_);
+}
+
+// Lichess TV's hooks in fastchess-gui's pages (#86), which do not include its module's header.
+bool App::tvOnBoard() const { return tv_->onBoard(); }
+void App::leaveTvBoard() { tv_->leaveBoard(); }
+void App::drawTvBoardCard() { tv_->drawBoardCard(); }
+void App::drawTvEngineLine(const EngineEntry& e) { tv_->drawEngineLine(e.name); }
+std::string App::tvName(const std::string& name) { return fcg::tvName(name); }
 
 void App::initChessServers() {
     // Scripted screenshots ask nothing of the internet (AppOptions::scripted): Lichess, its database, TWIC, chess.com
@@ -554,10 +636,8 @@ bool App::applyChessFocusWord(const std::string& w) {
             studies_.shown = studies_.opened = true;
         }
     });
-    words.on({"lichess-tv"}, [&] {  // the Lichess page, its card of Lichess TV's channels (#86)
-        page_ = Page::Lichess;
-        broadcast_round_.clear();
-    });
+    // Lichess TV's, its module's (#86): lichess-tv, tv-mosaic=CHANNEL, tv-board=CHANNEL:ID.
+    tv_->addFocusWords(words, w);
     words.on({"lichess-tournaments"}, [&] {  // the Lichess page scrolled to its card of tournaments (#95)
         page_ = Page::Lichess;
         broadcast_round_.clear();
@@ -589,16 +669,6 @@ bool App::applyChessFocusWord(const std::string& w) {
         page_        = Page::Play;
         play_part_   = 1;
         online_part_ = 1;
-    });
-    words.on({"tv-mosaic=*"}, [&] {  // tv-mosaic=CHANNEL: a channel of Lichess TV in the mosaic (#86)
-        openTvMosaic(w.substr(10));
-    });
-    words.on({"tv-board=*"}, [&] {
-        // tv-board=CHANNEL:ID: a game of a channel of Lichess TV followed on the Board, as its featured game (#86).
-        const auto spec  = w.substr(9);
-        const auto colon = spec.find(':');
-        if (colon != std::string::npos && lichess::isTvChannel(spec.substr(0, colon)))
-            followTvOnBoard(spec.substr(0, colon), spec.substr(colon + 1), true, spec.substr(colon + 1), {});
     });
     words.on({"board-to-study=*"}, [&] {  // board-to-study=FILE: on the Board, sent to a study (#79)
         std::ifstream in(w.substr(15), std::ios::binary);

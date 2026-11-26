@@ -30,6 +30,7 @@
 #include "home.hpp"
 #include "https.hpp"
 #include "i18n.hpp"
+#include "lichess_tv_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -493,8 +494,7 @@ void App::pollLichessArenas() {
         const std::size_t total = followed_rounds_.size() >= lichess::MOST_GAME_STREAMS
                                       ? 0
                                       : lichess::MOST_GAME_STREAMS - followed_rounds_.size();
-        const std::size_t others =
-            (tv_follower_ ? tv_follower_->open() : 0) + (players_follower_ ? players_follower_->open() : 0);
+        const std::size_t others = tv_->streams() + (players_follower_ ? players_follower_->open() : 0);
         f.quota  = shown ? (total > others ? total - others : 0) : 0;
         f.places = lichess::tvPlaces(f.places, f.over, f.listed, {}, ownLichessIds(), f.quota, resting);
         std::erase_if(f.over, [&](const std::string& id) {

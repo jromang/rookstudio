@@ -1,14 +1,17 @@
-// Lichess's arenas and Swiss tournaments (#95, mockup M13, board 8; lichess_arenas.hpp): the Lichess page's card
-// "Lichess tournaments" (the arenas in progress and to come, read without an account, Rapid / Classical / All; each
-// line Follow, and Join or why not; the user's teams' Swiss tournaments, team:read asked once), a tournament followed
-// in the mosaic (a fourth source: its standing every 15 s with its players' sheets, the games of its first eight, three
-// moves late, eight at most, never the user's own), the Play page's "On Lichess › Tournaments" (tournament:write asked
-// once; the conditions as Lichess judges them, with the user's figures; the rules; joined again each minute while the
-// user waits; Pause, Alt+P), the arena's line and the game before on the Board, the lock held between two games while
-// the user is in the arena (point 18), a Swiss's rounds and their notice at the window's corner, a finished Swiss kept
-// in a database with its standing, the Home page's line (R3), and closing RookStudio during an arena. What leaves the
-// machine (R16): following, the tournament asked and its games, without an account; joining, with the token, the join,
-// the pause and the user's moves; one request at a time, a minute after a 429.
+// Lichess's arenas and Swiss tournaments (#95, mockup M13, board 8), their module out of App (#107; lichess_arenas.hpp
+// is their part of the network): the Lichess page's card "Lichess tournaments" (the arenas in progress and to come,
+// read without an account, Rapid / Classical / All; each line Follow, and Join or why not; the user's teams' Swiss
+// tournaments, team:read asked once), a tournament followed in the mosaic (a fourth source: its standing every 15 s
+// with its players' sheets, the games of its first eight, three moves late, eight at most, never the user's own), the
+// Play page's "On Lichess › Tournaments" (tournament:write asked once; the conditions as Lichess judges them, with the
+// user's figures; the rules; joined again each minute while the user waits; Pause, Alt+P), the arena's line and the
+// game before on the Board, the lock held between two games while the user is in the arena (point 18), a Swiss's rounds
+// and their notice at the window's corner, a finished Swiss kept in a database with its standing, the Home page's line
+// (R3), and closing RookStudio during an arena. What leaves the machine (R16): following, the tournament asked and its
+// games, without an account; joining, with the token, the join, the pause and the user's moves; one request at a time,
+// a minute after a 429.
+
+#include "lichess_arenas_page.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -24,13 +27,16 @@
 
 #include <study/crosstable.hpp>
 
-#include "app.hpp"
-#include "console.hpp"
+#include "crosstables.hpp"
+#include "databases.hpp"
 #include "guide.hpp"
 #include "home.hpp"
 #include "https.hpp"
 #include "i18n.hpp"
-#include "lichess_tv_page.hpp"
+#include "jobs.hpp"
+#include "lichess_account.hpp"
+#include "lichess_broadcasts.hpp"
+#include "lichess_settings.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -246,91 +252,118 @@ std::string figureOf(const lichess::TourCondition& c, std::string_view perf, con
 // ---------------------------------------------------------------------------
 // The state of things
 
-bool App::arenaHoldsAids() const {
+LichessArenasPage::LichessArenasPage(ArenasContext& app) : app_(app) {}
+
+LichessArenasPage::~LichessArenasPage() = default;
+
+bool LichessArenasPage::holdsAids() const {
     // In the arena from here, once it has started: between two games too (point 18), until Pause; the account
     // unlinked, RookStudio is in no arena any more.
-    return lichess_account_ && arena_play_ && arena_play_->seat.locks() && arena_play_->state.value &&
+    return app_.lichessAccount() && arena_play_ && arena_play_->seat.locks() && arena_play_->state.value &&
            arena_play_->state.value->info.state == lichess::TourState::Started;
 }
 
-bool App::arenaGameOn() const {
+const lichess::PlayingGame& LichessArenasPage::waiting() const { return arena_play_->waiting; }
+
+bool LichessArenasPage::arenaGameOn() const {
     if (!arena_play_) return false;
-    if (online_game_ && !online_game_->ended && !online_game_->state.over() &&
-        online_game_->state.tournament == arena_play_->id)
+    const auto online_game = app_.onlineGame();
+    if (online_game && !online_game->ended && !online_game->state.over() &&
+        online_game->state.tournament == arena_play_->id)
         return true;
-    return std::any_of(lichess_playing_.begin(), lichess_playing_.end(),
-                       [&](const auto& g) { return g.tournament == arena_play_->id; });
+    const auto& playing = app_.playingGames();
+    return std::any_of(playing.begin(), playing.end(), [&](const auto& g) { return g.tournament == arena_play_->id; });
 }
 
-std::string App::arenaTimeLeft() const {
+std::string LichessArenasPage::arenaTimeLeft() const {
     if (!arena_play_ || !arena_play_->state.value) return {};
     const auto& a = *arena_play_->state.value;
     if (a.info.state != lichess::TourState::Started || a.info.finishes_at <= 0) return {};
     return lengthText((a.info.finishes_at - nowMillis()) / 1000);
 }
 
-bool App::tourMosaicShown() const { return tour_follow_ && broadcast_round_ == tour_follow_->key; }
+bool LichessArenasPage::followedShown() const { return tour_follow_ && app_.mosaicShown() == tour_follow_->key; }
+
+const std::string& LichessArenasPage::followedKey() const {
+    static const std::string none;
+    return tour_follow_ ? tour_follow_->key : none;
+}
+
+const std::vector<std::string>& LichessArenasPage::slots() const {
+    static const std::vector<std::string> none;
+    return tour_follow_ ? tour_follow_->slots : none;
+}
+
+std::size_t LichessArenasPage::streams() const {
+    return tour_follow_ && tour_follow_->follower ? tour_follow_->follower->open() : 0;
+}
+
+bool LichessArenasPage::isArenaGame(const std::string& tournament) const {
+    return arena_play_ && !tournament.empty() && tournament == arena_play_->id;
+}
+
+bool LichessArenasPage::isSwissGame(const std::string& swiss) const {
+    return swiss_play_ && !swiss.empty() && swiss == swiss_play_->id;
+}
+
+bool LichessArenasPage::inArena() const { return arena_play_ && arena_play_->seat.in(); }
+
+bool LichessArenasPage::arenaOver() const { return arena_play_ && arena_play_->seat.isOver(); }
+
+const std::string& LichessArenasPage::arenaName() const { return arena_play_->name; }
+
+const std::string& LichessArenasPage::lastGame() const { return arena_play_->last_game; }
+
+bool LichessArenasPage::berserkable() const {
+    return arena_play_ && arena_play_->state.value && arena_play_->state.value->info.berserkable;
+}
 
 // A tournament's requests under way parked until they end, out of sight: a future of std::async waits for its task when
 // destroyed.
-void App::dropTour() {
+void LichessArenasPage::dropTour() {
     if (!tour_follow_) return;
-    jobs_.park(std::move(tour_follow_->arena_job));
-    jobs_.park(std::move(tour_follow_->swiss_job));
-    jobs_.park(std::move(tour_follow_->status_job));
+    app_.jobs().park(std::move(tour_follow_->arena_job));
+    app_.jobs().park(std::move(tour_follow_->swiss_job));
+    app_.jobs().park(std::move(tour_follow_->status_job));
     tour_follow_.reset();  // its streams closed
 }
 
-void App::dropArena() {
+void LichessArenasPage::dropArena() {
     if (!arena_play_) return;
-    jobs_.park(std::move(arena_play_->job));
-    jobs_.park(std::move(arena_play_->join_job));
-    jobs_.park(std::move(arena_play_->pause_job));
+    app_.jobs().park(std::move(arena_play_->job));
+    app_.jobs().park(std::move(arena_play_->join_job));
+    app_.jobs().park(std::move(arena_play_->pause_job));
     arena_play_.reset();
 }
 
-void App::dropSwiss() {
+void LichessArenasPage::dropSwiss() {
     if (!swiss_play_) return;
-    jobs_.park(std::move(swiss_play_->job));
-    jobs_.park(std::move(swiss_play_->join_job));
-    jobs_.park(std::move(swiss_play_->pause_job));
-    jobs_.park(std::move(swiss_play_->keep_job));
+    app_.jobs().park(std::move(swiss_play_->job));
+    app_.jobs().park(std::move(swiss_play_->join_job));
+    app_.jobs().park(std::move(swiss_play_->pause_job));
+    app_.jobs().park(std::move(swiss_play_->keep_job));
     swiss_play_.reset();
-}
-
-void App::askArenaProfile() {
-    // The user's figures for the conditions (#46's profile), read again when they are ten minutes old.
-    pollLichessProfile();
-    if (!lichess_account_ || options_.scripted) return;
-    const auto now   = Clock::now();
-    const bool stale = !lichess_profile_ || std::time(nullptr) - lichess_profile_->read_at > 600;
-    if (stale && !lichess_profile_job_.valid() &&
-        (lichess_profile_asked_.time_since_epoch().count() == 0 ||
-         now - lichess_profile_asked_ > std::chrono::minutes(10))) {
-        lichess_profile_asked_ = now;
-        lichess_profile_job_ = std::async(std::launch::async,
-                                          [token = lichess_account_->token] { return lichess::accountProfile(token); });
-    }
 }
 
 // ---------------------------------------------------------------------------
 // Each frame
 
-void App::pollLichessArenas() {
+void LichessArenasPage::poll() {
     using namespace std::chrono_literals;
-    const auto now    = Clock::now();
-    const auto frame  = ImGui::GetFrameCount();
-    const auto token  = lichess_account_ ? lichess_account_->token : std::string();
-    const bool linked = lichess_account_.has_value();
+    const auto now      = Clock::now();
+    const auto frame    = app_.frame();
+    const auto* account = app_.lichessAccount();
+    const auto token    = account ? account->token : std::string();
+    const bool linked   = account != nullptr;
     // After a 429: until the host's pause is over.
     const auto pause = [&](const lichess::Failure& f) {
         return f.net == lichess::NetError::RateLimited ? now + HostGate::instance().pausedFor(apiHost()) : now;
     };
 
     // The permission to read the user's teams granted: its question goes (#45's card).
-    if (lichess_scope_ask_ && lichess_scope_ask_->scope == lichess::SCOPE_TEAM_READ && linked && !lichess_link_ &&
-        lichess_account_->has(lichess::SCOPE_TEAM_READ))
-        lichess_scope_ask_.reset();
+    if (app_.scopeAsked() == lichess::SCOPE_TEAM_READ && linked && !app_.lichessLinking() &&
+        account->has(lichess::SCOPE_TEAM_READ))
+        app_.dropScopeAsk();
     // The card's list: asked when it shows (or the Play page's part), again after a minute.
     if (ready(arena_card_.job)) {
         auto a = arena_card_.job.get();
@@ -351,11 +384,11 @@ void App::pollLichessArenas() {
         arena_card_.swisses   = std::move(swisses);
         arena_card_.teams     = teams;
     }
-    if (card_shown && linked && lichess_account_->has(lichess::SCOPE_TEAM_READ) && !arena_card_.swiss_job.valid() &&
+    if (card_shown && linked && account->has(lichess::SCOPE_TEAM_READ) && !arena_card_.swiss_job.valid() &&
         (arena_card_.swiss_token != token || now - arena_card_.swiss_asked >= 5min)) {
         arena_card_.swiss_asked = now;
         arena_card_.swiss_token = token;
-        arena_card_.swiss_job   = std::async(std::launch::async, [token, name = lichess_account_->username] {
+        arena_card_.swiss_job   = std::async(std::launch::async, [token, name = account->username] {
             auto teams = lichess::teamsOf(name, token);
             auto out   = lichess::failedWith<std::vector<lichess::SwissInfo>>(teams);
             if (!teams.value) return std::make_pair(std::move(out), std::size_t{0});
@@ -388,8 +421,8 @@ void App::pollLichessArenas() {
     // The tournament followed in the mosaic.
     if (tour_follow_) {
         auto& f          = *tour_follow_;
-        const bool shown = tourMosaicShown();
-        const bool drawn = shown && frame - broadcast_drawn_ < 3;
+        const bool shown = followedShown();
+        const bool drawn = shown && frame - app_.mosaicDrawn() < 3;
         if (ready(f.arena_job)) {
             auto a = f.arena_job.get();
             if (a.net == lichess::NetError::RateLimited) f.waits_until = pause(a);
@@ -454,8 +487,8 @@ void App::pollLichessArenas() {
                 f.status_error = {};
                 // Their games, in the standing's order: never one of the user's own.
                 std::vector<std::string> mine;
-                for (const auto& g : lichess_playing_) mine.push_back(g.id);
-                if (online_game_) mine.push_back(online_game_->id);
+                for (const auto& g : app_.playingGames()) mine.push_back(g.id);
+                if (const auto online_game = app_.onlineGame()) mine.push_back(online_game->id);
                 f.listed.clear();
                 for (const auto& name : f.top)
                     for (const auto& s : *a.value) {
@@ -491,12 +524,12 @@ void App::pollLichessArenas() {
         std::set<std::string> resting;
         for (const auto& [id, at] : f.over_since)
             if (now - at < 5s) resting.insert(id);
-        const std::size_t total = followed_rounds_.size() >= lichess::MOST_GAME_STREAMS
-                                      ? 0
-                                      : lichess::MOST_GAME_STREAMS - followed_rounds_.size();
-        const std::size_t others = tv_->streams() + (players_follower_ ? players_follower_->open() : 0);
-        f.quota  = shown ? (total > others ? total - others : 0) : 0;
-        f.places = lichess::tvPlaces(f.places, f.over, f.listed, {}, ownLichessIds(), f.quota, resting);
+        const auto streams = app_.gameStreams();
+        const std::size_t total =
+            streams.rounds >= lichess::MOST_GAME_STREAMS ? 0 : lichess::MOST_GAME_STREAMS - streams.rounds;
+        const std::size_t others = streams.tv + streams.players;
+        f.quota                  = shown ? (total > others ? total - others : 0) : 0;
+        f.places = lichess::tvPlaces(f.places, f.over, f.listed, {}, app_.ownLichessIds(), f.quota, resting);
         std::erase_if(f.over, [&](const std::string& id) {
             const bool listed =
                 std::any_of(f.listed.begin(), f.listed.end(), [&](const auto& g) { return g.id == id; });
@@ -545,13 +578,12 @@ void App::pollLichessArenas() {
         }
         // Its page every 15 s while the user is in it or looks at it; their own page when they are not in the first
         // ten.
-        const bool looked =
-            (page_ == Page::Play && play_part_ == 1 && online_part_ == 1) || a.seat.in() || (page_ == Page::ChessHome);
+        const bool looked = app_.playTournamentsShown() || a.seat.in() || app_.homeShown();
         if (looked && now >= a.waits_until && !a.job.valid() && !a.seat.isOver() &&
             (a.asked.time_since_epoch().count() == 0 || now - a.asked >= lichess::STANDING_EVERY)) {
             a.asked = now;
-            a.job   = std::async(
-                std::launch::async, [id = a.id, token, name = linked ? lichess_account_->username : std::string()] {
+            a.job =
+                std::async(std::launch::async, [id = a.id, token, name = linked ? account->username : std::string()] {
                     auto state = lichess::arenaOf(id, 1, token);
                     std::optional<lichess::ArenaPlayer> me;
                     if (state.value && !name.empty()) {
@@ -582,28 +614,27 @@ void App::pollLichessArenas() {
             const auto r = a.pause_job.get();
             if (!r.ok) a.error = r;
             if (a.quit_after) {
-                a.quit_after      = false;
-                quit_online_said_ = true;
-                requestQuit();
+                a.quit_after = false;
+                app_.closeAnyway();
             }
         }
-        if (a.quit_after && ImGui::GetTime() - a.quit_asked > 5.0) {  // Lichess too slow: closed all the same
-            a.quit_after      = false;
-            quit_online_said_ = true;
-            requestQuit();
+        if (a.quit_after && app_.seconds() - a.quit_asked > 5.0) {  // Lichess too slow: closed all the same
+            a.quit_after = false;
+            app_.closeAnyway();
         }
         // A game of it being played: no join; its end, the next join at once.
-        const bool on = arenaGameOn();
+        const bool on          = arenaGameOn();
+        const auto online_game = app_.onlineGame();
         a.seat.playing(on);
-        if (on && online_game_ && online_game_->state.tournament == a.id && a.last_game != online_game_->id &&
-            std::find(a.games.begin(), a.games.end(), online_game_->id) == a.games.end()) {
-            a.games.push_back(online_game_->id);
+        if (on && online_game && online_game->state.tournament == a.id && a.last_game != online_game->id &&
+            std::find(a.games.begin(), a.games.end(), online_game->id) == a.games.end()) {
+            a.games.push_back(online_game->id);
             a.sheet_before = a.me ? static_cast<int>(lichess::readSheet(a.me->sheet).size()) : -1;
         }
         // Its end: the game before, as the card says it until the next one.
-        if (online_game_ && online_game_->ended && online_game_->state.tournament == a.id &&
-            a.last_game != online_game_->id) {
-            const auto& og = *online_game_;
+        if (online_game && online_game->ended && online_game->state.tournament == a.id &&
+            a.last_game != online_game->id) {
+            const auto& og = *online_game;
             const auto& s  = og.state;
             a.last_game    = og.id;
             a.last_moves   = static_cast<int>((s.moves.size() + 1) / 2);
@@ -614,7 +645,7 @@ void App::pollLichessArenas() {
             a.asked = {};  // the sheet asked again at once
         }
         if (a.seat.due(now) && !a.join_job.valid() && linked && now >= a.waits_until) joinArenaHere(true);
-        if (a.join_pending && linked && !lichess_link_ && lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
+        if (a.join_pending && linked && !app_.lichessLinking() && account->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
             a.join_pending = false;
             joinArenaHere();
         }
@@ -622,9 +653,7 @@ void App::pollLichessArenas() {
         a.waiting.tournament = a.id;
         a.waiting.speed      = a.state.value ? a.state.value->info.speed : std::string("rapid");
         // Alt+P: the pause, and back in, wherever the user is.
-        if ((a.seat.in() || a.seat.paused()) && !ImGui::GetIO().WantTextInput &&
-            ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_P))
-            toggleArenaPause();
+        if ((a.seat.in() || a.seat.paused()) && app_.shortcutPressed(ImGuiMod_Alt | ImGuiKey_P)) toggleArenaPause();
     }
 
     // The Swiss the Play page shows.
@@ -644,7 +673,7 @@ void App::pollLichessArenas() {
                 static_cast<lichess::Failure&>(s.info) = info;
             }
         }
-        const bool looked = (page_ == Page::Play && play_part_ == 1 && online_part_ == 1) || s.joined;
+        const bool looked = app_.playTournamentsShown() || s.joined;
         const auto every = s.joined || (s.info.value && s.info.value->state == lichess::TourState::Started) ? 20s : 60s;
         if (looked && !s.job.valid() && (s.asked.time_since_epoch().count() == 0 || now - s.asked >= every) &&
             !(s.info.value && s.info.value->state == lichess::TourState::Finished && s.rows.value && s.trf)) {
@@ -680,13 +709,14 @@ void App::pollLichessArenas() {
             else
                 s.error = r;
         }
-        if (s.join_pending && linked && !lichess_link_ && lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
+        if (s.join_pending && linked && !app_.lichessLinking() && account->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
             s.join_pending = false;
             joinSwissHere();
         }
         // A game of it started where the user is: they are in it, its round read again at once.
-        if (online_game_ && online_game_->state.swiss == s.id && s.game != online_game_->id) {
-            s.game   = online_game_->id;
+        if (const auto online_game = app_.onlineGame();
+            online_game && online_game->state.swiss == s.id && s.game != online_game->id) {
+            s.game   = online_game->id;
             s.joined = true;
             s.asked  = {};
         }
@@ -697,13 +727,14 @@ void App::pollLichessArenas() {
             s.kept_games = kept.games;
             // The rounds without a game, set by hand for the tournament's crosstable (#92).
             if (!kept.failure.failed() && !kept.key.empty() && !kept.hand.empty()) {
-                const auto place = crosstablePlace(s.kept_folder, kept.key);
-                auto settings      = crosstableStore().get(place);
+                const auto place   = crosstablePlace(s.kept_folder, kept.key);
+                auto settings      = app_.crosstables().get(place);
                 settings.hand      = kept.hand;
                 settings.hand_from = "lichess-trf";  // the crosstable says where they come from
-                crosstableStore().set(place, settings);
+                app_.crosstables().set(place, settings);
             }
-            if (!kept.failure.failed() && kept.index < shelf().entries().size()) shelf().rebuildTree(kept.index);
+            if (!kept.failure.failed() && kept.index < app_.shelf().entries().size())
+                app_.shelf().rebuildTree(kept.index);
         }
     }
 }
@@ -711,9 +742,9 @@ void App::pollLichessArenas() {
 // ---------------------------------------------------------------------------
 // The Lichess page's card
 
-void App::drawLichessArenasCard() {
-    arena_card_.drawn = ImGui::GetFrameCount();
-    askArenaProfile();
+void LichessArenasPage::drawCard() {
+    arena_card_.drawn = app_.frame();
+    app_.askLichessProfile();
     const ui::TopicRegion topic(guide::topics::LichessTournaments);
     ui::beginCard("lichess_arenas");
     if (arena_card_y_ == -2) arena_card_y_ = ImGui::GetCursorScreenPos().y;  // asked for: the page scrolls to it
@@ -731,16 +762,17 @@ void App::drawLichessArenasCard() {
         ui::sameLineOrWrap(w);
         for (int i = 0; i < 3; ++i) {
             if (i > 0) ImGui::SameLine(0, px(4));
-            if (chip(fmt::format("{}##arena_speed{}", labels[i], i).c_str(), lichess_.arena_speeds == i)) {
-                lichess_.arena_speeds = i;
-                saveLichessSettings();
+            if (chip(fmt::format("{}##arena_speed{}", labels[i], i).c_str(),
+                     app_.lichessSettings().arena_speeds == i)) {
+                app_.lichessSettings().arena_speeds = i;
+                app_.saveLichessSettings();
             }
         }
     }
     const auto& list  = arena_card_.list;
-    const auto speeds = lichess_.arena_speeds == 0   ? lichess::ArenaSpeeds::Rapid
-                        : lichess_.arena_speeds == 1 ? lichess::ArenaSpeeds::Classical
-                                                     : lichess::ArenaSpeeds::All;
+    const auto speeds = app_.lichessSettings().arena_speeds == 0   ? lichess::ArenaSpeeds::Rapid
+                        : app_.lichessSettings().arena_speeds == 1 ? lichess::ArenaSpeeds::Classical
+                                                                   : lichess::ArenaSpeeds::All;
     if (!list.value) {
         ImGui::TextDisabled("%s", list.failed() ? lichess::gaveNothing(list).c_str() : TR("Asking Lichess…"));
     } else {
@@ -748,7 +780,7 @@ void App::drawLichessArenasCard() {
         for (const auto& a : *list.value)
             if (lichess::arenaShown(a, speeds)) shown.push_back(&a);
         if (shown.empty()) ImGui::TextDisabled("%s", TR("No arena of these speeds now."));
-        const auto* profile = lichess_profile_ ? &*lichess_profile_ : nullptr;
+        const auto* profile = app_.lichessProfile();
         // The last column as wide as its widest line: Follow, then Join or why not.
         const auto& style = ImGui::GetStyle();
         float why_w       = ImGui::CalcTextSize(TR("Join")).x + style.FramePadding.x * 2;
@@ -837,7 +869,7 @@ void App::drawLichessArenasCard() {
                                trf("The list shown was read earlier: {}.", lichess::describe(list)).c_str());
     }
     ImGui::Dummy(ImVec2(0, px(4)));
-    drawLichessSwissList();
+    drawSwissList();
     ImGui::Dummy(ImVec2(0, px(4)));
     beginTinted("##arenas_board_api", ui::ACCENT);
     ui::inlineIcon(ui::Icon::Info, ui::ACCENT);
@@ -853,25 +885,22 @@ void App::drawLichessArenasCard() {
     ui::endCard();
 }
 
-void App::drawLichessSwissList() {
+void LichessArenasPage::drawSwissList() {
     ImGui::TextUnformatted(TR("Your teams' Swiss tournaments"));
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("· team:read, asked once to read your teams"));
-    if (!lichess_account_) {
+    const auto* account = app_.lichessAccount();
+    if (!account) {
         ImGui::TextDisabled("%s",
                             TR("With your Lichess account linked: a Swiss tournament is for its team's members."));
         return;
     }
-    if (!lichess_account_->has(lichess::SCOPE_TEAM_READ)) {
-        if (lichess_.team_declined) {
+    if (!account->has(lichess::SCOPE_TEAM_READ)) {
+        if (app_.lichessSettings().team_declined) {
             ImGui::TextDisabled("%s", TR("Your teams are not read."));
             ImGui::SameLine();
         }
-        if (ImGui::SmallButton(TR("Read my teams…"))) {
-            LichessScopeAsk ask;
-            ask.scope          = lichess::SCOPE_TEAM_READ;
-            lichess_scope_ask_ = ask;
-        }
+        if (ImGui::SmallButton(TR("Read my teams…"))) app_.askScope(lichess::SCOPE_TEAM_READ);
         tip(TR("Lichess asks for the permission to read your teams (team:read); RookStudio writes nothing to them."));
         return;
     }
@@ -922,10 +951,22 @@ void App::drawLichessSwissList() {
     }
 }
 
+void LichessArenasPage::showCard() {
+    app_.showLichessPage();
+    arena_card_y_ = -2;
+}
+
+void LichessArenasPage::scrollToCard() {
+    if (arena_card_y_ >= 0) {
+        ImGui::SetScrollFromPosY(arena_card_y_ - ImGui::GetWindowPos().y, 0.0f);
+        arena_card_y_ = -1;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The mosaic
 
-void App::followTournament(const std::string& id, const std::string& name, bool swiss) {
+void LichessArenasPage::followTournament(const std::string& id, const std::string& name, bool swiss) {
     const auto key = std::string(swiss ? lichess::SWISS_MOSAIC : lichess::ARENA_MOSAIC) + id;
     if (!tour_follow_ || tour_follow_->key != key) {
         TourFollow f;
@@ -936,18 +977,39 @@ void App::followTournament(const std::string& id, const std::string& name, bool 
         dropTour();  // the one before: its streams closed
         tour_follow_ = std::move(f);
     }
-    openBroadcastMosaic(key);
+    app_.openMosaic(key);
 }
 
-void App::stopFollowingTournament() {
+void LichessArenasPage::stopFollowing() {
     dropTour();
-    if (isTourMosaic(broadcast_round_)) {
-        broadcast_round_.clear();
-        broadcast_boards_.clear();
-    }
+    if (isTourMosaic(app_.mosaicShown())) app_.closeMosaic();
 }
 
-void App::drawTourMosaicHead() {
+std::vector<lichess::BroadcastGame> LichessArenasPage::mosaicGames() {
+    // The first eight's games in the order of their places; a game that ended keeps its tile until the one taking its
+    // place has come, so that the tiles do not move (as Lichess TV's).
+    std::vector<lichess::BroadcastGame> games;
+    if (!tour_follow_) return games;
+    auto& f = *tour_follow_;
+    if (f.follower) {
+        const auto all  = f.follower->games();
+        const auto find = [&](const std::string& url) {
+            return std::find_if(all.begin(), all.end(), [&](const auto& g) { return g.url == url; });
+        };
+        std::vector<std::string> slots;
+        for (std::size_t i = 0; i < f.places.size(); ++i) {
+            const auto url     = fmt::format("https://lichess.org/{}", f.places[i]);
+            const bool kept_on = find(url) == all.end() && i < f.slots.size() && find(f.slots[i]) != all.end();
+            slots.push_back(kept_on ? f.slots[i] : url);
+        }
+        f.slots = std::move(slots);
+        for (const auto& url : f.slots)
+            if (const auto it = find(url); it != all.end()) games.push_back(*it);
+    }
+    return games;
+}
+
+void LichessArenasPage::drawMosaicHead() {
     if (!tour_follow_) return;
     auto& f = *tour_follow_;
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.1f);
@@ -971,7 +1033,8 @@ void App::drawTourMosaicHead() {
         parts.push_back(trn("{} player", "{} players", s.players, ui::exactCount(s.players)));
     }
     parts.push_back(TR("followed without an account"));
-    if (!lichess_.broadcast_engine.empty()) parts.push_back(trf("analysed by {}", lichess_.broadcast_engine));
+    if (const auto& engine = app_.lichessSettings().broadcast_engine; !engine.empty())
+        parts.push_back(trf("analysed by {}", engine));
     std::string line;
     for (const auto& p : parts) line += (line.empty() ? "· " : " · ") + p;
     ImGui::SameLine();
@@ -982,7 +1045,7 @@ void App::drawTourMosaicHead() {
         SDL_OpenURL((f.swiss ? swissUrl(f.id) : arenaUrl(f.id)).c_str());
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Stop following##tour"))) {
-        stopFollowingTournament();
+        stopFollowing();
         return;
     }
     // Lichess refused too many requests: the standing waits its minute, the games go on.
@@ -1001,7 +1064,7 @@ void App::drawTourMosaicHead() {
     }
 }
 
-void App::drawTourStanding() {
+void LichessArenasPage::drawStanding() {
     if (!tour_follow_) return;
     auto& f = *tour_follow_;
     const ui::TopicRegion topic(guide::topics::LichessTournaments);
@@ -1116,10 +1179,37 @@ void App::drawTourStanding() {
     ui::endCard();
 }
 
+void LichessArenasPage::drawMosaicEmpty() {
+    if (!tour_follow_) return;
+    const auto& f       = *tour_follow_;
+    const bool started  = f.swiss ? f.swiss_info.value && f.swiss_info.value->state != lichess::TourState::Created
+                                  : f.arena.value && f.arena.value->info.state != lichess::TourState::Created;
+    const bool finished = f.swiss ? f.swiss_info.value && f.swiss_info.value->state == lichess::TourState::Finished
+                                  : f.arena.value && f.arena.value->info.state == lichess::TourState::Finished;
+    ImGui::PushTextWrapPos();
+    if (f.quota == 0)
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           trf("Lichess lets an address follow {} games at once: the rounds and the players "
+                               "followed take them all now.",
+                               lichess::MOST_GAME_STREAMS)
+                               .c_str());
+    else
+        ImGui::TextDisabled("%s", finished   ? TR("It is over: its standing stays.")
+                                  : !started ? TR("It has not started: the games of its first eight come here when "
+                                                  "it does.")
+                                  : f.swiss  ? TR("No game of its first eight now: the next round's games come here "
+                                                  "as it starts, three moves late.")
+                                             : TR("None of its first eight plays now: their games come here as they "
+                                                  "start, three moves late."));
+    ImGui::PopTextWrapPos();
+    ImGui::Dummy(ImVec2(0, px(6)));
+    drawStanding();
+}
+
 // ---------------------------------------------------------------------------
 // The Play page: On Lichess › Tournaments
 
-void App::chooseArena(const std::string& id, const std::string& name) {
+void LichessArenasPage::chooseArena(const std::string& id, const std::string& name) {
     if (!arena_play_ || arena_play_->id != id) {
         if (arena_play_ && (arena_play_->seat.in() || arena_play_->seat.paused()))
             pauseArena();  // in another one: paused there first
@@ -1130,17 +1220,11 @@ void App::chooseArena(const std::string& id, const std::string& name) {
         arena_play_ = std::move(a);
     }
     dropSwiss();
-    tour_part_swiss_      = false;
-    online_part_          = 1;
-    onlineSettings().part = 1;
-    saveOnlineSettings();
-    play_part_          = 1;
-    playSettings().part = 1;
-    savePlaySettings();
-    page_ = Page::Play;
+    tour_part_swiss_ = false;
+    app_.showPlayTournaments(true);
 }
 
-void App::chooseSwiss(const lichess::SwissInfo& swiss) {
+void LichessArenasPage::chooseSwiss(const lichess::SwissInfo& swiss) {
     if (!swiss_play_ || swiss_play_->id != swiss.id) {
         SwissPlay s;
         s.id         = swiss.id;
@@ -1152,45 +1236,47 @@ void App::chooseSwiss(const lichess::SwissInfo& swiss) {
         swiss_play_ = std::move(s);
     }
     if (arena_play_ && !arena_play_->seat.in() && !arena_play_->seat.paused()) dropArena();
-    tour_part_swiss_      = true;
-    online_part_          = 1;
-    onlineSettings().part = 1;
-    saveOnlineSettings();
-    play_part_          = 1;
-    playSettings().part = 1;
-    savePlaySettings();
-    page_ = Page::Play;
+    tour_part_swiss_ = true;
+    app_.showPlayTournaments(true);
 }
 
-void App::joinArenaHere(bool quiet) {
-    if (!arena_play_ || !lichess_account_) return;
+void LichessArenasPage::joinArenaHere(bool quiet) {
+    const auto* account = app_.lichessAccount();
+    if (!arena_play_ || !account) return;
     auto& a = *arena_play_;
     if (a.join_job.valid()) return;
-    if (!lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
+    if (!account->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
         a.join_pending = true;
-        if (!lichess_link_)
-            startLichessLink(lichess::scopesAdding(lichess_account_->scopes, lichess::SCOPE_TOURNAMENT_WRITE),
-                             lichess_account_->username);
+        if (!app_.lichessLinking())
+            app_.startLichessLink(lichess::scopesAdding(account->scopes, lichess::SCOPE_TOURNAMENT_WRITE),
+                                  account->username);
         return;
     }
     a.quiet_join = quiet;
     a.join_asked = Clock::now();
     if (!quiet) a.error = {};
-    a.join_job = std::async(std::launch::async, [token = lichess_account_->token, id = a.id] {
-        return lichess::joinArena(token, id, true);
-    });
+    a.join_job = std::async(std::launch::async,
+                            [token = account->token, id = a.id] { return lichess::joinArena(token, id, true); });
 }
 
-void App::pauseArena() {
-    if (!arena_play_ || !lichess_account_) return;
+void LichessArenasPage::pauseArena() {
+    const auto* account = app_.lichessAccount();
+    if (!arena_play_ || !account) return;
     auto& a = *arena_play_;
     a.seat.pause();  // the aids back at once, the joins stopped; a game being played goes on to its end
     if (a.pause_job.valid()) return;
-    a.pause_job = std::async(
-        std::launch::async, [token = lichess_account_->token, id = a.id] { return lichess::withdrawArena(token, id); });
+    a.pause_job = std::async(std::launch::async,
+                             [token = account->token, id = a.id] { return lichess::withdrawArena(token, id); });
 }
 
-void App::toggleArenaPause() {
+void LichessArenasPage::pauseAndClose() {
+    if (!arena_play_) return;
+    pauseArena();  // RookStudio closes once Lichess took the pause, or after a few seconds
+    arena_play_->quit_after = true;
+    arena_play_->quit_asked = app_.seconds();
+}
+
+void LichessArenasPage::toggleArenaPause() {
     if (!arena_play_) return;
     if (arena_play_->seat.in())
         pauseArena();
@@ -1198,30 +1284,49 @@ void App::toggleArenaPause() {
         joinArenaHere();
 }
 
-void App::joinSwissHere() {
-    if (!swiss_play_ || !lichess_account_) return;
+void LichessArenasPage::joinSwissHere() {
+    const auto* account = app_.lichessAccount();
+    if (!swiss_play_ || !account) return;
     auto& s = *swiss_play_;
     if (s.join_job.valid()) return;
-    if (!lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
+    if (!account->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
         s.join_pending = true;
-        if (!lichess_link_)
-            startLichessLink(lichess::scopesAdding(lichess_account_->scopes, lichess::SCOPE_TOURNAMENT_WRITE),
-                             lichess_account_->username);
+        if (!app_.lichessLinking())
+            app_.startLichessLink(lichess::scopesAdding(account->scopes, lichess::SCOPE_TOURNAMENT_WRITE),
+                                  account->username);
         return;
     }
-    s.error    = {};
-    s.join_job = std::async(std::launch::async,
-                            [token = lichess_account_->token, id = s.id] { return lichess::joinSwiss(token, id); });
+    s.error = {};
+    s.join_job =
+        std::async(std::launch::async, [token = account->token, id = s.id] { return lichess::joinSwiss(token, id); });
 }
 
-void App::pauseSwiss() {
-    if (!swiss_play_ || !lichess_account_ || swiss_play_->pause_job.valid()) return;
-    swiss_play_->pause_job = std::async(std::launch::async, [token = lichess_account_->token, id = swiss_play_->id] {
+void LichessArenasPage::pauseSwiss() {
+    const auto* account = app_.lichessAccount();
+    if (!swiss_play_ || !account || swiss_play_->pause_job.valid()) return;
+    swiss_play_->pause_job = std::async(std::launch::async, [token = account->token, id = swiss_play_->id] {
         return lichess::withdrawSwiss(token, id);
     });
 }
 
-void App::drawPlayTournaments() {
+bool LichessArenasPage::backToTournament(const std::string& swiss) {
+    if (swiss_play_ && swiss == swiss_play_->id && swiss_play_->info.value)
+        chooseSwiss(*swiss_play_->info.value);
+    else if (arena_play_)
+        chooseArena(arena_play_->id, arena_play_->name);
+    else
+        return false;
+    return true;
+}
+
+void LichessArenasPage::drawGameRound(const std::string& swiss) {
+    if (!swiss.empty() && swiss_play_ && swiss == swiss_play_->id && swiss_play_->info.value)
+        ImGui::TextDisabled("%s", trf("{} · round {} of {}", swiss_play_->name, swiss_play_->info.value->round,
+                                      swiss_play_->info.value->rounds)
+                                      .c_str());
+}
+
+void LichessArenasPage::drawPlayTournaments() {
     const ui::TopicRegion topic(guide::topics::PlayTournaments);
     // The one chosen last, the arena or the Swiss.
     if (swiss_play_ && (tour_part_swiss_ || !arena_play_)) return drawSwissPart();
@@ -1230,9 +1335,9 @@ void App::drawPlayTournaments() {
     ui::beginCard("##play_tournaments");
     ImGui::PushTextWrapPos();
     heading(TR("Arenas you can play from RookStudio"));
-    arena_card_.drawn   = ImGui::GetFrameCount();  // the list asked as the card asks it
+    arena_card_.drawn   = app_.frame();  // the list asked as the card asks it
     const auto& list    = arena_card_.list;
-    const auto* profile = lichess_profile_ ? &*lichess_profile_ : nullptr;
+    const auto* profile = app_.lichessProfile();
     if (!list.value) {
         ImGui::TextDisabled("%s", list.failed() ? lichess::gaveNothing(list).c_str() : TR("Asking Lichess…"));
     } else {
@@ -1266,7 +1371,7 @@ void App::drawPlayTournaments() {
             ImGui::TextDisabled("%s", TR("No rapid or classical arena now: the Lichess page lists the others."));
     }
     // The user's teams' Swiss tournaments, to come or in progress, read with team:read.
-    if (lichess_account_->has(lichess::SCOPE_TEAM_READ) && arena_card_.swisses.value) {
+    if (app_.lichessAccount()->has(lichess::SCOPE_TEAM_READ) && arena_card_.swisses.value) {
         bool heading_said = false;
         for (const auto& sw : *arena_card_.swisses.value) {
             if (sw.state == lichess::TourState::Finished) continue;
@@ -1292,11 +1397,7 @@ void App::drawPlayTournaments() {
             ImGui::PopID();
         }
     }
-    if (ImGui::SmallButton(TR("Lichess tournaments on the Lichess page ›"))) {
-        broadcast_round_.clear();
-        page_         = Page::Lichess;
-        arena_card_y_ = -2;
-    }
+    if (ImGui::SmallButton(TR("Lichess tournaments on the Lichess page ›"))) showCard();
     wrapped(
         TR("Blitz and bullet arenas are followed on the Lichess page and played on lichess.org: Lichess's Board API "
            "plays rapid, classical and correspondence only."),
@@ -1305,11 +1406,12 @@ void App::drawPlayTournaments() {
     ui::endCard();
 }
 
-void App::drawArenaPart() {
-    askArenaProfile();
+void LichessArenasPage::drawArenaPart() {
+    app_.askLichessProfile();
     auto& a             = *arena_play_;
     const auto* state   = a.state.value ? &*a.state.value : nullptr;
-    const auto* profile = lichess_profile_ ? &*lichess_profile_ : nullptr;
+    const auto* profile = app_.lichessProfile();
+    const auto* account = app_.lichessAccount();
     const auto& io      = ImGui::GetIO();
     const bool enter = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
                        !io.KeyAlt &&
@@ -1365,7 +1467,7 @@ void App::drawArenaPart() {
         return;
     }
     // The first time: tournament:write.
-    if (!lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE) && !drawTournamentScope(enter)) {
+    if (!account->has(lichess::SCOPE_TOURNAMENT_WRITE) && !drawTournamentScope(enter)) {
         dropArena();
         return;
     }
@@ -1380,7 +1482,7 @@ void App::drawArenaPart() {
                 true);
         } else if (arenaGameOn()) {
             wrapped(TR("Your game is being played on the Board."), true);
-            if (primaryButton(TR("Back to the game##arena"))) backToOnlineGame();
+            if (primaryButton(TR("Back to the game##arena"))) app_.backToOnlineGame();
         } else {
             const auto since =
                 std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - a.seat.lastJoin()).count();
@@ -1430,7 +1532,7 @@ void App::drawArenaPart() {
             }
             const auto met  = lichess::conditionsMet(state->info.conditions, state->info.speed, profile);
             const bool can  = met != false && (!state->info.judged || state->info.accepted);
-            const bool keys = lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE);  // else Enter asks for it
+            const bool keys = account->has(lichess::SCOPE_TOURNAMENT_WRITE);  // else Enter asks for it
             if (!can) coloured(TR("A condition is missing: Lichess would refuse the join."), ui::WARN);
             ImGui::Dummy(ImVec2(0, px(2)));
             if (primaryButton(TR("Join##arena_play"), can && !a.join_job.valid()) ||
@@ -1482,7 +1584,7 @@ void App::drawArenaPart() {
     ImGui::PopTextWrapPos();
 }
 
-bool App::drawTournamentScope(bool enter) {
+bool LichessArenasPage::drawTournamentScope(bool enter) {
     beginTinted("##tournament_scope", ui::ACCENT);
     ImGui::PushTextWrapPos();
     heading(TR("The first time: Lichess asks for one more permission"));
@@ -1490,20 +1592,22 @@ bool App::drawTournamentScope(bool enter) {
                "Lichess's page opens; your account stays linked, the token it replaces is revoked."),
             true);
     bool keep = true;
-    if (lichess_link_) {
+    if (app_.lichessLinking()) {
         coloured(TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."), ui::ACCENT);
     } else {
-        if (lichess_error_.failed())
-            coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
-        if (primaryButton(TR("Allow on Lichess…##tournament")) || enter)
-            startLichessLink(lichess::scopesAdding(lichess_account_->scopes, lichess::SCOPE_TOURNAMENT_WRITE),
-                             lichess_account_->username);
+        if (app_.lichessLinkError().failed())
+            coloured(trf("Lichess gave nothing ({}).", lichess::describe(app_.lichessLinkError())), ui::WARN);
+        if (primaryButton(TR("Allow on Lichess…##tournament")) || enter) {
+            const auto* account = app_.lichessAccount();
+            app_.startLichessLink(lichess::scopesAdding(account->scopes, lichess::SCOPE_TOURNAMENT_WRITE),
+                                  account->username);
+        }
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("Enter"));
         ImGui::SameLine();
         if (ImGui::Button(TR("Not now##tournament"))) {
-            onlineSettings().tournament_declined = true;
-            saveOnlineSettings();
+            app_.onlineSettings().tournament_declined = true;
+            app_.saveOnlineSettings();
             keep = false;
         }
     }
@@ -1513,7 +1617,7 @@ bool App::drawTournamentScope(bool enter) {
     return keep;
 }
 
-void App::drawArenaLine(bool board) {
+void LichessArenasPage::drawArenaLine(bool board) {
     if (!arena_play_) return;
     auto& a           = *arena_play_;
     const auto* state = a.state.value ? &*a.state.value : nullptr;
@@ -1572,7 +1676,7 @@ void App::drawArenaLine(bool board) {
     ImGui::PopStyleColor();
 }
 
-void App::drawArenaGameBefore() {
+void LichessArenasPage::drawArenaGameBefore() {
     if (!arena_play_ || arena_play_->last_game.empty()) return;
     auto& a = *arena_play_;
     beginTinted("##arena_before", a.last_result == "won" ? ui::GOOD : a.last_result == "draw" ? ui::ACCENT : ui::WARN);
@@ -1597,7 +1701,8 @@ void App::drawArenaGameBefore() {
         title += " · " + std::string(TR("its points: asking Lichess…"));
     }
     coloured(title, a.last_result == "won" ? ui::GOOD : a.last_result == "draw" ? ui::ACCENT : ui::WARN);
-    const auto base = lichess_account_ ? "Lichess · " + lichess_account_->username : std::string("Lichess");
+    const auto* account = app_.lichessAccount();
+    const auto base     = account ? "Lichess · " + account->username : std::string("Lichess");
     wrapped(a.seat.in() ? trf("The next game in a few seconds. It is kept in “{}”, its review offered at the arena's "
                               "end.",
                               base)
@@ -1607,15 +1712,14 @@ void App::drawArenaGameBefore() {
     endTinted();
 }
 
-void App::drawArenaOver(bool home) {
+void LichessArenasPage::drawArenaOver(bool home) {
     if (!arena_play_ || !arena_play_->state.value) return;
-    auto& a         = *arena_play_;
-    const auto& s   = *a.state.value;
-    const auto base = lichess_account_ ? "Lichess · " + lichess_account_->username : std::string("Lichess");
+    auto& a             = *arena_play_;
+    const auto& s       = *a.state.value;
+    const auto* account = app_.lichessAccount();
+    const auto base     = account ? "Lichess · " + account->username : std::string("Lichess");
     int rank = a.me ? a.me->rank : s.me ? s.me->rank : 0, points = a.me ? a.me->score : 0;
-    std::vector<FinishedGame*> held;
-    for (auto& f : lichess_finished_)
-        if (f.held && f.game.tournament == a.id) held.push_back(&f);
+    const auto held = app_.heldGames(a.id);  // the games of the arena kept, their review held until its end
     const auto title =
         rank > 0 ? trn("The arena is over: rank {} of {}, {} point", "The arena is over: rank {} of {}, {} points",
                        points, ui::exactCount(rank), ui::exactCount(s.info.players), points)
@@ -1631,41 +1735,24 @@ void App::drawArenaOver(bool home) {
     ui::inlineIcon(ui::Icon::Trophy, ui::GOOD);
     ImGui::SameLine();
     coloured(title, ui::GOOD);
-    const auto games = std::max(a.games.size(), held.size());
+    const auto games = std::max(a.games.size(), held);
     wrapped(games > 0 ? trn("Your {} game is in “{}”.", "Your {} games are in “{}”.", games, games, base)
                       : std::string(TR("You played no game of it from here.")),
             true);
-    if (!held.empty() && held.back()->got && !held.back()->got->pgn.empty()) {
-        if (primaryButton(TR("Review the last game"))) {
-            auto* last = held.back();
-            for (auto* f : held) {
-                f->held = false;
-                if (f != last) f->done = true;
-            }
-            reviewFinishedGame(*last);
-        }
+    if (held > 0 && app_.lastHeldArrived(a.id)) {
+        if (primaryButton(TR("Review the last game"))) app_.reviewLastHeld(a.id);
         ImGui::SameLine();
     }
     if (games > 0 && ImGui::Button(TR("Its games in the list"))) {
-        auto& sh = shelf();
+        auto& sh = app_.shelf();
         for (std::size_t i = 0; i < sh.entries().size(); ++i)
-            if (!sh.entries()[i].source && lower(sh.entries()[i].name) == lower(base)) {
-                db_selected_ = static_cast<int>(i);
-                db_list_     = true;
-                std::snprintf(db_filter_.data(), db_filter_.size(), "%s", s.info.name.c_str());
-                page_ = Page::Databases;
-            }
-        for (auto* f : held) {
-            f->held = false;
-            f->done = true;
-        }
+            if (!sh.entries()[i].source && lower(sh.entries()[i].name) == lower(base))
+                app_.showDatabaseGames(i, s.info.name);
+        app_.letGoHeld(a.id);
     }
     ImGui::SameLine();
     if (ImGui::Button(TR("Close##arena_over"))) {
-        for (auto* f : held) {
-            f->held = false;
-            f->done = true;
-        }
+        app_.letGoHeld(a.id);
         dropArena();
         ImGui::PopTextWrapPos();
         endTinted();
@@ -1675,10 +1762,11 @@ void App::drawArenaOver(bool home) {
     endTinted();
 }
 
-void App::drawSwissPart() {
-    auto& s          = *swiss_play_;
-    const auto* info = s.info.value ? &*s.info.value : nullptr;
-    const auto& io   = ImGui::GetIO();
+void LichessArenasPage::drawSwissPart() {
+    auto& s             = *swiss_play_;
+    const auto* info    = s.info.value ? &*s.info.value : nullptr;
+    const auto* account = app_.lichessAccount();
+    const auto& io      = ImGui::GetIO();
     const bool enter = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
                        !io.KeyAlt &&
                        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
@@ -1725,11 +1813,11 @@ void App::drawSwissPart() {
         return;
     }
     const bool over = info->state == lichess::TourState::Finished;
-    if (!over && !s.joined && !lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE) && !drawTournamentScope(enter)) {
+    if (!over && !s.joined && !account->has(lichess::SCOPE_TOURNAMENT_WRITE) && !drawTournamentScope(enter)) {
         dropSwiss();
         return;
     }
-    const bool scoped = lichess_account_->has(lichess::SCOPE_TOURNAMENT_WRITE);
+    const bool scoped = account->has(lichess::SCOPE_TOURNAMENT_WRITE);
     if (!lichess::playableHere(*info) && !over) {
         beginTinted("##swiss_web", ui::ACCENT);
         ImGui::PushTextWrapPos();
@@ -1757,7 +1845,7 @@ void App::drawSwissPart() {
             ImGui::TableSetupColumn(TR("Tie-break"), ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableSetupColumn(TR("Perf."), ImGuiTableColumnFlags_WidthFixed);
             ImGui::TableHeadersRow();
-            const auto me = lichess_account_ ? lower(lichess_account_->username) : std::string();
+            const auto me = account ? lower(account->username) : std::string();
             std::size_t n = 0;
             for (const auto& r : *s.rows.value) {
                 const bool mine = lower(r.name) == me;
@@ -1792,7 +1880,7 @@ void App::drawSwissPart() {
         ui::beginCard("##swiss_mine");
         ImGui::PushTextWrapPos();
         heading(TR("Your games"));
-        const auto me    = lichess_account_ ? lichess_account_->username : std::string();
+        const auto me    = account ? account->username : std::string();
         const auto* mine = s.trf ? s.trf->player(me) : nullptr;
         bool any         = false;
         if (mine)
@@ -1826,14 +1914,15 @@ void App::drawSwissPart() {
                 ImGui::TextUnformatted(text.c_str());
                 any = true;
             }
-        if (online_game_ && online_game_->state.swiss == s.id && !online_game_->ended) {
-            const auto& og = *online_game_;
+        if (const auto online_game = app_.onlineGame();
+            online_game && online_game->state.swiss == s.id && !online_game->ended) {
+            const auto& og = *online_game;
             ImGui::TextColored(
                 ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
-                trf("R{} · against {} · being played, on the Board", info->round, onlineOpponent()).c_str());
+                trf("R{} · against {} · being played, on the Board", info->round, app_.onlineOpponent()).c_str());
             if (!og.shown) {
                 ImGui::SameLine();
-                if (ImGui::SmallButton(TR("Back to the game##swiss"))) backToOnlineGame();
+                if (ImGui::SmallButton(TR("Back to the game##swiss"))) app_.backToOnlineGame();
             }
             any = true;
         }
@@ -1849,15 +1938,10 @@ void App::drawSwissPart() {
             if (!s.kept_in.empty()) {
                 wrapped(trf("Kept in “{}”: its games and its standing, its crosstable a click away.", s.kept_in), true);
                 if (ImGui::SmallButton(TR("Open its crosstable"))) {
-                    auto& sh = shelf();
+                    auto& sh = app_.shelf();
                     for (std::size_t i = 0; i < sh.entries().size(); ++i)
-                        if (!sh.entries()[i].source && sh.entries()[i].name == s.kept_in) {
-                            db_selected_        = static_cast<int>(i);
-                            db_list_            = true;
-                            db_tournaments_     = true;
-                            page_               = Page::Databases;
-                            crosstable_request_ = std::make_pair(s.name, s.kept_in);
-                        }
+                        if (!sh.entries()[i].source && sh.entries()[i].name == s.kept_in)
+                            app_.openCrosstable(i, s.name, s.kept_in);
                 }
             } else if (s.keep_job.valid()) {
                 wrapped(TR("Its games and its standing are coming from Lichess…"), true);
@@ -1928,10 +2012,10 @@ void App::drawSwissPart() {
     ImGui::PopTextWrapPos();
 }
 
-void App::keepSwiss(const std::string& folder, const std::string& name) {
+void LichessArenasPage::keepSwiss(const std::string& folder, const std::string& name) {
     if (!swiss_play_ || swiss_play_->keep_job.valid()) return;
     auto& s           = *swiss_play_;
-    auto& sh          = shelf();
+    auto& sh          = app_.shelf();
     std::size_t index = sh.entries().size();
     try {
         for (std::size_t i = 0; i < sh.entries().size(); ++i)
@@ -1948,11 +2032,12 @@ void App::keepSwiss(const std::string& folder, const std::string& name) {
         s.keep_error = lichess::Failure::own(trf("“{}” cannot be written", sh.entries()[index].name));
         return;
     }
-    lichess_.swiss_keep_base = sh.entries()[index].folder.string();
-    saveLichessSettings();
+    app_.lichessSettings().swiss_keep_base = sh.entries()[index].folder.string();
+    app_.saveLichessSettings();
     s.kept_folder        = sh.entries()[index].folder.string();
     const auto base      = sh.entries()[index].name;
-    const auto token     = lichess_account_ ? lichess_account_->token : std::string();
+    const auto* account  = app_.lichessAccount();
+    const auto token     = account ? account->token : std::string();
     const int64_t starts = s.info.value ? s.info.value->starts_at : 0;
     // Its games and its TRF asked, read and kept; the rounds without a game go to its crosstable's settings once back.
     s.keep_job   = std::async(std::launch::async, [db, base, index, id = s.id, name = s.name, token, starts] {
@@ -1985,7 +2070,7 @@ void App::keepSwiss(const std::string& folder, const std::string& name) {
     s.kept_games = 0;
 }
 
-void App::drawSwissKeepMenu() {
+void LichessArenasPage::drawSwissKeepMenu() {
     if (!swiss_play_) return;
     constexpr const char* kId = "##swiss_keep";
     if (swiss_play_->keep_menu) {
@@ -1993,7 +2078,7 @@ void App::drawSwissKeepMenu() {
         ImGui::OpenPopup(kId);
     }
     if (!ImGui::BeginPopup(kId)) return;
-    auto& sh               = shelf();
+    auto& sh               = app_.shelf();
     const std::string name = TR("Lichess tournaments");  // as the Broadcasts database is named
     ImGui::TextDisabled("%s", TR("Keep the Swiss in"));
     std::vector<std::size_t> order;
@@ -2001,9 +2086,9 @@ void App::drawSwissKeepMenu() {
         if (!sh.entries()[i].source) order.push_back(i);
     std::stable_sort(order.begin(), order.end(), [&](std::size_t x, std::size_t y) {
         const auto rank = [&](std::size_t i) {
-            return sh.entries()[i].folder == std::filesystem::path(lichess_.swiss_keep_base) ? 0
-                   : sh.entries()[i].name == name                                            ? 1
-                                                                                             : 2;
+            return sh.entries()[i].folder == std::filesystem::path(app_.lichessSettings().swiss_keep_base) ? 0
+                   : sh.entries()[i].name == name                                                          ? 1
+                                                                                                           : 2;
         };
         return rank(x) < rank(y);
     });
@@ -2026,7 +2111,7 @@ void App::drawSwissKeepMenu() {
 // ---------------------------------------------------------------------------
 // Elsewhere: the Home page, the window's corner
 
-void App::drawArenaHome() {
+void LichessArenasPage::drawHome() {
     if (arena_play_ && (arena_play_->seat.in() || arena_play_->seat.paused())) {
         auto& a = *arena_play_;
         ui::beginCard("chess_arena");
@@ -2043,7 +2128,7 @@ void App::drawArenaHome() {
         ImGui::SameLine();
         if (ImGui::SmallButton(arenaGameOn() ? TR("Back to the game##home_arena") : TR("Back to the arena##home_arena"))) {
             if (arenaGameOn())
-                backToOnlineGame();
+                app_.backToOnlineGame();
             else
                 chooseArena(a.id, a.name);
         }
@@ -2090,14 +2175,14 @@ void App::drawArenaHome() {
     }
 }
 
-void App::drawSwissNotice() {
+void LichessArenasPage::drawSwissNotice() {
     if (!swiss_play_ || !swiss_play_->joined || !swiss_play_->info.value) return;
     auto& s          = *swiss_play_;
     const auto& info = *s.info.value;
     const int next   = info.round + 1;
     if (info.state == lichess::TourState::Finished || s.noticed_round >= next) return;
     if (!lichess::roundNoticeDue(info.next_round_at, nowMillis())) return;
-    if (liveGameOn() && !arenaHoldsAids()) return;  // during a live game, nothing at the corner
+    if (app_.liveGameOn() && !holdsAids()) return;  // during a live game, nothing at the corner
     const auto* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - px(18),
                                    viewport->WorkPos.y + viewport->WorkSize.y - px(18)),
@@ -2127,6 +2212,87 @@ void App::drawSwissNotice() {
     ImGui::End();
     ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
+}
+
+// ---------------------------------------------------------------------------
+// Ctrl+K and --focus
+
+void LichessArenasPage::addCommands(const PaletteAdd& add, const std::string& lichess_view,
+                                    const std::string& play_view) {
+    // The card; an arena of its list followed or joined; the Play page's part; in an arena, the pause and berserk; the
+    // user's teams' Swiss tournaments; a finished Swiss kept.
+    const auto* account = app_.lichessAccount();
+    add(TR("Lichess tournaments: arenas and Swiss tournaments"), lichess_view, [this] {
+        showCard();  // the page itself, where its card is
+    });
+    add(TR("Play an arena or a Swiss tournament on Lichess"), play_view, [this] { app_.showPlayTournaments(true); });
+    if (arena_card_.list.value)
+        for (const auto& a : *arena_card_.list.value) {
+            add(trf("Follow the arena: {}", a.name), "Lichess",
+                [this, id = a.id, name = a.name] { followTournament(id, name, false); });
+            if (lichess::playableHere(a) && account)
+                add(trf("Join the arena: {}", a.name), TR("Play"),
+                    [this, id = a.id, name = a.name] { chooseArena(id, name); });
+        }
+    if (tour_follow_)
+        add(trf("The tournament followed in the mosaic: {}", tour_follow_->name), "Lichess",
+            [this] { app_.openMosaic(tour_follow_->key); });
+    if (arena_play_ && (arena_play_->seat.in() || arena_play_->seat.paused())) {
+        add(arena_play_->seat.in() ? TR("Pause in the arena") : TR("Back in the arena"), "Alt+P",
+            [this] { toggleArenaPause(); });
+        add(TR("Back to the arena"), TR("Play"), [this] { chooseArena(arena_play_->id, arena_play_->name); });
+    }
+    const auto online_game = app_.onlineGame();
+    if (online_game && arena_play_ && online_game->state.tournament == arena_play_->id && arena_play_->state.value &&
+        arena_play_->state.value->info.berserkable &&
+        lichess::berserkAllowed(true, online_game->state, online_game->white))
+        add(TR("Berserk"), TR("Play"), [this] {
+            app_.onlineCall(TR("Berserk"), [id = app_.onlineGame()->id](const std::string& token) {
+                return lichess::berserk(token, id);
+            });
+        });
+    if (account && !account->has(lichess::SCOPE_TEAM_READ))
+        add(TR("Read my teams' Swiss tournaments…"), "Lichess", [this] {
+            app_.showLichessPage();
+            app_.askScope(lichess::SCOPE_TEAM_READ);
+        });
+    if (swiss_play_ && swiss_play_->info.value && swiss_play_->info.value->state == lichess::TourState::Finished &&
+        swiss_play_->kept_in.empty() && !swiss_play_->keep_job.valid())
+        add(TR("Keep the Swiss in a database…"), TR("Play"), [this] {
+            chooseSwiss(*swiss_play_->info.value);
+            swiss_play_->keep_menu = true;
+        });
+}
+
+void LichessArenasPage::addFocusWords(FocusWords& words, const std::string& w) {
+    words.on({"lichess-tournaments"}, [&] {  // the Lichess page scrolled to its card of tournaments (#95)
+        showCard();
+    });
+    words.on({"arena-mosaic=*", "swiss-mosaic=*", "play-arena=*", "play-swiss=*"}, [&] {
+        // arena-mosaic=ID[@NAME], swiss-mosaic=ID[@NAME]: a tournament followed in the mosaic;
+        // play-arena=ID[@NAME], play-swiss=ID[@NAME]: the Play page's Tournaments part on it (#95), with
+        // lichess-api= before them.
+        const auto eq   = w.find('=');
+        const auto kind = w.substr(0, eq);
+        const auto spec = w.substr(eq + 1);
+        const auto at   = spec.find('@');
+        const auto id   = spec.substr(0, at);
+        const auto name = at == std::string::npos ? std::string() : spec.substr(at + 1);
+        if (kind == "arena-mosaic" || kind == "swiss-mosaic") {
+            followTournament(id, name, kind == "swiss-mosaic");
+        } else if (kind == "play-arena") {
+            chooseArena(id, name);
+        } else {
+            lichess::SwissInfo s;
+            s.id   = id;
+            s.name = name;
+            chooseSwiss(s);
+            swiss_play_->info = {};  // asked of Lichess
+        }
+    });
+    words.on({"play-tournaments"}, [&] {  // the Play page's "On Lichess › Tournaments" part (#95)
+        app_.showPlayTournaments(false);
+    });
 }
 
 }  // namespace fcg

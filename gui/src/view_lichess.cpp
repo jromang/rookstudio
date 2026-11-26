@@ -19,6 +19,8 @@
 #include "https.hpp"
 #include "i18n.hpp"
 #include "lichess_account.hpp"
+#include "lichess_arenas.hpp"
+#include "lichess_arenas_page.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
 #include "lichess_tv_page.hpp"
@@ -150,7 +152,7 @@ void App::pollLichess() {
         lichess_broadcasts_time_ = std::chrono::steady_clock::now();
     }
     tv_->poll();            // Lichess TV: its card, a channel's games, the Board's game, those kept (#86)
-    pollLichessArenas();    // Lichess's tournaments: the card, one followed, one played, a Swiss (#95)
+    arenas_->poll();        // Lichess's tournaments: the card, one followed, one played, a Swiss (#95)
     pollBroadcastBoards();  // the mosaic's games, their engines, the game the board follows
 }
 
@@ -956,7 +958,7 @@ void App::drawLichessPage() {
             ImGui::Dummy(ImVec2(0, px(8)));
         }
     }
-    drawLichessArenasCard();  // Lichess's arenas and the user's teams' Swiss tournaments (#95)
+    arenas_->drawCard();  // Lichess's arenas and the user's teams' Swiss tournaments (#95)
     ImGui::Dummy(ImVec2(0, px(8)));
     tv_->drawCard();  // Lichess TV's channels (#86)
     ImGui::Dummy(ImVec2(0, px(8)));
@@ -982,10 +984,7 @@ void App::drawLichessPage() {
         offline_evals_y_ = -1;
     }
     // So the tournaments' card (#95).
-    if (arena_card_y_ >= 0) {
-        ImGui::SetScrollFromPosY(arena_card_y_ - ImGui::GetWindowPos().y, 0.0f);
-        arena_card_y_ = -1;
-    }
+    arenas_->scrollToCard();
 }
 
 }  // namespace fcg

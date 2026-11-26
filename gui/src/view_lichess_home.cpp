@@ -73,6 +73,21 @@ void App::pollLichessProfile() {
     }
 }
 
+void App::askArenaProfile() {
+    // The user's figures for the conditions (#46's profile), read again when they are ten minutes old.
+    pollLichessProfile();
+    if (!lichess_account_ || options_.scripted) return;
+    const auto now   = std::chrono::steady_clock::now();
+    const bool stale = !lichess_profile_ || std::time(nullptr) - lichess_profile_->read_at > 600;
+    if (stale && !lichess_profile_job_.valid() &&
+        (lichess_profile_asked_.time_since_epoch().count() == 0 ||
+         now - lichess_profile_asked_ > std::chrono::minutes(10))) {
+        lichess_profile_asked_ = now;
+        lichess_profile_job_ = std::async(std::launch::async,
+                                          [token = lichess_account_->token] { return lichess::accountProfile(token); });
+    }
+}
+
 void App::drawLichessAccountPanel() {
     if (!lichess_account_) return;
     pollLichessProfile();

@@ -16,6 +16,7 @@
 #include "assistant_service.hpp"
 #include "board_view.hpp"
 #include "i18n.hpp"
+#include "lichess_arenas_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -62,7 +63,7 @@ void App::drawChessHome() {
     drawTrainingOffer();
     drawPlayOffer();
     // The arena or the Swiss the user is in from here, first (R3, #95).
-    drawArenaHome();
+    arenas_->drawHome();
 
     // Where the user was (mockup M0): the Board page's game at its move, where it comes from, what it holds.
     const bool has_game = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();

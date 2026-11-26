@@ -16,11 +16,13 @@
 #include "fide_rating_list.hpp"
 #include "free_ports.hpp"
 #include "scripted_server.hpp"
+#include "test_support.hpp"
 #include "zip.hpp"
 
 using namespace fcg;
 using namespace fcg::test;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -82,13 +84,6 @@ fide::Job::Outcome wait(std::unique_ptr<fide::Job> job) {
     return job->done.get();
 }
 
-fs::path freshProfile(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
-
 }  // namespace
 
 TEST_CASE("fide list: a day read from HTTP and from a zip, the month offered, the list kept in the profile") {
@@ -126,7 +121,7 @@ TEST_CASE("fide list: a day read from HTTP and from a zip, the month offered, th
     REQUIRE(zipped);
     CHECK(zipped->text() == "2026-11-22");
 
-    const auto profile = freshProfile("fide-kept");
+    const ScratchDir profile("fide-kept");
     CHECK_FALSE(fide::readKept(profile));
     kept.month         = "2026-11";
     kept.published     = "2026-11-22";
@@ -148,7 +143,7 @@ TEST_CASE("fide list: a day read from HTTP and from a zip, the month offered, th
 
 TEST_CASE("fide list: downloaded, read into the profile, not downloaded again; a list that changed refused") {
     const uint16_t date = static_cast<uint16_t>(((2026 - 1980) << 9) | (11 << 5) | 22);
-    const auto profile  = freshProfile("fide-download");
+    const ScratchDir profile("fide-download");
     {
         FakeFide fide(zipArchive("players_list_foa.txt", list(), 0, date));
         const auto first = wait(fide::start(profile));

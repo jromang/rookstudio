@@ -29,6 +29,7 @@
 #include "run.hpp"
 #include "stats.hpp"
 #include "storage.hpp"
+#include "test_support.hpp"
 #include "topology.hpp"
 #include "ui.hpp"
 
@@ -40,15 +41,9 @@
 
 using namespace fcg;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path tempDir(const char* name) {
-    auto dir = fs::temp_directory_path() /
-               fmt::format("fcg-tests-{}-{}", name, std::chrono::steady_clock::now().time_since_epoch().count());
-    fs::create_directories(dir);
-    return dir;
-}
 
 // A small finished game: 1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7#, with scores from the mover's point of view.
 fastchess::MatchData sampleGame(bool timed) {
@@ -163,7 +158,7 @@ TEST_CASE("UCI_ShowWDL is switched on for a new engine that has it, and left as 
 }
 
 TEST_CASE("an engine's program: taken as it is, then noticed when rebuilt, moved, or without its folder") {
-    const auto dir     = tempDir("program");
+    const ScratchDir dir("program");
     const auto program = dir / "engine";
     std::ofstream(program) << "build 1";
 
@@ -193,7 +188,7 @@ TEST_CASE("an engine's program: taken as it is, then noticed when rebuilt, moved
 }
 
 TEST_CASE("an engine's program is fingerprinted in two parts, its CRC read only when the file system cannot tell") {
-    const auto dir     = tempDir("program-crc");
+    const ScratchDir dir("program-crc");
     const auto program = dir / "engine";
     std::ofstream(program) << "build 1";
 
@@ -693,7 +688,7 @@ TEST_CASE("a Chess960 game replays, castling included") {
 }
 
 TEST_CASE("pgn file offsets read games back, and replay parses them") {
-    const auto dir = tempDir("pgn");
+    const ScratchDir dir("pgn");
     {
         tour::PgnFile file(dir / "games.pgn");
 
@@ -823,7 +818,7 @@ TEST_CASE("the setup becomes a sanitized fastchess configuration") {
         MESSAGE("needs four hardware threads, skipped");
         return;
     }
-    const auto dir = tempDir("run");
+    const ScratchDir dir("run");
     // fastchess appends .exe to extension-less commands on Windows.
     const auto binary = dir / "engine.exe";
     std::ofstream(binary) << "x";
@@ -1071,7 +1066,7 @@ TEST_CASE("the 960 Chess960 starting positions: 518 is the usual one, all differ
 }
 
 TEST_CASE("engine lists of ChessGUI, cutechess and Arena are imported") {
-    const auto dir = tempDir("import");
+    const ScratchDir dir("import");
     fs::create_directories(dir / "engines" / "fruit");
     std::ofstream(dir / "engines" / "fruit" / "fruit.exe") << "x";
 
@@ -1119,7 +1114,7 @@ TEST_CASE("engine lists of ChessGUI, cutechess and Arena are imported") {
 }
 
 TEST_CASE("Arena's ArenaENG.cfg is imported: program, arguments, type, folder and UCI options") {
-    const auto dir = tempDir("import-arena");
+    const ScratchDir dir("import-arena");
     for (const char* program :
          {"Engines/Stockfish/stockfish-windows-x86-64-avx2.exe", "Engines/Crafty 25.2/crafty-25.2-x64.exe",
           "Engines/cray_blitz_49h_uci_ja/Data/CrayBlitz_49h_uci.exe", "Engines/Spike/Spike1.4.exe",
@@ -1811,7 +1806,7 @@ TEST_CASE("move charts: each side's values at its plies, and how far the PVs agr
 }
 
 TEST_CASE("live: an edit while a resumed tournament's games are read leaves the lists as a fresh open shows them") {
-    const auto dir = tempDir("records-loading");
+    const ScratchDir dir("records-loading");
     tour::TournamentSpec spec;
     spec.name      = "records";
     spec.format    = tour::Format::Match;
@@ -1858,7 +1853,7 @@ TEST_CASE("live: an edit while a resumed tournament's games are read leaves the 
 }
 
 TEST_CASE("live: a move the slot's board already has, or cannot play, is left out and the slots asked again") {
-    const auto dir = tempDir("resync");
+    const ScratchDir dir("resync");
     tour::TournamentSpec spec;
     spec.name      = "resync";
     spec.format    = tour::Format::Match;
@@ -1902,7 +1897,7 @@ TEST_CASE("live: a move the slot's board already has, or cannot play, is left ou
 }
 
 TEST_CASE("live: a game recorded while the lists start over is counted once in the search totals") {
-    const auto dir = tempDir("totals-once");
+    const ScratchDir dir("totals-once");
     tour::TournamentSpec spec;
     spec.name      = "totals";
     spec.format    = tour::Format::Match;
@@ -1949,7 +1944,7 @@ TEST_CASE("live: a game recorded while the lists start over is counted once in t
 }
 
 TEST_CASE("live: the nodes of each move count in the search totals, from a game recorded and from its PGN") {
-    const auto dir = tempDir("totals-nodes");
+    const ScratchDir dir("totals-nodes");
     tour::TournamentSpec spec;
     spec.name                       = "nodes";
     spec.format                     = tour::Format::Match;
@@ -1989,7 +1984,7 @@ TEST_CASE("live: the nodes of each move count in the search totals, from a game 
 }
 
 TEST_CASE("processor use: a game voided while the games are read has its figures when the edit is undone") {
-    const auto dir = tempDir("processor-undo");
+    const ScratchDir dir("processor-undo");
     tour::TournamentSpec spec;
     spec.name      = "cpu undo";
     spec.format    = tour::Format::Match;
@@ -2083,7 +2078,7 @@ TEST_CASE("processor use: kept with each game, so that a resumed tournament star
 #else
     const auto self = static_cast<int64_t>(getpid());
 #endif
-    const auto dir = tempDir("processor-use");
+    const ScratchDir dir("processor-use");
     tour::TournamentSpec spec;
     spec.name      = "cpu";
     spec.format    = tour::Format::Match;

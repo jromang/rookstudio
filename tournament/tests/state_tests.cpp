@@ -24,18 +24,14 @@
 #include <tour/state.hpp>
 #include <tour/summary.hpp>
 
+#include "test_support.hpp"
 #include "tour_fixtures.hpp"
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
 
 TournamentSpec matchSpec(uint64_t max_games = 0) {
     return fcg::test::SpecBuilder(Format::Match).name("test").maxGames(max_games).players(2);
@@ -51,7 +47,7 @@ std::string readAll(const fs::path& file) {
 }  // namespace
 
 TEST_CASE("journal: a last line cut short is dropped and removed; a bad line is an error") {
-    const auto dir = freshDir("journal");
+    const ScratchDir dir("journal");
     fs::create_directories(dir);
     const auto file = dir / "journal.jsonl";
 
@@ -88,7 +84,7 @@ TEST_CASE("journal: a last line cut short is dropped and removed; a bad line is 
 }
 
 TEST_CASE("state: pairs are played back to back, results survive a reopen, PGN orphans are cut") {
-    const auto dir = freshDir("state");
+    const ScratchDir dir("state");
 
     std::vector<GameTask> claimed;
     {
@@ -169,7 +165,8 @@ TEST_CASE("state: pairs are played back to back, results survive a reopen, PGN o
 }
 
 TEST_CASE("state: a released game is played again first") {
-    auto state   = TournamentState::create(freshDir("release"), matchSpec());
+    const ScratchDir dir("release");
+    auto state   = TournamentState::create(dir, matchSpec());
     const auto a = state->claimNext();
     const auto b = state->claimNext();
     REQUIRE(a);
@@ -189,7 +186,7 @@ TEST_CASE("state: a match with locked colours gives the same engine White in bot
     for (const auto colours : {Colours::AWhite, Colours::BWhite}) {
         const bool a_white = colours == Colours::AWhite;
         CAPTURE(a_white);
-        const auto dir          = freshDir(a_white ? "locked-a" : "locked-b");
+        const ScratchDir dir(a_white ? "locked-a" : "locked-b");
         auto spec               = matchSpec(4);
         spec.colours            = colours;
         const std::string white = a_white ? "A" : "B", black = a_white ? "B" : "A";
@@ -265,7 +262,7 @@ TEST_CASE("spec: locked colours are a match's only, and saved only when locked")
 }
 
 TEST_CASE("summaries: kept between two listings, read again when the journal changed") {
-    const auto root = freshDir("summaries");
+    const ScratchDir root("summaries");
     fs::create_directories(root);
     auto state = TournamentState::create(root / "20260101-000000 test", matchSpec());
 
@@ -288,7 +285,7 @@ TEST_CASE("summaries: kept between two listings, read again when the journal cha
 }
 
 TEST_CASE("summaries: a match's score, A first; a round robin's standings, the leader first") {
-    const auto root = freshDir("summary-scores");
+    const ScratchDir root("summary-scores");
     fs::create_directories(root);
     {
         // B wins three games of four.
@@ -340,7 +337,7 @@ TEST_CASE("state: the SPRT ends a match and the verdict is journaled") {
     spec.conditions.sprt.alpha   = 0.05;
     spec.conditions.sprt.beta    = 0.05;
     spec.conditions.sprt.model   = "normalized";
-    const auto dir               = freshDir("sprt");
+    const ScratchDir dir("sprt");
 
     {
         auto state = TournamentState::create(dir, spec);
@@ -362,7 +359,7 @@ TEST_CASE("state: the SPRT ends a match and the verdict is journaled") {
 }
 
 TEST_CASE("state: a malformed journal is reported with its position") {
-    const auto dir = freshDir("bad-journal");
+    const ScratchDir dir("bad-journal");
     {
         auto state = TournamentState::create(dir, matchSpec());
     }
@@ -374,7 +371,7 @@ TEST_CASE("state: a malformed journal is reported with its position") {
 }
 
 TEST_CASE("journal: a damaged line is skipped and reported; a partial line left in place gets its own line") {
-    const auto dir = freshDir("journal-damaged");
+    const ScratchDir dir("journal-damaged");
     fs::create_directories(dir);
     const auto file = dir / "journal.jsonl";
     {
@@ -402,7 +399,7 @@ TEST_CASE("journal: a damaged line is skipped and reported; a partial line left 
 }
 
 TEST_CASE("state: a damaged journal line is skipped with a warning, the tournament still opens") {
-    const auto dir = freshDir("state-damaged");
+    const ScratchDir dir("state-damaged");
     {
         auto state      = TournamentState::create(dir, matchSpec(4));
         const auto task = state->claimNext();
@@ -419,8 +416,8 @@ TEST_CASE("state: a damaged journal line is skipped with a warning, the tourname
 }
 
 TEST_CASE("state: a PGN file that lost its end is filled up, new games do not land on journaled ones") {
-    const auto dir = freshDir("state-pgn-lost");
-    uint64_t end   = 0;
+    const ScratchDir dir("state-pgn-lost");
+    uint64_t end = 0;
     {
         auto state = TournamentState::create(dir, matchSpec(4));
         for (int i = 0; i < 2; ++i) {
@@ -442,8 +439,8 @@ TEST_CASE("state: a PGN file that lost its end is filled up, new games do not la
 }
 
 TEST_CASE("state: one program at a time writes a tournament folder; others can read it") {
-    const auto dir = freshDir("state-lock");
-    auto state     = TournamentState::create(dir, matchSpec(4));
+    const ScratchDir dir("state-lock");
+    auto state = TournamentState::create(dir, matchSpec(4));
     {
         const auto task = state->claimNext();
         state->complete(*task, fakeGame(*task, "1-0"));
@@ -492,8 +489,8 @@ TEST_CASE("state: one program at a time writes a tournament folder; others can r
 }
 
 TEST_CASE("state: a tournament looked at lets go of its folder for the process that resumes it (#191)") {
-    const auto dir = freshDir("state-let-go");
-    auto state     = TournamentState::create(dir, matchSpec(4));
+    const ScratchDir dir("state-let-go");
+    auto state = TournamentState::create(dir, matchSpec(4));
     {
         const auto task = state->claimNext();
         state->complete(*task, fakeGame(*task, "1-0"));
@@ -534,7 +531,7 @@ TEST_CASE("state: a tournament looked at lets go of its folder for the process t
 }
 
 TEST_CASE("state: a game claimed before the folder was let go of and ended after is not recorded, nothing written") {
-    const auto dir  = freshDir("state-let-go-late");
+    const ScratchDir dir("state-let-go-late");
     auto state      = TournamentState::create(dir, matchSpec(4));
     const auto task = state->claimNext();
     REQUIRE(task);
@@ -548,7 +545,7 @@ TEST_CASE("state: a game claimed before the folder was let go of and ended after
 }
 
 TEST_CASE("files: a replaced file keeps its permissions, and the old content as .bak when asked") {
-    const auto dir = freshDir("files");
+    const ScratchDir dir("files");
     fs::create_directories(dir);
     const auto file = dir / "settings.json";
     replaceFile(file, "one");
@@ -568,7 +565,7 @@ TEST_CASE("files: a replaced file keeps its permissions, and the old content as 
 
 #ifndef _WIN32
 TEST_CASE("files: a file made is writable by its owner only whatever the umask, a secret's readable by them only") {
-    const auto dir = freshDir("files-modes");
+    const ScratchDir dir("files-modes");
     fs::create_directories(dir);
     const auto mode   = [](const fs::path& file) { return fs::status(file).permissions() & fs::perms::mask; };
     const auto shared = fs::perms::owner_read | fs::perms::owner_write | fs::perms::group_read | fs::perms::others_read;
@@ -596,8 +593,8 @@ TEST_CASE("files: a file made is writable by its owner only whatever the umask, 
 #endif
 
 TEST_CASE("state: a tournament folder from elsewhere cannot make the program write outside it") {
-    const auto dir    = freshDir("foreign");
-    const auto victim = dir.parent_path() / "fcg-tour-foreign-victim.sh";
+    const ScratchDir dir("foreign");
+    const auto victim = dir.path().parent_path() / "fcg-tour-foreign-victim.sh";
     std::ofstream(victim, std::ios::binary | std::ios::trunc) << "echo hello\n";
 
     // The games are appended to a .pgn file only.
@@ -645,7 +642,7 @@ TEST_CASE("state: a tournament folder from elsewhere cannot make the program wri
 }
 
 TEST_CASE("state: the PV warnings of a game are kept with its result, by ply") {
-    const auto dir = freshDir("state-pv");
+    const ScratchDir dir("state-pv");
     {
         auto state = TournamentState::create(dir, matchSpec(2));
         auto task  = state->claimNext();
@@ -667,7 +664,7 @@ TEST_CASE("state: the PV warnings of a game are kept with its result, by ply") {
 }
 
 TEST_CASE("state: a tournament written before a PGN setting existed still opens") {
-    const auto dir = freshDir("state-old-spec");
+    const ScratchDir dir("state-old-spec");
     TournamentState::create(dir, matchSpec(2));
     auto spec = nlohmann::json::parse(readAll(dir / "tournament.json"));
     REQUIRE(spec["conditions"]["pgn"].erase("track_wdl") == 1);
@@ -677,8 +674,8 @@ TEST_CASE("state: a tournament written before a PGN setting existed still opens"
 }
 
 TEST_CASE("state: one opening per round, the next of the book for each round, kept on reopening") {
-    const auto dir  = freshDir("state-per-round");
-    const auto book = dir.parent_path() / "fcg-tour-per-round.epd";
+    const ScratchDir dir("state-per-round");
+    const auto book = dir.path().parent_path() / "fcg-tour-per-round.epd";
     {
         std::ofstream out(book);
         for (const auto* fen : {"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
@@ -732,8 +729,8 @@ TEST_CASE("state: one opening per round, the next of the book for each round, ke
 
     // Without the rule, each encounter takes the next one.
     spec.opening_per_round = false;
-    const auto other       = freshDir("state-per-encounter");
-    auto plain             = TournamentState::create(other, spec);
+    const ScratchDir other("state-per-encounter");
+    auto plain = TournamentState::create(other, spec);
     std::set<std::string> first_round;
     for (int i = 0; i < 4; ++i) {
         auto task = plain->claimNext();
@@ -767,8 +764,8 @@ const std::vector<std::pair<std::string, std::string>> IN_ORDER = {{"1", "A"}, {
 }  // namespace
 
 TEST_CASE("state: the PGN file of the user's gets the games in schedule order, appended, across a resume") {
-    const auto dir = freshDir("pgn-out");
-    const auto out = dir.parent_path() / "fcg-tour-pgn-out-all.pgn";
+    const ScratchDir dir("pgn-out");
+    const auto out = dir.path().parent_path() / "fcg-tour-pgn-out-all.pgn";
     {
         std::ofstream old(out, std::ios::binary | std::ios::trunc);
         old << "[Event \"older\"]\n[Round \"9\"]\n[White \"X\"]\n\n1. e4 *\n\n";
@@ -806,8 +803,8 @@ TEST_CASE("state: the PGN file of the user's gets the games in schedule order, a
 }
 
 TEST_CASE("state: the PGN file of the user's gets a game held there with the result set by hand meanwhile") {
-    const auto dir = freshDir("pgn-out-set");
-    const auto out = dir.parent_path() / "fcg-tour-pgn-out-set.pgn";
+    const ScratchDir dir("pgn-out-set");
+    const auto out = dir.path().parent_path() / "fcg-tour-pgn-out-set.pgn";
     fs::remove(out);
     auto spec    = matchSpec(4);
     spec.pgn_out = out.string();
@@ -840,8 +837,8 @@ TEST_CASE("state: the PGN file of the user's gets a game held there with the res
 }
 
 TEST_CASE("state: a write to the user's PGN file cut by a crash is completed with the results set by hand then") {
-    const auto dir = freshDir("pgn-out-set-cut");
-    const auto out = dir.parent_path() / "fcg-tour-pgn-out-set-cut.pgn";
+    const ScratchDir dir("pgn-out-set-cut");
+    const auto out = dir.path().parent_path() / "fcg-tour-pgn-out-set-cut.pgn";
     fs::remove(out);
     auto spec    = matchSpec(4);
     spec.pgn_out = out.string();
@@ -870,7 +867,7 @@ TEST_CASE("state: a write to the user's PGN file cut by a crash is completed wit
 }
 
 TEST_CASE("state: the PGN file of the user's gets what is left when the tournament ends, and waits out failures") {
-    const auto dir = freshDir("pgn-out-sprt");
+    const ScratchDir dir("pgn-out-sprt");
     const auto out = dir / "missing-folder.pgn";  // a folder for now: it cannot be written
     fs::create_directories(out);
 
@@ -909,7 +906,7 @@ TEST_CASE("state: the PGN file of the user's gets what is left when the tourname
 TEST_CASE("state: a write to the PGN file of the user's that fails partway is completed, not written again") {
     for (const std::size_t cut : {std::size_t{0}, std::size_t{30}}) {
         CAPTURE(cut);
-        const auto dir = freshDir("pgn-out-cut");
+        const ScratchDir dir("pgn-out-cut");
         const auto out = dir / "all.pgn";
         auto spec      = matchSpec(4);
         spec.pgn_out   = out.string();
@@ -944,10 +941,10 @@ TEST_CASE("state: a write to the PGN file of the user's that fails partway is co
 }
 
 TEST_CASE("state: a replayed game goes to the PGN file of the user's when it ends, without holding the others") {
-    const auto dir = freshDir("pgn-out-replay");
-    auto spec      = matchSpec(6);
-    spec.pgn_out   = (dir / "all.pgn").string();
-    auto state     = TournamentState::create(dir, spec);
+    const ScratchDir dir("pgn-out-replay");
+    auto spec    = matchSpec(6);
+    spec.pgn_out = (dir / "all.pgn").string();
+    auto state   = TournamentState::create(dir, spec);
 
     for (int i = 0; i < 2; ++i) {
         auto task = state->claimNext();
@@ -973,7 +970,7 @@ TEST_CASE("state: a replayed game goes to the PGN file of the user's when it end
 }
 
 TEST_CASE("state: a tournament does not let go of its folder while it records a game") {
-    const auto dir = freshDir("state-let-go-busy");
+    const ScratchDir dir("state-let-go-busy");
     const auto out = dir / "all.pgn";
     auto spec      = matchSpec(4);
     spec.pgn_out   = out.string();
@@ -1020,7 +1017,7 @@ TEST_CASE("state: a tournament does not let go of its folder while it records a 
 }
 
 TEST_CASE("state: the PGN file of the user's is written again after a write ended by an exception none expected") {
-    const auto dir = freshDir("pgn-out-unexpected");
+    const ScratchDir dir("pgn-out-unexpected");
     const auto out = dir / "all.pgn";
     auto spec      = matchSpec(4);
     spec.pgn_out   = out.string();
@@ -1053,9 +1050,9 @@ TEST_CASE("state: the PGN file of the user's is written again after a write ende
 }
 
 TEST_CASE("state: games recorded by many threads at once resume exactly, each game where the journal says") {
-    const auto dir = freshDir("concurrent");
-    auto spec      = matchSpec(100);
-    spec.pgn_out   = (dir / "all.pgn").string();
+    const ScratchDir dir("concurrent");
+    auto spec    = matchSpec(100);
+    spec.pgn_out = (dir / "all.pgn").string();
 
     std::vector<GameResult> before;
     {
@@ -1130,7 +1127,7 @@ std::size_t countGames(const fs::path& file) {
 }  // namespace
 
 TEST_CASE("state: game text whose journal line a crash lost, in the middle of the PGN files, is blanked") {
-    const auto dir = freshDir("state-pgn-gap");
+    const ScratchDir dir("state-pgn-gap");
     {
         auto state = TournamentState::create(dir, matchSpec(6));
         for (int i = 0; i < 3; ++i) {
@@ -1185,7 +1182,7 @@ TEST_CASE("state: game text whose journal line a crash lost, in the middle of th
 }
 
 TEST_CASE("state: games dropped by an edit while their text was written leave none in the PGN files") {
-    const auto dir      = freshDir("state-pgn-void");
+    const ScratchDir dir("state-pgn-void");
     std::size_t results = 0;
     {
         auto state = TournamentState::create(dir, matchSpec(200));
@@ -1241,8 +1238,8 @@ TEST_CASE("state: games dropped by an edit while their text was written leave no
 }
 
 TEST_CASE("state: a crash in the middle of a write to the PGN file of the user's writes no game twice, loses none") {
-    const auto dir          = freshDir("pgn-out-crash");
-    const auto out          = dir.parent_path() / "fcg-tour-pgn-out-crash.pgn";
+    const ScratchDir dir("pgn-out-crash");
+    const auto out          = dir.path().parent_path() / "fcg-tour-pgn-out-crash.pgn";
     const std::string older = "[Event \"older\"]\n[Round \"9\"]\n[White \"X\"]\n\n1. e4 *\n\n";
     {
         std::ofstream file(out, std::ios::binary | std::ios::trunc);
@@ -1336,8 +1333,9 @@ TEST_CASE("engine options: as a Windows engine reads them, ASCII and the spec un
                                             "C:\\\xC3\x89"
                                             "checs\\b.bin"},
                                            {"Hash", "16"}};
-    auto state                          = TournamentState::create(freshDir("engine-text"), spec);
-    const auto task                     = state->claimNext();
+    const ScratchDir dir("engine-text");
+    auto state      = TournamentState::create(dir, spec);
+    const auto task = state->claimNext();
     REQUIRE(task);
     const auto& mine = task->game == 0 ? task->white : task->black;
     CHECK(mine.options[1].second == "16");
@@ -1373,7 +1371,7 @@ TEST_CASE("PGN file names: the tournament's name, made fit for a file name on an
 }
 
 TEST_CASE("state: a new tournament writes its games to <name>.pgn, kept when it is renamed, and resumes") {
-    const auto dir  = freshDir("named-pgn");
+    const ScratchDir dir("named-pgn");
     const auto file = std::string("\xC3\x89lite \xC3\xA0 Z\xC3\xBCrich_ R1_2_");
     auto spec       = matchSpec(4);
     spec.name       = "\xC3\x89lite \xC3\xA0 Z\xC3\xBCrich: R1/2?";
@@ -1446,10 +1444,10 @@ void makeOld(const fs::path& dir) {
 }  // namespace
 
 TEST_CASE("state: a tournament of an earlier version keeps games.pgn; the game database reads both kinds") {
-    const auto old_dir = freshDir("old-pgn");
-    const auto new_dir = freshDir("new-pgn");
-    for (const auto& dir : {old_dir, new_dir}) {
-        auto state = TournamentState::create(dir, matchSpec(4));
+    const ScratchDir old_dir("old-pgn");
+    const ScratchDir new_dir("new-pgn");
+    for (const auto* dir : {&old_dir.path(), &new_dir.path()}) {
+        auto state = TournamentState::create(*dir, matchSpec(4));
         for (int i = 0; i < 2; ++i) {
             const auto task = state->claimNext();
             REQUIRE(task);

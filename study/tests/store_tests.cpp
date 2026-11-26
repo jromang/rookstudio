@@ -19,9 +19,11 @@
 #include <study/tree.hpp>
 
 #include "test_games.hpp"
+#include "test_support.hpp"
 
 using namespace fcg::study;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -38,12 +40,6 @@ std::vector<ImportedGame> fixtureGames() {
     REQUIRE(report.error.empty());
     REQUIRE(games.size() == 120);
     return games;
-}
-
-fs::path freshFolder(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    return dir;
 }
 
 // What a database must give back of a game: its moves, flags, text, clocks and evaluations, and its tags whatever
@@ -83,7 +79,7 @@ struct Crash {};  // a simulated crash: no std::exception, so nothing catches it
 
 TEST_CASE("store: games written, read back as they were imported, and again once the database is reopened") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-roundtrip.fcgdb");
+    const ScratchDir dir("store-roundtrip.fcgdb");
     {
         auto db = Database::create(dir);
         CHECK(db->snapshot()->games() == 0);
@@ -120,8 +116,8 @@ TEST_CASE("store: games written, read back as they were imported, and again once
 
 TEST_CASE("store: a reader's snapshot outlives the commits after it; names shared across segments") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-snapshots.fcgdb");
-    auto db          = Database::create(dir);
+    const ScratchDir dir("store-snapshots.fcgdb");
+    auto db = Database::create(dir);
     db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 60));
     const auto first = db->snapshot();
     db->append(std::vector<ImportedGame>(games.begin() + 60, games.end()));
@@ -163,8 +159,8 @@ TEST_CASE("store: a crash at any step of a commit leaves the database as it was,
     // The steps of one commit.
     std::vector<std::string> steps;
     {
-        const auto dir = freshFolder("store-steps.fcgdb");
-        auto db        = Database::create(dir);
+        const ScratchDir dir("store-steps.fcgdb");
+        auto db = Database::create(dir);
         setCommitFaultHook([&](std::string_view step) { steps.emplace_back(step); });
         db->append(added);
         setCommitFaultHook({});
@@ -174,7 +170,7 @@ TEST_CASE("store: a crash at any step of a commit leaves the database as it was,
 
     for (std::size_t k = 0; k < steps.size(); ++k) {
         CAPTURE(steps[k]);
-        const auto dir = freshFolder("store-crash.fcgdb");
+        const ScratchDir dir("store-crash.fcgdb");
         {
             auto db = Database::create(dir);
             db->append(before);
@@ -205,7 +201,7 @@ TEST_CASE("store: a crash at any step of a commit leaves the database as it was,
 
 TEST_CASE("store: what a killed program left is cleared when the database opens") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-killed.fcgdb");
+    const ScratchDir dir("store-killed.fcgdb");
     {
         auto db = Database::create(dir);
         db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 30));
@@ -220,14 +216,14 @@ TEST_CASE("store: what a killed program left is cleared when the database opens"
     CHECK_FALSE(fs::exists(dir / "seg-000009"));
     // Killed while it made a database: its lock and its first manifest are all there is, and a database can be made
     // there.
-    const auto unborn = freshFolder("store-unborn.fcgdb");
+    const ScratchDir unborn("store-unborn.fcgdb");
     fs::create_directories(unborn);
     std::ofstream(unborn / "tournament.lock") << "";
     std::ofstream(unborn / "manifest.json.tmp") << "{";
     CHECK_THROWS(Database::open(unborn));
     CHECK(Database::create(unborn)->snapshot()->games() == 0);
     CHECK_FALSE(fs::exists(unborn / "manifest.json.tmp"));
-    const auto taken = freshFolder("store-taken");
+    const ScratchDir taken("store-taken");
     fs::create_directories(taken);
     std::ofstream(taken / "notes.txt") << "mine";
     CHECK_THROWS(Database::create(taken));
@@ -239,8 +235,8 @@ TEST_CASE("store: what a killed program left is cleared when the database opens"
 
 TEST_CASE("store: a disk that refuses leaves the database as before; what is no database is refused") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-refused.fcgdb");
-    auto db          = Database::create(dir);
+    const ScratchDir dir("store-refused.fcgdb");
+    auto db = Database::create(dir);
     db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 10));
     setCommitFaultHook([](std::string_view step) {
         if (step == "write moves.bin") throw std::runtime_error("disk full");
@@ -252,8 +248,9 @@ TEST_CASE("store: a disk that refuses leaves the database as before; what is no 
     CHECK(db->snapshot()->games() == games.size());
     for (std::size_t i = 0; i < games.size(); ++i) sameGame(db->snapshot()->game(i), games[i]);
 
-    CHECK_THROWS(Database::open(freshFolder("store-nothing.fcgdb")));
-    const auto broken = freshFolder("store-broken.fcgdb");
+    const ScratchDir nothing("store-nothing.fcgdb");
+    CHECK_THROWS(Database::open(nothing));
+    const ScratchDir broken("store-broken.fcgdb");
     fs::create_directories(broken);
     std::ofstream(broken / "manifest.json") << "{ not json";
     CHECK_THROWS(Database::open(broken));
@@ -271,7 +268,8 @@ TEST_CASE("store: the line of each damaged game an import read, found again by t
                                           << "[Event \"Illegal\"]\n[Round \"2\"]\n\n1. e4 e5 2. Ke3 *\n\n"
                                           << "[Event \"Fine again\"]\n\n1. d4 d5 0-1\n\n"
                                           << "[Event \"Cut\"]\n\n1. c4 e5 2. Nc";
-    auto db = Database::create(freshFolder("store-damaged-lines.fcgdb"));
+    const ScratchDir dir("store-damaged-lines.fcgdb");
+    auto db = Database::create(dir);
     std::atomic<bool> go_on{false};
     ImportProgress progress;
     const auto got = importInto(*db, file, ImportOptions{2, 4096}, progress, go_on);
@@ -290,7 +288,8 @@ TEST_CASE("store: the damaged games an import adds are those of its games added,
     std::ofstream(file, std::ios::binary) << "[Event \"Illegal\"]\n\n1. e4 e5 2. Ke3 *\n\n"
                                           << "[Event \"Illegal\"]\n\n1. e4 e5 2. Ke3 *\n\n"
                                           << "[Event \"Fine\"]\n\n1. e4 e5 1-0\n\n";
-    auto db = Database::create(freshFolder("store-damaged-twice.fcgdb"));
+    const ScratchDir dir("store-damaged-twice.fcgdb");
+    auto db = Database::create(dir);
     std::atomic<bool> go_on{false};
     ImportProgress progress;
     auto got = importInto(*db, file, ImportOptions{2, 4096}, progress, go_on);
@@ -308,8 +307,8 @@ TEST_CASE("store: the damaged games an import adds are those of its games added,
 
 TEST_CASE("store: a file imported into a database, committed as it goes; cancelled or refused, it keeps what it had") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-import.fcgdb");
-    auto db          = Database::create(dir);
+    const ScratchDir dir("store-import.fcgdb");
+    auto db = Database::create(dir);
     std::atomic<bool> go_on{false};
     ImportProgress progress;
     auto got = importInto(*db, data("games.pgn"), ImportOptions{2, 4096}, progress, go_on, false, 50);
@@ -326,7 +325,8 @@ TEST_CASE("store: a file imported into a database, committed as it goes; cancell
     CHECK(got.duplicates == 120);
 
     // Cancelled at once: what was read is committed, and the next import adds the rest, in the file's order.
-    auto other = Database::create(freshFolder("store-import-cancelled.fcgdb"));
+    const ScratchDir other_dir("store-import-cancelled.fcgdb");
+    auto other = Database::create(other_dir);
     std::atomic<bool> stop{true};
     ImportProgress first;
     got = importInto(*other, data("games.pgn"), ImportOptions{2, 4096}, first, stop, false, 50);
@@ -338,7 +338,8 @@ TEST_CASE("store: a file imported into a database, committed as it goes; cancell
     for (std::size_t i = 0; i < games.size(); ++i) sameGame(other->snapshot()->game(i), games[i]);
 
     // The disk refuses the second commit: said, and the first kept.
-    auto refused  = Database::create(freshFolder("store-import-refused.fcgdb"));
+    const ScratchDir refused_dir("store-import-refused.fcgdb");
+    auto refused  = Database::create(refused_dir);
     int committed = 0;
     setCommitFaultHook([&](std::string_view step) {
         if (step == "manifest written") ++committed;
@@ -356,8 +357,8 @@ TEST_CASE("store: a file imported into a database, committed as it goes; cancell
 
 TEST_CASE("store: a database another program writes, read as it commits, nothing written") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-read-only.fcgdb");
-    auto writer      = Database::create(dir);
+    const ScratchDir dir("store-read-only.fcgdb");
+    auto writer = Database::create(dir);
     writer->append(std::vector<ImportedGame>(games.begin(), games.begin() + 30));
     CHECK_FALSE(writer->readOnly());
     CHECK_FALSE(writer->refresh());  // the writer's snapshot is always current
@@ -393,13 +394,14 @@ TEST_CASE("store: a database another program writes, read as it commits, nothing
     const std::vector<GameId> one{0};
     CHECK_THROWS_AS(reader->setDeleted(one, true), std::runtime_error);
     CHECK(writer->snapshot()->games() == 70);
-    CHECK_THROWS(Database::openReadOnly(freshFolder("store-read-only-none")));
+    const ScratchDir none("store-read-only-none");
+    CHECK_THROWS(Database::openReadOnly(none));
 }
 
 TEST_CASE("store: a snapshot comes at once while a change commits, with the games before it (#99)") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-commit-readers.fcgdb");
-    auto db          = Database::create(dir);
+    const ScratchDir dir("store-commit-readers.fcgdb");
+    auto db = Database::create(dir);
     db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 60));
 
     // Each change held in its commit, its segment written and synced, its manifest not yet: the window's snapshots,
@@ -479,8 +481,8 @@ TEST_CASE("store: a snapshot comes at once while a change commits, with the game
 
 TEST_CASE("store: a database emptied in one commit, a snapshot taken before reading its games until let go (#100)") {
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-clear.fcgdb");
-    auto db          = Database::create(dir);
+    const ScratchDir dir("store-clear.fcgdb");
+    auto db = Database::create(dir);
     db->append(std::vector<ImportedGame>(games.begin(), games.begin() + 60));
     db->setDeleted(std::vector<GameId>{4}, true);
     Player player;
@@ -567,7 +569,7 @@ TEST_CASE("store: the files a database writes are the same bytes as before the f
         {"seg-000003/names.bin", {0, 0xcbf29ce484222325}},      {"seg-000003/sig.bin", {24, 0x21d8b0c2144168cb}},
     };
     const auto games = fixtureGames();
-    const auto dir   = freshFolder("store-format.fcgdb");
+    const ScratchDir dir("store-format.fcgdb");
     {
         auto db = Database::create(dir);
         db->append(games, true, "/x/games.pgn");

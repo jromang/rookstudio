@@ -15,18 +15,14 @@
 #include <tour/submission.hpp>
 #include <tour/summary.hpp>
 
+#include "test_support.hpp"
 #include "tour_fixtures.hpp"
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-edit-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
 
 using fcg::test::engineNamed;
 using fcg::test::fakeGame;
@@ -45,8 +41,8 @@ std::multiset<std::pair<int, int>> pairings(const TournamentState& state) {
 }  // namespace
 
 TEST_CASE("edit: a participant added with catch-up meets everyone in every cycle, nothing played moves") {
-    const auto dir = freshDir("add");
-    auto state     = TournamentState::create(dir, roundRobin(3, 2));
+    const ScratchDir dir("add");
+    auto state = TournamentState::create(dir, roundRobin(3, 2));
     CHECK(state->totalGames() == 12u);
 
     play(*state, 5);  // the first encounters of cycle 1
@@ -113,7 +109,8 @@ TEST_CASE("edit: a participant added with catch-up meets everyone in every cycle
 }
 
 TEST_CASE("edit: without catch-up, the newcomer only plays the cycles not started") {
-    auto state = TournamentState::create(freshDir("add-late"), roundRobin(3, 3));
+    const ScratchDir dir("add-late");
+    auto state = TournamentState::create(dir, roundRobin(3, 3));
     play(*state, 2);
 
     Edit add;
@@ -125,7 +122,8 @@ TEST_CASE("edit: without catch-up, the newcomer only plays the cycles not starte
 }
 
 TEST_CASE("edit: a replaced participant's games are played again by its successor") {
-    auto state = TournamentState::create(freshDir("replace"), roundRobin(3, 1));
+    const ScratchDir dir("replace");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, -1);
     CHECK(state->finished());
 
@@ -156,7 +154,8 @@ TEST_CASE("edit: a replaced participant's games are played again by its successo
 }
 
 TEST_CASE("edit: a game of a replaced participant still being played is not recorded; its successor plays it") {
-    auto state      = TournamentState::create(freshDir("replace-running"), roundRobin(3, 1));
+    const ScratchDir dir("replace-running");
+    auto state      = TournamentState::create(dir, roundRobin(3, 1));
     const auto task = state->claimNext();
     REQUIRE(task);
     const int old_id = task->encounter.first;
@@ -185,7 +184,8 @@ TEST_CASE("state: the engines left are those with a game to play, of active part
     auto spec   = roundRobin(4, 1);
     spec.format = Format::Gauntlet;
     spec.seeds  = 1;
-    auto state  = TournamentState::create(freshDir("engines-left"), spec);
+    const ScratchDir dir("engines-left");
+    auto state = TournamentState::create(dir, spec);
     CHECK(state->enginesLeft() == std::set<std::string>{"A", "B", "C", "D"});
 
     // The first opponent's two games: it has none left.
@@ -219,7 +219,8 @@ TEST_CASE("state: the engines left are those with a game to play, of active part
 }
 
 TEST_CASE("edit: a game of a withdrawn participant still being played is not recorded") {
-    auto state      = TournamentState::create(freshDir("withdraw-running"), roundRobin(4, 1));
+    const ScratchDir dir("withdraw-running");
+    auto state      = TournamentState::create(dir, roundRobin(4, 1));
     const auto task = state->claimNext();
     REQUIRE(task);
 
@@ -233,7 +234,7 @@ TEST_CASE("edit: a game of a withdrawn participant still being played is not rec
 }
 
 TEST_CASE("edit: withdrawing a participant whose game was the last running finishes the tournament") {
-    const auto dir = freshDir("withdraw-last");
+    const ScratchDir dir("withdraw-last");
     {
         auto state = TournamentState::create(dir, roundRobin(3, 1));
         CHECK(play(*state, 5) == 5);
@@ -255,7 +256,8 @@ TEST_CASE("edit: withdrawing a participant whose game was the last running finis
 }
 
 TEST_CASE("edit: withdrawing the participant of the last games left, none running, finishes the tournament") {
-    auto state = TournamentState::create(freshDir("withdraw-idle"), roundRobin(3, 1));
+    const ScratchDir dir("withdraw-idle");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     CHECK(play(*state, 4) == 4);
     // The last encounter has not started: its participants' games are no longer to play.
     const auto rows = state->scheduleRows();
@@ -271,7 +273,8 @@ TEST_CASE("edit: the preview of a Swiss counts the rounds still to pair") {
     auto spec   = roundRobin(8, 1);
     spec.format = Format::Swiss;
     spec.rounds = 7;
-    auto state  = TournamentState::create(freshDir("swiss-preview"), spec);
+    const ScratchDir dir("swiss-preview");
+    auto state = TournamentState::create(dir, spec);
     play(*state, 2);  // the first encounter of round 1
 
     Edit replay;
@@ -284,7 +287,8 @@ TEST_CASE("edit: the preview of a Swiss counts the rounds still to pair") {
 }
 
 TEST_CASE("edit: a withdrawn participant plays no more; its games can stop counting") {
-    auto state = TournamentState::create(freshDir("withdraw"), roundRobin(4, 1));
+    const ScratchDir dir("withdraw");
+    auto state = TournamentState::create(dir, roundRobin(4, 1));
     play(*state, 3);  // encounter 0 complete, encounter 1 half played
 
     Edit withdraw;
@@ -311,7 +315,8 @@ TEST_CASE("edit: a withdrawn participant plays no more; its games can stop count
 }
 
 TEST_CASE("edit: cycles added to a finished tournament, cycles removed before they start") {
-    auto state = TournamentState::create(freshDir("cycles"), roundRobin(3, 1));
+    const ScratchDir dir("cycles");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, -1);
     CHECK(state->finished());
 
@@ -335,7 +340,8 @@ TEST_CASE("edit: cycles added to a finished tournament, cycles removed before th
 }
 
 TEST_CASE("edit: voided games are played again, or dropped") {
-    auto state = TournamentState::create(freshDir("void"), roundRobin(3, 1));
+    const ScratchDir dir("void");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, -1);
 
     Edit replay;
@@ -369,7 +375,8 @@ TEST_CASE("edit: a match only accepts voided games") {
     TournamentSpec spec;
     spec.format       = Format::Match;
     spec.participants = {{0, engineNamed("A")}, {1, engineNamed("B")}};
-    auto state        = TournamentState::create(freshDir("match"), spec);
+    const ScratchDir dir("match");
+    auto state = TournamentState::create(dir, spec);
 
     Edit add;
     add.kind   = Edit::Kind::AddParticipant;
@@ -379,8 +386,8 @@ TEST_CASE("edit: a match only accepts voided games") {
 }
 
 TEST_CASE("edit: the last change is undone until the next game starts, and stays undone after a reopen") {
-    const auto dir = freshDir("undo");
-    auto state     = TournamentState::create(dir, roundRobin(4, 1));
+    const ScratchDir dir("undo");
+    auto state = TournamentState::create(dir, roundRobin(4, 1));
     play(*state, 3);
     const auto total = state->totalGames();
 
@@ -426,8 +433,8 @@ TEST_CASE("edit: the last change is undone until the next game starts, and stays
 }
 
 TEST_CASE("edit: undoing cycles added to a finished tournament finishes it again") {
-    const auto dir = freshDir("undo-reopen");
-    auto state     = TournamentState::create(dir, roundRobin(3, 1));
+    const ScratchDir dir("undo-reopen");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, -1);
     REQUIRE(state->finished());
 
@@ -451,7 +458,8 @@ TEST_CASE("edit: undoing cycles added to a finished tournament finishes it again
 }
 
 TEST_CASE("edit: other threads read the spec from a snapshot that edits, and undoing them, leave as it was") {
-    auto state        = TournamentState::create(freshDir("snapshot"), roundRobin(4, 1));
+    const ScratchDir dir("snapshot");
+    auto state        = TournamentState::create(dir, roundRobin(4, 1));
     const auto before = state->specSnapshot();
     CHECK(state->specSnapshot() == before);  // shared until the next change
     Edit add;
@@ -491,8 +499,8 @@ TEST_CASE("edit: other threads read the spec from a snapshot that edits, and und
 }
 
 TEST_CASE("programs: rebuilt, missing and new programs are noticed when the tournament is opened again") {
-    const auto dir  = freshDir("programs");
-    const auto bins = dir.parent_path() / "fcg-tour-edit-programs-bin";
+    const ScratchDir dir("programs");
+    const auto bins = dir.path().parent_path() / "fcg-tour-edit-programs-bin";
     fs::remove_all(bins);
     fs::create_directories(bins);
     auto write = [&](const std::string& name, const std::string& contents) {
@@ -554,8 +562,8 @@ double pointsOf(const Table& table, int id) {
 }  // namespace
 
 TEST_CASE("edit: a result set by hand counts everywhere, the PGN file keeping the game as played") {
-    const auto dir = freshDir("set-result");
-    auto state     = TournamentState::create(dir, roundRobin(3, 1));
+    const ScratchDir dir("set-result");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, -1);  // every game a White win
     REQUIRE(state->finished());
     const auto game = resultOf(state->results(), 0);  // encounter 0, game 0
@@ -615,8 +623,8 @@ TEST_CASE("edit: a result set by hand counts everywhere, the PGN file keeping th
 }
 
 TEST_CASE("edit: a result set by hand is undone, also after games were played; the played result takes it back") {
-    const auto dir = freshDir("set-result-undo");
-    auto state     = TournamentState::create(dir, roundRobin(4, 1));
+    const ScratchDir dir("set-result-undo");
+    auto state = TournamentState::create(dir, roundRobin(4, 1));
     play(*state, 3);
 
     state->applyEdit(setResult(1, 0, "0-1"));
@@ -649,7 +657,8 @@ TEST_CASE("edit: a result set by hand is undone, also after games were played; t
 }
 
 TEST_CASE("edit: a result is set on a game that counts, to another result") {
-    auto state = TournamentState::create(freshDir("set-result-errors"), roundRobin(3, 1));
+    const ScratchDir dir("set-result-errors");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, 2);
     CHECK_FALSE(state->preview(setResult(0, 0, "1-0")).error.empty());  // already its result
     CHECK_FALSE(state->preview(setResult(0, 0, "2-0")).error.empty());  // no result
@@ -667,7 +676,8 @@ TEST_CASE("edit: a result is set on a game that counts, to another result") {
     spec.format       = Format::Match;
     spec.max_games    = 4;
     spec.participants = {{0, engineNamed("A")}, {1, engineNamed("B")}};
-    auto match        = TournamentState::create(freshDir("set-result-match"), spec);
+    const ScratchDir match_dir("set-result-match");
+    auto match = TournamentState::create(match_dir, spec);
     play(*match, 2);
     CHECK(match->preview(setResult(0, 1, "0-1")).error.empty());
     match->applyEdit(setResult(0, 1, "0-1"));
@@ -679,6 +689,7 @@ namespace {
 // A knockout of four, its first round played but for its last game, claimed: P0 beat P3 twice; P1 and P2 drew game 2
 // (encounter 1, game 0), and P2, White in the last one, goes to the final by winning it.
 struct KnockoutRound {
+    std::unique_ptr<ScratchDir> dir;  // first, to go after the state
     std::unique_ptr<TournamentState> state;
     GameTask last;
 };
@@ -688,7 +699,9 @@ KnockoutRound knockoutRound(const std::string& name) {
     spec.format = Format::Knockout;
     spec.cycles = 1;
     for (int i = 0; i < 4; ++i) spec.participants.push_back({i, engineNamed("P" + std::to_string(i))});
-    KnockoutRound out{TournamentState::create(freshDir(name), spec), {}};
+    KnockoutRound out;
+    out.dir   = std::make_unique<ScratchDir>(name);
+    out.state = TournamentState::create(*out.dir, spec);
     for (const auto* result : {"1-0", "0-1", "1/2-1/2"}) {
         const auto task = out.state->claimNext();
         REQUIRE(task);
@@ -774,8 +787,8 @@ TEST_CASE("edit: in a knockout, a result set as the round's last game ends on an
 }
 
 TEST_CASE("edit: the export for a rating list gives the result set by hand") {
-    const auto dir = freshDir("set-result-export");
-    auto state     = TournamentState::create(dir, roundRobin(3, 1));
+    const ScratchDir dir("set-result-export");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, -1);
     state->applyEdit(setResult(0, 1, "1/2-1/2", "shuffling"));
 
@@ -797,8 +810,8 @@ TEST_CASE("edit: the export for a rating list gives the result set by hand") {
 }
 
 TEST_CASE("edit: games lost to an engine's broken connection voided and played again, not as the user's edit") {
-    const auto dir = freshDir("network");
-    auto state     = TournamentState::create(dir, roundRobin(3, 1));
+    const ScratchDir dir("network");
+    auto state = TournamentState::create(dir, roundRobin(3, 1));
     play(*state, 2);
     // The user's last edit, which the voids must not take the place of.
     Edit cycles;

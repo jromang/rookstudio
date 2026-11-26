@@ -15,10 +15,12 @@
 
 #include "lichess_studies.hpp"
 #include "repertoires.hpp"
+#include "test_support.hpp"
 #include "theory_shelf.hpp"
 
 namespace fs = std::filesystem;
 using namespace fcg;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -38,13 +40,6 @@ void write(const fs::path& file, const std::string& text) {
     std::ofstream(file, std::ios::binary) << text;
 }
 
-fs::path fresh(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
-
 constexpr const char* NOTES = R"([Event "My Najdorf"]
 
 1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bg5 e6 7. f4 {The main position.} 7... Qb6 $1 {The Poisoned
@@ -61,7 +56,7 @@ constexpr const char* PLANS = R"([Event "Plans"]
 }  // namespace
 
 TEST_CASE("theory: a PGN read where it is, its notes at a position, a transposition said as such") {
-    const auto dir     = fresh("theory-read");
+    const ScratchDir dir("theory-read");
     const auto profile = dir / "profile";
     write(dir / "najdorf.pgn", NOTES);
     write(dir / "plans.pgn", PLANS);
@@ -119,7 +114,7 @@ TEST_CASE("theory: a PGN read where it is, its notes at a position, a transposit
 }
 
 TEST_CASE("theory: a file changed on the disk is read again by itself; RookStudio never writes into it") {
-    const auto dir  = fresh("theory-changed");
+    const ScratchDir dir("theory-changed");
     const auto file = dir / "lines.pgn";
     write(file, NOTES);
     TheoryShelf shelf(dir / "profile");
@@ -164,7 +159,7 @@ TEST_CASE("theory: a file changed on the disk is read again by itself; RookStudi
 }
 
 TEST_CASE("theory: a study removed from the theory, its file left where it is; put back; what the profile keeps") {
-    const auto dir     = fresh("theory-removed");
+    const ScratchDir dir("theory-removed");
     const auto profile = dir / "profile";
     write(dir / "najdorf.pgn", NOTES);
     write(dir / "plans.pgn", PLANS);
@@ -208,7 +203,7 @@ TEST_CASE("theory: a study removed from the theory, its file left where it is; p
 }
 
 TEST_CASE("theory: the repertoires' comments show the same way, under their names") {
-    const auto dir     = fresh("theory-repertoires");
+    const ScratchDir dir("theory-repertoires");
     const auto profile = dir / "profile";
     write(profile / "repertoires" / "Najdorf.pgn",
           "[Event \"Repertoire\"]\n[RepertoireSide \"Black\"]\n\n1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 "
@@ -255,7 +250,7 @@ TEST_CASE("theory: the repertoires' comments show the same way, under their name
 }
 
 TEST_CASE("theory: a Lichess study's PGN as the profile keeps it, read again with the study") {
-    const auto dir     = fresh("theory-lichess");
+    const ScratchDir dir("theory-lichess");
     const auto profile = dir / "profile";
     const auto cache   = lichess::studyCache(profile, "abcd1234");
     // As Lichess exports a study, a chapter a game.

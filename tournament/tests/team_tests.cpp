@@ -11,18 +11,14 @@
 #include <tour/submission.hpp>
 #include <tour/teams.hpp>
 
+#include "test_support.hpp"
 #include "tour_fixtures.hpp"
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-team-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
 
 // Team A: the first `a` participants (A1, A2...), team B: the next `b` (B1...); ids are not indexes.
 TournamentSpec teamSpec(int a, int b, bool boards, int cycles = 1) {
@@ -256,7 +252,7 @@ TEST_CASE("team standings: points, score, the Elo of the team's score, the cross
 }
 
 TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the standings from the results") {
-    const auto dir  = freshDir("resume");
+    const ScratchDir dir("resume");
     auto spec       = teamSpec(2, 2, false, 2);
     spec.team_names = {"Old", "New"};
 
@@ -316,7 +312,8 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
 
 TEST_CASE("team match edits: a replacement takes the team and the board, a newcomer the team it is given") {
     SUBCASE("board by board") {
-        auto state = TournamentState::create(freshDir("edit-boards"), teamSpec(2, 2, true, 2));
+        const ScratchDir dir("edit-boards");
+        auto state = TournamentState::create(dir, teamSpec(2, 2, true, 2));
         // Board 1's first game played, then B2 (23) replaced.
         auto first = state->claimNext();
         REQUIRE(first);
@@ -362,7 +359,8 @@ TEST_CASE("team match edits: a replacement takes the team and the board, a newco
         CHECK(rows[3].encounter.first == 21);  // and A2 in even ones
     }
     SUBCASE("every engine against every engine of the other team") {
-        auto state = TournamentState::create(freshDir("edit-all"), teamSpec(2, 2, false, 1));
+        const ScratchDir dir("edit-all");
+        auto state = TournamentState::create(dir, teamSpec(2, 2, false, 1));
         Edit add;
         add.kind        = Edit::Kind::AddParticipant;
         add.engine.name = "A3";

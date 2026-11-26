@@ -17,10 +17,12 @@
 #include "board_text.hpp"
 #include "mock_engines.hpp"
 #include "run.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -83,18 +85,10 @@ std::string anyMove(const BoardMatch::State& state, const std::string& fen) {
     return moves.empty() ? std::string() : chess::uci::moveToUci(moves[0]);
 }
 
-fs::path freshDir(const char* name) {
-    const auto dir =
-        fs::temp_directory_path() /
-        (std::string(name) + "-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-    fs::create_directories(dir);
-    return dir;
-}
-
 }  // namespace
 
 TEST_CASE("board game: a pair of games with the colours reversed, every move legal, both in the PGN file") {
-    const auto dir = freshDir("fcg-board-game");
+    const ScratchDir dir("fcg-board-game");
     const auto pgn = dir / "games.pgn";
 
     BoardMatch match;
@@ -148,7 +142,7 @@ TEST_CASE("board game: a pair of games with the colours reversed, every move leg
 }
 
 TEST_CASE("board game: an engine that thinks past its clock loses on time; a stop ends the game without a result") {
-    const auto dir = freshDir("fcg-board-game-time");
+    const ScratchDir dir("fcg-board-game-time");
     BoardMatchSetup setup;
     setup.first        = "Slow";
     setup.second       = "Bravo";
@@ -200,7 +194,7 @@ TEST_CASE("board game: an engine that thinks past its clock loses on time; a sto
 }
 
 TEST_CASE("board game: the user against an engine, their moves at their turn only, the engine's scores kept back") {
-    const auto dir = freshDir("fcg-board-game-human");
+    const ScratchDir dir("fcg-board-game-human");
     BoardMatchSetup setup;
     setup.first        = "You";
     setup.second       = "Bravo";
@@ -271,7 +265,7 @@ TEST_CASE("board game: the user against an engine, their moves at their turn onl
 }
 
 TEST_CASE("board game: against the engine of the Play page, its openings first, moves taken back, a draw declined") {
-    const auto dir = freshDir("fcg-board-game-play");
+    const ScratchDir dir("fcg-board-game-play");
     BoardMatchSetup setup;
     setup.first        = "You";
     setup.second       = "Bravo";
@@ -366,7 +360,7 @@ TEST_CASE("board game: against the engine of the Play page, its openings first, 
 }
 
 TEST_CASE("board game: a game resumed where it was left; a draw taken once 20 moves are played") {
-    const auto dir = freshDir("fcg-board-game-resume");
+    const ScratchDir dir("fcg-board-game-resume");
     // 40 plies played at random from the start, none ending the game.
     ReplayGame so_far;
     so_far.start_fen = std::string(chess::constants::STARTPOS);

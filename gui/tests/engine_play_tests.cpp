@@ -11,19 +11,13 @@
 
 #include "engine_play.hpp"
 #include "i18n.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const char* name) {
-    const auto dir =
-        fs::temp_directory_path() /
-        (std::string(name) + "-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-    fs::create_directories(dir);
-    return dir;
-}
 
 EngineEntry withOptions(std::vector<UciOptionInfo> options) {
     EngineEntry e;
@@ -189,7 +183,7 @@ TEST_CASE("play: the openings picked, at random or the most played, then the eng
 
 TEST_CASE("play: the games played, their tally, where they ended") {
     i18n::setLanguage(i18n::Language::English);
-    const auto dir = freshDir("fcg-play-games");
+    const ScratchDir dir("fcg-play-games");
     CHECK(readPlayedGames(dir).empty());
     const auto game = [](const char* engine, const char* strength, bool white, const char* result, bool aids = false) {
         PlayedGame g;
@@ -240,7 +234,7 @@ TEST_CASE("play: the games played, their tally, where they ended") {
 }
 
 TEST_CASE("play: a game kept, read back, and its moves played again") {
-    const auto dir = freshDir("fcg-play-kept");
+    const ScratchDir dir("fcg-play-kept");
     CHECK_FALSE(readKeptGame(dir));
     KeptGame k;
     k.settings.engine   = "Gaia";
@@ -303,7 +297,7 @@ TEST_CASE("play: a game kept, read back, and its moves played again") {
 }
 
 TEST_CASE("play: the Play page's choice kept") {
-    const auto dir  = freshDir("fcg-play-settings");
+    const ScratchDir dir("fcg-play-settings");
     const auto none = readPlaySettings(dir);
     CHECK(none.engine.empty());
     CHECK(none.takebacks);

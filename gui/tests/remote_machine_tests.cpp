@@ -30,10 +30,12 @@
 #include "ssh_server.hpp"
 #include "ssh_tunnel.hpp"
 #include "ssh_wire.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -137,15 +139,6 @@ IAAAAgRuafaTCT3X0bc+hPkgTuU4a4dw0bvPLmKhlcDGpk6tsAAAAKdGVzdC1lY2RzYQEC
 AwQFBg==
 -----END OPENSSH PRIVATE KEY-----
 )";
-
-// A folder of its own for a test, empty.
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-machines-" + name);
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-    fs::create_directories(dir);
-    return dir;
-}
 
 void writeFile(const fs::path& path, const std::string& content) {
     fs::create_directories(path.parent_path());
@@ -380,7 +373,7 @@ TEST_CASE("Machines: SFTP's paths, a remote path's folder and name") {
 // The machines' file, budgets, what to install
 
 TEST_CASE("Machines: kept in machines.json without secrets, read back as written") {
-    const auto dir = freshDir("file");
+    const ScratchDir dir("file");
     Machine m;
     m.id         = "m00000001";
     m.name       = "test-box";
@@ -441,7 +434,7 @@ TEST_CASE("Machines: kept in machines.json without secrets, read back as written
 }
 
 TEST_CASE("Machines: the program installed is this one for the same system, the one chosen for another") {
-    const auto dir  = freshDir("install-choice");
+    const ScratchDir dir("install-choice");
     const auto self = dir / "rookstudio";
     Machine m;
     std::string error;
@@ -499,7 +492,7 @@ TEST_CASE("Machines: the Syzygy files offered, 6 pieces at most, each name once"
     CHECK(syzygyPieces("readme.rtbw") == 0);
     CHECK(syzygyPieces("KvK.rtbw") == 0);
 
-    const auto a = freshDir("syzygy-a"), b = freshDir("syzygy-b");
+    const ScratchDir a("syzygy-a"), b("syzygy-b");
     writeFile(a / "KQvK.rtbw", std::string(80, 'x'));
     writeFile(a / "KQvK.rtbz", std::string(144, 'x'));
     writeFile(a / "KQRvKRP.rtbw", std::string(208, 'x'));
@@ -528,7 +521,7 @@ TEST_CASE("Machines: the Syzygy files offered, 6 pieces at most, each name once"
 }
 
 TEST_CASE("Machines: SHA-256 of a file, as FIPS 180-2 gives it") {
-    const auto dir = freshDir("sha");
+    const ScratchDir dir("sha");
     writeFile(dir / "abc", "abc");
     CHECK(sha256File(dir / "abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     CHECK(sha256File(dir / "missing").empty());
@@ -594,7 +587,7 @@ TEST_CASE("Ed25519: RFC 8032's signatures, and public keys from their seeds") {
 }
 
 TEST_CASE("Machines: key files looked at before connecting, their passphrase told") {
-    const auto dir = freshDir("keyfiles");
+    const ScratchDir dir("keyfiles");
     writeFile(dir / "ed", ED25519_KEY);
     writeFile(dir / "pem", RSA_PEM_KEY);
     writeFile(dir / "ecdsa", ECDSA_KEY);
@@ -696,7 +689,7 @@ TEST_CASE("libssh2 backend: an RSA key file signs, the signature checked with it
 // The client against the in-process server
 
 TEST_CASE("SSH client: logs in with an Ed25519 or RSA key file, a passphrase missing or wrong told as such") {
-    const auto dir = freshDir("login");
+    const ScratchDir dir("login");
     writeFile(dir / "ed", ED25519_KEY);
     writeFile(dir / "rsa", RSA_KEY);
     writeFile(dir / "pem", RSA_PEM_KEY);
@@ -746,7 +739,7 @@ TEST_CASE("SSH client: logs in with an Ed25519 or RSA key file, a passphrase mis
 }
 
 TEST_CASE("SSH client: a host key that changed refused, the new one offered to the user") {
-    const auto dir = freshDir("hostkey");
+    const ScratchDir dir("hostkey");
     ssh::MockServer::Options options;
     options.root = dir;
     ssh::MockServer server(machinePort(), options);
@@ -766,7 +759,7 @@ TEST_CASE("SSH client: a host key that changed refused, the new one offered to t
 }
 
 TEST_CASE("SSH client: commands with their output, error output and exit code; a program talked to") {
-    const auto dir = freshDir("exec");
+    const ScratchDir dir("exec");
     ssh::MockServer::Options options;
     options.root = dir;
     options.exec = [](const std::string& command) {
@@ -823,7 +816,7 @@ TEST_CASE("SSH client: commands with their output, error output and exit code; a
 }
 
 TEST_CASE("SSH client: SFTP folders, files, renames over a file, a copy each way") {
-    const auto dir  = freshDir("sftp");
+    const ScratchDir dir("sftp");
     const auto root = dir / "home";
     fs::create_directories(root);
     ssh::MockServer::Options options;
@@ -876,7 +869,7 @@ TEST_CASE("SSH client: SFTP folders, files, renames over a file, a copy each way
 }
 
 TEST_CASE("SSH client: a copy cut by the network resumes where it stopped") {
-    const auto dir  = freshDir("resume");
+    const ScratchDir dir("resume");
     const auto root = dir / "home";
     fs::create_directories(root);
     std::string content;
@@ -915,7 +908,7 @@ TEST_CASE("SSH client: a copy cut by the network resumes where it stopped") {
 // The jobs
 
 TEST_CASE("Machine jobs: the test finds the system, Install copies the program and checks it answers") {
-    const auto dir  = freshDir("jobs-test");
+    const ScratchDir dir("jobs-test");
     const auto root = dir / "home";
     fs::create_directories(root);
     ssh::MockServer::Options options;
@@ -964,7 +957,7 @@ TEST_CASE("Machine jobs: the test finds the system, Install copies the program a
 }
 
 TEST_CASE("Machine jobs: a Windows machine's cmd told, its probe and engines' commands written for cmd") {
-    const auto dir = freshDir("jobs-windows");
+    const ScratchDir dir("jobs-windows");
     ssh::MockServer::Options options;
     options.root = dir;
     options.exec = [](const std::string& command) {
@@ -1004,7 +997,7 @@ TEST_CASE("Machine jobs: a Windows machine's cmd told, its probe and engines' co
 }
 
 TEST_CASE("Machine jobs: engines' paths checked there: missing, a folder, mute, answering uci") {
-    const auto dir  = freshDir("jobs-engines");
+    const ScratchDir dir("jobs-engines");
     const auto root = dir / "home";
     fs::create_directories(root / "engines/folder");
     writeFile(root / "engines/mock", "binary");
@@ -1050,7 +1043,7 @@ TEST_CASE("Machine jobs: engines' paths checked there: missing, a folder, mute, 
 }
 
 TEST_CASE("Machine jobs: books and tablebases compared, the missing ones pushed, then found the same") {
-    const auto dir  = freshDir("jobs-files");
+    const ScratchDir dir("jobs-files");
     const auto root = dir / "home";
     fs::create_directories(root);
     const auto here = dir / "here";
@@ -1156,7 +1149,7 @@ Machine linuxMachine() {
 }  // namespace
 
 TEST_CASE("Machine runs: the tournament as the machine plays it, its engines, books and tablebases there") {
-    const auto dir = freshDir("spec");
+    const ScratchDir dir("spec");
     tour::TournamentSpec spec;
     spec.name = "Gauntlet";
     spec.participants.push_back(participant(1, "Alpha 1.0", "/home/me/engines/alpha"));
@@ -1172,7 +1165,7 @@ TEST_CASE("Machine runs: the tournament as the machine plays it, its engines, bo
     m.engines        = {{"Alpha 1.0", "/opt/alpha", -1, "", ""}};
     const auto there = remoteTournamentDir(m, dir);
     CHECK(machineFolder(m) == "/home/tester/fcg");
-    CHECK(there == "/home/tester/fcg/tournaments/" + dir.filename().string());
+    CHECK(there == "/home/tester/fcg/tournaments/" + dir.path().filename().string());
 
     // Beta has no path there: named. Its library engine, by its program, has one: found.
     tour::TournamentSpec out;
@@ -1229,7 +1222,7 @@ TEST_CASE("Machine runs: the commands that start a tournament there and reach it
 }
 
 TEST_CASE("Machine runs: where a tournament plays, kept in its folder here") {
-    const auto dir = freshDir("place");
+    const ScratchDir dir("place");
     CHECK_FALSE(readMachinePlace(dir).has_value());
     REQUIRE(writeMachinePlace(dir, {"m1", "test-box", "/srv/fcg/tournaments/t"}));
     const auto place = readMachinePlace(dir);
@@ -1241,7 +1234,7 @@ TEST_CASE("Machine runs: where a tournament plays, kept in its folder here") {
 }
 
 TEST_CASE("Machine runs: prepared and started there, refused without the program, an engine or a book") {
-    const auto dir  = freshDir("start");
+    const ScratchDir dir("start");
     const auto root = dir / "home";
     const auto here = dir / "here";
     fs::create_directories(here);
@@ -1298,7 +1291,7 @@ TEST_CASE("Machine runs: prepared and started there, refused without the program
 }
 
 TEST_CASE("Machine runs: the tournament's files copied back as they grow, written afresh when shorter there") {
-    const auto dir   = freshDir("sync");
+    const ScratchDir dir("sync");
     const auto root  = dir / "home";
     const auto local = dir / "here";
     fs::create_directories(local);
@@ -1336,7 +1329,7 @@ TEST_CASE("Machine runs: the tournament's files copied back as they grow, writte
 }
 
 TEST_CASE("Machine runs: the control channel through SSH, and a process that is not there any more") {
-    const auto dir = freshDir("link");
+    const ScratchDir dir("link");
     ssh::MockServer::Options options;
     options.root = dir;
     options.exec = [](const std::string& command) {
@@ -1505,7 +1498,7 @@ TEST_CASE("Machines: a program's system and architecture read from its first byt
     CHECK(programFormat("").kind == ProgramFormat::Kind::Unknown);
 
     // A file, its PE header beyond the first 4 KiB read too.
-    const auto dir = freshDir("format");
+    const ScratchDir dir("format");
     writeFile(dir / "far.exe", peHeader(0xaa64, 6000) + std::string(100, 'x'));
     CHECK(readProgramFormat(dir / "far.exe").archs == std::vector<std::string>{"arm64"});
     CHECK(readProgramFormat(dir / "missing").kind == ProgramFormat::Kind::Unknown);
@@ -1590,7 +1583,7 @@ TEST_CASE("Machines: the names Windows cannot hold, engines' folder names, paths
 }
 
 TEST_CASE("Machines: an engine's copy planned here: its format, its folder counted, the options found in it") {
-    const auto dir = freshDir("copy-plan");
+    const ScratchDir dir("copy-plan");
     writeFile(dir / "alpha/alpha", elfHeader(62) + std::string(1000, 'a'));
     writeFile(dir / "alpha/nn-test.nnue", std::string(3000, 'n'));
     writeFile(dir / "alpha/books/own.bin", std::string(500, 'b'));
@@ -1642,7 +1635,7 @@ TEST_CASE("Machines: an engine's copy planned here: its format, its folder count
 }
 
 TEST_CASE("Machine jobs: an engine copied with its folder, each file's hash checked, its path set and checked") {
-    const auto dir  = freshDir("copy");
+    const ScratchDir dir("copy");
     const auto root = dir / "root";
     fs::create_directories(root / "home/tester");
     writeFile(root / "opt/alpha", "the build set there by hand");
@@ -1798,7 +1791,7 @@ TEST_CASE("Machine jobs: an engine copied with its folder, each file's hash chec
 }
 
 TEST_CASE("Machine jobs: an engine's copy cut by the network resumes; a Windows machine refuses names it cannot hold") {
-    const auto dir  = freshDir("copy-cut");
+    const ScratchDir dir("copy-cut");
     const auto root = dir / "root";
     fs::create_directories(root / "home/tester");
     const auto here    = dir / "here";
@@ -1902,7 +1895,7 @@ TEST_CASE("SSH client: a real server, when FCG_SSH_TEST names one") {
         start = colon + 1;
     }
     REQUIRE(parts.size() >= 3);
-    const auto dir = freshDir("real");
+    const ScratchDir dir("real");
     Machine m;
     m.name                = "real";
     m.user                = s.substr(0, at);
@@ -1956,11 +1949,11 @@ TEST_CASE("Machines: a real machine from end to end, when FCG_MACHINE_TEST names
     const auto colon2   = s.find(':', colon1 + 1);
     REQUIRE((at != std::string::npos && colon1 != std::string::npos && colon2 != std::string::npos));
 
-    const auto dir = freshDir("e2e");
+    const ScratchDir dir("e2e");
     Machine m;
-    m.id       = "e2e";
-    m.name     = "e2e-box";
-    m.user     = s.substr(0, at);
+    m.id              = "e2e";
+    m.name            = "e2e-box";
+    m.user            = s.substr(0, at);
     m.host     = s.substr(at + 1, colon1 - at - 1);
     m.port     = std::stoi(s.substr(colon1 + 1, colon2 - colon1 - 1));
     m.auth     = SshAuth::KeyFile;

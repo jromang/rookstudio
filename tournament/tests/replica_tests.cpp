@@ -12,18 +12,14 @@
 #include <tour/start_failures.hpp>
 #include <tour/state.hpp>
 
+#include "test_support.hpp"
 #include "tour_fixtures.hpp"
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-tour-replica-" + name);
-    fs::remove_all(dir);
-    return dir;
-}
 
 using fcg::test::roundRobin;
 
@@ -91,8 +87,8 @@ void checkSame(const TournamentState& writer, const TournamentState& copy) {
 }  // namespace
 
 TEST_CASE("replica: a read-only copy follows the journal lines of the program playing the tournament") {
-    const auto dir = freshDir("follow");
-    auto writer    = TournamentState::create(dir, roundRobin(4, 1));
+    const ScratchDir dir("follow");
+    auto writer = TournamentState::create(dir, roundRobin(4, 1));
     Lines lines;
     writer->setJournalListener(lines.listener());
 
@@ -137,8 +133,8 @@ TEST_CASE("replica: a read-only copy follows the journal lines of the program pl
 }
 
 TEST_CASE("replica: an undone edit is not followed: the copy is opened again, and holds what the writer holds") {
-    const auto dir = freshDir("undo");
-    auto writer    = TournamentState::create(dir, roundRobin(4, 1));
+    const ScratchDir dir("undo");
+    auto writer = TournamentState::create(dir, roundRobin(4, 1));
     Lines lines;
     writer->setJournalListener(lines.listener());
     auto copy = TournamentState::open(dir, true);

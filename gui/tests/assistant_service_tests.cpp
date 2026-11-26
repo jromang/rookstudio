@@ -15,18 +15,13 @@
 
 #    include "assistant_service.hpp"
 #    include "mock_engines.hpp"
+#    include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
-
-fs::path freshProfile(const char* name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    return dir;
-}
 
 // A GGUF file of the disk in place of the catalogue's model.
 void useModel(AssistantService& service, const fs::path& file) {
@@ -45,7 +40,7 @@ commentary::Request asked(std::string text) {
 }  // namespace
 
 TEST_CASE("assistant service: no model, no answer; the model chosen loads at the first request and unloads") {
-    const auto profile = freshProfile("assistant_service");
+    const ScratchDir profile("assistant_service");
     AssistantService service(profile, test::mockAssistant());
     CHECK_FALSE(service.installed());
     CHECK(service.state() == AssistantService::State::NoModel);
@@ -72,7 +67,7 @@ TEST_CASE("assistant service: no model, no answer; the model chosen loads at the
 }
 
 TEST_CASE("assistant service: a request cancelled is refused before the model loads; a task's model stops asking") {
-    const auto profile = freshProfile("assistant_cancel");
+    const ScratchDir profile("assistant_cancel");
     AssistantService service(profile, test::mockAssistant());
     const auto file = profile / "commentary.gguf";
     std::ofstream(file) << "model";
@@ -97,7 +92,7 @@ TEST_CASE("assistant service: a request cancelled is refused before the model lo
 }
 
 TEST_CASE("assistant service: its settings are kept in the profile") {
-    const auto profile = freshProfile("assistant_settings");
+    const ScratchDir profile("assistant_settings");
     {
         AssistantService service(profile, test::mockAssistant());
         CHECK(service.settings().unload_minutes == 15);
@@ -118,7 +113,7 @@ TEST_CASE("assistant service: its settings are kept in the profile") {
 }
 
 TEST_CASE("assistant service: settings changed while requests are answered; each request takes them as it starts") {
-    const auto profile = freshProfile("assistant_settings_race");
+    const ScratchDir profile("assistant_settings_race");
     AssistantService service(profile, test::mockAssistant());
     const auto file = profile / "commentary.gguf", other = profile / "other.gguf";
     std::ofstream(file) << "model";
@@ -164,7 +159,7 @@ TEST_CASE("assistant service: settings changed while requests are answered; each
 }
 
 TEST_CASE("assistant service: a model that does not load says why, and the next request tries again") {
-    const auto profile = freshProfile("assistant_missing");
+    const ScratchDir profile("assistant_missing");
     AssistantService service(profile, test::mockAssistant());
     // The scripted model refuses a file named "missing".
     const auto file = profile / "missing";

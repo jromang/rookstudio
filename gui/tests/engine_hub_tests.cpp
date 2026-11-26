@@ -28,20 +28,13 @@
 using namespace fcg;
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
 
 using fcg::test::waitUntil;
-
-fs::path freshDir(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / ("fcg-hub-" + name);
-    std::error_code ec;
-    fs::remove_all(dir, ec);
-    fs::create_directories(dir);
-    return dir;
-}
 
 // A profile with one Linux machine on the test server's port, tested or not (its host key known).
 Machine writeMachine(const fs::path& profile, uint16_t port) {
@@ -301,8 +294,8 @@ TEST_CASE("Machines: an engine's command quotes each argument, its process id fi
 }
 
 TEST_CASE("Engine hub: an engine played through a relay, after its machine was tested; never one not allowed") {
-    const auto profile = freshDir("relay");
-    const auto port    = test::freePort();
+    const ScratchDir profile("relay");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root = profile;
     server_options.exec = engines;
@@ -372,8 +365,8 @@ TEST_CASE("Engine hub: an engine played through a relay, after its machine was t
 }
 
 TEST_CASE("Engine hub: twelve engines on two connections of ten channels; idle connections closed") {
-    const auto profile = freshDir("pool");
-    const auto port    = test::freePort();
+    const ScratchDir profile("pool");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root         = profile;
     server_options.exec         = engines;
@@ -411,8 +404,8 @@ TEST_CASE("Engine hub: twelve engines on two connections of ten channels; idle c
 }
 
 TEST_CASE("Engine hub: a relay that goes has its engine ended there, by its process id") {
-    const auto profile = freshDir("end");
-    const auto port    = test::freePort();
+    const ScratchDir profile("end");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root = profile;
     server_options.exec = engines;
@@ -445,8 +438,8 @@ TEST_CASE("Engine hub: a relay that goes has its engine ended there, by its proc
 }
 
 TEST_CASE("Engine hub: a cut ends the relays and says which; a machine that stops answering is cut too") {
-    const auto profile = freshDir("cut");
-    const auto port    = test::freePort();
+    const ScratchDir profile("cut");
+    const auto port = test::freePort();
     ssh::MockServer::Options server_options;
     server_options.root = profile;
     server_options.exec = engines;

@@ -14,10 +14,12 @@
 #include <study/tree.hpp>
 
 #include "test_games.hpp"
+#include "test_support.hpp"
 
 using namespace fcg::study;
 using namespace fcg::test;
 namespace fs = std::filesystem;
+using fcg::test::ScratchDir;
 
 namespace {
 
@@ -74,12 +76,6 @@ ImportedGame broadcast(const std::string& white, const std::string& black, const
                 moves, result, " { [%clk 1:30:00] Played at once. }");
 }
 
-fs::path fresh(const std::string& name) {
-    const auto dir = fs::temp_directory_path() / name;
-    fs::remove_all(dir);
-    return dir;
-}
-
 std::vector<GameId> groupOf(const Duplicates& found, GameId id) {
     for (const auto& g : found.groups)
         if (std::find(g.games.begin(), g.games.end(), id) != g.games.end()) return g.games;
@@ -89,7 +85,8 @@ std::vector<GameId> groupOf(const Duplicates& found, GameId id) {
 }  // namespace
 
 TEST_CASE("maintenance: each game's source is the file it was imported from, kept as people name it") {
-    auto db = Database::create(fresh("maint-sources"));
+    const ScratchDir folder("maint-sources");
+    auto db = Database::create(folder);
     db->append({twic("Moreau, Claire", "Lindqvist, Erik", "9")}, false, "/tmp/twic1672g.zip");
     db->append({broadcast("Moreau, Claire", "Lindqvist, Erik", "9.2")}, false, "");
     auto snap = db->snapshot();

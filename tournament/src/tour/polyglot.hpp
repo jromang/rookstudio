@@ -1,7 +1,8 @@
 #pragma once
 
 // Polyglot opening books (.bin), which fastchess does not read: their lines are followed from the initial position
-// and the positions they lead to become an EPD book. Or a participant plays from one, as its own book.
+// and become a PGN book of their moves (earlier versions wrote an EPD book of the positions they lead to, which their
+// tournaments keep). Or a participant plays from one, as its own book.
 
 #include <cstddef>
 #include <cstdint>
@@ -55,11 +56,13 @@ struct PolyglotWalk {
     int randomness            = 0;
 };
 
-// A line of the book, as the walk ends it: the position it leads to (EPD: placement, side, castling, en passant) and
-// the chance of drawing it move by move, each move in proportion to its weight (choiceWeights()) among those kept.
+// A line of the book, as the walk ends it: the position it leads to (EPD: placement, side, castling, en passant), the
+// chance of drawing it move by move, each move in proportion to its weight (choiceWeights()) among those kept, and
+// its moves from the initial position.
 struct PolyglotLine {
     std::string epd;
     double share = 0;
+    std::vector<chess::Move> moves;
 };
 
 // The book's lines, cut at `plies`, each position once (a transposition counts the first line that reaches it), in
@@ -71,14 +74,24 @@ struct PolyglotLine {
 [[nodiscard]] std::vector<std::string> polyglotPositions(const std::filesystem::path& file,
                                                          const PolyglotWalk& walk = {});
 
-// The positions of `lines` in a random order from `seed` where a line comes the sooner the likelier it is: drawn one
+// `lines` (their indexes) in a random order from `seed` where a line comes the sooner the likelier it is: drawn one
 // after the other, each among those left in proportion to its share (Efraimidis and Spirakis' weighted sampling
-// without replacement). Every position once; the same seed gives the same order.
+// without replacement). Every line once; the same seed gives the same order.
+[[nodiscard]] std::vector<std::size_t> drawnOrder(const std::vector<PolyglotLine>& lines, uint64_t seed);
+
+// Their positions in that order.
 [[nodiscard]] std::vector<std::string> drawnInOrder(const std::vector<PolyglotLine>& lines, uint64_t seed);
 
-// The positions written to `epd` (one line each): in the order of the book, or drawn from `seed` (drawnInOrder()).
+// The positions written to `epd` (one line each): in the order of the book, or drawn from `seed` (drawnOrder()).
 // Returns the number of positions.
 std::size_t polyglotToEpd(const std::filesystem::path& file, const std::filesystem::path& epd,
+                          const PolyglotWalk& walk = {}, std::optional<uint64_t> seed = std::nullopt);
+
+// The same lines in the same order, written to `pgn` as the games of a PGN book: each line's moves from the initial
+// position, in SAN, after the seven tags of an opening suite, as fastchess' PGN reader takes them (which plays them
+// as book moves, marked {book} in the games' PGN). Returns the number of lines. Throws std::runtime_error with a
+// readable message, as polyglotLines() does, or when `pgn` cannot be written.
+std::size_t polyglotToPgn(const std::filesystem::path& file, const std::filesystem::path& pgn,
                           const PolyglotWalk& walk = {}, std::optional<uint64_t> seed = std::nullopt);
 
 // A Polyglot book whose entries are not sorted by key, as the format wants, and too large to be sorted in memory.

@@ -12,6 +12,8 @@
 #include <fmt/include/fmt/format.h>
 #include <chess.hpp>
 
+#include <game/pgn/pgn_gen.hpp>
+
 namespace fcg::tour {
 
 namespace {
@@ -224,13 +226,14 @@ std::vector<PolyglotLine> polyglotLines(const std::filesystem::path& file, const
     std::vector<PolyglotLine> out;
     std::unordered_set<uint64_t> seen;  // positions already met, as leaves or on the way
     chess::Board board;
+    std::vector<chess::Move> line;  // the moves from the initial position to `board`
 
     const auto leaf = [&](double share) {
         // An en passant square only when the capture is legal, as a FEN wants it (the key has it whenever a pawn
         // stands beside, see playForBook()).
         out.push_back({board.enpassantSq() == chess::Square::NO_SQ ? board.getFen(false)
                                                                    : chess::Board(board.getFen()).getFen(false),
-                       share});
+                       share, line});
         if (out.size() > walk.max_positions) {
             throw std::runtime_error(
                 fmt::format("the Polyglot book {} gives more than {} positions at {} plies: choose fewer plies",
@@ -266,7 +269,9 @@ std::vector<PolyglotLine> polyglotLines(const std::filesystem::path& file, const
         }
         for (const auto& [move, weight] : moves) {
             playForBook(board, move);
+            line.push_back(move);
             self(self, depth + 1, share * static_cast<double>(weight) / static_cast<double>(total));
+            line.pop_back();
             board.unmakeMove(move);
         }
     };
@@ -285,7 +290,7 @@ std::vector<std::string> polyglotPositions(const std::filesystem::path& file, co
     return out;
 }
 
-std::vector<std::string> drawnInOrder(const std::vector<PolyglotLine>& lines, uint64_t seed) {
+std::vector<std::size_t> drawnOrder(const std::vector<PolyglotLine>& lines, uint64_t seed) {
     // Each line gets the key u^(1 / share), u uniform in (0, 1); the largest keys first. As logarithms, log(u) /
     // share, which a share far below 1 does not underflow.
     std::mt19937_64 rng(seed);
@@ -297,9 +302,16 @@ std::vector<std::string> drawnInOrder(const std::vector<PolyglotLine>& lines, ui
         keys.emplace_back(std::log(u) / share, i);
     }
     std::stable_sort(keys.begin(), keys.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
-    std::vector<std::string> out;
+    std::vector<std::size_t> out;
     out.reserve(keys.size());
-    for (const auto& [key, i] : keys) out.push_back(lines[i].epd);
+    for (const auto& [key, i] : keys) out.push_back(i);
+    return out;
+}
+
+std::vector<std::string> drawnInOrder(const std::vector<PolyglotLine>& lines, uint64_t seed) {
+    std::vector<std::string> out;
+    out.reserve(lines.size());
+    for (const auto i : drawnOrder(lines, seed)) out.push_back(lines[i].epd);
     return out;
 }
 
@@ -311,6 +323,41 @@ std::size_t polyglotToEpd(const std::filesystem::path& file, const std::filesyst
     out.close();
     if (!out) throw std::runtime_error(fmt::format("cannot write {}", epd.string()));
     return positions.size();
+}
+
+std::size_t polyglotToPgn(const std::filesystem::path& file, const std::filesystem::path& pgn, const PolyglotWalk& walk,
+                          std::optional<uint64_t> seed) {
+    const auto lines = polyglotLines(file, walk);
+    std::vector<std::size_t> order;
+    if (seed) {
+        order = drawnOrder(lines, *seed);
+    } else {
+        order.resize(lines.size());
+        std::iota(order.begin(), order.end(), std::size_t{0});
+    }
+
+    std::ofstream out(pgn, std::ios::binary | std::ios::trunc);
+    for (const auto i : order) {
+        // The seven tags of an opening suite, unknown: of the tags, fastchess reads FEN only (none here, the games
+        // start from the initial position), but its reader begins a game at a tag.
+        fastchess::pgn::PGNGenerator game;
+        game.addHeader("Event", "?");
+        game.addHeader("Site", "?");
+        game.addHeader("Date", "????.??.??");
+        game.addHeader("Round", "?");
+        game.addHeader("White", "?");
+        game.addHeader("Black", "?");
+        game.setResult("*");
+        chess::Board board;
+        for (const auto& move : lines[i].moves) {
+            game.addMove(chess::uci::moveToSan(board, move));
+            board.makeMove<true>(move);
+        }
+        out << game.generate() << "\n\n";
+    }
+    out.close();
+    if (!out) throw std::runtime_error(fmt::format("cannot write {}", pgn.string()));
+    return order.size();
 }
 
 }  // namespace fcg::tour

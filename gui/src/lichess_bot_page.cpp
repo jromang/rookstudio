@@ -1,12 +1,14 @@
-// A Lichess bot for one of the user's engines (#85, mockup M12, board 6): on the Engines page, the engine's card gets
-// "On Lichess, as a bot": the bot's account (a second Lichess account, new and game-less, that RookStudio cannot
-// create: a link to lichess.org), linked through Lichess's page with bot:play only, or by a token pasted; its checks
-// before any request; the upgrade, irreversible, once its name is typed; its rules; online and offline. Online, its
-// own event stream brings the challenges, accepted or declined with Lichess's reason (lichess_bot.hpp); its game is
-// played by the engine, followed on the Board with the engine's search, and brought into "Lichess · <bot>" at its end
-// (#49's way). It shows where what runs shows: the Home page and the Tournaments page (R3). A tournament comes first
-// (R6): the bot declines "later" while it needs the cores. During the user's own live game, the bot's search is not
-// shown (#48's lock); its games go on.
+// A Lichess bot for one of the user's engines (#85, mockup M12, board 6), its module out of App (#107): on the Engines
+// page, the engine's card gets "On Lichess, as a bot": the bot's account (a second Lichess account, new and game-less,
+// that RookStudio cannot create: a link to lichess.org), linked through Lichess's page with bot:play only, or by a
+// token pasted; its checks before any request; the upgrade, irreversible, once its name is typed; its rules; online
+// and offline. Online, its own event stream brings the challenges, accepted or declined with Lichess's reason
+// (lichess_bot.hpp); its game is played by the engine, followed on the Board with the engine's search, and brought
+// into "Lichess · <bot>" at its end (#49's way). It shows where what runs shows: the Home page and the Tournaments page
+// (R3). A tournament comes first (R6): the bot declines "later" while it needs the cores. During the user's own live
+// game, the bot's search is not shown (#48's lock); its games go on.
+
+#include "lichess_bot_page.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -19,14 +21,13 @@
 #include <engine/uci_engine.hpp>
 #include <study/game_tree.hpp>
 
-#include "app.hpp"
 #include "board_page.hpp"
-#include "board_text.hpp"
+#include "board_view.hpp"
 #include "console.hpp"
+#include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "live.hpp"
-#include "memory.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -207,17 +208,26 @@ bool whiteToMove(const lichess::BoardState& s) {
 
 }  // namespace
 
+LichessBotPage::LichessBotPage(BotContext& app) : app_(app) {}
+
+LichessBotPage::~LichessBotPage() = default;
+
 // ---------------------------------------------------------------------------
 // The account, the settings
 
-void App::loadBot() {
+const lichess::Account* LichessBotPage::account() {
+    loadBot();
+    return bot_account_ ? &*bot_account_ : nullptr;
+}
+
+void LichessBotPage::loadBot() {
     if (bot_loaded_) return;
     bot_loaded_  = true;
-    bot_account_ = lichess::loadAccount(storage_.root(), lichess::BOT_ACCOUNT_FILE);
+    bot_account_ = lichess::loadAccount(app_.profileDir(), lichess::BOT_ACCOUNT_FILE);
     if (bot_account_ && !botSettings().facts.username.empty()) bot_facts_ = botSettings().facts;
 }
 
-lichess::BotSettings& App::botSettings() {
+lichess::BotSettings& LichessBotPage::botSettings() {
     if (!bot_settings_) {
         bot_settings_ = lichess::readBotSettings(botFolder());
         // Its words, until chosen: the interface's language's.
@@ -229,35 +239,37 @@ lichess::BotSettings& App::botSettings() {
     return *bot_settings_;
 }
 
-void App::saveBotSettings() {
-    if (bot_settings_ && !options_.scripted) (void)lichess::writeBotSettings(botFolder(), *bot_settings_);
+void LichessBotPage::saveBotSettings() {
+    if (bot_settings_ && !app_.scripted()) (void)lichess::writeBotSettings(botFolder(), *bot_settings_);
 }
 
-bool App::botReady() const { return bot_account_ && bot_facts_ && bot_facts_->bot() && botEngine(); }
+bool LichessBotPage::botReady() const { return bot_account_ && bot_facts_ && bot_facts_->bot() && botEngine(); }
 
-const EngineEntry* App::botEngine() const {
+const EngineEntry* LichessBotPage::botEngine() const {
     if (!bot_settings_) return nullptr;
-    for (const auto& e : engines_)
+    for (const auto& e : app_.engines())
         if (e.name == bot_settings_->engine) return &e;
     return nullptr;
 }
 
-lichess::BotPlay App::botPlay() const {
+lichess::BotPlay LichessBotPage::botPlay() const {
     lichess::BotPlay play;
     if (const auto* e = botEngine()) play.engine = *e;
     if (!bot_settings_) return play;
     const auto& s = *bot_settings_;
+    const auto& books = app_.books();
     if (!s.book.empty() &&
-        std::any_of(books_.begin(), books_.end(), [&](const BookEntry& b) { return b.path == s.book; }))
+        std::any_of(books.begin(), books.end(), [&](const BookEntry& b) { return b.path == s.book; }))
         play.book = s.book;
     // The tournaments' tables, unless the engine has its own path set.
-    if (s.tables && !setup_.tb_paths.empty() && !play.engine.option("SyzygyPath")) play.syzygy = setup_.tb_paths;
+    const auto tables = app_.tournamentTables();
+    if (s.tables && !tables.empty() && !play.engine.option("SyzygyPath")) play.syzygy = tables;
     play.greeting = s.greeting;
     play.thanks   = s.thanks;
     return play;
 }
 
-void App::startBotLink() {
+void LichessBotPage::startBotLink() {
     if (bot_link_ || bot_check_.valid()) return;
     bot_error_      = {};
     bot_unanswered_ = false;
@@ -289,7 +301,7 @@ void App::startBotLink() {
     bot_link_       = std::move(link);
 }
 
-void App::checkBotToken(std::string token) {
+void LichessBotPage::checkBotToken(std::string token) {
     if (bot_link_ || bot_check_.valid()) return;
     token.erase(0, token.find_first_not_of(" \t\r\n"));
     token.erase(token.find_last_not_of(" \t\r\n") + 1);
@@ -299,23 +311,23 @@ void App::checkBotToken(std::string token) {
     bot_check_      = std::async(std::launch::async, [token] { return lichess::checkBotToken(token); });
 }
 
-void App::keepBotAccount(const lichess::Account& account) {
+void LichessBotPage::keepBotAccount(const lichess::Account& account) {
     try {
-        lichess::saveAccount(storage_.root(), account, lichess::BOT_ACCOUNT_FILE);
+        lichess::saveAccount(app_.profileDir(), account, lichess::BOT_ACCOUNT_FILE);
     } catch (const std::exception& e) {
         bot_error_ = lichess::Failure::own(e.what());
         return;
     }
     // Another account than the last one: its games and words stay, its account's facts follow.
     if (bot_account_ && bot_account_->token != account.token && !bot_account_->token.empty()) {
-        revokeToken(bot_account_->token);
+        app_.revokeToken(bot_account_->token);
     }
     bot_account_ = account;
 }
 
-void App::forgetBotAccount() {
+void LichessBotPage::forgetBotAccount() {
     setBotOnline(false);
-    bot_unlink_ = std::async(std::launch::async, [root = storage_.root()] {
+    bot_unlink_ = std::async(std::launch::async, [root = app_.profileDir()] {
         return lichess::forgetAccount(root, nullptr, lichess::BOT_ACCOUNT_FILE);
     });
     bot_account_.reset();
@@ -329,25 +341,24 @@ void App::forgetBotAccount() {
 // ---------------------------------------------------------------------------
 // Online
 
-int App::botThreads() const { return bot_game_ && !bot_state_.done ? bot_game_->threads() : 0; }
+int LichessBotPage::threads() const { return bot_game_ && !bot_state_.done ? bot_game_->threads() : 0; }
 
-bool App::botPlaying() const { return bot_game_ && !bot_state_.done; }
+bool LichessBotPage::running() const { return bot_account_ && (bot_online_ || playing()); }
 
-bool App::botLive() const {
-    return botPlaying() && (!bot_state_.game.full || bot_state_.game.live()) && !bot_state_.game.over();
+bool LichessBotPage::playing() const { return bot_game_ && !bot_state_.done; }
+
+bool LichessBotPage::live() const {
+    return playing() && (!bot_state_.game.full || bot_state_.game.live()) && !bot_state_.game.over();
 }
 
-bool App::botCoresNeeded() const {
+bool LichessBotPage::botCoresNeeded() const {
     // A tournament playing on this computer, and fewer cores left beside it than the bot's engine takes.
-    bool playing = false;
-    for (const auto& r : runs_)
-        if (r.run->remote() && r.run->running() && r.machine_id.empty() && r.run->tournament()) playing = true;
-    if (!playing) return false;
+    if (!app_.tournamentPlaysHere()) return false;
     const auto* e = botEngine();
-    return freeCores() < (e ? e->threads() : 1);
+    return app_.freeCores() < (e ? e->threads() : 1);
 }
 
-void App::setBotOnline(bool online) {
+void LichessBotPage::setBotOnline(bool online) {
     if (online) {
         if (!botReady()) return;
         bot_online_error_.clear();
@@ -359,7 +370,7 @@ void App::setBotOnline(bool online) {
     }
     // Offline: no new challenge; a live game being played goes on to its end, its stream kept until then. A
     // correspondence game waits on Lichess for the bot's next time online.
-    if (botLive()) {
+    if (live()) {
         bot_closing_ = true;
         return;
     }
@@ -371,7 +382,7 @@ void App::setBotOnline(bool online) {
     bot_accepted_.clear();
 }
 
-void App::botEvent(const lichess::GameEvent& e) {
+void LichessBotPage::botEvent(const lichess::GameEvent& e) {
     using Kind = lichess::GameEvent::Kind;
     if (!bot_account_) return;
     switch (e.kind) {
@@ -382,14 +393,14 @@ void App::botEvent(const lichess::GameEvent& e) {
                             [&](const BotAnswer& a) { return a.challenge.id == c.id; }))
                 break;  // the stream opened again: answered already
             lichess::BotSituation now;
-            now.busy           = botPlaying() || !bot_accepted_.empty() || !bot_waiting_.empty();
+            now.busy           = playing() || !bot_accepted_.empty() || !bot_waiting_.empty();
             now.closing        = bot_closing_ || !bot_online_;
             now.cores_needed   = botCoresNeeded();
             const auto* engine = botEngine();
             now.engine_chess960 =
                 engine && std::any_of(engine->uci_options.begin(), engine->uci_options.end(),
                                       [](const UciOptionInfo& o) { return o.name == "UCI_Chess960"; });
-            if (lichess_account_) now.own_account = lichess_account_->username;
+            if (const auto* own = app_.lichessAccount()) now.own_account = own->username;
             const auto reason = lichess::declineReason(c, botSettings().rules, now);
             const auto id     = c.id;
             const auto token  = bot_account_->token;
@@ -415,7 +426,7 @@ void App::botEvent(const lichess::GameEvent& e) {
             const auto& g = e.game;
             if (bot_game_ && bot_game_->id() == g.id) break;
             if (g.id == bot_accepted_) bot_accepted_.clear();
-            if (!botPlaying())
+            if (!playing())
                 startBotGame(g.id, g.white);
             else if (std::none_of(bot_waiting_.begin(), bot_waiting_.end(),
                                   [&](const auto& w) { return w.first == g.id; }))
@@ -433,7 +444,7 @@ void App::botEvent(const lichess::GameEvent& e) {
     }
 }
 
-void App::startBotGame(const std::string& id, bool white) {
+void LichessBotPage::startBotGame(const std::string& id, bool white) {
     if (!bot_account_) return;
     // The Board follows the bot's next game when it still showed its last one.
     const bool follow = bot_shown_ && !bot_shown_id_.empty() && bot_game_ == nullptr;
@@ -447,7 +458,7 @@ void App::startBotGame(const std::string& id, bool white) {
     }
 }
 
-void App::finishBotGame(const lichess::BotGame::State& st) {
+void LichessBotPage::finishBotGame(const lichess::BotGame::State& st) {
     const auto& g = st.game;
     if (!g.full || g.id.empty()) return;
     // Its record, for the card.
@@ -476,7 +487,7 @@ void App::finishBotGame(const lichess::BotGame::State& st) {
         for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return text;
     };
-    auto& s = shelf();
+    auto& s = app_.shelf();
     std::optional<std::size_t> index;
     for (std::size_t i = 0; i < s.entries().size(); ++i)
         if (!s.entries()[i].source && lower(s.entries()[i].name) == lower(name)) index = i;
@@ -492,7 +503,7 @@ void App::finishBotGame(const lichess::BotGame::State& st) {
     }
 }
 
-void App::pollBot() {
+void LichessBotPage::poll() {
     loadBot();
     const auto ready = [](auto& f) {
         return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
@@ -505,11 +516,11 @@ void App::pollBot() {
             bot_error_      = c;
             if (!bot_error_.failed()) bot_error_.net = lichess::NetError::Offline;  // nothing, and no word why
             if (c.linked && c.account) {
-                revokeToken(c.account->token);
+                app_.revokeToken(c.account->token);
             }
             return;
         }
-        const auto verdict = lichess::botVerdict(*c.facts, lichess_account_ ? lichess_account_->username : "",
+        const auto verdict = lichess::botVerdict(*c.facts, app_.lichessAccount() ? app_.lichessAccount()->username : "",
                                                  c.account->has(lichess::SCOPE_BOT_PLAY));
         // Never the user's own account, nor one that cannot play: not kept; a token RookStudio made is revoked.
         if (verdict == lichess::BotVerdict::OwnAccount || verdict == lichess::BotVerdict::Closed ||
@@ -517,7 +528,7 @@ void App::pollBot() {
             bot_candidate_ = c.facts;
             bot_verdict_   = verdict;
             if (c.linked) {
-                revokeToken(c.account->token);
+                app_.revokeToken(c.account->token);
             }
             return;
         }
@@ -526,7 +537,7 @@ void App::pollBot() {
         bot_facts_          = c.facts;
         botSettings().facts = *c.facts;
         saveBotSettings();
-        if (window_) SDL_RaiseWindow(window_);  // back in front of the browser
+        app_.raiseWindow();  // back in front of the browser
     };
     if (bot_link_ && ready(bot_link_->result)) {
         auto c = bot_link_->result.get();
@@ -573,7 +584,7 @@ void App::pollBot() {
     for (auto& a : bot_arrivals_) {
         if (!ready(a.arrival)) continue;
         const auto got = a.arrival.get();
-        if (got.added && a.index < shelf().entries().size()) shelf().rebuildTree(a.index);
+        if (got.added && a.index < app_.shelf().entries().size()) app_.shelf().rebuildTree(a.index);
         if (got.failure.failed())
             Console::instance().add(trf("Lichess bot: the game {}: {}", a.id, lichess::describe(got.failure)), true);
     }
@@ -602,8 +613,8 @@ void App::pollBot() {
         if (bot_game_->state(bot_state_, bot_version_)) bot_board_dirty_ = true;
         if (bot_state_.done) {
             finishBotGame(bot_state_);
-            const auto shown = bot_shown_ && bot_shown_id_ == bot_game_->id();
-            if (shown) showBotGame();  // its end on the Board
+            const auto followed = bot_shown_ && bot_shown_id_ == bot_game_->id();
+            if (followed) showBotGame();  // its end on the Board
             bot_game_.reset();
             bot_board_dirty_ = false;
             // The next game started meanwhile, or none: offline once asked.
@@ -614,96 +625,64 @@ void App::pollBot() {
             }
         }
     }
-    if (bot_closing_ && !botLive()) setBotOnline(false);
-    if (bot_board_dirty_ && botShown()) showBotGame();
+    if (bot_closing_ && !live()) setBotOnline(false);
+    if (bot_board_dirty_ && shown()) showBotGame();
 }
 
 // ---------------------------------------------------------------------------
 // Its game on the Board
 
-bool App::botShown() const {
+bool LichessBotPage::shown() const {
     return bot_shown_ && bot_game_ && bot_game_->id() == bot_shown_id_ && !bot_state_.done && !bot_state_.game.over();
 }
 
-void App::openBotGame() {
+void LichessBotPage::openBotGame() {
     if (!bot_game_) return;
-    auto& b = board_;
     if (!(bot_shown_ && bot_shown_id_ == bot_game_->id())) {
-        rememberBoardGame();
-        board_origin_.reset();
-        b.undo.clear();
-        b.redo.clear();
-        b.start_notes = {};
-        b.comment_edit.reset();
-        b.changes  = {};
-        b.watching = false;
-        b.selected.reset();
-        b.move_typed.reset();
-        b.preview.reset();
-        b.pgn.reset();
-        if (b.analysing) setBoardAnalysis(false);
-        b.game           = ReplayGame{};
-        b.game.start_fen = std::string(chess::constants::STARTPOS);
-        b.tree           = GameTree{b.game, {}};
-        b.line           = -1;
-        b.ply            = INT32_MAX;
-        b.chess960       = false;
-        b.title          = trf("Lichess · {}", bot_game_->id());
-        b.message.clear();
-        if (online_game_) online_game_->shown = false;
+        app_.takeBoard(trf("Lichess · {}", bot_game_->id()));
         bot_shown_    = true;
         bot_shown_id_ = bot_game_->id();
         bot_flipped_  = false;
-        ++board_game_serial_;
     }
     bot_board_dirty_ = true;
     showBotGame();
-    if (!views_.empty() && !view().holds(views::PageId::Board))
-        toStudyBoard();
-    else
-        page_ = Page::Board;
-    board_back_.reset();
+    app_.showLiveBoard();
 }
 
-void App::showBotGame() {
-    auto& b             = board_;
+void LichessBotPage::showBotGame() {
     const auto& s       = bot_state_.game;
     auto game           = lichess::replayOf(s);
     const bool chess960 = s.variant == "chess960";
-    // The board follows the game, unless the user went back in it.
-    const bool at_end = b.line >= 0 || b.ply >= static_cast<int>(b.game.moves.size());
-    b.game            = std::move(game);
-    b.tree            = GameTree{b.game, {}};
-    b.line            = -1;
-    b.chess960        = chess960;
-    if (at_end) b.ply = static_cast<int>(b.game.moves.size());
-    b.ply = std::clamp(b.ply, 0, static_cast<int>(b.game.moves.size()));
+    // Its players once known, the bot's side below once (the user may turn the board).
+    std::string title;
+    std::optional<bool> flip;
     if (s.full) {
-        b.title = fmt::format("{} – {}", s.white.name, s.black.name);
+        title = fmt::format("{} – {}", s.white.name, s.black.name);
         if (!bot_flipped_) {
-            b.flip       = !bot_state_.white;  // the bot's side below
+            flip         = !bot_state_.white;  // the bot's side below
             bot_flipped_ = true;
         }
     }
+    app_.updateBoard(std::move(game), chess960, title, flip);
     bot_board_dirty_ = false;
 }
 
-std::optional<std::string> App::botStripClock(chess::Color side) const {
-    if (!botShown() || !bot_state_.game.full) return std::nullopt;
+std::optional<std::string> LichessBotPage::stripClock(chess::Color side) const {
+    if (!shown() || !bot_state_.game.full) return std::nullopt;
     const auto& s    = bot_state_.game;
     const bool white = side == chess::Color::WHITE;
     if (!s.live() || s.clock_ms < 0) return std::nullopt;
     return clockOf(s.clockNow(white, SteadyClock::now()));
 }
 
-std::string App::botOpponent() const {
+std::string LichessBotPage::botOpponent() const {
     const auto& s    = bot_state_.game;
     const auto& them = bot_state_.white ? s.black : s.white;
     if (them.name.empty()) return TR("its opponent");
     return them.rating > 0 ? fmt::format("{} ({})", them.name, them.rating) : them.name;
 }
 
-void App::drawBotGameCard() {
+void LichessBotPage::drawBoardCard() {
     if (!bot_shown_ || !bot_account_) return;
     const ui::TopicRegion topic(guide::topics::LichessBot);
     const bool same = bot_game_ && bot_game_->id() == bot_shown_id_;
@@ -764,7 +743,8 @@ void App::drawBotGameCard() {
         std::string score;
         if (info.score) score = ui::formatScore(whiteScore(*info.score, board.sideToMove()));
         ImGui::TextUnformatted(
-            fmt::format("{}  d{}  {}", score, info.depth.value_or(0), boardSan(pvToSan(board, info.pv, 8))).c_str());
+            fmt::format("{}  d{}  {}", score, info.depth.value_or(0), app_.boardSan(pvToSan(board, info.pv, 8)))
+                .c_str());
         tip(TR("The engine's search: its evaluation for White, its depth and the line it expects."));
     }
     if (!st.error.empty()) coloured(st.error, ui::WARN);
@@ -792,19 +772,20 @@ void App::drawBotGameCard() {
 // ---------------------------------------------------------------------------
 // The engine's card
 
-void App::drawBotPart(const EngineEntry& e) {
+void LichessBotPage::drawEnginePart(const EngineEntry& e, bool enter_below) {
     loadBot();
     const ui::TopicRegion topic(guide::topics::LichessBot);
     ImGui::Spacing();
-    auto& s = botSettings();
+    auto& s             = botSettings();
+    const auto& engines = app_.engines();
     if (bot_account_ && bot_facts_ && bot_facts_->bot() && !s.engine.empty() && s.engine != e.name &&
-        std::any_of(engines_.begin(), engines_.end(), [&](const EngineEntry& o) { return o.name == s.engine; })) {
+        std::any_of(engines.begin(), engines.end(), [&](const EngineEntry& o) { return o.name == s.engine; })) {
         // The bot plays another engine: this one a click away, while it does not play.
         ui::inlineIcon(ui::Icon::Bot, ui::MUTED);
         ImGui::SameLine();
         ImGui::TextDisabled("%s", trf("Your Lichess bot {} plays {}.", bot_account_->username, s.engine).c_str());
         ImGui::SameLine();
-        ImGui::BeginDisabled(bot_online_ || botPlaying());
+        ImGui::BeginDisabled(bot_online_ || playing());
         if (ImGui::SmallButton(TR("Play this engine instead"))) {
             s.engine = e.name;
             saveBotSettings();
@@ -830,10 +811,10 @@ void App::drawBotPart(const EngineEntry& e) {
             s.engine = e.name;
             saveBotSettings();
         }
-        if (bot_online_ || botPlaying())
+        if (bot_online_ || playing())
             drawBotOnline();
         else
-            drawBotRules(e);
+            drawBotRules(e, enter_below);
     } else {
         bot_setup_engine_ = e.name;
         if (bot_step_ == BotStep::Card) bot_step_ = BotStep::Account;
@@ -846,7 +827,7 @@ void App::drawBotPart(const EngineEntry& e) {
     endTinted();
 }
 
-void App::drawBotIntro(const EngineEntry& e) {
+void LichessBotPage::drawBotIntro(const EngineEntry& e) {
     ui::inlineIcon(ui::Icon::Bot, ui::ACCENT);
     ImGui::SameLine();
     ImGui::TextUnformatted(TR("On Lichess, as a bot"));
@@ -867,7 +848,7 @@ void App::drawBotIntro(const EngineEntry& e) {
     }
 }
 
-void App::drawBotSteps() {
+void LichessBotPage::drawBotSteps() {
     const auto* f = bot_facts_ ? &*bot_facts_ : nullptr;
     const bool shown_refusal =
         bot_candidate_.has_value() || (f && !f->bot() && f->games > 0) || (bot_error_.failed() && !bot_link_);
@@ -909,7 +890,7 @@ void App::drawBotSteps() {
     }
     if (f && linked) {
         // Its checks, each with its mark.
-        const auto own   = lichess_account_ ? lichess_account_->username : std::string();
+        const auto own   = app_.lichessAccount() ? app_.lichessAccount()->username : std::string();
         std::string line = fmt::format("{} · {} · ", f->username, createdText(f->created_ms));
         line += f->bot() ? std::string(TR("a bot already ✓"))
                          : (f->games == 0 ? std::string(TR("0 games played ✓"))
@@ -972,14 +953,14 @@ void App::drawBotSteps() {
     }
 }
 
-void App::drawBotRefusal() {
+void LichessBotPage::drawBotRefusal() {
     ImGui::Spacing();
     beginTinted("##bot_refused", ui::WARN);
     ImGui::PushTextWrapPos();
     ui::inlineIcon(ui::Icon::Alert, ui::WARN);
     ImGui::SameLine();
     ImGui::BeginGroup();
-    const auto own = lichess_account_ ? lichess_account_->username : std::string();
+    const auto own = app_.lichessAccount() ? app_.lichessAccount()->username : std::string();
     bool create = false, other = false;
     if (bot_candidate_) {
         // Refused before any request: the account was not kept.
@@ -1037,7 +1018,7 @@ void App::drawBotRefusal() {
     endTinted();
 }
 
-void App::drawBotConfirm() {
+void LichessBotPage::drawBotConfirm() {
     if (!bot_account_ || !bot_facts_) {
         bot_step_ = BotStep::Account;
         return;
@@ -1088,7 +1069,7 @@ void App::drawBotConfirm() {
     endTinted();
 }
 
-void App::drawBotRules(const EngineEntry& e) {
+void LichessBotPage::drawBotRules(const EngineEntry& e, bool enter_below) {
     auto& s      = botSettings();
     auto& r      = s.rules;
     bool changed = false;
@@ -1210,7 +1191,7 @@ void App::drawBotRules(const EngineEntry& e) {
     row(TR("Its play"));
     {
         std::vector<const BookEntry*> polyglot;
-        for (const auto& b : books_) {
+        for (const auto& b : app_.books()) {
             auto ext = std::filesystem::path(b.path).extension().string();
             for (auto& c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             if (ext == ".bin") polyglot.push_back(&b);
@@ -1237,17 +1218,18 @@ void App::drawBotRules(const EngineEntry& e) {
         ImGui::SameLine();
         const bool syzygy = std::any_of(e.uci_options.begin(), e.uci_options.end(),
                                         [](const UciOptionInfo& o) { return o.name == "SyzygyPath"; });
-        ImGui::BeginDisabled(!syzygy || setup_.tb_paths.empty() || e.option("SyzygyPath"));
-        bool tables = s.tables && syzygy && !setup_.tb_paths.empty() && !e.option("SyzygyPath");
+        const auto tb_paths = app_.tournamentTables();
+        ImGui::BeginDisabled(!syzygy || tb_paths.empty() || e.option("SyzygyPath"));
+        bool tables = s.tables && syzygy && !tb_paths.empty() && !e.option("SyzygyPath");
         if (ImGui::Checkbox(TR("the tournaments' tables"), &tables)) {
             s.tables = tables;
             changed  = true;
         }
         ImGui::EndDisabled();
-        tip(e.option("SyzygyPath")    ? TR("The engine's own SyzygyPath is used.")
-            : !syzygy                 ? TR("The engine has no SyzygyPath option.")
-            : setup_.tb_paths.empty() ? TR("No tables for the tournaments yet (New tournament › Engine settings).")
-                                      : trf("SyzygyPath = {}", setup_.tb_paths));
+        tip(e.option("SyzygyPath") ? TR("The engine's own SyzygyPath is used.")
+            : !syzygy              ? TR("The engine has no SyzygyPath option.")
+            : tb_paths.empty()     ? TR("No tables for the tournaments yet (New tournament › Engine settings).")
+                                   : trf("SyzygyPath = {}", tb_paths));
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("· no thinking on the opponent's time"));
     }
@@ -1284,9 +1266,9 @@ void App::drawBotRules(const EngineEntry& e) {
     // Enter is the Lichess analysis part's when it shows a button of its own (#96).
     const bool go =
         primaryButton(TR("Put online"), !missing) ||
-        (!missing && !lichess_engine_enter_ && !ImGui::GetIO().WantTextInput &&
+        (!missing && !enter_below && !ImGui::GetIO().WantTextInput &&
          ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && ImGui::IsKeyPressed(ImGuiKey_Enter, false));
-    if (!lichess_engine_enter_) {
+    if (!enter_below) {
         ImGui::SameLine(0, px(4));
         ImGui::TextDisabled("%s", TR("Enter"));
     }
@@ -1304,7 +1286,7 @@ void App::drawBotRules(const EngineEntry& e) {
     if (changed) saveBotSettings();
 }
 
-void App::drawBotOnline() {
+void LichessBotPage::drawBotOnline() {
     auto& s        = botSettings();
     const auto day = lichess::botDay(s, today());
     // The banner: online, what it does today.
@@ -1321,7 +1303,7 @@ void App::drawBotOnline() {
     ImGui::TextUnformatted(bot_closing_ ? trf("{} going offline", bot_account_->username).c_str()
                                         : trf("{} online", bot_account_->username).c_str());
     ImGui::SameLine();
-    std::string what = botPlaying() ? std::string(TR("1 game in progress")) : std::string(TR("waiting for challenges"));
+    std::string what = playing() ? std::string(TR("1 game in progress")) : std::string(TR("waiting for challenges"));
     what += " · " + trn("{} today", "{} today", day.games, day.games);
     if (day.games > 0) what += ": " + trf("{} won, {} drawn, {} lost", day.won, day.drawn, day.lost);
     const int declined = s.day == today() ? s.declined : 0;
@@ -1347,7 +1329,7 @@ void App::drawBotOnline() {
         coloured(TR("A tournament needs the cores: the challenges are declined “later” meanwhile."), ui::WARN);
     // Its game: on a small board, the Board a click away.
     ImGui::Spacing();
-    if (botPlaying() && bot_state_.game.full) {
+    if (playing() && bot_state_.game.full) {
         const auto& g    = bot_state_.game;
         auto game        = lichess::replayOf(g);
         const auto board = boardAt(game, g.variant == "chess960", static_cast<int>(game.moves.size()));
@@ -1355,11 +1337,11 @@ void App::drawBotOnline() {
         decor.eval_white = -1.0f;
         decor.flipped    = !bot_state_.white;
         if (!game.moves.empty()) decor.last_move = game.moves.back().move;
-        drawBoard(atlas_, board, px(180), decor);
+        drawBoard(app_.pieces(), board, px(180), decor);
         ImGui::SameLine(0, px(14));
     }
     ImGui::BeginGroup();
-    if (botPlaying()) {
+    if (playing()) {
         const auto& g = bot_state_.game;
         ImGui::TextUnformatted(trf("against {}", botOpponent()).c_str());
         if (g.full)
@@ -1422,8 +1404,8 @@ void App::drawBotOnline() {
 // ---------------------------------------------------------------------------
 // Where what runs shows: the Home page's "In progress", the Tournaments page
 
-void App::drawBotRunning(bool home) {
-    if (!bot_account_ || !(bot_online_ || botPlaying())) return;
+void LichessBotPage::drawRunning(bool home) {
+    if (!bot_account_ || !(bot_online_ || playing())) return;
     const ui::TopicRegion topic(guide::topics::LichessBot);
     if (!home) {
         ImGui::Spacing();
@@ -1437,7 +1419,7 @@ void App::drawBotRunning(bool home) {
     ImGui::TextUnformatted(bot_closing_ ? trf("Your Lichess bot {} is going offline", who).c_str()
                                         : trf("Your Lichess bot {} is online", who).c_str());
     ImGui::SameLine();
-    if (botPlaying()) {
+    if (playing()) {
         const auto& g = bot_state_.game;
         ImGui::TextDisabled("%s", g.full ? fmt::format("· {} · {} · {}", trf("against {}", botOpponent()),
                                                        gameKindText(g), trf("move {}", g.moves.size() / 2 + 1))
@@ -1450,9 +1432,11 @@ void App::drawBotRunning(bool home) {
     }
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Its card"))) {
-        for (int i = 0; i < static_cast<int>(engines_.size()); ++i)
-            if (engine && engines_[static_cast<std::size_t>(i)].name == engine->name) selected_engine_ = i;
-        page_ = Page::Engines;
+        const auto& engines = app_.engines();
+        std::optional<int> card;
+        for (int i = 0; i < static_cast<int>(engines.size()); ++i)
+            if (engine && engines[static_cast<std::size_t>(i)].name == engine->name) card = i;
+        app_.showEngineCard(card, false);
     }
     if (!bot_closing_) {
         ImGui::SameLine();
@@ -1465,18 +1449,16 @@ void App::drawBotRunning(bool home) {
     if (!home) ui::endCard();
 }
 
-void App::drawQuitBot() {
-    if (quit_bot_open_) {
-        ImGui::OpenPopup(TR("Close RookStudio?###quit_bot"));
-        quit_bot_open_ = false;
-    }
+bool LichessBotPage::drawQuitQuestion(bool open) {
+    if (open) ImGui::OpenPopup(TR("Close RookStudio?###quit_bot"));
     const auto* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(TR("Close RookStudio?###quit_bot"), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    if (!ImGui::BeginPopupModal(TR("Close RookStudio?###quit_bot"), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        return false;
     {
         const ui::TopicRegion topic(guide::topics::LichessBot);
         ImGui::PushTextWrapPos(px(420));
-        if (bot_account_ && botLive()) {
+        if (bot_account_ && live()) {
             ImGui::TextUnformatted(trf("Your bot {} is playing {} on Lichess: closing RookStudio stops its engine, and "
                                        "the game would be lost on time.",
                                        bot_account_->username, botOpponent())
@@ -1496,12 +1478,58 @@ void App::drawQuitBot() {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button(TR("Close anyway"))) {
-        quit_bot_said_ = true;
-        ImGui::CloseCurrentPopup();
-        requestQuit();
-    }
+    const bool close = ImGui::Button(TR("Close anyway"));
+    if (close) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
+    return close;
+}
+
+// ---------------------------------------------------------------------------
+// Its palette commands and --focus words
+
+void LichessBotPage::addCommands(const PaletteAdd& add) {
+    // Online or offline, its game on the Board, its card; the engine shown's setup.
+    loadBot();
+    const auto bot_card = [this] {
+        const auto& engines = app_.engines();
+        std::optional<int> card;
+        for (int i = 0; i < static_cast<int>(engines.size()); ++i)
+            if (engines[static_cast<std::size_t>(i)].name == botSettings().engine) card = i;
+        app_.showEngineCard(card, true);
+    };
+    if (botReady()) {
+        if (!bot_online_ || bot_closing_)
+            add(TR("Put the Lichess bot online"), bot_account_->username, [this] { setBotOnline(true); });
+        else
+            add(TR("Put the Lichess bot offline"), bot_account_->username, [this] { setBotOnline(false); });
+        if (playing())
+            add(TR("The Lichess bot's game on the Board"), bot_account_->username, [this] { openBotGame(); });
+        add(TR("The Lichess bot's card"), bot_account_->username, bot_card);
+    } else if (const auto* engine = app_.engineShown()) {
+        add(trf("Make {} a Lichess bot…", engine->name), TR("Engines"), [this] {
+            const auto* shown = app_.engineShown();
+            if (!shown) return;
+            bot_setup_engine_    = shown->name;
+            bot_step_            = BotStep::Account;
+            botSettings().engine = bot_setup_engine_;
+            saveBotSettings();
+        });
+    }
+}
+
+void LichessBotPage::addFocusWords(FocusWords& words, const std::string& word) {
+    words.on({"engines-bot", "bot-online"}, [&] {
+        // The Engines page, the first engine's card: its bot's setup started (#85); bot-online: the bot put online,
+        // its account linked already.
+        const auto& engines = app_.engines();
+        app_.showEngineCard(engines.empty() ? -1 : 0, false);
+        loadBot();
+        if (word == "engines-bot" && !engines.empty()) {
+            bot_setup_engine_ = engines[0].name;
+            bot_step_         = BotStep::Account;
+        }
+        if (word == "bot-online") setBotOnline(true);
+    });
 }
 
 }  // namespace fcg

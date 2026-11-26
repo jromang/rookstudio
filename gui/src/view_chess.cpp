@@ -17,6 +17,7 @@
 #include "board_view.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
+#include "lichess_bot_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -269,7 +270,7 @@ void App::drawChessHome() {
     // A game on Lichess played here, the challenges received (#84): first.
     const bool online =
         (online_game_ && !online_game_->ended && !online_game_->state.over()) || !online_incoming_.empty();
-    const bool bot = bot_account_ && (bot_online_ || botPlaying());  // the Lichess bot online, its game (#85)
+    const bool bot            = bot_->running();     // the Lichess bot online, its game (#85)
     const bool engine_offered = !services_.empty();  // an engine of the user's serving lichess.org (#96)
     if (b.reviewing() || b.analysing || importing || !assistant.empty() || training || online || bot ||
         engine_offered) {
@@ -277,7 +278,7 @@ void App::drawChessHome() {
         ui::beginCard("chess_running");
         ImGui::TextUnformatted(TR("In progress"));
         if (online) drawOnlineHome();
-        if (bot) drawBotRunning(true);
+        if (bot) bot_->drawRunning(true);
         if (engine_offered) drawLichessEngineRunning(true);
         if (training) drawTrainingHome();
         for (const auto& task : b.review_tasks) {

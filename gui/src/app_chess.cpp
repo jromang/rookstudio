@@ -14,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include <SDL3/SDL.h>
 #include <imgui.h>
@@ -32,6 +33,7 @@
 #include "focus_words.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
+#include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
 #include "twic.hpp"
@@ -311,6 +313,7 @@ void App::initChessModules() {
     modules_context_ = std::make_unique<ModulesContext>(*this);
     tv_              = std::make_unique<LichessTvPage>(*modules_context_);
     arenas_          = std::make_unique<LichessArenasPage>(*modules_context_);
+    bot_             = std::make_unique<LichessBotPage>(*modules_context_);
 }
 
 // The arenas' hooks in fastchess-gui's pages (#95), which do not include its module's header.
@@ -323,6 +326,25 @@ void App::leaveTvBoard() { tv_->leaveBoard(); }
 void App::drawTvBoardCard() { tv_->drawBoardCard(); }
 void App::drawTvEngineLine(const EngineEntry& e) { tv_->drawEngineLine(e.name); }
 std::string App::tvName(const std::string& name) { return fcg::tvName(name); }
+
+// The Lichess bot's hooks in fastchess-gui's pages (#85), which do not include its module's header.
+void App::drawBotPart(const EngineEntry& e) { bot_->drawEnginePart(e, lichess_engine_enter_); }
+void App::drawBotRunning(bool home) { bot_->drawRunning(home); }
+int App::botThreads() const { return bot_->threads(); }
+bool App::botOnBoard() const { return bot_->onBoard(); }
+bool App::botShown() const { return bot_->shown(); }
+void App::drawBotGameCard() { bot_->drawBoardCard(); }
+const lichess::BoardState& App::botGame() const { return bot_->game(); }
+std::optional<std::string> App::botStripClock(chess::Color side) const { return bot_->stripClock(side); }
+void App::leaveBotBoard() { bot_->leaveBoard(); }
+bool App::botLive() const { return bot_->live(); }
+void App::drawQuitBot() {
+    // Close anyway: RookStudio closes, the bot's question answered (requestQuit() asks the others first).
+    if (bot_->drawQuitQuestion(std::exchange(quit_bot_open_, false))) {
+        quit_bot_said_ = true;
+        requestQuit();
+    }
+}
 
 void App::initChessServers() {
     // Scripted screenshots ask nothing of the internet (AppOptions::scripted): Lichess, its database, TWIC, chess.com
@@ -367,7 +389,7 @@ void App::pollChess() {
     pollEndgameCheck();        // a finished tournament's endgames against the tables (#94)
     pollEngineGame();          // a game against an engine: kept at each move, its end, a hint (#83)
     pollOnlinePlay();          // playing on Lichess: a seek, the challenges, the game on the Board (#84)
-    pollBot();                 // a Lichess bot for an engine: its account, its challenges, its game (#85)
+    bot_->poll();              // a Lichess bot for an engine: its account, its challenges, its game (#85)
     pollLichessEngines();      // the engines offered to lichess.org: their registrations, guards, requests (#96)
     pollBroadcastStandings();  // a broadcast's standings, a search among the broadcasts (#55)
     pollFideCards();           // a FIDE card asked for (#57)
@@ -897,18 +919,8 @@ bool App::applyChessFocusWord(const std::string& w) {
         page_      = Page::Play;
         play_part_ = 1;
     });
-    words.on({"engines-bot", "bot-online"}, [&] {
-        // The Engines page, the first engine's card: its bot's setup started (#85); bot-online: the bot put online,
-        // its account linked already.
-        page_            = Page::Engines;
-        selected_engine_ = engines_.empty() ? -1 : 0;
-        loadBot();
-        if (w == "engines-bot" && !engines_.empty()) {
-            bot_setup_engine_ = engines_[0].name;
-            bot_step_         = BotStep::Account;
-        }
-        if (w == "bot-online") setBotOnline(true);
-    });
+    // The Lichess bot's, its module's (#85): engines-bot, bot-online.
+    bot_->addFocusWords(words, w);
     words.on({"lichess-game=*"}, [&] {
         // lichess-game=ID[@black]: a game of the user's on Lichess played on the Board (#84), its stream asked of
         // the server --focus lichess-api= named.

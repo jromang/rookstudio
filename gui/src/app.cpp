@@ -1,7 +1,6 @@
 #include "app.hpp"
 
 #include "assistant_service.hpp"
-#include "board_text.hpp"
 #include "engine_hub.hpp"
 
 #include <algorithm>
@@ -9,7 +8,6 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
-#include <future>
 #include <limits>
 #include <sstream>
 
@@ -21,7 +19,6 @@
 #include <fmt/include/fmt/format.h>
 #include <core/globals/globals.hpp>
 #include <engine/uci_engine.hpp>
-#include <study/import.hpp>
 #include <tour/files.hpp>
 #include <tour/sprt_rules.hpp>
 
@@ -1427,16 +1424,6 @@ void App::handleDialogs() {
             case Dialogs::Purpose::AddEngine:
                 addEngine(path);
                 break;
-            case Dialogs::Purpose::Export:  // the Export sheet's file (#93)
-                exportTo(path);
-                break;
-            case Dialogs::Purpose::TheoryPgn:  // a theory study (#77)
-                addTheoryFile(path);
-                break;
-            case Dialogs::Purpose::TheoryFind:
-                if (theory_chosen_ >= 0 && static_cast<std::size_t>(theory_chosen_) < theory().studies().size())
-                    theory().relocate(static_cast<std::size_t>(theory_chosen_), path);
-                break;
             case Dialogs::Purpose::TournamentsFolder:
                 storage_.setRunsDir(path);
                 tournaments_dirty_ = true;
@@ -1510,11 +1497,6 @@ void App::handleDialogs() {
             case Dialogs::Purpose::AddBook:
                 addBook(path);
                 break;
-            case Dialogs::Purpose::CtgPolyglotBook:
-                if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size()) &&
-                    study::isCtg(books_[selected_book_].path))
-                    startCtgJob(CtgJobKind::Polyglot, books_[selected_book_].path, path);
-                break;
             case Dialogs::Purpose::BookFile:
                 if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size())) {
                     books_[selected_book_].path = path;
@@ -1525,24 +1507,6 @@ void App::handleDialogs() {
             case Dialogs::Purpose::Chess324Book:
             case Dialogs::Purpose::Chess324SymmetricalBook:
                 writeChess324Book(path, answer->purpose == Dialogs::Purpose::Chess324SymmetricalBook);
-                break;
-            case Dialogs::Purpose::OpeningSuiteBook:
-                writeOpeningSuiteBook(path);
-                break;
-            case Dialogs::Purpose::EvaluatedSuiteBook:
-                writeEvaluatedSuiteBook(path);
-                break;
-            case Dialogs::Purpose::EvalsFile:
-                startEvalsReading(path);
-                break;
-            case Dialogs::Purpose::OfflineEvalsFile:
-                startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
-                break;
-            case Dialogs::Purpose::OfflinePuzzlesFile:
-                startOfflinePuzzles(path);
-                break;
-            case Dialogs::Purpose::LichessMonthFile:
-                startMonthReading(path);
                 break;
             case Dialogs::Purpose::BuildBookPgn:
                 book_build_form_.pgn = path;
@@ -1666,49 +1630,6 @@ void App::handleDialogs() {
             case Dialogs::Purpose::BoardPgn:
                 openBoardPgn(std::filesystem::path(path));
                 break;
-            case Dialogs::Purpose::AppendBoardPgn:
-                try {
-                    // After the file's games, a blank line between.
-                    if (chessBoard()) fillBoardEco();
-                    std::string text;
-                    {
-                        std::ifstream in(std::filesystem::path(path), std::ios::binary);
-                        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-                    }
-                    while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
-                        text.pop_back();
-                    if (!text.empty()) text += "\n\n";
-                    text += gamePgn(board_.tree, board_.chess960);
-                    tour::replaceFile(std::filesystem::path(path), text);
-                    board_.changes.saved(std::filesystem::path(path).filename().string());
-                    boardToast(trf("Saved at the end of “{}”", std::filesystem::path(path).filename().string()));
-                } catch (const std::exception& e) {
-                    board_.message       = trf("Cannot write {}: {}", path, e.what());
-                    board_.message_error = true;
-                }
-                break;
-            case Dialogs::Purpose::AssistantModel: {
-                // A GGUF file in place of the catalogue's model: loaded at the next question.
-                auto settings       = assistant_->settings();
-                settings.model_file = path;
-                settings.not_now    = false;
-                assistant_->setSettings(settings);
-                assistant_->unload();  // after: a request that starts meanwhile loads the file chosen
-                assistant_->saveSettings();
-                break;
-            }
-            case Dialogs::Purpose::SaveBoardPgn:
-                try {
-                    if (chessBoard()) fillBoardEco();
-                    tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
-                    board_.changes.saved(std::filesystem::path(path).filename().string());
-                    board_.message       = trf("Saved in {}", path);
-                    board_.message_error = false;
-                } catch (const std::exception& e) {
-                    board_.message       = trf("Cannot write {}: {}", path, e.what());
-                    board_.message_error = true;
-                }
-                break;
             case Dialogs::Purpose::MachineKey:
             case Dialogs::Purpose::MachineProgram:
                 if (auto* machine = machineById(machine_dialog_for_)) {
@@ -1719,18 +1640,8 @@ void App::handleDialogs() {
             case Dialogs::Purpose::MachineEngineBuild:
                 offerEngineCopy(machine_dialog_for_, machine_dialog_engine_, std::filesystem::path(path));
                 break;
-            case Dialogs::Purpose::ImportGames:
-                importIntoDatabase(db_selected_, std::filesystem::path(path));
-                break;
-            case Dialogs::Purpose::AddDatabase:
-                try {
-                    db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
-                } catch (const std::exception& e) {
-                    db_message_ = e.what();
-                }
-                break;
-            case Dialogs::Purpose::FideList:
-                startFideList(std::filesystem::path(path));
+            default:  // RookStudio's (app_chess.cpp)
+                handleChessDialog(*answer);
                 break;
         }
     }

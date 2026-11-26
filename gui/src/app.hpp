@@ -4001,10 +4001,11 @@ class App {
     void drawSubmissionChecklist();  // in the overview of a finished tournament
 
     void handleDialogs();
-    // RookStudio's parts of frame(), out of it (app_chess.cpp, #108): the polls of its pages and jobs; its --focus
-    // words, tried before fastchess-gui's (false: the word is not one of them).
+    // RookStudio's parts of frame() and handleDialogs(), out of them (app_chess.cpp, #108): the polls of its pages and
+    // jobs; its --focus words, tried before fastchess-gui's (false: the word is not one of them); its dialogs' files.
     void pollChess();
     [[nodiscard]] bool applyChessFocusWord(const std::string& w);
+    void handleChessDialog(const Dialogs::Answer& answer);
     void saveSetupSoon() { setup_dirty_ = true; }
 
     SDL_Window* window_;

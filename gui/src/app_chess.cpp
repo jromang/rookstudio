@@ -1,5 +1,6 @@
-// RookStudio's additions to App::frame(), out of it so that it stays as fastchess-gui writes it and its releases merge
-// without conflicts (#108): the polls of RookStudio's pages and jobs, and its --focus words.
+// RookStudio's additions to App::frame() and App::handleDialogs(), out of those functions so that they stay as
+// fastchess-gui writes them and its releases merge without conflicts (#108): the polls of RookStudio's pages and jobs,
+// its --focus words, and what becomes of the files its dialogs chose.
 
 #include "app.hpp"
 
@@ -16,8 +17,12 @@
 #include <study/evals_index.hpp>
 #include <study/import.hpp>
 #include <study/patterns.hpp>
+#include <tour/files.hpp>
 
+#include "assistant_service.hpp"
+#include "board_text.hpp"
 #include "focus_words.hpp"
+#include "i18n.hpp"
 #include "lichess_tv.hpp"
 
 namespace fcg {
@@ -704,6 +709,103 @@ bool App::applyChessFocusWord(const std::string& w) {
         }
     });
     return words.applied();
+}
+
+void App::handleChessDialog(const Dialogs::Answer& answer) {
+    const auto& path = answer.path;
+    switch (answer.purpose) {
+        case Dialogs::Purpose::Export:  // the Export sheet's file (#93)
+            exportTo(path);
+            break;
+        case Dialogs::Purpose::TheoryPgn:  // a theory study (#77)
+            addTheoryFile(path);
+            break;
+        case Dialogs::Purpose::TheoryFind:
+            if (theory_chosen_ >= 0 && static_cast<std::size_t>(theory_chosen_) < theory().studies().size())
+                theory().relocate(static_cast<std::size_t>(theory_chosen_), path);
+            break;
+        case Dialogs::Purpose::CtgPolyglotBook:
+            if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size()) &&
+                study::isCtg(books_[selected_book_].path))
+                startCtgJob(CtgJobKind::Polyglot, books_[selected_book_].path, path);
+            break;
+        case Dialogs::Purpose::OpeningSuiteBook:
+            writeOpeningSuiteBook(path);
+            break;
+        case Dialogs::Purpose::EvaluatedSuiteBook:
+            writeEvaluatedSuiteBook(path);
+            break;
+        case Dialogs::Purpose::EvalsFile:
+            startEvalsReading(path);
+            break;
+        case Dialogs::Purpose::OfflineEvalsFile:
+            startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
+            break;
+        case Dialogs::Purpose::OfflinePuzzlesFile:
+            startOfflinePuzzles(path);
+            break;
+        case Dialogs::Purpose::LichessMonthFile:
+            startMonthReading(path);
+            break;
+        case Dialogs::Purpose::AppendBoardPgn:
+            try {
+                // After the file's games, a blank line between.
+                if (chessBoard()) fillBoardEco();
+                std::string text;
+                {
+                    std::ifstream in(std::filesystem::path(path), std::ios::binary);
+                    text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                }
+                while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
+                    text.pop_back();
+                if (!text.empty()) text += "\n\n";
+                text += gamePgn(board_.tree, board_.chess960);
+                tour::replaceFile(std::filesystem::path(path), text);
+                board_.changes.saved(std::filesystem::path(path).filename().string());
+                boardToast(trf("Saved at the end of “{}”", std::filesystem::path(path).filename().string()));
+            } catch (const std::exception& e) {
+                board_.message       = trf("Cannot write {}: {}", path, e.what());
+                board_.message_error = true;
+            }
+            break;
+        case Dialogs::Purpose::AssistantModel: {
+            // A GGUF file in place of the catalogue's model: loaded at the next question.
+            auto settings       = assistant_->settings();
+            settings.model_file = path;
+            settings.not_now    = false;
+            assistant_->setSettings(settings);
+            assistant_->unload();  // after: a request that starts meanwhile loads the file chosen
+            assistant_->saveSettings();
+            break;
+        }
+        case Dialogs::Purpose::SaveBoardPgn:
+            try {
+                if (chessBoard()) fillBoardEco();
+                tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
+                board_.changes.saved(std::filesystem::path(path).filename().string());
+                board_.message       = trf("Saved in {}", path);
+                board_.message_error = false;
+            } catch (const std::exception& e) {
+                board_.message       = trf("Cannot write {}: {}", path, e.what());
+                board_.message_error = true;
+            }
+            break;
+        case Dialogs::Purpose::ImportGames:
+            importIntoDatabase(db_selected_, std::filesystem::path(path));
+            break;
+        case Dialogs::Purpose::AddDatabase:
+            try {
+                db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
+            } catch (const std::exception& e) {
+                db_message_ = e.what();
+            }
+            break;
+        case Dialogs::Purpose::FideList:
+            startFideList(std::filesystem::path(path));
+            break;
+        default:  // fastchess-gui's, in handleDialogs()
+            break;
+    }
 }
 
 }  // namespace fcg

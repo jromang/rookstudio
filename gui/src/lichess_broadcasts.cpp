@@ -309,7 +309,12 @@ void RoundFollower::run() {
         };
         stream.cancel = &stop_;
         stream.idle_s = 120;  // Lichess sends nothing while no game changes
-        if (!broke.failed()) broke = responseOf(asked, politeStream(asked, stream));
+        if (!broke.failed()) {
+            auto ended = politeStream(asked, stream);
+            // Once open, its end is no failure, whatever ended it (Lichess closing it, two minutes without a change, a
+            // cut): it is opened again in a moment, and a failure to open it then is said.
+            if (!opened) broke = responseOf(asked, std::move(ended));
+        }
         streaming_ = false;
         if (stop_) break;
         {

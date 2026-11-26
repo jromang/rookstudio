@@ -329,6 +329,31 @@ TEST_CASE("Lichess broadcasts: a round's tournament and names, from its address"
     CHECK(authorization == "Bearer allowed");
 }
 
+TEST_CASE("Lichess broadcasts: a stream cut once open is opened again, no failure said") {
+    const auto port = freePort();
+    std::atomic<int> streams{0};
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        if (requestPath(head) == "/api/broadcast/round/R1.pgn") {
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            return;
+        }
+        // Open, then cut in the middle of a chunk: a quiet round's two minutes without a word end the same way.
+        ++streams;
+        c.sendAll(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/x-chess-pgn\r\nTransfer-Encoding: chunked\r\n"
+            "Connection: close\r\n\r\n5\r\n[Ev");
+    });
+    REQUIRE(server.ok());
+    Servers_ local(port);
+    RoundFollower::setRetry(10ms, 40ms);
+    RoundFollower follower("R1");
+    REQUIRE(waitUntil([&] { return streams.load() >= 3; }));
+    CHECK(follower.connections() >= 2);
+    CHECK_FALSE(follower.failure().failed());
+    follower.stop();
+    RoundFollower::setRetry(5s, 60s);
+}
+
 TEST_CASE("Lichess broadcasts: each failure of the lists, a round and its follower told by its kind") {
     AnsweringServer server;
     REQUIRE(server.ok());

@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_playing.hpp"
@@ -127,7 +128,8 @@ TEST_CASE("Lichess playing: the stream heard on its own thread; a refused token 
         EventListener listener("bad-token");
         for (int i = 0; i < 200 && !listener.refused(); ++i) std::this_thread::sleep_for(25ms);
         CHECK(listener.refused());
-        CHECK(listener.error() == "Lichess refused the token");
+        CHECK(listener.failure().net == NetError::Unauthorized);
+        CHECK(describe(listener.failure()) == "Lichess refused the token: link the account again");
     }
     servers() = Servers{};
 }
@@ -178,23 +180,73 @@ TEST_CASE("Lichess playing: a finished game brought into a database, once") {
     const auto db = study::Database::create(dir);
     REQUIRE(db);
     const auto first = bringGame("abcd1234", "a-token", db.get());
-    CHECK(first.error.empty());
+    CHECK_FALSE(first.failure.failed());
     CHECK(first.added);
     CHECK(first.analysed);
     CHECK(first.plies == 7);
     CHECK(first.result == '1');
     const auto again = bringGame("abcd1234", "a-token", db.get());
-    CHECK(again.error.empty());
+    CHECK_FALSE(again.failure.failed());
     CHECK_FALSE(again.added);  // the database has it
     const auto without = bringGame("abcd1234", "a-token", nullptr);
     CHECK(without.pgn == PGN);
     CHECK_FALSE(without.added);
     const auto aborted = bringGame("abor1234", "a-token", db.get());
-    CHECK(aborted.error.empty());
+    CHECK_FALSE(aborted.failure.failed());
     CHECK(aborted.plies == 1);
     CHECK_FALSE(aborted.added);  // Lichess aborted it: it stays out
     const auto missing = bringGame("zzzz9999", "a-token", db.get());
     CHECK(missing.pgn.empty());
-    CHECK_FALSE(missing.error.empty());
+    CHECK(missing.failure.net == NetError::NotFound);
+    CHECK(describe(missing.failure) == "Lichess has no such game");
+    servers() = Servers{};
+}
+
+TEST_CASE("Lichess playing: each failure of the games in progress, a finished game, the event stream by kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(playingGames("tok").net == net);
+        const auto brought = bringGame("abcd1234", "tok", nullptr);
+        CHECK(brought.pgn.empty());
+        CHECK(brought.failure.net == net);
+        EventListener listener("tok");
+        REQUIRE(waitUntil([&] { return listener.failure().net == net; }));
+        // A token refused stops it; the others are tried again.
+        const bool refused = net == NetError::Unauthorized || net == NetError::Forbidden;
+        if (refused)
+            CHECK(waitUntil([&] { return listener.refused(); }));
+        else
+            CHECK_FALSE(listener.refused());
+    }
+    // An answer that is not what Lichess sends: no JSON, no game.
+    server.answer(200, "");
+    CHECK(playingGames("tok").net == NetError::BadAnswer);
+    const auto garbled = bringGame("abcd1234", "tok", nullptr);
+    CHECK(garbled.failure.net == NetError::BadAnswer);
+    CHECK(describe(garbled.failure) == "Lichess's answer could not be read");
+    pointNowhere();
+    CHECK(playingGames("tok").net == NetError::Offline);
+    CHECK(describe(bringGame("abcd1234", "tok", nullptr).failure) == "Lichess cannot be reached");
+    {
+        EventListener listener("tok");
+        REQUIRE(waitUntil([&] { return listener.failure().net == NetError::Offline; }));
+        CHECK_FALSE(listener.refused());
+    }
+    pointAtPausedHost("lichess-playing.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(playingGames("tok", &cancel).net == NetError::Cancelled);
+    CHECK(bringGame("abcd1234", "tok", nullptr, &cancel).failure.net == NetError::Cancelled);
     servers() = Servers{};
 }

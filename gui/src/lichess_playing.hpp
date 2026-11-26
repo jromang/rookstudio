@@ -98,7 +98,7 @@ struct Arrival {
     uint32_t plies = 0;
     char result    = '*';    // '1' 1-0, '0' 0-1, '=' a draw, '*' none
     bool analysed  = false;  // Lichess's evaluations in it ([%eval])
-    std::string error;
+    Failure failure;         // why it did not come (Lichess's), or did not go in (the database's own words)
 };
 [[nodiscard]] Arrival bringGame(const std::string& id, const std::string& token, study::Database* db,
                                 const std::atomic<bool>* cancel = nullptr);
@@ -156,8 +156,9 @@ class EventListener {
     EventListener(const EventListener&)            = delete;
     EventListener& operator=(const EventListener&) = delete;
 
-    [[nodiscard]] std::vector<GameEvent> take();             // the events heard since the last call
-    [[nodiscard]] std::string error() const;                 // why the stream broke last, empty while it is open
+    [[nodiscard]] std::vector<GameEvent> take();  // the events heard since the last call
+    // Why the stream broke last: no answer, or Lichess's refusal; none while it is open, or when Lichess closed it.
+    [[nodiscard]] Failure failure() const;
     [[nodiscard]] bool refused() const { return refused_; }  // Lichess said no to the token: it stops
     // The stream is open now: a seek may go (Lichess asks for the stream first, not to miss the game's start).
     [[nodiscard]] bool connected() const { return connected_; }
@@ -172,7 +173,7 @@ class EventListener {
     std::atomic<bool> connected_{false};
     mutable std::mutex mutex_;
     std::deque<GameEvent> events_;
-    std::string error_;
+    Failure failure_;
     std::thread thread_;
 };
 

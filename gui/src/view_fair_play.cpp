@@ -436,9 +436,10 @@ void App::pollLichessFinished() {
         if (ready(f.arrival)) {
             f.got = f.arrival.get();
             if (f.got->added && f.index < shelf().entries().size()) shelf().rebuildTree(f.index);
-            if (!f.got->error.empty())
-                Console::instance().add(trf("Lichess: your game against {}: {}", opponentText(f.game), f.got->error),
-                                        true);
+            if (f.got->failure.failed())
+                Console::instance().add(
+                    trf("Lichess: your game against {}: {}", opponentText(f.game), lichess::describe(f.got->failure)),
+                    true);
             // An aborted game is not worth a word; a finished one's review at once, when chosen, no live game going
             // on and the Board holding nothing that would be lost.
             if (!f.got->pgn.empty() && f.got->plies < 2) f.done = true;
@@ -513,9 +514,9 @@ void App::drawFinishedBanner(bool home) {
     else if (f.again.valid())
         text = TR("Asking Lichess for its analysis…");
     else if (!came)
-        text = trf("Lichess did not send it ({}).", f.got ? f.got->error : std::string());
-    else if (!f.got->error.empty())
-        text = trf("It could not go into “{}”: {}.", f.base, f.got->error);
+        text = trf("Lichess did not send it ({}).", f.got ? lichess::describe(f.got->failure) : std::string());
+    else if (f.got->failure.failed())
+        text = trf("It could not go into “{}”: {}.", f.base, lichess::describe(f.got->failure));
     else
         text = f.got->analysed ? trf("It is in “{}”, with Lichess's analysis.", f.base) : trf("It is in “{}”.", f.base);
     if (came && !f.again.valid() && !liveGameOn()) text += std::string(" ") + TR("The aids are back.");

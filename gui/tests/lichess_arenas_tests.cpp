@@ -834,7 +834,7 @@ TEST_CASE("Lichess arenas: a finished arena game kept in the user's Lichess data
     auto db         = study::Database::create(dir);
     const auto came = bringGame("aRena001", "tok", db.get());
     servers()       = Servers{};
-    CHECK(came.error.empty());
+    CHECK_FALSE(came.failure.failed());
     CHECK(came.added);
     CHECK(came.plies == 7);
     const auto snap = db->snapshot();

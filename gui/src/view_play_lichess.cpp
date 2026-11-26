@@ -1131,13 +1131,14 @@ void App::drawSeekCard(bool& enter) {
         }
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("Enter"));
-        if (!stream)
-            wrapped(lichess_events_ && !lichess_events_->error().empty()
+        if (!stream) {
+            const auto broke = lichess_events_ ? lichess_events_->failure() : lichess::Failure{};
+            wrapped(broke.failed()
                         ? trf("Waiting for Lichess's event stream ({}): a seek goes once it is open.",
-                              lichess_events_->error())
+                              lichess::describe(broke))
                         : std::string(TR("Waiting for Lichess's event stream: a seek goes once it is open.")),
                     true);
-        else if (lock)
+        } else if (lock)
             wrapped(TR("One of your games is being played live: no seek meanwhile."), true);
     } else {
         // Seeking: since when, called back by Escape.

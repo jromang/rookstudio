@@ -573,7 +573,8 @@ void App::pollBot() {
         if (!ready(a.arrival)) continue;
         const auto got = a.arrival.get();
         if (got.added && a.index < shelf().entries().size()) shelf().rebuildTree(a.index);
-        if (!got.error.empty()) Console::instance().add(trf("Lichess bot: the game {}: {}", a.id, got.error), true);
+        if (got.failure.failed())
+            Console::instance().add(trf("Lichess bot: the game {}: {}", a.id, lichess::describe(got.failure)), true);
     }
     std::erase_if(bot_arrivals_, [](const auto& a) { return !a.arrival.valid(); });
     if (!bot_account_) {
@@ -1335,8 +1336,12 @@ void App::drawBotOnline() {
         ImGui::TextDisabled("%s", TR("No new challenge; the game in progress goes on to its end."));
     }
     if (!bot_online_error_.empty()) coloured(bot_online_error_, ui::WARN);
-    if (bot_events_ && !bot_events_->connected() && !bot_events_->error().empty())
-        coloured(trf("The connection to Lichess is cut ({}): tried again by itself.", bot_events_->error()), ui::WARN);
+    if (const auto broke = bot_events_ ? bot_events_->failure() : lichess::Failure{};
+        bot_events_ && !bot_events_->connected() && broke.failed())
+        coloured(broke.net == lichess::NetError::Offline
+                     ? std::string(TR("The connection to Lichess is cut: tried again by itself."))
+                     : trf("The connection to Lichess is cut ({}): tried again by itself.", lichess::describe(broke)),
+                 ui::WARN);
     if (botCoresNeeded())
         coloured(TR("A tournament needs the cores: the challenges are declined “later” meanwhile."), ui::WARN);
     // Its game: on a small board, the Board a click away.

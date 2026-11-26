@@ -88,7 +88,7 @@ struct ExternalEngine {
                                                     const std::atomic<bool>* cancel = nullptr);
 [[nodiscard]] Answer<std::vector<ExternalEngine>> listEngines(const std::string& token,
                                                               const std::atomic<bool>* cancel = nullptr);
-// The registration `id`: no value and no error when Lichess has it no more (404: withdrawn on lichess.org).
+// The registration `id`: no value and no failure when Lichess has it no more (404: withdrawn on lichess.org).
 [[nodiscard]] Answer<ExternalEngine> engineRegistration(const std::string& token, const std::string& id,
                                                         const std::atomic<bool>* cancel = nullptr);
 // A registration changed (its name, limits, or a new secret).

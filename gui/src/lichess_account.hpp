@@ -80,7 +80,7 @@ struct TokenState {
     std::vector<std::string> scopes;
     int64_t expires = 0;
 };
-// The token tested (POST /api/token/test); no value, with no error, when Lichess no longer takes it (revoked, or
+// The token tested (POST /api/token/test); no value, with no failure, when Lichess no longer takes it (revoked, or
 // expired).
 [[nodiscard]] Answer<TokenState> testToken(std::string_view token, const std::atomic<bool>* cancel = nullptr);
 

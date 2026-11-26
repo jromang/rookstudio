@@ -29,6 +29,7 @@
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::readFile;
 using fcg::test::ScratchDir;
 
 namespace {
@@ -38,11 +39,6 @@ TournamentSpec matchSpec(uint64_t max_games = 0) {
 }
 
 using fcg::test::fakeGame;
-
-std::string readAll(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 }  // namespace
 
@@ -64,7 +60,7 @@ TEST_CASE("journal: a last line cut short is dropped and removed; a bad line is 
     const auto events = Journal::read(file);
     REQUIRE(events.size() == 2);
     CHECK(events[1]["t"] == "b");
-    CHECK(readAll(file).back() == '\n');
+    CHECK(readFile(file).back() == '\n');
 
     {
         std::ofstream out(file, std::ios::binary | std::ios::app);
@@ -152,7 +148,7 @@ TEST_CASE("state: pairs are played back to back, results survive a reopen, PGN o
     CHECK_FALSE(state->hasWork());
 
     // Every game is in the PGN, once.
-    const auto text  = readAll(dir / "test.pgn");
+    const auto text  = readFile(dir / "test.pgn");
     std::size_t hits = 0;
     for (auto pos = text.find("[Event "); pos != std::string::npos; pos = text.find("[Event ", pos + 1)) ++hits;
     CHECK(hits == 10);
@@ -221,7 +217,7 @@ TEST_CASE("state: a match with locked colours gives the same engine White in bot
         }
 
         // Saved, of a version the versions that would alternate the colours refuse.
-        const auto saved = nlohmann::json::parse(readAll(dir / "tournament.json"));
+        const auto saved = nlohmann::json::parse(readFile(dir / "tournament.json"));
         CHECK(saved.at("version") == 5);
         CHECK(saved.at("colours") == (a_white ? "a_white" : "b_white"));
 
@@ -450,7 +446,7 @@ TEST_CASE("state: one program at a time writes a tournament folder; others can r
     CHECK_NOTHROW((void)TournamentState::open(dir));
 
     // Read-only: nothing to claim, no edit, the files untouched.
-    const auto journal = readAll(dir / "journal.jsonl");
+    const auto journal = readFile(dir / "journal.jsonl");
     auto shown         = TournamentState::open(dir, true);
     CHECK(shown->readOnly());
     CHECK(shown->results().size() == 1);
@@ -459,7 +455,7 @@ TEST_CASE("state: one program at a time writes a tournament folder; others can r
     edit.kind  = Edit::Kind::VoidGames;
     edit.games = {{0, 0}};
     CHECK_THROWS_AS(shown->applyEdit(edit), std::runtime_error);
-    CHECK(readAll(dir / "journal.jsonl") == journal);
+    CHECK(readFile(dir / "journal.jsonl") == journal);
 
 #ifndef _WIN32
     // Another program is refused while this one has it open.
@@ -499,7 +495,7 @@ TEST_CASE("state: a tournament looked at lets go of its folder for the process t
     // Opened to look at it, as the window does: it holds the folder.
     auto shown = TournamentState::open(dir);
     REQUIRE_FALSE(shown->readOnly());
-    const auto journal = readAll(dir / "journal.jsonl");
+    const auto journal = readFile(dir / "journal.jsonl");
     shown->letGo();
     // Shown as it stands, read-only, nothing more written.
     CHECK(shown->readOnly());
@@ -508,7 +504,7 @@ TEST_CASE("state: a tournament looked at lets go of its folder for the process t
     edit.kind  = Edit::Kind::VoidGames;
     edit.games = {{0, 0}};
     CHECK_THROWS_AS(shown->applyEdit(edit), std::runtime_error);
-    CHECK(readAll(dir / "journal.jsonl") == journal);
+    CHECK(readFile(dir / "journal.jsonl") == journal);
 #ifndef _WIN32
     // Another program takes the folder at once.
     const pid_t child = fork();
@@ -535,13 +531,13 @@ TEST_CASE("state: a game claimed before the folder was let go of and ended after
     auto state      = TournamentState::create(dir, matchSpec(4));
     const auto task = state->claimNext();
     REQUIRE(task);
-    const auto journal = readAll(dir / "journal.jsonl");
-    const auto pgn     = readAll(dir / "test.pgn");
+    const auto journal = readFile(dir / "journal.jsonl");
+    const auto pgn     = readFile(dir / "test.pgn");
     state->letGo();
     CHECK_THROWS_AS(state->complete(*task, fakeGame(*task, "1-0")), std::logic_error);
     CHECK(state->results().empty());
-    CHECK(readAll(dir / "journal.jsonl") == journal);
-    CHECK(readAll(dir / "test.pgn") == pgn);
+    CHECK(readFile(dir / "journal.jsonl") == journal);
+    CHECK(readFile(dir / "test.pgn") == pgn);
 }
 
 TEST_CASE("files: a replaced file keeps its permissions, and the old content as .bak when asked") {
@@ -549,14 +545,14 @@ TEST_CASE("files: a replaced file keeps its permissions, and the old content as 
     fs::create_directories(dir);
     const auto file = dir / "settings.json";
     replaceFile(file, "one");
-    CHECK(readAll(file) == "one");
+    CHECK(readFile(file) == "one");
     CHECK_FALSE(fs::exists(fs::path(file).concat(".bak")));
 #ifndef _WIN32
     fs::permissions(file, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::replace);
 #endif
     replaceFile(file, "two", true);
-    CHECK(readAll(file) == "two");
-    CHECK(readAll(fs::path(file).concat(".bak")) == "one");
+    CHECK(readFile(file) == "two");
+    CHECK(readFile(fs::path(file).concat(".bak")) == "one");
     CHECK_FALSE(fs::exists(fs::path(file).concat(".tmp")));
 #ifndef _WIN32
     CHECK(fs::status(file).permissions() == (fs::perms::owner_read | fs::perms::owner_write));
@@ -588,7 +584,7 @@ TEST_CASE("files: a file made is writable by its owner only whatever the umask, 
     CHECK(mode(dir / "token.json") == owner_only);
     CHECK(mode(dir / "a.json") == owner_only);
     CHECK(mode(dir / "a.json.bak") == owner_only);
-    CHECK(readAll(dir / "a.json.bak") == "{}");
+    CHECK(readFile(dir / "a.json.bak") == "{}");
 }
 #endif
 
@@ -609,7 +605,7 @@ TEST_CASE("state: a tournament folder from elsewhere cannot make the program wri
         while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1-0"));
         REQUIRE(state->finished());
     }
-    auto json       = nlohmann::json::parse(readAll(dir / "tournament.json"));
+    auto json       = nlohmann::json::parse(readFile(dir / "tournament.json"));
     json["pgn_out"] = victim.string();
     std::ofstream(dir / "tournament.json", std::ios::binary | std::ios::trunc) << json.dump(2);
     {
@@ -619,24 +615,24 @@ TEST_CASE("state: a tournament folder from elsewhere cannot make the program wri
         CHECK(std::any_of(warnings.begin(), warnings.end(),
                           [](const std::string& w) { return w.find("not a .pgn file") != std::string::npos; }));
     }
-    CHECK(readAll(victim) == "echo hello\n");
+    CHECK(readFile(victim) == "echo hello\n");
 
 #ifndef _WIN32
     // Its files linked to a file elsewhere, which opening it would cut or write over.
-    const auto pgn = readAll(dir / "test.pgn");
+    const auto pgn = readFile(dir / "test.pgn");
     for (const auto* name : {"test.pgn", "journal.jsonl", "tournament.lock"}) {
         const auto file = dir / name;
         const auto kept = fs::path(file).concat(".kept");
         if (fs::exists(file)) fs::rename(file, kept);
         fs::create_symlink(victim, file);
         CHECK_THROWS_WITH(TournamentState::open(dir), doctest::Contains("symbolic link"));
-        CHECK(readAll(victim) == "echo hello\n");
+        CHECK(readFile(victim) == "echo hello\n");
         fs::remove(file);
         if (fs::exists(kept)) fs::rename(kept, file);
     }
     // Opened as before once the links are gone.
     CHECK(TournamentState::open(dir)->results().size() == 2);
-    CHECK(readAll(dir / "test.pgn") == pgn);
+    CHECK(readFile(dir / "test.pgn") == pgn);
 #endif
     fs::remove(victim);
 }
@@ -666,7 +662,7 @@ TEST_CASE("state: the PV warnings of a game are kept with its result, by ply") {
 TEST_CASE("state: a tournament written before a PGN setting existed still opens") {
     const ScratchDir dir("state-old-spec");
     TournamentState::create(dir, matchSpec(2));
-    auto spec = nlohmann::json::parse(readAll(dir / "tournament.json"));
+    auto spec = nlohmann::json::parse(readFile(dir / "tournament.json"));
     REQUIRE(spec["conditions"]["pgn"].erase("track_wdl") == 1);
     std::ofstream(dir / "tournament.json", std::ios::binary | std::ios::trunc) << spec.dump(2);
     const auto state = TournamentState::open(dir);
@@ -745,7 +741,7 @@ namespace {
 
 // The (Round, White) of each game of a PGN file, in file order.
 std::vector<std::pair<std::string, std::string>> gamesOf(const fs::path& file) {
-    const auto text = readAll(file);
+    const auto text = readFile(file);
     std::vector<std::pair<std::string, std::string>> games;
     const auto tag = [&](std::size_t from, const std::string& name) {
         const auto at    = text.find("[" + name + " \"", from);
@@ -823,7 +819,7 @@ TEST_CASE("state: the PGN file of the user's gets a game held there with the res
         state->applyEdit(set);
         state->complete(first, fakeGame(first, "1/2-1/2"));
     }
-    const auto text = readAll(out);
+    const auto text = readFile(out);
     CHECK(gamesOf(out).size() == 2);
     CHECK(text.find("[Result \"0-1\"]") != std::string::npos);
     CHECK(text.find("[Result \"1-0\"]") == std::string::npos);
@@ -831,7 +827,7 @@ TEST_CASE("state: the PGN file of the user's gets a game held there with the res
     CHECK(text.find("{Adjudicated by the operator: an illegal move the GUI missed") != std::string::npos);
 
     // The tournament's own PGN file keeps the game as played; a reopen writes nothing twice.
-    CHECK(readAll(dir / "test.pgn").find("[Result \"1-0\"]") != std::string::npos);
+    CHECK(readFile(dir / "test.pgn").find("[Result \"1-0\"]") != std::string::npos);
     TournamentState::open(dir);
     CHECK(gamesOf(out).size() == 2);
 }
@@ -861,7 +857,7 @@ TEST_CASE("state: a write to the user's PGN file cut by a crash is completed wit
     }
     // Opened again: the rest of the same text, the result set included, not the games again.
     TournamentState::open(dir);
-    const auto text = readAll(out);
+    const auto text = readFile(out);
     CHECK(gamesOf(out).size() == 2);
     CHECK(text.find("[Termination \"adjudicated by the operator\"]") != std::string::npos);
 }
@@ -900,7 +896,7 @@ TEST_CASE("state: the PGN file of the user's gets what is left when the tourname
 
     // Every game played but the second, which never ended, in the ChessBase style.
     CHECK(gamesOf(out).size() == static_cast<std::size_t>(played));
-    CHECK(readAll(out) == readAll(dir / "test-chessbase.pgn"));
+    CHECK(readFile(out) == readFile(dir / "test-chessbase.pgn"));
 }
 
 TEST_CASE("state: a write to the PGN file of the user's that fails partway is completed, not written again") {
@@ -928,15 +924,15 @@ TEST_CASE("state: a write to the PGN file of the user's that fails partway is co
             state->complete(*second, fakeGame(*second, "0-1"));
             CHECK(state->pgnOutError().empty());
             CHECK(gamesOf(out).size() == 2);
-            CHECK(readAll(out) == readAll(dir / "test.pgn"));
+            CHECK(readFile(out) == readFile(dir / "test.pgn"));
         }
 
         // Nothing is left to settle when the tournament is opened again.
         auto state = TournamentState::open(dir);
-        CHECK(readAll(out) == readAll(dir / "test.pgn"));
+        CHECK(readFile(out) == readFile(dir / "test.pgn"));
         while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
         CHECK(gamesOf(out).size() == 4);
-        CHECK(readAll(out) == readAll(dir / "test.pgn"));
+        CHECK(readFile(out) == readFile(dir / "test.pgn"));
     }
 }
 
@@ -1041,12 +1037,12 @@ TEST_CASE("state: the PGN file of the user's is written again after a write ende
     state->complete(*second, fakeGame(*second, "0-1"));
     CHECK(state->pgnOutError().empty());
     CHECK(gamesOf(out).size() == 2);
-    CHECK(readAll(out) == readAll(dir / "test.pgn"));
+    CHECK(readFile(out) == readFile(dir / "test.pgn"));
 
     // Nothing written twice when the tournament is opened again.
     state.reset();
     state = TournamentState::open(dir);
-    CHECK(readAll(out) == readAll(dir / "test.pgn"));
+    CHECK(readFile(out) == readFile(dir / "test.pgn"));
 }
 
 TEST_CASE("state: games recorded by many threads at once resume exactly, each game where the journal says") {
@@ -1118,7 +1114,7 @@ void cutJournal(const fs::path& dir, const std::vector<nlohmann::json>& events) 
 
 // The games another PGN viewer sees in a file.
 std::size_t countGames(const fs::path& file) {
-    const auto text = readAll(file);
+    const auto text = readFile(file);
     std::size_t n   = 0;
     for (auto pos = text.find("[Event "); pos != std::string::npos; pos = text.find("[Event ", pos + 1)) ++n;
     return n;
@@ -1174,10 +1170,10 @@ TEST_CASE("state: game text whose journal line a crash lost, in the middle of th
     CHECK(countGames(dir / "test-chessbase.pgn") == 6);
 
     // Nothing more to do on the next opening.
-    const auto text = readAll(dir / "test.pgn");
+    const auto text = readFile(dir / "test.pgn");
     state.reset();
     state = TournamentState::open(dir);
-    CHECK(readAll(dir / "test.pgn") == text);
+    CHECK(readFile(dir / "test.pgn") == text);
     CHECK(state->results().size() == 6);
 }
 
@@ -1254,7 +1250,7 @@ TEST_CASE("state: a crash in the middle of a write to the PGN file of the user's
             state->complete(*task, fakeGame(*task, "1-0"));
         }
     }
-    const auto full = readAll(out);
+    const auto full = readFile(out);
     REQUIRE(gamesOf(out).size() == 3);
 
     // The write of game 1 was journaled before, not after: the crash came in between.
@@ -1289,18 +1285,18 @@ TEST_CASE("state: a crash in the middle of a write to the PGN file of the user's
     }
 
     auto state = TournamentState::open(dir);
-    CHECK(readAll(out) == expected);
+    CHECK(readFile(out) == expected);
     CHECK(state->pgnOutError().empty());
 
     // Settled in the journal: the next opening leaves the file alone.
     state.reset();
     state = TournamentState::open(dir);
-    CHECK(readAll(out) == expected);
+    CHECK(readFile(out) == expected);
 
     // The rest of the games follow, each once.
     while (auto task = state->claimNext()) state->complete(*task, fakeGame(*task, "1/2-1/2"));
     CHECK(state->finished());
-    const auto text = readAll(out);
+    const auto text = readFile(out);
     REQUIRE(text.size() > expected.size());
     CHECK(text.compare(0, expected.size(), expected) == 0);
     auto games = gamesOf(out);
@@ -1390,7 +1386,7 @@ TEST_CASE("state: a new tournament writes its games to <name>.pgn, kept when it 
     CHECK_FALSE(fs::exists(dir / "games.pgn"));
 
     // In tournament.json from the start; a name changed afterwards keeps the files.
-    auto json = nlohmann::json::parse(readAll(dir / "tournament.json"));
+    auto json = nlohmann::json::parse(readFile(dir / "tournament.json"));
     CHECK(json["pgn_file"] == file + ".pgn");
     CHECK(json["pgn_chessbase_file"] == file + "-chessbase.pgn");
     // Version 2, which versions before 0.4.13 refuse rather than writing a games.pgn of their own.
@@ -1432,7 +1428,7 @@ namespace {
 
 // A tournament as 0.4.12 and earlier left it: games.pgn and games-chessbase.pgn, no file names in tournament.json.
 void makeOld(const fs::path& dir) {
-    auto json = nlohmann::json::parse(readAll(dir / "tournament.json"));
+    auto json = nlohmann::json::parse(readFile(dir / "tournament.json"));
     CHECK(json.erase("pgn_file") == 1);
     CHECK(json.erase("pgn_chessbase_file") == 1);
     json["version"] = 1;
@@ -1470,7 +1466,7 @@ TEST_CASE("state: a tournament of an earlier version keeps games.pgn; the game d
     CHECK(countGames(old_dir / "games-chessbase.pgn") == 4);
     CHECK_FALSE(fs::exists(old_dir / "test.pgn"));
     // Still without the names: an earlier version opens it as before.
-    const auto old_json = nlohmann::json::parse(readAll(old_dir / "tournament.json"));
+    const auto old_json = nlohmann::json::parse(readFile(old_dir / "tournament.json"));
     CHECK_FALSE(old_json.contains("pgn_file"));
     CHECK(old_json["version"] == 1);
 

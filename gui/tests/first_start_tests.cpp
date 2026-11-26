@@ -6,20 +6,17 @@
 #include <string>
 
 #include "first_start.hpp"
+#include "test_support.hpp"
 
 namespace fs = std::filesystem;
 using namespace fcg::first;
+using fcg::test::readFile;
 
 namespace {
 
 void write(const fs::path& file, const std::string& text) {
     fs::create_directories(file.parent_path());
     std::ofstream(file, std::ios::binary) << text;
-}
-
-std::string read(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 // A fastchess-gui profile: engines, books, settings, two tournaments, and what a copy leaves out.
@@ -105,8 +102,8 @@ TEST_CASE("first start: what fastchess-gui's profile holds, and what a copy leav
     CHECK(s.tournaments == 2);
     CHECK(s.settings);
     // The files copied: neither running.json, queue.json, the log nor the control file.
-    CHECK(s.bytes == read(from / "engines.json").size() + read(from / "books.json").size() +
-                         read(from / "settings.json").size() + read(from / "setup.json").size() + 2 + 1000 + 2);
+    CHECK(s.bytes == readFile(from / "engines.json").size() + readFile(from / "books.json").size() +
+                         readFile(from / "settings.json").size() + readFile(from / "setup.json").size() + 2 + 1000 + 2);
 }
 
 TEST_CASE("first start: the copy of fastchess-gui's profile, which stays as it was") {
@@ -122,17 +119,17 @@ TEST_CASE("first start: the copy of fastchess-gui's profile, which stays as it w
     REQUIRE(copyProfile(from, to, error, &done));
     CHECK(error.empty());
     CHECK(done == summarize(from).bytes);
-    CHECK(read(to / "engines.json") == read(from / "engines.json"));
-    CHECK(read(to / "setup.json") == R"({"language":"fr"})");
-    CHECK(read(to / "runs" / "gaia-vs-sf" / "games.pgn") == std::string(1000, 'p'));
+    CHECK(readFile(to / "engines.json") == readFile(from / "engines.json"));
+    CHECK(readFile(to / "setup.json") == R"({"language":"fr"})");
+    CHECK(readFile(to / "runs" / "gaia-vs-sf" / "games.pgn") == std::string(1000, 'p'));
     CHECK(fs::is_directory(to / "runs" / "gauntlet"));
     CHECK_FALSE(fs::exists(to / "running.json"));
     CHECK_FALSE(fs::exists(to / "queue.json"));
     CHECK_FALSE(fs::exists(to / "fastchess-gui.log"));
     CHECK_FALSE(fs::exists(to / "runs" / "gaia-vs-sf" / "control.json"));
-    CHECK(read(to / "rookstudio.log") == "our log");
+    CHECK(readFile(to / "rookstudio.log") == "our log");
     // fastchess-gui's profile is untouched.
-    CHECK(read(from / "running.json") == "[]");
-    CHECK(read(from / "fastchess-gui.log") == "a log");
+    CHECK(readFile(from / "running.json") == "[]");
+    CHECK(readFile(from / "fastchess-gui.log") == "a log");
     CHECK(fresh(to));  // the views are the first start's to keep
 }

@@ -148,9 +148,5 @@ inline std::string movetext(const std::vector<std::string>& line) {
     return text;
 }
 
-inline std::string fileText(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 }  // namespace fcg::test

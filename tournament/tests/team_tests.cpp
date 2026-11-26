@@ -16,6 +16,7 @@
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
+using fcg::test::readFile;
 using fcg::test::ScratchDir;
 
 namespace {
@@ -38,11 +39,6 @@ TournamentSpec teamSpec(int a, int b, bool boards, int cycles = 1) {
 }
 
 using fcg::test::fakeGame;
-
-std::string readAll(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 GameResult game(uint32_t encounter, int g, int white, int black, const std::string& result) {
     GameResult r;
@@ -269,7 +265,7 @@ TEST_CASE("team match: played, resumed exactly, the teams in the PGN tags, the s
         for (int i = 0; i < 4; ++i) state->complete(claimed[static_cast<std::size_t>(i)], fakeGame(claimed[i], "1-0"));
     }
 
-    const auto pgn = readAll(dir / "teams.pgn");
+    const auto pgn = readFile(dir / "teams.pgn");
     CHECK(pgn.find("[WhiteTeam \"Old\"]") != std::string::npos);
     CHECK(pgn.find("[BlackTeam \"New\"]") != std::string::npos);
     CHECK(pgn.find("[WhiteTeam \"New\"]") != std::string::npos);

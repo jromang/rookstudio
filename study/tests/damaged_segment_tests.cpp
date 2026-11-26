@@ -124,18 +124,13 @@ fs::path copyOf(const fs::path& from, const std::string& name) {
     return to;
 }
 
-std::string bytesOf(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
 void writeBytes(const fs::path& file, const std::string& bytes) { std::ofstream(file, std::ios::binary) << bytes; }
 
 // What a database's folder holds, file by file.
 std::map<std::string, std::string> contents(const fs::path& dir) {
     std::map<std::string, std::string> out;
     for (const auto& e : fs::recursive_directory_iterator(dir))
-        out[utf8(fs::relative(e.path(), dir))] = e.is_regular_file() ? bytesOf(e.path()) : std::string("(folder)");
+        out[utf8(fs::relative(e.path(), dir))] = e.is_regular_file() ? readFile(e.path()) : std::string("(folder)");
     return out;
 }
 
@@ -187,7 +182,7 @@ void damage(const fs::path& segment, const Case& c) {
     const auto file = c.file.empty() ? segment : segment / c.file;
     switch (c.how) {
         case Harm::Cut: {
-            const auto bytes = bytesOf(file);
+            const auto bytes = readFile(file);
             REQUIRE(bytes.size() > 1);
             writeBytes(file, bytes.substr(0, bytes.size() / 2));
             break;
@@ -196,7 +191,7 @@ void damage(const fs::path& segment, const Case& c) {
             REQUIRE(fs::remove_all(file) > 0);
             break;
         case Harm::Header: {
-            auto bytes = bytesOf(file);
+            auto bytes = readFile(file);
             REQUIRE(c.at < bytes.size());
             bytes[c.at] = c.byte;
             writeBytes(file, bytes);

@@ -10,10 +10,12 @@
 #include <json.hpp>
 
 #include "repertoires.hpp"
+#include "test_support.hpp"
 #include "training.hpp"
 
 namespace fs = std::filesystem;
 using namespace fcg;
+using fcg::test::readFile;
 using study::fsrs::Rating;
 
 namespace {
@@ -32,11 +34,6 @@ chess::Move next(const std::vector<std::string>& line, const std::string& san) {
     chess::Board board;
     for (const auto& s : line) board.makeMove<false>(chess::uci::parseSan(board, s));
     return chess::uci::parseSan(board, san);
-}
-
-std::string readText(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 const study::TrainingCard* cardAfter(const std::vector<study::TrainingCard>& cards,
@@ -63,7 +60,7 @@ TEST_CASE("training: the cards' memories kept beside the repertoire, read back t
     RepertoireShelf shelf(profile);
     const auto index  = najdorf(shelf);
     const auto& entry = shelf.entries()[index];
-    const auto pgn    = readText(entry.file);
+    const auto pgn    = readFile(entry.file);
     CHECK(trainingFileOf(entry.file) == profile / "repertoires" / "Najdorf.training.json");
     CHECK(reviewsFileOf(entry.file) == profile / "repertoires" / "Najdorf.reviews.jsonl");
     // Nothing kept yet: every card is new.
@@ -94,7 +91,7 @@ TEST_CASE("training: the cards' memories kept beside the repertoire, read back t
     CHECK(first.card.due == now + 2 * study::fsrs::DAY);
     CHECK(read.memories.at(cards[1].key).card.state == study::fsrs::State::Learning);
     // The repertoire's PGN is as it was.
-    CHECK(readText(entry.file) == pgn);
+    CHECK(readFile(entry.file) == pgn);
     // One line per answer.
     std::ifstream log(reviewsFileOf(entry.file));
     std::vector<nlohmann::json> lines;

@@ -38,6 +38,7 @@
 using namespace fcg;
 using namespace fcg::ssh;
 using namespace std::chrono_literals;
+using fcg::test::readFile;
 using fcg::test::waitUntil;
 
 namespace {
@@ -48,11 +49,6 @@ std::string unhex(std::string_view hex) {
         out += static_cast<char>(std::stoi(std::string(hex.substr(i, 2)), nullptr, 16));
     }
     return out;
-}
-
-std::string readText(const std::filesystem::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(in), {});
 }
 
 bool netTests() {
@@ -561,7 +557,7 @@ TEST_CASE("Tunnel: host keys trusted on first use, kept by host and port, forgot
         std::ofstream(file) << text;
         CHECK_FALSE(knownHostKey(file, "example.org", 2222).has_value());
         CHECK_FALSE(rememberHostKey(file, "example.org", 22, "SHA256:ccc"));
-        CHECK(readText(file) == text);
+        CHECK(readFile(file) == text);
     }
     std::filesystem::remove_all(dir);
 }
@@ -1214,7 +1210,7 @@ TEST_CASE("Tunnel: known hosts that cannot be read, or none to keep keys in, sto
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
         CHECK(tunnel.status().error.find("cannot be read") != std::string::npos);
         CHECK(tunnel.status().new_key.empty());
-        CHECK(readText(known) == broken);
+        CHECK(readFile(known) == broken);
     }
     // Neither a key pinned nor a file to keep it in: refused, not trusted every time.
     {

@@ -35,6 +35,7 @@
 using namespace fcg;
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
+using fcg::test::readFile;
 using fcg::test::ScratchDir;
 
 namespace {
@@ -143,11 +144,6 @@ AwQFBg==
 void writeFile(const fs::path& path, const std::string& content) {
     fs::create_directories(path.parent_path());
     std::ofstream(path, std::ios::binary) << content;
-}
-
-std::string readFile(const fs::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(in), {});
 }
 
 // The command `sh -c '...'` runs, as sh would read the quoted part (viaSh's quoting undone); the command as it is

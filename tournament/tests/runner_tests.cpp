@@ -24,6 +24,7 @@
 
 #include "mock_engines.hpp"
 #include "own_temp.hpp"
+#include "test_support.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -35,6 +36,7 @@
 using namespace fcg::tour;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
+using fcg::test::readFile;
 
 namespace {
 
@@ -124,11 +126,6 @@ struct ScopedEnv {
    private:
     const char* name_;
 };
-
-std::string readFile(const fs::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-}
 
 std::size_t countOf(const std::string& text, const std::string& what) {
     std::size_t n = 0;

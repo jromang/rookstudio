@@ -33,11 +33,6 @@ using namespace std::chrono_literals;
 
 namespace {
 
-std::string readAll(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
 HttpRequest get(const std::string& url) {
     HttpRequest request;
     request.url    = url;
@@ -302,7 +297,7 @@ TEST_CASE("HTTP: a download cut short or cancelled goes on from where it stopped
     CHECK(got.resumed);
     CHECK(got.bytes == 300000);
     CHECK(progress.bytes == 300000);
-    CHECK(readAll(file) == contents[0]);
+    CHECK(readFile(file) == contents[0]);
     CHECK_FALSE(fs::exists(part));
     CHECK(asked == std::vector<std::string>{"-|-", "bytes=100000-|\"v1\""});
 
@@ -314,7 +309,7 @@ TEST_CASE("HTTP: a download cut short or cancelled goes on from where it stopped
     got     = httpDownload(url, file);
     CHECK(got.ok);
     CHECK_FALSE(got.resumed);
-    CHECK(readAll(file) == contents[1]);
+    CHECK(readFile(file) == contents[1]);
 
     // Cancelled while it comes: kept, then resumed.
     fs::remove(file);
@@ -333,14 +328,14 @@ TEST_CASE("HTTP: a download cut short or cancelled goes on from where it stopped
     got = httpDownload(url, file);
     CHECK(got.ok);
     CHECK(got.resumed);
-    CHECK(readAll(file) == contents[1]);
+    CHECK(readFile(file) == contents[1]);
 
     // A part already whole (the rename did not happen): the server has nothing more, and the file is there.
     fs::rename(file, part);
     std::ofstream(fs::path(file).concat(".part.tag")) << "\"v2\"\n";
     got = httpDownload(url, file);
     CHECK(got.ok);
-    CHECK(readAll(file) == contents[1]);
+    CHECK(readFile(file) == contents[1]);
 
     // Checked against its SHA-256: a file that differs is not kept.
     const auto reference = dir / "reference";
@@ -461,7 +456,7 @@ TEST_CASE("HTTPS: games streamed from Lichess, a file of its database downloaded
     const auto got = httpDownload("https://database.lichess.org/standard/sha256sums.txt", file, &progress);
     CHECK_MESSAGE(got.ok, got.error);
     CHECK(progress.size == progress.bytes);
-    CHECK(readAll(file).find("lichess_db_standard_rated_2013-01.pgn.zst") != std::string::npos);
+    CHECK(readFile(file).find("lichess_db_standard_rated_2013-01.pgn.zst") != std::string::npos);
 }
 
 TEST_CASE("assistant models: the recommended one is pinned to what was published") {
@@ -505,7 +500,7 @@ TEST_CASE("assistant models: a model comes into the profile, checked against its
     const auto got = downloadModel(profile, small, &progress, nullptr, url);
     REQUIRE_MESSAGE(got.ok, got.error);
     CHECK(modelInstalled(profile, small));
-    CHECK(readAll(modelFile(profile, small)) == content);
+    CHECK(readFile(modelFile(profile, small)) == content);
     CHECK(progress.bytes == content.size());
     // A file that is not the one published is removed.
     const std::string zeros(64, '0');  // the model holds a view of it

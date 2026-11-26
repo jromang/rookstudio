@@ -48,18 +48,13 @@ const std::string TEST_PASSWORD = "rstest20";
 
 fs::path chessbaseData(const std::string& name) { return data("chessbase/" + name); }
 
-std::string slurp(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
 void spit(const fs::path& file, const std::string& bytes) {
     std::ofstream out(file, std::ios::binary);
     out << bytes;
 }
 
 std::vector<GameTree> pgnGames() {
-    const auto text = slurp(chessbaseData("cbtest.pgn"));
+    const auto text = readFile(chessbaseData("cbtest.pgn"));
     std::vector<GameTree> games;
     for (std::string_view rest(text);;) {
         const auto read = readPgnGame(rest);
@@ -343,7 +338,7 @@ std::string archive(const std::vector<ArchiveMember>& members, std::size_t block
 std::vector<ArchiveMember> cbhMembers(const std::string& base) {
     std::vector<ArchiveMember> members;
     for (const char* ext : {".cba", ".cbc", ".cbe", ".cbg", ".cbh", ".cbj", ".cbp", ".cbs", ".cbt"})
-        members.push_back({base + ext, slurp(chessbaseData(std::string("cbtest1") + ext))});
+        members.push_back({base + ext, readFile(chessbaseData(std::string("cbtest1") + ext))});
     return members;
 }
 
@@ -586,7 +581,7 @@ TEST_CASE("ChessBase CBV archive: the CBH database's 35 games, its members unpac
              {".cbh", ".cbg", ".cba", ".cbp", ".cbt", ".cbc", ".cbs", ".cbe", ".cbj", ".cbm", ".cbtt", ".cbl"}) {
             INFO(ext);
             auto member      = members->open(ext, false);
-            const auto loose = slurp(chessbaseData(std::string("cbtest1") + ext));
+            const auto loose = readFile(chessbaseData(std::string("cbtest1") + ext));
             REQUIRE(member);
             REQUIRE(member->size() == loose.size());
             const auto bytes = member->read(0, loose.size());
@@ -695,7 +690,7 @@ TEST_CASE("ChessBase archive: blocks stored in every way the format has, members
     // The members, unpacked a block at a time, read at every place.
     auto members      = chessbase::archiveMembers(dir / "Blocks.cbv", "", 0);
     auto header       = members->open(".cbh", false);
-    const auto source = slurp(chessbaseData("cbtest1.cbh"));
+    const auto source = readFile(chessbaseData("cbtest1.cbh"));
     for (uint64_t at = source.size(); at-- > 0;) {
         const std::size_t n = std::min<std::size_t>(97, source.size() - at);
         const auto bytes    = header->read(at, n);
@@ -729,7 +724,7 @@ TEST_CASE("ChessBase CBZ archive: DES, and a .cbv enciphered with a password") {
     fs::create_directories(dir);
     for (const std::string password : {"pass", "my long password"}) {
         INFO(password);
-        auto bytes = slurp(chessbaseData("cbtest1.cbv"));
+        auto bytes = readFile(chessbaseData("cbtest1.cbv"));
         bytes.resize((bytes.size() + 7) / 8 * 8, '\0');
         std::vector<uint8_t> enciphered(bytes.begin(), bytes.end());
         chessbase::desBlocks(password, enciphered, false);
@@ -774,7 +769,7 @@ TEST_CASE("ChessBase 2CBV archive: a zip of the 2CBH database's files, its membe
         for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid", ".2lcd", ".2lgd"}) {
             INFO(ext);
             auto member      = members->open(ext, false);
-            const auto loose = slurp(chessbaseData(std::string("cbtest2") + ext));
+            const auto loose = readFile(chessbaseData(std::string("cbtest2") + ext));
             REQUIRE(member);
             REQUIRE(member->size() == loose.size());
             const auto bytes = member->read(0, loose.size());
@@ -786,7 +781,7 @@ TEST_CASE("ChessBase 2CBV archive: a zip of the 2CBH database's files, its membe
     // Read a piece at a time at every place, backward: each read before what is kept unpacks the member again.
     auto members      = chessbase::archiveMembers(file, "", 0);
     auto moves        = members->open(".2cbg", false);
-    const auto source = slurp(chessbaseData("cbtest2.2cbg"));
+    const auto source = readFile(chessbaseData("cbtest2.2cbg"));
     for (uint64_t at = source.size(); at-- > 0;) {
         const std::size_t n = std::min<std::size_t>(97, source.size() - at);
         const auto bytes    = moves->read(at, n);
@@ -825,11 +820,11 @@ TEST_CASE("ChessBase 2CBZ archive: the zip enciphered, read with its password, a
         CHECK(games[i].tree.main.moves.size() == plain[i].tree.main.moves.size());
     }
     // It is the zip, enciphered as a .cbz is, padded with zeros to the cipher's blocks.
-    auto zip = slurp(chessbaseData("cbtest2.2cbv"));
+    auto zip = readFile(chessbaseData("cbtest2.2cbv"));
     zip.resize((zip.size() + 7) / 8 * 8, '\0');
     std::vector<uint8_t> enciphered(zip.begin(), zip.end());
     chessbase::desBlocks(TEST_PASSWORD, enciphered, false);
-    CHECK(std::string(enciphered.begin(), enciphered.end()) == slurp(file));
+    CHECK(std::string(enciphered.begin(), enciphered.end()) == readFile(file));
     CHECK(archivePasswordFits(file, TEST_PASSWORD));
     CHECK_FALSE(archivePasswordFits(file, "RSTEST20"));
     CHECK(throwsWith([&] { ChessBaseDatabase(file, ChessBaseOptions{"RSTEST20"}); }, "wrong password"));
@@ -859,7 +854,7 @@ TEST_CASE("ChessBase archive: a zip whose files are stored as they are, or with 
     const auto files = [](uint16_t moves_method) {
         std::vector<ZipFile> out;
         for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid"})
-            out.push_back({std::string("Stored") + ext, slurp(chessbaseData(std::string("cbtest2") + ext)),
+            out.push_back({std::string("Stored") + ext, readFile(chessbaseData(std::string("cbtest2") + ext)),
                            std::string(ext) == ".2cbg" ? moves_method : uint16_t{0}});
         return out;
     };
@@ -884,7 +879,7 @@ TEST_CASE("ChessBase archive: a large deflated member read a piece at a time, fo
     for (auto& c : big) c = static_cast<char>(random() & 0x7F);
     auto files = std::vector<ZipFile>{{"Big.dat", big, 8}};
     for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid"})
-        files.push_back({std::string("Big") + ext, slurp(chessbaseData(std::string("cbtest2") + ext)), 8});
+        files.push_back({std::string("Big") + ext, readFile(chessbaseData(std::string("cbtest2") + ext)), 8});
     const auto dir = fs::temp_directory_path() / "chessbase-big";
     fs::create_directories(dir);
     spit(dir / "Big.2cbv", zipOf(files));
@@ -907,7 +902,7 @@ TEST_CASE("ChessBase archive: a large deflated member read a piece at a time, fo
     CHECK_THROWS_AS((void)member->read(big.size() - 1, 2), chessbase::Damage);
     // Whole, its CRC-32 checked; a member whose bytes are not those its CRC says is damaged.
     auto whole = chessbase::archiveMembers(dir / "Big.2cbv", "", 16u << 20)->open(".2cbh", false);
-    CHECK(whole->size() == slurp(chessbaseData("cbtest2.2cbh")).size());
+    CHECK(whole->size() == readFile(chessbaseData("cbtest2.2cbh")).size());
     auto wrong      = zipOf(files);
     const auto name = wrong.rfind("Big.2lid");  // its directory entry: the CRC 30 bytes before its name
     REQUIRE(name != std::string::npos);
@@ -952,7 +947,7 @@ TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read
     int opened = 0, refused = 0, damaged = 0;
     for (const auto& set : sets) {
         for (const auto& ext : set.extensions) {
-            const auto original = slurp(chessbaseData(set.from + ext));
+            const auto original = readFile(chessbaseData(set.from + ext));
             const auto dir      = fs::temp_directory_path() / "chessbase-damage";
             const auto reset    = [&] {
                 fs::remove_all(dir);
@@ -1000,7 +995,7 @@ TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read
 
 TEST_CASE("ChessBase database: its games as the PGN import gives them, ready to be copied into a database") {
     // The PGN import of the same games.
-    const auto pgn = slurp(chessbaseData("cbtest.pgn"));
+    const auto pgn = readFile(chessbaseData("cbtest.pgn"));
     std::vector<ImportedGame> want;
     for (const auto text : splitGames(pgn)) {
         ImportedGame g;

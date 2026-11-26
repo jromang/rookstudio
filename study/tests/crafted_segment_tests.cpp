@@ -45,11 +45,6 @@ std::size_t columnAt(int column, std::size_t n) {
     return at;
 }
 
-std::string bytesOf(const fs::path& file) {
-    std::ifstream in(file, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
 void writeBytes(const fs::path& file, const std::string& bytes) {
     std::ofstream(file, std::ios::binary | std::ios::trunc) << bytes;
 }
@@ -188,8 +183,8 @@ TEST_CASE("crafted segment: offsets out of order or past their files, annex reco
         REQUIRE(db->snapshot()->segmentInfos().size() == 1);
         segment = db->snapshot()->segmentInfos().front().name;
     }
-    const auto cols_base  = bytesOf(base / segment / "cols.bin");
-    const auto annex_base = bytesOf(base / segment / "annex.bin");
+    const auto cols_base  = readFile(base / segment / "cols.bin");
+    const auto annex_base = readFile(base / segment / "annex.bin");
     const auto moves_size = fs::file_size(base / segment / "moves.bin");
     REQUIRE(cols_base.size() == columnAt(END, n));  // the format as written down
     REQUIRE(u64At(cols_base, columnAt(MOVES, n) + 8 * n) == moves_size);
@@ -313,9 +308,9 @@ TEST_CASE("crafted segment: an edits file's counts made up to overflow its size 
     for (const auto& e : fs::directory_iterator(dir))
         if (e.path().filename().string().rfind("edits-", 0) == 0) edits_name = e.path().filename().string();
     REQUIRE_FALSE(edits_name.empty());
-    const auto edits = bytesOf(dir / edits_name);
+    const auto edits = readFile(dir / edits_name);
     REQUIRE(edits.size() == 40);  // the header, one game deleted
-    const auto manifest = bytesOf(dir / "manifest.json");
+    const auto manifest = readFile(dir / "manifest.json");
 
     // Counts whose products wrap around to the file's size: refused, nothing read past the file.
     for (const auto& [replaced, deleted] :

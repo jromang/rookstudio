@@ -211,9 +211,9 @@ TEST_CASE("tree: random games with many transpositions, as a recount gives them,
     const auto shared = checkTree(*db);
     CHECK(shared > 1000);
     const auto dir     = db->folder() / Tree::open(db->folder())->folderName();
-    const auto records = fileText(dir / "records.bin");
-    const auto keys    = fileText(dir / "keys.bin");
-    const auto order   = fileText(dir / "order.bin");
+    const auto records = readFile(dir / "records.bin");
+    const auto keys    = readFile(dir / "keys.bin");
+    const auto order   = readFile(dir / "order.bin");
 
     // Little memory: the positions of single games' moves in several passes, one thread: the same files.
     TreeOptions small;
@@ -224,9 +224,9 @@ TEST_CASE("tree: random games with many transpositions, as a recount gives them,
     const auto again = db->folder() / Tree::open(db->folder())->folderName();
     CHECK(again != dir);
     CHECK_FALSE(fs::exists(dir));  // the tree before, removed once the new one is named
-    CHECK(fileText(again / "records.bin") == records);
-    CHECK(fileText(again / "keys.bin") == keys);
-    CHECK(fileText(again / "order.bin") == order);
+    CHECK(readFile(again / "records.bin") == records);
+    CHECK(readFile(again / "keys.bin") == keys);
+    CHECK(readFile(again / "order.bin") == order);
     checkTree(*db);
 }
 
@@ -246,7 +246,7 @@ TEST_CASE("tree: fewer plies followed") {
 TEST_CASE("tree: real games, and the database read again") {
     std::vector<ImportedGame> games;
     {
-        const auto text = fileText(data("games.pgn"));
+        const auto text = readFile(data("games.pgn"));
         for (const auto piece : splitGames(text)) {
             ImportedGame g;
             if (readImportedGame(piece, g)) games.push_back(std::move(g));

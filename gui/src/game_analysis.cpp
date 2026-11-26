@@ -178,9 +178,12 @@ nlohmann::json reviewToJson(const GameReview& review) {
 std::vector<GameReview> loadReviews(const std::filesystem::path& dir, const ReplayGame& game) {
     const auto key = reviewKey(game);
     const auto j   = readJson<nlohmann::json>(dir / (key + ".json"));
-    if (!j || !j->is_object() || j->value("key", "") != key) return {};
+    if (!j || !j->is_object()) return {};
     std::vector<GameReview> out;
     try {
+        // Its key read with the rest: of another type than a text, the file goes unread as for any other error in it
+        // (#136), rather than stopping the program.
+        if (j->value("key", "") != key) return {};
         // Several analyses, or one as the first versions kept it.
         if (j->contains("analyses")) {
             for (const auto& a : j->at("analyses")) out.push_back(reviewFromJson(a));

@@ -118,6 +118,16 @@ jobs:
           newer=$(objdump -T $files | grep -E 'GLIBC_2\.(39|[4-9][0-9])\b' || true)
           if [ -n "$newer" ]; then echo "Newer than glibc 2.38:"; echo "$newer"; exit 1; fi
 
+      - name: The processors the program runs on
+        # The loader refuses a file whose GNU property asks for a newer x86-64 level than the processor's ("CPU ISA
+        # level is lower than required"): nothing shipped may ask beyond x86-64-v2 (an Intel Sandy Bridge, 2011), but
+        # llama.cpp's CPU variants, which ggml loads only on the processors that have what each needs.
+        run: |
+          files="build/rookstudio build/fastchess $(find build -maxdepth 1 -name '*.so' ! -name 'libggml-cpu-*' | sort)"
+          for f in $files; do echo "$f: $(readelf -n "$f" | grep -E 'x86 ISA (needed|used)' | tr -s ' ' | tr '\n' ';')"; done
+          beyond=$(for f in $files; do readelf -n "$f" | grep -E 'x86 ISA needed:.*x86-64-v[34]' | sed "s|^|$f: |"; done || true)
+          if [ -n "$beyond" ]; then echo "Asking for more than x86-64-v2:"; echo "$beyond"; exit 1; fi
+
       - name: Tests
         # Side by side, each test case in a process of its own (tools/run_tests.py): they mostly wait, so two per
         # processor, counted on the runner (a public repository's has four, a private one's two: twice as many tests at

@@ -196,7 +196,7 @@ Progress progressOf(const SpeedRating& speed, int64_t today) {
         return at;
     };
     const auto last = speed.history.back().day;
-    for (const auto [days, week] : {std::pair{7, true}, std::pair{30, false}}) {
+    for (const auto& [days, week] : {std::pair{7, true}, std::pair{30, false}}) {
         if (last <= today - days) continue;  // no game in that time
         if (const auto before = ratingAt(today - days)) {
             p.delta = speed.rating - *before;

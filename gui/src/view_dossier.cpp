@@ -1351,8 +1351,8 @@ void App::drawDossierOnline() {
                         fmt::format(fmt::runtime(format), fmt::format("{}{}", sp.rating, sp.provisional ? "?" : "")));
             }
             for (const auto& e : each) level += (level.empty() ? "" : " · ") + e;
-        } else if (p && !p->profile_error.empty()) {
-            from = p->profile_error;
+        } else if (p && p->profile_error.failed()) {
+            from = lichess::describeAlone(p->profile_error);
         }
         card("dossier_level", TR("Their level online"), level, from);
         ImGui::TableNextColumn();

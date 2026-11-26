@@ -61,9 +61,9 @@ void App::pollLichessProfile() {
         if (answer.value) {
             lichess_profile_ = std::move(*answer.value);
             lichess::keepProfile(storage_.root(), *lichess_profile_);
-            lichess_profile_error_.clear();
+            lichess_profile_error_ = {};
         } else {
-            lichess_profile_error_ = answer.error;
+            lichess_profile_error_ = answer;
         }
     }
     if (lichess_figures_job_.valid() &&
@@ -87,17 +87,15 @@ void App::drawLichessAccountPanel() {
                                           [token = lichess_account_->token] { return lichess::accountProfile(token); });
     }
     if (!lichess_profile_) {
-        ImGui::TextDisabled("%s",
-                            lichess_profile_error_.empty()
-                                ? TR("Asking Lichess…")
-                                : trf("Lichess cannot be reached from here: {}.", lichess_profile_error_).c_str());
+        ImGui::TextDisabled("%s", lichess_profile_error_.failed() ? lichess::gaveNothing(lichess_profile_error_).c_str()
+                                                                  : TR("Asking Lichess…"));
         return;
     }
     const auto& p = *lichess_profile_;
     ImGui::TextDisabled("%s", trf("read {} · kept a day", agoText(p.read_at)).c_str());
-    if (!lichess_profile_error_.empty()) {
+    if (lichess_profile_error_.failed()) {  // what is shown was read earlier
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", trf("· Lichess cannot be reached from here: {}", lichess_profile_error_).c_str());
+        ImGui::TextDisabled("· %s", lichess::describeAlone(lichess_profile_error_).c_str());
     }
 
     // A card per speed: its rating, its games, its curve, what it did lately; a click shows its figures.
@@ -193,7 +191,7 @@ void App::drawLichessAccountPanel() {
     } else if (figures == lichess_figures_.end()) {
         ImGui::TextDisabled("%s", TR("Asking Lichess…"));
     } else if (!figures->second.value) {
-        ImGui::TextDisabled("%s", figures->second.error.c_str());
+        ImGui::TextDisabled("%s", lichess::gaveNothing(figures->second).c_str());
     } else {
         const auto& f = *figures->second.value;
         if (f.highest > 0)

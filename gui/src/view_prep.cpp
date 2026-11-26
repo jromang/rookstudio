@@ -89,7 +89,7 @@ void App::pollPrep() {
         if (answer.value)
             p.profile = std::move(*answer.value);
         else
-            p.profile_error = answer.error;
+            p.profile_error = answer;
     }
     if (ready(p.sync)) {
         const auto report = p.sync.get();

@@ -2,13 +2,18 @@
 // what a speed did lately, all kept a day in the profile.
 #include <doctest/doctest.hpp>
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 
 #include <json.hpp>
 
+#include "answering_server.hpp"
 #include "lichess_profile.hpp"
 
 using namespace fcg::lichess;
+using namespace fcg::test;
+using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 namespace {
@@ -108,4 +113,48 @@ TEST_CASE("Lichess profile: kept in the profile and read back") {
     REQUIRE(back);
     CHECK(*back == p);
     fs::remove_all(root);
+}
+
+TEST_CASE("Lichess profile: an account's, a player's and a speed's figures asked, each failure told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    fcg::HostGate::instance().setPause(50ms);
+    server.answer(200, R"({"username": "MyAccount", "perfs": {"blitz": {"games": 1268, "rating": 2143}}})");
+    const auto account = accountProfile("tok");
+    REQUIRE_MESSAGE(account.value, describe(account));
+    CHECK(account.value->username == "MyAccount");
+    CHECK(account.value->read_at > 0);
+    CHECK(publicProfile("MyAccount").value);
+    CHECK(perfFigures("MyAccount", "blitz", "tok").value);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, R"({"error":"Missing scope"})", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(accountProfile("tok").net == net);
+        CHECK(publicProfile("Nobody").net == net);
+        CHECK(perfFigures("MyAccount", "blitz", "tok").net == net);
+    }
+    server.answer(404, R"({"error":"Not found"})");
+    CHECK(describe(publicProfile("Nobody")) == "Lichess has no account of that name");
+    // Not what Lichess sends: not JSON, or an account without its name.
+    server.answer(200, "<html>not JSON</html>");
+    CHECK(accountProfile("tok").net == NetError::BadAnswer);
+    CHECK(perfFigures("MyAccount", "blitz", "tok").net == NetError::BadAnswer);
+    server.answer(200, R"({"perfs": {}})");
+    CHECK(publicProfile("Nobody").net == NetError::BadAnswer);
+    pointNowhere();
+    CHECK(accountProfile("tok").net == NetError::Offline);
+    CHECK(describe(publicProfile("Nobody")) == "Lichess cannot be reached");
+    pointAtPausedHost("lichess-profile.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(accountProfile("tok", &cancel).net == NetError::Cancelled);
+    CHECK(perfFigures("MyAccount", "blitz", "tok", &cancel).net == NetError::Cancelled);
+    servers() = Servers{};
 }

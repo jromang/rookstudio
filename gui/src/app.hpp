@@ -2103,7 +2103,7 @@ class App {
         std::string error;
         std::future<lichess::Answer<lichess::Profile>> profile_job;
         std::optional<lichess::Profile> profile;
-        std::string profile_error;
+        lichess::Failure profile_error;
         uint64_t synced = 0;    // the syncs ended: the dossier made again after each (#90)
         std::string last_sync;  // the day their database last took games ("2026-11-20"), empty when it never did
     };
@@ -2480,7 +2480,7 @@ class App {
     std::optional<lichess::Profile> lichess_profile_;
     bool lichess_profile_loaded_ = false;
     std::future<lichess::Answer<lichess::Profile>> lichess_profile_job_;
-    std::string lichess_profile_error_;
+    lichess::Failure lichess_profile_error_;
     std::chrono::steady_clock::time_point lichess_profile_asked_{};
     int lichess_speed_ = 1;  // the speed whose figures show: blitz
     std::map<std::string, lichess::Answer<lichess::PerfFigures>> lichess_figures_;

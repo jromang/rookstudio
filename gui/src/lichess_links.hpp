@@ -54,15 +54,14 @@ struct Export {
                                           const std::atomic<bool>* cancel = nullptr);
 
 // The games of a link (not a player's) streamed into `db`, committed `commit_games` at a time; `games` counts those
-// read as they come. A cancel keeps what was committed.
-struct LinkImport {
+// read as they come. A cancel keeps what was committed. Why it stopped (Failure): Lichess's refusal or the network,
+// worded as the link's (a broadcast's, the bookmarks', a page's); the database's refusal in its words.
+struct LinkImport : Failure {
     uint64_t read       = 0;
     uint64_t added      = 0;
     uint64_t duplicates = 0;
     uint64_t damaged    = 0;
     bool cancelled      = false;
-    int status          = 0;
-    std::string error;
 };
 [[nodiscard]] LinkImport importLink(study::Database& db, const Link& link, const std::string& token,
                                     std::atomic<uint64_t>& games, const std::atomic<bool>& cancel,

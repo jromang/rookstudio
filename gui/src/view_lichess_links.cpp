@@ -191,8 +191,8 @@ void App::pollLinkJob() {
         return;
     const auto report = link_job_->result.get();
     auto& job         = *link_job_;
-    if (!report.error.empty()) {
-        job.said = trf("Stopped: {}. The games received are in “{}”.", report.error, job.name);
+    if (report.failed()) {
+        job.said = trf("Stopped: {}. The games received are in “{}”.", lichess::describe(report), job.name);
     } else if (report.cancelled) {
         job.said = trf("Stopped at your request: {} games kept in “{}”.", ui::exactCount(report.added), job.name);
     } else {
@@ -338,7 +338,7 @@ void App::drawLinkCard() {
         else if (card.got->value)
             ImGui::TextDisabled("%s", gameLine(*card.got->value).c_str());
         else
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", card.got->error.c_str());
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", lichess::describe(*card.got).c_str());
     } else {
         ImGui::TextDisabled("%s", kindWhat(link.kind));
     }

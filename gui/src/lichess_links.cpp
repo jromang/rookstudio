@@ -107,22 +107,16 @@ Link simple(LinkKind kind, std::string id, std::string chapter = {}) {
     return link;
 }
 
-std::string reason(const HttpResult& r, const Link& link) {
-    switch (r.status) {
-        case 0:
-            return r.error.empty() ? std::string("Lichess did not answer") : r.error;
-        case 401:
-        case 403:
-            return link.kind == LinkKind::BroadcastRound || link.kind == LinkKind::BroadcastTour
-                       ? "Lichess refuses this without an account allowed to read broadcasts"
-                   : link.kind == LinkKind::Bookmarks ? "Lichess's bookmarks need a linked account"
-                                                      : "Lichess refuses it: private, or for another account";
-        case 404:
-            return "Lichess has nothing at this address";
-        case 429:
-            return "Lichess asks to wait a minute: too many requests";
+// What a link asks for, for the words of its failures: who may read it (401, 403), and a 404 at its address.
+Asked askedOf(const Link& link) {
+    switch (link.kind) {
+        case LinkKind::BroadcastRound:
+        case LinkKind::BroadcastTour:
+            return Asked::Broadcast;
+        case LinkKind::Bookmarks:
+            return Asked::Bookmarks;
         default:
-            return fmt::format("Lichess answered {}", r.status);
+            return Asked::Page;
     }
 }
 
@@ -208,19 +202,10 @@ Export exportOf(const Link& link) {
 }
 
 Answer<std::string> linkPgn(const Link& link, const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::string> a;
-    HttpRequest request;
-    request.url    = exportOf(link).url;
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/x-chess-pgn");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = reason(r, link);
-        return a;
-    }
-    a.value = r.body;
+    const auto r = send(request("GET", exportOf(link).url, token, "application/x-chess-pgn"), cancel);
+    auto a       = failedWith<std::string>(r);
+    a.asked      = askedOf(link);
+    if (!r.failed()) a.value = r.body;
     return a;
 }
 
@@ -238,12 +223,8 @@ LinkImport importLink(study::Database& db, const Link& link, const std::string& 
         report.error = "a player's games come through their sync";
         return report;
     }
-    HttpRequest request;
-    request.url       = e.url;
-    request.method    = "GET";
-    request.token     = token;
-    request.timeout_s = 60;
-    request.headers.emplace_back("Accept", "application/x-chess-pgn");
+    auto asked      = request("GET", e.url, token, "application/x-chess-pgn");
+    asked.timeout_s = 60;
 
     std::string pending;  // what came of the games not read yet
     std::vector<study::ImportedGame> batch;
@@ -289,7 +270,7 @@ LinkImport importLink(study::Database& db, const Link& link, const std::string& 
     };
     stream.cancel     = &cancel;
     stream.idle_s     = 60;
-    const auto result = politeStream(request, stream);
+    const auto result = politeStream(asked, stream);
 
     report.cancelled = cancel;
     const bool whole = report.status == 200 && result.error.empty() && !report.cancelled && refused.empty();
@@ -300,13 +281,13 @@ LinkImport importLink(study::Database& db, const Link& link, const std::string& 
     commit();
     if (!refused.empty()) {
         report.error = "the database could not take the games: " + refused;
-    } else if (report.status != 200 && !report.cancelled) {
-        HttpResult r;
-        r.status     = report.status;
-        r.error      = result.error;
-        report.error = reason(r, link);
-    } else if (!whole && !report.cancelled) {
-        report.error = result.error.empty() ? std::string("the games stopped coming") : result.error;
+    } else if (!whole && !report.cancelled) {  // refused by Lichess, or the network cut it
+        static_cast<Failure&>(report) = responseOf(asked, result);
+        report.asked                  = askedOf(link);
+        if (!report.failed()) {
+            report.net    = NetError::Offline;
+            report.detail = "the games stopped coming";
+        }
     }
     return report;
 }

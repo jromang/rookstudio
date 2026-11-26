@@ -348,7 +348,7 @@ void PlayersFollower::follow(Game& g) {
         if (!answer.value) {
             {
                 std::lock_guard lock(mutex_);
-                error_ = fmt::format("{}: {}", g.id, answer.error);
+                error_ = fmt::format("{}: {}", g.id, describe(answer));
             }
             if (++failures >= 3) return;
             rest(g.stop, 10);

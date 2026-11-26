@@ -210,7 +210,7 @@ Arrival bringGame(const std::string& id, const std::string& token, study::Databa
     Arrival out;
     auto answer = gamePgn(id, token, cancel);
     if (!answer.value) {
-        out.error = answer.error.empty() ? std::string("Lichess did not answer") : answer.error;
+        out.error = answer.failed() ? describe(answer) : std::string("Lichess did not answer");
         return out;
     }
     out.pgn      = std::move(*answer.value);

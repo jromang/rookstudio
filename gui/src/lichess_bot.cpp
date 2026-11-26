@@ -25,36 +25,14 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 int64_t intOf(const nlohmann::json& j, const char* key, int64_t otherwise = 0) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_integer() ? it->get<int64_t>() : otherwise;
 }
 
-bool boolOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_boolean() && it->get<bool>();
-}
-
 std::string lower(std::string text) {
     for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return text;
-}
-
-// Lichess's own words, when its answer gives some ({"error": "..."}); else what the status says.
-std::string whyNot(const HttpResult& r) {
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (!j.is_discarded() && j.is_object())
-        if (auto error = textOf(j, "error"); !error.empty()) return error;
-    return r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-           : r.status == 401 ? std::string("Lichess refused the token")
-           : r.status == 403 ? std::string("the token may not do it")
-           : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                             : fmt::format("Lichess answered {}", r.status);
 }
 
 void sleepFor(std::chrono::milliseconds wait, const std::atomic<bool>& stop) {
@@ -104,39 +82,20 @@ std::optional<BotAccountFacts> readBotAccount(const nlohmann::json& j) {
 }
 
 Answer<BotAccountFacts> botAccount(const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<BotAccountFacts> a;
-    HttpRequest request;
-    request.url    = servers().api + "/api/account";
-    request.method = "GET";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = whyNot(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    a.value      = readBotAccount(j);
-    if (!a.value) a.error = "Lichess's answer could not be read";
-    return a;
+    return call<BotAccountFacts>(request("GET", servers().api + "/api/account", token), readBotAccount, cancel);
 }
 
 BotTokenCheck checkBotToken(const std::string& token, const std::atomic<bool>* cancel) {
     BotTokenCheck c;
     const auto tested = testToken(token, cancel);
-    c.status          = tested.status;
+    static_cast<Failure&>(c) = tested;
     if (!tested.value) {
-        c.error =
-            tested.error.empty() ? std::string("Lichess does not take this token (revoked, or ended)") : tested.error;
+        if (!c.failed()) c.net = NetError::Unauthorized;  // answered, but no longer a token (revoked, or ended)
         return c;
     }
-    auto facts = botAccount(token, cancel);
-    c.status   = facts.status;
-    if (!facts.value) {
-        c.error = facts.error;
-        return c;
-    }
+    auto facts               = botAccount(token, cancel);
+    static_cast<Failure&>(c) = facts;
+    if (!facts.value) return c;
     Account a;
     a.username = facts.value->username;
     a.token    = token;
@@ -159,16 +118,9 @@ BotVerdict botVerdict(const BotAccountFacts& facts, std::string_view own_account
 }
 
 Reply upgradeToBot(const std::string& token, const std::atomic<bool>* cancel) {
-    HttpRequest request;
-    request.url    = servers().api + "/api/bot/account/upgrade";
-    request.method = "POST";
-    request.token  = token;
-    request.headers.emplace_back("Accept", "application/json");
-    const auto r = politeRequest(request, cancel);
     Reply out;
-    out.status = r.status;
-    out.ok     = r.status == 200;
-    if (!out.ok) out.error = whyNot(r);
+    static_cast<Failure&>(out) = send(request("POST", servers().api + "/api/bot/account/upgrade", token), cancel);
+    out.ok                     = !out.failed();
     return out;
 }
 

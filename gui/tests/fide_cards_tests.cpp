@@ -1,6 +1,8 @@
 // FIDE cards for the players of the databases (#57): asked by id or by name, matched, kept in the profile.
 #include <doctest/doctest.hpp>
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <mutex>
 #include <string>
@@ -8,6 +10,7 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "answering_server.hpp"
 #include "fide_cards.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
@@ -17,6 +20,8 @@ using namespace fcg;
 using namespace fcg::lichess;
 using fcg::test::requestPath;
 using fcg::test::ScriptedServer;
+using namespace fcg::test;
+using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 TEST_CASE("FIDE cards: a player by id, a search by name, the match, and what leaves the machine") {
@@ -60,7 +65,9 @@ TEST_CASE("FIDE cards: a player by id, a search by name, the match, and what lea
     CHECK(card.value->standard == 2830);
     CHECK(card.value->blitz == 2885);
     CHECK(card.value->asked > 0);
-    CHECK(fidePlayer(999).error == "Lichess has no such FIDE player");
+    const auto missing = fidePlayer(999);
+    CHECK(missing.net == NetError::NotFound);
+    CHECK(describe(missing) == "Lichess has no such FIDE player");
 
     const auto found = fideSearch("Player, Sample");
     REQUIRE(found.value);
@@ -108,4 +115,32 @@ TEST_CASE("FIDE cards: kept in the profile, by id and by the names confirmed") {
     REQUIRE(again.byId(42) != nullptr);
     CHECK(again.byId(42)->name == "Somebody");
     CHECK(fideNameKey("Carlsen, Magnus") == "carlsenmagnus");
+}
+
+TEST_CASE("FIDE cards: each failure of Lichess's answers told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, "{}", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{502, "<html>Bad gateway</html>", NetError::Server},
+          Case{200, "<html>not JSON</html>", NetError::BadAnswer}, Case{200, R"({"cards":[]})", NetError::BadAnswer}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(fidePlayer(1503014).net == (status == 200 && body[0] == '{' ? NetError::None : net));
+        CHECK(fideSearch("Carlsen").net == net);
+    }
+    pointNowhere();
+    CHECK(fidePlayer(1503014).net == NetError::Offline);
+    CHECK(fideSearch("Carlsen").net == NetError::Offline);
+    pointAtPausedHost("lichess-fide.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(fidePlayer(1503014, &cancel).net == NetError::Cancelled);
+    CHECK(fideSearch("Carlsen", &cancel).net == NetError::Cancelled);
 }

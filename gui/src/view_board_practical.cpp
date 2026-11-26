@@ -141,7 +141,7 @@ void App::drawPractical() {
             p.level[p.job_key] = levelMoves(*a.value);
         } else {
             p.level_failed.insert(p.job_key);
-            p.error = a.error;
+            p.error = lichess::describe(a);
         }
     }
     if (ready(p.db_job)) p.level[p.job_key] = p.db_job.get();

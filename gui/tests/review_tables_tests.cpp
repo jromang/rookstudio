@@ -177,7 +177,7 @@ TEST_CASE("review tables: asked one at a time, kept in the profile, asked once")
     std::atomic<bool> cancel{false};
     std::atomic<int> done{0};
     const auto positions = tablePositions(*line, tables);
-    CHECK(askTables(positions, *line, profile, tables, cancel, done).empty());
+    CHECK_FALSE(askTables(positions, *line, profile, tables, cancel, done).failed());
     CHECK(done == 2);
     CHECK(tables.verdict(line->positions()[1]) == commentary::Verdict::Win);
     {
@@ -191,7 +191,7 @@ TEST_CASE("review tables: asked one at a time, kept in the profile, asked once")
     // Another review of the game: what was kept is not asked again.
     commentary::Tablebases again;
     done = 0;
-    CHECK(askTables(tablePositions(*line, again), *line, profile, again, cancel, done).empty());
+    CHECK_FALSE(askTables(tablePositions(*line, again), *line, profile, again, cancel, done).failed());
     CHECK(again.verdict(line->positions()[1]) == commentary::Verdict::Win);
     {
         std::lock_guard lock(mutex);
@@ -202,7 +202,7 @@ TEST_CASE("review tables: asked one at a time, kept in the profile, asked once")
     cancel = true;
     commentary::Tablebases stopped;
     done = 0;
-    CHECK(askTables(tablePositions(*line, stopped), *line, profile, stopped, cancel, done).empty());
+    CHECK_FALSE(askTables(tablePositions(*line, stopped), *line, profile, stopped, cancel, done).failed());
     CHECK(done == 0);
 
     lichess::servers() = lichess::Servers{};

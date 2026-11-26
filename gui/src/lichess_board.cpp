@@ -17,19 +17,9 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 int64_t intOf(const nlohmann::json& j, const char* key, int64_t otherwise = 0) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_integer() ? it->get<int64_t>() : otherwise;
-}
-
-bool boolOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_boolean() && it->get<bool>();
 }
 
 // The API's segment of a game's endpoints.

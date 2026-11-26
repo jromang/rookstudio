@@ -15,11 +15,6 @@ namespace {
 constexpr std::array<std::string_view, 8> CHANNELS = {"best",      "bullet",      "blitz", "rapid",
                                                       "classical", "ultraBullet", "bot",   "computer"};
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 std::string lower(std::string_view text) {
     std::string out(text);
     for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -32,12 +27,6 @@ std::string squeezed(std::string_view key) {
     for (const char c : key)
         if (c != ' ' && c != '-' && c != '_') out += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return out == "toprated" ? std::string("best") : out;
-}
-
-std::string failure(const HttpResult& r) {
-    return r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-           : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                             : fmt::format("Lichess answered {}", r.status);
 }
 
 TvPlayer playerOf(const nlohmann::json& p) {
@@ -80,65 +69,37 @@ TvGame gameOf(const nlohmann::json& j) {
     return g;
 }
 
-HttpResult ask(const std::string& url, const std::atomic<bool>* cancel, const char* accept = "application/json",
-               std::string body = {}) {
-    HttpRequest request;
-    request.url    = url;
-    request.method = body.empty() ? "GET" : "POST";
-    request.headers.emplace_back("Accept", accept);
-    if (!body.empty()) {
-        request.content_type = "text/plain";
-        request.body         = std::move(body);
-    }
-    return politeRequest(request, cancel);
+Answer<std::vector<TvFeatured>> featuredGames(const std::atomic<bool>* cancel) {
+    return call<std::vector<TvFeatured>>(request("GET", servers().api + "/api/tv/channels"), readTvChannels, cancel);
 }
 
-Answer<std::vector<TvFeatured>> featuredGames(const std::atomic<bool>* cancel) {
-    Answer<std::vector<TvFeatured>> a;
-    const auto r = ask(servers().api + "/api/tv/channels", cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    try {
-        a.value = readTvChannels(nlohmann::json::parse(r.body));
-    } catch (const std::exception&) {
-        a.error = "Lichess's answer could not be read";
-    }
+// The games of an NDJSON answer, a line each (a line that is not one passed over).
+Answer<std::vector<TvGame>> gamesOf(const Response& r) {
+    auto a = failedWith<std::vector<TvGame>>(r);
+    if (!r.failed()) a.value = readTvGames(r.body);
     return a;
 }
 
 Answer<std::vector<TvGame>> channelGames(const std::string& channel, std::size_t nb, const std::atomic<bool>* cancel) {
-    Answer<std::vector<TvGame>> a;
-    nb           = std::clamp<std::size_t>(nb, 1, TV_MOST_GAMES);
-    const auto r = ask(fmt::format("{}/api/tv/{}?nb={}&moves=false", servers().api, urlEncode(channel), nb), cancel,
-                       "application/x-ndjson");
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    a.value = readTvGames(r.body);
-    return a;
+    nb = std::clamp<std::size_t>(nb, 1, TV_MOST_GAMES);
+    return gamesOf(
+        send(request("GET", fmt::format("{}/api/tv/{}?nb={}&moves=false", servers().api, urlEncode(channel), nb), {},
+                     "application/x-ndjson"),
+             cancel));
 }
 
 Answer<std::vector<TvGame>> gamesByIds(const std::vector<std::string>& ids, const std::atomic<bool>* cancel) {
-    Answer<std::vector<TvGame>> a;
     std::string body;
     for (std::size_t i = 0; i < ids.size() && i < 300; ++i) body += (body.empty() ? "" : ",") + ids[i];
     if (body.empty()) {
+        Answer<std::vector<TvGame>> a;
         a.value.emplace();
         return a;
     }
-    const auto r = ask(servers().api + "/api/games/export/_ids?moves=false", cancel, "application/x-ndjson", body);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = failure(r);
-        return a;
-    }
-    a.value = readTvGames(r.body);
-    return a;
+    auto asked = request("POST", servers().api + "/api/games/export/_ids?moves=false", {}, "application/x-ndjson");
+    asked.content_type = "text/plain";
+    asked.body         = std::move(body);
+    return gamesOf(send(asked, cancel));
 }
 
 }  // namespace
@@ -297,19 +258,11 @@ std::vector<std::string> tvPlaces(const std::vector<std::string>& shown, const s
 }
 
 Answer<TvList> tvList(const std::string& channel, std::size_t nb, const std::atomic<bool>* cancel) {
-    Answer<TvList> a;
     auto featured = featuredGames(cancel);
-    if (!featured.value) {
-        a.status = featured.status;
-        a.error  = featured.error;
-        return a;
-    }
+    if (!featured.value) return failedWith<TvList>(featured);
     auto games = channelGames(channel, nb, cancel);
-    a.status   = games.status;
-    if (!games.value) {
-        a.error = games.error;
-        return a;
-    }
+    auto a     = failedWith<TvList>(games);
+    if (!games.value) return a;
     TvList list;
     for (const auto& f : *featured.value)
         if (f.channel == channel) list.featured = f.game;
@@ -319,13 +272,9 @@ Answer<TvList> tvList(const std::string& channel, std::size_t nb, const std::ato
 }
 
 Answer<std::vector<TvRow>> tvRows(const std::atomic<bool>* cancel) {
-    Answer<std::vector<TvRow>> a;
     auto featured = featuredGames(cancel);
-    a.status      = featured.status;
-    if (!featured.value) {
-        a.error = featured.error;
-        return a;
-    }
+    auto a        = failedWith<std::vector<TvRow>>(featured);
+    if (!featured.value) return a;
     std::vector<std::string> ids;
     for (const auto& f : *featured.value)
         if (std::find(ids.begin(), ids.end(), f.game) == ids.end()) ids.push_back(f.game);
@@ -380,13 +329,9 @@ TvNext tvNext(const std::string& ended, const TvRow& featured, const std::vector
 
 Answer<TvNext> askTvNext(const std::string& channel, const std::string& ended, const std::vector<std::string>& own,
                          bool others, const std::atomic<bool>* cancel) {
-    Answer<TvNext> a;
     auto rows = tvRows(cancel);
-    a.status  = rows.status;
-    if (!rows.value) {
-        a.error = rows.error;
-        return a;
-    }
+    auto a    = failedWith<TvNext>(rows);
+    if (!rows.value) return a;
     TvRow row;
     for (const auto& r : *rows.value)
         if (r.featured.channel == channel) row = r;
@@ -395,11 +340,7 @@ Answer<TvNext> askTvNext(const std::string& channel, const std::string& ended, c
     // wait is over.
     if (next.game.empty() && (others || row.featured.game != ended)) {
         const auto games = channelGames(channel, TV_MOST_GAMES, cancel);
-        a.status         = games.status;
-        if (!games.value) {
-            a.error = games.error;
-            return a;
-        }
+        if (!games.value) return failedWith<TvNext>(games);
         next = tvNext(ended, row, *games.value, own);
     }
     a.value = std::move(next);

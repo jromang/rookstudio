@@ -313,8 +313,9 @@ void App::pollEndgames() {
                 endgameAnswered();
             }
         } else {
-            r.waiting        = answer.value ? std::string(TR("Lichess's tables do not know this position."))
-                                            : (answer.error.empty() ? std::string(TR("no answer")) : answer.error);
+            r.waiting        = answer.value      ? std::string(TR("Lichess's tables do not know this position."))
+                               : answer.failed() ? lichess::describe(answer)
+                                                 : std::string(TR("no answer"));
             r.waiting_status = answer.status;
             r.retry_at       = Clock::now() + std::chrono::seconds(answer.status == 429 ? 61 : RETRY_SECONDS);
         }

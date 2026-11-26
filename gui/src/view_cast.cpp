@@ -72,7 +72,7 @@ void App::startCast() {
 void App::pollCast() {
     // The permission granted: the broadcast is made.
     if (cast_after_link_ && !lichess_link_ && !broadcastToken().empty()) startCast();
-    if (cast_after_link_ && !lichess_link_ && broadcastToken().empty() && !lichess_error_.empty())
+    if (cast_after_link_ && !lichess_link_ && broadcastToken().empty() && lichess_error_.failed())
         cast_after_link_ = false;  // refused, or no answer: the sheet says so
 }
 
@@ -117,11 +117,11 @@ void App::drawCastSheet() {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                            TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
     } else {
-        if (!lichess_error_.empty() && !may)
+        if (lichess_error_.failed() && !may)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                lichess::linkRefused(lichess_error_)
                                    ? TR("You refused it on Lichess: nothing was made.")
-                                   : trf("Lichess gave nothing ({}).", lichess_error_).c_str());
+                                   : trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)).c_str());
         ImGui::BeginDisabled(!name_ok);
         if (ImGui::Button(TR("Create the broadcast"))) {
             if (may) {

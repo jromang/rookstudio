@@ -35,74 +35,26 @@ namespace {
 namespace fs = std::filesystem;
 using Clock  = std::chrono::steady_clock;
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 int intOf(const nlohmann::json& j, const char* key, int otherwise = 0) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number_integer() ? it->get<int>() : otherwise;
 }
 
-// Lichess's words for a refusal: {"error": "…"}, or a form's {"error": {"name": ["…"]}}; empty when it gave none.
-std::string lichessWords(const std::string& body) {
-    const auto j = nlohmann::json::parse(body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return {};
-    const auto it = j.find("error");
-    if (it == j.end()) return {};
-    if (it->is_string()) return it->get<std::string>();
-    if (!it->is_object()) return {};
-    std::string out;
-    for (const auto& [field, messages] : it->items()) {
-        std::string said;
-        if (messages.is_array()) {
-            for (const auto& m : messages)
-                if (m.is_string()) said += (said.empty() ? "" : " ") + m.get<std::string>();
-        } else if (messages.is_string()) {
-            said = messages.get<std::string>();
-        }
-        out += (out.empty() ? "" : "; ") + field + ": " + said;
+// A request about a registration: with the user's token, and the registration's JSON (its secret in it) when given.
+HttpRequest engineRequest(const char* method, const std::string& path, const std::string& token,
+                          const EngineRegistration* r = nullptr) {
+    auto asked = request(method, servers().api + path, token);
+    if (r) {
+        asked.content_type = "application/json";
+        asked.body         = registrationJson(*r);
     }
-    return out;
+    return asked;
 }
 
-std::string reason(const HttpResult& r) {
-    if (r.status == 0) return r.error.empty() ? std::string("Lichess did not answer") : r.error;
-    if (r.status == 401) return "Lichess refused the token";
-    if (r.status == 403) return "the token may not register engines (engine:write)";
-    if (r.status == 429) return "Lichess asks to wait a minute: too many requests";
-    if (const auto words = lichessWords(r.body); !words.empty())
-        return fmt::format("Lichess answered {}: {}", r.status, words);
-    return fmt::format("Lichess answered {}", r.status);
-}
-
-HttpRequest apiRequest(const std::string& path, const std::string& method, const std::string& token,
-                       std::string body = {}) {
-    HttpRequest r;
-    r.url    = servers().api + path;
-    r.method = method;
-    r.token  = token;
-    r.headers.emplace_back("Accept", "application/json");
-    if (!body.empty()) {
-        r.content_type = "application/json";
-        r.body         = std::move(body);
-    }
-    return r;
-}
-
-Answer<ExternalEngine> engineAnswer(const HttpResult& r) {
-    Answer<ExternalEngine> a;
-    a.status = r.status;
-    if (r.status != 200) {
-        a.error = reason(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (auto e = j.is_discarded() ? std::nullopt : readExternalEngine(j))
-        a.value = std::move(*e);
-    else
-        a.error = "Lichess's answer could not be read: the external engine API may have changed";
+// The registration Lichess answered with, its failures worded as the external engines'.
+Answer<ExternalEngine> engineAnswer(const Response& r) {
+    auto a  = readAnswer<ExternalEngine>(r, readExternalEngine);
+    a.asked = Asked::Engines;
     return a;
 }
 
@@ -248,40 +200,32 @@ std::string newProviderSecret() {
 
 Answer<ExternalEngine> registerEngine(const std::string& token, const EngineRegistration& r,
                                       const std::atomic<bool>* cancel) {
-    if (const auto problem = registrationProblem(r); !problem.empty()) {
-        Answer<ExternalEngine> a;
-        a.error = problem;
-        return a;
-    }
-    return engineAnswer(politeRequest(apiRequest("/api/external-engine", "POST", token, registrationJson(r)), cancel));
+    if (const auto problem = registrationProblem(r); !problem.empty())
+        return failedWith<ExternalEngine>(Failure::own(problem));
+    return engineAnswer(send(engineRequest("POST", "/api/external-engine", token, &r), cancel));
 }
 
 Answer<std::vector<ExternalEngine>> listEngines(const std::string& token, const std::atomic<bool>* cancel) {
-    Answer<std::vector<ExternalEngine>> a;
-    const auto r = politeRequest(apiRequest("/api/external-engine", "GET", token), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = reason(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_array()) {
-        a.error = "Lichess's answer could not be read: the external engine API may have changed";
-        return a;
-    }
-    std::vector<ExternalEngine> list;
-    for (const auto& one : j)
-        if (auto e = readExternalEngine(one)) list.push_back(std::move(*e));
-    a.value = std::move(list);
+    auto a = call<std::vector<ExternalEngine>>(
+        engineRequest("GET", "/api/external-engine", token),
+        [](const nlohmann::json& j) -> std::optional<std::vector<ExternalEngine>> {
+            if (!j.is_array()) return std::nullopt;
+            std::vector<ExternalEngine> list;
+            for (const auto& one : j)
+                if (auto e = readExternalEngine(one)) list.push_back(std::move(*e));
+            return list;
+        },
+        cancel);
+    a.asked = Asked::Engines;
     return a;
 }
 
 Answer<ExternalEngine> engineRegistration(const std::string& token, const std::string& id,
                                           const std::atomic<bool>* cancel) {
-    const auto r = politeRequest(apiRequest("/api/external-engine/" + urlEncode(id), "GET", token), cancel);
-    if (r.status == 404) {
+    const auto r = send(engineRequest("GET", "/api/external-engine/" + urlEncode(id), token), cancel);
+    if (r.net == NetError::NotFound) {  // withdrawn on lichess.org: nothing, and nothing wrong
         Answer<ExternalEngine> a;
-        a.status = 404;
+        a.status = r.status;
         return a;
     }
     return engineAnswer(r);
@@ -289,18 +233,16 @@ Answer<ExternalEngine> engineRegistration(const std::string& token, const std::s
 
 Answer<ExternalEngine> updateEngine(const std::string& token, const std::string& id, const EngineRegistration& r,
                                     const std::atomic<bool>* cancel) {
-    if (const auto problem = registrationProblem(r); !problem.empty()) {
-        Answer<ExternalEngine> a;
-        a.error = problem;
-        return a;
-    }
-    return engineAnswer(
-        politeRequest(apiRequest("/api/external-engine/" + urlEncode(id), "PUT", token, registrationJson(r)), cancel));
+    if (const auto problem = registrationProblem(r); !problem.empty())
+        return failedWith<ExternalEngine>(Failure::own(problem));
+    return engineAnswer(send(engineRequest("PUT", "/api/external-engine/" + urlEncode(id), token, &r), cancel));
 }
 
-std::string withdrawEngine(const std::string& token, const std::string& id, const std::atomic<bool>* cancel) {
-    const auto r = politeRequest(apiRequest("/api/external-engine/" + urlEncode(id), "DELETE", token), cancel);
-    return r.status == 200 || r.status == 204 || r.status == 404 ? std::string() : reason(r);
+Failure withdrawEngine(const std::string& token, const std::string& id, const std::atomic<bool>* cancel) {
+    Failure r = send(engineRequest("DELETE", "/api/external-engine/" + urlEncode(id), token), cancel);
+    if (r.net == NetError::NotFound) return {};  // withdrawn already
+    r.asked = Asked::Engines;
+    return r;
 }
 
 // ---------------------------------------------------------------------------
@@ -674,14 +616,22 @@ void EngineService::run() {
         stream.redirects = 0;  // its body holds the secret: to the work host alone
         const auto r     = httpStream(request, stream);
         if (stop_ || quit_) break;
-        if (r.error == "cancelled") continue;  // a guard paused it
-        const bool whole = r.error.empty();    // an answer cut short is the network's doing, not the API's
+        if (netErrorOf(r) == NetError::Cancelled) continue;  // a guard paused it
+        const bool whole = r.error.empty();  // an answer cut short is the network's doing, not the API's
+        // The work host's failure, as the card says it.
+        const auto failure = [&](NetError net) {
+            Failure f;
+            f.net    = net;
+            f.status = r.status;
+            f.detail = r.error;
+            return f;
+        };
         if (whole && (r.status == 204 || r.status == 200)) {
             failures = 0;
             update([](ServiceStatus& s) {
                 if (s.state != ServiceState::Offline) return;
-                s.state = ServiceState::Waiting;
-                s.error.clear();
+                s.state   = ServiceState::Waiting;
+                s.failure = {};
             });
         }
         if (whole && r.status == 204) continue;
@@ -700,8 +650,8 @@ void EngineService::run() {
         }
         if (r.status == 401 || r.status == 403) {
             update([&](ServiceStatus& s) {
-                s.state = ServiceState::Refused;
-                s.error = fmt::format("{}", r.status);
+                s.state   = ServiceState::Refused;
+                s.failure = failure(r.status == 401 ? NetError::Unauthorized : NetError::Forbidden);
             });
             break;
         }
@@ -709,7 +659,7 @@ void EngineService::run() {
             HostGate::instance().tooMany(host_name);
             update([&](ServiceStatus& s) {
                 s.state    = ServiceState::Offline;
-                s.error    = "429";
+                s.failure  = failure(NetError::RateLimited);
                 s.retry_at = Clock::now() + HostGate::instance().pausedFor(host_name);
             });
             continue;
@@ -728,7 +678,7 @@ void EngineService::run() {
         ++failures;
         update([&](ServiceStatus& s) {
             s.state    = ServiceState::Offline;
-            s.error    = r.status == 0 || !whole ? r.error : fmt::format("the work host answered {}", r.status);
+            s.failure  = failure(r.status == 0 || !whole ? NetError::Offline : NetError::Server);
             s.retry_at = Clock::now() + wait;
         });
         const auto until = Clock::now() + wait;
@@ -804,6 +754,7 @@ void EngineService::answer(const EngineWork& w) {
     // The engine: started at the first request, kept between them; started once more when it ended meanwhile (between
     // two requests, or before its readyok: a crash, the system, a machine's connection).
     std::string failed;
+    bool no_chess960        = false;  // what failed: the engine does not know the Chess960 mode
     const auto start_engine = [&]() -> std::string {
         auto e = std::make_unique<Engine>();
         std::string why;
@@ -824,8 +775,10 @@ void EngineService::answer(const EngineWork& w) {
             return fmt::format("{} does not answer uci", setup_.engine.name);
         for (const auto& o : options)
             if (o.type != "button") e->options.push_back(o.name);
-        if (!e->has("UCI_Chess960"))
+        if (!e->has("UCI_Chess960")) {
+            no_chess960 = true;
             return fmt::format("{} does not know the Chess960 mode, which Lichess asks for", setup_.engine.name);
+        }
         // The library's values, but what the service sets itself.
         static constexpr std::string_view OWN[] = {"Threads",         "Hash",  "MultiPV", "UCI_Chess960",
                                                    "UCI_AnalyseMode", "Ponder"};
@@ -878,8 +831,9 @@ void EngineService::answer(const EngineWork& w) {
         answerEmpty();
         finish(false);
         update([&](ServiceStatus& s) {
-            s.state = ServiceState::EngineFailed;
-            s.error = failed;
+            s.state            = ServiceState::EngineFailed;
+            s.error            = failed;
+            s.chess960_missing = no_chess960;
         });
         quit_ = true;
         return;

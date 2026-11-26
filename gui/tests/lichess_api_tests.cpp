@@ -84,7 +84,7 @@ TEST_CASE("Lichess: the cloud's evaluation of a position, or none") {
                R"("pvs":[{"moves":"e7e5 g1f3 b8c6 f1b5","cp":22},{"moves":"f7f6 d2d4 g7g5 d1h5","mate":2}]})");
     });
     const auto e = cloudEval(AFTER_E4, 2);
-    REQUIRE_MESSAGE(e.value, e.error);
+    REQUIRE_MESSAGE(e.value, describe(e));
     CHECK(lichess.lastPath() == std::string("/api/cloud-eval?fen=") + urlEncode(AFTER_E4) + "&multiPv=2");
     CHECK(e.value->depth == 60);
     CHECK(e.value->knodes == 119133);
@@ -96,7 +96,7 @@ TEST_CASE("Lichess: the cloud's evaluation of a position, or none") {
     // A position the cloud has not evaluated: no value, and nothing wrong.
     const auto none = cloudEval("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
     CHECK_FALSE(none.value);
-    CHECK(none.error.empty());
+    CHECK_FALSE(none.failed());
     CHECK(none.status == 404);
     // Five lines at most, as Lichess gives.
     (void)cloudEval(AFTER_E4, 9);
@@ -187,14 +187,14 @@ TEST_CASE("Lichess: the opening explorer, with an account's token, and without")
     const auto refused = explorer(q);
     CHECK_FALSE(refused.value);
     CHECK(refused.status == 401);
-    CHECK(refused.error == "Lichess asks for a linked account");
+    CHECK(refused.net == NetError::Unauthorized);
 
     q.token            = "lip_test";
     q.moves            = 5;
     q.top_games        = 2;
     q.since            = "1990";
     const auto masters = explorer(q);
-    REQUIRE_MESSAGE(masters.value, masters.error);
+    REQUIRE_MESSAGE(masters.value, describe(masters));
     CHECK(lichess.lastPath() ==
           std::string("/explorer/masters?fen=") + urlEncode(AFTER_E4) + "&moves=5&topGames=2&since=1990");
     CHECK(masters.value->white == 524563);
@@ -232,7 +232,7 @@ TEST_CASE("Lichess: the opening explorer, with an account's token, and without")
     mine.recent_games  = 3;
     mine.since         = "";
     const auto own     = explorer(mine);
-    REQUIRE_MESSAGE(own.value, own.error);
+    REQUIRE_MESSAGE(own.value, describe(own));
     CHECK(lichess.lastPath() == std::string("/explorer/player?variant=standard&player=player&color=black&fen=") +
                                     urlEncode(AFTER_E4) + "&moves=5&recentGames=3");
     CHECK(own.value->white == 3);
@@ -254,13 +254,15 @@ TEST_CASE("Lichess: too many requests pause its host, and an answer that is not 
     const auto busy = tablebase("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
     CHECK_FALSE(busy.value);
     CHECK(busy.status == 429);
-    CHECK(busy.error == "Lichess asks to wait a minute: too many requests");
+    CHECK(busy.net == NetError::RateLimited);
+    CHECK(describe(busy) == "Lichess asks to wait a minute: too many requests");
     CHECK(HostGate::instance().pausedFor("127.0.0.1") > 0ms);
     // The next request waits for the pause, then reads what comes.
     const auto odd = tablebase("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
     CHECK_FALSE(odd.value);
     CHECK(odd.status == 200);
-    CHECK(odd.error.starts_with("Lichess's answer could not be read"));
+    CHECK(odd.net == NetError::BadAnswer);
+    CHECK(describe(odd) == "Lichess's answer could not be read");
 }
 
 TEST_CASE("Lichess: a position's games month by month, where they go, and a master's game") {
@@ -314,6 +316,76 @@ TEST_CASE("Lichess: a position's games month by month, where they go, and a mast
     REQUIRE(game.value);
     CHECK(game.value->find("[White \"Master, A\"]") != std::string::npos);
     CHECK(lichess.lastPath() == "/explorer/masters/pgn/aAbqI4ey");
-    CHECK(lichess::mastersGame("missing1", "lip_test").error == "Lichess has no such game");
+    const auto missing = lichess::mastersGame("missing1", "lip_test");
+    CHECK(missing.net == NetError::NotFound);
+    CHECK(describe(missing) == "Lichess has no such game");
     CHECK(lichess::mastersGame("aAbqI4ey", "").status == 401);
+}
+
+TEST_CASE("Lichess: each failure of the cloud, the tables and the explorer told by its kind") {
+    std::mutex mutex;
+    std::pair<int, std::string> next{200, "{}"};  // what the server answers next
+    Lichess lichess([&](const std::string&, const std::string&, net::TcpConnection& c) {
+        std::pair<int, std::string> now;
+        {
+            std::lock_guard lock(mutex);
+            now = next;
+        }
+        answer(c, now.first, now.second);
+    });
+    const auto answering = [&](int status, std::string body) {
+        std::lock_guard lock(mutex);
+        next = {status, std::move(body)};
+    };
+    constexpr const char* KK = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
+    ExplorerQuery masters;
+    masters.fen          = AFTER_E4;
+    masters.token        = "lip_test";
+    ExplorerQuery player = masters;
+    player.source        = ExplorerSource::Player;
+    player.player        = "player";
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, R"({"error":"No such token"})", NetError::Unauthorized},
+          Case{403, R"({"error":"Missing scope"})", NetError::Forbidden}, Case{429, "{}", NetError::RateLimited},
+          Case{500, "<html>Internal error</html>", NetError::Server}, Case{503, "{}", NetError::Server},
+          Case{200, "<html>not JSON</html>", NetError::BadAnswer}}) {
+        CAPTURE(status);
+        answering(status, body);
+        CHECK(tablebase(KK).net == net);
+        CHECK(tablebaseMainline(KK).net == net);
+        CHECK(cloudEval(AFTER_E4).net == net);
+        CHECK(explorer(masters).net == net);
+        CHECK(explorer(player).net == net);
+        // A game's PGN is text: any 200 is one.
+        CHECK(mastersGame("aAbqI4ey", "lip_test").net == (status == 200 ? NetError::None : net));
+    }
+    // 404: no such game; the cloud has nothing for it, which is no failure; the tables are not where they were.
+    answering(404, R"({"error":"Not found"})");
+    CHECK(describe(mastersGame("missing1", "lip_test")) == "Lichess has no such game");
+    CHECK_FALSE(cloudEval(AFTER_E4).failed());
+    CHECK(tablebase(KK).net == NetError::NotFound);
+    CHECK(explorer(player).net == NetError::NotFound);
+
+    // Nothing listens: no answer.
+    const auto nobody = fmt::format("http://127.0.0.1:{}", freePort());
+    servers()         = Servers{nobody, nobody + "/tb", nobody + "/explorer"};
+    CHECK(tablebase(KK).net == NetError::Offline);
+    CHECK(cloudEval(AFTER_E4).net == NetError::Offline);
+    CHECK(explorer(masters).net == NetError::Offline);
+    CHECK(explorer(player).net == NetError::Offline);
+    // Cancelled while the host pauses after a 429: nothing sent.
+    HostGate::instance().setPause(60s);
+    HostGate::instance().tooMany("lichess-api.invalid");
+    servers() =
+        Servers{"http://lichess-api.invalid", "http://lichess-api.invalid/tb", "http://lichess-api.invalid/explorer"};
+    std::atomic<bool> cancel{true};
+    CHECK(tablebase(KK, &cancel).net == NetError::Cancelled);
+    CHECK(cloudEval(AFTER_E4, 1, &cancel).net == NetError::Cancelled);
+    CHECK(explorer(masters, &cancel).net == NetError::Cancelled);
+    CHECK(explorer(player, &cancel).net == NetError::Cancelled);
 }

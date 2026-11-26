@@ -546,8 +546,8 @@ void App::pollPuzzles() {
             if (std::exchange(online_start_after_, false)) startPuzzles();
         } else {
             online_start_after_ = false;
-            online_error_ =
-                answer.value ? std::string(TR("Lichess has no puzzle of this theme for you now.")) : answer.error;
+            online_error_       = answer.value ? std::string(TR("Lichess has no puzzle of this theme for you now."))
+                                               : lichess::describe(answer);
         }
     }
     if (ready(online_send_)) {
@@ -573,7 +573,7 @@ void App::pollPuzzles() {
             // Another theme chosen since: its batch asked for now.
             if (online_batch_->puzzles.empty()) askOnlineBatch();
         } else {
-            online_error_ = answer.error;
+            online_error_ = lichess::describe(answer);
             // Kept: sent again by itself in a minute, unless Lichess refused the token. The last send that went
             // through stays said as it was.
             if (answer.status != 401 && answer.status != 403) online_retry_ = Clock::now() + std::chrono::seconds(61);
@@ -1058,9 +1058,9 @@ void App::drawOnlinePuzzles(bool& enter) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                                TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
         } else {
-            if (!lichess_error_.empty())
+            if (lichess_error_.failed())
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess gave nothing ({}).", lichess_error_).c_str());
+                                   trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)).c_str());
             if (primaryButton(TR("Allow on Lichess…")) || enter) {
                 enter = false;
                 askPuzzleScopes();

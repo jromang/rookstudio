@@ -54,12 +54,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(BotAccountFacts, id, username, t
 [[nodiscard]] Answer<BotAccountFacts> botAccount(const std::string& token, const std::atomic<bool>* cancel = nullptr);
 
 // A token checked before it is kept (one the link made, or one pasted): what it may do (POST /api/token/test) and its
-// account's facts (GET /api/account).
-struct BotTokenCheck {
+// account's facts (GET /api/account); why not (Failure): a token Lichess no longer takes is Unauthorized.
+struct BotTokenCheck : Failure {
     std::optional<Account> account;  // its name, the token, its scopes, its expiry
     std::optional<BotAccountFacts> facts;
-    std::string error;    // why it gave nothing
-    int status  = 0;      // HTTP's, 0 without an answer
     bool linked = false;  // made by RookStudio's link: revoked when it is not kept
 };
 [[nodiscard]] BotTokenCheck checkBotToken(const std::string& token, const std::atomic<bool>* cancel = nullptr);

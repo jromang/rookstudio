@@ -641,9 +641,9 @@ void App::drawBroadcastMosaic() {
         state = "· " + state;
         ui::sameLineOrWrap(ImGui::CalcTextSize(state.c_str()).x);
         ImGui::TextDisabled("%s", state.c_str());
-        if (!tv_list_error_.empty()) {
+        if (tv_list_error_.failed()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", trf("· Lichess: {}", tv_list_error_).c_str());
+            ImGui::TextDisabled("%s", trf("· Lichess: {}", lichess::describe(tv_list_error_)).c_str());
         }
     } else if (players) {
         const auto live = std::count_if(broadcast_boards_.begin(), broadcast_boards_.end(),
@@ -808,8 +808,11 @@ void App::drawBroadcastMosaic() {
                                    "followed take them all now.",
                                    lichess::MOST_GAME_STREAMS)
                                    .c_str());
-        else if (tv && !tv_list_error_.empty() && tv_listed_of_ != channel)
-            ImGui::TextDisabled("%s", trf("Lichess cannot be reached from here: {}.", tv_list_error_).c_str());
+        else if (tv && tv_list_error_.failed() && tv_listed_of_ != channel)
+            ImGui::TextDisabled(
+                "%s", tv_list_error_.net == lichess::NetError::Offline
+                          ? TR("Lichess cannot be reached from here.")
+                          : trf("Lichess cannot be reached from here: {}.", lichess::describe(tv_list_error_)).c_str());
         else
             ImGui::TextDisabled("%s", tv        ? TR("No game of the channel has come yet: they appear as Lichess "
                                                      "lists them, three moves late.")

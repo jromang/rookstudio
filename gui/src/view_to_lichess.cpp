@@ -104,7 +104,7 @@ void App::pollToLichess() {
                 ImGui::SetClipboardText(answer.value->c_str());
                 Console::instance().add(trf("The game is on Lichess, its address copied: {}", *answer.value));
             } else {
-                to_lichess_->error = answer.error;
+                to_lichess_->error = lichess::describe(answer);
             }
         }
     }
@@ -115,14 +115,14 @@ void App::pollToLichess() {
             if (answer.value)
                 to_lichess_->challenge = std::move(answer.value);
             else
-                to_lichess_->error = answer.error;
+                to_lichess_->error = lichess::describe(answer);
         }
     }
     if (lichess_bookmark_job_.valid() && lichess_bookmark_job_.wait_for(0s) == std::future_status::ready) {
         const auto answer = lichess_bookmark_job_.get();
         if (to_lichess_ && to_lichess_->kind == ToLichess::Kind::Bookmark) {
             to_lichess_->busy = false;
-            if (!answer.value) to_lichess_->error = answer.error;
+            if (!answer.value) to_lichess_->error = lichess::describe(answer);
         }
         if (answer.value) Console::instance().add(TR("The game is in your bookmarks on Lichess"));
     }
@@ -246,11 +246,11 @@ void App::drawToLichessResult(float width) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                                TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
         } else {
-            if (!lichess_error_.empty())
+            if (lichess_error_.failed())
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                    lichess::linkRefused(lichess_error_)
                                        ? TR("You refused it on Lichess: nothing changed.")
-                                       : trf("Lichess gave nothing ({}).", lichess_error_).c_str());
+                                       : trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)).c_str());
             if (ui::iconButton("to_lichess_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
                 auto scopes = lichess_account_->scopes;
                 scopes.push_back(lichess::SCOPE_PREFERENCE_WRITE);

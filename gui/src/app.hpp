@@ -1822,7 +1822,7 @@ class App {
     // Lichess (mockup M4): the account, a player's games, the broadcasts, the online services of the analysis.
     LichessSettings lichess_;
     std::optional<lichess::Account> lichess_account_;
-    std::string lichess_error_;  // why the last link failed
+    lichess::Failure lichess_error_;  // why the last link failed
     struct LichessLink {
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<std::string> url;  // Lichess's page, as given to the browser
@@ -1832,7 +1832,7 @@ class App {
         std::optional<lichess::BroadcastEntry> then_follow;  // the round to follow once the scope is granted
     };
     std::unique_ptr<LichessLink> lichess_link_;
-    std::future<std::string> lichess_unlink_;
+    std::future<lichess::Failure> lichess_unlink_;
     // A token no longer used (replaced by a link made again, one the bot refused) revoked in the background: parked in
     // jobs_, a failure said in the console, waited for at quit.
     void revokeToken(std::string token);
@@ -1840,7 +1840,7 @@ class App {
     struct LichessScopeAsk {
         std::string scope;
         std::optional<lichess::BroadcastEntry> follow;  // the round to follow with it (#44)
-        std::string error;                              // why the last try gave nothing
+        lichess::Failure error;                         // why the last try gave nothing
         bool players = false;                           // the followed players' mosaic to open with it (#50)
         bool search  = false;                           // a search among the broadcasts to make with it (#55)
     };
@@ -1878,7 +1878,7 @@ class App {
     std::unique_ptr<lichess::PlayersFollower> tv_follower_;  // the mosaic's games, the Board's, those kept
     lichess::TvList tv_listed_;  // the mosaic's channel: its featured game and games, as Lichess listed them last
     std::string tv_listed_of_;   // that channel
-    std::string tv_list_error_;
+    lichess::Failure tv_list_error_;
     std::future<std::pair<std::string, lichess::Answer<lichess::TvList>>> tv_list_job_;
     std::string tv_list_asked_of_;  // the channel asked last, and when
     std::chrono::steady_clock::time_point tv_list_asked_at_{};
@@ -2551,7 +2551,7 @@ class App {
     std::array<char, 40> bot_confirm_{};      // the name typed to confirm the upgrade
     bool bot_confirm_focus_ = false;
     std::future<lichess::Reply> bot_upgrade_;
-    std::future<std::string> bot_unlink_;
+    std::future<lichess::Failure> bot_unlink_;
     bool bot_unlink_asked_ = false;  // "Unlink…" armed: a second click
     // Online: its event stream, its game, the challenges answered.
     std::unique_ptr<lichess::EventListener> bot_events_;
@@ -2648,7 +2648,7 @@ class App {
         std::string engine;
         enum class Kind { Register, Update, Withdraw } kind = Kind::Register;
         std::future<lichess::Answer<lichess::ExternalEngine>> result;
-        std::future<std::string> withdrawn;
+        std::future<lichess::Failure> withdrawn;
         lichess::OfferedEngine offer;  // what it registers, its secret drawn
     };
     std::vector<OfferCall> offer_calls_;
@@ -2760,6 +2760,7 @@ class App {
         bool after_link = false;  // sent once Lichess gave the permission
         bool busy       = false;
         std::string error;
+        bool refused = false;                     // the error: the permission refused on Lichess's page
         lichess::SentRecord going;                // what goes, while it goes
         uint64_t serial = 0;                      // the board's game then (board_game_serial_)
         int count       = 0;                      // and its changes
@@ -3439,7 +3440,7 @@ class App {
         std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
         std::shared_ptr<std::atomic<int>> done    = std::make_shared<std::atomic<int>>(0);
         int total                                 = 0;
-        std::future<std::string> finished;  // why it stopped early, empty when it went to the end
+        std::future<lichess::Failure> finished;  // why it stopped early, none when it went to the end
     };
     std::optional<ReviewTablesJob> review_tables_job_;
     std::shared_ptr<commentary::Tablebases> review_tables_;  // what they were taught, for review_tables_of_
@@ -3450,7 +3451,7 @@ class App {
     bool review_tables_started_ = false;                              // asked for this game already
     bool review_tables_once_    = false;                              // asked for this game, without « Always »
     bool review_tables_not_now_ = false;                              // not asked for this game
-    std::string review_tables_error_;
+    lichess::Failure review_tables_error_;
     void updateReviewTables();  // a new game's tables; the asking started when allowed, its end taken
     void drawReviewTables();    // the review's line about them: the question, the asking, what they judged
     [[nodiscard]] const commentary::Tablebases* reviewTables() const;  // when taught anything

@@ -243,7 +243,7 @@ void App::pollStudies() {
             }
             if (renamed) saveStudiesState();
         } else {
-            studies_list_error_ = answer.error;
+            studies_list_error_ = lichess::describe(answer);
         }
     }
     // A study read, imported too.
@@ -254,7 +254,7 @@ void App::pollStudies() {
         study_said_of_  = job.id;
         study_said_bad_ = false;
         if (!read.text.value) {
-            study_said_     = trf("Lichess did not give the study: {}.", read.text.error);
+            study_said_     = trf("Lichess did not give the study: {}.", lichess::describe(read.text));
             study_said_bad_ = true;
         } else {
             std::string name = job.id;
@@ -343,8 +343,9 @@ void App::pollStudies() {
                                           lichess::StudyInfo{answer.value->study, s.going.study_name,
                                                              nowSeconds() * 1000, nowSeconds() * 1000});
             }
-            if (!answer.error.empty() || !answer.value || answer.value->chapter.empty()) {
-                s.error = answer.error.empty() ? std::string(TR("Lichess made no chapter of it")) : answer.error;
+            if (answer.failed() || !answer.value || answer.value->chapter.empty()) {
+                s.error =
+                    answer.failed() ? lichess::describe(answer) : std::string(TR("Lichess made no chapter of it"));
                 if (answer.value && !answer.value->created && answer.value->chapters >= 0)  // a full study, counted
                     studies_.record(answer.value->study, s.going.study_name).chapters = answer.value->chapters;
             } else {
@@ -399,7 +400,7 @@ void App::pollStudies() {
             saveStudiesState();
             boardToast(TR("The chapter on Lichess has the game's changes now"));
         } else {
-            study_update_error_ = answer.error;
+            study_update_error_ = lichess::describe(answer);
         }
     }
     // Lichess's page answered: what waited for the permission goes on, or says why not.
@@ -412,10 +413,12 @@ void App::pollStudies() {
             study_send_->after_link = false;
             if (!studyToken(true).empty())
                 startStudySend();
-            else
-                study_send_->error = lichess_error_.empty() ? std::string(TR("Lichess gave no permission to write in "
-                                                                             "your studies: nothing was sent."))
-                                                            : lichess_error_;
+            else {
+                study_send_->error   = !lichess_error_.failed() ? std::string(TR("Lichess gave no permission to write "
+                                                                                 "in your studies: nothing was sent."))
+                                                                : lichess::describe(lichess_error_);
+                study_send_->refused = lichess::linkRefused(lichess_error_);
+            }
         }
         if (study_update_after_link_) {
             study_update_after_link_ = false;
@@ -928,6 +931,7 @@ void App::startStudySend() {
     if (!study_send_ || study_send_job_.valid()) return;
     auto& s = *study_send_;
     s.error.clear();
+    s.refused = false;
     if (toLichessLock(true)) {
         s.error =
             TR("A game you are playing on Lichess is on this line: nothing of it leaves the machine while it is "
@@ -1221,8 +1225,8 @@ void App::drawStudySendCard() {
                                       "here."));
             } else if (!s.error.empty()) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   lichess::linkRefused(s.error) ? TR("You refused it on Lichess: nothing was sent.")
-                                                                 : trf("Not sent: {}.", s.error).c_str());
+                                   s.refused ? TR("You refused it on Lichess: nothing was sent.")
+                                             : trf("Not sent: {}.", s.error).c_str());
             }
             const bool can =
                 !s.busy && !lichess_link_ && (s.where == 0 ? !s.study.empty() : lichess::studyNameOk(s.name.data()));

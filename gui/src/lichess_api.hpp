@@ -11,6 +11,8 @@
 #include <string_view>
 #include <vector>
 
+#include "lichess_http.hpp"  // Answer<T>, NetError
+
 namespace fcg::lichess {
 
 // The servers asked: Lichess's, or a test's.
@@ -21,15 +23,6 @@ struct Servers {
     std::string engine    = "https://engine.lichess.ovh";  // the external engines' work (#96)
 };
 [[nodiscard]] Servers& servers();
-
-// What a request gave: its value, or none and why. No value and no error: the server has nothing for it (a position
-// the cloud has not evaluated).
-template <typename T>
-struct Answer {
-    std::optional<T> value;
-    std::string error;
-    int status = 0;  // HTTP's, 0 without an answer
-};
 
 // The cloud: lines of moves (UCI) with their evaluation for White, in centipawns or as a mate in so many moves
 // (negative: Black mates).

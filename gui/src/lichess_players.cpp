@@ -16,11 +16,6 @@ namespace fcg::lichess {
 
 namespace {
 
-std::string textOf(const nlohmann::json& j, const char* key) {
-    const auto it = j.find(key);
-    return it != j.end() && it->is_string() ? it->get<std::string>() : std::string();
-}
-
 std::string lower(std::string text) {
     for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return text;
@@ -353,7 +348,7 @@ void PlayersFollower::follow(Game& g) {
         if (!answer.value) {
             {
                 std::lock_guard lock(mutex_);
-                error_ = fmt::format("{}: {}", g.id, answer.error);
+                error_ = fmt::format("{}: {}", g.id, describe(answer));
             }
             if (++failures >= 3) return;
             rest(g.stop, 10);

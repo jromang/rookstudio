@@ -275,20 +275,15 @@ void App::startBotLink() {
                 return opened->load();
             },
             {lichess::SCOPE_BOT_PLAY}, std::chrono::minutes(5), cancel.get());
-        if (!linked.value) {
-            lichess::BotTokenCheck c;
-            c.error  = linked.error;
-            c.status = linked.status;
-            return c;
-        }
-        // The link told the token's name and scopes already: its account's facts only.
         lichess::BotTokenCheck c;
-        c.linked   = true;
-        c.account  = linked.value;  // revoked if it is refused
-        auto facts = lichess::botAccount(linked.value->token, cancel.get());
-        c.status   = facts.status;
-        c.error    = facts.error;
-        c.facts    = std::move(facts.value);
+        static_cast<lichess::Failure&>(c) = linked;
+        if (!linked.value) return c;
+        // The link told the token's name and scopes already: its account's facts only.
+        c.linked                          = true;
+        c.account                         = linked.value;  // revoked if it is refused
+        auto facts                        = lichess::botAccount(linked.value->token, cancel.get());
+        static_cast<lichess::Failure&>(c) = facts;
+        c.facts                           = std::move(facts.value);
         return c;
     });
     bot_link_       = std::move(link);
@@ -505,9 +500,9 @@ void App::pollBot() {
     // An account linked or a token pasted: checked before it is kept, and before anything changes it.
     const auto take = [&](lichess::BotTokenCheck c) {
         if (!c.account || !c.facts) {
-            if (c.error == "cancelled") return;
-            bot_unanswered_ = c.status == 0 && !lichess::linkRefused(c.error);
-            bot_error_      = c.error.empty() ? std::string(TR("Lichess did not answer")) : c.error;
+            if (c.net == lichess::NetError::Cancelled) return;
+            bot_unanswered_ = c.status == 0 && !lichess::linkRefused(c);
+            bot_error_      = c.failed() ? lichess::describe(c) : std::string(TR("Lichess did not answer"));
             if (c.linked && c.account) {
                 revokeToken(c.account->token);
             }
@@ -551,7 +546,7 @@ void App::pollBot() {
             std::fill(bot_confirm_.begin(), bot_confirm_.end(), '\0');
         } else {
             bot_unanswered_ = r.status == 0;
-            bot_error_      = r.error;
+            bot_error_      = lichess::describe(r);
             bot_step_       = BotStep::Account;
             // Refused: the account looked at again, what Lichess saw in it then said.
             if (r.status != 0 && bot_account_ && !bot_check_.valid())
@@ -560,8 +555,9 @@ void App::pollBot() {
         }
     }
     if (ready(bot_unlink_)) {
-        if (const auto error = bot_unlink_.get(); !error.empty())
-            Console::instance().add(trf("Lichess: the bot's token could not be revoked: {}", error), true);
+        if (const auto failure = bot_unlink_.get(); failure.failed())
+            Console::instance().add(
+                trf("Lichess: the bot's token could not be revoked: {}", lichess::describe(failure)), true);
     }
     // Its answers to the challenges: what failed is said on its card.
     for (auto& c : bot_calls_) {

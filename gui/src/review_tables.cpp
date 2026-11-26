@@ -46,9 +46,9 @@ std::vector<TablePosition> tablePositions(const commentary::MainLine& line, cons
     return out;
 }
 
-std::string askTables(const std::vector<TablePosition>& positions, const commentary::MainLine& line,
-                      const std::filesystem::path& profile, commentary::Tablebases& tables,
-                      const std::atomic<bool>& cancel, std::atomic<int>& done) {
+lichess::Failure askTables(const std::vector<TablePosition>& positions, const commentary::MainLine& line,
+                           const std::filesystem::path& profile, commentary::Tablebases& tables,
+                           const std::atomic<bool>& cancel, std::atomic<int>& done) {
     const auto& all = line.positions();
     for (const auto& p : positions) {
         if (cancel) return {};
@@ -62,7 +62,7 @@ std::string askTables(const std::vector<TablePosition>& positions, const comment
                 const auto answer = lichess::tablebase(p.fen, &cancel);
                 if (cancel) return {};
                 if (!answer.value) {
-                    if (!answer.error.empty()) return answer.error;
+                    if (answer.failed()) return answer;
                 } else if (teachTables(tables, pos, *answer.value)) {
                     keepTablebase(profile, p.fen, *answer.value);
                 }

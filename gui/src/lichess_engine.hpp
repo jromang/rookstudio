@@ -81,21 +81,23 @@ struct ExternalEngine {
 // A secret drawn here: 48 letters and digits. Throws std::runtime_error when there are no random numbers.
 [[nodiscard]] std::string newProviderSecret();
 
-// The registration's requests, with the user's token, one at a time to lichess.org. A refusal in Lichess's words.
+// The registration's requests, with the user's token, one at a time to lichess.org: their failures worded as the
+// external engines' (Asked::Engines), a refusal in Lichess's words; a registration Lichess would refuse, in
+// registrationProblem's words (Failure::error).
 [[nodiscard]] Answer<ExternalEngine> registerEngine(const std::string& token, const EngineRegistration& r,
                                                     const std::atomic<bool>* cancel = nullptr);
 [[nodiscard]] Answer<std::vector<ExternalEngine>> listEngines(const std::string& token,
                                                               const std::atomic<bool>* cancel = nullptr);
-// The registration `id`: no value and no error when Lichess has it no more (404: withdrawn on lichess.org).
+// The registration `id`: no value and no failure when Lichess has it no more (404: withdrawn on lichess.org).
 [[nodiscard]] Answer<ExternalEngine> engineRegistration(const std::string& token, const std::string& id,
                                                         const std::atomic<bool>* cancel = nullptr);
 // A registration changed (its name, limits, or a new secret).
 [[nodiscard]] Answer<ExternalEngine> updateEngine(const std::string& token, const std::string& id,
                                                   const EngineRegistration& r,
                                                   const std::atomic<bool>* cancel = nullptr);
-// The registration deleted: an error, empty when Lichess took it (or has it no more).
-[[nodiscard]] std::string withdrawEngine(const std::string& token, const std::string& id,
-                                         const std::atomic<bool>* cancel = nullptr);
+// The registration deleted: no failure when Lichess took it (or has it no more).
+[[nodiscard]] Failure withdrawEngine(const std::string& token, const std::string& id,
+                                     const std::atomic<bool>* cancel = nullptr);
 
 // ---------------------------------------------------------------------------
 // The work
@@ -220,7 +222,10 @@ struct ServiceStatus {
     uint64_t version   = 0;
     ServiceState state = ServiceState::Waiting;
     ServicePause pause = ServicePause::None;
-    std::string error;                                 // why: offline, refused, the API's change, the engine
+    Failure failure;    // Offline: the work host unanswered (Offline), too many requests (RateLimited), in trouble
+                        // (Server); Refused: the secret refused (Unauthorized, Forbidden)
+    std::string error;  // why, in the program's words: the API's change, the engine's failure
+    bool chess960_missing = false;  // EngineFailed: the engine does not know the Chess960 mode, which Lichess asks for
     std::optional<ServiceJob> job;                     // being answered
     std::optional<ServiceJob> last;                    // the last one answered
     int threads_now = 0;                               // the engine's threads while it answers, in the core budget

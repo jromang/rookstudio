@@ -65,10 +65,11 @@ void App::saveLichessSettings() { (void)writeJson(storage_.root() / "lichess.jso
 
 void App::revokeToken(std::string token) {
     jobs_.park(std::async(std::launch::async, [token = std::move(token)] { return lichess::revoke(token); }),
-               [](const std::string& error) {
-                   if (!error.empty())
-                       Console::instance().add(trf("Lichess: the token replaced could not be revoked: {}", error),
-                                               true);
+               [](const lichess::Failure& failure) {
+                   if (failure.failed())
+                       Console::instance().add(
+                           trf("Lichess: the token replaced could not be revoked: {}", lichess::describe(failure)),
+                           true);
                });
 }
 
@@ -83,7 +84,7 @@ void App::pollLichess() {
             try {
                 lichess::saveAccount(storage_.root(), *answer.value);
                 lichess_account_ = *answer.value;
-                lichess_error_.clear();
+                lichess_error_   = {};
                 if (lichess_.player.empty()) lichess_.player = answer.value->username;
                 saveLichessSettings();
                 if (window_) SDL_RaiseWindow(window_);  // back in front of the browser
@@ -102,18 +103,20 @@ void App::pollLichess() {
                 }
                 if (follow) followBroadcast(*follow);
             } catch (const std::exception& e) {
-                lichess_error_ = e.what();
+                lichess_error_ = lichess::Failure::own(e.what());
             }
-        } else if (answer.error != "cancelled") {
+        } else if (answer.net != lichess::NetError::Cancelled) {
             if (lichess_scope_ask_)
-                lichess_scope_ask_->error = answer.error;
+                lichess_scope_ask_->error = answer;
             else
-                lichess_error_ = answer.error;
+                lichess_error_ = answer;
         }
     }
     if (lichess_unlink_.valid() && ready(lichess_unlink_)) {
-        const auto error = lichess_unlink_.get();
-        if (!error.empty()) Console::instance().add(trf("Lichess: the token could not be revoked: {}", error), true);
+        const auto failure = lichess_unlink_.get();
+        if (failure.failed())
+            Console::instance().add(trf("Lichess: the token could not be revoked: {}", lichess::describe(failure)),
+                                    true);
     }
     // A player's games: the sync ends.
     if (lichess_sync_ && ready(lichess_sync_->done)) {
@@ -275,8 +278,8 @@ void App::askBroadcasts() {
 
 void App::startLichessLink(std::vector<std::string> scopes, std::string username,
                            std::optional<lichess::BroadcastEntry> then_follow) {
-    lichess_error_.clear();
-    if (lichess_scope_ask_) lichess_scope_ask_->error.clear();
+    lichess_error_ = {};
+    if (lichess_scope_ask_) lichess_scope_ask_->error = {};
     auto link         = std::make_unique<LichessLink>();
     link->cancel      = std::make_shared<std::atomic<bool>>(false);
     auto url          = std::make_shared<std::string>();
@@ -339,10 +342,11 @@ void App::drawLichessScopeAsk() {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                            TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
     } else {
-        if (!ask.error.empty())
+        if (ask.error.failed())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               lichess::linkRefused(ask.error) ? TR("You refused it on Lichess: nothing changed.")
-                                                               : trf("Lichess gave nothing ({}).", ask.error).c_str());
+                               lichess::linkRefused(ask.error)
+                                   ? TR("You refused it on Lichess: nothing changed.")
+                                   : trf("Lichess gave nothing ({}).", lichess::describe(ask.error)).c_str());
         if (ui::iconButton("lichess_scope_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
             auto scopes = lichess_account_->scopes;
             if (!lichess_account_->has(ask.scope)) scopes.push_back(ask.scope);
@@ -465,19 +469,22 @@ void App::drawLichessAccount() {
             ImGui::TextWrapped("%s", line);
         }
         // What went wrong last, and the gesture that mends it (M4, board 2).
-        if (!lichess_error_.empty()) {
+        if (lichess_error_.failed()) {
             const bool refused = lichess::linkRefused(lichess_error_);
-            const bool late    = lichess_error_.find("in time") != std::string::npos;
+            const bool late    = lichess_error_.net == lichess::NetError::TimedOut;
+            const bool offline = lichess_error_.net == lichess::NetError::Offline;
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                refused ? TR("You refused the access on Lichess: nothing is linked.")
                                : late ? TR("No answer from Lichess in 5 minutes: the link stopped, the port is closed.")
-                                      : trf("Lichess cannot be reached from here ({}): the link waits for a "
-                                            "connection. Everything else works without it.",
-                                            lichess_error_)
-                                            .c_str());
+                               : offline ? TR("Lichess cannot be reached from here: the link waits for a connection. "
+                                              "Everything else works without it.")
+                                         : trf("Lichess cannot be reached from here ({}): the link waits for a "
+                                               "connection. Everything else works without it.",
+                                               lichess::describe(lichess_error_))
+                                               .c_str());
         }
         if (ui::iconButton("lichess_link", ui::Icon::External,
-                           lichess_error_.empty() ? TR("Link the account…") : TR("Try again")))
+                           !lichess_error_.failed() ? TR("Link the account…") : TR("Try again")))
             startLichessLink();
         ImGui::TextDisabled("%s", TR("The browser opens on lichess.org: you allow RookStudio there, without giving it "
                                      "a password."));
@@ -1066,8 +1073,11 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
             pause.count() > 0
                 ? trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {} s.",
                       std::chrono::duration_cast<std::chrono::seconds>(pause).count())
+            : a.net == lichess::NetError::Offline
+                ? std::string(TR("Lichess did not answer: asked again in a minute. The local databases answer as "
+                                 "always."))
                 : trf("Lichess did not answer ({}): asked again in a minute. The local databases answer as always.",
-                      a.error);
+                      lichess::describe(a));
         // Asked again after a minute, or at once in another position: never in a loop.
         if (ImGui::GetTime() - explorer_failed_[key] > 60) {
             explorer_answers_.erase(found);
@@ -1187,7 +1197,7 @@ void App::drawTreeGames() {
                 if (ply < n) board.makeMove(b.game.moves[static_cast<std::size_t>(ply)].move);
             }
         } else {
-            explorer_game_error_ = answer.error;
+            explorer_game_error_ = lichess::describe(answer);
         }
     }
     if (tree_games_.empty() || !lichess_account_) return;

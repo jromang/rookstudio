@@ -4,6 +4,7 @@
 // in the profile with its answers.
 #include <doctest/doctest.hpp>
 
+#include <atomic>
 #include <filesystem>
 #include <mutex>
 #include <random>
@@ -14,6 +15,7 @@
 #include <chess.hpp>
 #include <json.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -24,6 +26,7 @@ using namespace fcg;
 using namespace fcg::lichess;
 using fcg::test::requestPath;
 using fcg::test::ScriptedServer;
+using namespace fcg::test;
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 
@@ -219,13 +222,15 @@ TEST_CASE("lichess puzzles: a batch asked for, its results sent in one request t
     const auto a = solvePuzzles("tok", "fork", results, 50, "harder");
     CHECK_FALSE(a.value);
     CHECK(a.status == 429);
-    CHECK(a.error.find("wait a minute") != std::string::npos);
+    CHECK(a.net == NetError::RateLimited);
+    CHECK(describe(a).find("wait a minute") != std::string::npos);
     HostGate::instance().setPause(1ms);  // its minute's pause, short for the test
     status       = 401;
     const auto b = puzzleBatch("old", "mix", 50, "normal");
     CHECK_FALSE(b.value);
     CHECK(b.status == 401);
-    CHECK(b.error == "Lichess refused the token");
+    CHECK(b.net == NetError::Unauthorized);
+    CHECK(describe(b) == "Lichess refused the token: link the account again");
     servers() = Servers{};
     HostGate::instance().setPause(60s);
 }
@@ -292,4 +297,34 @@ TEST_CASE("lichess puzzles: the batch kept in the profile with its answers") {
     CHECK(kept->complete());
     forgetOnlineBatch(folder);
     CHECK_FALSE(loadOnlineBatch(folder));
+}
+
+TEST_CASE("lichess puzzles: each failure of a batch, its answers or the dashboard told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    const std::vector<PuzzleSolution> results = {{"aaaaa", true, true}};
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, R"({"error":"No such token"})", NetError::Unauthorized},
+          Case{403, R"({"error":"Missing scope"})", NetError::Forbidden}, Case{404, "{}", NetError::NotFound},
+          Case{429, "{}", NetError::RateLimited}, Case{500, "<html>Internal error</html>", NetError::Server},
+          Case{200, "<html>not JSON</html>", NetError::BadAnswer}, Case{200, "[1, 2]", NetError::BadAnswer}}) {
+        CAPTURE(status);
+        CAPTURE(body);
+        server.answer(status, body);
+        CHECK(puzzleBatch("tok", "mix", 10, "normal").net == net);
+        CHECK(solvePuzzles("tok", "mix", results, 10, "normal").net == net);
+        CHECK(puzzleDashboard("tok", 30).net == net);
+    }
+    pointNowhere();
+    CHECK(puzzleBatch("tok", "mix", 10, "normal").net == NetError::Offline);
+    pointAtPausedHost("lichess-puzzles.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(puzzleBatch("tok", "mix", 10, "normal", &cancel).net == NetError::Cancelled);
+    CHECK(puzzleDashboard("tok", 30, &cancel).net == NetError::Cancelled);
 }

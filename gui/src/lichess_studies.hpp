@@ -31,7 +31,6 @@ inline constexpr int STUDY_CHAPTERS = 64;  // the chapters a study holds at most
 inline constexpr int STUDIES_A_DAY  = 30;  // the studies an account may make in a day
 
 using Tags = std::vector<std::pair<std::string, std::string>>;
-using Form = std::vector<std::pair<std::string, std::string>>;
 
 // A study as the list of a user's gives it: its name and dates (milliseconds since the epoch). Lichess says nothing
 // else there: neither its visibility nor its chapters.

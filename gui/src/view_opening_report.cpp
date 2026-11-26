@@ -463,7 +463,7 @@ void App::askReportLichess(int source) {
         r.lichess_error[i].clear();
     } else {
         // Offline, or Lichess refused: its last figures for this position, dated, when the report kept them.
-        r.lichess_error[i] = found->second.error.empty() ? std::string("?") : found->second.error;
+        r.lichess_error[i] = found->second.failed() ? lichess::describe(found->second) : std::string("?");
         if (!r.lichess[i])
             if (auto kept = keptExplorer(storage_.root(), key)) {
                 r.lichess[i]      = std::move(kept->first);

@@ -3,6 +3,7 @@
 #include <doctest/doctest.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <mutex>
 #include <string>
@@ -11,6 +12,7 @@
 #include <fmt/include/fmt/format.h>
 #include <study/store.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_links.hpp"
@@ -167,12 +169,13 @@ TEST_CASE("Lichess links: one game for the board, and a study's chapters into a 
     CHECK(lichess.lastHead().find("Authorization") == std::string::npos);  // no token: none sent
     CHECK_FALSE(gamePgn("zzzz9999", "").value);
     CHECK(gamePgn("zzzz9999", "").status == 404);
+    CHECK(describe(gamePgn("zzzz9999", "")) == "Lichess has nothing at this address");
 
     const auto db = emptyDatabase("fcg-lichess-links-study");
     std::atomic<uint64_t> games{0};
     std::atomic<bool> cancel{false};
     const auto report = importLink(*db, link(LinkKind::Study, "AbCdEfGh"), "", games, cancel);
-    CHECK(report.error.empty());
+    CHECK_FALSE(report.failed());
     CHECK(report.read == 2);
     CHECK(report.added == 2);
     CHECK(games == 2);
@@ -190,10 +193,58 @@ TEST_CASE("Lichess links: a broadcast without the account it needs says so; with
     std::atomic<bool> cancel{false};
     const auto refused = importLink(*db, link(LinkKind::BroadcastRound, "Xy12AbCd"), "", games, cancel);
     CHECK(refused.status == 401);
-    CHECK(refused.error.find("account allowed to read broadcasts") != std::string::npos);
+    CHECK(refused.net == NetError::Unauthorized);
+    CHECK(describe(refused) == "Lichess refuses this without an account allowed to read broadcasts");
     CHECK(refused.added == 0);
     const auto taken = importLink(*db, link(LinkKind::BroadcastRound, "Xy12AbCd"), "a-token", games, cancel);
-    CHECK(taken.error.empty());
+    CHECK_FALSE(taken.failed());
     CHECK(taken.added == 2);
     CHECK(lichess.lastHead().find("Authorization: Bearer a-token") != std::string::npos);
+}
+
+TEST_CASE("Lichess links: each failure of a link's export told by its kind, in the link's words") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(std::chrono::milliseconds(50));
+    const auto db = emptyDatabase("fcg-lichess-links-failures");
+    std::atomic<uint64_t> games{0};
+    std::atomic<bool> cancel{false};
+    const auto study = link(LinkKind::Study, "AbCdEfGh");
+    const auto round = link(LinkKind::BroadcastRound, "Xy12AbCd");
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, "{}", NetError::Forbidden},
+          Case{404, "{}", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{502, "<html>Bad gateway</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(linkPgn(study, "").net == net);
+        CHECK(gamePgn("abcd1234", "").net == net);
+        const auto report = importLink(*db, round, "", games, cancel);
+        CHECK(report.net == net);
+        CHECK(report.status == status);
+        CHECK(report.added == 0);
+    }
+    // Who may read it, said for what the link names.
+    server.answer(403, "{}");
+    CHECK(describe(linkPgn(study, "")) == "Lichess refuses it: private, or for another account");
+    CHECK(describe(importLink(*db, round, "", games, cancel)) ==
+          "Lichess refuses this without an account allowed to read broadcasts");
+    CHECK(describe(linkPgn(link(LinkKind::Bookmarks, ""), "")) == "Lichess's bookmarks need a linked account");
+    server.answer(404, "{}");
+    CHECK(describe(importLink(*db, round, "", games, cancel)) == "Lichess has nothing at this address");
+    // Nothing listens; cancelled in a pause; a cancel during the import is no failure.
+    pointNowhere();
+    CHECK(linkPgn(study, "").net == NetError::Offline);
+    CHECK(importLink(*db, study, "", games, cancel).net == NetError::Offline);
+    pointAtPausedHost("lichess-links.invalid");
+    cancel = true;
+    CHECK(linkPgn(study, "", &cancel).net == NetError::Cancelled);
+    const auto stopped = importLink(*db, study, "", games, cancel);
+    CHECK(stopped.cancelled);
+    CHECK_FALSE(stopped.failed());
 }

@@ -14,13 +14,6 @@ namespace fcg::lichess {
 
 namespace {
 
-std::string refusal(const HttpResult& r) {
-    return r.status == 0     ? (r.error.empty() ? std::string("Lichess did not answer") : r.error)
-           : r.status == 404 ? std::string("Lichess has no such FIDE player")
-           : r.status == 429 ? std::string("Lichess asks to wait a minute: too many requests")
-                             : fmt::format("Lichess answered {}", r.status);
-}
-
 FideCard cardOf(const nlohmann::json& j) {
     FideCard c;
     const auto number = [&](const char* key) {
@@ -45,51 +38,28 @@ FideCard cardOf(const nlohmann::json& j) {
     return c;
 }
 
-HttpResult ask(const std::string& url, const std::atomic<bool>* cancel) {
-    HttpRequest request;
-    request.url    = url;
-    request.method = "GET";
-    request.headers.emplace_back("Accept", "application/json");
-    return politeRequest(request, cancel);
-}
-
 }  // namespace
 
 Answer<FideCard> fidePlayer(int64_t id, const std::atomic<bool>* cancel) {
-    Answer<FideCard> a;
-    const auto r = ask(fmt::format("{}/api/fide/player/{}", servers().api, id), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = refusal(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    a.value = cardOf(j);
+    auto a = call<FideCard>(
+        request("GET", fmt::format("{}/api/fide/player/{}", servers().api, id)),
+        [](const nlohmann::json& j) { return j.is_object() ? std::optional<FideCard>(cardOf(j)) : std::nullopt; },
+        cancel);
+    a.asked = Asked::FidePlayer;
     return a;
 }
 
 Answer<std::vector<FideCard>> fideSearch(const std::string& name, const std::atomic<bool>* cancel) {
-    Answer<std::vector<FideCard>> a;
-    const auto r = ask(fmt::format("{}/api/fide/player?q={}", servers().api, urlEncode(name)), cancel);
-    a.status     = r.status;
-    if (r.status != 200) {
-        a.error = refusal(r);
-        return a;
-    }
-    const auto j = nlohmann::json::parse(r.body, nullptr, false);
-    if (j.is_discarded() || !j.is_array()) {
-        a.error = "Lichess's answer could not be read";
-        return a;
-    }
-    std::vector<FideCard> found;
-    for (const auto& p : j)
-        if (p.is_object()) found.push_back(cardOf(p));
-    a.value = std::move(found);
-    return a;
+    return call<std::vector<FideCard>>(
+        request("GET", fmt::format("{}/api/fide/player?q={}", servers().api, urlEncode(name))),
+        [](const nlohmann::json& j) -> std::optional<std::vector<FideCard>> {
+            if (!j.is_array()) return std::nullopt;
+            std::vector<FideCard> found;
+            for (const auto& p : j)
+                if (p.is_object()) found.push_back(cardOf(p));
+            return found;
+        },
+        cancel);
 }
 
 std::string fideNameKey(std::string_view name) {

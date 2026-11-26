@@ -172,14 +172,17 @@ std::string clockText(int64_t seconds) {
 
 
 // Why Lichess gave nothing, said with what still works (M4, board 6).
-std::string trouble(const std::string& error, const char* host) {
+std::string trouble(const lichess::Failure& failure, const char* host) {
     const auto pause = HostGate::instance().pausedFor(host);
     if (pause.count() > 0) {
         const auto s = std::chrono::duration_cast<std::chrono::seconds>(pause).count();
         return trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {}:{:02}.", s / 60,
                    s % 60);
     }
-    return trf("Lichess cannot be reached from here ({}): the answers kept still show, your engine answers.", error);
+    if (failure.net == lichess::NetError::Offline)
+        return TR("Lichess cannot be reached from here: the answers kept still show, your engine answers.");
+    return trf("Lichess cannot be reached from here ({}): the answers kept still show, your engine answers.",
+               lichess::describe(failure));
 }
 
 }  // namespace
@@ -233,7 +236,7 @@ void App::drawBoardOnline() {
         auto answer = online_cloud_job_.get();
         if (answer.value)
             writeCached(cacheFile(root, "cloud", online_cloud_asked_), online_cloud_asked_, cloudJson(*answer.value));
-        else if (answer.error.empty())
+        else if (!answer.failed())
             online_not_in_cloud_.insert(positionOf(online_cloud_asked_));
         online_cloud_ = OnlineCloud{online_cloud_asked_, std::move(answer), nowSeconds()};
     }
@@ -342,8 +345,7 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
         "%s",
         trf("· {} pieces · Lichess · asked at {}, kept in your profile", pieces, clockText(online_tb_->when)).c_str());
     if (!a.value) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trouble(a.error, "tablebase.lichess.ovh").c_str());
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a, "tablebase.lichess.ovh").c_str());
         if (ImGui::SmallButton(TR("Try again"))) online_tb_.reset();
         ImGui::PopTextWrapPos();
         ui::endCard();
@@ -372,11 +374,11 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
 
 void App::drawOnlineCloud(const chess::Board& board) {
     const auto& a = online_cloud_->answer;
-    if (!a.value && a.error.empty()) return;  // a position the cloud has not computed says nothing
+    if (!a.value && !a.failed()) return;  // a position the cloud has not computed says nothing
     ui::beginCard("online_cloud");
     ImGui::PushTextWrapPos();
     if (!a.value) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a.error, "lichess.org").c_str());
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a, "lichess.org").c_str());
         if (ImGui::SmallButton(TR("Try again"))) online_cloud_.reset();
         ImGui::PopTextWrapPos();
         ui::endCard();

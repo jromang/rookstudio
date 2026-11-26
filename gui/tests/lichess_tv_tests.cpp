@@ -13,6 +13,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 
+#include "answering_server.hpp"
 #include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_players.hpp"
@@ -345,7 +346,7 @@ TEST_CASE("Lichess TV: the card, a channel's games and the next game, asked of a
     // Lichess not there: said.
     servers().api = fmt::format("http://127.0.0.1:{}", freePort());
     CHECK_FALSE(tvRows().value);
-    CHECK_FALSE(tvList("blitz").error.empty());
+    CHECK(tvList("blitz").net == NetError::Offline);
     servers() = Servers{};
 }
 
@@ -425,4 +426,32 @@ TEST_CASE("Lichess TV: the games of an address followed a few at a time, as Lich
     }
     quit      = true;
     servers() = Servers{};
+}
+
+TEST_CASE("Lichess TV: each failure of the channels and their games told by its kind") {
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, "{}", NetError::Unauthorized}, Case{403, "{}", NetError::Forbidden},
+          Case{404, R"({"error":"Not found"})", NetError::NotFound}, Case{429, "{}", NetError::RateLimited},
+          Case{503, "<html>down</html>", NetError::Server}, Case{200, "<html>not JSON</html>", NetError::BadAnswer}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        CHECK(tvRows().net == net);
+        CHECK(tvList("blitz").net == net);
+        CHECK(askTvNext("blitz", "game0003", {}, true).net == net);
+    }
+    pointNowhere();
+    CHECK(tvRows().net == NetError::Offline);
+    CHECK(describe(tvRows()) == "Lichess cannot be reached");
+    pointAtPausedHost("lichess-tv.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(tvRows(&cancel).net == NetError::Cancelled);
+    CHECK(tvList("blitz", TV_MOST_GAMES, &cancel).net == NetError::Cancelled);
 }

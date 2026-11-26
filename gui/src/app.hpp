@@ -473,9 +473,9 @@ class App {
     bool broadcast_sheet_ = false;
     int broadcast_pick_   = 0;
     int broadcast_target_ = -2;                                                           // as twic_target_
-    std::optional<std::future<std::pair<std::string, std::string>>> lichess_months_job_;  // the page, or why not
+    std::optional<std::future<lichess::Answer<std::string>>> lichess_months_job_;         // the page, or why not
     std::vector<lichess::Month> lichess_broadcast_months_, lichess_standard_months_;
-    std::string lichess_months_error_;
+    lichess::Failure lichess_months_error_;  // Lichess's, or a page without a month the program reads
     // A chess.com player's games (#74): their months asked for, then each month's PGN; a followed player under the
     // list of databases, looked at again when the user asks.
     void drawChesscomSheet();

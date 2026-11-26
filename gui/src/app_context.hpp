@@ -3,17 +3,20 @@
 // What a module of RookStudio's asks of the program around it (#107). A module holds an area of its own out of App
 // (its state, its poll(), its draw(), its palette commands and --focus words: Lichess TV, lichess_tv_page.hpp; the
 // arenas and Swiss tournaments, lichess_arenas_page.hpp; the Lichess bot, lichess_bot_page.hpp; the puzzles,
-// puzzles_page.hpp; the user's mistakes as exercises, mistakes_page.hpp; guessing the moves of a game, guess_page.hpp),
-// and reaches the rest through the facets below instead of App's members: the program (the frame, the profile and its
-// databases, the jobs), the pages it opens, the databases' pages, the Board, the mosaic its games show in, the Lichess
-// settings, the user's Lichess account and its link, the user's games on Lichess and the fair play their live game
-// holds, the engines and the cores, the Board taken by a game followed live, the tokens given up, the window, the Board
-// taken by a training session (board_session.hpp) and a game replayed on it, the Training page and its day's review,
-// the user's mistakes, the file dialogs, the user's names, the analysis engine, the games reviewed in the background,
-// the repertoires' positions, the games opened on the Board from a session, the Board's own game. A module's context
-// is the facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext, MistakesContext, GuessContext); App
-// answers them all (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of the module it builds,
-// with a fake of its own, without App.
+// puzzles_page.hpp; the user's mistakes as exercises, mistakes_page.hpp; guessing the moves of a game, guess_page.hpp;
+// the endgames against the tables, endgames_page.hpp; board vision, vision_page.hpp), and reaches the rest through the
+// facets below instead of App's members: the program (the frame, the profile and its databases, the jobs), the pages it
+// opens, the databases' pages, the Board, the mosaic its games show in, the Lichess settings, the user's Lichess
+// account and its link, the user's games on Lichess and the fair play their live game holds, the engines and the cores,
+// the Board taken by a game followed live, the tokens given up, the window, the Board taken by a training session
+// (board_session.hpp), a game replayed on it, the Board drawn flat with the pieces a session shows and a game played on
+// it, the Training page and its day's review, the user's mistakes, Lichess's puzzles, the file dialogs, the user's
+// names, the analysis engine, the games reviewed in the background, the repertoires' positions, the games opened on the
+// Board from a session, the Board's own game, the Syzygy tables of the disk and their download, the Play page's
+// opponent. A module's context is the facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext,
+// MistakesContext, GuessContext, EndgamesContext, VisionContext); App answers them all (AppContext, by
+// App::ModulesContext, app_chess.cpp), and a test only those of the module it builds, with a fake of its own, without
+// App.
 //
 // Each method says what a module needs, in its words, not which member of App gives it. The facets hold only what the
 // modules out of App need now, and grow with those that follow (the other kinds of training): a facet a module does not
@@ -27,6 +30,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <random>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -35,6 +39,7 @@
 #include <chess.hpp>
 
 #include "board_session.hpp"
+#include "syzygy_download.hpp"
 
 namespace fcg {
 
@@ -47,9 +52,12 @@ class DatabaseShelf;
 struct EngineEntry;
 class JobGroup;
 struct LichessSettings;
+struct MistakeExercise;
 class PieceAtlas;
+struct PlaySettings;
 struct ReplayGame;
 class ReviewRunner;
+struct ThemeResults;
 struct TrainingSettings;
 namespace lichess {
 struct Account;
@@ -382,6 +390,26 @@ class SessionReplay {
     virtual void showSessionPly(int ply)                                    = 0;
 };
 
+// The Board as board vision draws it (#82, vision_page.hpp): flat whatever the appearance (the 3D board has no hidden
+// pieces nor a board without its letters and figures); a game the session plays on it, followed there, and the move
+// the user types in its field.
+class FlatBoard {
+   public:
+    virtual ~FlatBoard() = default;
+
+    // The flat board, `size` wide: `pieces` on it rather than the position's (some hidden, or a position of the
+    // exercise's own), `marks` over it (squares tinted, its letters and figures left out), the side below and the last
+    // move of the position shown; the user's moves on `moves` taken there when it is given (a click, a promotion's
+    // piece; each given to the session, BoardSession::sessionMove()), else the square clicked given back (none when
+    // none was).
+    virtual std::optional<chess::Square> drawFlatBoard(float size, const std::array<chess::Piece, 64>& pieces,
+                                                       const BoardDecor& marks, const chess::Board* moves) = 0;
+    // The game the session plays on the Board (a game played blindfold against an engine), followed there: at its last
+    // move, the piece the user picked up let go; whether a move is being typed in the move field.
+    virtual void followSessionGame(ReplayGame game) = 0;
+    [[nodiscard]] virtual bool typingMove() const   = 0;
+};
+
 // The Training page (#80, view_training_page.cpp) and the day's review it starts, "Review all" taking the kinds one
 // after the other (review_queue.hpp); the training's settings.
 class Training {
@@ -411,12 +439,29 @@ class Training {
 };
 
 // The user's mistakes as exercises (#81, their module's, mistakes_page.hpp): the kinds of their mistakes since `since`
-// (a packed date, packedDaysBefore()), counted, as their reviews' "To work on" says them.
+// (a packed date, packedDaysBefore()), counted, as their reviews' "To work on" says them; the exercises asked (those of
+// the record but a position a repertoire of the same side trains), whose positions of 7 men or fewer the endgames play
+// against the tables (#82).
 class Mistakes {
    public:
     virtual ~Mistakes() = default;
 
     [[nodiscard]] virtual std::map<std::string, std::size_t> mistakeKinds(uint32_t since) = 0;
+    [[nodiscard]] virtual std::vector<const MistakeExercise*> mistakeExercises()          = 0;
+};
+
+// Lichess's puzzles (#80, their module's, puzzles_page.hpp), whose mates the Endgames part offers (#82): a theme's
+// results ("mateIn2": the puzzles tried, those solved at the first try); a series of a theme, of the database on the
+// disk, else of the account's batch when the account allows it (false when there are neither: nothing started);
+// whether the database is on the disk; whether the linked account may play them online.
+class Puzzles {
+   public:
+    virtual ~Puzzles() = default;
+
+    [[nodiscard]] virtual ThemeResults puzzleTheme(const std::string& theme) = 0;
+    virtual bool startPuzzleTheme(const std::string& theme)                  = 0;
+    [[nodiscard]] virtual bool puzzlesOnDisk() const                         = 0;
+    [[nodiscard]] virtual bool puzzlesOnline() const                         = 0;
 };
 
 // The file dialogs a module opens, the file chosen given back to the module by App (App::handleChessDialog()).
@@ -518,6 +563,46 @@ class BoardGame {
     [[nodiscard]] virtual int treeDatabase() const    = 0;
 };
 
+// The Syzygy tables of the disk (#82), which the endgames are played against: the folders they are probed in (the
+// tournaments' setting, Settings › Adjudication, with the profile's own once it holds tables), and the setting as it
+// is; the most pieces they cover whole, those of fewer pieces too (checked off the interface's thread); whether a
+// tournament plays in this process and holds them (fastchess keeps them in its globals: none probed meanwhile).
+class DiskTables {
+   public:
+    virtual ~DiskTables() = default;
+
+    [[nodiscard]] virtual std::string diskTablesPaths()     = 0;
+    [[nodiscard]] virtual std::string tablesSetting() const = 0;
+    [[nodiscard]] virtual int diskTablesPieces()            = 0;
+    [[nodiscard]] virtual bool diskTablesLocked() const     = 0;
+    // The tables of 3 to 5 pieces downloaded into the profile on the user's click (syzygy_download.hpp): the download
+    // (none when the program has none); what its folder holds, read again now and then; why it last stopped (empty
+    // when it did not fail); started, the files missing one after the other. A folder of tables already on the disk,
+    // chosen in a dialog and added to the tournaments' setting.
+    [[nodiscard]] virtual SyzygyDownload* tablesDownload()               = 0;
+    [[nodiscard]] virtual const SyzygyDownload::State& tablesHeld()      = 0;
+    [[nodiscard]] virtual const std::string& tablesDownloadError() const = 0;
+    virtual void startTablesDownload()                                   = 0;
+    virtual void chooseTablesFolder()                                    = 0;
+};
+
+// The Play page (#83, view_play.cpp), whose opponent a game played blindfold takes (#82): its choice (play.json: the
+// engine, its strength, its openings); the engine it plays, the one chosen while the library has it active, else the
+// analysis engine (none without any); the engine's openings when it plays `engine_side`, as the choice says: what a
+// game says of them ("the moves of your databases", "its own"), and their book for a game (BoardMatchSetup::book),
+// seeded from `rng` (none for the engine's own, or when their source is not there); the page shown.
+class Play {
+   public:
+    virtual ~Play() = default;
+
+    [[nodiscard]] virtual const PlaySettings& playSettings()                 = 0;
+    [[nodiscard]] virtual const EngineEntry* playEngine()                    = 0;
+    [[nodiscard]] virtual std::string playOpenings(chess::Color engine_side) = 0;
+    [[nodiscard]] virtual std::function<std::optional<std::string>(const chess::Board&)> playBook(
+        chess::Color engine_side, std::mt19937& rng) = 0;
+    virtual void showPlayPage()                      = 0;
+};
+
 }  // namespace context
 
 // What Lichess TV asks of the program (lichess_tv_page.hpp).
@@ -577,12 +662,32 @@ class GuessContext : public virtual context::Program,
                      public virtual context::Analysis,
                      public virtual context::BoardGame {};
 
+// What the endgames against the tables and the mates ask of the program (endgames_page.hpp).
+class EndgamesContext : public virtual context::Program,
+                        public virtual context::SessionBoard,
+                        public virtual context::Training,
+                        public virtual context::FairPlay,
+                        public virtual context::Lichess,
+                        public virtual context::Mistakes,
+                        public virtual context::Puzzles,
+                        public virtual context::DiskTables {};
+
+// What board vision asks of the program (vision_page.hpp).
+class VisionContext : public virtual context::Program,
+                      public virtual context::SessionBoard,
+                      public virtual context::FlatBoard,
+                      public virtual context::Training,
+                      public virtual context::FairPlay,
+                      public virtual context::Play {};
+
 // What App answers: every module's context, each facet once.
 class AppContext : public TvContext,
                    public ArenasContext,
                    public BotContext,
                    public PuzzlesContext,
                    public MistakesContext,
-                   public GuessContext {};
+                   public GuessContext,
+                   public EndgamesContext,
+                   public VisionContext {};
 
 }  // namespace fcg

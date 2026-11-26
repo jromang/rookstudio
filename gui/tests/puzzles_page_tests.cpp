@@ -124,6 +124,7 @@ class FakeApp final : public PuzzlesContext {
 
     // The user's mistakes; the file dialogs.
     std::map<std::string, std::size_t> mistakeKinds(uint32_t) override { return {}; }
+    std::vector<const MistakeExercise*> mistakeExercises() override { return {}; }
     void choosePuzzleFile() override { ++file_dialogs; }
 
     // The user's Lichess account, its link; fair play.

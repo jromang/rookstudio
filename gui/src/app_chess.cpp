@@ -392,6 +392,36 @@ class App::ModulesContext final : public AppContext {
         b.new_game = true;
     }
     void showSessionPly(int ply) override { app_.board_.ply = ply; }
+    std::optional<chess::Square> drawFlatBoard(float size, const std::array<chess::Piece, 64>& pieces,
+                                               const BoardDecor& marks, const chess::Board* moves) override {
+        auto& b          = app_.board_;
+        BoardDecor decor = marks;
+        decor.flipped    = b.flip;
+        decor.eval_white = -1.0f;
+        if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
+        decor.selected = moves ? b.selected : std::nullopt;
+        if (decor.selected)
+            for (const auto& m : movesFrom(*moves, *decor.selected)) decor.targets.push_back(shownTarget(m));
+        const ImVec2 top = ImGui::GetCursorScreenPos();
+        drawBoard(app_.atlas_, pieces, size, decor);
+        const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
+        const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+        if (moves) {
+            app_.boardPointer(*moves, left ? hover : std::nullopt, hover, ImGui::IsItemClicked(ImGuiMouseButton_Right));
+            app_.drawPromotionPopup(*moves);
+            return std::nullopt;
+        }
+        return left ? hover : std::nullopt;
+    }
+    void followSessionGame(ReplayGame game) override {
+        auto& b = app_.board_;
+        b.game  = std::move(game);
+        b.tree  = GameTree{b.game, {}};
+        b.line  = -1;
+        b.ply   = static_cast<int>(b.game.moves.size());
+        b.selected.reset();
+    }
+    bool typingMove() const override { return app_.board_.move_typed.has_value(); }
     void setFlip(bool flip) override { app_.board_.flip = flip; }
     void dropPick() override { app_.board_.selected.reset(); }
     void dropTypedMove() override { app_.board_.move_typed.reset(); }
@@ -480,6 +510,17 @@ class App::ModulesContext final : public AppContext {
     std::map<std::string, std::size_t> mistakeKinds(uint32_t since) override {
         return app_.mistakes_->mistakeKinds(since);
     }
+    std::vector<const MistakeExercise*> mistakeExercises() override { return app_.mistakes_->mistakeExercises(); }
+
+    // Lichess's puzzles, their module's.
+    ThemeResults puzzleTheme(const std::string& theme) override {
+        const auto& themes = app_.puzzles_->puzzleRecord().themes;
+        const auto it      = themes.find(theme);
+        return it == themes.end() ? ThemeResults{} : it->second;
+    }
+    bool startPuzzleTheme(const std::string& theme) override { return app_.puzzles_->startTheme(theme); }
+    bool puzzlesOnDisk() const override { return app_.puzzles_->store() != nullptr; }
+    bool puzzlesOnline() const override { return app_.puzzles_->puzzleScopes(); }
 
     // The file dialogs.
     void choosePuzzleFile() override {
@@ -560,6 +601,46 @@ class App::ModulesContext final : public AppContext {
                                   session};
     }
     int treeDatabase() const override { return app_.tree_db_; }
+
+    // The Syzygy tables of the disk, and their download.
+    std::string diskTablesPaths() override { return app_.endgameTablesPaths(); }
+    std::string tablesSetting() const override { return app_.setup_.tb_paths; }
+    int diskTablesPieces() override { return app_.diskTablesPieces(); }
+    bool diskTablesLocked() const override { return app_.diskTablesLocked(); }
+    SyzygyDownload* tablesDownload() override { return app_.syzygy_download_.get(); }
+    const SyzygyDownload::State& tablesHeld() override { return app_.syzygyState(); }
+    const std::string& tablesDownloadError() const override { return app_.syzygy_error_; }
+    void startTablesDownload() override {
+        if (!app_.syzygy_download_ || app_.syzygy_download_->busy()) return;
+        app_.syzygy_error_.clear();
+        app_.syzygy_download_->start();
+    }
+    void chooseTablesFolder() override { app_.dialogs_.openFolder(Dialogs::Purpose::Tablebases); }
+
+    // The Play page's opponent.
+    const PlaySettings& playSettings() override { return app_.playSettings(); }
+    const EngineEntry* playEngine() override {
+        const EngineEntry* engine = app_.engineNamed(app_.playSettings().engine);
+        if (engine && engine->inactive) engine = nullptr;
+        return engine ? engine : app_.analysisEngine();
+    }
+    std::string playOpenings(chess::Color engine_side) override {
+        std::string text, tag, note;
+        uint64_t least = 1;
+        (void)app_.openingSource(app_.playSettings(), engine_side, text, tag, note, least, false);
+        return text;
+    }
+    std::function<std::optional<std::string>(const chess::Board&)> playBook(chess::Color engine_side,
+                                                                            std::mt19937& rng) override {
+        std::string text, tag, note;
+        uint64_t least   = 1;
+        const auto& play = app_.playSettings();
+        auto source      = app_.openingSource(play, engine_side, text, tag, note, least);
+        if (!source) return {};
+        auto book = std::make_shared<OpeningBook>(std::move(source), play.vary, least, rng());
+        return [book](const chess::Board& board) { return book->move(board); };
+    }
+    void showPlayPage() override { app_.page_ = Page::Play; }
 
    private:
     // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.

@@ -4,7 +4,9 @@
 // bounded by what they await (test_support.hpp).
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -68,6 +70,26 @@ class ScriptedServer {
     std::thread thread_;
     bool ok_ = false;
 };
+
+// The request's body after its head (readUntil() may have read a part of it with the head), as long as its
+// Content-Length says. A server reads it before it closes the connection: on Windows a socket closed with bytes it did
+// not read resets the connection, and the client loses the answer already sent (a POST then reads as no answer).
+inline std::string requestBody(const std::string& head, net::TcpConnection& c) {
+    const auto end = head.find("\r\n\r\n");
+    if (end == std::string::npos) return {};
+    std::string lower = head.substr(0, end);
+    for (auto& ch : lower) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    std::size_t length = 0;
+    if (const auto at = lower.find("\r\ncontent-length:"); at != std::string::npos)
+        length = static_cast<std::size_t>(std::strtoull(lower.c_str() + at + 17, nullptr, 10));
+    auto body = head.substr(end + 4);
+    while (body.size() < length) {
+        const auto more = c.readUntil("\x01never", length - body.size(), 2000);
+        if (more.empty()) break;
+        body += more;
+    }
+    return body;
+}
 
 inline std::string requestPath(const std::string& head) {
     const auto start = head.find(' ') + 1;

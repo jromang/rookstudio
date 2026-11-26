@@ -365,18 +365,19 @@ TEST_CASE("Lichess account: each failure of the token's requests told by its kin
         const auto tested = testToken("lio_x");
         CHECK_FALSE(tested.value);
         CHECK(tested.net == net);
-        // A revocation reads no body: a 200 is taken, whatever it says.
-        CHECK(revoke("lio_x").net == (status == 200 ? NetError::None : net));
+        // A revocation reads no body: a 200 is taken, whatever it says. lichess::, named: glibc's unistd.h has a
+        // revoke(const char*) of its own, which a string literal would choose.
+        CHECK(lichess::revoke("lio_x").net == (status == 200 ? NetError::None : net));
     }
     answering(401, R"({"error":"No such token"})");
     CHECK(accountName("lio_x").net == NetError::Unauthorized);
-    CHECK(describe(revoke("lio_x")) == "Lichess refused the token: link the account again");
+    CHECK(describe(lichess::revoke("lio_x")) == "Lichess refused the token: link the account again");
     // Nothing listens: no answer.
     servers().api      = fmt::format("http://127.0.0.1:{}", freePort());
     const auto offline = accountName("lio_x");
     CHECK(offline.net == NetError::Offline);
     CHECK(offline.status == 0);
-    CHECK(revoke("lio_x").net == NetError::Offline);
+    CHECK(lichess::revoke("lio_x").net == NetError::Offline);
     // Cancelled while the host pauses after a 429: nothing sent.
     HostGate::instance().setPause(60s);
     HostGate::instance().tooMany("lichess-account.invalid");

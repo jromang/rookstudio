@@ -19,7 +19,8 @@ namespace fcg::test {
 class AnsweringServer {
    public:
     AnsweringServer()
-        : port_(freePort()), server_(port_, [this](const std::string&, net::TcpConnection& c) {
+        : port_(freePort()), server_(port_, [this](const std::string& head, net::TcpConnection& c) {
+              (void)requestBody(head, c);  // read whole before the answer (Windows: scripted_server.hpp)
               std::pair<int, std::string> now;
               {
                   std::lock_guard lock(mutex_);

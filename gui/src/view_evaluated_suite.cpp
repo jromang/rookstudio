@@ -14,6 +14,7 @@
 #include "app.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
+#include "lichess_months.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
 
@@ -46,7 +47,7 @@ void App::openEvaluatedSuite() {
         evaluated_job_ = std::async(std::launch::async, evaluatedPositions, evalsFolderPath());
     // Its size, said before anything is downloaded: asked of the server by the file's first byte.
     if (!evals_folder_->done && !evals_size_ && !evals_size_job_.valid())
-        evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(LICHESS_EVALS_URL); });
+        evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
 }
 
 void App::startEvalsReading(std::string source) {
@@ -128,7 +129,7 @@ void App::drawEvaluatedSuite() {
                 evals_folder_ = evalsFolder(evalsFolderPath());
                 evals_stopped_.clear();
                 if (!evals_size_ && !evals_size_job_.valid())
-                    evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(LICHESS_EVALS_URL); });
+                    evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
             }
         } else {
             if (evals_size_ && !evals_size_->failed()) {
@@ -152,7 +153,7 @@ void App::drawEvaluatedSuite() {
             const auto label = evals_size_ && !evals_size_->failed()
                                    ? trf("Download and read ({})", formatBytes(evals_size_->bytes))
                                    : std::string(TR("Download and read"));
-            if (ImGui::Button(label.c_str())) startEvalsReading(LICHESS_EVALS_URL);
+            if (ImGui::Button(label.c_str())) startEvalsReading(lichess::evalsUrl());
             ImGui::SameLine();
             if (ImGui::Button(TR("Read a file already downloaded…")))
                 dialogs_.openFile(Dialogs::Purpose::EvalsFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
@@ -179,7 +180,7 @@ void App::drawEvaluatedSuite() {
         fs::remove(evalsFolderPath() / "evaluations.json", ec);
         evals_folder_ = evalsFolder(evalsFolderPath());
         if (!evals_size_ && !evals_size_job_.valid())
-            evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(LICHESS_EVALS_URL); });
+            evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
         ImGui::PopTextWrapPos();
         return;
     }

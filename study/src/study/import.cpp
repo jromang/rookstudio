@@ -245,9 +245,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
                     break;
                 }
                 if (!word.value.empty()) out.annotated = true;  // a glyph glued to the move
-                const int code = board.encode(*move);
-                if (board.codeCount() > 256) out.moves.push_back(static_cast<uint8_t>(code >> 8));
-                out.moves.push_back(static_cast<uint8_t>(code & 0xFF));
+                appendCode(out.moves, board, *move);
                 signature.before(board, *move, out.plies);
                 board.play(*move);
                 ++out.plies;

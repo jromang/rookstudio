@@ -44,20 +44,15 @@ GameSignature SignatureMaker::finish(const ScanBoard& end) const noexcept {
 std::optional<GameSignature> signatureOf(const ScanBoard& start, std::span<const uint8_t> codes, uint32_t plies) {
     ScanBoard board = start;
     SignatureMaker maker(board);
-    std::size_t at = 0;
-    for (uint32_t ply = 0; ply < plies; ++ply) {
-        const int count = board.codeCount();
-        if (at >= codes.size()) return std::nullopt;
-        int code = codes[at++];
-        if (count > 256) {
-            if (at >= codes.size()) return std::nullopt;
-            code = (code << 8) | codes[at++];
-        }
-        if (code >= count) return std::nullopt;
+    Cursor cursor(codes, plies);
+    for (uint32_t ply = 0;; ++ply) {
+        const int code = cursor.next(board);
+        if (code == Cursor::END) break;
         const auto move = board.decode(code);
         maker.before(board, move, ply);
         board.play(move);
     }
+    if (cursor.ply() < plies) return std::nullopt;  // a code that cannot be read: no signature for the whole game
     return maker.finish(board);
 }
 

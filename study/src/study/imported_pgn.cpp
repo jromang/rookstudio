@@ -47,17 +47,12 @@ std::string importedPgn(const ImportedGame& game) {
     ScanBoard scan;
     std::string moves;
     if (scan.setFen(fen, game.chess960)) {
-        std::size_t at = 0;
-        for (uint32_t ply = 0; ply < game.plies && at < game.moves.size(); ++ply) {
-            // A code no move of the position has, or one cut short: the game is damaged from there, written up to it
-            // as the other decoders read it (decode() would make it a null move, "--").
-            const int count = scan.codeCount();
-            int code        = game.moves[at++];
-            if (count > 256) {
-                if (at >= game.moves.size()) break;
-                code = code << 8 | game.moves[at++];
-            }
-            if (code >= count) break;
+        // A code no move of the position has, or one cut short: the game is damaged from there, written up to it as
+        // the other decoders read it (decode() would make it a null move, "--").
+        Cursor cursor(game.moves, game.plies);
+        for (uint32_t ply = 0;; ++ply) {
+            const int code = cursor.next(scan);
+            if (code == Cursor::END) break;
             const auto coded = scan.decode(code);
             if (coded.flags & MOVE_NULL) {
                 moves += (board.sideToMove() == chess::Color::WHITE ? std::to_string(board.fullMoveNumber()) + ". "

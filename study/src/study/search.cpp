@@ -18,17 +18,12 @@ constexpr uint64_t PART = 4096;
 // Calls at(ply, board) for the start and after each move, up to ply `last`, until it returns true: true then.
 template <typename At>
 bool replay(std::span<const uint8_t> codes, uint32_t plies, uint32_t last, ScanBoard& board, At&& at) {
-    std::size_t p = 0;
+    Cursor cursor(codes, plies);
     for (uint32_t ply = 0;; ++ply) {
         if (at(ply, static_cast<const ScanBoard&>(board))) return true;
-        if (ply >= last || ply >= plies || p >= codes.size()) return false;
-        const int count = board.codeCount();
-        int code        = codes[p++];
-        if (count > 256) {
-            if (p >= codes.size()) return false;
-            code = (code << 8) | codes[p++];
-        }
-        if (code >= count) return false;
+        if (ply >= last) return false;
+        const int code = cursor.next(board);
+        if (code == Cursor::END) return false;
         board.play(board.decode(code));
     }
 }
@@ -282,21 +277,16 @@ std::optional<uint32_t> findRelation(const Snapshot& snap, GameId id, const Patt
     thread_local std::vector<Candidate> candidates;
     moves.clear();
     candidates.clear();
-    std::size_t p = 0;
+    Cursor cursor(g.codes, g.plies);
     for (uint32_t ply = 0;; ++ply) {
         if (ply >= from && ply <= to)
             m.first(board, ply == g.plies, [&](const Binding& b) {
                 candidates.push_back({ply, board, b});
                 return false;  // every binding
             });
-        if (ply >= last || ply >= g.plies || p >= g.codes.size()) break;
-        const int count = board.codeCount();
-        int code        = g.codes[p++];
-        if (count > 256) {
-            if (p >= g.codes.size()) break;
-            code = (code << 8) | g.codes[p++];
-        }
-        if (code >= count) break;
+        if (ply >= last) break;
+        const int code = cursor.next(board);
+        if (code == Cursor::END) break;
         const auto move = board.decode(code);
         moves.push_back(move);
         board.play(move);
@@ -358,16 +348,11 @@ Found findManoeuvre(const Snapshot& snap, GameId id, const ManoeuvreQuery& q, bo
     };
     std::vector<Attempt> attempts;
     std::vector<std::vector<uint8_t>> parted;
-    int done_on   = -1;  // the route done: the square of its man, whose next move is looked for
-    std::size_t p = 0;
-    for (uint32_t ply = 0; ply < g.plies && p < g.codes.size(); ++ply) {
-        const int count = board.codeCount();
-        int code        = g.codes[p++];
-        if (count > 256) {
-            if (p >= g.codes.size()) break;
-            code = (code << 8) | g.codes[p++];
-        }
-        if (code >= count) break;
+    int done_on = -1;  // the route done: the square of its man, whose next move is looked for
+    Cursor cursor(g.codes, g.plies);
+    for (uint32_t ply = 0;; ++ply) {
+        const int code = cursor.next(board);
+        if (code == Cursor::END) break;
         const auto move = board.decode(code);
         if (ply >= start) {
             const bool ours = board.sideToMove() == q.side;

@@ -1004,9 +1004,7 @@ ImportedGame importedGame(const ChessBaseGame& game) {
             if (!n.before.empty() || !n.after.empty() || !n.nags.empty() || !n.arrows.empty() || !n.squares.empty() ||
                 n.emt_ms || !n.commands.empty())
                 out.annotated = true;
-            const int code = board.encode(*coded);
-            if (board.codeCount() > 256) out.moves.push_back(static_cast<uint8_t>(code >> 8));
-            out.moves.push_back(static_cast<uint8_t>(code & 0xFF));
+            appendCode(out.moves, board, *coded);
             signature.before(board, *coded, out.plies);
             board.play(*coded);
             ++out.plies;

@@ -1637,23 +1637,16 @@ bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
             if (!(flags & GAME_DAMAGED) || game.plies != 0 || !game.moves.empty()) return false;
         } else {
             SignatureMaker signature(board);
-            const auto& codes = game.moves;
-            std::size_t at    = 0;
-            for (uint32_t ply = 0; ply < game.plies; ++ply) {
-                const int count = board.codeCount();
-                if (at >= codes.size()) return false;
-                int code = codes[at++];
-                if (count > 256) {
-                    if (at >= codes.size()) return false;
-                    code = code << 8 | codes[at++];
-                }
-                if (code >= count) return false;
+            Cursor cursor(game.moves, game.plies);
+            for (uint32_t ply = 0;; ++ply) {
+                const int code = cursor.next(board);
+                if (code == Cursor::END) break;
                 const auto move = board.decode(code);
-                if (move.from >= 64 || move.to >= 64) return false;
                 signature.before(board, move, ply);
                 board.play(move);
             }
-            if (at != codes.size()) return false;
+            // Every ply read, and nothing after them.
+            if (cursor.ply() < game.plies || cursor.bytes() != game.moves.size()) return false;
             if (const auto* stored = segment.signatureBytes(i); stored && (stored[21] & SIG_KNOWN)) {
                 const auto again = signature.finish(board);
                 if (std::memcmp(stored, again.home.data(), 16) != 0) return false;

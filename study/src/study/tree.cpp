@@ -559,13 +559,16 @@ class Builder {
                 };
                 int d = (i == from || shared < 0) ? 0 : shared + 1;
                 if (d == 0 && !startBoard(g, stack[0])) continue;
+                // Its codes read from the position it starts from: a byte each before it, as no game is followed past
+                // a position of more than 256 codes.
+                Cursor cursor(std::span(g.codes, g.plies), g.plies, d > 0 ? static_cast<uint32_t>(d - 1) : 0);
                 // The moves it shares with a neighbour, on the stack the next game starts from.
                 bool stopped = false;
                 for (; d <= std::min(last, deep); ++d) {
                     if (d > 0) {
                         const ScanBoard& before = stack[d - 1];
-                        const int code          = g.codes[d - 1];
-                        if (code >= before.codeCount()) {  // a damaged code, which a database does not hold
+                        const int code          = cursor.next(before);
+                        if (code == Cursor::END) {  // a damaged code, which a database does not hold
                             stops_at = d - 1;
                             stopped  = true;
                             break;
@@ -584,8 +587,8 @@ class Builder {
                 own = stack[d == 0 ? 0 : d - 1];
                 for (; d <= last; ++d) {
                     if (d > 0) {
-                        const int code = g.codes[d - 1];
-                        if (code >= own.codeCount()) break;
+                        const int code = cursor.next(own);
+                        if (code == Cursor::END) break;
                         own.play(own.decode(code));
                     }
                     if (visit(d, own)) break;
@@ -631,7 +634,11 @@ class Builder {
     [[nodiscard]] int codeOf(std::size_t j, uint32_t depth, bool wide) const {
         const auto& g = games_[j];
         if (depth >= g.plies) return TreeMove::END;
-        return wide ? (g.codes[depth] << 8) | g.codes[depth + 1] : g.codes[depth];
+        if (!wide) return g.codes[depth];
+        // Two bytes, at the last position a game is followed to: within its codes as Tree::at() reads them (a
+        // damaged record's may stop after the first).
+        const auto m = snap_.gameMoves(g.id);
+        return codeAt(m.codes, m.plies, depth, true);
     }
 
     // The moves of a popular position: within a run of games that share their moves, the next moves are in order,

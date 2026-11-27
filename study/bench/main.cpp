@@ -352,20 +352,9 @@ long long replay(const Snapshot& snap, GameId id, const ScanBoard& start) {
     } else if (chess960 && !board.setFen(chess::constants::STARTPOS, true)) {
         return -1;
     }
-    const auto* p   = game.codes.data();
-    const auto* end = p + game.codes.size();
-    for (uint32_t ply = 0; ply < game.plies; ++ply) {
-        const int count = board.codeCount();
-        if (p == end) return -1;
-        int code = *p++;
-        if (count > 256) {
-            if (p == end) return -1;
-            code = (code << 8) | *p++;
-        }
-        if (code >= count) return -1;
-        board.play(board.decode(code));
-    }
-    return p == end ? game.plies : -1;
+    Cursor cursor(game.codes, game.plies);
+    for (int code; (code = cursor.next(board)) != Cursor::END;) board.play(board.decode(code));
+    return cursor.ply() == game.plies && cursor.bytes() == game.codes.size() ? game.plies : -1;
 }
 
 // Every game replayed on `threads` threads: the plies and the games that failed.

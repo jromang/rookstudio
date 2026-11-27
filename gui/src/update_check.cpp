@@ -85,19 +85,20 @@ const Release* notice(const Settings& settings, std::string_view current) {
 }
 
 Checker::~Checker() {
+    cancel_ = true;
     if (future_.valid()) future_.wait();
 }
 
 void Checker::start() {
     if (future_.valid()) return;
-    future_ = std::async(std::launch::async, [] {
+    future_ = std::async(std::launch::async, [this] {
         Answer answer;
         HttpRequest request;
         request.method    = "GET";
         request.url       = LATEST_API;
         request.timeout_s = 15;
         request.headers   = {{"Accept", "application/vnd.github+json"}, {"X-GitHub-Api-Version", "2022-11-28"}};
-        const auto result = httpRequest(request);
+        const auto result = politeRequest(request, &cancel_);
         if (!result.error.empty()) {
             answer.error = result.error;
         } else if (result.status != 200) {

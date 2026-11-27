@@ -26,6 +26,7 @@
 using namespace fcg;
 using namespace fcg::catalogue;
 using namespace fcg::test;
+using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 namespace {
@@ -218,8 +219,11 @@ TEST_CASE("engine downloads: the latest release, the list when it is a side rele
     CHECK(got.limited());
     CHECK(describe(got).find("60 an hour") != std::string::npos);
     CHECK(got.list.empty());
+    // A 429 pauses the host, as Lichess's do (HostGate): its minute, short for the test.
+    HostGate::instance().setPause(50ms);
     github.set("/repos/test/mover/releases/latest", "{}", 429);
     CHECK(fetchReleases(engine, cpu, base).failure == GitHubFailure::RateLimited);
+    CHECK(HostGate::instance().pausedFor("127.0.0.1") > 0ms);
 
     // GitHub in trouble, or refusing for another reason: its status.
     github.set("/repos/test/mover/releases/latest", "<html>down</html>", 503);
@@ -237,6 +241,7 @@ TEST_CASE("engine downloads: the latest release, the list when it is a side rele
     CHECK(nobody.failure == GitHubFailure::Offline);
     CHECK(describe(nobody) == "GitHub cannot be reached");
     CHECK(describe(Releases{}).empty());
+    HostGate::instance().setPause(60s);
 }
 
 TEST_CASE("engine downloads: a program downloaded, checked against its hash, made executable and started") {

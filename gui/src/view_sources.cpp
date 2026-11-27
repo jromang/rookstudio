@@ -127,7 +127,8 @@ void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, i
                                        if (cancel->load()) break;
                                        progress->bytes = 0;
                                        progress->size  = 0;
-                                       const auto got  = httpDownload(urls[i], wanted[i], progress.get(), cancel.get());
+                                       const auto got =
+                                           politeDownload(urls[i], wanted[i], progress.get(), cancel.get());
                                        out.emplace_back(wanted[i], got.ok ? std::string() : got.error);
                                        if (!got.ok) break;
                                    }

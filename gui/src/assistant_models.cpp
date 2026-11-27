@@ -32,8 +32,8 @@ bool modelInstalled(const std::filesystem::path& profile, const AssistantModel& 
 
 Download downloadModel(const std::filesystem::path& profile, const AssistantModel& model, DownloadProgress* progress,
                        const std::atomic<bool>* cancel, std::string_view url) {
-    return httpDownload(std::string(url.empty() ? model.url : url), modelFile(profile, model), progress, cancel,
-                        model.sha256);
+    return politeDownload(std::string(url.empty() ? model.url : url), modelFile(profile, model), progress, cancel,
+                          model.sha256);
 }
 
 }  // namespace fcg

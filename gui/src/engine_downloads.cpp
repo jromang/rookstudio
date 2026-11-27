@@ -36,7 +36,8 @@ HttpResult apiGet(std::string_view api, const std::string& path) {
     request.method    = "GET";
     request.timeout_s = 20;
     request.headers   = {{"Accept", "application/vnd.github+json"}, {"X-GitHub-Api-Version", "2022-11-28"}};
-    return httpRequest(request);
+    // In the host's turn: GitHub asks its API's clients for one request at a time.
+    return politeRequest(request);
 }
 
 // Why GitHub's answer is not one to read: its kind; no answer leaves the network's words in the log.
@@ -305,7 +306,7 @@ Catalogue currentCatalogue(const fs::path& profile, bool fetch, std::string_view
         request.url       = std::string(url);
         request.method    = "GET";
         request.timeout_s = 20;
-        const auto answer = httpRequest(request);
+        const auto answer = politeRequest(request);
         if (answer.status == 200) {
             if (auto catalogue = parseCatalogue(answer.body)) {
                 std::error_code ec;
@@ -426,7 +427,7 @@ InstallResult installEngine(const fs::path& profile, const Engine& engine, const
     for (const auto& choice : pick.choices) {
         folder          = versionFolder(profile, engine.id, choice.version);
         const auto file = folder / tour::fileNameOf(choice.asset.name);
-        const auto got  = httpDownload(choice.asset.url, file, progress, cancel, choice.asset.sha256);
+        const auto got  = politeDownload(choice.asset.url, file, progress, cancel, choice.asset.sha256);
         if (!got.ok) {
             // The network or the disk: another file would fare no better.
             out.cancelled = got.error == "cancelled";

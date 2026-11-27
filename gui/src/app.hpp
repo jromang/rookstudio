@@ -96,6 +96,7 @@
 #include "qr.hpp"
 #include "refreshing.hpp"
 #include "remote_run.hpp"
+#include "repairs.hpp"
 #include "repertoires.hpp"
 #include "review_tables.hpp"
 #include "run.hpp"
@@ -473,6 +474,12 @@ class App {
         twic::Report report;
         StoreFailure error;   // the database's (made, its import) with the store's code, or "Cancelled."
         NetFailure download;  // a download's (#141): its kind, the file beside its words
+        // What a download that failed asked, for its Try again (#141): the same files into the same database.
+        std::vector<twic::Issue> issues;
+        std::vector<std::string> urls;
+        std::vector<std::filesystem::path> wanted;
+        std::string player;
+        std::vector<std::string> months;
         std::vector<study::DuplicateGroup> others;  // the games already there from another source
         study::GameId from = 0;
         [[nodiscard]] bool failed() const noexcept { return !error.empty() || download.failed(); }
@@ -3153,6 +3160,18 @@ class App {
     void drawSetupNotices(std::vector<Notice> notices, const char* id);  // with the fixes possible now
     void applyFix(const Fix& fix);
     void selectEngine(const std::string& name);  // on the Engines page, as the palette opens an engine
+    // The Chess space's errors with what repairs them (#141, repairs.hpp): a notice drawn in place of an error's
+    // line, its fix carried out by applyFix() through Repairs; a Try again during its host's pause queued in retries_,
+    // sent by the page's own Try again once the pause is over (runDueRetries(), each frame).
+    class Repairs;
+    RetryQueue retries_;
+    void runDueRetries();
+    void retryNow(Retry what);
+    void linkLichessFor(const std::string& scope);  // the account linked again, asking also for `scope`
+    [[nodiscard]] RetryState retryState(Retry what, const std::string& host) const;
+    [[nodiscard]] LichessAccess lichessAccess(const std::string& needs = {}) const;
+    void drawRepairNotice(const Notice& notice, const char* id);
+    std::string board_message_fix_for_;  // the Board's message that offers Choose an engine…
     TablebaseChecks tb_checks_;
     void drawTemplates();
     void setupEngines();

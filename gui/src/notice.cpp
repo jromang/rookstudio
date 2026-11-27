@@ -1,5 +1,8 @@
 #include "notice.hpp"
 
+#include <algorithm>
+
+#include <fmt/format.h>
 #include <imgui.h>
 
 #include "i18n.hpp"
@@ -126,6 +129,94 @@ Fix enterPassphraseFix(const std::string& machine_id) {
     return f;
 }
 
+std::string allowScopeLabel(std::string_view scope) {
+    // What each permission lets RookStudio do, as the user asks for it.
+    if (scope == "study:read") return TR("Allow reading studies…");
+    if (scope == "study:write") return TR("Allow writing studies…");
+    if (scope == "preference:write") return TR("Allow bookmarking games…");
+    if (scope == "board:play") return TR("Allow playing on Lichess…");
+    if (scope == "challenge:read") return TR("Allow reading challenges…");
+    if (scope == "follow:read") return TR("Allow reading whom you follow…");
+    if (scope == "team:read") return TR("Allow reading your teams…");
+    if (scope == "tournament:write") return TR("Allow making tournaments…");
+    if (scope == "engine:read" || scope == "engine:write") return TR("Allow registering engines…");
+    if (scope == "puzzle:read" || scope == "puzzle:write") return TR("Allow reading puzzles…");
+    return trf("Allow {}…", scope);
+}
+
+std::string pauseClock(std::chrono::milliseconds pause) {
+    const auto s = std::chrono::ceil<std::chrono::seconds>(std::max(pause, std::chrono::milliseconds(0))).count();
+    return fmt::format("{}:{:02}", s / 60, s % 60);
+}
+
+Fix linkLichessFix(const std::string& scope, bool linked) {
+    Fix f;
+    f.kind = Fix::Kind::LinkLichess;
+    f.path = scope;
+    if (!linked) {
+        f.label   = TR("Link the Lichess account…");
+        f.tooltip = scope.empty() ? std::string(TR("Opens lichess.org in your browser to link an account, without "
+                                                   "giving RookStudio a password. Nothing is sent before you agree "
+                                                   "there."))
+                                  : trf("Opens lichess.org in your browser to link an account, asking for {}, without "
+                                        "giving RookStudio a password. Nothing is sent before you agree there.",
+                                        scope);
+    } else if (!scope.empty()) {
+        f.label = allowScopeLabel(scope);
+        f.tooltip =
+            trf("Opens lichess.org in your browser, asking also for {}. Nothing is sent before you agree "
+                "there; your account stays linked meanwhile.",
+                scope);
+    } else {
+        f.label = TR("Link Lichess again…");
+        f.tooltip =
+            TR("Opens lichess.org in your browser to link the account again. Nothing is sent before you agree "
+               "there.");
+    }
+    return f;
+}
+
+Fix retryAfterPauseFix(Retry what, const std::string& host, std::chrono::milliseconds pause, bool queued) {
+    Fix f;
+    f.kind          = Fix::Kind::RetryAfterPause;
+    f.value         = static_cast<int>(what);
+    f.path          = host;
+    const auto site = host.empty() ? std::string(TR("the site")) : host;
+    if (pause.count() > 0 && queued) {
+        f.label    = trf("Asks again in {}", pauseClock(pause));
+        f.tooltip  = trf("Asks {} again by itself once its pause is over; nothing is sent before.", site);
+        f.disabled = true;
+    } else if (pause.count() > 0) {
+        f.label   = trf("Try again in {}", pauseClock(pause));
+        f.tooltip = trf("Asks {} again once its pause is over; nothing is sent before.", site);
+    } else {
+        f.label   = TR("Try again");
+        f.tooltip = trf("Asks {} again what was asked; nothing else is sent.", site);
+    }
+    return f;
+}
+
+Fix checkDatabaseFix(int database) {
+    auto f  = make(Fix::Kind::CheckDatabase, TR("Check the database…"),
+                   TR("Opens the database's care at its checks, which find what can be kept. Nothing leaves the "
+                      "machine."));
+    f.index = database;
+    return f;
+}
+
+Fix chooseEngineFix() {
+    return make(Fix::Kind::ChooseEngine, TR("Choose an engine…"),
+                TR("Opens the engine picker of the Board: an engine of this machine analyses, nothing leaves it."));
+}
+
+Fix registerEngineAgainFix(const std::string& engine) {
+    return make(Fix::Kind::RegisterEngineAgain, TR("Register it again"),
+                trf("Registers {} with Lichess again, under the same name and settings: they go to lichess.org, the "
+                    "engine stays on this machine.",
+                    engine),
+                engine);
+}
+
 const char* noticeTopic(const Notice& notice) {
     if (notice.topic) return notice.topic;
     const char* topic = nullptr;
@@ -159,6 +250,16 @@ const char* noticeTopic(const Notice& notice) {
             case Fix::Kind::EnterPassphrase:
             case Fix::Kind::SetMargin:
                 if (!topic) topic = guide::topics::RemoteEngines;
+                break;
+            case Fix::Kind::LinkLichess:
+                if (!topic && f.path.empty()) topic = guide::topics::LichessLink;
+                break;
+            case Fix::Kind::CheckDatabase:
+                if (!topic) topic = guide::topics::Maintenance;
+                break;
+            case Fix::Kind::RetryAfterPause:
+            case Fix::Kind::ChooseEngine:
+            case Fix::Kind::RegisterEngineAgain:
                 break;
         }
     }
@@ -194,9 +295,14 @@ const Fix* drawNotice(const Notice& notice, const char* id) {
         if (i > 0) ui::sameLineOrWrap(fix.label.c_str());
         if (ImGui::GetCursorPosX() < text_x) ImGui::SetCursorPosX(text_x);
         ImGui::PushID(static_cast<int>(i));
-        if (ImGui::SmallButton(fix.label.c_str())) clicked = &fix;
+        // A disabled fix (a retry waiting for its host's pause) keeps its place and its tooltip.
+        ImGui::BeginDisabled(fix.disabled);
+        if (ImGui::SmallButton(fix.label.c_str()) && !fix.disabled) clicked = &fix;
+        ImGui::EndDisabled();
         ImGui::PopID();
-        if (!fix.tooltip.empty()) ImGui::SetItemTooltip("%s", fix.tooltip.c_str());
+        if (!fix.tooltip.empty() &&
+            ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", fix.tooltip.c_str());
     }
     if (topic) {
         if (!notice.fixes.empty()) ImGui::SameLine();

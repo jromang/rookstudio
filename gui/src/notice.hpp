@@ -1,12 +1,31 @@
 #pragma once
 
 // An actionable message: what is wrong, naming the engine (and its option or file) and the resource (memory, cores,
-// a folder), and the fixes, one button each. The setup summary, the home page and the tournament header show them.
+// a folder), and the fixes, one button each. The setup summary, the home page and the tournament header show them,
+// and the Chess space's pages in place of their errors' lines (#141, repairs.hpp).
 
+#include <chrono>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace fcg {
+
+// What a RetryAfterPause asks again (its `value`): each a page's own way to ask again, the one its Try again took
+// before (App::retryNow()).
+enum class Retry : int {
+    None,             // nothing to ask again
+    TwicIndex,        // TWIC's page of issues
+    ChesscomMonths,   // the months of the chess.com player looked up last
+    LichessMonths,    // database.lichess.org's page of monthly files
+    StudiesList,      // the Lichess account's list of studies
+    FideList,         // FIDE's rating list downloaded (the rest only, when a part came)
+    BoardTables,      // the Endgames tab's question to Lichess's tables
+    OnlineTablebase,  // the Board's line of Lichess's tables
+    OnlineCloud,      // the Board's line of Lichess's cloud
+    EndgameCheck,     // a tournament's endgame check, its position to Lichess's tables
+    FileAdd,          // the downloads of the sources' sheet that failed (TWIC, chess.com, Lichess's broadcasts)
+};
 
 // What fixes a problem. The App carries it out (App::applyFix); the views only show its button.
 struct Fix {
@@ -28,6 +47,12 @@ struct Fix {
         SetRunOn,                 // the setup's Run on set to the machine whose id is `path` (empty: this computer)
         SetMargin,                // the setup's time margin set to `value` milliseconds
         EnterPassphrase,          // the passphrase of the key of the machine whose id is `path` asked
+        // The Chess space's repairs (#141, repairs.hpp):
+        LinkLichess,          // the Lichess account linked again, asking also for the permission `path` (empty: none)
+        RetryAfterPause,      // what `value` (Retry) names asked again once the pause of the host `path` is over
+        CheckDatabase,        // the care of the database `index` opened at its checks
+        ChooseEngine,         // the Board's engine picker opened, for an engine to analyse with
+        RegisterEngineAgain,  // the engine `engine` registered with Lichess again (#96)
     };
     Kind kind;
     std::string label;    // the button's
@@ -36,6 +61,7 @@ struct Fix {
     std::string path;
     int value = 0;
     int index = -1;
+    bool disabled = false;  // drawn disabled, its tooltip still shown: a retry that waits for its host's pause
 
     bool operator==(const Fix&) const = default;
 };
@@ -59,6 +85,19 @@ struct Fix {
 [[nodiscard]] Fix setRunOnFix(const std::string& machine_id, const std::string& machine_name);
 [[nodiscard]] Fix setMarginFix(int milliseconds);
 [[nodiscard]] Fix enterPassphraseFix(const std::string& machine_id);
+// The Chess space's (#141). Link Lichess again… (`linked`: an account is linked, else Link the Lichess account…), or,
+// for a permission the account lacks (`scope`), the button named by what it allows: "Allow writing studies…".
+[[nodiscard]] Fix linkLichessFix(const std::string& scope = {}, bool linked = true);
+// Try again: "Try again in 0:42" while `host` pauses (`pause` left), "Asks again in 0:41" and disabled once `queued`.
+[[nodiscard]] Fix retryAfterPauseFix(Retry what, const std::string& host, std::chrono::milliseconds pause = {},
+                                     bool queued = false);
+[[nodiscard]] Fix checkDatabaseFix(int database);
+[[nodiscard]] Fix chooseEngineFix();
+[[nodiscard]] Fix registerEngineAgainFix(const std::string& engine);
+// What a Lichess permission lets RookStudio do, as a button that asks for it: "Allow writing studies…".
+[[nodiscard]] std::string allowScopeLabel(std::string_view scope);
+// A pause left as the buttons count it, whole seconds rounded up: "0:42".
+[[nodiscard]] std::string pauseClock(std::chrono::milliseconds pause);
 
 struct Notice {
     enum class Level { Ok, Warning, Error };

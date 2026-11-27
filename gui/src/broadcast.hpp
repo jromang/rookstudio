@@ -246,9 +246,12 @@ class WebServer {
    public:
     ~WebServer();
 
+    // On `port`, or with 0 on a port the system gives, which port() tells.
     std::string start(uint16_t port);
     void stop();
     [[nodiscard]] bool running() const noexcept { return running_; }
+    // The port it listens on, 0 when it does not.
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
 
     void publish(const BroadcastSnapshot& snapshot);
 

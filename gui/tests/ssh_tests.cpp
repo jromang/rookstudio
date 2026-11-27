@@ -1293,6 +1293,25 @@ TEST_CASE("Sockets: a socket asked nothing, that hung up, does not end the wait 
     CHECK(waits[0].can_read);
 }
 
+TEST_CASE("Sockets: a listener on port 0 takes a port the system gives, and tells it while it listens") {
+    net::TcpListener listener;
+    CHECK(listener.port() == 0);
+    REQUIRE(listener.listen(0, true).empty());
+    const auto port = listener.port();
+    REQUIRE(port != 0);
+    // Taken from the start: no other listener has it, a client reaches this one there.
+    net::TcpListener other;
+    CHECK_FALSE(other.listen(port, true).empty());
+    const auto fd = net::connectTo(LOCALHOST_IP, port, 2000);
+    REQUIRE(fd);
+    net::Socket client(*fd);
+    const auto accepted = listener.accept(2000);
+    REQUIRE(accepted);
+    net::Socket served(*accepted);
+    listener.close();
+    CHECK(listener.port() == 0);
+}
+
 TEST_CASE("Sockets: a connection refused on this machine is told within the time given") {
     // On Windows a refused connect takes two seconds or so unless bounded; elsewhere it is told at once.
     const auto start = std::chrono::steady_clock::now();

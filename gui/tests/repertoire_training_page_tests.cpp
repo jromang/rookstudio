@@ -236,7 +236,7 @@ std::function<void()> boardPage(RepertoireTrainingPage& page) {
 // The palette's entries, by label, with where they lead.
 std::map<std::string, std::pair<std::string, std::function<void()>>> commands(RepertoireTrainingPage& page) {
     std::map<std::string, std::pair<std::string, std::function<void()>>> out;
-    page.addCommands([&](std::string label, std::string where, std::function<void()> run) {
+    page.addOpeningsCommands([&](std::string label, std::string where, std::function<void()> run) {
         out[label] = {std::move(where), std::move(run)};
     });
     return out;

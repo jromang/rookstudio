@@ -1,12 +1,12 @@
 #pragma once
 
 // Endgames against the tablebases and the mates (#82, mockup M12, board 3), a module of its own out of App (#107;
-// endgames.hpp is their data): the Training page's part "Endgames" (what answers, the catalogue, the endgames of the
-// user's games, the mates of Lichess's puzzles), the tables missing (download those of 3 to 5 pieces, a folder already
-// on the disk, Lichess's online), and an endgame played on the Board page, whose column becomes the endgame's (a
-// session of the Board's, board_session.hpp): the tables answer each move, a fault is said with the moves that kept the
-// result, the position before it comes back in the day's review; the record endgames/record.json; the Home page's line;
-// its palette commands and --focus words.
+// endgames.hpp is their data): the Training page's part "Endgames" and its cards (a kind of training of the page's,
+// training_kind.hpp: what answers, the catalogue, the endgames of the user's games, the mates of Lichess's puzzles),
+// the tables missing (download those of 3 to 5 pieces, a folder already on the disk, Lichess's online), and an endgame
+// played on the Board page, whose column becomes the endgame's (a session of the Board's, board_session.hpp): the
+// tables answer each move, a fault is said with the moves that kept the result, the position before it comes back in
+// the day's review; the record endgames/record.json; the Home page's line; its palette commands and --focus words.
 //
 // What it needs of the program around it, it asks of its context (EndgamesContext, app_context.hpp): App's, or a
 // test's. The tables of the disk and their download stay App's (the Board's Endgames tab and a tournament's endgame
@@ -24,14 +24,14 @@
 #include <chess.hpp>
 
 #include "app_context.hpp"
-#include "board_session.hpp"
 #include "endgames.hpp"
 #include "focus_words.hpp"
 #include "review_queue.hpp"
+#include "training_kind.hpp"
 
 namespace fcg {
 
-class EndgamesPage final : public BoardSession {
+class EndgamesPage final : public TrainingKind {
    public:
     explicit EndgamesPage(EndgamesContext& app);
     ~EndgamesPage() override;
@@ -41,22 +41,30 @@ class EndgamesPage final : public BoardSession {
     // Once a frame, whatever shows: Lichess's answers, a question that gave nothing asked again, the tables' move half
     // a second after the user's, the line of "See the win".
     void poll();
-    // The Training page's part "Endgames": what answers, the tables missing and their download, the catalogue, the
-    // endgames of the user's games, the mates.
-    void drawPart();
+    // The Training page's part "Endgames" (TrainingKind): what answers, the tables missing and their download, the
+    // catalogue, the endgames of the user's games, the mates; its cards on the Today part, the endgames and the mates
+    // (the user's rate at the puzzles' mates in 2, a click to the part's mates).
+    [[nodiscard]] Part part() const override;
+    void drawPart() override;
+    void drawTodayCards(TodayCards& cards) override;
     // The Home page's "In progress", while an endgame is played: where it is, Back to the endgame.
-    void drawHomeLine();
+    void drawHomeLine() override;
     // Its entries of the command palette (Ctrl+K): the part and its mates (in the view `training_view`), each endgame
     // of the catalogue, the missed ones due, those of the user's games, the tables' download or its Cancel.
-    void addCommands(const PaletteAdd& add, const std::string& training_view);
-    // Its --focus words, tried where App's table has them (app_chess.cpp): endgame=ID, endgames-review. `word` is the
-    // word `words` was made with.
-    void addFocusWords(FocusWords& words, const std::string& word);
+    void addCommands(const PaletteAdd& add, const std::string& training_view) override;
+    // Its --focus words, tried where the Training page has them (training_page.cpp): endgame=ID, endgames-review.
+    // `word` is the word `words` was made with.
+    void addFocusWords(FocusWords& words, const std::string& word) override;
 
     // The day's review: the endgames missed due today and after, how long one takes; their session, the longest overdue
-    // first (false when none is due, or none can be played now).
-    [[nodiscard]] ReviewCount reviewCount();
+    // first (false when none is due, or none can be played now); their share of "Review all" (TrainingKind): one step,
+    // last of all, "Next: 2 missed endgames".
+    [[nodiscard]] ReviewCount reviewCount() override;
     bool startReview();
+    [[nodiscard]] std::optional<ReviewKind> reviewKind() const override { return ReviewKind::Endgames; }
+    bool startReviewStep(std::size_t) override { return startReview(); }
+    [[nodiscard]] std::string reviewNextLabel(std::size_t) override;
+    [[nodiscard]] std::string dueWords(std::size_t n) const override;
     // The record (endgames/record.json), read once; kept (not by a run for screenshots), a failure said in the console.
     [[nodiscard]] EndgameRecord& endgameRecord();
     void saveEndgameRecord();
@@ -66,7 +74,7 @@ class EndgamesPage final : public BoardSession {
     void showMates() { endgame_scroll_mates_ = true; }
 
     // An endgame holds the Board; it, while it does.
-    [[nodiscard]] bool onBoard() const { return endgame_ != nullptr; }
+    [[nodiscard]] bool onBoard() const override { return endgame_ != nullptr; }
     [[nodiscard]] const EndgameRun* session() const { return endgame_.get(); }
 
     // The Board's hooks while an endgame holds it (BoardSession).

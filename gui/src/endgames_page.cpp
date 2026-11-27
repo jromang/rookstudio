@@ -1696,6 +1696,13 @@ ReviewCount EndgamesPage::reviewCount() {
     return out;
 }
 
+std::string EndgamesPage::reviewNextLabel(std::size_t) {
+    const auto n = reviewCount().due;
+    return trn("Next: {} missed endgame", "Next: {} missed endgames", n, ui::exactCount(n));
+}
+
+std::string EndgamesPage::dueWords(std::size_t n) const { return trn("missed endgame", "missed endgames", n); }
+
 std::size_t EndgamesPage::doneCount() {
     std::size_t done = 0;
     for (const auto& e : endgameCatalogue())
@@ -1703,6 +1710,21 @@ std::size_t EndgamesPage::doneCount() {
             it != endgameRecord().results.end() && it->second.done > 0)
             ++done;
     return done;
+}
+
+TrainingKind::Part EndgamesPage::part() const { return {4, TR("Endgames"), "endgames", guide::topics::Endgames}; }
+
+void EndgamesPage::drawTodayCards(TodayCards& cards) {
+    // The endgames against the tables; the mates, a card of their own that leads to the part's mates.
+    cards.card("##training_kind_endgames", ui::Icon::Crown, TR("Endgames"),
+               TR("Against the tables: win, or hold the draw."),
+               trf("{} endgames · {} done", endgameCatalogue().size(), doneCount()));
+    const auto mates = app_.puzzleTheme("mateIn2");
+    cards.card("##training_kind_mates", ui::Icon::Zap, TR("Mates"),
+               TR("Mates in 1 to 5 of the puzzles; Q, R, 2B, B+N against the tables."),
+               mates.tried >= 5 ? trf("mate in 2: {} % right", 100 * mates.won / mates.tried)
+                                : std::string(TR("mates in 1 to 5, by pattern")),
+               [this] { showMates(); });
 }
 
 void EndgamesPage::drawHomeLine() {

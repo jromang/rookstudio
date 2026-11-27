@@ -5,24 +5,25 @@
 // arenas and Swiss tournaments, lichess_arenas_page.hpp; the Lichess bot, lichess_bot_page.hpp; the puzzles,
 // puzzles_page.hpp; the user's mistakes as exercises, mistakes_page.hpp; guessing the moves of a game, guess_page.hpp;
 // the endgames against the tables, endgames_page.hpp; board vision, vision_page.hpp; the repertoires' training,
-// repertoire_training_page.hpp), and reaches the rest through the facets below instead of App's members: the program
-// (the frame, the profile and its databases, the jobs), the pages it opens, the databases' pages, the Board, the mosaic
-// its games show in, the Lichess settings, the user's Lichess account and its link, the user's games on Lichess and the
-// fair play their live game holds, the engines and the cores, the Board taken by a game followed live, the tokens given
-// up, the window, the Board taken by a training session (board_session.hpp), a game replayed on it, the Board drawn
-// flat with the pieces a session shows and a game played on it, the Training page and its day's review, the user's
-// mistakes, Lichess's puzzles, the file dialogs, the user's names, the analysis engine, the games reviewed in the
-// background, the repertoires' positions, the games opened on the Board from a session, the Board's own game, the
-// Syzygy tables of the disk and their download, the Play page's opponent, the Openings page and its repertoires, the
-// user's correspondence games on Lichess, the Board as the repertoires' training asks on it. A module's context is the
-// facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext, MistakesContext, GuessContext,
-// EndgamesContext, VisionContext, RepertoireTrainingContext); App answers them all (AppContext, by
-// App::ModulesContext, app_chess.cpp), and a test only those of the module it builds, with a fake of its own, without
-// App.
+// repertoire_training_page.hpp; the Training page, training_page.hpp), and reaches the rest through the facets below
+// instead of App's members: the program (the frame, the profile and its databases, the jobs), the pages it opens, the
+// databases' pages, the Board, the mosaic its games show in, the Lichess settings, the user's Lichess account and its
+// link, the user's games on Lichess and the fair play their live game holds, the engines and the cores, the Board taken
+// by a game followed live, the tokens given up, the window, the Board taken by a training session (board_session.hpp),
+// a game replayed on it, the Board drawn flat with the pieces a session shows and a game played on it, the Training
+// page and its day's review (the Training page module's), the user's mistakes, Lichess's puzzles, the file dialogs, the
+// user's names, the analysis engine, the games reviewed in the background, the repertoires' positions, the games opened
+// on the Board from a session, the Board's own game, the Syzygy tables of the disk and their download, the Play page's
+// opponent, the Openings page and its repertoires, the user's correspondence games on Lichess, the Board as the
+// repertoires' training asks on it, the views and the pages offered once, the Training page among the program's pages.
+// A module's context is the facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext, MistakesContext,
+// GuessContext, EndgamesContext, VisionContext, RepertoireTrainingContext, TrainingPageContext); App answers them all
+// (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of the module it builds, with a fake of
+// its own, without App.
 //
 // Each method says what a module needs, in its words, not which member of App gives it. The facets hold only what the
-// modules out of App need now, and grow with those that follow (the rest of the Training page): a facet a module does
-// not ask for is none of its fake's business.
+// modules out of App need now, and grow with those that follow: a facet a module does not ask for is none of its fake's
+// business.
 
 #include <array>
 #include <cstddef>
@@ -71,6 +72,9 @@ struct PlayingGame;
 struct Profile;
 struct Reply;
 }  // namespace lichess
+namespace views {
+enum class PageId;
+}
 
 // An entry of the command palette (Ctrl+K), as App::paletteEntries() makes them: add(label, where, run).
 using PaletteAdd = std::function<void(std::string, std::string, std::function<void()>)>;
@@ -413,8 +417,8 @@ class FlatBoard {
     [[nodiscard]] virtual bool typingMove() const   = 0;
 };
 
-// The Training page (#80, view_training_page.cpp) and the day's review it starts, "Review all" taking the kinds one
-// after the other (review_queue.hpp); the training's settings.
+// The Training page (#80) and the day's review it starts, "Review all" taking the kinds one after the other
+// (review_queue.hpp); the training's settings. The Training page module answers it (training_page.hpp), through App.
 class Training {
    public:
     virtual ~Training() = default;
@@ -489,6 +493,8 @@ class Names {
     // The names as Settings shows them: a chip each (a click takes it away), the Lichess account's, a field that adds
     // one; `id` tells this place's apart from the others.
     virtual void drawPlayerNames(const char* id) = 0;
+    // The Settings page, where they are set ("Your names…" in Ctrl+K).
+    virtual void showNamesSettings() = 0;
 };
 
 // The Board page's analysis (#78), whose engine the training takes: the engine chosen for it, else the first of the
@@ -645,6 +651,39 @@ class QuestionBoard {
     virtual void sayOnBoard(const std::string& text) = 0;
 };
 
+// The views (#43, mockup M6; views.hpp): the sets of pages the rail shows, one of them shown; the pages offered once on
+// the Home page to a view made before them (settings.json "pages_offered", by their names: "training", "play").
+class Views {
+   public:
+    virtual ~Views() = default;
+
+    // Whether there are views (none while the sheet where they are made stands in place of the pages); the name of the
+    // view shown; whether it holds `page`; whether one of the views does.
+    [[nodiscard]] virtual bool hasViews() const                    = 0;
+    [[nodiscard]] virtual std::string viewName() const             = 0;
+    [[nodiscard]] virtual bool viewHolds(views::PageId page) const = 0;
+    [[nodiscard]] virtual bool viewsHold(views::PageId page) const = 0;
+    // `page` added to the view shown, after the first page of `after` it holds, else before the first of `before`, else
+    // at its end; the views saved.
+    virtual void addToView(views::PageId page, const std::vector<views::PageId>& after,
+                           const std::vector<views::PageId>& before) = 0;
+    // The pages offered once; the list written as it is given.
+    [[nodiscard]] virtual std::vector<std::string> pagesOffered() const = 0;
+    virtual void setPagesOffered(const std::vector<std::string>& pages) = 0;
+};
+
+// The Training page among the program's pages (#80, training_page.hpp): shown (at the part the page shows), whether it
+// is the page shown; a game played on the Board (against an engine of the Play page, #83, or between two engines, the
+// Board's "Play a game…"), whose end a training session waits for.
+class TrainingPlace {
+   public:
+    virtual ~TrainingPlace() = default;
+
+    virtual void toTrainingPage()                        = 0;
+    [[nodiscard]] virtual bool trainingPageShown() const = 0;
+    [[nodiscard]] virtual bool boardGamePlayed() const   = 0;
+};
+
 }  // namespace context
 
 // What Lichess TV asks of the program (lichess_tv_page.hpp).
@@ -731,6 +770,12 @@ class RepertoireTrainingContext : public virtual context::Program,
                                   public virtual context::Correspondence,
                                   public virtual context::Openings {};
 
+// What the Training page asks of the program (training_page.hpp): the kinds of training are given to it apart.
+class TrainingPageContext : public virtual context::Program,
+                            public virtual context::FairPlay,
+                            public virtual context::Views,
+                            public virtual context::TrainingPlace {};
+
 // What App answers: every module's context, each facet once.
 class AppContext : public TvContext,
                    public ArenasContext,
@@ -740,6 +785,7 @@ class AppContext : public TvContext,
                    public GuessContext,
                    public EndgamesContext,
                    public VisionContext,
-                   public RepertoireTrainingContext {};
+                   public RepertoireTrainingContext,
+                   public TrainingPageContext {};
 
 }  // namespace fcg

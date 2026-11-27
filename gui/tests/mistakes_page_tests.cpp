@@ -146,6 +146,7 @@ class FakeApp final : public MistakesContext {
     bool liveGameOn() const override { return live_game; }
     std::vector<std::string> userNames() const override { return names; }
     void drawPlayerNames(const char* id) override { names_drawn.emplace_back(id); }
+    void showNamesSettings() override { ++names_settings; }
 
     // The engines: the analysis's, the library's by name; the reviews in the background.
     const EngineEntry* analysisEngine() override { return engines.empty() ? nullptr : &engines.front(); }
@@ -192,7 +193,7 @@ class FakeApp final : public MistakesContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1, review_stopped = 0;
+    int training_part = -1, review_stopped = 0, names_settings = 0;
     bool training_shown = false, enter_puzzles = true, live_game = false;
     std::vector<ReviewKind> reviewed_only;
     std::vector<std::string> names{"Tester"};
@@ -593,10 +594,19 @@ TEST_CASE("mistakes page: an answer no engine can judge is said and not counted;
     CHECK_FALSE(page.onBoard());
     CHECK(app.training_part == 2);  // the Training page's part instead
 
-    // Without the user's names, the part asks for them first.
+    // Without the user's names, the part asks for them first; Ctrl+K's "Your names…", among the mistakes' commands,
+    // leads to Settings, where they are set.
     app.live_game = false;
     app.names.clear();
     frames.draw(app, [&] { page.drawPart(); });
     REQUIRE(app.names_drawn.size() == 1);
     CHECK(app.names_drawn[0] == "training_names");
+    page.addCommands(
+        [&](const std::string& label, const std::string& where, const std::function<void()>& run) {
+            if (label != "Your names…") return;
+            CHECK(where == "Settings");
+            run();
+        },
+        "Study");
+    CHECK(app.names_settings == 1);
 }

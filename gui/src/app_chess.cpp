@@ -46,6 +46,7 @@
 #include "repertoire_training_page.hpp"
 #include "review_bridge.hpp"
 #include "review_runner.hpp"
+#include "training_page.hpp"
 #include "twic.hpp"
 #include "vision_page.hpp"
 
@@ -320,12 +321,11 @@ class App::ModulesContext final : public AppContext {
     }
 
     // The Board taken by a training session.
-    std::string sessionLock() const override { return app_.trainingLock(); }
+    std::string sessionLock() const override { return app_.training_->lock(); }
     BoardTaken takeBoard(const std::string& title, bool tree) override {
-        const bool chained = app_.review_running_;  // the day's review goes on (#80)
-        app_.closeBoardSession();
-        app_.review_running_ = chained;
-        auto& b              = app_.board_;
+        app_.stopVisit();  // a guided visit under way ends: the Board is the session's now (#137)
+        app_.training_->closeSessionForAnother();  // the session that holds it closed, the day's review going on (#80)
+        auto& b = app_.board_;
         BoardTaken taken;
         taken.flip = b.flip;
         taken.tab  = app_.board_side_tab_;
@@ -488,26 +488,19 @@ class App::ModulesContext final : public AppContext {
         return true;
     }
 
-    // The Training page and its day's review.
-    const TrainingSettings& trainingSettings() override { return app_.trainingSettings(); }
+    // The Training page and its day's review, the Training page module's.
+    const TrainingSettings& trainingSettings() override { return app_.training_->trainingSettings(); }
     void setTrainingSettings(const TrainingSettings& settings) override {
-        app_.trainingSettings() = settings;
-        app_.saveTrainingSettings();
+        app_.training_->setTrainingSettings(settings);
     }
-    void showTrainingPage(int part) override {
-        app_.page_         = Page::Training;
-        app_.training_tab_ = part;
-    }
-    bool trainingShown() const override { return app_.page_ == Page::Training; }
-    void setEnterStartsPuzzles(bool puzzles) override { app_.training_enter_puzzles_ = puzzles; }
-    void reviewOnly(ReviewKind kind) override { app_.startReview(kind); }
-    bool reviewRunning() const override { return app_.review_running_; }
-    bool nextReview() override { return app_.nextReview(); }
-    void stopReview() override {
-        app_.review_running_ = false;
-        app_.review_chain_.clear();
-    }
-    void drawReviewNext(bool enter) override { app_.drawReviewNext(enter); }
+    void showTrainingPage(int part) override { app_.training_->showTrainingPage(part); }
+    bool trainingShown() const override { return app_.training_->trainingShown(); }
+    void setEnterStartsPuzzles(bool puzzles) override { app_.training_->setEnterStartsPuzzles(puzzles); }
+    void reviewOnly(ReviewKind kind) override { app_.training_->reviewOnly(kind); }
+    bool reviewRunning() const override { return app_.training_->reviewRunning(); }
+    bool nextReview() override { return app_.training_->nextReview(); }
+    void stopReview() override { app_.training_->stopReview(); }
+    void drawReviewNext(bool enter) override { app_.training_->drawReviewNext(enter); }
 
     // The user's mistakes, their module's.
     std::map<std::string, std::size_t> mistakeKinds(uint32_t since) override {
@@ -533,6 +526,7 @@ class App::ModulesContext final : public AppContext {
     // The user's names.
     std::vector<std::string> userNames() const override { return app_.userNames(); }
     void drawPlayerNames(const char* id) override { app_.drawPlayerNames(id); }
+    void showNamesSettings() override { app_.page_ = Page::Settings; }
 
     // The Board page's analysis.
     const EngineEntry* analysisEngine() override { return app_.analysisEngine(); }
@@ -673,6 +667,41 @@ class App::ModulesContext final : public AppContext {
         app_.board_.message_error = true;
     }
 
+    // The views and the pages offered once.
+    bool hasViews() const override { return !app_.views_.empty(); }
+    std::string viewName() const override { return app_.views_.empty() ? std::string() : app_.view().name; }
+    bool viewHolds(views::PageId page) const override { return !app_.views_.empty() && app_.view().holds(page); }
+    bool viewsHold(views::PageId page) const override {
+        return std::any_of(app_.views_.begin(), app_.views_.end(), [&](const auto& v) { return v.holds(page); });
+    }
+    void addToView(views::PageId page, const std::vector<views::PageId>& after,
+                   const std::vector<views::PageId>& before) override {
+        if (app_.views_.empty()) return;
+        auto& view  = app_.views_[static_cast<std::size_t>(app_.view_)];
+        auto& pages = view.pages;
+        auto at     = pages.end();
+        for (const auto p : after)
+            if (at == pages.end()) at = std::find(pages.begin(), pages.end(), p);
+        if (at != pages.end()) {
+            ++at;
+        } else {
+            for (const auto p : before)
+                if (at == pages.end()) at = std::find(pages.begin(), pages.end(), p);
+        }
+        pages.insert(at, page);
+        views::tidy(view);
+        app_.saveViews();
+    }
+    std::vector<std::string> pagesOffered() const override { return app_.storage_.pagesOffered(); }
+    void setPagesOffered(const std::vector<std::string>& pages) override { app_.storage_.setPagesOffered(pages); }
+
+    // The Training page among the program's pages.
+    void toTrainingPage() override { app_.page_ = Page::Training; }
+    bool trainingPageShown() const override { return app_.page_ == Page::Training; }
+    bool boardGamePlayed() const override {
+        return (app_.board_.match && app_.board_.match_state.running) || app_.engineGameRunning();
+    }
+
    private:
     // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.
     std::vector<FinishedGame*> held(const std::string& tournament) const {
@@ -696,24 +725,23 @@ void App::initChessModules() {
     endgames_        = std::make_unique<EndgamesPage>(*modules_context_);
     vision_          = std::make_unique<VisionPage>(*modules_context_);
     rep_training_    = std::make_unique<RepertoireTrainingPage>(*modules_context_);
+    // The Training page and the kinds of training that plug into it, in the order the Board asks them which holds it.
+    training_ = std::make_unique<TrainingPage>(
+        *modules_context_, std::vector<TrainingKind*>{rep_training_.get(), puzzles_.get(), mistakes_.get(),
+                                                      guessing_.get(), endgames_.get(), vision_.get()});
 }
 
-// The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, asked in the order
-// the Board's hooks asked the kinds before.
-BoardSession* App::boardSession() const {
-    if (rep_training_->onBoard()) return rep_training_.get();
-    if (puzzles_->onBoard()) return puzzles_.get();
-    if (mistakes_->onBoard()) return mistakes_.get();
-    if (guessing_->onBoard()) return guessing_.get();
-    if (endgames_->onBoard()) return endgames_.get();
-    if (vision_->onBoard()) return vision_.get();
-    return nullptr;
-}
+// The Training page's hooks in fastchess-gui's pages (#80), which do not include its module's header.
+void App::drawTraining() { training_->draw(); }
+const char* App::trainingGuideTopic() const { return training_->guideTopic(); }
+
+// The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, the Training page
+// knows which.
+BoardSession* App::boardSession() const { return training_->boardSession(); }
 
 bool App::drawBoardSession() {
     auto* session = boardSession();
-    // A guided visit (#94) started during an endgame or a vision exercise shows over their page, as it always did.
-    if (!session || (visit_ && (endgames_->onBoard() || vision_->onBoard()))) return false;
+    if (!session) return false;
     session->drawSessionPage();
     return true;
 }
@@ -729,20 +757,9 @@ void App::leaveBoardSession() {
     if (auto* session = boardSession()) session->sessionDropped();
 }
 
-void App::closeBoardSession() {
-    if (auto* session = boardSession()) session->closeSession(false);
-}
-
 const char* App::sessionGuideTopic() const {
     const auto* session = boardSession();
     return session ? session->guideTopic() : nullptr;
-}
-
-std::string App::trainingLock() const {
-    if (liveGameOn()) return TR("Locked while one of your games is played on Lichess.");
-    if ((board_.match && board_.match_state.running) || engineGameRunning())
-        return TR("Once the game played on the board is over.");
-    return {};
 }
 
 bool App::trainingHidesAids() const {
@@ -1017,26 +1034,10 @@ bool App::applyChessFocusWord(const std::string& w) {
         addTheoryFile(std::filesystem::path(w.substr(11, comma == std::string::npos ? std::string::npos : comma - 11)));
         if (comma != std::string::npos) focus_next_ = w.substr(comma + 1);
     });
-    // A session of the active repertoire's training (#76): its module's (#107).
-    rep_training_->addFocusWords(words, w);
-    puzzles_->addFocusWords(words, w);  // the Training page, its puzzles: their module's (#80)
-    words.on({"review-all"}, [&] {  // the day's review, every kind one after the other (#80)
-        startReview();
-    });
-    words.on({"training-mistakes", "training-guess"}, [&] {
-        // The Training page's parts of #81: the mistakes as exercises, guessing the moves.
-        page_         = Page::Training;
-        training_tab_ = w == "training-mistakes" ? 2 : 3;
-    });
-    mistakes_->addFocusWords(words, w);  // a session of the user's mistakes: their module's (#81)
-    words.on({"training-endgames", "training-vision"}, [&] {
-        // The Training page's parts of #82: the endgames against the tables and the mates, board vision.
-        page_         = Page::Training;
-        training_tab_ = w == "training-endgames" ? 4 : 5;
-    });
-    endgames_->addFocusWords(words, w);  // the endgames against the tables: their module's (#82)
-    vision_->addFocusWords(words, w);    // board vision's exercises: its module's (#82)
-    guessing_->addFocusWords(words, w);  // guessing the moves of a game: its module's (#81)
+    // The Training page, its parts and the day's review, then each kind's words (a repertoire's session, the puzzles'
+    // database, the user's mistakes, guessing the moves, the endgames, board vision): their modules' (#76, #80–#82,
+    // #107).
+    training_->addFocusWords(words, w);
     words.on({"board-analysis*"}, [&] {
         // The study Board's Analysis tab (#78); board-analysis=FILE[@PLY]: FILE on the board (at that ply once
         // read), analysed; board-analysis-menu[=FILE[@PLY]]: its "+ An engine" open too.

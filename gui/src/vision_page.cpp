@@ -173,6 +173,17 @@ void VisionPage::saveVisionRecord() {
                                 true);
 }
 
+TrainingKind::Part VisionPage::part() const { return {5, TR("Vision"), "vision", guide::topics::Vision}; }
+
+void VisionPage::drawTodayCards(TodayCards& cards) {
+    int best = 0;
+    for (const auto& [key, n] : visionRecord().coordinates) best = std::max(best, n);
+    cards.card("##training_kind_vision", ui::Icon::Grid, TR("Vision"),
+               TR("The coordinates, blindfold, a line read in your head."),
+               best > 0 ? trn("record: {} square in 30 s", "record: {} squares in 30 s", best, best)
+                        : std::string(TR("not tried yet")));
+}
+
 void VisionPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::Vision);
     const bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&

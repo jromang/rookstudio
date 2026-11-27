@@ -37,6 +37,12 @@ struct VisitShows {
 // the moves it marked ? and ?? when it has none.
 [[nodiscard]] std::vector<std::size_t> visitMoments(const commentary::GameReport& report);
 
+// Whether a visit may read its moment `ply` on the Board's game `game` (#137): the Board still shows the game the visit
+// was made for (`made_for`, the serial of the Board's game then, is `shown`, its serial now), and the game's move at
+// that moment (the move to position `ply`) is one of its moves. Another game came on the Board, or a training session
+// took it: the visit reads nothing of it, and ends.
+[[nodiscard]] bool visitReadsMoment(const ReplayGame& game, std::size_t ply, uint64_t made_for, uint64_t shown);
+
 // An answer judged: its points (guessPoints(): the engine's move 3, as good 2, playable 1, else 0) by the engine's
 // evaluations after the engine's move and after the answer, in pawns for the side that plays; and whether it is wrong:
 // no point, or "I don't know".

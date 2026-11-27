@@ -3,9 +3,10 @@
 // The day's review (#80, mockup M12, board 1, point 2): one queue for what every kind of training has due today, each
 // with its spaced repetition (FSRS) and its own page. One count for the Home page and the Training page ("35 to
 // review"), "Review all" taking the kinds one after the other in the order below, the time it should take, what comes
-// back tomorrow and within three days. A kind plugs in with its counts (App::reviewCount) and the session of its cards
-// due (App::startReviewOf): the repertoires today, the puzzles missed; the mistakes of the user's games (#81) and the
-// endgames missed (#82) to come.
+// back tomorrow and within three days. A kind plugs in through TrainingKind (training_kind.hpp): its counts, the steps
+// "Review all" takes for it and the session of each; the Training page holds the queue (training_page.hpp): the
+// mistakes of the user's games (#81), the repertoires' positions (#76), the puzzles missed (#80), the endgames missed
+// (#82).
 
 #include <cstddef>
 #include <cstdint>

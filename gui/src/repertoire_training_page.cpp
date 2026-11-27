@@ -1194,6 +1194,10 @@ std::string RepertoireTrainingPage::reviewNextLabel(std::size_t repertoire) {
                app_.repertoires().entries()[repertoire].name);
 }
 
+std::string RepertoireTrainingPage::dueWords(std::size_t n) const {
+    return trn("repertoire position", "repertoire positions", n);
+}
+
 void RepertoireTrainingPage::drawHomeLine() {
     if (!training_) return;
     const auto& t    = *training_;
@@ -1205,7 +1209,7 @@ void RepertoireTrainingPage::drawHomeLine() {
     if (ImGui::SmallButton(TR("Back to the session"))) app_.showSession();
 }
 
-void RepertoireTrainingPage::addCommands(const PaletteAdd& add) {
+void RepertoireTrainingPage::addOpeningsCommands(const PaletteAdd& add) {
     for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i) {
         const auto& counts = summary(i).counts;
         if (counts.cards == 0) continue;

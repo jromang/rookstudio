@@ -3,9 +3,9 @@
 // Your mistakes as exercises (#81, mockup M12, board 2), a module of its own out of App (#107; mistakes.hpp is their
 // data): the exercises the user's reviewed games give, looked for in the background when the databases, the names or
 // the reviews change; the latest of the user's games without a review, reviewed in the background as the Board page
-// reviews a game; the Training page's part "My mistakes"; the day's review of them; a session on the Board page whose
-// column becomes the exercise's (a session of the Board's, board_session.hpp); the Home page's line; its palette
-// commands and --focus words.
+// reviews a game; the Training page's part "My mistakes" and its card (a kind of training of the page's,
+// training_kind.hpp); the day's review of them; a session on the Board page whose column becomes the exercise's (a
+// session of the Board's, board_session.hpp); the Home page's line; its palette commands and --focus words.
 //
 // What it needs of the program, it asks of its context (MistakesContext, app_context.hpp): App's, or a test's.
 
@@ -26,15 +26,15 @@
 #include <chess.hpp>
 
 #include "app_context.hpp"
-#include "board_session.hpp"
 #include "focus_words.hpp"
 #include "mistakes.hpp"
 #include "review_queue.hpp"
 #include "review_runner.hpp"
+#include "training_kind.hpp"
 
 namespace fcg {
 
-class MistakesPage final : public BoardSession {
+class MistakesPage final : public TrainingKind {
    public:
     explicit MistakesPage(MistakesContext& app);
     ~MistakesPage() override;
@@ -44,26 +44,34 @@ class MistakesPage final : public BoardSession {
     // Once a frame, whatever shows: the user's games looked for again (on the Training page, when what it looks at
     // changed), the games reviewed in the background, a session's answer judged by the review's engine.
     void poll();
-    // The Training page's part "My mistakes": the user's names first, then the exercises, their kinds and the games
-    // they come from, the games without a review, what starts.
-    void drawPart();
+    // The Training page's part "My mistakes" (TrainingKind): the user's names first, then the exercises, their kinds
+    // and the games they come from, the games without a review, what starts; its card on the Today part.
+    [[nodiscard]] Part part() const override;
+    void drawPart() override;
+    void drawTodayCards(TodayCards& cards) override;
     // The Home page's "In progress", while a session runs: where it is, Back to the session.
-    void drawHomeLine();
+    void drawHomeLine() override;
     // Its entries of the command palette (Ctrl+K): the part (in the view `training_view`), the day's review of the
-    // mistakes alone, today's exercises, the games reviewed in the background.
-    void addCommands(const PaletteAdd& add, const std::string& training_view);
-    // Its --focus words, tried where App's table has them (app_chess.cpp): mistakes-session, mistakes-review. `word` is
-    // the word `words` was made with.
-    void addFocusWords(FocusWords& words, const std::string& word);
+    // mistakes alone, today's exercises, the games reviewed in the background, the user's names.
+    void addCommands(const PaletteAdd& add, const std::string& training_view) override;
+    // Its --focus words, tried where the Training page has them (training_page.cpp): mistakes-session,
+    // mistakes-review. `word` is the word `words` was made with.
+    void addFocusWords(FocusWords& words, const std::string& word) override;
 
     // The exercises asked: those of the record but a position of a repertoire of the same side (trained on the
     // Openings page); of `kind` when it is given ("-": those of no kind).
     [[nodiscard]] std::vector<const MistakeExercise*> mistakeExercises(const std::string* kind = nullptr);
     // The kinds of the mistakes since `since` (a packed date, packedDaysBefore()), counted (context::Mistakes).
     [[nodiscard]] std::map<std::string, std::size_t> mistakeKinds(uint32_t since);
-    // The day's review: the exercises due and after, how long an answer takes; their session (false when none is due).
-    [[nodiscard]] ReviewCount reviewCount();
+    // The day's review: the exercises due and after, how long an answer takes; their session (false when none is due);
+    // their share of "Review all" (TrainingKind): one step, first of all, "Next: …", "Only my mistakes".
+    [[nodiscard]] ReviewCount reviewCount() override;
     bool startReview();
+    [[nodiscard]] std::optional<ReviewKind> reviewKind() const override { return ReviewKind::Mistakes; }
+    bool startReviewStep(std::size_t) override { return startReview(); }
+    [[nodiscard]] std::string reviewNextLabel(std::size_t) override;
+    [[nodiscard]] std::string dueWords(std::size_t n) const override;
+    [[nodiscard]] const char* reviewOnlyLabel() const override;
     // The record of the exercises and their cards (mistakes/exercises.json), read once; kept (not by a run for
     // screenshots), a failure said in the console.
     [[nodiscard]] MistakeRecord& mistakeRecord();
@@ -74,7 +82,7 @@ class MistakesPage final : public BoardSession {
     void cancelScan();
 
     // A session holds the Board; it, while it does.
-    [[nodiscard]] bool onBoard() const { return mistake_ != nullptr; }
+    [[nodiscard]] bool onBoard() const override { return mistake_ != nullptr; }
     [[nodiscard]] const MistakeRun* session() const { return mistake_.get(); }
 
     // The Board's hooks while a session holds it (BoardSession).

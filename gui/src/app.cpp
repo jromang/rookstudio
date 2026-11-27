@@ -12,6 +12,7 @@
 #include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "repertoire_training_page.hpp"
+#include "training_page.hpp"
 #include "vision_page.hpp"
 
 #include <algorithm>

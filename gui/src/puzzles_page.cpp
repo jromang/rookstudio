@@ -439,6 +439,15 @@ ReviewCount PuzzlesPage::reviewCount() {
     return out;
 }
 
+std::string PuzzlesPage::reviewNextLabel(std::size_t) {
+    const auto n = reviewCount().due;
+    return trn("Next: {} missed puzzle", "Next: {} missed puzzles", n, ui::exactCount(n));
+}
+
+std::string PuzzlesPage::dueWords(std::size_t n) const { return trn("missed puzzle", "missed puzzles", n); }
+
+const char* PuzzlesPage::reviewOnlyLabel() const { return TR("Only the puzzles"); }
+
 void PuzzlesPage::drawHomeLine() {
     if (!puzzle_) return;
     const auto& p    = *puzzle_;
@@ -512,10 +521,9 @@ void PuzzlesPage::addCommands(const PaletteAdd& add, const std::string& training
 }
 
 void PuzzlesPage::addFocusWords(FocusWords& words, const std::string& w) {
-    words.on({"training-page", "training-puzzles", "puzzles-online"}, [&] {
-        // The Training page (#80): its Today part, its Puzzles part, the puzzles online chosen.
-        app_.showTrainingPage(w == "training-page" ? 0 : 1);
-        puzzles_online_ = w == "puzzles-online";
+    words.on({"puzzles-online"}, [&] {  // the Training page's Puzzles part (#80), the puzzles online chosen
+        app_.showTrainingPage(1);
+        puzzles_online_ = true;
     });
     words.on({"puzzles-file=*"}, [&] {  // puzzles-file=FILE: Lichess's puzzle database read from it
         app_.showTrainingPage(1);
@@ -1326,6 +1334,17 @@ void PuzzlesPage::drawPuzzleEnd() {
 
 // ---------------------------------------------------------------------------
 // The Training page
+
+TrainingKind::Part PuzzlesPage::part() const { return {1, TR("Puzzles"), "puzzles", guide::topics::Puzzles}; }
+
+void PuzzlesPage::drawTodayCards(TodayCards& cards) {
+    const auto state = storeState();
+    cards.card("##training_kind_puzzles", ui::Icon::Puzzle, TR("Puzzles"),
+               TR("Lichess's, by theme and at your rating, offline or online."),
+               state.ready ? trf("{} on the disk · your rating {}", ui::exactCount(state.puzzles),
+                                 static_cast<int>(std::lround(puzzleRating().glicko.rating)))
+                           : std::string(TR("not on this disk yet")));
+}
 
 void PuzzlesPage::drawPart() {
     bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&

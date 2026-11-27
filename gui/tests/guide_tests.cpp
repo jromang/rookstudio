@@ -9,7 +9,10 @@
 #include <string>
 #include <vector>
 
+#include <imgui.h>
+
 #include "guide.hpp"
+#include "guide_view.hpp"
 #include "markdown.hpp"
 #include "strict_translations.hpp"
 #include "zip.hpp"
@@ -351,4 +354,43 @@ TEST_CASE("markdown: the search folds letter case and accents") {
           std::vector<std::pair<std::size_t, std::size_t>>{{0, 5}});
     CHECK(md::matches("锦标赛设置", md::queryWords("标赛")) ==
           std::vector<std::pair<std::size_t, std::size_t>>{{3, 9}});
+}
+
+TEST_CASE("guide: its panel says when it has the keyboard, Ctrl+F then its search's rather than the page's") {
+    // An ImGui context of the test's own, without a window: the panel drawn in a page, focused or not.
+    ImGuiContext* context = ImGui::CreateContext();
+    auto& io              = ImGui::GetIO();
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    io.IniFilename = nullptr;
+    io.DisplaySize = ImVec2(1200, 800);
+    io.DeltaTime   = 1.0f / 60.0f;
+    {
+        GuideView guide;
+        const auto frame = [&](bool focus_guide) {
+            ImGui::NewFrame();
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(io.DisplaySize);
+            ImGui::Begin("page");
+            if (!focus_guide) ImGui::SetWindowFocus();
+            ImGui::TextUnformatted("the page");
+            if (guide.isOpen()) {
+                if (focus_guide) ImGui::SetNextWindowFocus();
+                guide.draw(400, 600);
+            }
+            ImGui::End();
+            ImGui::EndFrame();
+        };
+        frame(false);
+        CHECK_FALSE(guide.focused());  // closed
+        guide.search("qqqzzz");        // its results, no section's pictures (they need the window's renderer)
+        frame(true);
+        CHECK(guide.focused());
+        frame(false);  // the page clicked
+        CHECK_FALSE(guide.focused());
+        frame(true);
+        CHECK(guide.focused());
+        guide.close();
+        CHECK_FALSE(guide.focused());
+    }
+    ImGui::DestroyContext(context);
 }

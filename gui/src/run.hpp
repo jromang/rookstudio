@@ -237,6 +237,12 @@ class Run {
     // Playing, and Pause (Pause all) or Resume (Resume all) would act on it.
     [[nodiscard]] bool pausable() const { return running() && !paused() && canPause(); }
     [[nodiscard]] bool resumable() const { return running() && paused() && canResume(); }
+    // Which of the two Ctrl+K offers for it, the shown tournament's as another tab's: none once a stop was asked, now
+    // or once the running games are over (paused then, its card refusing Resume).
+    enum class PauseOffer { None, Pause, Resume };
+    [[nodiscard]] PauseOffer pauseOffer() const {
+        return resumable() ? PauseOffer::Resume : pausable() ? PauseOffer::Pause : PauseOffer::None;
+    }
 
     // Call once per frame.
     virtual void update() = 0;

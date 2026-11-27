@@ -909,7 +909,10 @@ void App::drawDatabases() {
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("%s", TR("Enter"));
     ImGui::SameLine();
-    if (ui::iconButton("db_search_here", ui::Icon::Search, TR("Search"))) {
+    // Ctrl+F as its hint says, the search of the database chosen: no text field having the keys, nor the guide's
+    // panel (its own search).
+    if (ui::iconButton("db_search_here", ui::Icon::Search, TR("Search")) ||
+        (facts.error.empty() && !guide_.focused() && keyboard::shortcut(keyboard::SEARCH))) {
         db_list_        = true;
         db_row_         = 0;
         db_search_open_ = true;
@@ -1123,7 +1126,7 @@ void App::drawGameList() {
     ImGui::TextDisabled("%s", keyboard::name(keyboard::FILTER).c_str());
     ImGui::SameLine();
     if (ui::iconButton("db_search", ui::Icon::Search, db_search_open_ ? TR("Close the search") : TR("Search")) ||
-        ImGui::IsKeyChordPressed(keyboard::SEARCH))
+        (!guide_.focused() && ImGui::IsKeyChordPressed(keyboard::SEARCH)))
         db_search_open_ = !db_search_open_;
     ImGui::SameLine(0, px(4));
     ImGui::TextDisabled("%s", keyboard::name(keyboard::SEARCH).c_str());

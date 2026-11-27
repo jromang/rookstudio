@@ -128,6 +128,39 @@ TEST_CASE("commands: a tournament's Pause, Resume, Stop and Try again follow the
     CHECK_FALSE(r.pausable());
 }
 
+TEST_CASE("commands: Ctrl+K offers Pause or Resume as the tournament's card does, another tab's as the shown one's") {
+    // Every state: Resume where the card's Resume can be clicked, Pause where its Pause can, never both.
+    for (int bits = 0; bits < 16; ++bits) {
+        FakeRun r;
+        r.state_s        = bits & 1 ? Run::State::Running : Run::State::Finished;
+        r.paused_s       = (bits & 2) != 0;
+        r.stopping_s     = (bits & 4) != 0;
+        r.stopping_idle_ = (bits & 8) != 0;
+        CAPTURE(bits);
+        const auto offer = r.pauseOffer();
+        CHECK((offer == Run::PauseOffer::Resume) == (r.running() && r.paused() && r.canResume()));
+        CHECK((offer == Run::PauseOffer::Pause) == (r.running() && !r.paused() && r.canPause()));
+    }
+    // Stopping once its running games are over, it is paused: neither Resume (the card refuses it) nor Pause.
+    FakeRun r;
+    r.state_s = Run::State::Running;
+    CHECK(r.pauseOffer() == Run::PauseOffer::Pause);
+    r.setPaused(true);
+    CHECK(r.pauseOffer() == Run::PauseOffer::Resume);
+    r.stopWhenIdle();
+    CHECK_FALSE(r.canResume());
+    CHECK(r.pauseOffer() == Run::PauseOffer::None);
+    // Stopped now: nothing either.
+    FakeRun stopped;
+    stopped.state_s = Run::State::Running;
+    stopped.stopNow();
+    CHECK(stopped.pauseOffer() == Run::PauseOffer::None);
+    // Not playing: nothing.
+    FakeRun idle;
+    idle.paused_s = true;
+    CHECK(idle.pauseOffer() == Run::PauseOffer::None);
+}
+
 TEST_CASE("commands: the page's keys are its own without a text field or a popup taking them") {
     Frames frames;
     frames.begin();

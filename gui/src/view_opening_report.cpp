@@ -414,10 +414,10 @@ void App::askReportLichess(int source) {
             if (!options_.scripted) keepExplorer(storage_.root(), key, *found->second.value);
         }
         r.lichess_when[i] = 0;
-        r.lichess_error[i].clear();
+        r.lichess_failure[i].reset();
     } else {
         // Offline, or Lichess refused: its last figures for this position, dated, when the report kept them.
-        r.lichess_error[i] = found->second.failed() ? lichess::describe(found->second) : std::string("?");
+        r.lichess_failure[i] = found->second;
         if (!r.lichess[i])
             if (auto kept = keptExplorer(storage_.root(), key)) {
                 r.lichess[i]      = std::move(kept->first);
@@ -548,8 +548,8 @@ void App::pollOpeningReport() {
         auto written = r.summary_job.get();
         if (!written.cancelled) r.summary = std::move(written);
     }
-    const bool lichess_in = (!r.masters || r.lichess[0] || !r.lichess_error[0].empty()) &&
-                            (!r.players || r.lichess[1] || !r.lichess_error[1].empty());
+    const bool lichess_in =
+        (!r.masters || r.lichess[0] || r.lichess_failure[0]) && (!r.players || r.lichess[1] || r.lichess_failure[1]);
     if (r.report && r.report->made == study::ReportSection::Done && !r.cancelled && !correspondence &&
         !r.evals_job.valid() && lichess_in && !r.summary_job.valid()) {
         const auto of = fmt::format("{}|{}|{}|{}", r.rows_of, r.evals_of, r.round, static_cast<int>(lang()));
@@ -794,7 +794,7 @@ void App::drawOpeningReport() {
             const auto& e = *r.lichess[i];
             label += " · " + ui::exactCount(e.white + e.draws + e.black);
             if (r.lichess_when[i]) label += " · " + trf("on {}", dateOf(r.lichess_when[i]));
-        } else if (on && r.lichess_error[i].empty() && linked && !aidsLocked()) {
+        } else if (on && !r.lichess_failure[i] && linked && !aidsLocked()) {
             label += " · …";
         }
         const std::string id = fmt::format("##report_lichess{}", source);
@@ -973,9 +973,17 @@ void App::drawReportStates() {
         }
         endState();
     }
-    // Offline: the databases and the evaluations kept answer; Lichess's sources their last figures, dated.
-    if ((r.masters && !r.lichess_error[0].empty()) || (r.players && !r.lichess_error[1].empty())) {
-        state("report_offline", ui::Icon::WifiOff, text, TR("Offline"),
+    // Lichess unanswered (offline, or a failure said in its words): the databases and the evaluations kept answer;
+    // Lichess's sources their last figures, dated.
+    const lichess::Failure* unanswered = nullptr;
+    if (r.masters && r.lichess_failure[0])
+        unanswered = &*r.lichess_failure[0];
+    else if (r.players && r.lichess_failure[1])
+        unanswered = &*r.lichess_failure[1];
+    if (unanswered) {
+        const bool offline = unanswered->net == lichess::NetError::Offline;
+        state("report_offline", offline ? ui::Icon::WifiOff : ui::Icon::Alert, offline ? text : ui::WARN,
+              reportUnanswered(*unanswered),
               TR("Your databases and the evaluations kept offline answer; Lichess's sources show their last figures "
                  "for this position, dated, when the report kept them."));
         endState();

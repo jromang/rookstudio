@@ -159,6 +159,7 @@ struct Download {
     uint64_t bytes = 0;
     bool resumed   = false;  // went on from where an earlier try stopped
     int status     = 0;      // the server's last answer, 0 when there was none
+    std::optional<std::chrono::seconds> retry_after;  // a 429's Retry-After (retryAfter()), when it gave one
 };
 
 // `url` saved as `file`, its folder made if need be. Written to <file>.part, which a later call resumes from where it
@@ -174,8 +175,17 @@ struct Download {
 // The SHA-256 of a file, in hexadecimal; empty when it cannot be read.
 [[nodiscard]] std::string sha256File(const std::filesystem::path& file);
 
+// The pause a 429's Retry-After header asks for (RFC 9110): a number of seconds, or an HTTP date (IMF-fixdate, or the
+// obsolete RFC 850 and asctime forms) from `now`. Kept between RETRY_AFTER_LEAST and RETRY_AFTER_MOST, a date already
+// past asking for the least; none when it is neither, the host then pausing its minute.
+inline constexpr std::chrono::seconds RETRY_AFTER_LEAST{1};
+inline constexpr std::chrono::seconds RETRY_AFTER_MOST{15 * 60};
+[[nodiscard]] std::optional<std::chrono::seconds> retryAfter(
+    std::string_view value, std::chrono::system_clock::time_point now = std::chrono::system_clock::now());
+
 // What Lichess asks of its API's clients: one request at a time to a host, and a pause of a full minute after it
-// answered 429 (Too Many Requests). A process's own: a tournament process's (its broadcast relay) is not the window's.
+// answered 429 (Too Many Requests), or longer when its Retry-After asks for more. A process's own: a tournament
+// process's (its broadcast relay) is not the window's.
 class HostGate {
    public:
     static HostGate& instance();
@@ -185,7 +195,9 @@ class HostGate {
                                                           const std::atomic<bool>* cancel = nullptr);
     // Waits for `host`'s pause to end (true), or for `cancel` (false).
     bool waitPause(const std::string& host, const std::atomic<bool>* cancel = nullptr);
-    void tooMany(const std::string& host);  // the host answered 429
+    // The host answered 429: paused for the pause, a minute, or for `asked` (its Retry-After, retryAfter()) when that
+    // is longer.
+    void tooMany(const std::string& host, std::optional<std::chrono::seconds> asked = std::nullopt);
     [[nodiscard]] std::chrono::milliseconds pausedFor(const std::string& host) const;
     void setPause(std::chrono::milliseconds pause);  // a minute; the tests make it shorter
 

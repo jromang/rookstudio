@@ -288,12 +288,12 @@ void App::offerEngine(const std::string& engine) {
     try {
         o.secret = lichess::newProviderSecret();
     } catch (const std::exception& e) {
-        offer_errors_[engine] = e.what();
+        offer_errors_[engine] = lichess::Failure::own(e.what());
         return;
     }
     const lichess::EngineRegistration r{o.name, o.threads, o.hash_mb, o.secret, {}};
     if (const auto problem = lichess::registrationProblem(r); !problem.empty()) {
-        offer_errors_[engine] = problem;
+        offer_errors_[engine] = lichess::Failure::own(problem);
         return;
     }
     OfferCall call;
@@ -331,7 +331,7 @@ void App::startService(const std::string& engine) {
     std::string error;
     auto run = serviceEngine(*o, error);
     if (!run) {
-        offer_errors_[engine] = error;
+        offer_errors_[engine] = lichess::Failure::own(error);
         return;
     }
     if (!run->machine.empty()) {
@@ -381,7 +381,8 @@ void App::withdrawOffer(const std::string& engine) {
         return;
     }
     if (!lichess_account_) {
-        offer_errors_[engine] = TR("Withdrawing it needs your Lichess account linked: link it on the Lichess page.");
+        offer_errors_[engine] =
+            lichess::Failure::own(TR("Withdrawing it needs your Lichess account linked: link it on the Lichess page."));
         return;
     }
     OfferCall call;
@@ -415,7 +416,7 @@ void App::pollLichessEngines() {
                 std::erase_if(offers(), [&](const lichess::OfferedEngine& x) { return x.engine == c.engine; });
                 saveOffers();
             } else {
-                offer_errors_[c.engine] = lichess::describe(failure);
+                offer_errors_[c.engine] = failure;
             }
             it = offer_calls_.erase(it);
             continue;
@@ -439,7 +440,7 @@ void App::pollLichessEngines() {
             stopService(c.engine);  // a service with the secret before, if one ran
             startService(c.engine);
         } else {
-            offer_errors_[c.engine] = lichess::describe(answer);
+            offer_errors_[c.engine] = answer;
         }
         it = offer_calls_.erase(it);
     }
@@ -665,7 +666,7 @@ void App::drawLichessEngineForm(const EngineEntry& e) {
         wrapped(trf("Chess, in the Chess960 mode Lichess asks for: {} knows it.", e.name));
     ImGui::Spacing();
     const auto error = offer_errors_.find(e.name);
-    if (error != offer_errors_.end()) coloured(trf("Lichess gave nothing ({}).", error->second), ui::WARN);
+    if (error != offer_errors_.end()) coloured(lichess::gaveNothing(error->second), ui::WARN);
     const int length = lichess::nameLength(nameOf(f.name));
     const bool valid = length >= lichess::NAME_CHARS_MIN && length <= lichess::NAME_CHARS_MAX;
     const bool enter = !ImGui::GetIO().WantTextInput && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
@@ -681,8 +682,7 @@ void App::drawLichessEngineForm(const EngineEntry& e) {
         wrapped(TR("Lichess offers an engine to the analysis board of an account: linking yours asks for the "
                    "permissions to register an engine (engine:read, engine:write). Lichess's page opens."),
                 true);
-        if (lichess_error_.failed())
-            coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
+        if (lichess_error_.failed()) coloured(lichess::gaveNothing(lichess_error_), ui::WARN);
         if (primaryButton(TR("Link the account…")) || enter) {
             offer_after_link_ = e.name;
             startLichessLink({lichess::SCOPE_ENGINE_READ, lichess::SCOPE_ENGINE_WRITE});
@@ -698,8 +698,7 @@ void App::drawLichessEngineForm(const EngineEntry& e) {
         wrapped(TR("engine:read and engine:write: to register an engine for your account, read it, withdraw it. "
                    "Lichess's page opens; your account stays linked, the token it replaces is revoked."),
                 true);
-        if (lichess_error_.failed())
-            coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
+        if (lichess_error_.failed()) coloured(lichess::gaveNothing(lichess_error_), ui::WARN);
         if (primaryButton(TR("Allow on Lichess…##engine")) || enter) {
             offer_after_link_ = e.name;
             auto scopes       = lichess::scopesAdding(lichess_account_->scopes, lichess::SCOPE_ENGINE_READ);
@@ -901,7 +900,7 @@ void App::drawLichessEngineService(const EngineEntry& e, lichess::OfferedEngine&
                                           .c_str());
     }
     if (const auto error = offer_errors_.find(e.name); error != offer_errors_.end())
-        coloured(trf("Lichess gave nothing ({}).", error->second), ui::WARN);
+        coloured(lichess::gaveNothing(error->second), ui::WARN);
     if (calling) {
         coloured(TR("Asking Lichess…"), ui::ACCENT);
         return;
@@ -980,7 +979,7 @@ void App::drawLichessEnginesCard() {
             std::find_if(shown.begin(), shown.end(),
                          [&](const lichess::OfferedEngine* o) { return offer_errors_.count(o->engine); });
         error != shown.end())
-        coloured(trf("Lichess gave nothing ({}).", offer_errors_[(*error)->engine]), ui::WARN);
+        coloured(lichess::gaveNothing(offer_errors_[(*error)->engine]), ui::WARN);
     ImGui::PopTextWrapPos();
     ui::endCard();
     if (!withdraw.empty()) withdrawOffer(withdraw);

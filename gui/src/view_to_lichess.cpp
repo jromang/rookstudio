@@ -250,7 +250,7 @@ void App::drawToLichessResult(float width) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                    lichess::linkRefused(lichess_error_)
                                        ? TR("You refused it on Lichess: nothing changed.")
-                                       : trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)).c_str());
+                                       : lichess::gaveNothing(lichess_error_).c_str());
             if (ui::iconButton("to_lichess_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
                 auto scopes = lichess_account_->scopes;
                 scopes.push_back(lichess::SCOPE_PREFERENCE_WRITE);

@@ -120,6 +120,7 @@ std::string describeAlone(const Failure& failure) {
 }
 
 std::string gaveNothing(const Failure& failure) {
+    if (failure.net == NetError::None) return failure.error;  // the program's own words: nothing asked of Lichess
     if (failure.net == NetError::Offline) return TR("Lichess cannot be reached from here.");
     return trf("Lichess gave nothing ({}).", describe(failure));
 }

@@ -18,6 +18,7 @@
 #include "board_text.hpp"
 #include "dossier.hpp"
 #include "engine_oracle.hpp"
+#include "i18n.hpp"
 #include "mistakes.hpp"
 #include "offline_evals.hpp"
 
@@ -424,6 +425,16 @@ std::optional<std::pair<lichess::Explorer, int64_t>> keptExplorer(const std::fil
     } catch (const std::exception&) {
         return std::nullopt;
     }
+}
+
+std::string reportUnanswered(const lichess::Failure& failure) {
+    if (failure.net == lichess::NetError::Offline) return TR("Offline");
+    if (!failure.failed()) {  // no value and no failure: not what the explorer sends
+        lichess::Failure unread = failure;
+        unread.net              = lichess::NetError::BadAnswer;
+        return lichess::gaveNothing(unread);
+    }
+    return lichess::gaveNothing(failure);
 }
 
 ReportSummary writeSummary(commentary::Model* model, const commentary::SummaryFigures& figures, commentary::Lang lang,

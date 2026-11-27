@@ -27,6 +27,8 @@ class GuideView {
     [[nodiscard]] bool isOpen() const noexcept { return open_; }
     // Whether the mouse was over it in the last frame.
     [[nodiscard]] bool hovered() const noexcept { return open_ && hovered_; }
+    // Whether it had the keyboard's focus in the last frame: its Ctrl+F is its search's, not the page's.
+    [[nodiscard]] bool focused() const noexcept { return open_ && focused_; }
     // Opens it on the search of `query`.
     void search(const std::string& query);
     // The English section shown (the one asked for last), and the search typed.
@@ -100,6 +102,7 @@ class GuideView {
     bool focus_search_ = false;
     bool dragging_     = false;
     bool hovered_      = false;
+    bool focused_      = false;
 
     std::string code_;  // the language of the caches below
     std::map<std::size_t, Section> sections_;

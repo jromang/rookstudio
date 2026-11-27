@@ -139,9 +139,10 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
 
     // Actions, as their buttons allow them.
     if (run_->running()) {
-        if (run_->paused()) {
-            if (run_->canResume()) add(TR("Resume"), name, [this] { setRunPaused(false); });
-        } else if (run_->canPause()) {
+        const auto offer = run_->pauseOffer();
+        if (offer == Run::PauseOffer::Resume) {
+            add(TR("Resume"), name, [this] { setRunPaused(false); });
+        } else if (offer == Run::PauseOffer::Pause) {
             add(TR("Pause"), name, [this] { setRunPaused(true); });
         }
         if (run_->canStop()) {
@@ -215,13 +216,12 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             showRun(i);
             page_ = Page::Tournament;
         });
-        auto& r = *runs_[i].run;
-        if (r.running() && !r.stopping()) {
-            if (r.paused()) {
-                add(TR("Resume"), other_name, [this, i] { runs_[i].run->setPaused(false); });
-            } else {
-                add(TR("Pause"), other_name, [this, i] { runs_[i].run->setPaused(true); });
-            }
+        // As for the shown one: no Resume while it stops once its running games are over (its card refuses it).
+        const auto offer = runs_[i].run->pauseOffer();
+        if (offer == Run::PauseOffer::Resume) {
+            add(TR("Resume"), other_name, [this, i] { runs_[i].run->setPaused(false); });
+        } else if (offer == Run::PauseOffer::Pause) {
+            add(TR("Pause"), other_name, [this, i] { runs_[i].run->setPaused(true); });
         }
     }
     const bool ready = setupReady();

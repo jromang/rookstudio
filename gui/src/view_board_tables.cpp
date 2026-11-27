@@ -18,7 +18,6 @@
 #include "board_tables.hpp"
 #include "board_text.hpp"
 #include "endgames.hpp"
-#include "https.hpp"
 #include "i18n.hpp"
 #include "lichess_api.hpp"
 #include "online_cache.hpp"
@@ -115,7 +114,7 @@ void App::drawBoardEndgames() {
         t.since = now;
         t.answer.reset();
         t.online = false;
-        t.error.clear();
+        t.nothing.reset();
         t.lines.clear();
         t.lines_failed.clear();
         t.hovered.clear();
@@ -129,10 +128,13 @@ void App::drawBoardEndgames() {
                 t.answer = std::move(*a.value);
                 t.online = true;
             } else {
-                t.error = a.error.empty() ? std::string(TR("Lichess's tables do not know this position.")) : a.error;
+                t.nothing = a;  // why: a failure (an outage, a 429, a refusal), or none (the position unknown)
             }
         }
     }
+    // A 429's pause over: the tables asked again by themselves, as the tab said.
+    const auto pause = tablesPause();
+    if (t.nothing && tablesAskAgain(*t.nothing, pause)) t.nothing.reset();
     if (isReady(t.line_job)) {
         auto a = t.line_job.get();
         if (a.value)
@@ -161,7 +163,7 @@ void App::drawBoardEndgames() {
             way = tablesWay(pieces, op1, 0, true, lichess_.tablebase, once);  // a table missing: as without the disk
         }
     }
-    if (!t.answer && way == TablesWay::Lichess && t.error.empty() && !t.asking.valid()) {
+    if (!t.answer && way == TablesWay::Lichess && !t.nothing && !t.asking.valid()) {
         if (auto kept = cachedTablebase(storage_.root(), fen); kept && kept->outcome != lichess::Outcome::Unknown) {
             sortTableMoves(*kept);
             t.answer = std::move(*kept);
@@ -209,20 +211,10 @@ void App::drawBoardEndgames() {
             if (ImGui::SmallButton(TR("Ask for this position"))) online_once_.insert(positionKey(fen));
         } else if (t.asking.valid()) {
             ImGui::TextDisabled("%s", TR("Asking Lichess's tables…"));
-        } else if (!t.error.empty()) {
-            const auto pause = HostGate::instance().pausedFor("tablebase.lichess.ovh");
-            if (pause.count() > 0) {
-                const auto s = std::chrono::duration_cast<std::chrono::seconds>(pause).count();
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Too many requests in a short time: Lichess asked for a pause. Trying again in "
-                                       "{}:{:02}.",
-                                       s / 60, s % 60)
-                                       .c_str());
-            } else {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess's tables gave nothing: {}", t.error).c_str());
-            }
-            if (ImGui::SmallButton(TR("Try again"))) t.error.clear();
+        } else if (t.nothing) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               tablesNothing(*t.nothing, pause).c_str());
+            if (ImGui::SmallButton(TR("Try again"))) t.nothing.reset();
         }
         ImGui::PopTextWrapPos();
         return;

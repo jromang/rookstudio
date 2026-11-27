@@ -107,9 +107,8 @@ void App::drawCastSheet() {
     } else {
         if (lichess_error_.failed() && !may)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               lichess::linkRefused(lichess_error_)
-                                   ? TR("You refused it on Lichess: nothing was made.")
-                                   : trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)).c_str());
+                               lichess::linkRefused(lichess_error_) ? TR("You refused it on Lichess: nothing was made.")
+                                                                    : lichess::gaveNothing(lichess_error_).c_str());
         ImGui::BeginDisabled(!name_ok);
         if (ImGui::Button(TR("Create the broadcast"))) {
             if (may) {

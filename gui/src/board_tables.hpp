@@ -13,10 +13,12 @@
 // request at a time.
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <chess.hpp>
@@ -90,5 +92,20 @@ struct TablesMoves {
 [[nodiscard]] lichess::Answer<std::vector<std::string>> keptOrAskedLine(const std::filesystem::path& root,
                                                                         const std::string& fen, bool& asked,
                                                                         const std::atomic<bool>* cancel = nullptr);
+
+// What is left of the pause of Lichess's tables' host after a 429 (HostGate); zero when there is none.
+[[nodiscard]] std::chrono::milliseconds tablesPause();
+// Why Lichess's tables gave no verdict, as the Endgames tab and the endgame check say it, for an answer without one: a
+// 429's while the host's pause lasts, with when they are asked again; another failure in gaveNothing()'s words (an
+// outage as one); none, the tables not knowing the position.
+[[nodiscard]] std::string tablesNothing(const lichess::Failure& answer, std::chrono::milliseconds pause);
+// Whether a request to the tables that failed is asked again by itself: a 429's, once the host's pause is over (as
+// tablesNothing() said). Another failure waits for "Try again".
+[[nodiscard]] bool tablesAskAgain(const lichess::Failure& answer, std::chrono::milliseconds pause);
+// Lichess's answer for a position the endgame check asked: the tables' verdict, White's point of view (1, 0, -1; none
+// when they do not know the position), or nullopt when the request failed (an outage, a 429, a refusal), the check then
+// keeping the failure until it is asked again.
+[[nodiscard]] std::optional<std::optional<int>> checkedVerdict(const lichess::Answer<lichess::Tablebase>& answer,
+                                                               std::string_view fen);
 
 }  // namespace fcg

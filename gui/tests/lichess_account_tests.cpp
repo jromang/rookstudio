@@ -276,6 +276,9 @@ TEST_CASE("Lichess account: the user's no on Lichess's page told from a token Li
     CHECK(yes.net == NetError::Unauthorized);
     CHECK(describe(yes) == "Lichess refused the token: link the account again");
     CHECK_FALSE(linkRefused(yes));
+    // The account's card: the user's no as theirs, the token refused in its words, never Lichess out of reach.
+    CHECK(linkFailed(no) == "You refused the access on Lichess: nothing is linked.");
+    CHECK(linkFailed(yes) == "Lichess gave nothing (Lichess refused the token: link the account again).");
     // A 403 Lichess answers is no refusal of the user's either: only the browser's no, without a status, is.
     Failure answered;
     answered.net    = NetError::Forbidden;
@@ -327,6 +330,26 @@ TEST_CASE("Lichess account: an answer to another question is ignored, a code Lic
     CHECK(stale.net == NetError::Server);
     CHECK(stale.status == 400);
     CHECK(describe(stale) == "Lichess did not take the code");
+    CHECK(linkFailed(stale) == "Lichess gave nothing (Lichess did not take the code).");
+}
+
+TEST_CASE("Lichess account: the card's words for a link that failed, Lichess out of reach only when it is") {
+    Failure late;
+    late.net = NetError::TimedOut;
+    CHECK(linkFailed(late) == "No answer from Lichess in 5 minutes: the link stopped, the port is closed.");
+    Failure offline;
+    offline.net = NetError::Offline;
+    CHECK(linkFailed(offline) ==
+          "Lichess cannot be reached from here: the link waits for a connection. Everything else works without it.");
+    // The program's own problem, a server that answered: neither is Lichess out of reach.
+    const auto own = Failure::own("no port to listen on for Lichess's answer");
+    CHECK(linkFailed(own) == "no port to listen on for Lichess's answer");
+    Failure down;
+    down.net    = NetError::Server;
+    down.status = 503;
+    down.asked  = Asked::Link;
+    CHECK(linkFailed(down) == "Lichess gave nothing (Lichess answered 503).");
+    for (const auto& f : {own, down}) CHECK(linkFailed(f).find("cannot be reached") == std::string::npos);
 }
 
 TEST_CASE("Lichess account: each failure of the token's requests told by its kind") {

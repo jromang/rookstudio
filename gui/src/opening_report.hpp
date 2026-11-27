@@ -126,6 +126,10 @@ struct ReportView {
 void keepExplorer(const std::filesystem::path& profile, const std::string& key, const lichess::Explorer& answer);
 [[nodiscard]] std::optional<std::pair<lichess::Explorer, int64_t>> keptExplorer(const std::filesystem::path& profile,
                                                                                 const std::string& key);
+// The title of the report's state when one of Lichess's sources gave nothing, its failure kept as the explorer's answer
+// had it: "Offline" when Lichess cannot be reached, else the failure in gaveNothing()'s words (a token refused, a 429,
+// Lichess in trouble).
+[[nodiscard]] std::string reportUnanswered(const lichess::Failure& failure);
 
 // The summary written: the model's passages, each held to the figures, the templates' where the checker refused twice;
 // the templates' alone without the model.

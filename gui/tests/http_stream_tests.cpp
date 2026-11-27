@@ -431,6 +431,65 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
     CHECK(gate.pausedFor("paused.invalid") > 59s);
 }
 
+TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bounds, lengthens the pause, never less") {
+    using namespace std::chrono;
+    // "Wed, 21 Oct 2015 07:28:00 GMT".
+    const system_clock::time_point now{sys_days{std::chrono::year{2015} / 10 / 21} + 7h + 28min};
+    CHECK(retryAfter("120", now) == 120s);
+    CHECK(retryAfter(" 30 ", now) == 30s);
+    CHECK(retryAfter("Wed, 21 Oct 2015 07:30:00 GMT", now) == 120s);     // IMF-fixdate
+    CHECK(retryAfter("Wednesday, 21-Oct-15 07:29:30 GMT", now) == 90s);  // RFC 850
+    CHECK(retryAfter("Wed Oct 21 07:28:45 2015", now) == 45s);           // asctime
+    // A second at least (never a loop), a quarter of an hour at most (never a session's requests held).
+    CHECK(retryAfter("0", now) == RETRY_AFTER_LEAST);
+    CHECK(retryAfter("Wed, 21 Oct 2015 07:00:00 GMT", now) == RETRY_AFTER_LEAST);  // a date past
+    CHECK(retryAfter("Fri Oct  9 07:28:00 2015", now) == RETRY_AFTER_LEAST);       // asctime's day padded
+    CHECK(retryAfter("86400", now) == RETRY_AFTER_MOST);
+    CHECK(retryAfter("123456789012345678901234567890", now) == RETRY_AFTER_MOST);
+    CHECK(retryAfter("Thu, 22 Oct 2015 07:28:00 GMT", now) == RETRY_AFTER_MOST);
+    CHECK(RETRY_AFTER_LEAST == 1s);
+    CHECK(RETRY_AFTER_MOST == 15min);
+    // Neither: the host's minute.
+    for (const char* value : {"", "soon", "-5", "1.5", "Wed, 32 Oct 2015 07:30:00 GMT", "Wed, 21 Foo 2015 07:30:00 GMT",
+                              "Wed, 21 Oct 2015 7:30 GMT", "Wed, 21 Oct 1969 07:30:00 GMT"}) {
+        CAPTURE(value);
+        CHECK_FALSE(retryAfter(value, now));
+    }
+
+    // A request's, a stream's and a download's 429 pause their host as long as its Retry-After asks when that is longer
+    // than the pause (a minute; the tests make it shorter), never less: Lichess asks for a full minute.
+    auto& gate = HostGate::instance();
+    gate.setPause(50ms);
+    const auto port = fcg::test::freePort();
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        if (requestPath(head) == "/later")
+            c.sendAll("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 1\r\nContent-Length: 0\r\n\r\n");
+        else
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+    });
+    REQUIRE(server.ok());
+    const auto later = fmt::format("http://127.0.0.1:{}/later", port);
+    CHECK(politeRequest(get(later)).status == 429);
+    CHECK(gate.pausedFor("127.0.0.1") > 100ms);  // its second, longer than the pause
+    CHECK(gate.pausedFor("127.0.0.1") <= 1001ms);
+    CHECK(gate.waitPause("127.0.0.1"));
+    HttpStream stream;
+    CHECK(politeStream(get(later), stream).status == 429);
+    CHECK(gate.pausedFor("127.0.0.1") > 100ms);
+    CHECK(gate.pausedFor("127.0.0.1") <= 1001ms);
+    CHECK(gate.waitPause("127.0.0.1"));
+    // A Retry-After shorter than the pause leaves the pause.
+    gate.setPause(1500ms);
+    const auto file = fs::temp_directory_path() / "retry-after-download";
+    const auto got  = politeDownload(later, file);
+    CHECK(got.status == 429);
+    CHECK(got.retry_after == 1s);
+    CHECK(gate.pausedFor("127.0.0.1") > 1001ms);
+    CHECK(gate.pausedFor("127.0.0.1") <= 1501ms);
+    CHECK(gate.waitPause("127.0.0.1"));
+    CHECK(politeRequest(get(fmt::format("http://127.0.0.1:{}/now", port))).status == 200);
+}
+
 TEST_CASE("HTTP: one head for every way to ask, no Content-Length where no body goes, each request in the log") {
     std::mutex mutex;
     std::map<std::string, std::string> heads;  // path -> the head received

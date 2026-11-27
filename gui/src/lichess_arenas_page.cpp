@@ -1554,8 +1554,7 @@ bool LichessArenasPage::drawTournamentScope(bool enter) {
     if (app_.lichessLinking()) {
         coloured(TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."), ui::ACCENT);
     } else {
-        if (app_.lichessLinkError().failed())
-            coloured(trf("Lichess gave nothing ({}).", lichess::describe(app_.lichessLinkError())), ui::WARN);
+        if (app_.lichessLinkError().failed()) coloured(lichess::gaveNothing(app_.lichessLinkError()), ui::WARN);
         if (primaryButton(TR("Allow on Lichess…##tournament")) || enter) {
             const auto* account = app_.lichessAccount();
             app_.startLichessLink(lichess::scopesAdding(account->scopes, lichess::SCOPE_TOURNAMENT_WRITE),

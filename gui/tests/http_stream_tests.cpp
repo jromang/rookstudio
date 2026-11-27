@@ -750,6 +750,95 @@ TEST_CASE("HTTP: a download takes no turn of its host, waits for its pause, and 
     CHECK(gate.pausedFor("paused.invalid") > 59s);
 }
 
+TEST_CASE("HTTP: a wait for the host's pause ends at once by its cancel flag, or for all as the program quits (#148)") {
+    auto& gate = HostGate::instance();
+    // The gate opened again whatever this test case's end: another one of this process may follow it.
+    struct Reopen {
+        ~Reopen() {
+            HostGate::instance().reopen();
+            HostGate::instance().setPause(50ms);
+            HostGate::instance().tooMany("127.0.0.1");
+        }
+    } reopen;
+    std::atomic<int> asked{0};
+    ScriptedServer server(0, [&](const std::string&, net::TcpConnection& c) {
+        ++asked;
+        c.sendAll("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n");
+    });
+    REQUIRE(server.ok());
+    const auto base = fmt::format("http://127.0.0.1:{}", server.port());
+    const auto dir  = fs::temp_directory_path() / "gate-closed";
+    fs::remove_all(dir);
+    // Lichess answers 429 to everything: its minute of pause.
+    gate.setPause(60s);
+    CHECK(politeRequest(get(base + "/api/tv/channels")).status == 429);
+    REQUIRE(gate.pausedFor("127.0.0.1") > 59s);
+    // How long `wait` takes, and that it ended.
+    const auto ends = [](const std::function<void()>& wait) {
+        const auto start = std::chrono::steady_clock::now();
+        wait();
+        return std::chrono::steady_clock::now() - start;
+    };
+
+    // A request given a cancel flag waits for the pause; the flag set, it ends at once, nothing sent.
+    std::atomic<bool> cancel{false}, started{false};
+    HttpResult result;
+    std::thread waiting([&] {
+        started = true;
+        result  = politeRequest(get(base + "/api/broadcast/top?page=1"), &cancel);
+    });
+    REQUIRE(waitUntil([&] { return started.load(); }));
+    std::this_thread::sleep_for(200ms);  // into its wait; shorter, it is cancelled before it, which ends it as well
+    cancel = true;
+    CHECK(ends([&] { waiting.join(); }) < 5s);
+    CHECK(result.error == "cancelled");
+    CHECK(asked == 1);
+
+    // Requests without a flag: one waits for the pause holding the host's turn, another for that turn, a stream and a
+    // download for the pause. The program quits: each of them ends at once, cancelled, nothing sent.
+    std::vector<HttpResult> results(3);
+    Download download;
+    std::atomic<int> going{0};
+    std::vector<std::thread> clients;
+    clients.emplace_back([&] {
+        ++going;
+        results[0] = politeRequest(get(base + "/api/team/of/someone"));
+    });
+    clients.emplace_back([&] {
+        ++going;
+        results[1] = politeRequest(get(base + "/api/team/club/swiss"));
+    });
+    clients.emplace_back([&] {
+        HttpStream stream;
+        stream.on_data = [](std::string_view) { return true; };
+        ++going;
+        results[2] = politeStream(get(base + "/api/stream/game/abcdefgh"), stream);
+    });
+    clients.emplace_back([&] {
+        ++going;
+        download = politeDownload(base + "/evals.zst", dir / "evals.zst");
+    });
+    REQUIRE(waitUntil([&] { return going == 4; }));
+    std::this_thread::sleep_for(200ms);  // into their waits, as above
+    gate.close();
+    CHECK(ends([&] {
+              for (auto& t : clients) t.join();
+          }) < 5s);
+    for (const auto& r : results) CHECK(r.error == "cancelled");
+    CHECK(download.error == "cancelled");
+    CHECK(download.failure.kind == NetFailure::Kind::Cancelled);
+    CHECK(asked == 1);
+    // Closed, none waits: a request in the pause gives up at once, even with a flag that is not set.
+    std::atomic<bool> unset{false};
+    CHECK(ends([&] { CHECK(politeRequest(get(base + "/api/account"), &unset).error == "cancelled"); }) < 1s);
+    CHECK(asked == 1);
+    // A host free and not paused: its request still goes (a token revoked at the last moment).
+    gate.setPause(0ms);
+    gate.tooMany("127.0.0.1");
+    CHECK(politeRequest(get(base + "/api/token")).status == 429);
+    CHECK(asked == 2);
+}
+
 TEST_CASE("HTTP: a file's SHA-256") {
     const auto file = fs::temp_directory_path() / "abc.txt";
     std::ofstream(file, std::ios::binary) << "abc";

@@ -13,6 +13,7 @@
 //
 // What it needs of the program around it, it asks of its context (ArenasContext, app_context.hpp): App's, or a test's.
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -151,6 +152,9 @@ class LichessArenasPage {
         std::chrono::steady_clock::time_point asked{};
         std::chrono::steady_clock::time_point waits_until{};  // a 429: the standing waits until then, and says so
         std::future<lichess::Answer<std::vector<lichess::PlayerStatus>>> status_job;
+        // The cancel flag of its requests (its standing, its players' status): set when it is no longer followed, and
+        // as the program quits (#148).
+        std::shared_ptr<std::atomic<bool>> cancel;
         std::chrono::steady_clock::time_point status_asked{};
         std::vector<std::string> top;         // the first eight's names, as the standing gives them
         std::vector<lichess::TvGame> listed;  // their games in progress, the first ranked first
@@ -168,8 +172,11 @@ class LichessArenasPage {
         lichess::Answer<lichess::Arena> state;   // its page with the user's token: their verdicts, rank
         std::optional<lichess::ArenaPlayer> me;  // the user's row of the standing (their page)
         std::future<std::pair<lichess::Answer<lichess::Arena>, std::optional<lichess::ArenaPlayer>>> job;
+        std::shared_ptr<std::atomic<bool>> cancel;  // of `job`, a reading: set when dropped, and at quit (#148)
         std::chrono::steady_clock::time_point asked{};
         std::chrono::steady_clock::time_point waits_until{};  // a 429
+        // A join, a pause: sent once asked, a tournament chosen after them (dropArena()) or not; at quit, they no
+        // longer wait for the host's pause (HostGate::close()).
         std::future<lichess::Reply> join_job, pause_job;
         std::chrono::steady_clock::time_point join_asked{};
         bool quiet_join   = false;  // a join again of the minute: its failure said in the line only
@@ -205,6 +212,9 @@ class LichessArenasPage {
         std::future<std::tuple<lichess::Answer<lichess::SwissInfo>, lichess::Answer<std::vector<lichess::SwissRow>>,
                                std::optional<lichess::Trf>>>
             job;
+        // Of `job` and `keep_job`, readings: set when dropped, and at quit (#148). A join or a withdrawal is sent all
+        // the same, as an arena's.
+        std::shared_ptr<std::atomic<bool>> cancel;
         std::chrono::steady_clock::time_point asked{};
         std::future<lichess::Reply> join_job, pause_job;
         bool join_pending = false;
@@ -243,6 +253,9 @@ class LichessArenasPage {
     void askAgain(Retry what);                              // its own Try again
 
     ArenasContext& app_;
+    // The cancel flag of the card's requests (the user's teams' Swiss tournaments): set when it goes, and by the
+    // program's cancelAll() as it quits (#148), so that none waits on for the host's pause.
+    std::shared_ptr<std::atomic<bool>> stop_;
     OwnRetries retries_;
     ArenaCard arena_card_{app_.jobs()};
     float arena_card_y_ = -1;  // the card asked for (Ctrl+K, --focus): the page scrolled to it

@@ -420,3 +420,38 @@ TEST_CASE("Lichess broadcasts: each failure of the lists, a round and its follow
     servers() = Servers{};
     RoundFollower::setRetry(5s, 60s);
 }
+
+TEST_CASE(
+    "Lichess broadcasts: the list, a search, a tournament's players asked in the host's pause end at once by their "
+    "cancel flag (#148)") {
+    std::atomic<int> asked{0};
+    ScriptedServer server(0, [&](const std::string&, net::TcpConnection& c) {
+        ++asked;
+        c.sendAll("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    });
+    REQUIRE(server.ok());
+    Servers_ local(server.port());
+    auto& gate = HostGate::instance();
+    gate.setPause(60s);  // Lichess's minute after a 429
+    gate.tooMany("127.0.0.1");
+    std::atomic<bool> cancel{false}, started{false};
+    Failure list, found, players, teams;
+    std::thread asking([&] {
+        started = true;
+        list    = topBroadcasts(&cancel);
+        found   = searchBroadcasts("Olympiad", "a-token", &cancel);
+        players = broadcastPlayers("tour0001", &cancel);
+        teams   = teamStandings("tour0001", &cancel);
+    });
+    REQUIRE(waitUntil([&] { return started.load(); }));
+    std::this_thread::sleep_for(200ms);  // into its wait; shorter, it is cancelled before it, which ends it too
+    cancel           = true;
+    const auto start = std::chrono::steady_clock::now();
+    asking.join();
+    CHECK(std::chrono::steady_clock::now() - start < 5s);
+    // Read as cancelled, which no card says.
+    for (const auto* f : {&list, &found, &players, &teams}) CHECK(f->net == NetError::Cancelled);
+    CHECK(asked == 0);
+    gate.setPause(50ms);
+    gate.tooMany("127.0.0.1");
+}

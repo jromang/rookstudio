@@ -148,6 +148,25 @@ TEST_CASE("jobs: the group asks every job's task to stop at once") {
     CHECK(b.take());
 }
 
+TEST_CASE("jobs: a flag given for a task that is no job's, set by its owner or with the jobs' by the group (#148)") {
+    JobGroup group;
+    Job<bool> job(group);
+    job.start([](TaskState<>& state) { return untilCancelled(state.cancel); });
+    const auto first = group.cancelFlag(), second = group.cancelFlag();
+    CHECK_FALSE(*first);
+    CHECK_FALSE(*second);
+    // Its owner stops its task: the others go on.
+    *first = true;
+    CHECK_FALSE(*second);
+    CHECK_FALSE(job.cancelled());
+    // The program quits: every flag set with the jobs', and those given after.
+    group.cancelAll();
+    CHECK(*second);
+    REQUIRE(waitFor([&] { return job.ready(); }));
+    CHECK(job.take());
+    CHECK(*group.cancelFlag());
+}
+
 TEST_CASE("jobs: what the task throws comes back from take()") {
     JobGroup group;
     Job<int> job(group);

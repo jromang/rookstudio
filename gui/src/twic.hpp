@@ -4,6 +4,7 @@
 // personal use; nothing of it ships with RookStudio, an issue is downloaded when the user asks for it (#71, mockup
 // M10).
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -36,8 +37,9 @@ struct Issue {
 
 // The index page asked of the site (politeRequest) and read: its issues, or none and why (#141), the network's kind
 // (an outage, a status, the host's pause after a 429), Unexpected for a page that lists none the program can read.
-// Blocks: call it from a thread of its own.
-[[nodiscard]] std::pair<std::vector<Issue>, NetFailure> fetchIndex();
+// Blocks: call it from a thread of its own; `cancel` ends the wait for the host's turn or pause, and the request
+// (#148).
+[[nodiscard]] std::pair<std::vector<Issue>, NetFailure> fetchIndex(const std::atomic<bool>* cancel = nullptr);
 // Why the index gave none, as the sheet says it: an outage and the host's pause in their words, a status and a page
 // that cannot be read after "theweekinchess.com did not answer".
 [[nodiscard]] std::string indexSaid(const NetFailure& failure);

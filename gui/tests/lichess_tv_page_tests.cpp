@@ -13,9 +13,11 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -598,4 +600,39 @@ TEST_CASE("Lichess TV's module without App: why its channels did not come said w
     }
     CHECK(lichess.channelsAsked() == asked + 1);
     CHECK(app.repairs.size() == 1);
+}
+
+TEST_CASE("Lichess TV's module without App: its requests in the host's pause end at once as it goes (#148)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess({});
+    REQUIRE(lichess.ok());
+    lichess.refuse   = 429;  // Lichess answers 429 to everything
+    auto& gate       = HostGate::instance();
+    const auto host  = lichess::apiHost();
+    const auto pause = [&](std::chrono::milliseconds length) {
+        gate.setPause(length);
+        gate.tooMany(host);
+    };
+    pause(60s);  // its minute of pause after a 429
+    const ScratchDir profile("tv-quit");
+    FakeApp app(profile);
+    Frames frames;
+    // How long the module takes to go, its channels asked while the host is paused.
+    const auto goes = [&](bool quitting) {
+        auto tv = std::make_unique<LichessTvPage>(app);
+        frames.draw(app, [&] { tv->drawCard(); });
+        tv->poll();                            // the channels asked: the request waits for the pause
+        std::this_thread::sleep_for(200ms);    // into its wait; shorter, it is cancelled before it, which ends it too
+        if (quitting) app.jobs().cancelAll();  // as App's quit does first
+        const auto start = std::chrono::steady_clock::now();
+        tv.reset();
+        return std::chrono::steady_clock::now() - start;
+    };
+    // The module goes (its page closed with the program): its request ends at once, not after the pause.
+    CHECK(goes(false) < 5s);
+    // The program quits: its flags set, then the module goes.
+    CHECK(goes(true) < 5s);
+    CHECK(lichess.channelsAsked() == 0);  // nothing sent during the pause
+    CHECK(gate.pausedFor(host) > 50s);
+    pause(50ms);  // over for what follows in this process
 }

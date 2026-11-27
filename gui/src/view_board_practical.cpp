@@ -110,7 +110,8 @@ const std::vector<LevelMove>* App::practicalLevelAt(const chess::Board& board, b
         q.moves        = 12;
         q.top_games    = 0;
         q.token        = lichess_account_->token;
-        p.explorer_job = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+        p.explorer_job =
+            std::async(std::launch::async, [q, stop = jobs_.cancelFlag()] { return lichess::explorer(q, stop.get()); });
     } else {
         std::vector<LevelSource> sources;
         auto& sh = shelf();

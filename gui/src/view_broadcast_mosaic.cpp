@@ -229,7 +229,8 @@ void App::pollBroadcastBoards() {
             b.tb     = known->outcome;
         } else if (shown && !broadcast_tb_job_.valid()) {
             broadcast_tb_fen_ = fen;
-            broadcast_tb_job_ = std::async(std::launch::async, [fen] { return lichess::tablebase(fen); });
+            broadcast_tb_job_ = std::async(
+                std::launch::async, [fen, stop = jobs_.cancelFlag()] { return lichess::tablebase(fen, stop.get()); });
         }
     }
 
@@ -395,9 +396,9 @@ void App::pollBroadcastStandings() {
                 continue;
             broadcast_named_.insert(f.entry.round.id);
             const auto token = f.with_token && lichess_account_ ? lichess_account_->token : std::string();
-            broadcast_named_job_ =
-                std::async(std::launch::async, [id = f.entry.round.id, url = f.entry.round.url, token] {
-                    return std::make_pair(id, lichess::broadcastRoundEntry(url, token));
+            broadcast_named_job_ = std::async(
+                std::launch::async, [id = f.entry.round.id, url = f.entry.round.url, token, stop = jobs_.cancelFlag()] {
+                    return std::make_pair(id, lichess::broadcastRoundEntry(url, token, stop.get()));
                 });
             break;
         }
@@ -421,8 +422,8 @@ void App::pollBroadcastStandings() {
     }
     s.tour  = round->entry.tour.id;
     s.asked = now;
-    s.job   = std::async(std::launch::async, [tour = s.tour] {
-        return std::make_pair(lichess::broadcastPlayers(tour), lichess::teamStandings(tour));
+    s.job   = std::async(std::launch::async, [tour = s.tour, stop = jobs_.cancelFlag()] {
+        return std::make_pair(lichess::broadcastPlayers(tour, stop.get()), lichess::teamStandings(tour, stop.get()));
     });
 }
 

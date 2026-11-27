@@ -298,7 +298,9 @@ void App::drawLichessOfflineEvals() {
             ImGui::BeginDisabled(offline_evals_update_.valid());
             if (ImGui::Button(TR("Update"))) {
                 offline_evals_note_.clear();
-                offline_evals_update_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
+                offline_evals_update_ = std::async(std::launch::async, [stop = jobs_.cancelFlag()] {
+                    return evalsSize(lichess::evalsUrl(), stop.get());
+                });
             }
             ImGui::EndDisabled();
             tip(

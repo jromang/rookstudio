@@ -4,6 +4,7 @@
 // each month's games as PGN, asked for one at a time. A followed player keeps the months already added, the newest
 // asked for again when looked at (it may have grown).
 
+#include <atomic>
 #include <cstdint>
 #include <set>
 #include <string>
@@ -31,8 +32,10 @@ void setServer(std::string base);
 
 // The player's list of months asked of the API (politeRequest) and read: the months, or none and why (#141), the
 // network's kind (NotFound: no player of that name; an outage, another status, the host's pause after a 429). None and
-// no failure: the player has no game. Blocks: call it from a thread of its own.
-[[nodiscard]] std::pair<std::vector<std::string>, NetFailure> fetchMonths(const std::string& player);
+// no failure: the player has no game. Blocks: call it from a thread of its own; `cancel` ends the wait for the host's
+// turn or pause, and the request (#148).
+[[nodiscard]] std::pair<std::vector<std::string>, NetFailure> fetchMonths(const std::string& player,
+                                                                          const std::atomic<bool>* cancel = nullptr);
 // Why the months could not be had, as the sheet says it.
 [[nodiscard]] std::string monthsSaid(const NetFailure& failure);
 

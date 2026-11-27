@@ -67,7 +67,7 @@ void App::startTwicIndex(bool weekly) {
     if (!weekly) twic_error_ = {};
     TwicIndexJob job;
     job.weekly      = weekly;
-    job.done        = std::async(std::launch::async, [] { return twic::fetchIndex(); });
+    job.done = std::async(std::launch::async, [stop = jobs_.cancelFlag()] { return twic::fetchIndex(stop.get()); });
     twic_index_job_ = std::move(job);
 }
 
@@ -600,10 +600,10 @@ std::string monthsFailure(const lichess::Failure& failure) {
 void App::startLichessMonths() {
     if (lichess_months_job_) return;
     lichess_months_error_ = {};
-    lichess_months_job_   = std::async(std::launch::async, [] {
+    lichess_months_job_   = std::async(std::launch::async, [stop = jobs_.cancelFlag()] {
         auto asked      = lichess::request("GET", lichess::databaseUrl(), {}, "text/html");
         asked.timeout_s = 30;
-        return lichess::readBody<std::string>(lichess::send(asked),
+        return lichess::readBody<std::string>(lichess::send(asked, stop.get()),
                                               [](std::string_view html) { return std::string(html); });
     });
 }
@@ -723,7 +723,8 @@ void App::startChesscomLookup(const std::string& player) {
     chesscom_none_  = false;
     chesscom_months_.clear();
     chesscom_player_ = player;
-    chesscom_job_    = std::async(std::launch::async, [player] { return chesscom::fetchMonths(player); });
+    chesscom_job_    = std::async(
+        std::launch::async, [player, stop = jobs_.cancelFlag()] { return chesscom::fetchMonths(player, stop.get()); });
 }
 
 void App::drawChesscomSheet() {

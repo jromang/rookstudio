@@ -405,8 +405,9 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
                 show();
                 offline_evals_note_.clear();
                 if (!offline_evals_update_.valid())
-                    offline_evals_update_ =
-                        std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
+                    offline_evals_update_ = std::async(std::launch::async, [stop = jobs_.cancelFlag()] {
+                        return evalsSize(lichess::evalsUrl(), stop.get());
+                    });
             });
             add(TR("Remove Lichess's evaluations offline…"), "Lichess", [this, show] {
                 show();

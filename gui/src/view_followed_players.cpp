@@ -62,7 +62,9 @@ void App::pollFollowedPlayers() {
     if (may_read && lichess_following_token_ != lichess_account_->token && !lichess_following_job_.valid()) {
         lichess_following_token_ = lichess_account_->token;
         lichess_following_job_ =
-            std::async(std::launch::async, [token = lichess_account_->token] { return lichess::followingOf(token); });
+            std::async(std::launch::async, [token = lichess_account_->token, stop = jobs_.cancelFlag()] {
+                return lichess::followingOf(token, stop.get());
+            });
     }
     // The permission granted for their mosaic: it opens.
     if (lichess_players_then_mosaic_ && may_read) {
@@ -88,7 +90,9 @@ void App::pollFollowedPlayers() {
     if (shown && !names.empty() && !lichess_status_job_.valid() &&
         dueAfter(lichess_status_asked_, std::chrono::seconds(15), now)) {
         lichess_status_asked_ = now;
-        lichess_status_job_   = std::async(std::launch::async, [names] { return lichess::playerStatuses(names); });
+        lichess_status_job_   = std::async(std::launch::async, [names, stop = jobs_.cancelFlag()] {
+            return lichess::playerStatuses(names, stop.get());
+        });
     }
     // Their games while their mosaic is open: those being played, the user's own never (fair play).
     if (!mosaic) {

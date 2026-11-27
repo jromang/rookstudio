@@ -197,11 +197,17 @@ class HostGate {
    public:
     static HostGate& instance();
     // Waits for `host`'s turn, then for its pause to end; the turn is held while the lock lives. A lock that owns
-    // nothing when `cancel` ended the wait.
+    // nothing when `cancel` ended the wait, or the gate closed (close()).
     [[nodiscard]] std::unique_lock<std::timed_mutex> turn(const std::string& host,
                                                           const std::atomic<bool>* cancel = nullptr);
-    // Waits for `host`'s pause to end (true), or for `cancel` (false).
+    // Waits for `host`'s pause to end (true), or for `cancel`, or for the gate to close (false).
     bool waitPause(const std::string& host, const std::atomic<bool>* cancel = nullptr);
+    // The program quits (#148): every wait for a turn or a pause ends at once, cancelled, whatever its request's cancel
+    // flag, and none waits from then on; a request whose host is free and not paused still goes (a token revoked at
+    // the last moment). reopen() undoes it, for the tests.
+    void close() noexcept { closed_ = true; }
+    void reopen() noexcept { closed_ = false; }
+    [[nodiscard]] bool closed() const noexcept { return closed_; }
     // The host answered 429: paused for the pause, a minute, or for `asked` (its Retry-After, retryAfter()) when that
     // is longer.
     void tooMany(const std::string& host, std::optional<std::chrono::seconds> asked = std::nullopt);
@@ -218,6 +224,7 @@ class HostGate {
     mutable std::mutex mutex_;
     std::map<std::string, std::unique_ptr<Host>> hosts_;
     std::chrono::milliseconds pause_{60000};
+    std::atomic<bool> closed_{false};
 };
 
 // httpRequest in its host's turn, once its pause is over; a 429 pauses the host. `cancel` ends the wait for the turn or

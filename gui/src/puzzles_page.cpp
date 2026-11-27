@@ -247,8 +247,9 @@ void PuzzlesPage::askOnlineBatch() {
     std::string angle = puzzles_theme_.empty() ? std::string("mix") : puzzles_theme_;
     if (angle.rfind(OPENING_PREFIX, 0) == 0) angle = angle.substr(OPENING_PREFIX.size());
     online_ask_ = std::async(std::launch::async, [token      = app_.lichessAccount()->token, angle,
-                                                  difficulty = std::string(difficultyKey(puzzles_difficulty_))] {
-        return lichess::puzzleBatch(token, angle, lichess::PUZZLE_BATCH, difficulty);
+                                                  difficulty = std::string(difficultyKey(puzzles_difficulty_)),
+                                                  stop       = app_.jobs().cancelFlag()] {
+        return lichess::puzzleBatch(token, angle, lichess::PUZZLE_BATCH, difficulty, stop.get());
     });
 }
 
@@ -443,8 +444,9 @@ void PuzzlesPage::addCommands(const PaletteAdd& add, const std::string& training
             add(TR("Update Lichess's puzzles"), TR("Training"), [this] {
                 app_.showTrainingPage(TrainingPart::Puzzles);
                 offline_puzzles_note_.clear();
-                offline_puzzles_update_ =
-                    std::async(std::launch::async, [] { return evalsSize(lichess::puzzlesUrl()); });
+                offline_puzzles_update_ = std::async(std::launch::async, [stop = app_.jobs().cancelFlag()] {
+                    return evalsSize(lichess::puzzlesUrl(), stop.get());
+                });
             });
             add(TR("Remove Lichess's puzzles…"), TR("Training"), [this] {
                 app_.showTrainingPage(TrainingPart::Puzzles);
@@ -1622,7 +1624,9 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
     if (!online_dashboard_asked_) {
         online_dashboard_asked_ = true;
         online_dashboard_job_ =
-            std::async(std::launch::async, [token = account->token] { return lichess::puzzleDashboard(token, 30); });
+            std::async(std::launch::async, [token = account->token, stop = app_.jobs().cancelFlag()] {
+                return lichess::puzzleDashboard(token, 30, stop.get());
+            });
     }
     if (isReady(online_dashboard_job_)) {
         if (auto answer = online_dashboard_job_.get(); answer.value) online_dashboard_ = std::move(*answer.value);
@@ -1792,8 +1796,9 @@ void PuzzlesPage::drawPuzzleStoreCard() {
             ImGui::BeginDisabled(offline_puzzles_update_.valid());
             if (ImGui::Button(TR("Update##offline_puzzles"))) {
                 offline_puzzles_note_.clear();
-                offline_puzzles_update_ =
-                    std::async(std::launch::async, [] { return evalsSize(lichess::puzzlesUrl()); });
+                offline_puzzles_update_ = std::async(std::launch::async, [stop = app_.jobs().cancelFlag()] {
+                    return evalsSize(lichess::puzzlesUrl(), stop.get());
+                });
             }
             ImGui::EndDisabled();
             tip(

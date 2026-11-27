@@ -10,6 +10,7 @@
 //
 // What it needs of the program around it, it asks of its context (TvContext, app_context.hpp): App's, or a test's.
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -96,7 +97,7 @@ class LichessTvPage {
 
     // The Board follows a game of a channel; it leaves it (another game on the Board).
     [[nodiscard]] bool onBoard() const { return board_tv_.has_value(); }
-    void leaveBoard() { board_tv_.reset(); }
+    void leaveBoard() { dropBoardTv(); }
 
     // Why the card's channels did not come, as the card says it in place of its line (#146): a token refused with Link
     // Lichess again…, an outage or the host's pause with Try again, the pause counted down; none while nothing failed.
@@ -113,7 +114,8 @@ class LichessTvPage {
         int tries = 0;              // the next game asked again since it ended
         std::chrono::steady_clock::time_point next_at{};
         std::future<lichess::Answer<lichess::TvNext>> next;
-        lichess::Failure error;  // why the next game did not come
+        std::shared_ptr<std::atomic<bool>> next_cancel;  // its request's: set when the Board leaves the game (#148)
+        lichess::Failure error;                          // why the next game did not come
     };
     struct TvKept {
         std::string id, title;
@@ -126,8 +128,13 @@ class LichessTvPage {
     void saveKept();
     void drawRepair(const Notice& notice, const char* id);  // in place of an error's line, its fix carried out
     void askAgain(Retry what);                              // its own Try again
+    // The Board's game let go of: the next one's request cancelled and parked, never waited for (#148).
+    void dropBoardTv();
 
     TvContext& app_;
+    // The cancel flag of its requests (the channels, a channel's games): set when it goes, and by the program's
+    // cancelAll() as it quits (#148), so that none waits on for the host's pause.
+    std::shared_ptr<std::atomic<bool>> stop_;
     OwnRetries retries_;
     lichess::Answer<std::vector<lichess::TvRow>> tv_rows_;
     std::future<lichess::Answer<std::vector<lichess::TvRow>>> tv_rows_job_;

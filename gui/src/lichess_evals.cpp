@@ -464,7 +464,7 @@ class EvalsConsumer final : public ZstdConsumer {
     fs::path rows_file_;
     EvalsReading::Progress& progress_;
     EvalScanner scanner_;
-    std::unique_ptr<std::FILE, int (*)(std::FILE*)> rows_{nullptr, &std::fclose};
+    tour::File rows_;
     std::string pending_;
     uint64_t lines_ = 0;
     std::string error_;

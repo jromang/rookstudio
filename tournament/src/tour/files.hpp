@@ -16,6 +16,12 @@ namespace fcg::tour {
 // others. nullptr when it fails.
 [[nodiscard]] std::FILE* openFile(const std::filesystem::path& file, const char* mode);
 
+// A file openFile() opened, closed when it goes (#117); a close whose failure matters is std::fclose(f.release()).
+struct FileCloser {
+    void operator()(std::FILE* file) const noexcept { std::fclose(file); }
+};
+using File = std::unique_ptr<std::FILE, FileCloser>;
+
 // Flushes `file` and asks the system to put its data on the disk. False when that fails.
 [[nodiscard]] bool syncFile(std::FILE* file);
 

@@ -85,8 +85,7 @@ uint64_t checkHeader(const MappedFile& file, FileKind kind, const fs::path& path
 // A file written from the start, its header written again at the end with what it holds.
 class Writer {
    public:
-    Writer(const fs::path& file, FileKind kind)
-        : path_(file), kind_(kind), file_(tour::openFile(file, "wb"), &std::fclose) {
+    Writer(const fs::path& file, FileKind kind) : path_(file), kind_(kind), file_(tour::openFile(file, "wb")) {
         if (!file_) throw std::runtime_error("cannot write " + file.string());
         put(header(kind, 0));
     }
@@ -117,7 +116,7 @@ class Writer {
     }
     fs::path path_;
     FileKind kind_;
-    std::unique_ptr<std::FILE, int (*)(std::FILE*)> file_;
+    tour::File file_;
     std::string buffer_;
     uint64_t written_ = 0;
 };

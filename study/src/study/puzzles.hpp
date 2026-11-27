@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <json.hpp>
+#include <tour/files.hpp>
 
 #include "mapped_file.hpp"
 
@@ -170,7 +171,7 @@ class PuzzleBuilder {
                              std::string_view name, int most);
 
     std::filesystem::path build_;
-    std::FILE* files_[BUCKETS] = {};
+    tour::File files_[BUCKETS];
     uint64_t lengths_[BUCKETS] = {};
     uint64_t lines_            = 0;
     uint64_t kept_             = 0;

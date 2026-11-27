@@ -72,37 +72,33 @@ uint32_t restOf(uint64_t key56, int bits) { return static_cast<uint32_t>(key56 >
 class Writer {
    public:
     explicit Writer(const fs::path& file) : file_(tour::openFile(file, "wb")) {
-        if (file_) std::setvbuf(file_, nullptr, _IOFBF, 1 << 20);
-    }
-    ~Writer() {
-        if (file_) std::fclose(file_);
+        if (file_) std::setvbuf(file_.get(), nullptr, _IOFBF, 1 << 20);
     }
     Writer(const Writer&)            = delete;
     Writer& operator=(const Writer&) = delete;
     [[nodiscard]] bool ok() const noexcept { return file_ && ok_; }
     void put(const void* data, std::size_t n) {
-        if (ok() && std::fwrite(data, 1, n, file_) != n) ok_ = false;
+        if (ok() && std::fwrite(data, 1, n, file_.get()) != n) ok_ = false;
     }
     void at(uint64_t offset) {
         if (!ok()) return;
 #ifdef _WIN32
-        if (_fseeki64(file_, static_cast<long long>(offset), SEEK_SET) != 0) ok_ = false;
+        if (_fseeki64(file_.get(), static_cast<long long>(offset), SEEK_SET) != 0) ok_ = false;
 #else
-        if (fseeko(file_, static_cast<off_t>(offset), SEEK_SET) != 0) ok_ = false;
+        if (fseeko(file_.get(), static_cast<off_t>(offset), SEEK_SET) != 0) ok_ = false;
 #endif
     }
     // Synced to the disk and closed: false when anything failed.
     bool close() {
         if (!file_) return false;
-        if (ok_ && !tour::syncFile(file_)) ok_ = false;
-        if (std::fclose(file_) != 0) ok_ = false;
-        file_ = nullptr;
+        if (ok_ && !tour::syncFile(file_.get())) ok_ = false;
+        if (std::fclose(file_.release()) != 0) ok_ = false;
         return ok_;
     }
 
    private:
-    std::FILE* file_ = nullptr;
-    bool ok_         = true;
+    tour::File file_;
+    bool ok_ = true;
 };
 
 // Renames `from` over `to`; false when it cannot.
@@ -130,12 +126,10 @@ class RunReader {
     explicit RunReader(const fs::path& file) : file_(tour::openFile(file, "rb")) {
         if (!file_) return;
         uint8_t header[RUN_HEADER];
-        if (std::fread(header, 1, RUN_HEADER, file_) != RUN_HEADER || std::memcmp(header, RUN_MAGIC, 8) != 0) return;
+        if (std::fread(header, 1, RUN_HEADER, file_.get()) != RUN_HEADER || std::memcmp(header, RUN_MAGIC, 8) != 0)
+            return;
         count_ = load64(header + 8);
         ok_    = true;
-    }
-    ~RunReader() {
-        if (file_) std::fclose(file_);
     }
     RunReader(const RunReader&)            = delete;
     RunReader& operator=(const RunReader&) = delete;
@@ -146,7 +140,7 @@ class RunReader {
         if (!ok_ || read_ >= count_) return false;
         if (at_ >= filled_) {
             const auto want = static_cast<std::size_t>(std::min<uint64_t>(count_ - read_, buffer_.size() / RUN_RECORD));
-            filled_         = std::fread(buffer_.data(), 1, want * RUN_RECORD, file_);
+            filled_         = std::fread(buffer_.data(), 1, want * RUN_RECORD, file_.get());
             at_             = 0;
             if (filled_ != want * RUN_RECORD) {
                 ok_ = false;
@@ -166,8 +160,8 @@ class RunReader {
     }
 
    private:
-    std::FILE* file_ = nullptr;
-    bool ok_         = false;
+    tour::File file_;
+    bool ok_        = false;
     uint64_t count_ = 0, read_ = 0;
     std::vector<uint8_t> buffer_ = std::vector<uint8_t>(RUN_RECORD * 21846);  // 256 KB
     std::size_t at_ = 0, filled_ = 0;
@@ -773,9 +767,7 @@ EvalsBuilder::EvalsBuilder(fs::path build, Options options) : build_(std::move(b
     fs::create_directories(build_, ec);
 }
 
-EvalsBuilder::~EvalsBuilder() {
-    if (log_file_) std::fclose(log_file_);
-}
+EvalsBuilder::~EvalsBuilder() = default;
 
 fs::path EvalsBuilder::runFile(uint64_t id) const { return build_ / ("run-" + std::to_string(id) + ".bin"); }
 fs::path EvalsBuilder::logFile(uint64_t id) const { return build_ / ("log-" + std::to_string(id) + ".bin"); }
@@ -812,8 +804,7 @@ void EvalsBuilder::add(const EvalsLine& l) {
 }
 
 void EvalsBuilder::openLog(bool truncate) {
-    if (log_file_) std::fclose(log_file_);
-    log_file_ = tour::openFile(logFile(log_), truncate ? "wb" : "ab");
+    log_file_.reset(tour::openFile(logFile(log_), truncate ? "wb" : "ab"));
     if (!log_file_) fail("cannot write " + logFile(log_).string());
 }
 
@@ -905,7 +896,8 @@ void EvalsBuilder::commit() {
             std::memcpy(record + 7, buffer_[i].eval.bytes, 5);
             bytes.insert(bytes.end(), record, record + LOG_RECORD);
         }
-        if (std::fwrite(bytes.data(), 1, bytes.size(), log_file_) != bytes.size() || std::fflush(log_file_) != 0) {
+        if (std::fwrite(bytes.data(), 1, bytes.size(), log_file_.get()) != bytes.size() ||
+            std::fflush(log_file_.get()) != 0) {
             fail("cannot write " + logFile(log_).string() + " (is the disk full?)");
             return;
         }
@@ -922,8 +914,7 @@ void EvalsBuilder::commit() {
 }
 
 void EvalsBuilder::restore(const nlohmann::json& state) {
-    if (log_file_) std::fclose(log_file_);
-    log_file_ = nullptr;
+    log_file_.reset();
     error_.clear();
     buffer_.clear();
     logged_ = 0;
@@ -980,8 +971,7 @@ void EvalsBuilder::restore(const nlohmann::json& state) {
 }
 
 void EvalsBuilder::startAgain() {
-    if (log_file_) std::fclose(log_file_);
-    log_file_ = nullptr;
+    log_file_.reset();
     error_.clear();
     std::error_code ec;
     std::vector<fs::path> old;
@@ -1009,8 +999,7 @@ std::string EvalsBuilder::finish(const fs::path& index, const std::string& date,
     if (!error_.empty()) return error_;
     cutRun();
     if (!error_.empty()) return error_;
-    if (log_file_) std::fclose(log_file_);
-    log_file_ = nullptr;
+    log_file_.reset();
     // The runs read from their start through buffers (mapped, their pages would count as the program's memory).
     std::vector<std::unique_ptr<RunReader>> runs;
     uint64_t sum = 0;

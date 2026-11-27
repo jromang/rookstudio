@@ -86,11 +86,10 @@ Journal::Journal(const fs::path& file) {
         }
     }
 
-    file_ = openFile(file, "ab");
+    file_.reset(openFile(file, "ab"));
     if (!file_) throw std::runtime_error("cannot write " + file.string());
-    if (cut_short && (std::fputc('\n', file_) == EOF || !syncFile(file_))) {
-        std::fclose(file_);
-        file_ = nullptr;
+    if (cut_short && (std::fputc('\n', file_.get()) == EOF || !syncFile(file_.get()))) {
+        file_.reset();
         throw std::runtime_error("cannot write " + file.string());
     }
     std::error_code ec;
@@ -103,15 +102,11 @@ void Journal::setListener(Listener listener) {
     listener_ = std::move(listener);
 }
 
-Journal::~Journal() {
-    if (file_) std::fclose(file_);
-}
-
 void Journal::append(const nlohmann::json& event) {
     const auto line = event.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + '\n';
     std::lock_guard<std::mutex> lock(mutex_);
     if (failed_) throw std::runtime_error("cannot write the tournament journal");
-    if (std::fwrite(line.data(), 1, line.size(), file_) != line.size() || !syncFile(file_)) {
+    if (std::fwrite(line.data(), 1, line.size(), file_.get()) != line.size() || !syncFile(file_.get())) {
         failed_ = true;
         throw std::runtime_error("cannot write the tournament journal (is the disk full?)");
     }

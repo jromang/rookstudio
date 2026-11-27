@@ -21,6 +21,7 @@
 
 #include <chess.hpp>
 #include <json.hpp>
+#include <tour/files.hpp>
 
 #include "mapped_file.hpp"
 
@@ -228,7 +229,7 @@ class EvalsBuilder {
     uint64_t log_   = 0;  // the log's id
     uint64_t next_  = 1;  // the next file's id
     uint64_t lines_ = 0, unread_ = 0, in_runs_ = 0;
-    std::FILE* log_file_ = nullptr;
+    tour::File log_file_;
     // Logs replaced by a run, each with the mark it was replaced at: removed once a later state is saved.
     std::vector<std::pair<uint64_t, uint64_t>> retired_;
     uint64_t marks_ = 0, saved_mark_ = 0;

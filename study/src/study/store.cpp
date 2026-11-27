@@ -188,7 +188,7 @@ StoreError readOnlyError(const fs::path& dir) {
 void writeFile(const fs::path& file, std::string_view bytes) {
     step("write " + file.filename().string());
     // Closed however this ends: Windows removes no folder whose files are open.
-    const std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(tour::openFile(file, "wb"), &std::fclose);
+    const tour::File f(tour::openFile(file, "wb"));
     if (!f) throw StoreError(writeErrc(errno), "cannot write " + file.string());
     const bool written    = bytes.empty() || std::fwrite(bytes.data(), 1, bytes.size(), f.get()) == bytes.size();
     const int write_error = written ? 0 : errno;

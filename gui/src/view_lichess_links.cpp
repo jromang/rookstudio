@@ -183,12 +183,8 @@ void App::closeLinkCard() {
 }
 
 void App::pollLinkJob() {
-    if (link_card_ && link_card_->pgn.valid() &&
-        link_card_->pgn.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-        link_card_->got = link_card_->pgn.get();
-    if (!link_job_ || !link_job_->result.valid() ||
-        link_job_->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-        return;
+    if (link_card_ && isReady(link_card_->pgn)) link_card_->got = link_card_->pgn.get();
+    if (!link_job_ || !isReady(link_job_->result)) return;
     const auto report = link_job_->result.get();
     auto& job         = *link_job_;
     if (report.failed()) {

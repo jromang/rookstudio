@@ -198,7 +198,7 @@ const std::vector<study::TrainingCard>* RepertoireTrainingPage::plannedCards(std
     std::string bases_key;
     auto bases    = trainingBases(&bases_key, nullptr);
     const auto of = fmt::format("{}|{}|{}", e.file.string(), e.revision, bases_key);
-    if (planning_ && planning_->cards.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (planning_ && isReady(planning_->cards)) {
         try {
             planned_[planning_->file] = {planning_->of, planning_->cards.get()};
         } catch (const std::exception& ex) {

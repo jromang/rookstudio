@@ -32,11 +32,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 using ui::numbered;
 
 // The moves a group shows at most, and the spoiling moves whose main line is asked of Lichess by itself (the others
@@ -126,7 +121,7 @@ void App::drawBoardEndgames() {
         t.hovered.clear();
     }
     const bool settled = now - t.since > 0.4;  // stepping through a game asks nothing on the way
-    if (ready(t.asking)) {
+    if (isReady(t.asking)) {
         auto a = t.asking.get();
         if (t.asking_fen == fen) {
             if (a.value && a.value->outcome != lichess::Outcome::Unknown) {
@@ -138,7 +133,7 @@ void App::drawBoardEndgames() {
             }
         }
     }
-    if (ready(t.line_job)) {
+    if (isReady(t.line_job)) {
         auto a = t.line_job.get();
         if (a.value)
             t.lines[t.line_job_fen] = std::move(*a.value);

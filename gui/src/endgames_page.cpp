@@ -177,14 +177,11 @@ void EndgamesPage::startSyzygyDownload() {
 }
 
 void EndgamesPage::poll() {
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // Fair play (#48): the tables are an aid; the endgame waits for a live game's end, where it is.
     if (!endgame_ || app_.liveGameOn()) return;
     auto& r = *endgame_;
     // Lichess's answer.
-    if (ready(r.asking)) {
+    if (isReady(r.asking)) {
         auto answer = r.asking.get();
         if (answer.value && answer.value->outcome != lichess::Outcome::Unknown) {
             keepTablebase(app_.profileDir(), r.asking_fen, *answer.value);
@@ -210,7 +207,7 @@ void EndgamesPage::poll() {
         if (!r.answer && r.waiting.empty() && r.missing.empty() && r.phase != EgPhase::Done && r.phase != EgPhase::End)
             askEndgameTables();
     }
-    if (ready(r.win_line_job)) {
+    if (isReady(r.win_line_job)) {
         const auto line = r.win_line_job.get();
         if (line.value) r.win_line = *line.value;
     }

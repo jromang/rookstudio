@@ -294,12 +294,9 @@ void App::onlineEvent(const lichess::GameEvent& e) {
 }
 
 void App::pollOnlinePlay() {
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // The requests under way: what failed is said where the user plays.
     for (auto& c : online_calls_) {
-        if (!ready(c.reply)) continue;
+        if (!isReady(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
         play_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
@@ -434,7 +431,7 @@ void App::pollOnlinePlay() {
         }
     }
     // The move's answer: refused, or cut, it is taken back.
-    if (ready(og.move_job)) {
+    if (isReady(og.move_job)) {
         const auto r = og.move_job.get();
         if (!r.ok) {
             og.sent.reset();

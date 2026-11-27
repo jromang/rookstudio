@@ -101,10 +101,6 @@ void progressBar(float fraction, float width) {
     ImGui::Dummy(ImVec2(width, ImGui::GetFrameHeight()));
 }
 
-bool ready(auto& future) {
-    return future.valid() && future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 }  // namespace
 
 const CpuFeatures& App::cpu() {
@@ -169,14 +165,14 @@ void App::openEnginePicker() {
 
 void App::pollEnginePicker() {
     auto& p = picker_;
-    if (ready(p.catalogue_job)) {
+    if (isReady(p.catalogue_job)) {
         p.catalogue = p.catalogue_job.get();
         syncPickerEngines();
         for (auto& e : p.engines) {
             if (p.open) askReleases(e);
         }
     }
-    if (ready(p.answer)) {
+    if (isReady(p.answer)) {
         auto answer = p.answer.get();
         if (auto* e = pickerEngine(p.asking)) {
             p.limited |= answer.limited();
@@ -223,7 +219,7 @@ void App::pollEnginePicker() {
         });
     }
     for (auto& e : p.engines) {
-        if (ready(e.install)) pickerInstalled(e, e.install.get());
+        if (isReady(e.install)) pickerInstalled(e, e.install.get());
     }
 }
 

@@ -407,7 +407,7 @@ void App::pollLichessEngines() {
     for (auto it = offer_calls_.begin(); it != offer_calls_.end();) {
         auto& c = *it;
         if (c.kind == OfferCall::Kind::Withdraw) {
-            if (c.withdrawn.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            if (!isReady(c.withdrawn)) {
                 ++it;
                 continue;
             }
@@ -420,7 +420,7 @@ void App::pollLichessEngines() {
             it = offer_calls_.erase(it);
             continue;
         }
-        if (c.result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        if (!isReady(c.result)) {
             ++it;
             continue;
         }

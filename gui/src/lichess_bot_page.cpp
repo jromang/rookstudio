@@ -470,9 +470,6 @@ void LichessBotPage::finishBotGame(const lichess::BotGame::State& st) {
 
 void LichessBotPage::poll() {
     loadBot();
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // An account linked or a token pasted: checked before it is kept, and before anything changes it.
     const auto take = [&](lichess::BotTokenCheck c) {
         if (!c.account || !c.facts) {
@@ -504,14 +501,14 @@ void LichessBotPage::poll() {
         saveBotSettings();
         app_.raiseWindow();  // back in front of the browser
     };
-    if (bot_link_ && ready(bot_link_->result)) {
+    if (bot_link_ && isReady(bot_link_->result)) {
         auto c = bot_link_->result.get();
         bot_link_.reset();
         take(std::move(c));
     }
-    if (ready(bot_check_)) take(bot_check_.get());
+    if (isReady(bot_check_)) take(bot_check_.get());
     // The upgrade: done, refused with Lichess's words, or unanswered (nothing changed).
-    if (ready(bot_upgrade_)) {
+    if (isReady(bot_upgrade_)) {
         const auto r = bot_upgrade_.get();
         if (r.ok && bot_facts_) {
             bot_facts_->title         = "BOT";
@@ -531,14 +528,14 @@ void LichessBotPage::poll() {
                                         [token = bot_account_->token] { return lichess::checkBotToken(token); });
         }
     }
-    if (ready(bot_unlink_)) {
+    if (isReady(bot_unlink_)) {
         if (const auto failure = bot_unlink_.get(); failure.failed())
             Console::instance().add(
                 trf("Lichess: the bot's token could not be revoked: {}", lichess::describe(failure)), true);
     }
     // Its answers to the challenges: what failed is said on its card.
     for (auto& c : bot_calls_) {
-        if (!ready(c.reply)) continue;
+        if (!isReady(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
         bot_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
@@ -547,7 +544,7 @@ void LichessBotPage::poll() {
     std::erase_if(bot_calls_, [](const auto& c) { return !c.reply.valid(); });
     // Its finished games brought in.
     for (auto& a : bot_arrivals_) {
-        if (!ready(a.arrival)) continue;
+        if (!isReady(a.arrival)) continue;
         const auto got = a.arrival.get();
         if (got.added && a.index < app_.shelf().entries().size()) app_.shelf().rebuildTree(a.index);
         if (got.failure.failed())

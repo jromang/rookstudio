@@ -295,7 +295,7 @@ void GuessPage::drawPart() {
 
 void GuessPage::poll() {
     // A game drawn at random for guessing.
-    if (guess_pick_.valid() && guess_pick_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(guess_pick_)) {
         auto pick = guess_pick_.get();
         if (pick.game)
             startGuess(std::move(*pick.game), pick.chess960, std::move(pick.title), guess_pick_side_, 0,
@@ -489,7 +489,7 @@ void GuessPage::pollGuess() {
     auto& g = *guess_;
     g.engine.poll();
     if (g.phase == GuessPhase::Preparing) {
-        if (g.theory.valid() && g.theory.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (isReady(g.theory)) {
             try {
                 g.book = g.theory.get();
             } catch (const std::exception& e) {

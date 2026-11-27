@@ -168,7 +168,7 @@ void App::pollEngineVersions() {
                         [](const catalogue::Installed& i) { return i.retired > 0 && i.deleted == 0; }))
             checkVersions();
     }
-    if (version_check_ && version_check_->result.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (version_check_ && isReady(version_check_->result)) {
         const auto deleted = version_check_->result.get();
         const auto ended   = version_check_->ended;
         const auto brought = version_check_->replaced;
@@ -209,7 +209,7 @@ void App::pollEngineVersions() {
         }
     }
     // A version downloaded again for a tournament that asks for it.
-    if (version_download_ && version_download_->result.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (version_download_ && isReady(version_download_->result)) {
         auto r             = version_download_->result.get();
         const auto* engine = picker_.catalogue.find(version_download_->id);
         const auto label =

@@ -345,7 +345,7 @@ void MistakesPage::poll() {
             mistake_scan_job_ = std::move(job);
         }
     }
-    if (mistake_scan_job_ && mistake_scan_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (mistake_scan_job_ && isReady(mistake_scan_job_->done)) {
         MistakeScan scan;
         try {
             scan = mistake_scan_job_->done.get();

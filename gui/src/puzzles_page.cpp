@@ -269,8 +269,7 @@ void PuzzlesPage::sendOnlineResults() {
 
 void PuzzlesPage::poll() {
     if (offline_puzzles_) {
-        if (offline_puzzles_update_.valid() &&
-            offline_puzzles_update_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (isReady(offline_puzzles_update_)) {
             const auto size  = offline_puzzles_update_.get();
             const auto state = offline_puzzles_->state();
             if (size.failed())
@@ -292,10 +291,7 @@ void PuzzlesPage::poll() {
         }
     }
     // Online: a batch asked for, results sent.
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
-    if (ready(online_ask_)) {
+    if (isReady(online_ask_)) {
         auto answer    = online_ask_.get();
         online_status_ = answer.status;
         if (answer.value && !answer.value->puzzles.empty()) {
@@ -322,7 +318,7 @@ void PuzzlesPage::poll() {
                                                : lichess::describe(answer);
         }
     }
-    if (ready(online_send_)) {
+    if (isReady(online_send_)) {
         auto answer    = online_send_.get();
         online_status_ = answer.status;
         auto* batch    = onlineBatch();
@@ -1628,8 +1624,7 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
         online_dashboard_job_ =
             std::async(std::launch::async, [token = account->token] { return lichess::puzzleDashboard(token, 30); });
     }
-    if (online_dashboard_job_.valid() &&
-        online_dashboard_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(online_dashboard_job_)) {
         if (auto answer = online_dashboard_job_.get(); answer.value) online_dashboard_ = std::move(*answer.value);
     }
     if (online_dashboard_ && online_dashboard_->nb > 0) {

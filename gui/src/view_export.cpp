@@ -838,7 +838,7 @@ void App::pollExport() {
     export_old_textures_.clear();
     if (!export_) return;
     auto& e = *export_;
-    if (e.job.valid() && e.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(e.job)) {
         std::string error;
         try {
             error = e.job.get();
@@ -854,7 +854,7 @@ void App::pollExport() {
             e.error = error;
         }
     }
-    if (e.estimate_job.valid() && e.estimate_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(e.estimate_job)) {
         e.estimate    = e.estimate_job.get();
         e.estimate_of = e.estimating;
     }

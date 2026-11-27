@@ -12,6 +12,7 @@
 #include <tour/files.hpp>
 
 #include "assistant_notes.hpp"
+#include "jobs.hpp"
 #include "lichess_studies.hpp"
 #include "portable.hpp"
 
@@ -271,7 +272,7 @@ void TheoryShelf::syncRepertoires(const std::vector<std::pair<std::string, fs::p
 bool TheoryShelf::poll(std::chrono::steady_clock::time_point now, std::chrono::milliseconds every) {
     bool changed    = false;
     const auto take = [&](TheorySource& s) {
-        if (!s.job.valid() || s.job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(s.job)) return;
         try {
             auto notes = s.job.get();
             s.notes    = std::make_shared<const study::TheoryNotes>(std::move(notes));

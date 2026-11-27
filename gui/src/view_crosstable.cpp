@@ -604,7 +604,7 @@ void App::startCrosstable() {
 void App::pollCrosstable() {
     if (!crosstable_) return;
     auto& c = *crosstable_;
-    if (c.job.valid() && c.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(c.job)) {
         try {
             auto input = c.job.get();
             if (!*c.cancel) {
@@ -625,7 +625,7 @@ void App::pollCrosstable() {
             if (s.entries()[i].folder == c.folder)
                 if (const auto db = s.open(i); db && db->snapshot()->generation() != c.generation) startCrosstable();
     }
-    if (c.looking.valid() && c.looking.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(c.looking)) {
         try {
             auto found = c.looking.get();
             if (!*c.look_cancel) c.found = std::move(found);

@@ -36,11 +36,6 @@ namespace fs = std::filesystem;
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 int64_t nowSeconds() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
@@ -218,7 +213,7 @@ void App::checkFollowedStudies() {
 void App::pollStudies() {
     loadStudiesState();
     // The account's list.
-    if (ready(studies_list_job_)) {
+    if (isReady(studies_list_job_)) {
         auto answer = studies_list_job_.get();
         if (answer.value) {
             studies_list_ = std::move(*answer.value);
@@ -236,7 +231,7 @@ void App::pollStudies() {
         }
     }
     // A study read, imported too.
-    if (study_job_ && ready(study_job_->done)) {
+    if (study_job_ && isReady(study_job_->done)) {
         auto job  = std::move(*study_job_);
         auto read = job.done.get();
         study_job_.reset();
@@ -305,7 +300,7 @@ void App::pollStudies() {
         }
     }
     // The followed studies: has each changed?
-    if (ready(study_checks_job_)) {
+    if (isReady(study_checks_job_)) {
         bool any = false;
         for (auto& [id, answer] : study_checks_job_.get()) {
             if (auto* r = studies_.find(id); r && answer.value && r->checked != *answer.value) {
@@ -316,7 +311,7 @@ void App::pollStudies() {
         if (any) saveStudiesState();
     }
     // The game sent.
-    if (ready(study_send_job_)) {
+    if (isReady(study_send_job_)) {
         const auto answer = study_send_job_.get();
         if (study_send_) {
             auto& s = *study_send_;
@@ -367,7 +362,7 @@ void App::pollStudies() {
         }
     }
     // The changes sent.
-    if (ready(study_update_job_)) {
+    if (isReady(study_update_job_)) {
         const auto answer = study_update_job_.get();
         if (answer.value) {
             study_update_error_.clear();

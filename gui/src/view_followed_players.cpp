@@ -50,11 +50,8 @@ std::vector<std::string> App::followedPlayers() const {
 }
 
 void App::pollFollowedPlayers() {
-    const auto ready = [](auto& job) {
-        return job.valid() && job.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // Whom the account follows: read once a session with a token allowed to, again when the token changes.
-    if (ready(lichess_following_job_)) {
+    if (isReady(lichess_following_job_)) {
         auto answer = lichess_following_job_.get();
         if (answer.value)
             lichess_following_ = std::move(*answer.value);
@@ -81,7 +78,7 @@ void App::pollFollowedPlayers() {
     const bool mosaic = broadcast_round_ == lichess::PLAYERS_MOSAIC;
     const int frame   = ImGui::GetFrameCount();
     const bool shown  = drawnLately(lichess_players_drawn_, frame) || (mosaic && drawnLately(broadcast_drawn_, frame));
-    if (ready(lichess_status_job_)) {
+    if (isReady(lichess_status_job_)) {
         auto answer = lichess_status_job_.get();
         if (answer.value) {
             lichess_statuses_     = std::move(*answer.value);

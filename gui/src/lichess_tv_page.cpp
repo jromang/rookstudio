@@ -37,11 +37,6 @@ using Clock = std::chrono::steady_clock;
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 std::string gameUrl(const std::string& id) { return fmt::format("https://lichess.org/{}", id); }
 
 std::string tagOf(const std::string& pgn, std::string_view tag) {
@@ -254,7 +249,7 @@ void LichessTvPage::poll() {
     const auto own = app_.ownLichessIds();
 
     // The card's answer; asked again while it shows, every 30 s at most.
-    if (ready(tv_rows_job_)) {
+    if (isReady(tv_rows_job_)) {
         auto a = tv_rows_job_.get();
         if (a.value) {
             tv_rows_ = std::move(a);
@@ -306,7 +301,7 @@ void LichessTvPage::poll() {
     // The Board's game ended: on to the channel's next one, by itself, unless the user stays on it.
     if (board_tv_) {
         auto& t = *board_tv_;
-        if (ready(t.next)) {
+        if (isReady(t.next)) {
             auto a = t.next.get();
             if (a.value && !a.value->game.empty() && a.value->game != t.game) {
                 const auto next = *a.value;
@@ -335,7 +330,7 @@ void LichessTvPage::poll() {
     // The mosaic's channel: its games asked when it opens, when one of them ends (every 10 s at most), and every 30 s
     // while there is room for more.
     const auto channel = channelShown();
-    if (ready(tv_list_job_)) {
+    if (isReady(tv_list_job_)) {
         auto [of, a] = tv_list_job_.get();
         if (a.value) {
             tv_listed_     = std::move(*a.value);

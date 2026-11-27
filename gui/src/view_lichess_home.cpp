@@ -61,8 +61,7 @@ void App::pollLichessProfile() {
         }
     }
     if (lichess_profile_.poll()) lichess::keepProfile(storage_.root(), *lichess_profile_.value);
-    if (lichess_figures_job_.valid() &&
-        lichess_figures_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(lichess_figures_job_)) {
         auto [key, answer]    = lichess_figures_job_.get();
         lichess_figures_[key] = std::move(answer);
     }

@@ -35,11 +35,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 int64_t nowSeconds() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
@@ -221,7 +216,7 @@ void App::drawBoardOnline() {
     const auto root    = storage_.root();
 
     // The answers that came.
-    if (ready(online_tb_job_)) {
+    if (isReady(online_tb_job_)) {
         auto answer = online_tb_job_.get();
         // Kept for good, a verdict not changing; not a position the tables do not know (op1's eight pieces), which
         // they may know later.
@@ -229,7 +224,7 @@ void App::drawBoardOnline() {
             writeCached(cacheFile(root, "tablebase", online_tb_asked_), online_tb_asked_, tablebaseJson(*answer.value));
         online_tb_ = OnlineTablebase{online_tb_asked_, std::move(answer), nowSeconds()};
     }
-    if (ready(online_cloud_job_)) {
+    if (isReady(online_cloud_job_)) {
         auto answer = online_cloud_job_.get();
         if (answer.value)
             writeCached(cacheFile(root, "cloud", online_cloud_asked_), online_cloud_asked_, cloudJson(*answer.value));

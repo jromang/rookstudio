@@ -36,11 +36,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 // A table cell's text: wider than the cell, it ends in "…", whole under the mouse.
 void cellText(const std::string& text, bool muted = false) {
     const float room  = ImGui::GetContentRegionAvail().x;
@@ -145,7 +140,7 @@ void App::pollEndgameCheck() {
     if (!endgame_check_) return;
     auto& c = *endgame_check_;
     if (c.reading.valid()) {
-        if (!ready(c.reading)) return;
+        if (!isReady(c.reading)) return;
         auto read = c.reading.get();
         c.error   = std::move(read.error);
         c.games   = std::move(read.games);
@@ -154,7 +149,7 @@ void App::pollEndgameCheck() {
     if (c.summary || !c.error.empty()) return;
 
     // Lichess's answer for the position a check waits for.
-    if (ready(c.asking)) {
+    if (isReady(c.asking)) {
         auto a          = c.asking.get();
         auto& check     = *c.checks[c.asking_game];
         const auto& fen = check.fen(c.asking_ply);

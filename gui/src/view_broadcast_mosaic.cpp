@@ -212,7 +212,7 @@ void App::pollBroadcastBoards() {
     }
     // The tables' verdict for the games of 7 pieces or fewer, when the user said « always » to Lichess's tables (M4,
     // board 4): from the profile's answers, else asked, one position at a time, while the mosaic shows.
-    if (broadcast_tb_job_.valid() && broadcast_tb_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(broadcast_tb_job_)) {
         const auto answer = broadcast_tb_job_.get();
         if (answer.value) keepTablebase(storage_.root(), broadcast_tb_fen_, *answer.value);
     }
@@ -371,15 +371,14 @@ void App::followWholeTournament(const std::string& key) {
 void App::pollBroadcastStandings() {
     using namespace std::chrono_literals;
     auto& s = broadcast_standings_;
-    if (s.job.valid() && s.job.wait_for(0s) == std::future_status::ready) {
+    if (isReady(s.job)) {
         auto [players, teams] = s.job.get();
         s.players             = std::move(players);
         s.teams               = std::move(teams);
     }
-    if (broadcast_search_job_.valid() && broadcast_search_job_.wait_for(0s) == std::future_status::ready)
-        broadcast_found_ = broadcast_search_job_.get();
+    if (isReady(broadcast_search_job_)) broadcast_found_ = broadcast_search_job_.get();
     // A round followed from a link: its tournament and its names, from Lichess.
-    if (broadcast_named_job_.valid() && broadcast_named_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(broadcast_named_job_)) {
         auto [round_id, answer] = broadcast_named_job_.get();
         if (answer.value && !answer.value->tour.id.empty())
             for (auto& f : followed_rounds_)

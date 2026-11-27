@@ -383,7 +383,7 @@ void App::askReportLichess(int source) {
     auto& r = *opening_report_;
     if (!lichess_account_ || !lichess_.explorer || aidsLocked()) return;
     // The answers that came, for the Tree tab and the report alike.
-    if (explorer_job_.valid() && explorer_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(explorer_job_)) {
         if (explorer_answers_.size() > 2000) explorer_answers_.clear();
         auto answer = explorer_job_.get();
         if (!answer.value) explorer_failed_[explorer_asked_] = ImGui::GetTime();
@@ -448,7 +448,7 @@ void App::pollOpeningReport() {
         return;
     }
     if (r.locked) {
-        if (r.job.valid() && r.job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (r.job.valid() && !isReady(r.job)) return;
         startOpeningReport();
         return;
     }
@@ -465,7 +465,7 @@ void App::pollOpeningReport() {
             }
         }
     }
-    if (r.job.valid() && r.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(r.job)) {
         try {
             r.job.get();
         } catch (const std::exception& e) {
@@ -515,7 +515,7 @@ void App::pollOpeningReport() {
     if (r.report && !correspondence && !r.rows.empty()) {
         std::string of;
         for (const auto& row : r.rows) of += chess::uci::moveToUci(row.move) + " ";
-        if (r.evals_job.valid() && r.evals_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (isReady(r.evals_job)) {
             r.evals = r.evals_job.get();
             r.evals_offline =
                 std::any_of(r.evals.begin(), r.evals.end(), [](const auto& e) { return e && !e->engine; });
@@ -545,7 +545,7 @@ void App::pollOpeningReport() {
         }
     }
     // The summary, once the report, its evaluations and Lichess's sources ticked are in.
-    if (r.summary_job.valid() && r.summary_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(r.summary_job)) {
         auto written = r.summary_job.get();
         if (!written.cancelled) r.summary = std::move(written);
     }

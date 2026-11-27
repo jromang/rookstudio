@@ -48,7 +48,7 @@ void App::pollFideCards() {
     using namespace std::chrono_literals;
     if (!fide_ask_) return;
     auto& a = *fide_ask_;
-    if (a.card.valid() && a.card.wait_for(0s) == std::future_status::ready) {
+    if (isReady(a.card)) {
         auto got = a.card.get();
         if (got.value) {
             fideCards().keep(*got.value, a.name);  // the game gave its id: the card of that name there
@@ -58,7 +58,7 @@ void App::pollFideCards() {
             a.error = lichess::describe(got);
         }
     }
-    if (a.search.valid() && a.search.wait_for(0s) == std::future_status::ready) {
+    if (isReady(a.search)) {
         auto got = a.search.get();
         if (!got.value) {
             a.error = lichess::describe(got);

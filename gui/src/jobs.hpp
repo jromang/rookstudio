@@ -22,6 +22,13 @@
 
 namespace fcg {
 
+// Whether a future (std::future, std::shared_future) has its result or its exception, without waiting: false for one
+// without a task (not valid()).
+template <typename Future>
+[[nodiscard]] bool isReady(const Future& future) {
+    return future.valid() && future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
 // What a task that tells nothing as it goes tells.
 struct NoProgress {};
 

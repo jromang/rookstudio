@@ -115,7 +115,7 @@ bool reviewPgnPlayers(const std::vector<tour::GameDb::Player>& players, const st
 
 void App::refreshRatings() {
     if (ratings_job_.valid()) {
-        if (ratings_job_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(ratings_job_)) return;
         auto r              = ratings_job_.get();
         game_db_            = std::move(r.db);
         rating_list_        = std::move(r.list);

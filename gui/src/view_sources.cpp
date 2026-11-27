@@ -175,7 +175,7 @@ void App::pollTwic() {
     const auto now = nowSeconds();
     // The weekly look, when ticked: the page of issues, at most four times a day.
     if (!twic_index_job_ && twic::lookDue(twic_, now)) startTwicIndex(true);
-    if (twic_index_job_ && twic_index_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (twic_index_job_ && isReady(twic_index_job_->done)) {
         auto [issues, error] = twic_index_job_->done.get();
         const bool weekly    = twic_index_job_->weekly;
         twic_index_job_.reset();
@@ -191,7 +191,7 @@ void App::pollTwic() {
         saveTwic();
     }
     // Lichess's page of monthly files, asked for by a sheet.
-    if (lichess_months_job_ && lichess_months_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (lichess_months_job_ && isReady(*lichess_months_job_)) {
         auto page = lichess_months_job_->get();
         lichess_months_job_.reset();
         if (!page.value) {
@@ -208,7 +208,7 @@ void App::pollTwic() {
     auto& add = *twic_add_;
     // The downloads, then the imports one after the other.
     if (!add.downloaded) {
-        if (add.downloads.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(add.downloads)) return;
         add.downloaded = true;
         for (const auto& [file, error] : add.downloads.get()) {
             if (!error.empty()) {
@@ -732,7 +732,7 @@ void App::drawChesscomSheet() {
         loadChesscom();
         chesscom_loaded_ = true;
     }
-    if (chesscom_job_ && chesscom_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (chesscom_job_ && isReady(*chesscom_job_)) {
         auto [months, error] = chesscom_job_->get();
         chesscom_job_.reset();
         chesscom_months_ = months;

@@ -247,7 +247,7 @@ void App::refreshPrograms() {
 }
 
 void App::pollFingerprints() {
-    if (!fingerprints_.valid() || fingerprints_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!isReady(fingerprints_)) return;
     bool save = false;
     for (const auto& [program, fingerprint] : fingerprints_.get()) {
         for (auto& e : engines_) {
@@ -360,8 +360,8 @@ bool App::startAfterReads(const std::string& key, std::vector<std::string> needs
 
 bool App::advanceStart() {
     // What ended meanwhile first: a read it needs is applied, and what ended is not interrupted for nothing.
-    if (probe_.valid() && probe_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) applyProbe();
-    if (check_.valid() && check_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) pollCheck();
+    if (isReady(probe_)) applyProbe();
+    if (isReady(check_)) pollCheck();
     if (!pending_start_) return false;  // a read it needed failed: it does not start
 
     auto& pending     = *pending_start_;
@@ -507,7 +507,7 @@ void App::pollProbe() {
         }
     }
 
-    if (probe_.valid() && probe_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) applyProbe();
+    if (isReady(probe_)) applyProbe();
 }
 
 void App::applyProbe() {
@@ -1818,7 +1818,7 @@ void App::pollCheck() {
         if (it != engines_.end()) startCheck(static_cast<int>(it - engines_.begin()));
     }
 
-    if (!check_.valid() || check_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!isReady(check_)) return;
     CheckResult result;
     try {
         result = check_.get();

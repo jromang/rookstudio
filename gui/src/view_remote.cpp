@@ -368,7 +368,7 @@ void App::hashRemotePrograms(std::vector<std::string> names) {
 }
 
 void App::pollRemoteHashes() {
-    if (!remote_hashes_.valid() || remote_hashes_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!isReady(remote_hashes_)) return;
     const auto hashes = remote_hashes_.get();
     bool save = false, machines = false;
     for (const auto& h : hashes) {
@@ -556,7 +556,7 @@ void App::drawRemotePicker() {
         ImGui::OpenPopup("##remote_picker");
         p.shown = true;
     }
-    if (p.listing.valid() && p.listing.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(p.listing)) {
         auto listing = p.listing.get();
         if (!listing.file.empty()) {
             chooseRemote(listing.file);

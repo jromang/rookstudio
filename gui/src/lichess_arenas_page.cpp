@@ -49,11 +49,6 @@ using Clock = std::chrono::steady_clock;
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 std::string lower(std::string_view text) {
     std::string out(text);
     for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -330,7 +325,7 @@ void LichessArenasPage::poll() {
     if (card_shown && arena_card_.list.due())
         arena_card_.list.ask([](const TaskState<>& state) { return lichess::arenaList(&state.cancel); });
     // The user's teams' Swiss tournaments, with team:read: their teams, then each one's, every five minutes.
-    if (ready(arena_card_.swiss_job)) {
+    if (isReady(arena_card_.swiss_job)) {
         auto [swisses, teams] = arena_card_.swiss_job.get();
         arena_card_.swisses   = std::move(swisses);
         arena_card_.teams     = teams;
@@ -378,7 +373,7 @@ void LichessArenasPage::poll() {
         auto& f          = *tour_follow_;
         const bool shown = followedShown();
         const bool drawn = shown && drawnLately(app_.mosaicDrawn(), frame);
-        if (ready(f.arena_job)) {
+        if (isReady(f.arena_job)) {
             auto a = f.arena_job.get();
             if (a.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
             if (a.value) {
@@ -388,7 +383,7 @@ void LichessArenasPage::poll() {
                 static_cast<lichess::Failure&>(f.arena) = a;
             }
         }
-        if (ready(f.swiss_job)) {
+        if (isReady(f.swiss_job)) {
             auto [info, rows] = f.swiss_job.get();
             if (info.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
             if (rows.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
@@ -437,7 +432,7 @@ void LichessArenasPage::poll() {
         }
         const bool playing = f.swiss ? f.swiss_info.value && f.swiss_info.value->ongoing > 0
                                      : f.arena.value && f.arena.value->info.state == lichess::TourState::Started;
-        if (ready(f.status_job)) {
+        if (isReady(f.status_job)) {
             auto a = f.status_job.get();
             if (a.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
             if (a.value) {
@@ -511,7 +506,7 @@ void LichessArenasPage::poll() {
     // The arena the user is in from here.
     if (arena_play_) {
         auto& a = *arena_play_;
-        if (ready(a.job)) {
+        if (isReady(a.job)) {
             auto [state, me] = a.job.get();
             if (state.net == lichess::NetError::RateLimited) a.waits_until = pause_end();
             if (state.value) {
@@ -566,7 +561,7 @@ void LichessArenasPage::poll() {
                     return std::make_pair(std::move(state), std::move(me));
                 });
         }
-        if (ready(a.join_job)) {
+        if (isReady(a.join_job)) {
             const auto r = a.join_job.get();
             if (r.ok) {
                 a.seat.joined(Clock::now());
@@ -578,7 +573,7 @@ void LichessArenasPage::poll() {
                 if (!a.quiet_join) a.seat.pause();
             }
         }
-        if (ready(a.pause_job)) {
+        if (isReady(a.pause_job)) {
             const auto r = a.pause_job.get();
             if (!r.ok) a.error = r;
             if (a.quit_after) {
@@ -627,7 +622,7 @@ void LichessArenasPage::poll() {
     // The Swiss the Play page shows.
     if (swiss_play_) {
         auto& s = *swiss_play_;
-        if (ready(s.job)) {
+        if (isReady(s.job)) {
             auto [info, rows, trf_read] = s.job.get();
             if (info.value) {
                 if (rows.value) {
@@ -665,7 +660,7 @@ void LichessArenasPage::poll() {
                 return std::make_tuple(std::move(info), std::move(rows), std::move(trf_read));
             });
         }
-        if (ready(s.join_job)) {
+        if (isReady(s.join_job)) {
             const auto r = s.join_job.get();
             if (r.ok) {
                 s.joined = true;
@@ -675,7 +670,7 @@ void LichessArenasPage::poll() {
                 s.error = r;
             }
         }
-        if (ready(s.pause_job)) {
+        if (isReady(s.pause_job)) {
             const auto r = s.pause_job.get();
             if (r.ok)
                 s.joined = false;
@@ -693,7 +688,7 @@ void LichessArenasPage::poll() {
             s.joined = true;
             s.asked  = {};
         }
-        if (ready(s.keep_job)) {
+        if (isReady(s.keep_job)) {
             auto kept    = s.keep_job.get();
             s.kept_in    = kept.base;
             s.keep_error = kept.failure;

@@ -197,7 +197,7 @@ void App::drawOpeningsPage() {
         });
         coverage_job_     = std::move(job);
     }
-    if (coverage_job_ && coverage_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (coverage_job_ && isReady(coverage_job_->done)) {
         coverage_error_.clear();
         try {
             coverage_ = coverage_job_->done.get();

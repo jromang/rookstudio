@@ -207,7 +207,7 @@ void App::startFideList(const fs::path& file) {
 }
 
 void App::pollFideList() {
-    if (!fide_job_ || fide_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!fide_job_ || !isReady(fide_job_->done)) return;
     auto outcome = fide_job_->done.get();
     fide_job_.reset();
     if (outcome.ok) {
@@ -378,7 +378,7 @@ void App::startCareKeep(std::size_t index, std::vector<study::GameId> damaged) {
 
 void App::pollCare() {
     pollFideList();
-    if (!care_job_ || care_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!care_job_ || !isReady(care_job_->done)) return;
     auto job         = std::move(care_job_);
     const auto index = indexOf(shelf(), job->folder);
     const bool here  = care_ && care_->folder == job->folder;
@@ -1652,7 +1652,7 @@ void App::drawCareChecks(std::size_t index) {
     ImGui::SameLine();
     ImGui::TextUnformatted(TR("Compact"));
     // What it gives back, made in the background once for each snapshot (it reads every game's place).
-    if (c.plan_job && c.plan_job->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (c.plan_job && isReady(*c.plan_job)) {
         try {
             c.plan = c.plan_job->get();
         } catch (const std::exception& e) {

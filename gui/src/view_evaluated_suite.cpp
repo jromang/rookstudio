@@ -58,9 +58,8 @@ void App::startEvalsReading(std::string source) {
 
 void App::pollEvalsReading() {
     using namespace std::chrono_literals;
-    if (evals_size_job_.valid() && evals_size_job_.wait_for(0s) == std::future_status::ready)
-        evals_size_ = evals_size_job_.get();
-    if (evaluated_job_.valid() && evaluated_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(evals_size_job_)) evals_size_ = evals_size_job_.get();
+    if (isReady(evaluated_job_)) {
         evaluated_positions_ = evaluated_job_.get();
         evaluated_suite_preview_.reset();
     }

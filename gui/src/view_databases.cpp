@@ -332,7 +332,7 @@ int markedLine(const std::vector<std::string>& lines, std::string_view move) {
 
 void App::drawFileLines() {
     auto& v = *db_lines_;
-    if (!v.ready && v.reading.valid() && v.reading.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (!v.ready && isReady(v.reading)) {
         try {
             v.lines = v.reading.get();
         } catch (const std::exception& e) {
@@ -1184,7 +1184,7 @@ void App::drawGameList() {
         });
         db_view_job_ = std::move(job);
     }
-    if (db_view_job_ && db_view_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (db_view_job_ && isReady(db_view_job_->done)) {
         study::View view;
         try {
             view = db_view_job_->done.get();

@@ -1112,7 +1112,7 @@ void App::openBoardPgn(const std::filesystem::path& file) {
 
 void App::pollBoardPgn() {
     auto& b = board_;
-    if (!b.reading || b.reading->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!b.reading || !isReady(b.reading->result)) return;
     auto index        = b.reading->result.get();
     const auto file   = b.reading->file;
     const bool cancel = *b.reading->cancel;

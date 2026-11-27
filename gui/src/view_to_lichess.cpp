@@ -95,7 +95,7 @@ void App::bookmarkGameOnLichess() {
 
 void App::pollToLichess() {
     using namespace std::chrono_literals;
-    if (lichess_share_job_.valid() && lichess_share_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(lichess_share_job_)) {
         const auto answer = lichess_share_job_.get();
         if (to_lichess_ && to_lichess_->kind == ToLichess::Kind::Share) {
             to_lichess_->busy = false;
@@ -108,7 +108,7 @@ void App::pollToLichess() {
             }
         }
     }
-    if (lichess_challenge_job_.valid() && lichess_challenge_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(lichess_challenge_job_)) {
         auto answer = lichess_challenge_job_.get();
         if (to_lichess_ && to_lichess_->kind == ToLichess::Kind::Challenge) {
             to_lichess_->busy = false;
@@ -118,7 +118,7 @@ void App::pollToLichess() {
                 to_lichess_->error = lichess::describe(answer);
         }
     }
-    if (lichess_bookmark_job_.valid() && lichess_bookmark_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(lichess_bookmark_job_)) {
         const auto answer = lichess_bookmark_job_.get();
         if (to_lichess_ && to_lichess_->kind == ToLichess::Kind::Bookmark) {
             to_lichess_->busy = false;

@@ -225,7 +225,7 @@ void App::pollDossier() {
     auto& d = *dossier_;
     // Another page shown (the rail, a command): the dossier steps aside.
     if (d.shown && page_ != d.over) d.shown = false;
-    if (d.job.valid() && d.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(d.job)) {
         DossierReport report;
         try {
             report = d.job.get();
@@ -334,7 +334,7 @@ void App::lookForDossierNames(const std::string& query) {
     }
     if (letters < 3) words.clear();
     auto& job = dossier_names_job_;
-    if (job && job->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (job && isReady(job->done)) {
         try {
             auto found = job->done.get();
             if (!*job->cancel && job->of == words) {

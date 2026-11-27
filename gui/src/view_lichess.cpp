@@ -36,11 +36,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 std::string lower(std::string text) {
     for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return text;
@@ -94,7 +89,7 @@ void App::revokeToken(std::string token) {
 
 void App::pollLichess() {
     // The link: the browser said yes or no, or the wait ended.
-    if (lichess_link_ && ready(lichess_link_->result)) {
+    if (lichess_link_ && isReady(lichess_link_->result)) {
         auto answer         = lichess_link_->result.get();
         const auto previous = std::move(lichess_link_->previous_token);
         const auto follow   = std::move(lichess_link_->then_follow);
@@ -131,14 +126,14 @@ void App::pollLichess() {
                 lichess_error_ = answer;
         }
     }
-    if (lichess_unlink_.valid() && ready(lichess_unlink_)) {
+    if (lichess_unlink_.valid() && isReady(lichess_unlink_)) {
         const auto failure = lichess_unlink_.get();
         if (failure.failed())
             Console::instance().add(trf("Lichess: the token could not be revoked: {}", lichess::describe(failure)),
                                     true);
     }
     // A player's games: the sync ends.
-    if (lichess_sync_ && ready(lichess_sync_->done)) {
+    if (lichess_sync_ && isReady(lichess_sync_->done)) {
         auto report          = lichess_sync_->done.get();
         const auto index     = lichess_sync_->index;
         lichess_sync_report_ = report;
@@ -146,7 +141,7 @@ void App::pollLichess() {
         if (report.added > 0 && index < shelf().entries().size()) shelf().rebuildTree(index);
     }
     // The broadcasts: asked once a page shows them, again after ten minutes.
-    if (lichess_broadcasts_job_.valid() && ready(lichess_broadcasts_job_)) {
+    if (lichess_broadcasts_job_.valid() && isReady(lichess_broadcasts_job_)) {
         lichess_broadcasts_      = lichess_broadcasts_job_.get();
         lichess_broadcasts_time_ = std::chrono::steady_clock::now();
     }
@@ -241,8 +236,7 @@ void App::drawLichessHomeCard() {
                         return lichess::countNewGames(folder, player, token, filters, cancel.get());
                     });
             }
-            if (lichess_count_job_.valid() &&
-                lichess_count_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            if (isReady(lichess_count_job_)) {
                 const auto answer  = lichess_count_job_.get();
                 lichess_new_games_ = answer.value;
             }
@@ -1010,7 +1004,7 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
         return false;
     }
     // The answers that came.
-    if (explorer_job_.valid() && explorer_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(explorer_job_)) {
         if (explorer_answers_.size() > 2000) explorer_answers_.clear();
         auto answer = explorer_job_.get();
         if (!answer.value) explorer_failed_[explorer_asked_] = ImGui::GetTime();
@@ -1145,7 +1139,7 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
 
 void App::pollExplorerMonths() {
     using namespace std::chrono_literals;
-    if (explorer_month_job_.valid() && explorer_month_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(explorer_month_job_)) {
         auto answer = explorer_month_job_.get();
         if (!answer.value) explorer_failed_[explorer_month_asked_] = ImGui::GetTime();
         explorer_answers_[explorer_month_asked_] = std::move(answer);
@@ -1177,7 +1171,7 @@ void App::pollExplorerMonths() {
 
 void App::drawTreeGames() {
     using namespace std::chrono_literals;
-    if (explorer_game_job_.valid() && explorer_game_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(explorer_game_job_)) {
         const auto answer = explorer_game_job_.get();
         if (answer.value) {
             readOnBoard(*answer.value, explorer_game_title_);

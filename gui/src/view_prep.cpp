@@ -82,17 +82,14 @@ void App::startPrep(const std::string& opponent) {
 void App::pollPrep() {
     if (!prep_) return;
     auto& p          = *prep_;
-    const auto ready = [](auto& job) {
-        return job.valid() && job.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
-    if (ready(p.profile_job)) {
+    if (isReady(p.profile_job)) {
         auto answer = p.profile_job.get();
         if (answer.value)
             p.profile = std::move(*answer.value);
         else
             p.profile_error = answer;
     }
-    if (ready(p.sync)) {
+    if (isReady(p.sync)) {
         const auto report = p.sync.get();
         if (report.failed() && !report.cancelled) p.error = report;
         if (report.added > 0 && p.index < shelf().entries().size()) shelf().rebuildTree(p.index);

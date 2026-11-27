@@ -115,8 +115,7 @@ void App::pollOfflineEvals() {
     if (!offline_evals_) return;
     if (page_ != Page::Lichess) offline_evals_keys_ = false;  // Enter is the card's only while it is shown
     offline_evals_->poll();
-    if (offline_evals_update_.valid() &&
-        offline_evals_update_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(offline_evals_update_)) {
         const auto size  = offline_evals_update_.get();
         const auto state = offline_evals_->state();
         if (size.failed()) {

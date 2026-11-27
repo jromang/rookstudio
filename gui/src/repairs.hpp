@@ -48,8 +48,10 @@ struct LichessAccess {
                                    const RetryState& retry, Notice::Level level = Notice::Level::Warning);
 
 // A link to Lichess that failed, on the account's card, in its words (`text`, lichess::linkFailed()): a token Lichess
-// refused after a yes says so, an error. Each offers Link Lichess again…, as its Try again did.
-[[nodiscard]] Notice linkNotice(const lichess::Failure& failure, std::string text);
+// refused after a yes says so, an error. Each offers Link Lichess again…, as its Try again did; an account whose file
+// could not be written (`unwritten`, #146) names it in the tooltip of the words, with Open the folder after.
+[[nodiscard]] Notice linkNotice(const lichess::Failure& failure, std::string text,
+                                const std::filesystem::path& unwritten = {});
 
 // A request about an engine offered to Lichess (#96) that failed, in the page's words (`text`): a 404 says Lichess no
 // longer knows the engine, with Register it again while it is in the library (`in_library`); a token refused or the

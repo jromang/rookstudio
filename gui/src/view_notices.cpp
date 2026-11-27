@@ -116,6 +116,12 @@ void App::retryNow(Retry what) {
             }
             if (opening_report_) opening_report_->lichess_failure = {};
             break;
+        case Retry::ReviewTables:  // those not answered asked again, those answered read from the profile
+            if (!review_tables_job_) {
+                review_tables_started_ = false;
+                review_tables_error_   = {};
+            }
+            break;
         case Retry::TvChannels:
         case Retry::ArenaList:
         case Retry::TeamSwisses:

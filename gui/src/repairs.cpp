@@ -79,13 +79,18 @@ Notice lichessNotice(const lichess::Failure& failure, std::string text, const Li
     return n;
 }
 
-Notice linkNotice(const lichess::Failure& failure, std::string text) {
+Notice linkNotice(const lichess::Failure& failure, std::string text, const std::filesystem::path& unwritten) {
     Notice n{Notice::Level::Warning, std::move(text), {}, {}};
     if (failure.net == lichess::NetError::Unauthorized) {
         n.level = Notice::Level::Error;
         n.text  = TR("Lichess refused the token: it was revoked or has expired.");
     }
     if (failure.failed()) n.fixes.push_back(linkLichessFix({}, true));
+    if (failure.failed() && !unwritten.empty()) {
+        n.level  = Notice::Level::Error;
+        n.detail = unwritten.string();  // the file, out of the words
+        n.fixes.push_back(openFolderFix(unwritten.parent_path().string()));
+    }
     return n;
 }
 

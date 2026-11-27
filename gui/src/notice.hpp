@@ -32,6 +32,7 @@ enum class Retry : int {
     TvChannels,       // Lichess TV's card: each channel's featured game (its module's)
     ArenaList,        // the Lichess tournaments card: the arenas in progress and to come (its module's)
     TeamSwisses,      // the same card: the user's teams' Swiss tournaments (its module's)
+    ReviewTables,     // a review's endgame: the positions Lichess's tables did not answer, asked again
 };
 
 // What fixes a problem. The App carries it out (App::applyFix); the views only show its button.

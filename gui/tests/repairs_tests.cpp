@@ -298,6 +298,22 @@ TEST_CASE("repairs: a link that failed offers Link Lichess again…, a token ref
     CHECK(no.level == Notice::Level::Warning);
     CHECK(no.text == "You refused it.");
     CHECK(no.fixes.size() == 1);
+
+    // The account received but its file not written (#146): the file out of the words, its folder a click away.
+    const fs::path file = fs::path("profile") / "lichess-account.json";
+    const auto unkept =
+        linkNotice(lichess::Failure::own("The account could not be kept: the file could not be "
+                                         "written (is the disk full?)."),
+                   "The account could not be kept: the file could not be written (is the disk full?).", file);
+    CHECK(unkept.level == Notice::Level::Error);
+    CHECK_FALSE(contains(unkept.text, "lichess-account.json"));
+    CHECK(unkept.detail == file.string());
+    REQUIRE(unkept.fixes.size() == 2);
+    CHECK(unkept.fixes[0].kind == Fix::Kind::LinkLichess);  // the repair first,
+    CHECK(unkept.fixes[1].kind == Fix::Kind::OpenFolder);   // then the folder
+    CHECK(unkept.fixes[1].path == file.parent_path().string());
+    // Nothing failed: nothing to open.
+    CHECK(linkNotice(lichess::Failure{}, "", file).fixes.empty());
 }
 
 TEST_CASE("repairs: the cases no gesture repairs stay notices without a button") {

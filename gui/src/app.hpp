@@ -1504,6 +1504,7 @@ class App {
     LichessSettings lichess_;
     std::optional<lichess::Account> lichess_account_;
     lichess::Failure lichess_error_;  // why the last link failed
+    std::filesystem::path lichess_unwritten_;  // the account's file a link could not write, said beside it (#146)
     struct LichessLink {
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<std::string> url;  // Lichess's page, as given to the browser

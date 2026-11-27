@@ -2,12 +2,12 @@
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
 
 #include <fmt/include/fmt/format.h>
 #include <chess.hpp>
 
 #include "https.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg::lichess {
@@ -209,34 +209,45 @@ bool OnlineBatch::answered(const std::string& id) const {
 }
 
 std::optional<OnlineBatch> loadOnlineBatch(const fs::path& folder) {
-    std::ifstream in(folder / "online.json", std::ios::binary);
-    if (!in) return std::nullopt;
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return std::nullopt;
+    // Read with its types checked (#136): a value of another type than written (another version, a hand edit) is set
+    // aside, the readable ones kept, said in the console with the file as it was kept beside it; a file cut short is
+    // kept aside and said, a new batch then asked of Lichess.
+    const auto file = folder / "online.json";
+    const auto read = readProfileJson(file);
+    if (!read) return std::nullopt;
+    const auto& j = *read;
+    ProfileEntries entries(file);
     OnlineBatch b;
-    b.angle      = j.value("angle", "mix");
-    b.difficulty = j.value("difficulty", "normal");
-    b.rated      = j.value("rated", true);
-    b.received   = j.value("received", int64_t{0});
+    entries.entry("angle", [&] { b.angle = j.value("angle", "mix"); });
+    entries.entry("difficulty", [&] { b.difficulty = j.value("difficulty", "normal"); });
+    entries.entry("rated", [&] { b.rated = j.value("rated", true); });
+    entries.entry("received", [&] { b.received = j.value("received", int64_t{0}); });
     if (const auto it = j.find("puzzles"); it != j.end() && it->is_array())
         for (const auto& p : *it) {
             auto puzzle = puzzleFromJson(p);
             if (!puzzle.id.empty() && puzzle.moves.size() >= 2) b.puzzles.push_back(std::move(puzzle));
         }
     if (const auto it = j.find("results"); it != j.end() && it->is_array())
-        for (const auto& r : *it) {
+        for (std::size_t i = 0; i < it->size(); ++i) {
+            const auto& r = (*it)[i];
             if (!r.is_object()) continue;
-            PuzzleSolution s;
-            s.id    = textOf(r, "id");
-            s.win   = r.value("win", false);
-            s.rated = r.value("rated", true);
-            if (!s.id.empty()) b.results.push_back(std::move(s));
+            entries.entry(fmt::format("results/{}", i + 1), [&] {
+                PuzzleSolution s;
+                s.id    = textOf(r, "id");
+                s.win   = r.value("win", false);
+                s.rated = r.value("rated", true);
+                if (!s.id.empty()) b.results.push_back(std::move(s));
+            });
         }
     if (const auto it = j.find("glicko"); it != j.end() && it->is_object())
-        b.glicko = PuzzleGlicko{it->value("rating", 0.0), it->value("deviation", 0.0), it->value("provisional", false)};
-    b.sent_at     = j.value("sent_at", int64_t{0});
-    b.sent_count  = j.value("sent_count", 0);
-    b.sent_status = j.value("sent_status", "");
+        entries.entry("glicko", [&] {
+            b.glicko =
+                PuzzleGlicko{it->value("rating", 0.0), it->value("deviation", 0.0), it->value("provisional", false)};
+        });
+    entries.entry("sent_at", [&] { b.sent_at = j.value("sent_at", int64_t{0}); });
+    entries.entry("sent_count", [&] { b.sent_count = j.value("sent_count", 0); });
+    entries.entry("sent_status", [&] { b.sent_status = j.value("sent_status", ""); });
+    entries.sayUnread();
     return b;
 }
 

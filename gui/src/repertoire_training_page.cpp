@@ -167,7 +167,7 @@ const RepertoireTrainingPage::Summary& RepertoireTrainingPage::summary(std::size
         s.cards    = study::trainingCards(e.lines, e.side);
         s.counted  = 0;
     }
-    const auto now  = epochNow();
+    const auto now  = app_.now();
     const int limit = app_.trainingSettings().new_per_day;
     if (s.counted / 60 != now / 60 || s.new_per_day != limit) {
         s.counts      = study::trainingCounts(s.cards, s.kept.memories, trainingDay(now),
@@ -353,7 +353,7 @@ void RepertoireTrainingPage::drawCard(std::size_t index) {
                 const auto* planned = plannedCards(index);
                 if (planned && !names.empty()) {
                     const auto order =
-                        study::sessionOrder(*planned, s.kept.memories, trainingDay(epochNow()), 1, false);
+                        study::sessionOrder(*planned, s.kept.memories, trainingDay(app_.now()), 1, false);
                     if (!order.empty() && (*planned)[order.front()].games > 0 &&
                         !(*planned)[order.front()].line.empty()) {
                         const auto& card = (*planned)[order.front()];
@@ -420,7 +420,7 @@ void RepertoireTrainingPage::poll() {
     if (!index) return closeTraining(false);
     const auto* cards = plannedCards(*index);
     if (!cards) return;
-    const auto day    = trainingDay(epochNow());
+    const auto day    = trainingDay(app_.now());
     const auto limit  = static_cast<std::size_t>(std::max(0, t.settings.new_per_day));
     const auto counts = study::trainingCounts(*cards, t.kept.memories, day, limit);
     std::size_t fresh = t.kind == TrainingRun::Kind::Review ? 0 : counts.today;
@@ -489,7 +489,7 @@ void RepertoireTrainingPage::trainingGrade(bool right) {
     const auto key       = t.session->cards()[i].key;
     t.seconds            = since(t.asked);
     t.rating             = study::gradeOf(right, t.hint, t.seconds);
-    const auto now       = epochNow();
+    const auto now       = app_.now();
     t.graded             = t.session->grade(t.rating, t.played, now);
     t.graded_at          = now;
     t.kept.memories[key] = t.graded.after;
@@ -1029,7 +1029,7 @@ void RepertoireTrainingPage::drawTrainingEnd() {
         else
             ++first;
     }
-    const auto day       = trainingDay(epochNow());
+    const auto day       = trainingDay(app_.now());
     std::size_t tomorrow = 0, tomorrow_all = 0;
     for (const auto& o : outcomes) {
         const auto it = t.session->memories().find(t.session->cards()[o.card].key);

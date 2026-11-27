@@ -26,10 +26,12 @@
 #include "assistant_notes.hpp"
 #include "assistant_service.hpp"
 #include "board_page.hpp"
+#include "console.hpp"
 #include "explained.hpp"
 #include "mock_engines.hpp"
 #include "pgn_store.hpp"
 #include "review_bridge.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -347,4 +349,33 @@ TEST_CASE("every move explained: a forced recapture takes back what the captures
     CHECK(word(12) == std::nullopt);
     CHECK(behindSinceTheCaptures(line, 13));
     CHECK(word(13) == std::optional<std::string>("Forced recapture."));
+}
+
+TEST_CASE("every move explained: kept explanations of the wrong types or cut short set aside and said (#136)") {
+    const test::ScratchDir dir("explained-types");
+    const auto file = dir / "abcd.en.explained.json";
+    // Its key a number (an older or newer version, a hand edit): it used to stop the program as soon as the Board
+    // showed the game's explanations.
+    const std::string written = R"({"key": 7, "lang": "en", "lines": []})";
+    std::ofstream(file, std::ios::binary) << written;
+    auto before = Console::instance().added();
+    std::optional<Explained> back;
+    REQUIRE_NOTHROW(back = loadExplained(dir, "abcd", "en"));
+    CHECK_FALSE(back);  // made again
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A line of another type: the same.
+    std::ofstream(file, std::ios::binary) << R"({"key": "abcd", "lang": "en", "lines": [{"from": "one"}]})";
+    before = Console::instance().added();
+    CHECK_FALSE(loadExplained(dir, "abcd", "en"));
+    CHECK(Console::instance().since(before).size() == 1);
+    // Cut short: kept aside, said.
+    std::ofstream(file, std::ios::binary) << R"({"key": "abcd", "lang": "en", "lin)";
+    before = Console::instance().added();
+    CHECK_FALSE(loadExplained(dir, "abcd", "en"));
+    said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable3")));
 }

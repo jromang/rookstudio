@@ -557,7 +557,7 @@ void GuessPage::finishGuess(bool stopped) {
     app_.replaySessionGame(g.game, std::min<int>(g.ply, static_cast<int>(g.game.moves.size())), g.chess960);
     if (g.guesses.empty()) return;
     GuessRecord r;
-    r.at    = epochNow();
+    r.at    = app_.now();
     r.title = g.title;
     r.white = g.side == chess::Color::WHITE;
     for (const auto& x : g.guesses) {

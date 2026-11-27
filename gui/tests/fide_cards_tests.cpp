@@ -4,13 +4,17 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
+#include <json.hpp>
 
 #include "answering_server.hpp"
+#include "console.hpp"
 #include "fide_cards.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
@@ -143,4 +147,49 @@ TEST_CASE("FIDE cards: each failure of Lichess's answers told by its kind") {
     std::atomic<bool> cancel{true};
     CHECK(fidePlayer(1503014, &cancel).net == NetError::Cancelled);
     CHECK(fideSearch("Carlsen", &cancel).net == NetError::Cancelled);
+}
+
+TEST_CASE("FIDE cards: a card of the wrong type set aside, the others kept, said; a cache cut short too (#136)") {
+    const test::ScratchDir profile("fide-cards-types");
+    const auto file = profile / "lichess-cache" / "fide.json";
+    {
+        FideCards cards(file);
+        FideCard c;
+        c.id       = 1503014;
+        c.name     = "Carlsen, Magnus";
+        c.standard = 2830;
+        c.asked    = 1795000000;
+        cards.keep(c, "Carlsen,M");
+        FideCard other;
+        other.id    = 42;
+        other.name  = "Somebody";
+        other.asked = 1795000000;
+        cards.keep(other);
+        cards.save();
+    }
+    // When it was asked as a text (an older or newer version, a hand edit): it used to stop the program as soon as a
+    // page read the cards.
+    auto j = nlohmann::json::parse(test::readFile(file));
+    for (auto& card : j["cards"])
+        if (card["id"] == 42) card["asked"] = "yesterday";
+    const auto written = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    std::optional<FideCards> back;
+    REQUIRE_NOTHROW(back.emplace(file));
+    REQUIRE(back->byName("Carlsen,M"));
+    CHECK(back->byName("Carlsen,M")->standard == 2830);
+    CHECK(back->byId(42) == nullptr);  // asked of Lichess again when it is wanted
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("1 entry could not be read and was set aside") != std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A cache cut short: kept aside, said.
+    std::ofstream(file, std::ios::binary) << "{\"cards\": [{\"id\": 15030";
+    const auto cut = Console::instance().added();
+    CHECK(FideCards(file).byId(1503014) == nullptr);
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

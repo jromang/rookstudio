@@ -11,6 +11,7 @@
 #include <commentary/writing.hpp>
 #include <tour/files.hpp>
 
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -223,10 +224,11 @@ bool saveExplained(const std::filesystem::path& dir, const Explained& e) {
 
 std::optional<Explained> loadExplained(const std::filesystem::path& dir, const std::string& key,
                                        const std::string& lang) {
-    const auto j = readJson<nlohmann::json>(dir / (key + "." + lang + ".explained.json"));
-    if (!j || !j->is_object() || j->value("key", std::string()) != key || j->value("lang", std::string()) != lang)
-        return std::nullopt;
+    const auto file = dir / (key + "." + lang + ".explained.json");
+    const auto j    = readProfileJson(file);  // cut short: kept aside and said
+    if (!j) return std::nullopt;
     try {
+        if (j->value("key", std::string()) != key || j->value("lang", std::string()) != lang) return std::nullopt;
         Explained e;
         e.key         = key;
         e.lang        = lang;
@@ -252,6 +254,9 @@ std::optional<Explained> loadExplained(const std::filesystem::path& dir, const s
         }
         return e;
     } catch (const std::exception&) {
+        // A value of another type than written (another version, a hand edit, #136): the explanations are made again,
+        // the file as it was kept aside and said.
+        sayUnreadableFile(file);
         return std::nullopt;
     }
 }

@@ -10,7 +10,9 @@
 #include <study/fsrs_json.hpp>
 #include <tour/files.hpp>
 
+#include "console.hpp"
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -285,46 +287,67 @@ void PuzzleRecord::add(const PuzzleResult& result) {
 
 PuzzleRecord readPuzzleRecord(const fs::path& folder) {
     PuzzleRecord out;
-    if (const auto j = readJsonFile(folder / "rating.json")) {
-        PuzzleRating r;
-        r.glicko.rating     = j->value("rating", 1500.0);
-        r.glicko.deviation  = j->value("deviation", 350.0);
-        r.glicko.volatility = j->value("volatility", 0.06);
-        r.games             = j->value("games", 0);
-        r.from              = j->value("from", "default");
-        r.last              = j->value("last", int64_t{0});
-        out.rating          = r;
+    // Each file read with its types checked (#136): a value of another type than the one written (another version, a
+    // hand edit) is set aside, the readable ones kept, said in the console with the file as it was kept beside it; a
+    // file cut short is kept aside and said rather than replaced in silence by the next save.
+    if (const auto j = readProfileJson(folder / "rating.json")) {
+        ProfileEntries entries(folder / "rating.json");
+        PuzzleRating r;  // what does not read keeps a new player's value
+        entries.entry("rating", [&] { r.glicko.rating = j->value("rating", 1500.0); });
+        entries.entry("deviation", [&] { r.glicko.deviation = j->value("deviation", 350.0); });
+        entries.entry("volatility", [&] { r.glicko.volatility = j->value("volatility", 0.06); });
+        entries.entry("games", [&] { r.games = j->value("games", 0); });
+        entries.entry("from", [&] { r.from = j->value("from", "default"); });
+        entries.entry("last", [&] { r.last = j->value("last", int64_t{0}); });
+        out.rating = r;
+        entries.sayUnread();
     }
     {
-        forEachJsonLine(folder / "results.jsonl", [&](const nlohmann::json& j) {
-            PuzzleResult r;
-            r.id     = j.value("id", "");
-            r.at     = j.value("at", int64_t{0});
-            r.win    = j.value("win", false);
-            r.rating = j.value("rating", 0);
-            r.before = j.value("before", 0.0);
-            r.after  = j.value("after", 0.0);
-            r.ms     = j.value("ms", int64_t{0});
-            r.online = j.value("online", false);
-            r.review = j.value("review", false);
-            if (const auto it = j.find("themes"); it != j.end() && it->is_array())
-                for (const auto& t : *it)
-                    if (t.is_string()) r.themes.push_back(t.get<std::string>());
-            if (!r.id.empty()) out.add(r);
+        // A line of another type, or cut short by a crash, is left out and said; the file, only added to, keeps it.
+        const auto file   = folder / "results.jsonl";
+        std::size_t wrong = 0;
+        const auto cut    = forEachJsonLine(file, [&](const nlohmann::json& j) {
+            try {
+                PuzzleResult r;
+                r.id     = j.value("id", "");
+                r.at     = j.value("at", int64_t{0});
+                r.win    = j.value("win", false);
+                r.rating = j.value("rating", 0);
+                r.before = j.value("before", 0.0);
+                r.after  = j.value("after", 0.0);
+                r.ms     = j.value("ms", int64_t{0});
+                r.online = j.value("online", false);
+                r.review = j.value("review", false);
+                if (const auto it = j.find("themes"); it != j.end() && it->is_array())
+                    for (const auto& t : *it)
+                        if (t.is_string()) r.themes.push_back(t.get<std::string>());
+                if (!r.id.empty()) out.add(r);
+            } catch (const std::exception&) {
+                ++wrong;
+            }
         });
+        if (const auto unread = wrong + cut; unread > 0)
+            Console::instance().add(
+                trn("{}: {} line could not be read and was left out",
+                    "{}: {} lines could not be read and were left out", unread, file.string(), unread),
+                true);
     }
-    if (const auto j = readJsonFile(folder / "review.json")) {
+    if (const auto j = readProfileJson(folder / "review.json")) {
+        ProfileEntries entries(folder / "review.json");
         if (const auto cards = j->find("cards"); cards != j->end() && cards->is_object()) {
             for (const auto& [id, c] : cards->items()) {
                 if (!c.is_object()) continue;
-                PuzzleCard card;
-                card.puzzle = puzzleOf(c.value("puzzle", nlohmann::json::object()));
-                if (card.puzzle.id.empty()) card.puzzle.id = id;
-                card.since = c.value("since", int64_t{0});
-                card.card  = c.get<study::fsrs::Card>();  // its fields among the puzzle's
-                if (card.puzzle.moves.size() >= 2) out.cards[id] = std::move(card);
+                entries.entry("cards/" + id, [&] {
+                    PuzzleCard card;
+                    card.puzzle = puzzleOf(c.value("puzzle", nlohmann::json::object()));
+                    if (card.puzzle.id.empty()) card.puzzle.id = id;
+                    card.since = c.value("since", int64_t{0});
+                    card.card  = c.get<study::fsrs::Card>();  // its fields among the puzzle's
+                    if (card.puzzle.moves.size() >= 2) out.cards[id] = std::move(card);  // read whole first
+                });
             }
         }
+        entries.sayUnread();
     }
     return out;
 }

@@ -1,5 +1,6 @@
 #include "profile_entries.hpp"
 
+#include <fstream>
 #include <optional>
 #include <system_error>
 
@@ -49,6 +50,18 @@ void sayUnreadableFile(const fs::path& file) {
     Console::instance().add(aside ? trf("{} could not be read: kept as {}", file.string(), aside->string())
                                   : trf("{} could not be read", file.string()),
                             true);
+}
+
+std::optional<nlohmann::json> readProfileJson(const fs::path& file, nlohmann::json::value_t type) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in) return std::nullopt;
+    auto j = nlohmann::json::parse(in, nullptr, false);
+    in.close();  // let go before it is copied aside
+    if (j.is_discarded() || j.type() != type) {
+        sayUnreadableFile(file);
+        return std::nullopt;
+    }
+    return j;
 }
 
 }  // namespace fcg

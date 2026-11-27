@@ -44,6 +44,7 @@
 #include "lichess_api.hpp"
 #include "lichess_settings.hpp"
 #include "mistakes.hpp"
+#include "noon_clock.hpp"
 #include "online_cache.hpp"
 #include "puzzles.hpp"
 #include "scripted_server.hpp"
@@ -88,6 +89,7 @@ class FakeApp final : public EndgamesContext {
     DatabaseShelf& shelf() override { return shelf_; }
     void toast(const std::string& text) override { toasts.push_back(text); }
     JobGroup& jobs() override { return jobs_; }
+    int64_t now() const override { return clock_.now(); }  // noon: far from the training day's end
 
     // The Board taken by a session: what it was before, as the test made it, given back at the end.
     std::string sessionLock() const override { return live_game ? "Locked" : ""; }
@@ -205,6 +207,7 @@ class FakeApp final : public EndgamesContext {
    private:
     fs::path profile_;
     JobGroup jobs_;
+    fcg::test::NoonClock clock_;
     DatabaseShelf shelf_;  // after its jobs: gone before them
     TrainingSettings settings_;
     SyzygyDownload::State held_;

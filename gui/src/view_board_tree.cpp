@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -26,6 +27,7 @@
 #include "keyboard.hpp"
 #include "notation_view.hpp"
 #include "portable.hpp"
+#include "profile_entries.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
 
@@ -173,47 +175,52 @@ void App::saveRecentGames() const {
 
 void App::loadRecentGames() {
     if (options_.scripted) return;
-    std::ifstream in(storage_.root() / "recent.json", std::ios::binary);
-    if (!in) return;
-    nlohmann::json all;
-    try {
-        all = nlohmann::json::parse(in);
-    } catch (const std::exception&) {
-        return;  // a file cut short: the games of the session before are let go
-    }
-    if (!all.is_array()) return;
-    for (const auto& j : all) {
-        if (!j.is_object()) continue;
-        const auto read = study::readPgnGame(j.value("pgn", std::string()));
-        if (!read.tree) continue;
+    // Read game by game, the types checked (#136): a game written with a value of another type (by another version, by
+    // hand) is set aside and said, the others kept; a file cut short is copied aside and said.
+    const auto file = storage_.root() / "recent.json";
+    const auto all  = readProfileJson(file, nlohmann::json::value_t::array);
+    if (!all) return;
+    ProfileEntries entries(file);
+    for (std::size_t i = 0; i < all->size(); ++i) {
+        const auto& j = (*all)[i];
         RecentGame r;
-        r.title    = j.value("title", std::string());
-        r.where    = j.value("where", std::string());
-        r.tree     = *read.tree;
-        r.line     = j.value("line", -1);
-        r.ply      = j.value("ply", 0);
-        r.chess960 = j.value("chess960", read.chess960);
-        if (const auto c = j.find("changes"); c != j.end() && c->is_object()) {
-            r.changes.count    = c->value("count", 0);
-            r.changes.lost     = c->value("lost", false);
-            r.changes.saved_in = c->value("saved_in", std::string());
-        }
-        if (const auto o = j.find("origin"); o != j.end() && o->is_object()) {
-            BoardOrigin origin;
-            origin.folder = std::filesystem::path(portable::resolved(o->value("folder", std::string())));
-            origin.name   = o->value("name", std::string());
-            origin.linked = o->value("linked", false);
-            origin.id     = o->value("id", study::GameId{0});
-            r.origin      = std::move(origin);
-        }
-        if (const auto sent = j.find("sent"); sent != j.end()) {
-            r.sent = lichess::sentOf(*sent);
-            if (const auto c = j.find("since_sent"); r.sent && c != j.end() && c->is_object()) {
-                r.since_sent.count = c->value("count", 0);
-                r.since_sent.lost  = c->value("lost", false);
+        bool current = false;
+        bool kept    = false;
+        entries.entry(fmt::format("#{}", i + 1), [&] {
+            if (!j.is_object()) throw std::runtime_error("not an object");
+            const auto read = study::readPgnGame(j.value("pgn", std::string()));
+            if (!read.tree) return;  // a game that does not read: let go, as before
+            r.title    = j.value("title", std::string());
+            r.where    = j.value("where", std::string());
+            r.tree     = *read.tree;
+            r.line     = j.value("line", -1);
+            r.ply      = j.value("ply", 0);
+            r.chess960 = j.value("chess960", read.chess960);
+            if (const auto c = j.find("changes"); c != j.end() && c->is_object()) {
+                r.changes.count    = c->value("count", 0);
+                r.changes.lost     = c->value("lost", false);
+                r.changes.saved_in = c->value("saved_in", std::string());
             }
-        }
-        if (j.value("current", false) && !boardHasGame(board_)) {
+            if (const auto o = j.find("origin"); o != j.end() && o->is_object()) {
+                BoardOrigin origin;
+                origin.folder = std::filesystem::path(portable::resolved(o->value("folder", std::string())));
+                origin.name   = o->value("name", std::string());
+                origin.linked = o->value("linked", false);
+                origin.id     = o->value("id", study::GameId{0});
+                r.origin      = std::move(origin);
+            }
+            if (const auto sent = j.find("sent"); sent != j.end()) {
+                r.sent = lichess::sentOf(*sent);
+                if (const auto c = j.find("since_sent"); r.sent && c != j.end() && c->is_object()) {
+                    r.since_sent.count = c->value("count", 0);
+                    r.since_sent.lost  = c->value("lost", false);
+                }
+            }
+            current = j.value("current", false);
+            kept    = true;
+        });
+        if (!kept) continue;
+        if (current && !boardHasGame(board_)) {
             // The game the board showed, on it again, the page shown at the start kept.
             const auto page = page_;
             recent_games_.push_front(std::move(r));
@@ -224,6 +231,7 @@ void App::loadRecentGames() {
             recent_games_.push_back(std::move(r));
         }
     }
+    entries.sayUnread();
 }
 
 void App::restoreRecentGame(std::size_t index) {
@@ -750,6 +758,7 @@ void App::drawBoardTree() {
             fmt::format("dossier{}|{}|{}", static_cast<const void*>(dossier), dossier->games.size(), dossier_->lichess);
     const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
     if (!online && of != tree_rows_of_) {
+        tree_unread_  = false;
         tree_rows_of_ = of;
         tree_rows_.clear();
         tree_summary_.clear();
@@ -765,29 +774,27 @@ void App::drawBoardTree() {
             // One database's answer, or those of all, added move by move (a move's code is the position's own).
             std::optional<study::TreeAnswer> answer;
             std::map<int, std::string> shares;
-            if (dossier_source)  // their games alone, from their side: the board's and, ticked, Lichess's
+            std::string unread;    // a tree that could not be read (#139): said on the summary's line
+            if (dossier_source) {  // their games alone, from their side: the board's and, ticked, Lichess's
                 answer = dossier->at(scan.key(), tree_source_ == dossier_at,
                                      dossier_->lichess ? study::DossierParts::Both : study::DossierParts::Board);
-            for (const auto& [name, i] : databases) {
-                if (dossier_source) break;
-                if (!combined && static_cast<int>(i) != tree_db_) continue;
-                if (combined && tree_left_.count(s.entries()[i].folder)) continue;
-                const auto source = s.treeSource(i);
-                const auto one =
-                    source && source->tree ? source->tree->at(*source->snapshot, scan.key()) : std::nullopt;
-                if (!one) continue;
-                if (!answer) answer.emplace();
-                answer->total.add(one->total);
-                for (const auto& m : one->moves) {
-                    auto at = std::find_if(answer->moves.begin(), answer->moves.end(),
-                                           [&](const study::TreeMove& t) { return t.code == m.code; });
-                    if (at == answer->moves.end()) at = answer->moves.insert(answer->moves.end(), {m.code, {}});
-                    at->stats.add(m.stats);
-                    if (combined) {
-                        auto& text = shares[m.code];
-                        text += (text.empty() ? "" : "\n") + fmt::format("{}: {}", name, ui::exactCount(m.stats.games));
-                    }
+            } else {
+                std::vector<DatabaseShelf::TreeSource> trees;
+                for (const auto& [name, i] : databases) {
+                    if (!combined && static_cast<int>(i) != tree_db_) continue;
+                    if (combined && tree_left_.count(s.entries()[i].folder)) continue;
+                    if (auto source = s.treeSource(i); source && source->tree) trees.push_back(std::move(*source));
                 }
+                auto read    = treesAt(trees, scan.key());
+                answer       = std::move(read.answer);
+                unread       = std::move(read.error);
+                tree_unread_ = !unread.empty();
+                if (combined)
+                    for (const auto& [code, games] : read.by_database)
+                        for (const auto& [name, n] : games) {
+                            auto& text = shares[code];
+                            text += (text.empty() ? "" : "\n") + fmt::format("{}: {}", name, ui::exactCount(n));
+                        }
             }
             if (answer)
                 std::stable_sort(answer->moves.begin(), answer->moves.end(),
@@ -805,6 +812,7 @@ void App::drawBoardTree() {
                     tree_summary_ +=
                         trf(" · White {} % · draws {} % · Black {} %", std::lround(100.0 * t.white / decided),
                             std::lround(100.0 * t.draws / decided), std::lround(100.0 * t.black / decided));
+                if (!unread.empty()) tree_summary_ += "\n" + unread;  // the other databases' games counted
                 for (const auto& m : answer->moves) {
                     if (m.code == study::TreeMove::END) continue;
                     const auto move = study::moveOfCode(board, scan, m.code);
@@ -835,9 +843,10 @@ void App::drawBoardTree() {
                     tree_rows_.push_back(std::move(row));
                 }
             } else {
-                tree_summary_ = dossier_source ? TR("None of their games reaches this position.")
-                                : combined     ? TR("No two games of these databases reach this position.")
-                                               : TR("No two games of this database reach this position.");
+                tree_summary_ = !unread.empty()  ? unread
+                                : dossier_source ? TR("None of their games reaches this position.")
+                                : combined       ? TR("No two games of these databases reach this position.")
+                                                 : TR("No two games of this database reach this position.");
             }
         } else if (tree_ctg_) {
             // A CTG book (#68, mockup M10, board 3): the games behind each move, its colour and its symbol; green
@@ -936,7 +945,7 @@ void App::drawBoardTree() {
         ImGui::TextUnformatted(tree_summary_.c_str());
         ImGui::PopTextWrapPos();
     }
-    if (tree_db_ >= 0) drawTreeNovelty(static_cast<std::size_t>(tree_db_));
+    if (tree_db_ >= 0 && !tree_unread_) drawTreeNovelty(static_cast<std::size_t>(tree_db_));  // a damaged tree: none
     // Lichess's players: each move's games month by month, when asked for (#56).
     const bool lichess_players = online && tree_source_ - lichess_at == 1;
     if (lichess_players) {
@@ -1247,7 +1256,14 @@ void App::drawTreeNovelty(std::size_t index) {
             scan.play(*move);
             board.makeMove<false>(m);
         }
-        tree_novelty_.ply = src->tree->novelty(*src->snapshot, start, codes);
+        try {
+            tree_novelty_.ply = src->tree->novelty(*src->snapshot, start, codes);
+        } catch (const std::exception& e) {
+            // A tree that does not read (#139: its records damaged): no novelty said, why on its line and in the log;
+            // read again at another position.
+            tree_novelty_.error = loggedStoreError(
+                trf("Where the game's line leaves “{}” could not be read: {}.", src->name, storeErrorText(e)), e);
+        }
         if (tree_novelty_.ply && *tree_novelty_.ply <= path->size()) {
             // The position after it: no game of the database reaches it, unless a single one by other moves.
             study::ScanBoard after;
@@ -1260,6 +1276,11 @@ void App::drawTreeNovelty(std::size_t index) {
         }
     }
     auto& n = tree_novelty_;
+    if (!n.error.empty()) {
+        const ui::TextWrap wrap;
+        ImGui::TextUnformatted(n.error.c_str());
+        return;
+    }
     if (!n.ply || *n.ply > path->size()) return;
     if (n.search && n.search->done()) {
         if (const auto error = n.search->error()) {

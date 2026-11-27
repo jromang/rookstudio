@@ -41,6 +41,7 @@
 #include "jobs.hpp"
 #include "lichess_account.hpp"
 #include "lichess_puzzles.hpp"
+#include "noon_clock.hpp"
 #include "puzzles.hpp"
 #include "puzzles_page.hpp"
 #include "scripted_server.hpp"
@@ -69,6 +70,7 @@ class FakeApp final : public PuzzlesContext {
     DatabaseShelf& shelf() override { return shelf_; }
     void toast(const std::string& text) override { toasts.push_back(text); }
     JobGroup& jobs() override { return jobs_; }
+    int64_t now() const override { return clock_.now(); }  // noon: far from the training day's end
 
     // The Board taken by a session: what it was before, as the test made it, given back at the end.
     std::string sessionLock() const override { return live_game ? "Locked" : ""; }
@@ -161,6 +163,7 @@ class FakeApp final : public PuzzlesContext {
    private:
     fs::path profile_;
     JobGroup jobs_;
+    fcg::test::NoonClock clock_;
     DatabaseShelf shelf_;  // after its jobs: gone before them
     TrainingSettings settings_;
     lichess::Failure link_error_;

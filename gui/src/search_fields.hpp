@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -79,5 +80,9 @@ void setPattern(SearchFields& fields, const study::Pattern& pattern);
 // search kept by preview 1 has its pattern's men alone.
 [[nodiscard]] nlohmann::json keptSearchJson(const KeptSearch& kept);
 [[nodiscard]] KeptSearch keptSearchFrom(const nlohmann::json& json);
+// The searches a searches.json keeps, each read with its types checked (#136): one with a value of another type than
+// written (another version, a hand edit) is set aside and the others kept, said in the console with the file as it was
+// kept beside it; a file cut short is kept aside and said. None when there is no file.
+[[nodiscard]] std::vector<KeptSearch> readKeptSearches(const std::filesystem::path& file);
 
 }  // namespace fcg

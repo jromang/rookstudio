@@ -310,8 +310,18 @@ void App::pollQuestions() {
     pollExplained();  // every move explained (#94)
     pollVisit();      // the guided visit (#94)
     pollStory();
-    for (auto& q : questions_)
-        if (isReady(q.answer)) q.done = q.answer.get();
+    for (auto& q : questions_) {
+        if (!isReady(q.answer)) continue;
+        try {
+            q.done = q.answer.get();
+        } catch (const std::exception& e) {
+            // A database's tree that cannot be read (#139: its records damaged): said on the question's card and in
+            // the log.
+            QuestionResult failed;
+            failed.error = loggedStoreError(trf("The question could not be answered: {}.", storeErrorText(e)), e);
+            q.done       = std::move(failed);
+        }
+    }
 }
 
 void App::leaveQuestions() {

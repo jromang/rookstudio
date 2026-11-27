@@ -9,6 +9,7 @@
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -23,6 +24,7 @@
 #include <study/game.hpp>
 
 #include "app_context.hpp"
+#include "console.hpp"
 #include "databases.hpp"
 #include "focus_words.hpp"
 #include "free_ports.hpp"
@@ -430,4 +432,37 @@ TEST_CASE("Lichess TV's module without App: the Board's game kept at its end, th
                                [](const auto& g) { return g.url == "https://lichess.org/game0021"; });
         }));
     }
+}
+
+TEST_CASE("Lichess TV's module without App: a game kept of the wrong type set aside and said; cut short too (#136)") {
+    FakeLichess lichess({});  // nothing asked of lichess.org
+    REQUIRE(lichess.ok());
+    const ScratchDir profile("tv-kept-types");
+    const auto file = profile / "lichess-tv.json";
+    // A game kept whose id is a number (an older or newer version, a hand edit): it used to stop the program as soon as
+    // the module read the games kept.
+    const std::string written = R"({"kept": [{"id": 7, "title": "A – B", "folder": "x", "base": "TV"},)"
+                                R"( {"id": "game0003", "title": "Player_E – Player_F", "folder": "y", "base": "TV"}]})";
+    std::ofstream(file, std::ios::binary) << written;
+    FakeApp app(profile);
+    auto before = Console::instance().added();
+    {
+        LichessTvPage tv(app);
+        REQUIRE_NOTHROW(tv.poll());
+    }
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("1 entry could not be read and was set aside (kept/1)") != std::string::npos);
+    CHECK(readFile(std::filesystem::path(file).concat(".unreadable")) == written);
+    // Cut short: kept aside, said.
+    std::ofstream(file, std::ios::binary) << R"({"kept": [{"id": "game0)";
+    before = Console::instance().added();
+    {
+        LichessTvPage tv(app);
+        REQUIRE_NOTHROW(tv.poll());
+    }
+    said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(std::filesystem::exists(std::filesystem::path(file).concat(".unreadable2")));
 }

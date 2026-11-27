@@ -15,7 +15,8 @@
 // user's names, the analysis engine, the games reviewed in the background, the repertoires' positions, the games opened
 // on the Board from a session, the Board's own game, the Syzygy tables of the disk and their download, the Play page's
 // opponent, the Openings page and its repertoires, the user's correspondence games on Lichess, the Board as the
-// repertoires' training asks on it, the views and the pages offered once, the Training page among the program's pages.
+// repertoires' training asks on it, the views and the pages offered once, the Training page among the program's pages,
+// the clock the training is scheduled by.
 // A module's context is the facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext, MistakesContext,
 // GuessContext, EndgamesContext, VisionContext, RepertoireTrainingContext, TrainingPageContext); App answers them all
 // (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of the module it builds, with a fake of
@@ -685,6 +686,17 @@ class TrainingPlace {
     [[nodiscard]] virtual bool boardGamePlayed() const   = 0;
 };
 
+// The clock the training is scheduled by (#138): what is due, the day's review, a card's next date. The training day
+// ends at 4 a.m. local time (trainingDayEnd()), so a test gives a clock of its own, far from that hour: none depends on
+// the hour it runs at.
+class Clock {
+   public:
+    virtual ~Clock() = default;
+
+    // Now, in seconds since the epoch: the system's (epochNow()) for the program.
+    [[nodiscard]] virtual int64_t now() const = 0;
+};
+
 }  // namespace context
 
 // What Lichess TV asks of the program (lichess_tv_page.hpp).
@@ -716,6 +728,7 @@ class BotContext : public virtual context::Program,
 
 // What the puzzles ask of the program (puzzles_page.hpp).
 class PuzzlesContext : public virtual context::Program,
+                       public virtual context::Clock,
                        public virtual context::SessionBoard,
                        public virtual context::Training,
                        public virtual context::Mistakes,
@@ -726,6 +739,7 @@ class PuzzlesContext : public virtual context::Program,
 
 // What the user's mistakes as exercises ask of the program (mistakes_page.hpp).
 class MistakesContext : public virtual context::Program,
+                        public virtual context::Clock,
                         public virtual context::SessionBoard,
                         public virtual context::Training,
                         public virtual context::FairPlay,
@@ -737,6 +751,7 @@ class MistakesContext : public virtual context::Program,
 
 // What guessing the moves of a game asks of the program (guess_page.hpp).
 class GuessContext : public virtual context::Program,
+                     public virtual context::Clock,
                      public virtual context::SessionBoard,
                      public virtual context::SessionReplay,
                      public virtual context::Training,
@@ -746,6 +761,7 @@ class GuessContext : public virtual context::Program,
 
 // What the endgames against the tables and the mates ask of the program (endgames_page.hpp).
 class EndgamesContext : public virtual context::Program,
+                        public virtual context::Clock,
                         public virtual context::SessionBoard,
                         public virtual context::Training,
                         public virtual context::FairPlay,
@@ -764,6 +780,7 @@ class VisionContext : public virtual context::Program,
 
 // What the repertoires' training asks of the program (repertoire_training_page.hpp).
 class RepertoireTrainingContext : public virtual context::Program,
+                                  public virtual context::Clock,
                                   public virtual context::SessionBoard,
                                   public virtual context::QuestionBoard,
                                   public virtual context::Training,

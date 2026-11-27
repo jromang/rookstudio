@@ -302,7 +302,7 @@ void PuzzlesPage::poll() {
             b.angle      = angle;
             b.difficulty = difficultyKey(puzzles_difficulty_);
             b.rated      = onlineBatch() ? onlineBatch()->rated : true;
-            b.received   = epochNow();
+            b.received   = app_.now();
             b.puzzles    = std::move(answer.value->puzzles);
             b.glicko     = answer.value->glicko;
             if (const auto* old = onlineBatch()) {  // what the last send said stays shown
@@ -329,10 +329,10 @@ void PuzzlesPage::poll() {
             b.angle       = batch->angle;
             b.difficulty  = batch->difficulty;
             b.rated       = batch->rated;
-            b.received    = epochNow();
+            b.received    = app_.now();
             b.puzzles     = std::move(answer.value->next.puzzles);
             b.glicko      = answer.value->next.glicko ? answer.value->next.glicko : batch->glicko;
-            b.sent_at     = epochNow();
+            b.sent_at     = app_.now();
             b.sent_count  = static_cast<int>(count);
             b.sent_status = "accepted";
             online_batch_ = std::move(b);
@@ -367,7 +367,7 @@ void PuzzlesPage::poll() {
 ReviewCount PuzzlesPage::reviewCount() {
     ReviewCount out;
     out.kind       = ReviewKind::Puzzles;
-    const auto day = trainingDay(epochNow());
+    const auto day = trainingDay(app_.now());
     const auto& r  = puzzleRecord();
     out.due        = cardsDue(r.cards, day.end);
     out.tomorrow   = cardsDue(r.cards, day.end + study::fsrs::DAY) - out.due;
@@ -534,7 +534,7 @@ void PuzzlesPage::startPuzzles() {
 
 bool PuzzlesPage::startReview() {
     if (!puzzleLock().empty()) return false;
-    const auto day = trainingDay(epochNow());
+    const auto day = trainingDay(app_.now());
     auto run       = std::make_unique<PuzzleRun>();
     run->source    = PuzzleRun::Source::Review;
     run->title     = TR("Puzzles to review");
@@ -630,7 +630,7 @@ void PuzzlesPage::puzzleGrade(bool win) {
     auto& p             = *puzzle_;
     const auto& puzzle  = p.puzzles[p.current];
     p.seconds           = since(p.asked);
-    const auto now      = epochNow();
+    const auto now      = app_.now();
     auto& record        = puzzleRecord();
     const bool scripted = app_.scripted();  // a run for screenshots leaves the profile as it was
     PuzzleResult result;
@@ -1065,7 +1065,7 @@ void PuzzlesPage::drawPuzzleColumn() {
                 after = TR("Its result goes to Lichess at the batch's end.");
             else
                 after = p.next_again ? std::string(TR("Asked again in this series, then tomorrow."))
-                                     : trf("Next review {}.", whenText(p.next_review - epochNow()));
+                                     : trf("Next review {}.", whenText(p.next_review - app_.now()));
             if (!puzzle.themes.empty()) after += " · " + trf("themes: {}", themesText(puzzle.themes));
             wrapped(after, true);
             if (primaryButton(TR("Next"))) puzzleNext();
@@ -1114,7 +1114,7 @@ void PuzzlesPage::drawPuzzleColumn() {
                         "today”.");
                 else
                     what = p.next_again ? std::string(TR("Asked again in this series, then tomorrow."))
-                                        : trf("Next review {}.", whenText(p.next_review - epochNow()));
+                                        : trf("Next review {}.", whenText(p.next_review - app_.now()));
                 wrapped(what, true);
             }
             if (!p.shown) {
@@ -1375,7 +1375,7 @@ void PuzzlesPage::drawChooser(bool& enter) {
     // as puzzle themes, come first.
     std::vector<std::pair<std::string, std::size_t>> said;
     {
-        const auto month = packedDaysBefore(epochNow(), 30);
+        const auto month = packedDaysBefore(app_.now(), 30);
         std::map<std::string, std::size_t> kinds;
         for (const auto& [kind, n] : app_.mistakeKinds(month))
             if (!mistakeKindTheme(kind).empty()) kinds[kind] = n;

@@ -758,7 +758,7 @@ void App::drawBoardTree() {
             fmt::format("dossier{}|{}|{}", static_cast<const void*>(dossier), dossier->games.size(), dossier_->lichess);
     const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
     if (!online && of != tree_rows_of_) {
-        tree_unread_  = false;
+        tree_unread_  = {};
         tree_rows_of_ = of;
         tree_rows_.clear();
         tree_summary_.clear();
@@ -787,8 +787,8 @@ void App::drawBoardTree() {
                 }
                 auto read    = treesAt(trees, scan.key());
                 answer       = std::move(read.answer);
-                unread       = std::move(read.error);
-                tree_unread_ = !unread.empty();
+                unread       = read.error.said;
+                tree_unread_ = std::move(read.error);
                 if (combined)
                     for (const auto& [code, games] : read.by_database)
                         for (const auto& [name, n] : games) {
@@ -945,7 +945,8 @@ void App::drawBoardTree() {
         ImGui::TextUnformatted(tree_summary_.c_str());
         ImGui::PopTextWrapPos();
     }
-    if (tree_db_ >= 0 && !tree_unread_) drawTreeNovelty(static_cast<std::size_t>(tree_db_));  // a damaged tree: none
+    if (tree_db_ >= 0 && tree_unread_.empty())
+        drawTreeNovelty(static_cast<std::size_t>(tree_db_));  // a damaged tree: none
     // Lichess's players: each move's games month by month, when asked for (#56).
     const bool lichess_players = online && tree_source_ - lichess_at == 1;
     if (lichess_players) {
@@ -1261,7 +1262,7 @@ void App::drawTreeNovelty(std::size_t index) {
         } catch (const std::exception& e) {
             // A tree that does not read (#139: its records damaged): no novelty said, why on its line and in the log;
             // read again at another position.
-            tree_novelty_.error = loggedStoreError(
+            tree_novelty_.error = loggedStoreFailure(
                 trf("Where the game's line leaves “{}” could not be read: {}.", src->name, storeErrorText(e)), e);
         }
         if (tree_novelty_.ply && *tree_novelty_.ply <= path->size()) {
@@ -1278,7 +1279,7 @@ void App::drawTreeNovelty(std::size_t index) {
     auto& n = tree_novelty_;
     if (!n.error.empty()) {
         const ui::TextWrap wrap;
-        ImGui::TextUnformatted(n.error.c_str());
+        ImGui::TextUnformatted(n.error.said.c_str());
         return;
     }
     if (!n.ply || *n.ply > path->size()) return;

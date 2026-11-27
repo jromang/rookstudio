@@ -317,7 +317,7 @@ bool GuessPage::startGuessRandom() {
     const auto index = static_cast<std::size_t>(guess_source_);
     const auto db    = s.open(index);
     if (!db) {
-        guess_error_ = trf("“{}” cannot be opened: {}", s.entries()[index].name, s.facts(index).error);
+        guess_error_ = trf("“{}” cannot be opened: {}", s.entries()[index].name, s.facts(index).error.said);
         return false;
     }
     auto filter      = quickFilter(guess_words_.data());

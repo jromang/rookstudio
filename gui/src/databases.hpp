@@ -27,6 +27,7 @@
 #include <study/tree.hpp>
 
 #include "jobs.hpp"
+#include "store_failure.hpp"
 
 namespace fcg {
 
@@ -46,7 +47,7 @@ struct DatabaseFacts {
     bool tree      = false;  // its opening tree covers its games
     bool read_only = false;  // another program writes to it: read as it commits, nothing written here
     std::time_t changed = 0;      // its last commit (an import, a game saved), from its manifest; 0 when not known
-    std::string error;            // why it could not be opened
+    StoreFailure error;           // why it could not be opened, with the store's code
     // The games of its segments that could not be read when it was opened (#97): left out of `games`, its
     // maintenance's check says what to do with them.
     uint64_t unreadable = 0;
@@ -78,6 +79,10 @@ struct DamageSummary {
 // A store's error that one of the window's jobs received: `said`, the page's sentence for it (storeErrorText()'s words
 // in it), returned and added to the log, the store's own text (its details) after it when those words replaced it.
 std::string loggedStoreError(std::string said, const std::exception& e);
+// The same kept with the error's code (store_failure.hpp), for a page that says it and offers what repairs it.
+[[nodiscard]] StoreFailure loggedStoreFailure(std::string said, const std::exception& e);
+// storeErrorText()'s words for `e`, with its code: a job's, put in a sentence later.
+[[nodiscard]] StoreFailure storeFailureOf(const std::exception& e);
 
 // The quick filter of a game list, its words typed freely: a year (2024), an ECO code or its start (B90, B9, B), a
 // result (1-0, 0-1, 1/2 or ½) are told apart, the other words are looked for in the players, the event and the site.
@@ -190,7 +195,7 @@ class DatabaseShelf {
     std::filesystem::path profile_;
     std::vector<DatabaseEntry> entries_;
     std::vector<std::shared_ptr<study::Database>> open_;
-    std::vector<std::string> errors_;
+    std::vector<StoreFailure> errors_;
     struct CachedFacts {
         uint64_t generation = ~uint64_t{0};
         DatabaseFacts facts;
@@ -232,7 +237,7 @@ struct TreesAnswer {
     std::optional<study::TreeAnswer> answer;
     // By move code: each database's name and games.
     std::map<int, std::vector<std::pair<std::string, uint64_t>>> by_database;
-    std::string error;
+    StoreFailure error;  // the first tree that could not be read: the sentence naming its database, the store's code
 };
 [[nodiscard]] TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t key);
 

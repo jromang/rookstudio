@@ -232,7 +232,7 @@ void App::drawChessHome() {
                                                  : trf("import of {}: {} %", job->file.filename().string(),
                                                        static_cast<int>(100 * job->progress.bytes.load() / total));
             } else if (!facts.error.empty()) {
-                sub = facts.error;
+                sub = facts.error.said;
             } else if (facts.changed) {
                 sub = trf("changed {}", ui::dayText(facts.changed));
                 if (facts.tree) sub += std::string(" · ") + TR("tree up to date");

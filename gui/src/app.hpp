@@ -546,7 +546,7 @@ class App {
     int db_selected_ = -1;
     bool db_naming_  = false;  // a new database's name being typed
     std::array<char, 128> db_name_{};
-    std::string db_message_;     // the last import's outcome
+    StoreFailure db_message_;    // the last import's outcome, a database's error with its code
     std::string db_linked_key_;  // the linked sources listed: the tournaments, the PGN file opened
     // The maintenance of a database (mockup M13, board 1; view_maintenance.cpp), in place of the Databases page while
     // open, from a database's ⋯, an import's report or Ctrl+K: its duplicate games, its players' names and FIDE's
@@ -595,7 +595,7 @@ class App {
         uint64_t plan_of = ~uint64_t{0};
         std::shared_ptr<std::future<study::CompactPlan>> plan_job;
         std::string said;              // what was just done, and Ctrl+Z
-        std::string error;             // why it could not be done
+        StoreFailure error;            // why it could not be done
         bool start_check     = false;  // Ctrl+K "Check the database": started once the page shows
         bool open_first_pair = false;  // the first group compared once found (a capture's)
         struct Undo {
@@ -629,7 +629,8 @@ class App {
         study::CheckReport check;
         study::Compacted compacted;
         std::optional<Care::Undo> undo;  // a change's, pushed when it is done
-        std::string said, error;
+        std::string said;
+        StoreFailure error;
         std::size_t merged = 0;
         uint64_t set_aside = 0;      // Keep: the games set aside
         bool kept          = false;  // Restore: Keep what can be read undone, the damaged segments back
@@ -866,7 +867,7 @@ class App {
     std::optional<CoverageJob> coverage_job_;
     std::optional<study::Coverage> coverage_;
     std::string coverage_of_;
-    std::string coverage_error_;  // why the coverage of coverage_of_ could not be measured
+    StoreFailure coverage_error_;  // why the coverage of coverage_of_ could not be measured, with the store's code
     int coverage_depth_ = 0;  // 0 the ends of the lines, 1 move 10, 2 move 15
     std::set<std::filesystem::path> coverage_left_;  // the databases the coverage is not measured on (folders)
     bool rep_naming_    = false;
@@ -2898,11 +2899,13 @@ class App {
         std::unique_ptr<study::Search> search;  // the games through the position after it
         bool confirmed = false;                 // none found
         uint64_t found = 0;
-        std::string error;  // why the tree could not tell it (#139: a damaged tree), said in its place
+        StoreFailure error;  // why the tree could not tell it (#139: a damaged tree), said in its place
     };
     NoveltyJob tree_novelty_;
     std::string tree_summary_;
-    bool tree_unread_ = false;  // a tree of the rows could not be read: the summary says it, no novelty is looked for
+    // A tree of the rows that could not be read (#139), with the store's code: the summary says it, no novelty is
+    // looked for.
+    StoreFailure tree_unread_;
     bool tree_book_  = false;  // the rows are a book's weights
     int tree_source_ = 0;      // the databases with a tree, the library's Polyglot books, then Lichess's explorer
     // Lichess's explorer in the Tree tab (M3, board 2; M4): its answers this session, by position and source.

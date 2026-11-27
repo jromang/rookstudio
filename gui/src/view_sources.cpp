@@ -862,7 +862,7 @@ void App::startMonthReading(const std::string& source) {
     }
     const auto db = s.open(static_cast<std::size_t>(database));
     if (!db) {
-        month_stopped_ = s.facts(static_cast<std::size_t>(database)).error;
+        month_stopped_ = s.facts(static_cast<std::size_t>(database)).error.said;
         return;
     }
     MonthRun run;

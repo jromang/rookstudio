@@ -521,7 +521,7 @@ void App::saveEngineGame(ReplayGame& game) {
         }
         db = sh.open(*index);
         if (!db)
-            error = sh.facts(*index).error;
+            error = sh.facts(*index).error.said;
         else if (db->readOnly())
             error = TR("another program writes to it");
     } catch (const std::exception& e) {

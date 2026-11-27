@@ -92,7 +92,7 @@ void App::startExplaining(bool rest) {
             study::ScanBoard scan;
             if (!scan.setFen(pos.fen(), false)) return uint64_t{0};
             auto read = treesAt(trees, scan.key());
-            if (unread.empty()) unread = std::move(read.error);
+            if (unread.empty()) unread = std::move(read.error.said);
             return read.answer ? read.answer->total.games : uint64_t{0};
         };
         e.lines = explainPlan(review->line, review->report, lang, games);

@@ -5,6 +5,7 @@
 // it answers 401 to anyone else since 2026). A position goes as its FEN, and nothing else of the user's with it.
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -23,6 +24,9 @@ struct Servers {
     std::string engine    = "https://engine.lichess.ovh";  // the external engines' work (#96)
 };
 [[nodiscard]] Servers& servers();
+// The host of servers().api, as HostGate names it; how long it still pauses after a 429 (none, most of the time).
+[[nodiscard]] std::string apiHost();
+[[nodiscard]] std::chrono::milliseconds apiPause();
 
 // The cloud: lines of moves (UCI) with their evaluation for White, in centipawns or as a mate in so many moves
 // (negative: Black mates).

@@ -5,7 +5,8 @@
 // <name>.reviews.jsonl one line per answer. The profile's training.json holds the training's settings. Nothing leaves
 // the machine.
 //
-// A session runs on the Board page (view_training.cpp), whose column becomes the training's: TrainingRun is its state.
+// A session runs on the Board page, whose column becomes the training's: TrainingRun is its state, kept by the
+// repertoires' training module (repertoire_training_page.hpp, #107).
 
 #include <chrono>
 #include <cstdint>

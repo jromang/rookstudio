@@ -8,7 +8,9 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "console.hpp"
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
 
@@ -121,15 +123,9 @@ int handicapSquare(const FenParts& p, Handicap handicap, chess::Color side) {
 }  // namespace
 
 PlaySettings readPlaySettings(const fs::path& profile) {
-    std::ifstream in(profile / "play.json", std::ios::binary);
-    if (!in) return {};
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return {};
-    try {
-        return j.get<PlaySettings>();
-    } catch (const std::exception&) {
-        return {};
-    }
+    // Setting by setting (#143): one of another type keeps its default, said, the file as it was kept beside it, which
+    // the next save writes without it; a file cut short is kept aside and said.
+    return readProfileEntries<PlaySettings>(profile / "play.json");
 }
 
 bool writePlaySettings(const fs::path& profile, const PlaySettings& settings) {
@@ -271,12 +267,20 @@ void appendPlayedGame(const fs::path& folder, const PlayedGame& game) {
 
 std::vector<PlayedGame> readPlayedGames(const fs::path& folder) {
     std::vector<PlayedGame> out;
-    forEachJsonLine(folder / "games.jsonl", [&](const nlohmann::json& j) {
+    // A line of another type, or cut short by a crash, is left out and said (#143); the file, only added to, keeps it.
+    const auto file   = folder / "games.jsonl";
+    std::size_t wrong = 0;
+    const auto cut    = forEachJsonLine(file, [&](const nlohmann::json& j) {
         try {
             out.push_back(j.get<PlayedGame>());
         } catch (const std::exception&) {
+            ++wrong;
         }
     });
+    if (const auto unread = wrong + cut; unread > 0)
+        Console::instance().add(trn("{}: {} line could not be read and was left out",
+                                    "{}: {} lines could not be read and were left out", unread, file.string(), unread),
+                                true);
     return out;
 }
 

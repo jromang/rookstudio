@@ -4,12 +4,14 @@
 #include <cctype>
 #include <ctime>
 #include <fstream>
+#include <stdexcept>
 
 #include <fmt/include/fmt/format.h>
 #include <tour/files.hpp>
 #include <tour/util.hpp>
 
 #include "https.hpp"
+#include "profile_entries.hpp"
 
 namespace fcg::lichess {
 
@@ -265,42 +267,59 @@ std::chrono::seconds profileAge(const Profile& profile, int64_t now) {
 }
 
 std::optional<Profile> keptProfile(const std::filesystem::path& root) {
-    std::ifstream in(root / "lichess-cache" / "account.json", std::ios::binary);
-    if (!in) return std::nullopt;
-    try {
-        const auto j = nlohmann::json::parse(in);
-        if (j.value("format", "") != "rookstudio-lichess-account") return std::nullopt;
-        Profile p;
-        p.username = j.value("username", "");
-        p.read_at  = j.value("read_at", int64_t{0});
-        for (const auto& s : j.at("speeds")) {
-            SpeedRating r;
-            r.key         = s.value("key", "");
-            r.rating      = s.value("rating", 0);
-            r.games       = s.value("games", 0);
-            r.provisional = s.value("provisional", false);
-            for (const auto& h : s.at("history")) r.history.push_back({h.at(0).get<int64_t>(), h.at(1).get<int>()});
-            p.speeds.push_back(std::move(r));
-        }
-        for (const auto& d : j.at("activity")) {
-            ActivityDay a;
-            a.start = d.value("start", int64_t{0});
-            for (const auto& g : d.at("games"))
-                a.games.push_back({g.value("key", ""), g.value("win", 0), g.value("draw", 0), g.value("loss", 0)});
-            a.puzzles_win  = d.value("puzzles_win", 0);
-            a.puzzles_loss = d.value("puzzles_loss", 0);
-            a.studies      = d.value("studies", 0);
-            p.activity.push_back(std::move(a));
-        }
-        if (const auto it = j.find("puzzle"); it != j.end() && it->is_object()) {
-            p.puzzle_rating    = it->value("rating", 0);
-            p.puzzle_deviation = it->value("rd", 0);
-            p.puzzle_games     = it->value("games", 0);
-        }
-        return p;
-    } catch (const std::exception&) {
+    // Entry by entry (#143): a speed, a day of activity or a figure of another type is set aside and said, the others
+    // kept, the file as it was kept beside it; a file cut short is kept aside and said. Lichess is asked again either
+    // way once the profile is old.
+    const auto file = root / "lichess-cache" / "account.json";
+    const auto j    = readProfileJson(file);
+    if (!j) return std::nullopt;
+    if (const auto format = j->find("format");
+        format == j->end() || !format->is_string() || *format != "rookstudio-lichess-account")
         return std::nullopt;
+    ProfileEntries entries(file);
+    Profile p;
+    entries.entry("username", [&] { p.username = j->value("username", ""); });
+    entries.entry("read_at", [&] { p.read_at = j->value("read_at", int64_t{0}); });
+    // A list of objects, each an entry: the list's name and its place.
+    const auto each = [&](const char* list, const auto& read) {
+        const auto it = j->find(list);
+        if (it == j->end()) return;
+        if (!it->is_array()) {
+            entries.entry(list, [] { throw std::runtime_error("not a list"); });
+            return;
+        }
+        for (std::size_t i = 0; i < it->size(); ++i)
+            entries.entry(fmt::format("{}/#{}", list, i + 1), [&] { read((*it)[i]); });
+    };
+    each("speeds", [&](const nlohmann::json& s) {
+        SpeedRating r;
+        r.key         = s.value("key", "");
+        r.rating      = s.value("rating", 0);
+        r.games       = s.value("games", 0);
+        r.provisional = s.value("provisional", false);
+        for (const auto& h : s.at("history")) r.history.push_back({h.at(0).get<int64_t>(), h.at(1).get<int>()});
+        p.speeds.push_back(std::move(r));
+    });
+    each("activity", [&](const nlohmann::json& d) {
+        ActivityDay a;
+        a.start = d.value("start", int64_t{0});
+        for (const auto& g : d.at("games"))
+            a.games.push_back({g.value("key", ""), g.value("win", 0), g.value("draw", 0), g.value("loss", 0)});
+        a.puzzles_win  = d.value("puzzles_win", 0);
+        a.puzzles_loss = d.value("puzzles_loss", 0);
+        a.studies      = d.value("studies", 0);
+        p.activity.push_back(std::move(a));
+    });
+    if (const auto it = j->find("puzzle"); it != j->end() && it->is_object()) {
+        entries.entry("puzzle", [&] {
+            const int rating = it->value("rating", 0), deviation = it->value("rd", 0), games = it->value("games", 0);
+            p.puzzle_rating    = rating;
+            p.puzzle_deviation = deviation;
+            p.puzzle_games     = games;
+        });
     }
+    entries.sayUnread();
+    return p;
 }
 
 }  // namespace fcg::lichess

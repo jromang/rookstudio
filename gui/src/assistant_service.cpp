@@ -1,6 +1,7 @@
 #include "assistant_service.hpp"
 
 #include "jobs.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 #ifdef FCG_ASSISTANT
@@ -32,13 +33,8 @@ namespace fcg {
 
 AssistantService::AssistantService(std::filesystem::path profile, std::string program)
     : profile_(std::move(profile)), program_(std::move(program)) {
-    if (const auto json = readJson<nlohmann::json>(profile_ / "assistant.json")) {
-        try {
-            settings_ = json->get<AssistantSettings>();
-        } catch (const std::exception&) {
-            settings_ = AssistantSettings{};
-        }
-    }
+    // Setting by setting (#143): one of another type keeps its default, said, the file as it was kept beside it.
+    settings_ = readProfileEntries<AssistantSettings>(profile_ / "assistant.json");
 }
 
 AssistantService::~AssistantService() {

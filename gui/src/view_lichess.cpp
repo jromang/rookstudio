@@ -26,6 +26,7 @@
 #include "lichess_broadcasts.hpp"
 #include "lichess_games.hpp"
 #include "lichess_tv_page.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -49,13 +50,8 @@ std::string dateText(int64_t seconds) {
 
 void App::loadLichess() {
     lichess_account_ = lichess::loadAccount(storage_.root());
-    if (const auto json = readJson<nlohmann::json>(storage_.root() / "lichess.json")) {
-        try {
-            lichess_ = json->get<LichessSettings>();
-        } catch (const std::exception&) {
-            lichess_ = LichessSettings{};
-        }
-    }
+    // Setting by setting (#143): one of another type keeps its default, said, the file as it was kept beside it.
+    lichess_ = readProfileEntries<LichessSettings>(storage_.root() / "lichess.json");
 }
 
 void App::saveLichessSettings() { (void)writeJson(storage_.root() / "lichess.json", lichess_); }

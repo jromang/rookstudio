@@ -28,6 +28,7 @@
 #include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "repertoires.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -333,13 +334,12 @@ void RepertoireTrainingPage::drawCard(std::size_t index) {
                 ImGui::EndPopup();
             }
             // Enter starts, unless a field or a menu has the keys.
-            const bool keys = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
+            const bool keys = keyboard::available();
             if (keys && !here && session > 0 && lock.empty()) {
                 const auto owner = ImGui::GetID("##training_start");
                 ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
                 ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, owner);
-                if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-                    start = true;
+                if (keyboard::enterPressed()) start = true;
             }
 
             // What comes next, and the order of the new ones.
@@ -634,7 +634,7 @@ void RepertoireTrainingPage::dropTraining() {
 void RepertoireTrainingPage::trainingKeys() {
     auto& t        = *training_;
     const auto& io = ImGui::GetIO();
-    if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+    if (!keyboard::available()) return;
     // Enter, Space, Escape and the arrows are the training's: ImGui's keyboard navigation leaves them alone (the Tree
     // tab still reads its arrows).
     const auto owner = ImGui::GetID("##training_keys");
@@ -642,8 +642,7 @@ void RepertoireTrainingPage::trainingKeys() {
                            ImGuiKey_RightArrow, ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Home, ImGuiKey_End})
         ImGui::SetKeyOwner(key, owner);
     const bool plain = !io.KeyCtrl && !io.KeyAlt && !io.KeySuper;
-    const bool enter =
-        plain && (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter  = plain && keyboard::enterPressed();
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
     switch (t.phase) {
         case Ask::Preparing:

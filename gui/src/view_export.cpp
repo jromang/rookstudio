@@ -22,6 +22,7 @@
 #include "board_text.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "publish_pdf.hpp"
 #include "publish_reports.hpp"
 #include "renderer.hpp"
@@ -957,7 +958,7 @@ void App::drawExport() {
     ImGui::Dummy(ImVec2(0, px(6)));
     drawExportProblems();
     // Enter saves; with a PDF, it opens it to print (Ctrl+P too).
-    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+    const bool enter = keyboard::enterPressed();
     // --focus export…@print, @save:PATH: that gesture once the sheet shows, without the system's dialog.
     if (export_ && !export_action_.empty() && ImGui::GetFrameCount() % 30 == 0) {
         const auto action = std::exchange(export_action_, std::string());

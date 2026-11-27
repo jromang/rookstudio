@@ -33,6 +33,7 @@
 #include "engine_play.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "model.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -140,8 +141,7 @@ void VisionPage::drawTodayCards(TodayCards& cards) {
 
 void VisionPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::Vision);
-    const bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter = keyboard::available() && keyboard::enterPressed();
     if (enter) {
         const auto owner = ImGui::GetID("##training_enter");
         ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
@@ -501,13 +501,12 @@ void VisionPage::visionKeys() {
     auto& v        = *vision_;
     const auto& io = ImGui::GetIO();
     // A field has the keys (the move typed): Enter and Escape are its own.
-    if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+    if (!keyboard::available()) return;
     const auto owner = ImGui::GetID("##vision_keys");
     for (const auto key : {ImGuiKey_Enter, ImGuiKey_KeypadEnter, ImGuiKey_Escape, ImGuiKey_F2})
         ImGui::SetKeyOwner(key, owner);
     const bool plain = !io.KeyCtrl && !io.KeyAlt && !io.KeySuper;
-    const bool enter = plain && !io.WantTextInput &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter  = plain && !io.WantTextInput && keyboard::enterPressed();
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !io.WantTextInput;
     if (v.phase == VPhase::End) {
         if (escape) return closeVision(true);

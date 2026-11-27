@@ -21,6 +21,7 @@
 #include "app.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "portable.hpp"
 #include "ui.hpp"
 
@@ -235,8 +236,7 @@ void App::drawSaveMenu(ImVec2 under) {
         ImGui::TextDisabled("%s", (c.off.empty() ? c.detail : c.off).c_str());
         ImGui::Unindent(px(10));
         if (first && c.off.empty()) {
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-                chosen = c.act;
+            if (keyboard::enterPressed()) chosen = c.act;
             first = false;
         }
         ImGui::PopID();

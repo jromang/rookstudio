@@ -16,6 +16,7 @@
 #include "app.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "notation_view.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -856,8 +857,7 @@ void App::drawAddEngineMenu() {
         }
         ImGui::PopID();
     }
-    if (!offered.empty() && !full &&
-        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
+    if (!offered.empty() && !full && keyboard::enterPressed())
         chosen = rows[offered[static_cast<std::size_t>(side_menu_pick_)]].engine->name;
     ImGui::Separator();
     if (ImGui::Selectable(TR("Download an engine…"), false, 0, ImVec2(width, 0))) {

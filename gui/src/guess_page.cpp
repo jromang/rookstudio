@@ -30,6 +30,7 @@
 #include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "review_bridge.hpp"
 #include "training.hpp"
 #include "ui.hpp"
@@ -175,8 +176,7 @@ void GuessPage::drawTodayCards(TodayCards& cards) {
 
 void GuessPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::GuessMoves);
-    bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-                 (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    bool enter = keyboard::available() && keyboard::enterPressed();
     if (enter) {
         const auto owner = ImGui::GetID("##training_enter");
         ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
@@ -597,14 +597,13 @@ void GuessPage::dropGuess() {
 void GuessPage::guessKeys() {
     auto& g        = *guess_;
     const auto& io = ImGui::GetIO();
-    if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+    if (!keyboard::available()) return;
     const auto owner = ImGui::GetID("##guess_keys");
     for (const auto key : {ImGuiKey_Enter, ImGuiKey_KeypadEnter, ImGuiKey_Escape, ImGuiKey_LeftArrow,
                            ImGuiKey_RightArrow, ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Home, ImGuiKey_End})
         ImGui::SetKeyOwner(key, owner);
     const bool plain = !io.KeyCtrl && !io.KeyAlt && !io.KeySuper;
-    const bool enter =
-        plain && (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter  = plain && keyboard::enterPressed();
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
     switch (g.phase) {
         case GuessPhase::Preparing:

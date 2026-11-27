@@ -17,6 +17,7 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_months.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
@@ -181,8 +182,7 @@ void App::drawLichessOfflineEvals() {
     }
     const ui::Card card("lichess_offline_evals");
     // Enter: when the card is under the mouse, or was brought into view by Ctrl+K.
-    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::GetIO().WantTextInput &&
-                       !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
+    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) && keyboard::available() &&
                        (offline_evals_keys_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows));
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
         offline_evals_keys_ = false;  // a click elsewhere: Enter is another card's

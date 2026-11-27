@@ -37,6 +37,7 @@
 #include "guess_page.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
@@ -60,9 +61,7 @@ class App::ModulesContext final : public AppContext {
     // The program.
     int frame() const override { return ImGui::GetFrameCount(); }
     double seconds() const override { return ImGui::GetTime(); }
-    bool shortcutPressed(int chord) const override {
-        return !ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(chord);
-    }
+    bool shortcutPressed(int chord) const override { return keyboard::shortcut(chord); }
     bool scripted() const override { return app_.options_.scripted; }
     std::filesystem::path profileDir() const override { return app_.storage_.root(); }
     DatabaseShelf& shelf() override { return app_.shelf(); }
@@ -420,9 +419,7 @@ class App::ModulesContext final : public AppContext {
     void beginSessionPage() override {
         ui::pageTitle(TR("Board"), app_.guideSection());
         // The letters typed reach the move field whatever the keyboard's layout (see drawBoardPage).
-        if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-            !SDL_TextInputActive(app_.window_))
-            SDL_StartTextInput(app_.window_);
+        if (keyboard::available() && !SDL_TextInputActive(app_.window_)) SDL_StartTextInput(app_.window_);
     }
     void drawBoardMessage() override {
         const auto& b = app_.board_;

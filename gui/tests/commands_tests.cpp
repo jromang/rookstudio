@@ -1,10 +1,17 @@
 // What the buttons, Ctrl+K and the home page's cards share (#116): a tournament's rules, Pause, Resume, Stop and Try
-// again, each written once on Run.
+// again, each written once on Run; the keys' guards and the shortcuts written beside their button (keyboard.hpp),
+// read in an ImGui context of the test's own, without a window.
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
+#include <vector>
 
+#include <imgui.h>
+
+#include "keyboard.hpp"
 #include "run.hpp"
 
 using namespace fcg;
@@ -44,6 +51,44 @@ class FakeRun final : public Run {
     RunInfo info_;
 };
 
+// An ImGui context of the test's own; a frame is begun with the keys given held: those newly held pressed, those of
+// the frame before no longer held let go (Dear ImGui takes one change of a key a frame).
+class Frames {
+   public:
+    Frames() : context_(ImGui::CreateContext()) {
+        auto& io = ImGui::GetIO();
+        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+        io.IniFilename = nullptr;
+        io.DisplaySize = ImVec2(800, 600);
+        io.DeltaTime   = 1.0f / 60.0f;
+    }
+    ~Frames() {
+        if (open_) ImGui::EndFrame();
+        ImGui::DestroyContext(context_);
+    }
+    Frames(const Frames&)            = delete;
+    Frames& operator=(const Frames&) = delete;
+
+    // Ends the frame begun, if any, and begins another with `keys` held.
+    void begin(std::initializer_list<ImGuiKey> keys = {}) {
+        if (open_) ImGui::EndFrame();
+        auto& io = ImGui::GetIO();
+        const std::vector<ImGuiKey> now(keys);
+        for (const auto key : held_)
+            if (std::find(now.begin(), now.end(), key) == now.end()) io.AddKeyEvent(key, false);
+        for (const auto key : now)
+            if (std::find(held_.begin(), held_.end(), key) == held_.end()) io.AddKeyEvent(key, true);
+        held_ = now;
+        ImGui::NewFrame();
+        open_ = true;
+    }
+
+   private:
+    ImGuiContext* context_;
+    std::vector<ImGuiKey> held_;
+    bool open_ = false;
+};
+
 }  // namespace
 
 TEST_CASE("commands: a tournament's Pause, Resume, Stop and Try again follow the rules its buttons had") {
@@ -81,4 +126,72 @@ TEST_CASE("commands: a tournament's Pause, Resume, Stop and Try again follow the
     CHECK_FALSE(r.canStop());
     CHECK_FALSE(r.canTryEngineAgain());
     CHECK_FALSE(r.pausable());
+}
+
+TEST_CASE("commands: the page's keys are its own without a text field or a popup taking them") {
+    Frames frames;
+    frames.begin();
+    CHECK(keyboard::available());
+    CHECK(keyboard::plain());
+
+    // A text field has them.
+    ImGui::GetIO().WantTextInput = true;
+    CHECK_FALSE(keyboard::available());
+    CHECK_FALSE(keyboard::plain());
+    ImGui::GetIO().WantTextInput = false;
+
+    // A popup open: the page's keys are not its own, the popup's are.
+    ImGui::OpenPopup("menu");
+    CHECK_FALSE(keyboard::available());
+    if (ImGui::BeginPopup("menu")) {
+        CHECK(keyboard::available());
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    CHECK(keyboard::available());
+
+    // Ctrl or Alt held: available, but no plain key.
+    frames.begin({ImGuiMod_Ctrl});
+    CHECK(keyboard::available());
+    CHECK_FALSE(keyboard::plain());
+    frames.begin({ImGuiMod_Alt});
+    CHECK_FALSE(keyboard::plain());
+    frames.begin({ImGuiMod_Shift});
+    CHECK(keyboard::plain());
+    frames.begin();
+    CHECK(keyboard::plain());
+}
+
+TEST_CASE("commands: Enter is either Enter key, pressed once; a shortcut waits for no text field") {
+    Frames frames;
+    frames.begin({ImGuiKey_Enter});
+    CHECK(keyboard::enterPressed());
+    frames.begin();
+    CHECK_FALSE(keyboard::enterPressed());
+    frames.begin({ImGuiKey_KeypadEnter});
+    CHECK(keyboard::enterPressed());
+
+    frames.begin({ImGuiMod_Ctrl, ImGuiKey_K});
+    CHECK(keyboard::shortcut(keyboard::PALETTE));
+    CHECK_FALSE(keyboard::shortcut(keyboard::SAVE));
+    ImGui::GetIO().WantTextInput = true;  // a field keeps Ctrl+K, Ctrl+V...
+    CHECK_FALSE(keyboard::shortcut(keyboard::PALETTE));
+    ImGui::GetIO().WantTextInput = false;
+    // Ctrl+Shift+K is another chord.
+    frames.begin();
+    frames.begin({ImGuiMod_Ctrl, ImGuiMod_Shift, ImGuiKey_K});
+    CHECK_FALSE(keyboard::shortcut(keyboard::PALETTE));
+}
+
+TEST_CASE("commands: the shortcuts beside their button are written as their hints were typed") {
+    Frames frames;
+    frames.begin();
+    CHECK(keyboard::name(keyboard::PALETTE) == "Ctrl+K");
+    CHECK(keyboard::name(keyboard::OPEN_PGN) == "Ctrl+O");
+    CHECK(keyboard::name(keyboard::NEW_GAME) == "Ctrl+N");
+    CHECK(keyboard::name(keyboard::PASTE) == "Ctrl+V");
+    CHECK(keyboard::name(keyboard::SAVE) == "Ctrl+S");
+    CHECK(keyboard::name(keyboard::IMPORT) == "Ctrl+I");
+    CHECK(keyboard::name(keyboard::FILTER) == "Ctrl+L");
+    CHECK(keyboard::name(keyboard::SEARCH) == "Ctrl+F");
 }

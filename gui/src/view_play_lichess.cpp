@@ -19,6 +19,7 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_arenas.hpp"
 #include "lichess_arenas_page.hpp"
 #include "sound.hpp"
@@ -736,8 +737,7 @@ bool App::onlineGameKeys() {
     auto& og       = *online_game_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput) return false;
-    const bool enter = !io.KeyCtrl && !io.KeyAlt && !io.KeyShift &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter  = !io.KeyCtrl && !io.KeyAlt && !io.KeyShift && keyboard::enterPressed();
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
     if (og.held) {
         if (enter) {
@@ -889,12 +889,8 @@ void App::drawPlayLichess() {
         return;
     }
     // Enter: a challenge received taken first, else the seek.
-    const auto& io = ImGui::GetIO();
-    bool enter     = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
-                     !io.KeyAlt &&
-                     (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
-    if (!io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+    bool enter = keyboard::plain() && keyboard::enterPressed();
+    if (keyboard::available() && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
         if (online_seek_)
             cancelSeek();
         else if (online_challenge_)
@@ -955,9 +951,7 @@ void App::drawOnlineScopeCard() {
         if (lichess_error_.failed())
             coloured(trf("Lichess gave nothing ({}).", lichess::describe(lichess_error_)), ui::WARN);
         const auto& io = ImGui::GetIO();
-        const bool enter =
-            !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt &&
-            (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+        const bool enter = !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && keyboard::enterPressed();
         if (primaryButton(TR("Allow on Lichess…##board_play")) || enter) askOnlineScope();
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("Enter"));

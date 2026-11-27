@@ -10,6 +10,7 @@
 #include <json.hpp>
 
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "logo.hpp"
 #include "ui.hpp"
 #include "views.hpp"
@@ -277,7 +278,7 @@ bool drawPage(Page& page) {
     }
 
     // Start.
-    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+    const bool enter = keyboard::enterPressed();
     const char* go   = page.legacy.empty() ? TR("Continue") : TR("Copy and continue");
     const float go_w = ImGui::CalcTextSize(go).x + px(28);
     float row        = go_w;

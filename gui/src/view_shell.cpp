@@ -18,6 +18,7 @@
 #include "gl.hpp"
 #include "home.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "logo.hpp"
 #include "memory.hpp"
 #include "renderer.hpp"
@@ -194,9 +195,9 @@ void App::drawShell() {
     }
     if (chessBoard()) {
         drawRecentGames();  // Ctrl+Tab, on any of its pages
-        if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
-            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_O)) openBoardPgnDialog();
-            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_N)) newBoardGame();
+        if (keyboard::available()) {
+            if (ImGui::IsKeyChordPressed(keyboard::OPEN_PGN)) openBoardPgnDialog();
+            if (ImGui::IsKeyChordPressed(keyboard::NEW_GAME)) newBoardGame();
         }
     }
 

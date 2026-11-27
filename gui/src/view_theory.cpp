@@ -21,6 +21,7 @@
 #include "board_text.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_studies.hpp"
 #include "notation_view.hpp"
 #include "ui.hpp"
@@ -466,8 +467,7 @@ void App::drawTheoryPart() {
 
     const auto& studies = t.studies();
     const float now     = static_cast<float>(ImGui::GetTime());
-    const bool keys     = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-                          !ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt;
+    const bool keys     = keyboard::plain();
     if (studies.empty()) {
         ui::beginCard("theory_empty");
         ImGui::TextUnformatted(TR("No theory study yet."));
@@ -491,8 +491,7 @@ void App::drawTheoryPart() {
         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
             theory_chosen_ = std::min(theory_chosen_ + 1, static_cast<int>(studies.size()) - 1);
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) theory_chosen_ = std::max(theory_chosen_ - 1, 0);
-        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-            open = static_cast<std::size_t>(theory_chosen_);
+        if (keyboard::enterPressed()) open = static_cast<std::size_t>(theory_chosen_);
         if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) take_out = static_cast<std::size_t>(theory_chosen_);
     }
 

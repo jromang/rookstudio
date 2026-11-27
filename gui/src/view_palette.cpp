@@ -12,6 +12,7 @@
 #include "app.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "layout.hpp"
 #include "machines.hpp"
 #include "palette.hpp"
@@ -705,8 +706,8 @@ void App::drawPalette() {
 
     // Ctrl+K, but not while a text field has the keys, nor over another popup or dialog: opening this one would close
     // it.
-    const bool ctrl_k = ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_K);
-    if (ctrl_k && !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
+    const bool ctrl_k = ImGui::IsKeyChordPressed(keyboard::PALETTE);
+    if (ctrl_k && keyboard::available()) {
         palette_query_.clear();
         palette_request_ = true;
         palette_square_  = board_hover_;  // "This manoeuvre": the man under the mouse
@@ -769,7 +770,7 @@ void App::drawPalette() {
         if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) palette_selected_ -= 10, moved = true;
     }
     palette_selected_ = std::clamp(palette_selected_, 0, std::max(0, matches - 1));
-    if (matches > 0 && (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
+    if (matches > 0 && keyboard::enterPressed())
         chosen = entries[static_cast<std::size_t>(order[static_cast<std::size_t>(palette_selected_)])].run;
 
     ImGui::Spacing();

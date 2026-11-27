@@ -25,6 +25,7 @@
 #include "board_text.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "notation_view.hpp"
 #include "piece_letters.hpp"
 #include "review_bridge.hpp"
@@ -862,7 +863,7 @@ void App::drawBoardPage() {
         float width             = 0;
         for (const char* label : {open, paste, edit, play, review, analyse})
             width += ImGui::CalcTextSize(label).x + px(44);
-        width += ImGui::CalcTextSize("Ctrl+V").x +
+        width += ImGui::CalcTextSize(keyboard::name(keyboard::PASTE).c_str()).x +
                  (alt ? ImGui::CalcTextSize(review_key).x + ImGui::CalcTextSize(analyse_key).x
                       : ImGui::CalcTextSize("A").x * 2) +
                  ImGui::GetFrameHeight() + px(28);
@@ -882,7 +883,7 @@ void App::drawBoardPage() {
                                        "clipboard."));
         }
         ImGui::SameLine(0, px(4));
-        ImGui::TextDisabled("Ctrl+V");
+        ImGui::TextDisabled("%s", keyboard::name(keyboard::PASTE).c_str());
         ImGui::SameLine();
         if (ui::iconButton("board_edit", ui::Icon::Edit, edit)) openPositionEditor();
         if (ImGui::IsItemHovered()) {
@@ -950,7 +951,7 @@ void App::drawBoardPage() {
     }
 
     // Keys, unless a text field has them.
-    const bool keys = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
+    const bool keys = keyboard::available();
     const int total = static_cast<int>(b.game.moves.size());
     if (b.preview && b.preview->hover) {
         if (!b.preview_hovered) b.preview.reset();
@@ -988,8 +989,8 @@ void App::drawBoardPage() {
             ImGui::GetIO().KeyAlt == chessBoard()) {
             if (const int to = judgedPly(ImGui::GetIO().KeyShift ? -1 : 1); to >= 0) showBoardLine(-1, to);
         }
-        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) pasteOnBoard();
-        if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) boardSave();
+        if (ImGui::IsKeyChordPressed(keyboard::PASTE)) pasteOnBoard();
+        if (ImGui::IsKeyChordPressed(keyboard::SAVE)) boardSave();
         if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S)) boardSaveMenu(true);
         // The position's diagram into the clipboard, from anywhere on the page (#93).
         if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_C)) copyDiagram();

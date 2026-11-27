@@ -3,9 +3,11 @@
 The mistakes of the user's own games come back as exercises, scheduled with the repertoires' spaced repetition in the
 day's review; and a game of their databases can be replayed from one side, a move to guess at each turn (#81, mockup
 M12, board 2, point 5). The code: `gui/src/mistakes.*` (the user's names, what makes an exercise, an answer judged, the
-profile's files, the user's games looked for, a guess scored), `gui/src/view_mistakes.cpp` (the Training page's part,
-the games reviewed in the background, a session on the Board page), `gui/src/view_guess.cpp` (guessing), and the key
-of "To work on"'s topics (`commentary::WorkOn::Topic::key`).
+profile's files, the user's games looked for, a guess scored), `gui/src/mistakes_page.*` (their module out of App,
+#107: the Training page's part, the games reviewed in the background, a session on the Board page),
+`gui/src/guess_page.*` (guessing, a module of its own), and the key of "To work on"'s topics
+(`commentary::WorkOn::Topic::key`). Both plug into the Training page (`gui/src/training_page.*`) as kinds of training
+(`gui/src/training_kind.hpp`).
 
 ## Whose games
 

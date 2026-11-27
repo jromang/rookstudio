@@ -5,9 +5,10 @@
 // holds the Board, whatever its kind: it takes it from the program (context::SessionBoard, app_context.hpp), sets its
 // positions, draws its page with the Board's own parts, and gives it back as it was at its end. App's hooks in
 // fastchess-gui's Board page (view_board.cpp: a move played, the page, another game opened) ask the session that holds
-// the Board (App::boardSession()) through this interface, whatever its kind: each kind is a module of its own and its
-// own session (repertoire_training_page.hpp, puzzles_page.hpp, mistakes_page.hpp, guess_page.hpp, endgames_page.hpp,
-// vision_page.hpp).
+// the Board (App::boardSession(), which the Training page answers: training_page.hpp) through this interface, whatever
+// its kind: each kind is a module of its own and its own session (repertoire_training_page.hpp, puzzles_page.hpp,
+// mistakes_page.hpp, guess_page.hpp, endgames_page.hpp, vision_page.hpp), and a kind of training of the Training
+// page's (training_kind.hpp).
 
 #include <chess.hpp>
 

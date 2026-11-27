@@ -178,6 +178,38 @@ TEST_CASE("state: a released game is played again first") {
     CHECK(state->version() > before);
 }
 
+TEST_CASE("state: the operator's end asked once fastchess ended the game is refused, not taken and dropped (#142)") {
+    const ScratchDir dir("end-as-it-ends");
+    auto state       = TournamentState::create(dir, matchSpec());
+    const auto first = state->claimNext();
+    REQUIRE(first);
+    // Asked while it is played: the runner takes it as fastchess ends the game.
+    CHECK(state->requestEnd(first->number(), "1/2-1/2", "asked in time"));
+    const auto taken = state->takeEndAsItEnds(first->number());
+    REQUIRE(taken);
+    CHECK(taken->second == "asked in time");
+    // Asked between that moment and its record (the window's or the process's command, on another thread): the game
+    // is over. Accepted, its engine stopped, it was dropped and the game recorded without it.
+    CHECK_FALSE(state->requestEnd(first->number(), "1-0", "asked too late"));
+    state->complete(*first, fakeGame(*first, "1/2-1/2"));
+    CHECK_FALSE(state->takeEnd(first->number()));
+
+    // Let go of (the tournament stopping), then played again: an end is asked of it as of any game being played.
+    const auto second = state->claimNext();
+    REQUIRE(second);
+    CHECK_FALSE(state->takeEndAsItEnds(second->number()));
+    CHECK_FALSE(state->requestEnd(second->number(), "1-0", "while it ends"));
+    state->release(*second);
+    CHECK_FALSE(state->takeEnd(second->number()));
+    const auto again = state->claimNext();
+    REQUIRE(again);
+    REQUIRE(again->number() == second->number());
+    CHECK(state->requestEnd(again->number(), "0-1", "played again"));
+    const auto end = state->takeEndAsItEnds(again->number());
+    REQUIRE(end);
+    CHECK(end->first == "0-1");
+}
+
 TEST_CASE("state: a match with locked colours gives the same engine White in both games of a pair, after a reopen") {
     for (const auto colours : {Colours::AWhite, Colours::BWhite}) {
         const bool a_white = colours == Colours::AWhite;

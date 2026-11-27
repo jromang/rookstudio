@@ -1,5 +1,6 @@
 // The linked account's Lichess on the Home page (#46): its ratings and their history, its activity, a speed's figures,
-// what a speed did lately, all kept a day in the profile.
+// what a speed did lately, all kept a day in the profile; read again when ten minutes old, the kept copy's age counting
+// (#111).
 #include <doctest/doctest.hpp>
 
 #include <atomic>
@@ -9,7 +10,10 @@
 #include <json.hpp>
 
 #include "answering_server.hpp"
+#include "jobs.hpp"
 #include "lichess_profile.hpp"
+#include "refreshing.hpp"
+#include "test_support.hpp"
 
 using namespace fcg::lichess;
 using namespace fcg::test;
@@ -157,4 +161,82 @@ TEST_CASE("Lichess profile: an account's, a player's and a speed's figures asked
     CHECK(accountProfile("tok", &cancel).net == NetError::Cancelled);
     CHECK(perfFigures("MyAccount", "blitz", "tok", &cancel).net == NetError::Cancelled);
     servers() = Servers{};
+}
+
+TEST_CASE(
+    "Lichess profile: read again when ten minutes old, once in ten minutes at most, the kept copy's age counting") {
+    // As App holds it (app.hpp, #111): the Home page's card, the Play page's line, the arenas' conditions and the
+    // puzzles' rating ask it alike, with a clock of the test's own here.
+    using Clock = std::chrono::steady_clock;
+    fcg::JobGroup group;
+    auto now = Clock::time_point{} + 1h;
+    fcg::Refreshing<Profile> profile(
+        group, PROFILE_EVERY, fcg::Refresh::WhenStale, [&] { return now; }, [] { return Clock::duration(60s); });
+    const auto read = [](int64_t at) {
+        Profile p;
+        p.username      = "RS_Sample";
+        p.read_at       = at;
+        p.puzzle_rating = 1810;
+        return p;
+    };
+    const auto offline = [] {
+        Answer<Profile> a;
+        a.net = NetError::Offline;
+        return a;
+    };
+    // Its answer waited for and taken: whether a new profile came.
+    const auto taken = [&] {
+        bool fresh = false;
+        REQUIRE(waitUntil(
+            [&] {
+                fresh = profile.poll() || fresh;
+                return !profile.asking();
+            },
+            60s));
+        return fresh;
+    };
+    // The program starts, the copy kept on disk read five minutes ago: shown, Lichess not asked.
+    const int64_t wall = 1'800'000'000;
+    const auto kept    = read(wall - 300);
+    CHECK(profileAge(kept, wall) == 5min);
+    profile.keep(kept, profileAge(kept, wall));
+    CHECK_FALSE(profile.due());
+    now += 5min - 1s;
+    CHECK_FALSE(profile.due());
+    now += 1s;  // ten minutes old
+    REQUIRE(profile.due());
+    // Asked, Lichess unreachable: what was kept stays shown, why said, and Lichess is not asked again for ten minutes,
+    // however stale it is.
+    profile.ask(offline);
+    CHECK_FALSE(profile.due());  // under way
+    CHECK_FALSE(taken());
+    REQUIRE(profile.value);
+    CHECK(profile.value->read_at == wall - 300);
+    CHECK(profile.failed());
+    now += 10min - 1s;
+    CHECK(profile.stale());
+    CHECK_FALSE(profile.due());
+    now += 1s;
+    REQUIRE(profile.due());
+    // Read: shown for ten minutes, then asked again.
+    profile.ask([read, wall] {
+        Answer<Profile> a;
+        a.value = read(wall + 1200);
+        return a;
+    });
+    CHECK(taken());
+    CHECK(profile.value->read_at == wall + 1200);
+    CHECK_FALSE(profile.failed());
+    now += 10min - 1s;
+    CHECK_FALSE(profile.due());
+    now += 1s;
+    CHECK(profile.due());
+    // Another account: forgotten, asked at once.
+    profile.reset();
+    CHECK_FALSE(profile.value);
+    CHECK(profile.due());
+    // A copy kept an hour ago: asked at once.
+    const auto old = read(wall - 3600);
+    profile.keep(old, profileAge(old, wall));
+    CHECK(profile.due());
 }

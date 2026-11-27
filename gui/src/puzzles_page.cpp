@@ -1313,8 +1313,8 @@ void PuzzlesPage::drawPart() {
 
 void PuzzlesPage::drawChooser(bool& enter) {
     const ui::TopicRegion topic(puzzles_online_ ? guide::topics::PuzzlesOnline : guide::topics::Puzzles);
-    // The linked account's puzzle rating, as the Home page reads it: kept a day, asked once when none is known.
-    app_.askLichessProfileOnce();
+    // The linked account's puzzle rating, as the Home page reads it: kept a day, read again when ten minutes old.
+    app_.askLichessProfile();
     const auto state  = offline_puzzles_ ? offline_puzzles_->state() : OfflinePuzzles::State{};
     const auto store  = offline_puzzles_ ? offline_puzzles_->store() : nullptr;
     const auto rating = puzzleRating();

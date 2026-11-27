@@ -7,6 +7,7 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -99,5 +100,12 @@ struct Progress {
 // Kept in the profile: lichess-cache/account.json.
 void keepProfile(const std::filesystem::path& root, const Profile& profile);
 [[nodiscard]] std::optional<Profile> keptProfile(const std::filesystem::path& root);
+
+// The account's profile is read again when what is shown is ten minutes old, at most once in ten minutes (#46, #111):
+// the Home page's card, the Play page's line, the arenas' conditions and the puzzles' rating ask it alike. A profile
+// kept on disk counts its age (profileAge, at `now` in seconds since the epoch), so that the program started again does
+// not ask Lichess at once.
+inline constexpr auto PROFILE_EVERY = std::chrono::minutes(10);
+[[nodiscard]] std::chrono::seconds profileAge(const Profile& profile, int64_t now);
 
 }  // namespace fcg::lichess

@@ -264,6 +264,10 @@ void keepProfile(const std::filesystem::path& root, const Profile& profile) {
     }
 }
 
+std::chrono::seconds profileAge(const Profile& profile, int64_t now) {
+    return std::chrono::seconds(now - profile.read_at);
+}
+
 std::optional<Profile> keptProfile(const std::filesystem::path& root) {
     std::ifstream in(root / "lichess-cache" / "account.json", std::ios::binary);
     if (!in) return std::nullopt;

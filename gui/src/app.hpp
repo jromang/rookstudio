@@ -106,7 +106,6 @@
 #include "tablebases.hpp"
 #include "theory_shelf.hpp"
 #include "topology.hpp"
-#include "training.hpp"
 #include "twic.hpp"
 #include "ui.hpp"
 #include "views.hpp"
@@ -136,8 +135,10 @@ class LichessBotPage;
 class LichessTvPage;
 class MistakesPage;
 class PuzzlesPage;
+class RepertoireTrainingPage;
 class VisionPage;
 struct CommentaryReview;
+struct TrainingSettings;
 
 class EngineHub;
 
@@ -928,65 +929,19 @@ class App {
     // A line of moves from the start (SAN) shown on the board, at its end, the tree beside it.
     void showLineOnBoard(const std::vector<std::string>& line, const std::string& title);
 
-    // The repertoires' training (#76, mockup M11, board 1; training.hpp, view_training.cpp): the training card of the
-    // Openings page, a session on the Board page whose column becomes the training's, "In progress" on the Home page
-    // and Ctrl+K. Each repertoire's cards and memories, counted for the day.
-    struct TrainingSummary {
-        uint64_t revision = UINT64_MAX;  // the repertoire's when its cards were made
-        std::vector<study::TrainingCard> cards;
-        TrainingFile kept;
-        study::TrainingCounts counts;
-        int64_t counted = 0;   // when (seconds), counted again each minute
-        int new_per_day = -1;  // the limit it was counted with
-    };
-    std::map<std::filesystem::path, TrainingSummary> training_summaries_;  // by the repertoire's file
-    [[nodiscard]] const TrainingSummary& trainingSummary(std::size_t index);
-    // The cards ordered by what the databases play (the walk, the games of each), made in the background, one
-    // repertoire at a time: nullptr until they are ready.
-    struct TrainingPlanned {
-        std::string of;  // the repertoire's file and revision, the databases
-        std::vector<study::TrainingCard> cards;
-    };
-    std::map<std::filesystem::path, TrainingPlanned> training_planned_;
-    struct TrainingPlanning {
-        std::filesystem::path file;
-        std::string of;
-        std::future<std::vector<study::TrainingCard>> cards;
-    };
-    std::optional<TrainingPlanning> training_planning_;
-    [[nodiscard]] const std::vector<study::TrainingCard>* plannedCards(std::size_t index);
-    // The databases whose tree is built and that the Openings page measures on; `key` names them and their state.
-    [[nodiscard]] std::vector<study::TreeBase> trainingBases(std::string* key, std::vector<std::string>* names);
-    [[nodiscard]] std::optional<std::size_t> repertoireOf(const std::filesystem::path& file);
-    std::optional<TrainingSettings> training_settings_;
+    // The repertoires' training (#76, mockup M11, board 1): a module of its own (repertoire_training_page.hpp, #107),
+    // made by initChessModules(): each repertoire's cards and memories counted for the day, the Openings page's
+    // training card, a session on the Board page (a training session, below), the day's review of the positions due,
+    // the Home page's line, Ctrl+K. The Openings page, the Training page, the day's review and the Home page reach it
+    // directly.
+    std::unique_ptr<RepertoireTrainingPage> rep_training_;
+    // The training's settings (training.json, training.hpp; context::Training), read once: a right answer going on by
+    // itself, the new positions a day, the moves of theory in a game guessed. Kept, but not by a run for screenshots.
+    std::unique_ptr<TrainingSettings> training_settings_;
     TrainingSettings& trainingSettings();
     void saveTrainingSettings();
-    bool training_limit_menu_ = false;  // the menu of the new positions a day, asked from Ctrl+K
-    std::unique_ptr<TrainingRun> training_;
-    void drawTrainingCard(std::size_t index);                       // on the Openings page
-    [[nodiscard]] std::string trainingListLine(std::size_t index);  // "23 to review", for the list of repertoires
     // Why a session cannot start now, empty when it can.
     [[nodiscard]] std::string trainingLock() const;
-    void startTraining(std::size_t index, TrainingRun::Kind kind);
-    void pollTraining();      // each frame: the cards prepared, the session's first question
-    void drawTrainingPage();  // the Board page during a session
-    void drawTrainingBoard(float size);
-    void drawTrainingColumn();
-    void drawTrainingEnd();
-    void trainingKeys();
-    void trainingAnswer(chess::Move move);  // a move played on the board or typed
-    void trainingGrade(bool right);         // the first answer to the card asked, kept
-    void trainingDontKnow();
-    void trainingRetry();
-    void trainingNext();
-    void trainingAdd();  // the move played added to the repertoire (Ctrl+Z takes it back)
-    void trainingTakeBack();
-    void finishTraining(bool stopped);
-    void askTrainingCard();  // the board on the card asked, the opponent's move just played
-    void showTrainingCard(const study::TrainingCard& card);  // its line on the board, the question's position
-    void reviewMissed();                           // "Review them now": the missed moves in a session of their own
-    void closeTraining(bool to_openings);          // the session left, the board given back
-    void dropTraining();                           // another game came on the board: the session left where it is
     [[nodiscard]] bool trainingHidesAids() const;  // a question: the tree, the engines, the notes hidden
     void drawTrainingHome();                       // the Home page's "In progress": the positions to review
     [[nodiscard]] bool trainingDue();
@@ -1038,11 +993,9 @@ class App {
 
     // The training sessions on the Board page (board_session.hpp, #107): one at a time holds the Board, whatever its
     // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
-    // The repertoires' training, still in App, answers through a session of App's own (OwnSession, app_chess.cpp), made
-    // by initChessModules(); a kind in a module of its own is its own session (the puzzles', the mistakes', a game
-    // guessed, an endgame, a vision exercise), and takes the Board through context::SessionBoard (app_context.hpp).
-    class OwnSession;
-    std::unique_ptr<BoardSession> training_session_;
+    // Each kind is a module of its own and its own session (the repertoires' training, the puzzles', the mistakes', a
+    // game guessed, an endgame, a vision exercise), which takes the Board through context::SessionBoard
+    // (app_context.hpp).
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
     // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
     // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);

@@ -1,7 +1,8 @@
 // The Training page (#80, mockup M12, board 1): its Today part (the day's review in one queue, the kinds of exercises,
 // the puzzles to start) and its Puzzles part, the puzzles module's (Lichess's database offline, the batch online, the
 // results by theme; puzzles_page.hpp, #107). The day's review (review_queue.hpp): its counts, "Review all" taking the
-// kinds one after the other, the Home page's count. The page offered once on the Home page of a view made before it.
+// kinds one after the other, the Home page's count and its "In progress". The training's settings (training.json).
+// The page offered once on the Home page of a view made before it.
 //
 // The keys: Enter reviews what is due, or starts the puzzles once one of their choices was clicked; Ctrl+K has the
 // page, "Review all", each theme's puzzles and the database's commands.
@@ -21,6 +22,8 @@
 #include "i18n.hpp"
 #include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
+#include "repertoire_training_page.hpp"
+#include "training.hpp"
 #include "ui.hpp"
 #include "vision_page.hpp"
 
@@ -127,27 +130,29 @@ std::string kindDue(ReviewKind kind, std::size_t n) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
+// The training's settings
+
+TrainingSettings& App::trainingSettings() {
+    if (!training_settings_)
+        training_settings_ = std::make_unique<TrainingSettings>(readTrainingSettings(storage_.root()));
+    return *training_settings_;
+}
+
+void App::saveTrainingSettings() {
+    if (options_.scripted) return;  // a run for screenshots leaves the profile as it was
+    writeTrainingSettings(storage_.root(), trainingSettings());
+}
+
+// ---------------------------------------------------------------------------
 // The day's review
 
 ReviewCount App::reviewCount(ReviewKind kind) {
     ReviewCount out;
     out.kind = kind;
     switch (kind) {
-        case ReviewKind::Repertoire: {
-            int64_t ms = 0, weight = 0;
-            for (std::size_t i = 0; i < repertoires().entries().size(); ++i) {
-                const auto& s = trainingSummary(i);
-                out.due += s.counts.due;
-                out.tomorrow += s.counts.tomorrow;
-                out.three_days += s.counts.three_days;
-                if (s.kept.answer_ms > 0) {
-                    ms += s.kept.answer_ms * static_cast<int64_t>(std::max<std::size_t>(1, s.counts.due));
-                    weight += static_cast<int64_t>(std::max<std::size_t>(1, s.counts.due));
-                }
-            }
-            out.answer_ms = weight > 0 ? ms / weight : 0;
+        case ReviewKind::Repertoire:  // #76, its module's (#107)
+            out = rep_training_->reviewCount();
             break;
-        }
         case ReviewKind::Puzzles:  // their module's (#107)
             out = puzzles_->reviewCount();
             break;
@@ -173,10 +178,7 @@ ReviewDay App::reviewDay() {
 bool App::startReviewOf(ReviewKind kind, std::size_t repertoire) {
     switch (kind) {
         case ReviewKind::Repertoire:
-            if (repertoire >= repertoires().entries().size() || trainingSummary(repertoire).counts.due == 0)
-                return false;
-            startTraining(repertoire, TrainingRun::Kind::Review);
-            return training_ != nullptr;
+            return rep_training_->startReview(repertoire);
         case ReviewKind::Puzzles:
             return puzzles_->startReview();
         case ReviewKind::Mistakes:
@@ -194,8 +196,7 @@ void App::startReview(std::optional<ReviewKind> only) {
     for (const auto kind : reviewKinds()) {
         if (only && kind != *only) continue;
         if (kind == ReviewKind::Repertoire) {
-            for (std::size_t i = 0; i < repertoires().entries().size(); ++i)
-                if (trainingSummary(i).counts.due > 0) review_chain_.push_back({kind, i});
+            for (const auto i : rep_training_->dueRepertoires()) review_chain_.push_back({kind, i});
         } else if (reviewCount(kind).due > 0) {
             review_chain_.push_back({kind, 0});
         }
@@ -219,11 +220,7 @@ std::string App::reviewNextLabel() {
     const auto& step = review_chain_.front();
     switch (step.kind) {
         case ReviewKind::Repertoire:
-            if (step.repertoire < repertoires().entries().size()) {
-                const auto n = trainingSummary(step.repertoire).counts.due;
-                return trn("Next: {} position of “{}”", "Next: {} positions of “{}”", n, ui::exactCount(n),
-                           repertoires().entries()[step.repertoire].name);
-            }
+            if (auto label = rep_training_->reviewNextLabel(step.repertoire); !label.empty()) return label;
             break;
         case ReviewKind::Puzzles: {
             const auto n = reviewCount(ReviewKind::Puzzles).due;
@@ -261,6 +258,23 @@ void App::drawReviewNext(bool enter) {
         if (primaryButton((std::string(TR("Back to the Training page")) + " · " + TR("Enter")).c_str()) || enter)
             back();
     }
+}
+
+bool App::trainingDue() {
+    if (boardSession()) return true;  // a training session holds the Board (#76, #80–#82)
+    return reviewDay().due() > 0;     // the day's review, every kind (#80)
+}
+
+void App::drawTrainingHome() {
+    // A repertoire's session (#76), a session of exercises, a game guessed (#81), an endgame against the tables, a
+    // vision exercise (#82): their modules' (#107).
+    rep_training_->drawHomeLine();
+    mistakes_->drawHomeLine();
+    guessing_->drawHomeLine();
+    endgames_->drawHomeLine();
+    vision_->drawHomeLine();
+    // The day's review (#80): one count for every kind, a click reviewing them all.
+    drawReviewHome();
 }
 
 void App::drawReviewHome() {

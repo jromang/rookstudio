@@ -10,6 +10,7 @@
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "repertoire_training_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -110,7 +111,7 @@ void App::drawOpeningsPage() {
                                  ImGui::GetContentRegionMax().x - ImGui::CalcTextSize(side_name).x - px(6)));
         ImGui::TextDisabled("%s", side_name);
         ImGui::SetCursorPosX(start.x + px(6));
-        ImGui::TextDisabled("%s", trf("{} · {}", trainingListLine(i),
+        ImGui::TextDisabled("%s", trf("{} · {}", rep_training_->listLine(i),
                                       trn("{} position", "{} positions", static_cast<int>(r.map(i).size()),
                                           ui::exactCount(r.map(i).size())))
                                       .c_str());
@@ -128,14 +129,14 @@ void App::drawOpeningsPage() {
     // Printed (#93): each line under the one it leaves, a diagram at each branching, its coverage as an annex.
     if (ui::iconButton("rep_print", ui::Icon::Printer, TR("Print…"))) openRepertoirePrint(index);
     ImGui::SameLine(0, px(12));
-    ImGui::TextDisabled(
-        "%s", trf("{} · active · {}", e.side == chess::Color::WHITE ? TR("White") : TR("Black"),
-                  trn("{} position where it is your move", "{} positions where it is your move",
-                      trainingSummary(index).counts.cards, ui::exactCount(trainingSummary(index).counts.cards)))
-                  .c_str());
-    // Its training (#76, mockup M11, board 1): what is due, the new positions, Start.
+    const auto cards = rep_training_->cardCount(index);
+    ImGui::TextDisabled("%s", trf("{} · active · {}", e.side == chess::Color::WHITE ? TR("White") : TR("Black"),
+                                  trn("{} position where it is your move", "{} positions where it is your move", cards,
+                                      ui::exactCount(cards)))
+                                  .c_str());
+    // Its training (#76, mockup M11, board 1), its module's (#107): what is due, the new positions, Start.
     ImGui::Dummy(ImVec2(0, px(4)));
-    drawTrainingCard(index);
+    rep_training_->drawCard(index);
     ImGui::Dummy(ImVec2(0, px(8)));
 
     // Its coverage of the databases' games, measured in the background.

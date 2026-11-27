@@ -60,7 +60,8 @@ void App::pollLichessProfile() {
             lichess_profile_.keep(std::move(*kept), age);
         }
     }
-    if (lichess_profile_.poll()) lichess::keepProfile(storage_.root(), *lichess_profile_.value);
+    // Kept in the profile, unless the run is for screenshots: it leaves the profile as it was.
+    if (lichess_profile_.poll() && !options_.scripted) lichess::keepProfile(storage_.root(), *lichess_profile_.value);
     if (isReady(lichess_figures_job_)) {
         auto [key, answer]    = lichess_figures_job_.get();
         lichess_figures_[key] = std::move(answer);

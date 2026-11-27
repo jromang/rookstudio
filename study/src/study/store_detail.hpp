@@ -10,12 +10,14 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include <json.hpp>
@@ -192,6 +194,30 @@ std::string editsBytes(const std::vector<Snapshot::Version>& replaced, const std
 
 std::string segmentName(uint64_t number);
 
+// The new segments of one commit, each written whole before a manifest names it: under the next segment number (taken
+// under `numbers`, the lock a compaction takes the numbers under beside the commits), its files written and synced in
+// a folder "<name>.tmp", renamed to its name, the database's folder synced; a step of the tests' fault hook before each
+// file's writing and syncing, the rename ("rename segment") and the folder's sync ("sync folder"). discard() removes
+// what it wrote, when the commit does not happen.
+class SegmentWriter {
+   public:
+    SegmentWriter(std::filesystem::path dir, std::mutex& numbers, uint64_t& next_number)
+        : dir_(std::move(dir)), numbers_(numbers), next_number_(next_number) {}
+    // Its name; StoreError when the disk refuses.
+    std::string write(const SegmentBytes& segment);
+    // The segments written, in their order.
+    [[nodiscard]] const std::vector<std::string>& written() const noexcept { return written_; }
+    // The segments written and the folder of the one cut short removed.
+    void discard();
+
+   private:
+    std::filesystem::path dir_;
+    std::mutex& numbers_;
+    uint64_t& next_number_;
+    std::vector<std::string> written_;
+    std::string under_way_;  // the segment whose "<name>.tmp" is being written
+};
+
 // manifest.json, the only file a commit replaces (by a rename: tour::replaceFile()): the segments in their order, the
 // edits and the table of names it names, its generation. Read and written here alone. A manifest this program wrote
 // reads back to the same bytes; the keys it does not know (a newer program's) are kept as they are.
@@ -224,6 +250,8 @@ struct Manifest {
     void write(const std::filesystem::path& dir) const;
 };
 
+// A segment as it is read: its files mapped, checked against the counts its manifest entry gives (std::runtime_error
+// saying why otherwise), its records' columns, moves, annex, names and signatures read where they lie.
 class Segment {
    public:
     // `names_known`: false for names written as "?" in place of names lost (Database::keepReadable()).

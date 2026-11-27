@@ -243,6 +243,42 @@ std::string segmentName(uint64_t number) {
     return name;
 }
 
+std::string SegmentWriter::write(const SegmentBytes& segment) {
+    std::string name;
+    {
+        std::lock_guard lock(numbers_);
+        name = segmentName(next_number_++);
+    }
+    const auto tmp = dir_ / (name + ".tmp");
+    under_way_     = name;
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+    fs::create_directories(tmp, ec);
+    if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
+    writeFile(tmp / "cols.bin", segment.cols);
+    writeFile(tmp / "moves.bin", segment.moves);
+    writeFile(tmp / "annex.bin", segment.annex);
+    writeFile(tmp / "names.bin", segment.names);
+    writeFile(tmp / "sig.bin", segment.sig);
+    syncFolder(tmp);
+    step("rename segment");
+    fs::rename(tmp, dir_ / name, ec);
+    if (ec) throw std::runtime_error("cannot rename " + tmp.string() + ": " + ec.message());
+    under_way_.clear();
+    written_.push_back(name);
+    step("sync folder");
+    syncFolder(dir_);
+    return name;
+}
+
+void SegmentWriter::discard() {
+    std::error_code ec;
+    for (const auto& name : written_) fs::remove_all(dir_ / name, ec);
+    if (!under_way_.empty()) fs::remove_all(dir_ / (under_way_ + ".tmp"), ec);
+    written_.clear();
+    under_way_.clear();
+}
+
 Manifest Manifest::read(const fs::path& dir) {
     std::string text;
     {
@@ -1034,7 +1070,8 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         names_indexed_ = true;
     }
     std::vector<std::string> added;                     // the names this append adds, all segments
-    std::vector<std::string> made;                      // the segments it wrote
+    SegmentWriter writer(dir_, mutex_, next_segment_);  // the segments it writes
+    const auto& made = writer.written();
     std::vector<std::pair<uint32_t, uint32_t>> counts;  // their games and names
     auto manifest             = Manifest::read(dir_);
     const auto edits_before   = manifest.edits;
@@ -1052,29 +1089,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             const auto new_names = static_cast<uint32_t>(added.size() - names_before);
             for (std::size_t a = names_before; a < added.size(); ++a) segment.names += added[a] + "\n";
             segment.finish(new_names);
-
-            std::string name;
-            {
-                std::lock_guard lock(mutex_);  // the numbers a compaction takes too, without the writers' lock
-                name = segmentName(next_segment_++);
-            }
-            const auto tmp = dir_ / (name + ".tmp");
-            std::error_code ec;
-            fs::remove_all(tmp, ec);
-            fs::create_directories(tmp, ec);
-            if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
-            made.push_back(name);
-            writeFile(tmp / "cols.bin", segment.cols);
-            writeFile(tmp / "moves.bin", segment.moves);
-            writeFile(tmp / "annex.bin", segment.annex);
-            writeFile(tmp / "names.bin", segment.names);
-            writeFile(tmp / "sig.bin", segment.sig);
-            syncFolder(tmp);
-            step("rename segment");
-            fs::rename(tmp, dir_ / name, ec);
-            if (ec) throw std::runtime_error("cannot rename " + tmp.string() + ": " + ec.message());
-            step("sync folder");
-            syncFolder(dir_);
+            writer.write(segment);
             counts.emplace_back(static_cast<uint32_t>(n), new_names);
         }
         for (std::size_t s = 0; s < made.size(); ++s) {
@@ -1107,11 +1122,8 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         if (committed) throw;  // the games are in: nothing to undo
         // The disk refused: the database as before, the names this append gave forgotten.
         for (const auto& name : added) name_ids_.erase(name);
+        writer.discard();
         std::error_code ec;
-        for (const auto& name : made) {
-            fs::remove_all(dir_ / name, ec);
-            fs::remove_all(dir_ / (name + ".tmp"), ec);
-        }
         if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
         if (!players_written.empty()) fs::remove(dir_ / players_written, ec);
         throw;

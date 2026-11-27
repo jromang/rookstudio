@@ -147,20 +147,6 @@ SegmentBytes copiedSegment(const std::vector<RecordSource>& records, std::string
     return out;
 }
 
-// A segment's files written in folder `tmp`, synced.
-void writeSegment(const fs::path& tmp, const SegmentBytes& segment) {
-    std::error_code ec;
-    fs::remove_all(tmp, ec);
-    fs::create_directories(tmp, ec);
-    if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
-    writeFile(tmp / "cols.bin", segment.cols);
-    writeFile(tmp / "moves.bin", segment.moves);
-    writeFile(tmp / "annex.bin", segment.annex);
-    writeFile(tmp / "names.bin", segment.names);
-    writeFile(tmp / "sig.bin", segment.sig);
-    syncFolder(tmp);
-}
-
 }  // namespace
 
 Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& cancel, bool one_at_a_time) {
@@ -221,13 +207,12 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
     uint64_t old_bytes    = 0;
     std::string edits_now = manifest_before.edits;  // the edits file the manifest names
     for (const auto& batch : steps) {
+        SegmentWriter writer(dir_, mutex_, next_segment_);         // the numbers the appends take too
         std::vector<std::pair<std::size_t, std::string>> written;  // a segment's index, its new folder
         std::string edits_written;
-        std::string tmp_now;
         const auto clean = [&] {
+            writer.discard();
             std::error_code ec;
-            for (const auto& [s, name] : written) fs::remove_all(dir_ / name, ec);
-            if (!tmp_now.empty()) fs::remove_all(dir_ / tmp_now, ec);
             if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
         };
         try {
@@ -244,22 +229,9 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
                         records.push_back({where, i, snap->deleted(id)});
                     }
                 }
-                std::string name;
-                {
-                    std::lock_guard lock(mutex_);  // the numbers the appends take too
-                    name = segmentName(next_segment_++);
-                }
-                tmp_now = name + ".tmp";
-                writeSegment(dir_ / tmp_now,
-                             copiedSegment(records, seg.namesText(), seg.nameCount(), cancel, progress.games));
-                step("rename segment");
-                std::error_code ec;
-                fs::rename(dir_ / tmp_now, dir_ / name, ec);
-                if (ec) throw std::runtime_error("cannot rename " + (dir_ / tmp_now).string());
-                tmp_now.clear();
-                written.emplace_back(s, name);
+                written.emplace_back(
+                    s, writer.write(copiedSegment(records, seg.namesText(), seg.nameCount(), cancel, progress.games)));
             }
-            syncFolder(dir_);
             if (cancel) throw StoreError(StoreErrc::Cancelled, "cancelled");
         } catch (const std::exception& e) {
             // Nothing of this step committed: its files go. Those of the steps before stay committed.
@@ -419,28 +391,16 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
     auto manifest              = manifest_before;
     const auto old_edits       = manifest.edits;
     const uint64_t generation  = snap->generation_ + 1;
-    const auto blank          = snap->blankName();
-    const uint32_t blank_name = blank.value_or(snap->names_);  // none: a name "" added after the others
-    std::vector<std::string> written, old_files;
-    std::string tmp_now, edits_written;
+    const auto blank           = snap->blankName();
+    const uint32_t blank_name  = blank.value_or(snap->names_);  // none: a name "" added after the others
+    SegmentWriter writer(dir_, mutex_, next_segment_);          // the numbers the appends take too
+    std::vector<std::string> old_files;
+    std::string edits_written;
     try {
         const auto made = [&](std::vector<RecordSource> records, std::string_view names, uint32_t count) {
-            std::string name;
-            {
-                std::lock_guard lock(mutex_);  // the numbers the appends take too
-                name = segmentName(next_segment_++);
-            }
-            tmp_now = name + ".tmp";
             std::atomic<bool> go_on{false};
             std::atomic<uint64_t> done{0};
-            writeSegment(dir_ / tmp_now, copiedSegment(records, names, count, go_on, done, blank_name));
-            step("rename segment");
-            std::error_code ec;
-            fs::rename(dir_ / tmp_now, dir_ / name, ec);
-            if (ec) throw std::runtime_error("cannot rename " + (dir_ / tmp_now).string() + ": " + ec.message());
-            tmp_now.clear();
-            written.push_back(name);
-            return name;
+            return writer.write(copiedSegment(records, names, count, go_on, done, blank_name));
         };
         for (std::size_t s = 0; s < snap->segments_.size(); ++s) {
             const auto& segment = *snap->segments_[s];
@@ -465,7 +425,6 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
             entry.versions = true;
             manifest.segments.push_back(std::move(entry));
         }
-        syncFolder(dir_);
         edits_written = editsName(generation);
         writeFile(dir_ / edits_written, editsBytes(snap->replaced_, deleted));
         manifest.edits            = edits_written;
@@ -475,9 +434,8 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
         manifest.write(dir_);
     } catch (const std::exception&) {
         // Nothing committed: what it wrote goes, the database as before.
+        writer.discard();
         std::error_code ec;
-        for (const auto& name : written) fs::remove_all(dir_ / name, ec);
-        if (!tmp_now.empty()) fs::remove_all(dir_ / tmp_now, ec);
         if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
         throw;
     }
@@ -492,7 +450,7 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
     left.manifest   = manifest_before.text();
     left.generation = generation;
     left.files      = std::move(old_files);
-    left.new_files  = std::move(written);
+    left.new_files  = writer.written();
     left.new_files.push_back(edits_written);
     std::lock_guard lock(mutex_);
     if (kept_)  // an earlier one's, no longer undone: its files go at closing all the same

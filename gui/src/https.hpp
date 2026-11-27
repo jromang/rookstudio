@@ -11,6 +11,9 @@
 // what Lichess asks of its clients (HostGate): a short request waits for its host's turn, one at a time; a stream or a
 // download takes no turn, since it may last minutes, but waits as the others for the host's pause after a 429, and a
 // 429 it gets pauses the host.
+//
+// Their code: https.cpp (URLs, proxies, the connection, the request, the stream and the upload), http_download.cpp
+// (files downloaded, resumed and checked), host_gate.cpp (HostGate and the polite entry points).
 
 #include <atomic>
 #include <chrono>

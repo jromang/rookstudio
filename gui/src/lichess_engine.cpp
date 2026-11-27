@@ -205,21 +205,6 @@ Answer<ExternalEngine> registerEngine(const std::string& token, const EngineRegi
     return engineAnswer(send(engineRequest("POST", "/api/external-engine", token, &r), cancel));
 }
 
-Answer<std::vector<ExternalEngine>> listEngines(const std::string& token, const std::atomic<bool>* cancel) {
-    auto a = call<std::vector<ExternalEngine>>(
-        engineRequest("GET", "/api/external-engine", token),
-        [](const nlohmann::json& j) -> std::optional<std::vector<ExternalEngine>> {
-            if (!j.is_array()) return std::nullopt;
-            std::vector<ExternalEngine> list;
-            for (const auto& one : j)
-                if (auto e = readExternalEngine(one)) list.push_back(std::move(*e));
-            return list;
-        },
-        cancel);
-    a.asked = Asked::Engines;
-    return a;
-}
-
 Answer<ExternalEngine> engineRegistration(const std::string& token, const std::string& id,
                                           const std::atomic<bool>* cancel) {
     const auto r = send(engineRequest("GET", "/api/external-engine/" + urlEncode(id), token), cancel);

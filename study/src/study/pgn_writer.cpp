@@ -233,10 +233,6 @@ std::string noteText(const ReplayMove& m, bool assistant_mark, const std::option
 
 }  // namespace
 
-std::string noteComment(const ReplayMove& m, bool assistant_mark) {
-    return noteText(m, assistant_mark, heldComment(m));
-}
-
 std::string engineComment(const ReplayMove& m) { return engineText(m, heldComment(m).has_value()); }
 
 std::string assistantComment(const ReplayMove& m, bool assistant_mark) {

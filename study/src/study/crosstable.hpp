@@ -91,8 +91,6 @@ inline constexpr std::size_t TIEBREAKS = 14;
 
 [[nodiscard]] std::string_view tiebreakCode(Tiebreak t);  // FIDE's acronym: "BH-C1"; what the profile keeps
 [[nodiscard]] std::optional<Tiebreak> tiebreakFromCode(std::string_view code);
-// Those that read ratings (C.07 Art. 10): dropped from FIDE's list when a player has no rating.
-[[nodiscard]] bool ratingTiebreak(Tiebreak t);
 // The tie-breaks taken when none were chosen: a round robin's as FIDE's own Candidates Tournament 2026 orders them
 // (SB, WIN, DE), a Swiss's as FIDE's Grand Swiss 2025 does (ARO-C1, BH-C1, BH, DE), ARO-C1 left out when a player has
 // no rating (C.07 Art. 10). The current regulations themselves recommend none.

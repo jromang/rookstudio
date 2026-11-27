@@ -3031,7 +3031,6 @@ class App {
     void startGameReview();
     void cancelGameReview();
     void pollGameReview();
-    void drawGameReview();  // what it found
     // The analysis shown with the board's game: the one running for it (its latest values), else the first kept.
     [[nodiscard]] const GameReview* shownReview() const;
     // Every analysis of the board's game, the judging one first: those running with their latest values.

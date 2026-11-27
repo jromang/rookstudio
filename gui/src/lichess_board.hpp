@@ -261,8 +261,6 @@ bool readBoardLine(std::string_view line, BoardState& state);
 // The game as the board holds it: its tags (the players and their ratings, the event, the site, the time control) and
 // its moves from its start; a move that is not legal ends it there.
 [[nodiscard]] ReplayGame replayOf(const BoardState& state);
-// "Rated rapid 10+5", "Casual correspondence · 3 days a move"
-[[nodiscard]] std::string gameKind(const BoardState& state);
 
 // The game's stream, held on a thread of its own: opened again after a break (1 s, 2 s, 3 s, then every 5 s), the
 // whole game coming back each time (gameFull), the players' chat so far asked first; it stops once the game is over,

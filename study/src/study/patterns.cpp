@@ -958,8 +958,6 @@ std::string body(const Pattern& p, const Condition& c) {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-const std::vector<std::string_view>& patternWords() { return keywords(); }
-
 std::optional<uint64_t> readSquares(std::string_view text) {
     std::string t;
     for (const char c : text)

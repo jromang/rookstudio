@@ -54,13 +54,6 @@ bool folderWritable(const fs::path& folder) {
     return true;
 }
 
-fs::path freePath(const fs::path& folder, const std::string& stem, const std::string& extension) {
-    std::error_code ec;
-    auto path = folder / (stem + extension);
-    for (int n = 2; fs::exists(path, ec) && n < 10000; ++n) path = folder / fmt::format("{}-{}{}", stem, n, extension);
-    return path;
-}
-
 bool systemHasPdfReader() {
 #if defined(_WIN32) || defined(__APPLE__)
     return true;

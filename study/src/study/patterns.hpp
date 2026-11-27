@@ -175,8 +175,7 @@ void canonicalize(Pattern& pattern);
 // they do not read. And back: "f3", "[a-h8]", "[f3,g3]".
 [[nodiscard]] std::optional<uint64_t> readSquares(std::string_view text);
 [[nodiscard]] std::string squaresText(uint64_t squares);
-// The words of the language (for suggestions and help), and whether a word is CQL's but not read by RookStudio.
-[[nodiscard]] const std::vector<std::string_view>& patternWords();
+// Whether a word is CQL's but not read by RookStudio.
 [[nodiscard]] bool cqlWord(std::string_view word);
 
 // The presets of the search panel and of Ctrl+K: a key the program names them by, and their text.

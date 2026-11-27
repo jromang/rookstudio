@@ -921,7 +921,6 @@ TEST_CASE("external engine: each failure of the registration's requests told by 
         CHECK(registered.net == net);
         CHECK(describe(registered) == words);
         CHECK(updateEngine(TOKEN, "eei_Sample000001", r).net == net);
-        CHECK(listEngines(TOKEN).net == net);
         // A withdrawal reads no body: a 200 is taken.
         CHECK(withdrawEngine(TOKEN, "eei_Sample000001").net == (status == 200 ? NetError::None : net));
     }
@@ -942,6 +941,5 @@ TEST_CASE("external engine: each failure of the registration's requests told by 
     servers().api = "http://lichess-engines.invalid";
     std::atomic<bool> cancel{true};
     CHECK(registerEngine(TOKEN, r, &cancel).net == NetError::Cancelled);
-    CHECK(listEngines(TOKEN, &cancel).net == NetError::Cancelled);
     servers() = Servers{};
 }

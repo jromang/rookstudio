@@ -222,7 +222,6 @@ const Catalogue& builtInCatalogue() {
 
 std::string regexOf(std::string_view pattern) { return expand(pattern, false); }
 
-std::span<const std::string_view> platformNames() { return PLATFORMS; }
 std::span<const std::string_view> needNames() { return NEEDS; }
 
 std::vector<std::string> enginePlatforms(const CpuFeatures& cpu) {

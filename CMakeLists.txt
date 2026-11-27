@@ -537,6 +537,17 @@ endif()
 if(FCG_BUILD_GUI)
     include(FetchContent)
 
+    # The patches of the dependencies below are run by FetchContent once after the download, and again on the same
+    # sources whenever their command changes, never otherwise: the command has the script's hash, so that a script
+    # changed is run again, and the configuration runs again when one changes. Each script can run on sources it
+    # patched already.
+    foreach(patch imgui mbedtls libssh2)
+        set(script ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch_${patch}.cmake)
+        file(SHA256 ${script} hash)
+        set(FCG_PATCH_${patch} ${CMAKE_COMMAND} -DFCG_PATCH_SHA256=${hash} -P ${script})
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${script})
+    endforeach()
+
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON CACHE BOOL "" FORCE)
     set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
@@ -559,10 +570,11 @@ if(FCG_BUILD_GUI)
     FetchContent_Declare(sdl3
         URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
         URL_HASH SHA256=9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3)
-    # v1.92.9-docking, its commit's archive.
+    # v1.92.9-docking, its commit's archive, patched (cmake/patch_imgui.cmake).
     FetchContent_Declare(imgui
         URL https://github.com/ocornut/imgui/archive/9b4eb24cee2071e61dc1f9ef3e5228097cdde720.tar.gz
         URL_HASH SHA256=7af17518117f40103be7c2b68312a496e7dc3e1de6d3ce985df36c612fb05506
+        PATCH_COMMAND ${FCG_PATCH_imgui}
         SOURCE_SUBDIR fcg-no-cmake)
     FetchContent_Declare(implot
         URL https://github.com/epezent/implot/releases/download/v1.0/implot-v1.0.tar.gz
@@ -605,16 +617,6 @@ if(FCG_BUILD_GUI)
             endif()
         endforeach()
     endif()
-
-    # The patches below are run by FetchContent once after the download, and again on the same sources whenever their
-    # command changes, never otherwise: the command has the script's hash, so that a script changed is run again, and
-    # the configuration runs again when one changes. Each script can run on sources it patched already.
-    foreach(patch mbedtls libssh2)
-        set(script ${CMAKE_CURRENT_SOURCE_DIR}/cmake/patch_${patch}.cmake)
-        file(SHA256 ${script} hash)
-        set(FCG_PATCH_${patch} ${CMAKE_COMMAND} -DFCG_PATCH_SHA256=${hash} -P ${script})
-        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${script})
-    endforeach()
 
     # TLS for the lichess broadcasts: Mbed TLS (long term support branch), static, its libraries only.
     FetchContent_Declare(mbedtls

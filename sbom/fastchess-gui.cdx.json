@@ -38,6 +38,7 @@
       "bom-ref": "fetchcontent:imgui",
       "name": "Dear ImGui",
       "version": "1.92.9-docking",
+      "description": "The v1.92.9-docking tag's commit, patched (cmake/patch_imgui.cmake): no division of zero by zero in the first frame of a table sized by its contents.",
       "purl": "pkg:github/ocornut/imgui@v1.92.9-docking",
       "licenses": [{ "license": { "id": "MIT" } }],
       "hashes": [{ "alg": "SHA-256", "content": "7af17518117f40103be7c2b68312a496e7dc3e1de6d3ce985df36c612fb05506" }],

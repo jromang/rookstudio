@@ -39,10 +39,15 @@ class MockServer {
         int max_sessions = 0;
     };
 
+    // On `port`, or with 0 on a port the system gives (taken until the server goes: no other process draws it
+    // meanwhile), which port() tells.
     MockServer(uint16_t port, Options options);
     ~MockServer();
     MockServer(const MockServer&)            = delete;
     MockServer& operator=(const MockServer&) = delete;
+
+    // The port it listens on.
+    [[nodiscard]] uint16_t port() const;
 
     // What the tests read, once the clients are done.
     [[nodiscard]] std::vector<std::string> commands() const;

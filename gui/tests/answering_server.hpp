@@ -19,7 +19,7 @@ namespace fcg::test {
 class AnsweringServer {
    public:
     AnsweringServer()
-        : port_(freePort()), server_(port_, [this](const std::string& head, net::TcpConnection& c) {
+        : server_(0, [this](const std::string& head, net::TcpConnection& c) {
               (void)requestBody(head, c);  // read whole before the answer (Windows: scripted_server.hpp)
               std::pair<int, std::string> now;
               {
@@ -39,7 +39,7 @@ class AnsweringServer {
     AnsweringServer& operator=(const AnsweringServer&) = delete;
 
     [[nodiscard]] bool ok() const { return server_.ok(); }
-    [[nodiscard]] std::string base() const { return fmt::format("http://127.0.0.1:{}", port_); }
+    [[nodiscard]] std::string base() const { return fmt::format("http://127.0.0.1:{}", server_.port()); }
     // What every request is answered with from now on.
     void answer(int status, std::string body) {
         std::lock_guard lock(mutex_);
@@ -47,13 +47,12 @@ class AnsweringServer {
     }
 
    private:
-    uint16_t port_;
     std::mutex mutex_;
     std::pair<int, std::string> next_{200, "{}"};
     ScriptedServer server_;  // last: stopped first, its threads using what is above
 };
 
-// Lichess's servers pointed where nothing listens: no answer.
+// Lichess's servers pointed where nothing listens: no answer (freePort(): a free port nothing is started on).
 inline void pointNowhere() {
     const auto nobody  = fmt::format("http://127.0.0.1:{}", freePort());
     lichess::servers() = lichess::Servers{nobody, nobody + "/tb", nobody + "/explorer", nobody + "/engine"};

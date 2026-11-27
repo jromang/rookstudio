@@ -35,6 +35,7 @@
 #include "lichess_playing.hpp"
 #include "lichess_tv.hpp"
 #include "refreshing.hpp"
+#include "repairs.hpp"
 
 namespace fcg {
 
@@ -114,6 +115,14 @@ class LichessArenasPage {
     // The Home page, at its top (R3): the arena the user is in, a Swiss joined; the next round, at the window's corner.
     void drawHome();
     void drawSwissNotice();
+
+    // Why the card's arenas, or its teams' Swiss tournaments, did not come, as the card says it in place of its line
+    // (#146): a token refused with Link Lichess again… (the Swiss tournaments' with team:read), an outage or the host's
+    // pause with Try again, the pause counted down; none while nothing failed. A fix of it carried out: Try again the
+    // module's own (queued through the host's pause), the others the program's.
+    [[nodiscard]] std::optional<Notice> listNotice() const;
+    [[nodiscard]] std::optional<Notice> swissesNotice() const;
+    void repair(const Fix& fix);
 
    private:
     struct ArenaCard {
@@ -230,8 +239,11 @@ class LichessArenasPage {
     void drawSwissKeepMenu();
     [[nodiscard]] bool arenaGameOn() const;           // one of its games is being played here
     [[nodiscard]] std::string arenaTimeLeft() const;  // "31 min"
+    void drawRepair(const Notice& notice, const char* id);  // in place of an error's line, its fix carried out
+    void askAgain(Retry what);                              // its own Try again
 
     ArenasContext& app_;
+    OwnRetries retries_;
     ArenaCard arena_card_{app_.jobs()};
     float arena_card_y_ = -1;  // the card asked for (Ctrl+K, --focus): the page scrolled to it
     std::optional<TourFollow> tour_follow_;

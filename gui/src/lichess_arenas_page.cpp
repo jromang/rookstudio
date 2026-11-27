@@ -202,9 +202,45 @@ std::string figureOf(const lichess::TourCondition& c, std::string_view perf, con
 // ---------------------------------------------------------------------------
 // The state of things
 
-LichessArenasPage::LichessArenasPage(ArenasContext& app) : app_(app) {}
+LichessArenasPage::LichessArenasPage(ArenasContext& app)
+    : app_(app),
+      retries_([this](const std::string& host) { return app_.pausedFor(host); },
+               [this](Retry what) { askAgain(what); }) {}
 
 LichessArenasPage::~LichessArenasPage() = default;
+
+std::optional<Notice> LichessArenasPage::listNotice() const {
+    const auto& list = arena_card_.list;
+    if (!list.failed()) return std::nullopt;
+    // Without a list, why none came; with one, why it is not the latest.
+    auto text =
+        list.value ? trf("The list shown was read earlier: {}.", lichess::describe(list)) : lichess::gaveNothing(list);
+    return lichessNotice(list, std::move(text), app_.lichessAccess({}),
+                         retries_.state(Retry::ArenaList, lichess::apiHost()));
+}
+
+std::optional<Notice> LichessArenasPage::swissesNotice() const {
+    const auto& sw = arena_card_.swisses;
+    if (sw.value || !sw.failed()) return std::nullopt;
+    return lichessNotice(sw, lichess::gaveNothing(sw), app_.lichessAccess(lichess::SCOPE_TEAM_READ),
+                         retries_.state(Retry::TeamSwisses, lichess::apiHost()));
+}
+
+void LichessArenasPage::repair(const Fix& fix) {
+    if (!retries_.carryOut(fix)) app_.repair(fix);
+}
+
+void LichessArenasPage::drawRepair(const Notice& notice, const char* id) {
+    if (const auto* fix = drawNotice(notice, id)) repair(*fix);
+}
+
+void LichessArenasPage::askAgain(Retry what) {
+    if (what == Retry::ArenaList) {
+        arena_card_.list.again();  // asked at the next poll, the card showing
+    } else if (what == Retry::TeamSwisses) {
+        arena_card_.swiss_token.clear();  // asked at once, as with a token they were not read with
+    }
+}
 
 bool LichessArenasPage::holdsAids() const {
     // In the arena from here, once it has started: between two games too (point 18), until Pause; the account
@@ -307,6 +343,7 @@ void LichessArenasPage::poll() {
     const bool linked   = account != nullptr;
     // After a 429: until the host's pause is over.
     const auto pause_end = [&] { return now + lichess::apiPause(); };
+    retries_.poll();  // a Try again queued through the host's pause, asked once it is over
 
     // The permission to read the user's teams granted: its question goes (#45's card).
     if (app_.scopeAsked() == lichess::SCOPE_TEAM_READ && linked && !app_.lichessLinking() &&
@@ -736,7 +773,11 @@ void LichessArenasPage::drawCard() {
                         : app_.lichessSettings().arena_speeds == 1 ? lichess::ArenaSpeeds::Classical
                                                                    : lichess::ArenaSpeeds::All;
     if (!list.value) {
-        ImGui::TextDisabled("%s", list.failed() ? lichess::gaveNothing(list).c_str() : TR("Asking Lichess…"));
+        // Why nothing came, with its repair (#146), as the Lichess page's other cards say it.
+        if (const auto notice = listNotice())
+            drawRepair(*notice, "arena_list");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
     } else {
         std::vector<const lichess::ArenaInfo*> shown;
         for (const auto& a : *list.value)
@@ -826,9 +867,7 @@ void LichessArenasPage::drawCard() {
             ImGui::EndTable();
         }
         ImGui::PopTextWrapPos();
-        if (list.failed())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("The list shown was read earlier: {}.", lichess::describe(list)).c_str());
+        if (const auto notice = listNotice()) drawRepair(*notice, "arena_list");
     }
     ImGui::Dummy(ImVec2(0, px(4)));
     drawSwissList();
@@ -868,7 +907,10 @@ void LichessArenasPage::drawSwissList() {
     }
     const auto& sw = arena_card_.swisses;
     if (!sw.value) {
-        ImGui::TextDisabled("%s", sw.failed() ? lichess::gaveNothing(sw).c_str() : TR("Asking Lichess…"));
+        if (const auto notice = swissesNotice())
+            drawRepair(*notice, "team_swisses");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
         return;
     }
     if (sw.value->empty()) {
@@ -1301,7 +1343,10 @@ void LichessArenasPage::drawPlayTournaments() {
     const auto& list    = arena_card_.list;
     const auto* profile = app_.lichessProfile();
     if (!list.value) {
-        ImGui::TextDisabled("%s", list.failed() ? lichess::gaveNothing(list).c_str() : TR("Asking Lichess…"));
+        if (const auto notice = listNotice())  // as the Lichess page's card says it (#146)
+            drawRepair(*notice, "arena_list");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
     } else {
         int shown = 0;
         for (const auto& a : *list.value) {

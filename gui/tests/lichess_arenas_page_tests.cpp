@@ -4,7 +4,7 @@
 // list read and an arena of it followed, the games of its first eight in the mosaic, never the user's own; an arena
 // joined by Enter once Lichess takes the join, refused first: every aid locked while the user is in it, between two
 // games too, until Pause (Alt+P), and no longer once it is over; Pause and close, RookStudio closed once Lichess took
-// the pause, or five seconds after all the same.
+// the pause, or five seconds after all the same; why the card's lists did not come said with their repair (#146).
 #include <doctest/doctest.hpp>
 
 #include <algorithm>
@@ -139,6 +139,20 @@ class FakeApp final : public ArenasContext {
     void letGoHeld(const std::string&) override {}
     void closeAnyway() override { ++closed; }
 
+    // The repairs (#146): the account the test links, the hosts' pauses it sets, the fixes the program was given.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess a;
+        a.linked = account.has_value();
+        if (account) a.scopes = account->scopes;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string& host) const override {
+        const auto it = pauses.find(host);
+        return it == pauses.end() ? std::chrono::milliseconds(0) : it->second;
+    }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
+
     // What the module was told, and what the test sets.
     int frame_         = 0;
     double seconds_    = 100;
@@ -151,6 +165,8 @@ class FakeApp final : public ArenasContext {
     std::vector<std::vector<std::string>> links;
     std::vector<lichess::PlayingGame> playing;
     std::optional<BoardGame> online;
+    std::map<std::string, std::chrono::milliseconds> pauses;
+    std::vector<Fix> repairs;
     bool tournaments_shown = false;
     int tournaments_kept = 0, tournaments_peeked = 0, lichess_page = 0, board_page = 0, settings_saved = 0, closed = 0;
 
@@ -255,6 +271,7 @@ class FakeLichess {
     };
 
     [[nodiscard]] bool ok() const { return server_.ok(); }
+    std::atomic<int> refuse{0};               // a status every request is answered with (0: none), #146
     std::atomic<bool> refuse_joins{false};    // a team's members only
     std::atomic<bool> hold_withdraws{false};  // a pause answered once the test lets it go
     std::atomic<bool> finished{false};        // the arena over
@@ -312,7 +329,9 @@ class FakeLichess {
             {"mine0001", {"Player_D", "RS_Sample"}}};
         const auto& path = s.path;
         const auto id    = path.substr(path.rfind('/') + 1).substr(0, 8);
-        if (path == "/api/tournament") {
+        if (const int status = refuse; status != 0) {
+            c.sendAll(reply(status, "{}"));
+        } else if (path == "/api/tournament") {
             c.sendAll(reply(200, LIST));
         } else if (path.rfind("/api/tournament/rap1d100/join", 0) == 0) {
             ++joins_;
@@ -687,4 +706,102 @@ TEST_CASE("Lichess arenas' module without App: Pause and close, closed once Lich
         lichess.hold_withdraws = false;
         REQUIRE(waitUntil([&] { return lichess.withdraws() == 2; }));
     }
+}
+
+TEST_CASE("Lichess arenas' module without App: why the card's lists did not come said with their repair (#146)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(50ms);  // the host's minute after a 429, short for the test
+    const ScratchDir profile("arenas-repairs");
+    FakeApp app(profile);
+    app.account = sampleAccount({lichess::SCOPE_TEAM_READ});  // its teams' Swiss tournaments read too
+    Frames frames;
+    LichessArenasPage arenas(app);
+    const auto host = lichess::apiHost();
+    // The card drawn, as the Lichess page draws it, until `done`.
+    const auto drawn = [&](const std::function<bool()>& done) {
+        return waitUntil([&] {
+            frames.draw(app, [&] { arenas.drawCard(); });
+            arenas.poll();
+            return done();
+        });
+    };
+    const auto listAsked = [&] { return static_cast<int>(lichess.seen("/api/tournament").size()); };
+
+    // A token refused (401): the arenas and the teams' Swiss tournaments say it alike, as the studies card does, with
+    // Link Lichess again…, which the program carries out.
+    lichess.refuse = 401;
+    REQUIRE(drawn([&] { return arenas.listNotice() && arenas.swissesNotice(); }));
+    for (const auto& n : {*arenas.listNotice(), *arenas.swissesNotice()}) {
+        CHECK(n.level == Notice::Level::Error);
+        CHECK(n.text == "Lichess refused the token: it was revoked or has expired.");
+        REQUIRE(n.fixes.size() == 1);
+        CHECK(n.fixes[0].kind == Fix::Kind::LinkLichess);
+        CHECK(n.fixes[0].label == "Link Lichess again…");
+        CHECK(n.fixes[0].path.empty());  // the account has team:read already
+    }
+    arenas.repair(arenas.swissesNotice()->fixes[0]);
+    REQUIRE(app.repairs.size() == 1);
+    CHECK(app.repairs[0].kind == Fix::Kind::LinkLichess);
+
+    // The Swiss tournaments' Try again, at once: asked again with the token.
+    const auto teams = [&] { return static_cast<int>(lichess.seen("/api/team/of/RS_Sample").size()); };
+    int asked        = teams();
+    lichess.refuse   = 503;
+    arenas.repair(retryAfterPauseFix(Retry::TeamSwisses, host));
+    REQUIRE(drawn([&] {
+        const auto n = arenas.swissesNotice();
+        return teams() == asked + 1 && n && n->level == Notice::Level::Warning;
+    }));
+    CHECK(arenas.swissesNotice()->text == "Lichess gave nothing (Lichess answered 503).");
+    CHECK(arenas.swissesNotice()->fixes.at(0).label == "Try again");
+
+    // Lichess in trouble (503): the arenas' Try again, asked at once by the module.
+    asked = listAsked();
+    arenas.repair(retryAfterPauseFix(Retry::ArenaList, host));
+    REQUIRE(drawn([&] {
+        const auto n = arenas.listNotice();
+        return listAsked() == asked + 1 && n && n->level == Notice::Level::Warning;
+    }));
+    auto notice = *arenas.listNotice();
+    CHECK(notice.text == "Lichess gave nothing (Lichess answered 503).");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again");
+    CHECK(app.repairs.size() == 1);  // the module's own: not the program's
+    asked          = listAsked();
+    lichess.refuse = 429;
+    arenas.repair(notice.fixes[0]);
+    REQUIRE(drawn([&] { return listAsked() == asked + 1 && arenas.listNotice().has_value(); }));
+
+    // Its pause (429), in orange, counted down on Try again; a click queues it and nothing is sent before its end.
+    app.pauses[host] = 42s;
+    notice           = *arenas.listNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Lichess asked for a pause after too many requests.");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again in 0:42");
+    asked = listAsked();
+    arenas.repair(notice.fixes[0]);
+    arenas.repair(notice.fixes[0]);  // a second click: still once
+    notice = *arenas.listNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Asks again in 0:42");
+    CHECK(notice.fixes[0].disabled);
+    const auto until = std::chrono::steady_clock::now() + 300ms;
+    while (std::chrono::steady_clock::now() < until) {
+        frames.draw(app, [&] { arenas.drawCard(); });
+        arenas.poll();
+    }
+    CHECK(listAsked() == asked);
+    // The pause over: asked once, and the list comes.
+    app.pauses[host] = 0ms;
+    lichess.refuse   = 0;
+    REQUIRE(drawn([&] { return !arenas.listNotice() && listAsked() == asked + 1; }));
+    for (int i = 0; i < 20; ++i) {
+        frames.draw(app, [&] { arenas.drawCard(); });
+        arenas.poll();
+    }
+    CHECK(listAsked() == asked + 1);
+    CHECK(app.repairs.size() == 1);
 }

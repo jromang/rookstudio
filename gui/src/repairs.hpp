@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -116,5 +117,36 @@ class RepairActions {
 // A repair carried out: a Try again during its host's pause queued in `queue` (nothing sent before its end), at once
 // otherwise; the others through `actions`. False for a kind that is not a repair (App::applyFix() carries those out).
 bool carryOutRepair(const Fix& fix, RepairActions& actions, RetryQueue& queue);
+
+// A host's pause after a 429 as a page reads it (HostGate::pausedFor(), a test's), and a page's own way to ask again
+// what a Try again names.
+using PausedFor = std::function<std::chrono::milliseconds(const std::string& host)>;
+using AskAgain  = std::function<void(Retry what)>;
+
+// A Try again (RetryAfterPause) carried out: during its host's pause (`paused_for`), queued in `queue`, nothing sent
+// before its end; at once otherwise (`ask`). Queued already: nothing more is sent.
+void carryOutRetry(const Fix& fix, RetryQueue& queue, const PausedFor& paused_for, const AskAgain& ask);
+
+// The Try again of a module out of App (#146), its own as App's are its pages' (App::retryNow(),
+// App::runDueRetries()): asked at once outside its host's pause; during it, a click queues it, nothing sent before its
+// end, and poll() asks it once the pause is over. `paused_for` reads the host's pause (the program's,
+// context::Repairs::pausedFor()); `ask` is the module's own way to ask again what a Retry names.
+class OwnRetries {
+   public:
+    OwnRetries(PausedFor paused_for, AskAgain ask) : paused_for_(std::move(paused_for)), ask_(std::move(ask)) {}
+
+    // What a notice's Try again for `what`, asked of `host`, shows: the pause left, and whether a click queued it.
+    [[nodiscard]] RetryState state(Retry what, const std::string& host) const;
+    // A fix clicked: a Try again carried out (true); any other kind left to the program (false).
+    bool carryOut(const Fix& fix);
+    // Once a frame: what was queued and whose host no longer pauses, asked.
+    void poll();
+    [[nodiscard]] bool queued(Retry what) const { return queue_.queued(what); }
+
+   private:
+    PausedFor paused_for_;
+    AskAgain ask_;
+    RetryQueue queue_;
+};
 
 }  // namespace fcg

@@ -72,6 +72,13 @@ class App::ModulesContext final : public AppContext {
     // The clock the training is scheduled by.
     int64_t now() const override { return epochNow(); }
 
+    // The repairs of a module's errors (#146): its Try again its own, the other fixes as App's pages' (applyFix()).
+    LichessAccess lichessAccess(const std::string& needs) const override { return app_.lichessAccess(needs); }
+    std::chrono::milliseconds pausedFor(const std::string& host) const override {
+        return HostGate::instance().pausedFor(host);
+    }
+    void repair(const Fix& fix) override { app_.applyFix(fix); }
+
     // The pages.
     void showLichessPage() override {
         app_.page_ = Page::Lichess;

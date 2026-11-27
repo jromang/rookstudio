@@ -93,6 +93,21 @@ void App::retryNow(Retry what) {
             startFileAdd(std::move(add), database, title, nullptr);
             break;
         }
+        case Retry::Broadcasts:  // asked again at once, the failure said again if it fails again
+            lichess_broadcasts_time_                            = {};
+            static_cast<lichess::Failure&>(lichess_broadcasts_) = {};
+            askBroadcasts();
+            break;
+        case Retry::BroadcastSearch:
+            if (broadcast_found_ && !broadcast_search_job_.valid()) {
+                broadcast_found_.reset();
+                startBroadcastSearch();  // the same words, still in the field
+            }
+            break;
+        case Retry::TvChannels:
+        case Retry::ArenaList:
+        case Retry::TeamSwisses:
+            break;  // the modules' own, asked by them (OwnRetries)
     }
 }
 

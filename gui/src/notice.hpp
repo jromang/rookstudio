@@ -25,6 +25,12 @@ enum class Retry : int {
     OnlineCloud,      // the Board's line of Lichess's cloud
     EndgameCheck,     // a tournament's endgame check, its position to Lichess's tables
     FileAdd,          // the downloads of the sources' sheet that failed (TWIC, chess.com, Lichess's broadcasts)
+    // #146: the Lichess page's other cards; a module's own are asked again by it (OwnRetries).
+    Broadcasts,       // the Broadcasts card's list of official broadcasts
+    BroadcastSearch,  // the Broadcasts card's search, its words again
+    TvChannels,       // Lichess TV's card: each channel's featured game (its module's)
+    ArenaList,        // the Lichess tournaments card: the arenas in progress and to come (its module's)
+    TeamSwisses,      // the same card: the user's teams' Swiss tournaments (its module's)
 };
 
 // What fixes a problem. The App carries it out (App::applyFix); the views only show its button.

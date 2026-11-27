@@ -26,6 +26,7 @@
 #include "app_context.hpp"
 #include "focus_words.hpp"
 #include "lichess_tv.hpp"
+#include "repairs.hpp"
 
 namespace fcg {
 
@@ -97,6 +98,12 @@ class LichessTvPage {
     [[nodiscard]] bool onBoard() const { return board_tv_.has_value(); }
     void leaveBoard() { board_tv_.reset(); }
 
+    // Why the card's channels did not come, as the card says it in place of its line (#146): a token refused with Link
+    // Lichess again…, an outage or the host's pause with Try again, the pause counted down; none while nothing failed.
+    // A fix of it carried out: Try again the module's own (queued through the host's pause), the others the program's.
+    [[nodiscard]] std::optional<Notice> channelsNotice() const;
+    void repair(const Fix& fix);
+
    private:
     struct BoardTv {
         std::string channel, game;  // the game the Board follows, its channel
@@ -117,8 +124,11 @@ class LichessTvPage {
     void storeGame(const TvKept& kept, const std::string& pgn);  // into its database, now
     void loadKept();
     void saveKept();
+    void drawRepair(const Notice& notice, const char* id);  // in place of an error's line, its fix carried out
+    void askAgain(Retry what);                              // its own Try again
 
     TvContext& app_;
+    OwnRetries retries_;
     lichess::Answer<std::vector<lichess::TvRow>> tv_rows_;
     std::future<lichess::Answer<std::vector<lichess::TvRow>>> tv_rows_job_;
     std::chrono::steady_clock::time_point tv_rows_asked_{};

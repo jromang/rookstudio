@@ -1,12 +1,13 @@
 // Lichess TV's module (#107), built and driven without App: a context of the test's own answers what it asks of
 // the program, and Lichess is a server on this machine. Its --focus words and palette commands; a channel's games in
 // the mosaic, the user's own left out; the Board's game kept into a database at its end, then the channel's next game
-// on the Board in its place.
+// on the Board in its place; why the channels did not come said with its repair (#146).
 #include <doctest/doctest.hpp>
 
 #include <algorithm>
 #include <atomic>
 #include <cctype>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
+#include <imgui.h>
 #include <json.hpp>
 
 #include <study/game.hpp>
@@ -27,6 +29,7 @@
 #include "console.hpp"
 #include "databases.hpp"
 #include "focus_words.hpp"
+#include "https.hpp"
 #include "jobs.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_settings.hpp"
@@ -91,6 +94,18 @@ class FakeApp final : public TvContext {
     void saveLichessSettings() override { ++settings_saved; }
     std::vector<std::string> ownLichessIds() override { return own; }
 
+    // The repairs (#146): the account as the test sets it, the hosts' pauses it sets, the fixes the program was given.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        auto a  = access;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string& host) const override {
+        const auto it = pauses.find(host);
+        return it == pauses.end() ? std::chrono::milliseconds(0) : it->second;
+    }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
+
     // What the module was told, and what the test sets.
     struct Board {
         std::string title, mosaic, url;
@@ -106,11 +121,43 @@ class FakeApp final : public TvContext {
     int settings_saved = 0, lichess_page = 0, board_page = 0;
     std::vector<std::string> toasts, own;
     int frame_ = 0;
+    LichessAccess access;
+    std::map<std::string, std::chrono::milliseconds> pauses;
+    std::vector<Fix> repairs;
 
    private:
     std::filesystem::path profile_;
     JobGroup jobs_;
     DatabaseShelf shelf_;  // after its jobs: gone before them
+};
+
+// An ImGui context of the test's own, without a window: a frame draws the card, which then counts as shown.
+class Frames {
+   public:
+    Frames() : context_(ImGui::CreateContext()) {
+        auto& io = ImGui::GetIO();
+        io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+        io.IniFilename = nullptr;
+        io.DisplaySize = ImVec2(1280, 900);
+        io.DeltaTime   = 1.0f / 60.0f;
+    }
+    ~Frames() { ImGui::DestroyContext(context_); }
+    Frames(const Frames&)            = delete;
+    Frames& operator=(const Frames&) = delete;
+
+    void draw(FakeApp& app, const std::function<void()>& page) {
+        ++app.frame_;
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+        ImGui::Begin("page", nullptr, ImGuiWindowFlags_NoDecoration);
+        page();
+        ImGui::End();
+        ImGui::Render();
+    }
+
+   private:
+    ImGuiContext* context_;
 };
 
 std::string reply(int status, const std::string& body, const char* type = "application/json") {
@@ -173,6 +220,9 @@ class FakeLichess {
         ended_.insert(id);
     }
     [[nodiscard]] int streamsOpen() const { return streams_; }
+    // A status every request is answered with (0: none), Lichess refusing or in trouble; the channels asked so far.
+    std::atomic<int> refuse{0};
+    [[nodiscard]] int channelsAsked() const { return channels_asked_; }
 
    private:
     [[nodiscard]] bool ended(const std::string& id) {
@@ -191,7 +241,10 @@ class FakeLichess {
         const auto body = requestBody(head, c);
         const auto path = requestPath(head);
         const auto id   = path.substr(path.rfind('/') + 1).substr(0, 8);
-        if (path == "/api/tv/channels") {
+        if (path == "/api/tv/channels") ++channels_asked_;
+        if (const int status = refuse; status != 0) {
+            c.sendAll(reply(status, "{}"));
+        } else if (path == "/api/tv/channels") {
             std::lock_guard lock(mutex_);
             const nlohmann::json channels = {{"blitz",
                                               {{"user", {{"name", "Player_E"}, {"id", "player_e"}}},
@@ -237,7 +290,7 @@ class FakeLichess {
     std::string featured_ = "game0003";
     std::vector<std::string> channel_;
     std::set<std::string> ended_;
-    std::atomic<int> streams_{0};
+    std::atomic<int> streams_{0}, channels_asked_{0};
     std::atomic<bool> quit_{false};
     ScriptedServer server_;  // last: stopped first, its threads using what is above
 };
@@ -462,4 +515,87 @@ TEST_CASE("Lichess TV's module without App: a game kept of the wrong type set as
     REQUIRE(said.size() == 1);
     CHECK(said[0].find("could not be read: kept as") != std::string::npos);
     CHECK(std::filesystem::exists(std::filesystem::path(file).concat(".unreadable2")));
+}
+
+TEST_CASE("Lichess TV's module without App: why its channels did not come said with its repair (#146)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess({});
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(50ms);  // the host's minute after a 429, short for the test
+    const ScratchDir profile("tv-repairs");
+    FakeApp app(profile);
+    app.access.linked = true;  // an account linked, its token refused
+    Frames frames;
+    LichessTvPage tv(app);
+    const auto host = lichess::apiHost();
+    // The card drawn, as the Lichess page draws it, until `done`.
+    const auto drawn = [&](const std::function<bool()>& done) {
+        return waitUntil([&] {
+            frames.draw(app, [&] { tv.drawCard(); });
+            tv.poll();
+            return done();
+        });
+    };
+
+    // A token refused (401): said as the studies card says it, with Link Lichess again…, which the program carries out.
+    lichess.refuse = 401;
+    REQUIRE(drawn([&] { return tv.channelsNotice().has_value(); }));
+    auto notice = *tv.channelsNotice();
+    CHECK(notice.level == Notice::Level::Error);
+    CHECK(notice.text == "Lichess refused the token: it was revoked or has expired.");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::LinkLichess);
+    CHECK(notice.fixes[0].label == "Link Lichess again…");
+    tv.repair(notice.fixes[0]);
+    REQUIRE(app.repairs.size() == 1);
+    CHECK(app.repairs[0].kind == Fix::Kind::LinkLichess);
+
+    // Lichess in trouble (503): Try again, asked at once, by the module.
+    lichess.refuse = 503;
+    tv.repair(retryAfterPauseFix(Retry::TvChannels, host));
+    REQUIRE(drawn([&] {
+        const auto n = tv.channelsNotice();
+        return n && n->level == Notice::Level::Warning;
+    }));
+    notice = *tv.channelsNotice();
+    CHECK(notice.text == "Lichess gave nothing (Lichess answered 503).");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again");
+    CHECK(app.repairs.size() == 1);  // the module's own: not the program's
+    int asked      = lichess.channelsAsked();
+    lichess.refuse = 429;
+    tv.repair(notice.fixes[0]);
+    REQUIRE(drawn([&] { return lichess.channelsAsked() == asked + 1 && tv.channelsNotice().has_value(); }));
+
+    // Its pause (429), in orange, counted down on Try again; a click queues it and nothing is sent before its end.
+    app.pauses[host] = 42s;
+    frames.draw(app, [&] { tv.drawCard(); });
+    notice = *tv.channelsNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Lichess asked for a pause after too many requests.");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again in 0:42");
+    asked = lichess.channelsAsked();
+    tv.repair(notice.fixes[0]);
+    tv.repair(notice.fixes[0]);  // a second click: still once
+    notice = *tv.channelsNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Asks again in 0:42");
+    CHECK(notice.fixes[0].disabled);
+    const auto until = std::chrono::steady_clock::now() + 300ms;
+    while (std::chrono::steady_clock::now() < until) {
+        frames.draw(app, [&] { tv.drawCard(); });
+        tv.poll();
+    }
+    CHECK(lichess.channelsAsked() == asked);
+    // The pause over: asked once, and the channels come.
+    app.pauses[host] = 0ms;
+    lichess.refuse   = 0;
+    REQUIRE(drawn([&] { return !tv.channelsNotice() && lichess.channelsAsked() == asked + 1; }));
+    for (int i = 0; i < 20; ++i) {
+        frames.draw(app, [&] { tv.drawCard(); });
+        tv.poll();
+    }
+    CHECK(lichess.channelsAsked() == asked + 1);
+    CHECK(app.repairs.size() == 1);
 }

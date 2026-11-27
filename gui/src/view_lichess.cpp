@@ -641,7 +641,13 @@ void App::drawLichessBroadcasts() {
     }
     const auto& b = lichess_broadcasts_;
     if (!b.value && !broadcast_found_ && !broadcast_search_job_.valid()) {
-        ImGui::TextDisabled("%s", b.failed() ? lichess::gaveNothing(b).c_str() : TR("Asking Lichess…"));
+        // A token refused, the host's pause, an outage: each with its repair, as the studies card says them (#146).
+        if (b.failed())
+            drawRepairNotice(lichessNotice(b, lichess::gaveNothing(b), lichessAccess(),
+                                           retryState(Retry::Broadcasts, lichess::apiHost())),
+                             "broadcasts");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
     } else {
         const auto row = [&](const lichess::BroadcastEntry& e, bool live) {
             ImGui::PushID(e.round.id.c_str());
@@ -680,9 +686,11 @@ void App::drawLichessBroadcasts() {
                 return;
             }
             const auto& found = *broadcast_found_;
-            if (!found.value)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess did not search: {}", lichess::describe(found)).c_str());
+            if (!found.value)  // the search needs the account's study:read: a token refused, its permission (#146)
+                drawRepairNotice(lichessNotice(found, trf("Lichess did not search: {}", lichess::describe(found)),
+                                               lichessAccess(lichess::SCOPE_STUDY_READ),
+                                               retryState(Retry::BroadcastSearch, lichess::apiHost())),
+                                 "broadcast_search");
             else if (found.value->empty())
                 ImGui::TextDisabled("%s", trf("No broadcast found for “{}”.", broadcast_searched_).c_str());
             else

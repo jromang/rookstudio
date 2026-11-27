@@ -660,6 +660,9 @@ class ArchiveMembers final : public Members {
 // The zip archive of a 2CBH database (.2cbv, .2cbz)
 // ---------------------------------------------------------------------------------------------------------------
 
+// The most bytes deflate makes of one: a match of 258 bytes in two bits, its length's code and its distance's.
+constexpr uint64_t MOST_INFLATED = 1032;
+
 // The archive's directory read through its file, deciphered: zip's own (sources.hpp).
 ArchiveBytes zipBytes(const std::shared_ptr<CipheredFile>& file) {
     return [file](uint64_t offset, std::size_t size) {
@@ -725,7 +728,8 @@ class InflatedMember final : public Source {
         return {kept_.data() + (offset - kept_at_), size};
     }
 
-    // The whole member, its CRC-32 checked against `crc`.
+    // The whole member, its CRC-32 checked against `crc`. Room made for its size, which its data can unpack to
+    // (ZipMembers::open()), up to 64 MiB: the rest as it comes.
     std::vector<uint8_t> all(uint32_t crc) {
         restart();
         kept_.reserve(static_cast<std::size_t>(std::min<uint64_t>(size_, 64u << 20)));
@@ -836,6 +840,11 @@ class ZipMembers final : public Members {
         }
         if (data > file_->size() || e->compressed > file_->size() - data)
             throw Damage(name + ": damaged archive (it runs past the archive's end)");
+        // Deflate makes 1,032 bytes of a byte at most: a size past what its data can unpack to is a damaged or crafted
+        // entry's, never room to make (a file of names is unpacked whole, up to 1 GiB) (#119).
+        if (e->size / MOST_INFLATED > e->compressed)
+            throw Damage(name + ": damaged archive (it says it unpacks to " + std::to_string(e->size) +
+                         " bytes, more than its " + std::to_string(e->compressed) + " bytes can)");
         auto stream = std::make_unique<InflatedMember>(file_, name, data, e->compressed, e->size);
         // A file of names is read anywhere, often: unpacked whole. So is a small file.
         if ((random && e->size <= (uint64_t{1} << 30)) || e->size <= whole_)

@@ -32,7 +32,9 @@ frames, `.gz`, `.zip` of `.pgn` entries, zip64 included), cut into pieces at the
 workers, and given back in the file's order. The memory it holds stays bounded whatever the file's size. A game's text
 is kept when it has comments, symbols or variations, or could not be read whole (damaged), its lines ended by `\n`
 whatever the file's. A zip archive's directory lies within the archive: a size or a place read in a damaged one is
-refused, never a buffer to make (#102).
+refused, never a buffer to make (#102). So is the size of a 2CBV's member past what its deflated data can unpack to
+(deflate makes 1,032 bytes of a byte at most): a table of names is unpacked whole, up to 1 GiB, and room was made for
+its size before its data was found to fall short (#119).
 
 `importInto` adds a file's games to a database, committed every 262 144 games: a crash or a cancel keeps what was
 committed, and the same file imported again adds only what is missing.

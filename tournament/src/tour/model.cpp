@@ -98,7 +98,9 @@ void from_json(const nlohmann::json& j, FileFingerprint& f) {
 
 namespace {
 
-// File names compared as Windows does, letter case aside (ASCII only, enough for ".pgn").
+// The newest version of a tournament's spec this program writes, and reads (the versions are said in to_json).
+constexpr int SPEC_VERSION = 5;
+
 }  // namespace
 
 void to_json(nlohmann::json& j, const TournamentSpec& s) {
@@ -162,7 +164,8 @@ void to_json(nlohmann::json& j, const TournamentSpec& s) {
 
 void from_json(const nlohmann::json& j, TournamentSpec& s) {
     s.version = j.value("version", 1);
-    if (s.version > 5) throw std::runtime_error("this tournament was written by a newer version of " FCG_PRODUCT_NAME);
+    if (s.version > SPEC_VERSION)
+        throw std::runtime_error("this tournament was written by a newer version of " FCG_PRODUCT_NAME);
 
     s.name        = j.value("name", std::string{});
     s.format      = j.value("format", Format::Match);
@@ -213,7 +216,8 @@ void from_json(const nlohmann::json& j, TournamentSpec& s) {
     // A file of the folder, nothing else: the games are written to it.
     s.pgn_file           = j.value("pgn_file", std::string{});
     s.pgn_chessbase_file = j.value("pgn_chessbase_file", std::string{});
-    // A .pgn file, so that it can never be the journal or tournament.json, and two different files.
+    // A .pgn file, so that it can never be the journal or tournament.json, and two different files; their names
+    // compared as Windows does, letter case aside (ASCII only, enough for ".pgn").
     for (const auto& file : {s.pgn_file, s.pgn_chessbase_file}) {
         const bool pgn = file.size() > 4 && lower(file.substr(file.size() - 4)) == ".pgn";
         if (!file.empty() && (fileNameOf(file) != file || !pgn))

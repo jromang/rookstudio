@@ -2,3 +2,5 @@
 # line ends into "\r\n".
 study/tests/data/* -text
 commentary/data/* -text
+# A tournament folder an earlier version left, byte for byte: its journal points into its PGN files by offset.
+tournament/tests/data/** -text

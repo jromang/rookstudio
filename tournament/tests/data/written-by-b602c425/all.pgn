@@ -1,0 +1,222 @@
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "1"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "A00"]
+[Opening "Ware Opening"]
+
+1... a6 {[%eval 0.30,10] [%emt 0:00:00.100]}
+2. a5 {[%eval 0.30,11] [%emt 0:00:00.101]}
+Nc6 {[%eval 0.30,12] [%emt 0:00:00.102]}
+3. b3 {[%eval 0.30,13] [%emt 0:00:00.103]}
+b5 {[%eval 0.30,14] [%emt 0:00:00.104]}
+4. h4 {[%eval 0.30,10] [%emt 0:00:00.105]}
+Ra7 {[%eval 0.30,11] [%emt 0:00:00.106]}
+5. f3 {[%eval 0.30,12] [%emt 0:00:00.107]}
+Ne5 {[%eval 0.30,13] [%emt 0:00:00.108]}
+6. Ra4 {[%eval 0.30,14] [%emt 0:00:00.109], test game 1 (1-0)} 1-0
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "1"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/1P6/8/P1PPPPPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "A00"]
+[Opening "Polish Opening"]
+
+1... b6 {[%eval 0.30,10] [%emt 0:00:00.100]}
+2. a4 {[%eval 0.30,11] [%emt 0:00:00.101]}
+Na6 {[%eval 0.30,12] [%emt 0:00:00.102]}
+3. c3 {[%eval 0.30,13] [%emt 0:00:00.103]}
+e5 {[%eval 0.30,14] [%emt 0:00:00.104]}
+4. Nf3 {[%eval 0.30,10] [%emt 0:00:00.105]}
+Nc5 {[%eval 0.30,11] [%emt 0:00:00.106]}
+5. bxc5 {[%eval 0.30,12] [%emt 0:00:00.107]}
+bxc5 {[%eval 0.30,13] [%emt 0:00:00.108]}
+6. Ra2 {[%eval 0.30,14] [%emt 0:00:00.109], test game 2 (1-0)} 1-0
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "2"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "A11"]
+[Opening "English Opening: Caro-Kann Defensive System"]
+
+1... c6 {[%eval 3.00,10] [%emt 0:00:00.100]}
+2. b4 {[%eval 3.00,11] [%emt 0:00:00.101]}
+Nf6 {[%eval 3.00,12] [%emt 0:00:00.102]}
+3. a3 {[%eval 3.00,13] [%emt 0:00:00.103]}
+a5 {[%eval 3.00,14] [%emt 0:00:00.104]}
+4. Nf3 {[%eval 3.00,10] [%emt 0:00:00.105]}
+Ra7 {[%eval 3.00,11] [%emt 0:00:00.106]}
+5. g3 {[%eval 3.00,12] [%emt 0:00:00.107]}
+e5 {[%eval 3.00,13] [%emt 0:00:00.108]}
+6. Nxe5 {[%eval 3.00,14] [%emt 0:00:00.109], test game 3 (1-0)} 1-0
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "2"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/7P/8/PPPPPPP1/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "A00"]
+[Opening "Kádas Opening"]
+
+1... c6 {[%eval 0.30,10] [%emt 0:00:00.100]}
+2. b4 {[%eval 0.30,11] [%emt 0:00:00.101]}
+Nf6 {[%eval 0.30,12] [%emt 0:00:00.102]}
+3. c3 {[%eval 0.30,13] [%emt 0:00:00.103]}
+a5 {[%eval 0.30,14] [%emt 0:00:00.104]}
+4. g4 {[%eval 0.30,10] [%emt 0:00:00.105]}
+Ra7 {[%eval 0.30,11] [%emt 0:00:00.106]}
+5. a3 {[%eval 0.30,12] [%emt 0:00:00.107]}
+e5 {[%eval 0.30,13] [%emt 0:00:00.108]}
+6. Rh3 {[%eval 0.30,14] [%emt 0:00:00.109], test game 3 (1-0)} 1-0
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "2"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "B00"]
+[Opening "Pirc Defense"]
+
+1... d6 {[%eval 0.30,10] [%emt 0:00:00.100]}
+2. b4 {[%eval 0.30,11] [%emt 0:00:00.101]}
+Nc6 {[%eval 0.30,12] [%emt 0:00:00.102]}
+3. Bc4 {[%eval 0.30,13] [%emt 0:00:00.103]}
+b6 {[%eval 0.30,14] [%emt 0:00:00.104]}
+4. c3 {[%eval 0.30,10] [%emt 0:00:00.105]}
+Ne5 {[%eval 0.30,11] [%emt 0:00:00.106]}
+5. Bb2 {[%eval 0.30,12] [%emt 0:00:00.107]}
+Be6 {[%eval 0.30,13] [%emt 0:00:00.108]}
+6. Qf3 {[%eval 0.30,14] [%emt 0:00:00.109], test game 4 (1-0)} 1-0
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "1"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "A00"]
+[Opening "Ware Opening"]
+
+1... a6 {[%eval 0.30,10] [%emt 0:00:00.100]}
+2. a5 {[%eval 0.30,11] [%emt 0:00:00.101]}
+Nc6 {[%eval 0.30,12] [%emt 0:00:00.102]}
+3. b3 {[%eval 0.30,13] [%emt 0:00:00.103]}
+b5 {[%eval 0.30,14] [%emt 0:00:00.104]}
+4. h4 {[%eval 0.30,10] [%emt 0:00:00.105]}
+Ra7 {[%eval 0.30,11] [%emt 0:00:00.106]}
+5. f3 {[%eval 0.30,12] [%emt 0:00:00.107]}
+Ne5 {[%eval 0.30,13] [%emt 0:00:00.108]}
+6. Ra4 {[%eval 0.30,14] [%emt 0:00:00.109], test game 1 (1-0)} 1-0
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "1"]
+[White "A"]
+[Black "B"]
+[Result "1/2-1/2"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/1P6/8/P1PPPPPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "A00"]
+[Opening "Polish Opening"]
+
+1... b6 {[%eval 0.30,10] [%emt 0:00:00.100]}
+2. a4 {[%eval 0.30,11] [%emt 0:00:00.101]}
+Na6 {[%eval 0.30,12] [%emt 0:00:00.102]}
+3. c3 {[%eval 0.30,13] [%emt 0:00:00.103]}
+e5 {[%eval 0.30,14] [%emt 0:00:00.104]}
+4. Nf3 {[%eval 0.30,10] [%emt 0:00:00.105]}
+Nc5 {[%eval 0.30,11] [%emt 0:00:00.106]}
+5. bxc5 {[%eval 0.30,12] [%emt 0:00:00.107]}
+bxc5 {[%eval 0.30,13] [%emt 0:00:00.108]}
+6. Ra2 {[%eval 0.30,14] [%emt 0:00:00.109], test game 2 (1/2-1/2)} 1/2-1/2
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.11.27"]
+[Round "3"]
+[White "A"]
+[Black "B"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"]
+[GameDuration "00:00:07"]
+[GameStartTime "2026-11-27T10:00:00 +0100"]
+[GameEndTime "2026-11-27T10:00:07 +0100"]
+[PlyCount "10"]
+[Termination "normal"]
+[TimeControl "-"]
+[ECO "C00"]
+[Opening "French Defense: Steiner Variation"]
+
+1... e6 {[%eval

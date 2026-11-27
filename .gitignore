@@ -78,6 +78,9 @@ UHO*
 # The study layer's test games, in their subfolders too (a ChessBase database's .cbp is not a project file)
 !study/tests/data/*
 !study/tests/data/**
+# The tournament layer's test folders: a tournament folder an earlier version left (#113)
+!tournament/tests/data/*
+!tournament/tests/data/**
 
 # Build
 tmp

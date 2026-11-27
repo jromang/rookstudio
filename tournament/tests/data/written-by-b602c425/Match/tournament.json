@@ -1,0 +1,166 @@
+{
+    "book": {
+        "crc32": 3167311425,
+        "mtime": -4641891497357320166,
+        "size": 352
+    },
+    "colours": "a_white",
+    "conditions": {
+        "affinity": false,
+        "autosaveinterval": 20,
+        "check_mate_pvs": false,
+        "concurrency": 1,
+        "config_name": "config.json",
+        "draw": {
+            "enabled": false,
+            "move_count": 1,
+            "move_number": 0,
+            "score": 0
+        },
+        "epd": {
+            "append_file": true,
+            "file": ""
+        },
+        "force_concurrency": false,
+        "games": 2,
+        "gauntlet_seeds": 1,
+        "log": {
+            "append_file": true,
+            "compress": false,
+            "engine_coms": false,
+            "file": "",
+            "level": 3,
+            "realtime": true
+        },
+        "maxmoves": {
+            "enabled": false,
+            "move_count": 1
+        },
+        "noswap": false,
+        "opening": {
+            "file": "/tmp/fcg-tests-202256/bytes-match-4/book.epd",
+            "format": 0,
+            "order": 1,
+            "plies": -1,
+            "start": 1
+        },
+        "output": 0,
+        "pgn": {
+            "additional_lines_rgx": [],
+            "append_file": true,
+            "crc": false,
+            "event_name": "Fastchess Tournament",
+            "file": "",
+            "min": false,
+            "notation": 0,
+            "site": "?",
+            "track_decision": false,
+            "track_hashfull": false,
+            "track_latency": false,
+            "track_nodes": false,
+            "track_nps": false,
+            "track_pv": false,
+            "track_seldepth": false,
+            "track_tbhits": false,
+            "track_timeleft": false,
+            "track_wdl": false
+        },
+        "ratinginterval": 10,
+        "recover": false,
+        "report_penta": true,
+        "resign": {
+            "enabled": false,
+            "move_count": 1,
+            "score": 0,
+            "twosided": false
+        },
+        "reverse": false,
+        "rounds": 2,
+        "scoreinterval": 1,
+        "seed": 7876898267714442948,
+        "show_latency": false,
+        "sprt": {
+            "alpha": 0.1,
+            "beta": 0.1,
+            "elo0": 0.0,
+            "elo1": 200.0,
+            "enabled": true,
+            "model": "logistic"
+        },
+        "tb_adjudication": {
+            "enabled": false,
+            "ignore_50_move_rule": false,
+            "max_pieces": 0,
+            "syzygy_dirs": ""
+        },
+        "type": 0,
+        "variant": 0,
+        "wait": 0
+    },
+    "cycles": 1,
+    "format": "match",
+    "max_games": 0,
+    "name": "Match",
+    "participants": [
+        {
+            "engine": {
+                "args": "",
+                "cmd": "",
+                "dir": "",
+                "limit": {
+                    "nodes": 0,
+                    "plies": 0,
+                    "tc": {
+                        "fixed_time": 0,
+                        "increment": 0,
+                        "moves": 0,
+                        "time": 0,
+                        "timemargin": 0
+                    }
+                },
+                "name": "A",
+                "options": [],
+                "protocol": "",
+                "restart": false,
+                "variant": 0
+            },
+            "id": 0
+        },
+        {
+            "engine": {
+                "args": "",
+                "cmd": "",
+                "dir": "",
+                "limit": {
+                    "nodes": 0,
+                    "plies": 0,
+                    "tc": {
+                        "fixed_time": 0,
+                        "increment": 0,
+                        "moves": 0,
+                        "time": 0,
+                        "timemargin": 0
+                    }
+                },
+                "name": "B",
+                "options": [],
+                "protocol": "",
+                "restart": false,
+                "variant": 0
+            },
+            "id": 1
+        }
+    ],
+    "pgn_chessbase_file": "Match-chessbase.pgn",
+    "pgn_file": "Match.pgn",
+    "pgn_out": "/tmp/fcg-tests-202256/bytes-match-4/all.pgn",
+    "pgn_out_chessbase": true,
+    "rounds": 0,
+    "seeds": 1,
+    "unbalanced": {
+        "cp": 200,
+        "moves": 2,
+        "replace": true
+    },
+    "version": 5
+}

@@ -1,0 +1,33 @@
+{"encounter":0,"fen":"rnbqkbnr/pppppppp/8/8/P7/8/1PPPPPPP/RNBQKBNR b KQkq - 0 1","moves":[],"t":"encounter_started"}
+{"at":1795772502643,"black":1,"cb":[0,846],"encounter":0,"game":0,"ms":7000,"pgn":[0,656],"plies":10,"pv":[[3,"illegal PV move e2e5"]],"reason":"test game 1 (1-0)","result":"1-0","t":"game_finished","termination":0,"white":0}
+{"at":0,"begun":[0],"cb":true,"len":846,"pgn":[],"t":"pgn_out"}
+{"pgn":[0],"t":"pgn_out"}
+{"encounter":0,"fen":"rnbqkbnr/pppppppp/8/8/1P6/8/P1PPPPPP/RNBQKBNR b KQkq - 0 1","game":1,"moves":[],"t":"encounter_started"}
+{"at":1795772502643,"black":1,"cb":[846,853],"encounter":0,"game":1,"ms":7000,"pgn":[656,663],"plies":10,"reason":"test game 2 (1-0)","result":"1-0","t":"game_finished","termination":0,"white":0}
+{"at":846,"begun":[656],"cb":true,"len":853,"pgn":[],"t":"pgn_out"}
+{"pgn":[656],"t":"pgn_out"}
+{"encounter":1,"fen":"rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1","moves":[],"t":"encounter_started"}
+{"at":1795772502643,"black":1,"cb":[1699,879],"encounter":1,"game":0,"ms":7000,"pgn":[1319,689],"plies":10,"reason":"test game 3 (1-0)","result":"1-0","t":"game_finished","termination":0,"unbalanced":1,"white":0}
+{"at":1699,"begun":[1319],"cb":true,"len":879,"pgn":[],"t":"pgn_out"}
+{"pgn":[1319],"t":"pgn_out"}
+{"encounter":1,"fen":"rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1","game":1,"moves":[],"t":"encounter_started"}
+{"at":1795772502643,"black":1,"cb":[2578,865],"encounter":1,"game":1,"ms":7000,"pgn":[2008,675],"plies":10,"reason":"test game 4 (1/2-1/2)","result":"1/2-1/2","t":"game_finished","termination":0,"unbalanced":1,"white":0}
+{"games":[[1,0],[1,1]],"replay":true,"t":"games_voided","why":"unbalanced opening"}
+{"encounter":1,"fen":"rnbqkbnr/pppppppp/8/8/7P/8/PPPPPPP1/RNBQKBNR b KQkq - 0 1","moves":[],"t":"encounter_started"}
+{"encounter":1,"fen":"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1","game":1,"moves":[],"t":"encounter_started"}
+{"at":1795772502643,"black":1,"cb":[3443,847],"encounter":1,"game":0,"ms":7000,"pgn":[2683,657],"plies":10,"reason":"test game 3 (1-0)","result":"1-0","t":"game_finished","termination":0,"white":0}
+{"at":2578,"begun":[2683],"cb":true,"len":847,"pgn":[],"t":"pgn_out"}
+{"pgn":[2683],"t":"pgn_out"}
+{"at":1795772502643,"black":1,"cb":[4290,849],"encounter":1,"game":1,"ms":7000,"pgn":[3340,659],"plies":10,"reason":"test game 4 (1-0)","result":"1-0","t":"game_finished","termination":0,"white":0}
+{"at":3425,"begun":[3340],"cb":true,"len":849,"pgn":[],"t":"pgn_out"}
+{"pgn":[3340],"t":"pgn_out"}
+{"games":[[0,0],[0,1]],"machine":"box","network":true,"replay":true,"t":"games_voided","why":"connection to its machine lost: box"}
+{"at":1795772502643,"black":1,"cb":[5139,846],"encounter":0,"game":0,"ms":7000,"pgn":[3999,656],"plies":10,"pv":[[3,"illegal PV move e2e5"]],"reason":"test game 1 (1-0)","result":"1-0","t":"game_finished","termination":0,"white":0}
+{"at":4274,"begun":[3999],"cb":true,"len":846,"pgn":[],"t":"pgn_out"}
+{"pgn":[3999],"t":"pgn_out"}
+{"at":1795772502643,"black":1,"cb":[5985,865],"encounter":0,"game":1,"ms":7000,"pgn":[4655,675],"plies":10,"reason":"test game 2 (1/2-1/2)","result":"1/2-1/2","t":"game_finished","termination":0,"white":0}
+{"at":5120,"begun":[4655],"cb":true,"len":865,"pgn":[],"t":"pgn_out"}
+{"pgn":[4655],"t":"pgn_out"}
+{"encounter":2,"fen":"rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1","moves":[],"t":"encounter_started"}
+{"at":1795772502643,"black":1,"cb":[6850,870],"encounter":2,"game":0,"ms":7000,"pgn":[5330,680],"plies":10,"reason":"test game 5 (1-0)","result":"1-0","t":"game_finished","termination":0,"white":0}
+{"at":5985,"begun":[5330],"cb":true,"len":870,"pgn":[],"t":"pgn_out"}

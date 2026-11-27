@@ -164,7 +164,7 @@ void App::openCare(int database, CarePart part) {
     }
     page_ = Page::Databases;
     if (database < 0) {
-        db_message_ = TR("No database of yours yet: make one, or import a file, first.");
+        db_message_ = {TR("No database of yours yet: make one, or import a file, first.")};
         return;
     }
     db_selected_      = database;
@@ -284,7 +284,7 @@ void App::startCareMerges(std::size_t index, std::vector<study::DuplicateGroup> 
                 trn("Merged: {} game kept, its duplicate marked deleted. Ctrl+Z undoes.",
                     "Merged: {} games kept, their duplicates marked deleted. Ctrl+Z undoes.", n, ui::exactCount(n));
         } catch (const std::exception& e) {
-            j->error = storeErrorText(e);
+            j->error = storeFailureOf(e);
         }
     });
     care_job_    = std::move(job);
@@ -311,7 +311,7 @@ void App::startCarePlayers(std::size_t index, study::PlayerTable table, std::str
         try {
             db->setPlayers(std::move(table));
         } catch (const std::exception& e) {
-            j->error = storeErrorText(e);
+            j->error = storeFailureOf(e);
             j->undo.reset();
         }
     });
@@ -345,11 +345,11 @@ void App::startCareRestore(std::size_t index, Care::Undo undo, bool crosstable) 
     j->done   = std::async(std::launch::async, [db, j, undo = std::move(undo), refused = std::move(refused)]() mutable {
         study::enterBackground();
         try {
-            if (undo.kept && !db->undoKeepReadable()) j->error = refused;
+            if (undo.kept && !db->undoKeepReadable()) j->error = {refused};
             if (!undo.states.empty()) db->restore(undo.states);
             if (undo.players) db->setPlayers(std::move(*undo.players));
         } catch (const std::exception& e) {
-            j->error = storeErrorText(e);
+            j->error = storeFailureOf(e);
         }
     });
     care_job_ = std::move(job);
@@ -369,7 +369,7 @@ void App::startCareKeep(std::size_t index, std::vector<study::GameId> damaged) {
         try {
             j->set_aside = db->keepReadable(damaged);
         } catch (const std::exception& e) {
-            j->error = storeErrorText(e);
+            j->error = storeFailureOf(e);
         }
     });
     care_job_    = std::move(job);
@@ -386,14 +386,13 @@ void App::pollCare() {
     } catch (const std::exception& e) {
         // A task that stopped (a database that cannot be read, the disk): said where it was asked, as a refusal is;
         // a search stops as a cancelled one does, started again by its button.
-        const auto said = loggedStoreError(trf("Not done: {}.", storeErrorText(e)), e);
+        auto failure = loggedStoreFailure(trf("Not done: {}.", storeErrorText(e)), e);
         if (job->crosstable && crosstable_ && crosstable_->folder == job->folder) {
-            crosstable_->error = said;
+            crosstable_->error = std::move(failure.said);
         } else if (here) {
             // A full disk during a compaction: its card says so, and what to do.
-            if (job->kind == CareJob::Kind::Compact)
-                care_->disk_full = study::errorCode(e) == study::StoreErrc::DiskFull;
-            if (job->kind != CareJob::Kind::Compact || !care_->disk_full) care_->error = said;
+            if (job->kind == CareJob::Kind::Compact) care_->disk_full = failure.code == study::StoreErrc::DiskFull;
+            if (job->kind != CareJob::Kind::Compact || !care_->disk_full) care_->error = std::move(failure);
             if (job->kind == CareJob::Kind::Duplicates) {
                 care_->duplicates.emplace().cancelled = true;
                 care_->duplicates_of                  = job->generation;
@@ -431,7 +430,7 @@ void App::pollCare() {
         case CareJob::Kind::Keep:
             if (here) {
                 if (!job->error.empty()) {
-                    care_->error = trf("Not done: {}.", job->error);
+                    care_->error = {trf("Not done: {}.", job->error.said), job->error.code};
                     break;
                 }
                 Care::Undo undo;
@@ -442,7 +441,7 @@ void App::pollCare() {
                 care_->said = trn("{} damaged game set aside, its number kept. Ctrl+Z undoes.",
                                   "{} damaged games set aside, their numbers kept. Ctrl+Z undoes.", job->set_aside,
                                   ui::exactCount(job->set_aside));
-                care_->error.clear();
+                care_->error = {};
                 care_->check.reset();
             }
             if (job->error.empty() && index < shelf().entries().size()) shelf().rebuildTree(index);
@@ -451,8 +450,9 @@ void App::pollCare() {
             if (here) {
                 care_->disk_full = job->compacted.error_code == study::StoreErrc::DiskFull;
                 if (!job->compacted.error.empty() && !care_->disk_full)
-                    care_->error = trf("The compaction stopped: {}. Nothing changed in the database.",
-                                       storeErrorText(job->compacted.error_code, job->compacted.error));
+                    care_->error = {trf("The compaction stopped: {}. Nothing changed in the database.",
+                                        storeErrorText(job->compacted.error_code, job->compacted.error)),
+                                    job->compacted.error_code};
                 if (job->compacted.done) {
                     care_->undo.clear();  // the versions they would put back are gone from the files
                     care_->said =
@@ -468,9 +468,9 @@ void App::pollCare() {
         case CareJob::Kind::Restore:
             if (!job->error.empty()) {
                 if (job->crosstable && crosstable_ && crosstable_->folder == job->folder)
-                    crosstable_->error = trf("Not done: {}.", job->error);
+                    crosstable_->error = trf("Not done: {}.", job->error.said);
                 else if (here)
-                    care_->error = trf("Not done: {}.", job->error);
+                    care_->error = {trf("Not done: {}.", job->error.said), job->error.code};
                 break;
             }
             if (job->crosstable) {  // asked from a crosstable (#92): its undo, and what it says, there
@@ -486,7 +486,7 @@ void App::pollCare() {
             } else if (here) {
                 if (job->undo) care_->undo.push_back(std::move(*job->undo));
                 care_->said = job->said;
-                care_->error.clear();
+                care_->error = {};
                 if (job->kept) care_->check.reset();  // the damaged segments back: said again as when opened
             }
             // Merges and undoings change games: the opening tree is built again; the table of names changes none.
@@ -585,7 +585,7 @@ void App::drawCare() {
     if (!care_->error.empty() || !care_->said.empty()) {
         ImGui::PushTextWrapPos();
         if (!care_->error.empty())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", care_->error.c_str());
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", care_->error.said.c_str());
         else
             ImGui::TextDisabled("%s", care_->said.c_str());
         ImGui::PopTextWrapPos();
@@ -1135,6 +1135,7 @@ void App::drawFideListCard() {
                                trf("The download stopped at {}.", formatBytes(o.cut)).c_str());
             ImGui::TextDisabled(
                 "%s", o.error.empty() ? TR("What came is kept.") : trf("What came is kept ({}).", o.error).c_str());
+            ui::pathTooltip(o.net.path);  // the file, out of the sentence (#141)
             if (ImGui::SmallButton(TR("Resume (the rest only)"))) startFideList();
         } else if (o.same) {
             ImGui::TextDisabled("%s", trf("FIDE has published no newer list: the list of {} is the latest.",
@@ -1143,6 +1144,7 @@ void App::drawFideListCard() {
         } else if (!o.ok && !o.cancelled && !o.error.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                trf("FIDE's list could not be taken: {}.", o.error).c_str());
+            ui::pathTooltip(o.net.path);
             if (ImGui::SmallButton(TR("Try again"))) startFideList();
         }
     }
@@ -1575,7 +1577,7 @@ void App::drawCareChecks(std::size_t index) {
                     c.check.reset();
                     s.rebuildTree(index);
                 } catch (const std::exception& e) {
-                    c.error = trf("Not done: {}.", e.what());
+                    c.error = {trf("Not done: {}.", e.what()), study::errorCode(e)};
                 }
                 ImGui::EndDisabled();
                 ImGui::PopTextWrapPos();
@@ -1616,7 +1618,7 @@ void App::drawCareChecks(std::size_t index) {
                                                 ui::exactCount(games)));
                 std::erase_if(c.undo, [](const Care::Undo& u) { return u.kept; });
                 c.check.reset();  // said again as when the database was opened
-                c.error.clear();
+                c.error = {};
                 s.rebuildTree(index);
             }
         }
@@ -1655,7 +1657,7 @@ void App::drawCareChecks(std::size_t index) {
         try {
             c.plan = c.plan_job->get();
         } catch (const std::exception& e) {
-            c.error = loggedStoreError(
+            c.error = loggedStoreFailure(
                 trf("What compacting would give back could not be counted: {}.", storeErrorText(e)), e);
         }
         c.plan_job.reset();
@@ -1713,7 +1715,7 @@ void App::drawCareChecks(std::size_t index) {
             });
             care_job_          = std::move(job);
             c.disk_full        = false;
-            c.error.clear();
+            c.error            = {};
         };
         ImGui::BeginDisabled(!idle);
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(tinted(ui::ACCENT, 200)));

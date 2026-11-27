@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "graveyard.hpp"
+#include "net_failure.hpp"
 
 namespace fcg {
 
@@ -37,11 +38,19 @@ struct TaskEnd {
     enum class Kind { Done, Cancelled, Failed };
     Kind kind = Kind::Done;
     std::string error;  // why it failed, shown as it is
+    // A download's or a file's failure (#141): its kind, the host and the file, which `error` words without the path;
+    // None for the others.
+    NetFailure net = {};
 
     [[nodiscard]] static TaskEnd cancel() { return {Kind::Cancelled, {}}; }
     // At its end when `why` is empty (a reading's word for its end), else failed for it.
     [[nodiscard]] static TaskEnd of(std::string why) {
         return why.empty() ? TaskEnd{} : TaskEnd{Kind::Failed, std::move(why)};
+    }
+    // Failed for `failure`, said in its words (describe()), its file beside them.
+    [[nodiscard]] static TaskEnd of(NetFailure failure) {
+        auto said = describe(failure);
+        return {Kind::Failed, std::move(said), std::move(failure)};
     }
     [[nodiscard]] bool done() const noexcept { return kind == Kind::Done; }
     [[nodiscard]] bool cancelled() const noexcept { return kind == Kind::Cancelled; }

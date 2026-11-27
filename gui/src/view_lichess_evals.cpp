@@ -105,6 +105,7 @@ std::function<std::optional<PositionEval>(const chess::Board&)> App::reviewKnown
 void App::startOfflineEvals(std::string source, int min_men) {
     if (!offline_evals_ || offline_evals_->busy()) return;
     offline_evals_error_.clear();
+    offline_evals_failure_ = {};
     offline_evals_note_.clear();
     offline_evals_since_ = std::chrono::steady_clock::now();
     offline_evals_from_  = 0;
@@ -137,8 +138,11 @@ void App::pollOfflineEvals() {
         Console::instance().add(trf("Lichess's evaluations kept offline: {} positions, {}",
                                     ui::exactCount(state.positions), formatBytes(state.bytes)));
     } else if (end->failed()) {
-        offline_evals_error_ = end->error;
-        Console::instance().add(trf("Lichess's evaluations offline: the preparation stopped: {}", end->error), true);
+        offline_evals_error_   = end->error;
+        offline_evals_failure_ = end->net;
+        Console::instance().add(trf("Lichess's evaluations offline: the preparation stopped: {}", end->error) +
+                                    (end->net.detail.empty() ? std::string() : " (" + end->net.detail + ")"),
+                                true);
     }
 }
 
@@ -265,14 +269,17 @@ void App::drawLichessOfflineEvals() {
         if (state.stopped) {
             ImGui::TextUnformatted(
                 trf("An update stopped at {} of {}.", formatBytes(state.stopped_at), formatBytes(state.size)).c_str());
-            if (!offline_evals_error_.empty())
+            if (!offline_evals_error_.empty()) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_evals_error_.c_str());
+                ui::pathTooltip(offline_evals_failure_.path);  // the file, out of the sentence (#141)
+            }
             if (ImGui::Button(TR("Go on##offline_evals_update")))
                 startOfflineEvals(state.source, state.stopped_min_men);
             ImGui::SameLine();
             if (ImGui::Button(TR("Forget it"))) {
                 evals.forgetStopped();
                 offline_evals_error_.clear();
+                offline_evals_failure_ = {};
             }
         } else if (offline_evals_remove_) {
             ImGui::TextUnformatted(trf("Remove Lichess's evaluations kept offline? It frees {}; having them again "
@@ -337,8 +344,10 @@ void App::drawLichessOfflineEvals() {
                        formatBytes(state.stopped_at), ui::exactCount(state.kept), ui::exactCount(state.answering)))
                 .c_str());
         ImGui::TextDisabled("%s", (state.stopped_min_men > 0 ? openings() : std::string(TR("Every position"))).c_str());
-        if (!offline_evals_error_.empty())
+        if (!offline_evals_error_.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_evals_error_.c_str());
+            ui::pathTooltip(offline_evals_failure_.path);  // the file, out of the sentence (#141)
+        }
         if (ImGui::Button(TR("Go on##offline_evals")) || enter) {
             offline_evals_keys_ = false;
             startOfflineEvals(state.source, state.stopped_min_men);
@@ -348,6 +357,7 @@ void App::drawLichessOfflineEvals() {
         if (ImGui::Button(TR("Start again##offline_evals"))) {
             evals.forgetStopped();
             offline_evals_error_.clear();
+            offline_evals_failure_ = {};
         }
         return;
     }
@@ -376,8 +386,10 @@ void App::drawLichessOfflineEvals() {
                            trf("This disk lacks room: free at least {} in {}.", formatBytes(needed - free),
                                evals.folder().parent_path().string())
                                .c_str());
-    if (!offline_evals_error_.empty())
+    if (!offline_evals_error_.empty()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_evals_error_.c_str());
+        ui::pathTooltip(offline_evals_failure_.path);  // the file, out of the sentence (#141)
+    }
     const int min_men = offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0;
     if (ImGui::Button(TR("Download and prepare")) || enter) {
         offline_evals_keys_ = false;

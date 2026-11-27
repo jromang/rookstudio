@@ -102,7 +102,10 @@ TEST_CASE("Lichess month: its games read from a file, those kept added; cut shor
     REQUIRE(waitIdle(reading));
     const auto why = reading.finished();
     REQUIRE(why);
-    CHECK(why->error.find("cut short") != std::string::npos);
+    // Said without the file's path, kept beside the words (#141).
+    CHECK(why->net.kind == NetFailure::Kind::Unreadable);
+    CHECK(why->net.path == file);
+    CHECK(why->error == "the file could not be read to its end");
     CHECK(fs::exists(dir / "reading.json"));
     const auto first = db->snapshot()->games();
     CHECK(first > 0);

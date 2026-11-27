@@ -29,6 +29,8 @@
 #include <utility>
 #include <vector>
 
+#include "net_failure.hpp"
+
 namespace fcg {
 
 struct HttpResult {
@@ -155,7 +157,8 @@ struct DownloadProgress {
 
 struct Download {
     bool ok = false;
-    std::string error;  // "cancelled" when `cancel` stopped it
+    std::string error;   // "cancelled" when `cancel` stopped it; in English, with the address or the file: the log's
+    NetFailure failure;  // why it stopped, as a kind (#141), the file's path beside: what the window words
     uint64_t bytes = 0;
     bool resumed   = false;  // went on from where an earlier try stopped
     int status     = 0;      // the server's last answer, 0 when there was none
@@ -171,6 +174,10 @@ struct Download {
 
 // The host of an http:// or https:// URL, without its port, as HostGate names it; empty when it is not one.
 [[nodiscard]] std::string urlHost(std::string_view url);
+
+// The kind of failure of a request's result (#141), for `url`: None for a whole 2xx answer, Cancelled when the program
+// stopped it, Offline without an answer or with one cut short, else the status's (404, 429, another).
+[[nodiscard]] NetFailure netFailureOf(const HttpResult& result, std::string_view url);
 
 // The SHA-256 of a file, in hexadecimal; empty when it cannot be read.
 [[nodiscard]] std::string sha256File(const std::filesystem::path& file);

@@ -121,6 +121,8 @@ struct InstallResult {
     bool ok        = false;
     bool cancelled = false;  // `cancel` stopped the download: what came is kept, the next try goes on from there
     std::string error;
+    NetFailure
+        net;  // the download's failure `error` says, translated without the file's path (#141): its kind, the file
     Installed engine;
     ProbeResult probe;                // what the engine answered: its name, its author, its options
     std::vector<std::string> failed;  // the files that did not start before it, each with why

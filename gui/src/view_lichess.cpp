@@ -1171,7 +1171,7 @@ void App::drawTreeGames() {
                 if (ply < n) board.makeMove(b.game.moves[static_cast<std::size_t>(ply)].move);
             }
         } else {
-            explorer_game_error_ = lichess::describe(answer);
+            explorer_game_error_ = answer;
         }
     }
     if (tree_games_.empty() || !lichess_account_) return;
@@ -1184,7 +1184,7 @@ void App::drawTreeGames() {
         if (ImGui::Selectable(fmt::format("{}##tree_game_{}", title, g.id).c_str(), false)) {
             explorer_game_title_ = title;
             explorer_game_fen_   = boardFen();
-            explorer_game_error_.clear();
+            explorer_game_error_ = {};
             explorer_game_job_ = std::async(
                 std::launch::async, [id = g.id, token = lichess_account_->token, masters = tree_games_source_ == 0] {
                     return masters ? lichess::mastersGame(id, token) : lichess::gamePgn(id, token);
@@ -1198,9 +1198,9 @@ void App::drawTreeGames() {
     }
     if (explorer_game_job_.valid())
         ImGui::TextDisabled("%s", TR("Asking Lichess for the game…"));
-    else if (!explorer_game_error_.empty())
+    else if (explorer_game_error_.failed())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trf("Lichess did not give the game: {}", explorer_game_error_).c_str());
+                           trf("Lichess did not give the game: {}", lichess::describe(explorer_game_error_)).c_str());
 }
 
 }  // namespace fcg

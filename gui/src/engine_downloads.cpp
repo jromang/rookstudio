@@ -439,9 +439,10 @@ InstallResult installEngine(const fs::path& profile, const Engine& engine, const
         const auto file = folder / tour::fileNameOf(choice.asset.name);
         const auto got  = politeDownload(choice.asset.url, file, progress, cancel, choice.asset.sha256);
         if (!got.ok) {
-            // The network or the disk: another file would fare no better.
-            out.cancelled = got.error == "cancelled";
-            out.error     = got.error;
+            // The network or the disk: another file would fare no better. Said by its kind, the file beside (#141).
+            out.cancelled = got.failure.cancelled();
+            out.net       = got.failure;
+            out.error     = out.cancelled ? got.error : describe(got.failure);
             return out;
         }
         if (choice.asset.sha256.empty() && choice.asset.size > 0 && fs::file_size(file, ec) != choice.asset.size) {

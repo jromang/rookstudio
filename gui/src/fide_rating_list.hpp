@@ -76,6 +76,7 @@ struct Job {
         bool same      = false;  // FIDE has not published a newer list than the one kept
         uint64_t cut   = 0;      // the bytes kept of a download cut short, which "Resume" goes on from
         std::string error;
+        NetFailure net;     // the request's or the download's failure `error` says (#141): its kind, the file beside
         std::string month;  // of the list tried, "2026-12"
         Kept kept;          // the list now in the profile, when ok
     };

@@ -434,12 +434,14 @@ class App {
     std::set<int> twic_ticked_;
     int twic_target_ = -2;  // the database chosen in the sheet: the shelf's index, -1 a new one, -2 not chosen yet
     struct TwicIndexJob {
-        std::future<std::pair<std::vector<twic::Issue>, std::string>> done;
+        std::future<std::pair<std::vector<twic::Issue>, NetFailure>> done;
         bool weekly = false;
     };
     std::optional<TwicIndexJob> twic_index_job_;
     std::vector<twic::Issue> twic_issues_;  // the index's, this session
-    std::string twic_error_;
+    // Why the page of issues gave none (#141): its kind (an outage, a status, the host's pause after a 429, a page the
+    // program cannot read), worded where the sheet says it.
+    NetFailure twic_error_;
     struct TwicAdd {
         std::string title;                          // what is added, said by the report: "TWIC 1671", "…broadcasts of…"
         std::vector<twic::Issue> issues;            // TWIC's; empty for another source
@@ -451,7 +453,8 @@ class App {
         std::filesystem::path folder;
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<DownloadProgress> progress;
-        std::future<std::vector<std::pair<std::filesystem::path, TaskEnd>>> downloads;  // each file, and how it ended
+        std::future<std::vector<std::pair<std::filesystem::path, NetFailure>>>
+            downloads;  // each file, and why it stopped
         std::vector<std::filesystem::path> files;
         std::size_t next = 0;  // the next file to import
         bool downloaded  = false;
@@ -468,9 +471,11 @@ class App {
         std::string database;
         uint64_t added = 0, duplicates = 0;
         twic::Report report;
-        std::string error;
+        StoreFailure error;   // the database's (made, its import) with the store's code, or "Cancelled."
+        NetFailure download;  // a download's (#141): its kind, the file beside its words
         std::vector<study::DuplicateGroup> others;  // the games already there from another source
         study::GameId from = 0;
+        [[nodiscard]] bool failed() const noexcept { return !error.empty() || download.failed(); }
     };
     std::optional<TwicDone> twic_done_;
     // A month of Lichess's broadcasts (#73): its page of files asked for once, read for both kinds of months.
@@ -495,8 +500,9 @@ class App {
     std::array<char, 64> chesscom_name_{};
     std::string chesscom_player_;  // the name looked up
     std::vector<std::string> chesscom_months_;
-    std::optional<std::future<std::pair<std::vector<std::string>, std::string>>> chesscom_job_;
-    std::string chesscom_error_;
+    std::optional<std::future<std::pair<std::vector<std::string>, NetFailure>>> chesscom_job_;
+    NetFailure chesscom_error_;     // why the player's months could not be had (#141): an outage, a status, a pause
+    bool chesscom_none_   = false;  // they could: the player has none
     int chesscom_target_  = -2;
     bool chesscom_follow_ = true;
     bool chesscom_loaded_ = false;
@@ -522,6 +528,7 @@ class App {
     };
     std::optional<MonthRun> month_run_;
     std::string month_stopped_;  // why the last reading stopped, before its end
+    NetFailure month_failure_;   // the download's or the file's failure it says (#141): its kind, its file beside it
     // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
     // background, its move shown.
     struct FileLines {
@@ -546,7 +553,7 @@ class App {
     int db_selected_ = -1;
     bool db_naming_  = false;  // a new database's name being typed
     std::array<char, 128> db_name_{};
-    std::string db_message_;     // the last import's outcome
+    StoreFailure db_message_;    // the last import's outcome, a database's error with its code
     std::string db_linked_key_;  // the linked sources listed: the tournaments, the PGN file opened
     // The maintenance of a database (mockup M13, board 1; view_maintenance.cpp), in place of the Databases page while
     // open, from a database's ⋯, an import's report or Ctrl+K: its duplicate games, its players' names and FIDE's
@@ -595,7 +602,7 @@ class App {
         uint64_t plan_of = ~uint64_t{0};
         std::shared_ptr<std::future<study::CompactPlan>> plan_job;
         std::string said;              // what was just done, and Ctrl+Z
-        std::string error;             // why it could not be done
+        StoreFailure error;            // why it could not be done
         bool start_check     = false;  // Ctrl+K "Check the database": started once the page shows
         bool open_first_pair = false;  // the first group compared once found (a capture's)
         struct Undo {
@@ -629,7 +636,8 @@ class App {
         study::CheckReport check;
         study::Compacted compacted;
         std::optional<Care::Undo> undo;  // a change's, pushed when it is done
-        std::string said, error;
+        std::string said;
+        StoreFailure error;
         std::size_t merged = 0;
         uint64_t set_aside = 0;      // Keep: the games set aside
         bool kept          = false;  // Restore: Keep what can be read undone, the damaged segments back
@@ -866,7 +874,7 @@ class App {
     std::optional<CoverageJob> coverage_job_;
     std::optional<study::Coverage> coverage_;
     std::string coverage_of_;
-    std::string coverage_error_;  // why the coverage of coverage_of_ could not be measured
+    StoreFailure coverage_error_;  // why the coverage of coverage_of_ could not be measured, with the store's code
     int coverage_depth_ = 0;  // 0 the ends of the lines, 1 move 10, 2 move 15
     std::set<std::filesystem::path> coverage_left_;  // the databases the coverage is not measured on (folders)
     bool rep_naming_    = false;
@@ -950,6 +958,7 @@ class App {
     std::chrono::steady_clock::time_point syzygy_state_at_{};
     uint64_t syzygy_generation_ = 0;
     std::string syzygy_error_;
+    NetFailure syzygy_failure_;  // the failure it says (#141): its kind, the file beside the words
     const SyzygyDownload::State& syzygyState();
     void pollTablesDownload();
     // Endgames against the tablebases and the mates (#82, mockup M12, board 3), a module of its own
@@ -1068,7 +1077,9 @@ class App {
         std::future<lichess::Reply> reply;
     };
     std::vector<OnlineCall> online_calls_;  // under way
-    std::string play_online_error_;         // the last request refused, said where the user plays
+    // The last request refused, said where the user plays: what it asked, and Lichess's failure as it came (#141).
+    std::string play_online_what_;
+    lichess::Failure play_online_error_;
     std::array<char, 32> online_user_{};    // "Challenge a player": the name typed
     bool online_user_focus_     = false;    // the field takes the keys at the next frame (Ctrl+K)
     bool online_resume_checked_ = false;    // the game kept from the last session looked for among those in progress
@@ -1414,7 +1425,7 @@ class App {
         std::future<std::vector<LevelMove>> db_job;
         std::future<lichess::Answer<lichess::Explorer>> explorer_job;
         std::string job_key;
-        std::string error;  // why the explorer gave nothing
+        lichess::Failure error;  // why the explorer gave nothing, as it came (#141)
         std::unique_ptr<Analyser> engine;
         std::string engine_name;
         std::string
@@ -2094,7 +2105,7 @@ class App {
         std::string url;                                  // the game shared
         std::optional<lichess::OpenChallenge> challenge;  // its links
         lichess::ChallengeClock clock;
-        std::string error;
+        lichess::Failure error;  // why Lichess did not do it, as it came (#141)
     };
     std::optional<ToLichess> to_lichess_;  // what was asked last, under the board until closed
     std::future<lichess::Answer<std::string>> lichess_share_job_;
@@ -2119,7 +2130,7 @@ class App {
     lichess::StudiesState studies_;
     bool studies_loaded_ = false;
     std::optional<std::vector<lichess::StudyInfo>> studies_list_;  // the account's, asked once the card opens
-    std::string studies_list_error_;
+    lichess::Failure studies_list_error_;                          // as it came (#141), worded where it is said
     std::string studies_list_of_;  // the account and the permission the list was asked with
     std::future<lichess::Answer<std::vector<lichess::StudyInfo>>> studies_list_job_;
     std::string study_shown_;                                                   // the study whose chapters show
@@ -2174,7 +2185,7 @@ class App {
     lichess::SentRecord study_update_;                     // what they send
     uint64_t study_update_serial_ = 0;
     int study_update_count_       = 0;
-    std::string study_update_error_;
+    lichess::Failure study_update_error_;  // as it came (#141), worded where it is said
     bool study_update_after_link_ = false;
     std::string study_origin_seen_;  // the database game last looked for among the games sent
     int study_popup_frame_ = -10;    // the last frame a list was open over the send card: its Escape not the card's
@@ -2415,6 +2426,7 @@ class App {
     bool offline_evals_keys_   = false;  // Enter is the card's: it was brought into view, not clicked away from
     float offline_evals_y_     = -1;     // where the card starts on the screen, for the page to scroll there
     std::string offline_evals_error_;    // why the last preparation stopped
+    NetFailure offline_evals_failure_;   // the download's or the file's failure it says (#141), the file beside it
     std::future<EvalsSize> offline_evals_update_;                  // Update: the server's file asked for its date first
     std::string offline_evals_note_;                               // what Update found
     std::chrono::steady_clock::time_point offline_evals_since_{};  // the rate: since when, from how many bytes
@@ -2531,6 +2543,7 @@ class App {
         bool for_board          = false;  // from the first-need card: the analysis engine once installed
         std::string result;               // how its last install ended
         bool result_error = false;
+        std::filesystem::path result_file;  // the file a download that failed was for, out of `result` (#141)
     };
     struct EnginePicker {
         bool open = false;
@@ -2600,6 +2613,7 @@ class App {
     };
     std::optional<VersionDownload> version_download_;
     std::string version_download_error_;
+    std::filesystem::path version_download_file_;  // the file it was for, out of the words (#141)
     bool versions_checked_ = false;  // once at the start
     void checkVersions(std::string ended = {}, std::string replaced = {});
     void pollEngineVersions();
@@ -2898,11 +2912,13 @@ class App {
         std::unique_ptr<study::Search> search;  // the games through the position after it
         bool confirmed = false;                 // none found
         uint64_t found = 0;
-        std::string error;  // why the tree could not tell it (#139: a damaged tree), said in its place
+        StoreFailure error;  // why the tree could not tell it (#139: a damaged tree), said in its place
     };
     NoveltyJob tree_novelty_;
     std::string tree_summary_;
-    bool tree_unread_ = false;  // a tree of the rows could not be read: the summary says it, no novelty is looked for
+    // A tree of the rows that could not be read (#139), with the store's code: the summary says it, no novelty is
+    // looked for.
+    StoreFailure tree_unread_;
     bool tree_book_  = false;  // the rows are a book's weights
     int tree_source_ = 0;      // the databases with a tree, the library's Polyglot books, then Lichess's explorer
     // Lichess's explorer in the Tree tab (M3, board 2; M4): its answers this session, by position and source.
@@ -2923,7 +2939,8 @@ class App {
     std::vector<lichess::ExplorerGame> tree_games_;  // those of the answer shown
     int tree_games_source_ = -1;                     // 0 the masters', 1 Lichess's
     std::future<lichess::Answer<std::string>> explorer_game_job_;
-    std::string explorer_game_title_, explorer_game_fen_, explorer_game_error_;
+    std::string explorer_game_title_, explorer_game_fen_;
+    lichess::Failure explorer_game_error_;  // as it came (#141), worded where it is said
     void pollExplorerMonths();
     void drawTreeGames();
     void drawTreeMonths(const std::string& key);  // a move's months, as a line in its row
@@ -2937,7 +2954,7 @@ class App {
         std::future<lichess::Answer<std::vector<lichess::FideCard>>> search;
         std::optional<std::vector<lichess::FideCard>> choices;  // namesakes: the user chooses
         std::optional<lichess::FideCard> shown;
-        std::string error;
+        lichess::Failure error;  // Lichess's as it came (#141); no namesake on the list, in its own words
     };
     std::optional<FideAsk> fide_ask_;
     bool fide_popup_ = false;  // opened the next frame
@@ -3266,6 +3283,7 @@ class App {
     std::future<EvalsSize> evals_size_job_;
     std::optional<EvalsSize> evals_size_;
     std::string evals_stopped_;  // why the last reading stopped before its end
+    NetFailure evals_failure_;   // the download's or the file's failure it says (#141), the file beside it
     [[nodiscard]] std::filesystem::path evalsFolderPath() const;
     void openEvaluatedSuite();
     void startEvalsReading(std::string source);

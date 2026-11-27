@@ -141,6 +141,7 @@ class PuzzlesPage final : public TrainingKind {
     // Lichess's database offline, in the profile.
     std::unique_ptr<OfflinePuzzles> offline_puzzles_;
     std::string offline_puzzles_error_;  // why the last preparation stopped
+    NetFailure offline_puzzles_failure_;  // the download's or the file's failure it says (#141), the file beside it
     std::string offline_puzzles_note_;   // what Update found
     bool offline_puzzles_remove_ = false;
     std::future<EvalsSize> offline_puzzles_update_;

@@ -111,6 +111,10 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     auto why = download.finished();
     REQUIRE(why);
     CHECK_FALSE(why->done());
+    // Said by its kind without the file's path, the file kept beside (#141).
+    CHECK(why->net.kind == NetFailure::Kind::Offline);
+    CHECK(why->net.path == folder / "KPvK.rtbw");
+    CHECK(why->error.find("KPvK") == std::string::npos);
     CHECK(download.state().files == 4);
     CHECK(download.state().ready == 0);
     CHECK(fs::file_size(fs::path(folder / "KPvK.rtbw").concat(".part")) == 3000);
@@ -142,8 +146,34 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     REQUIRE(waitUntil([&] { return !download.busy(); }));
     why = download.finished();
     REQUIRE(why);
-    CHECK(why->error.find("KRvK.rtbz") != std::string::npos);
+    CHECK(why->net.kind == NetFailure::Kind::Unexpected);
+    CHECK(why->net.path == folder / "KRvK.rtbz");  // beside the words, not in them (#141)
+    CHECK(why->error == "the file that came is not the one expected");
     CHECK_FALSE(fs::exists(folder / "KRvK.rtbz"));
     CHECK(download.state().files == 9);
     fs::remove_all(folder);
+}
+
+TEST_CASE("Syzygy download: a folder that cannot be written said by its kind, the file beside the words (#141)") {
+    const auto port = freePort();
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        (void)requestBody(head, c);
+        c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata");
+    });
+    REQUIRE(server.ok());
+    // A file stands where the folder would be made: nothing can be written there.
+    const auto blocker = fs::temp_directory_path() / "syzygy-blocked";
+    std::ofstream(blocker, std::ios::binary) << "a file, not a folder";
+    const auto folder = blocker / "tables";
+    JobGroup jobs;
+    SyzygyDownload download(jobs, folder, fmt::format("http://127.0.0.1:{}/tables", port),
+                            {{"KBvK.rtbw", 4}, {"KBvK.rtbz", 4}});
+    download.start();
+    REQUIRE(waitUntil([&] { return !download.busy(); }));
+    const auto why = download.finished();
+    REQUIRE(why);
+    CHECK(why->failed());
+    CHECK(why->net.kind == NetFailure::Kind::Unwritable);
+    CHECK(why->net.path == folder / "KBvK.rtbw");
+    CHECK(why->error == "the file could not be written (is the disk full?)");
 }

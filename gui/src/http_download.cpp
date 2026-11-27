@@ -45,10 +45,39 @@ std::string sha256File(const std::filesystem::path& file) {
     return out;
 }
 
+NetFailure netFailureOf(const HttpResult& result, std::string_view url) {
+    NetFailure out;
+    out.host   = urlHost(url);
+    out.status = result.status;
+    out.detail = result.error;
+    using Kind = NetFailure::Kind;
+    if (result.error == "cancelled") {  // https.hpp's word for a request `cancel` stopped
+        out.kind = Kind::Cancelled;
+    } else if (result.status == 0) {
+        out.kind = Kind::Offline;
+        if (out.detail.empty()) out.detail = fmt::format("no answer for {}", url);
+    } else if (result.status >= 200 && result.status < 300) {
+        out.kind = result.error.empty() ? Kind::None : Kind::Offline;  // whole, or cut short
+    } else {
+        out.kind   = result.status == 404 ? Kind::NotFound : result.status == 429 ? Kind::RateLimited : Kind::Status;
+        out.detail = fmt::format("the server answered {} for {}", result.status, url);
+    }
+    return out;
+}
+
 Download httpDownload(const std::string& url, const std::filesystem::path& file, DownloadProgress* progress,
                       const std::atomic<bool>* cancel, std::string_view sha256) {
     namespace fs = std::filesystem;
+    using Kind   = NetFailure::Kind;
     Download out;
+    // Why it stopped, as a kind: the words the window gives it, the file beside them (#141).
+    const auto failed = [&](Kind kind) {
+        out.failure.kind   = kind;
+        out.failure.status = out.status;
+        out.failure.host   = urlHost(url);
+        out.failure.path   = file;
+        out.failure.detail = out.error;
+    };
     std::error_code ec;
     if (file.has_parent_path()) fs::create_directories(file.parent_path(), ec);
     const auto part = fs::path(file).concat(".part");
@@ -112,13 +141,16 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
                 other_file = !ranged || total != have;
                 return false;
             } else {
-                out.error = fmt::format("the server answered {} for {}", status, url);
+                out.error  = fmt::format("the server answered {} for {}", status, url);
+                out.status = status;
+                failed(status == 404 ? Kind::NotFound : status == 429 ? Kind::RateLimited : Kind::Status);
                 if (const auto asked = httpHeader(head, "Retry-After"); asked && status == 429)
                     out.retry_after = retryAfter(*asked);
                 return false;
             }
             if (!f) {
                 out.error = "cannot write " + part.string();
+                failed(Kind::Unwritable);
                 return false;
             }
             if (progress) {
@@ -130,6 +162,7 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
         stream.on_data = [&](std::string_view data) {
             if (std::fwrite(data.data(), 1, data.size(), f.get()) != data.size()) {
                 out.error = "cannot write " + part.string() + " (is the disk full?)";
+                failed(Kind::Unwritable);
                 return false;
             }
             have += data.size();
@@ -144,11 +177,21 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
             fs::remove(tag, ec);
             if (attempt == 0) continue;
             out.error = "the server does not send the rest of " + url + " as asked";
+            failed(Kind::Unexpected);
             return out;
         }
-        if (out.error.empty()) out.error = result.error;
-        if (out.error.empty() && result.status == 0) out.error = "no answer for " + url;
-        if (out.error.empty() && !closed) out.error = "cannot write " + part.string();
+        if (out.error.empty() && !result.error.empty()) {
+            out.error = result.error;
+            failed(result.error == "cancelled" ? Kind::Cancelled : Kind::Offline);
+        }
+        if (out.error.empty() && result.status == 0) {
+            out.error = "no answer for " + url;
+            failed(Kind::Offline);
+        }
+        if (out.error.empty() && !closed) {
+            out.error = "cannot write " + part.string();
+            failed(Kind::Unwritable);
+        }
         out.bytes = have;
         if (!out.error.empty()) return out;  // the part kept: the next call goes on from there
         break;
@@ -160,12 +203,14 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
             fs::remove(part, ec);
             fs::remove(tag, ec);
             out.error = "the file downloaded from " + url + " is not the one expected: its SHA-256 differs";
+            failed(Kind::Unexpected);
             return out;
         }
     }
     fs::rename(part, file, ec);
     if (ec) {
         out.error = "cannot rename " + part.string() + ": " + ec.message();
+        failed(Kind::Unwritable);
         return out;
     }
     fs::remove(tag, ec);

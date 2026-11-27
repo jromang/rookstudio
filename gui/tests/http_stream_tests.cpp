@@ -363,6 +363,80 @@ TEST_CASE("HTTP: a download cut short or cancelled goes on from where it stopped
     CHECK_FALSE(fs::exists(dir / "missing.part"));
 }
 
+TEST_CASE("HTTP: a download that stops keeps why by its kind and its file, worded without the file (#141)") {
+    using Kind = NetFailure::Kind;
+    auto& gate = HostGate::instance();
+    gate.setPause(50ms);  // the host's minute after a 429, shorter for the test
+    const auto port = fcg::test::freePort();
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        (void)requestBody(head, c);
+        const auto path = requestPath(head);
+        if (path == "/missing")
+            c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+        else if (path == "/busy")
+            c.sendAll("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n");
+        else if (path == "/broken")
+            c.sendAll("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+        else
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata");
+    });
+    REQUIRE(server.ok());
+    const auto base = fmt::format("http://127.0.0.1:{}", port);
+    const auto dir  = fs::temp_directory_path() / "download-kinds";
+    fs::create_directories(dir);
+
+    auto got = httpDownload(base + "/missing", dir / "missing.zip");
+    CHECK(got.failure.kind == Kind::NotFound);
+    CHECK(got.failure.status == 404);
+    CHECK(got.failure.host == "127.0.0.1");
+    CHECK(got.failure.path == dir / "missing.zip");
+    CHECK(describe(got.failure) == "127.0.0.1 answered 404");
+
+    got = httpDownload(base + "/broken", dir / "broken.zip");
+    CHECK(got.failure.kind == Kind::Status);
+    CHECK(got.failure.status == 503);
+
+    got = politeDownload(base + "/busy", dir / "busy.zip");
+    CHECK(got.failure.kind == Kind::RateLimited);
+    CHECK(gate.pausedFor(got.failure.host) > 0ms);
+    CHECK(describe(got.failure) == "127.0.0.1 asks to wait: too many requests");
+    CHECK(gate.waitPause(got.failure.host));
+
+    // No server at all: an outage.
+    got = httpDownload(fmt::format("http://127.0.0.1:{}/file", fcg::test::freePort()), dir / "nowhere.zip");
+    CHECK(got.failure.kind == Kind::Offline);
+    CHECK(describe(got.failure) == "127.0.0.1 cannot be reached from here");
+
+    // A folder that cannot be written (a file stands where it would be): the file kept beside the words, never in
+    // them.
+    std::ofstream(dir / "taken", std::ios::binary) << "a file, not a folder";
+    const auto unwritable = dir / "taken" / "issue.zip";
+    got                   = httpDownload(base + "/file", unwritable);
+    CHECK_FALSE(got.ok);
+    CHECK(got.failure.kind == Kind::Unwritable);
+    CHECK(got.failure.path == unwritable);
+    CHECK(describe(got.failure) == "the file could not be written (is the disk full?)");
+    CHECK(describe(got.failure).find("taken") == std::string::npos);
+
+    // A file whose SHA-256 differs.
+    got = httpDownload(base + "/file", dir / "other.zip", nullptr, nullptr, std::string(64, '0'));
+    CHECK(got.failure.kind == Kind::Unexpected);
+    CHECK(describe(got.failure) == "the file that came is not the one expected");
+
+    // Cancelled: nothing to say.
+    std::atomic<bool> cancel{true};
+    gate.tooMany("127.0.0.1");
+    got = politeDownload(base + "/file", dir / "cancelled.zip", nullptr, &cancel);
+    CHECK(got.failure.kind == Kind::Cancelled);
+    CHECK_FALSE(got.failure.failed());
+    CHECK(gate.waitPause("127.0.0.1"));
+
+    // Whole: no failure.
+    got = httpDownload(base + "/file", dir / "whole.zip");
+    CHECK(got.ok);
+    CHECK(got.failure.kind == Kind::None);
+}
+
 TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 429") {
     auto& gate       = HostGate::instance();
     const auto pause = 500ms;

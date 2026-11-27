@@ -8,7 +8,10 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
+
+#include "net_failure.hpp"
 
 namespace fcg::chesscom {
 
@@ -25,6 +28,13 @@ void setServer(std::string base);
 
 // The months the list names, the oldest first ("2026/10"); empty for a list it cannot read.
 [[nodiscard]] std::vector<std::string> parseArchives(std::string_view json);
+
+// The player's list of months asked of the API (politeRequest) and read: the months, or none and why (#141), the
+// network's kind (NotFound: no player of that name; an outage, another status, the host's pause after a 429). None and
+// no failure: the player has no game. Blocks: call it from a thread of its own.
+[[nodiscard]] std::pair<std::vector<std::string>, NetFailure> fetchMonths(const std::string& player);
+// Why the months could not be had, as the sheet says it.
+[[nodiscard]] std::string monthsSaid(const NetFailure& failure);
 
 // A followed player: the database their games go into, the months already added.
 struct Followed {

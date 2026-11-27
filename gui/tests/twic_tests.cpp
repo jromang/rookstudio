@@ -1,6 +1,8 @@
 // The Week in Chess (#71): its index read, the next issue's Monday, the report of the games added, the profile's state.
 #include <doctest/doctest.hpp>
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -8,6 +10,11 @@
 #include <study/import_into.hpp>
 #include <study/store.hpp>
 
+#include <fmt/include/fmt/format.h>
+
+#include "free_ports.hpp"
+#include "https.hpp"
+#include "scripted_server.hpp"
 #include "twic.hpp"
 
 using namespace fcg;
@@ -120,4 +127,59 @@ TEST_CASE("TWIC: the profile's state, the new issue and the weekly look") {
     CHECK_FALSE(twic::lookDue(s, 1000 + 3600));
     s.weekly = false;
     CHECK_FALSE(twic::lookDue(s, 1000 + 7 * 24 * 3600));
+}
+
+TEST_CASE("TWIC: the page of issues that gives none keeps why by its kind, worded by the sheet (#141)") {
+    using namespace std::chrono_literals;
+    using Kind = NetFailure::Kind;
+    auto& gate = HostGate::instance();
+    gate.setPause(50ms);  // the host's minute after a 429, shorter for the test
+    std::atomic<int> status{200};
+    const auto port = fcg::test::freePort();
+    fcg::test::ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        (void)fcg::test::requestBody(head, c);
+        if (status == 200)
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\n<html></html>");
+        else
+            c.sendAll(fmt::format("HTTP/1.1 {} No\r\nContent-Length: 0\r\n\r\n", status.load()));
+    });
+    REQUIRE(server.ok());
+    twic::setServer(fmt::format("http://127.0.0.1:{}", port));
+
+    status                = 404;
+    auto [issues, failed] = twic::fetchIndex();
+    CHECK(issues.empty());
+    CHECK(failed.kind == Kind::NotFound);
+    CHECK(failed.status == 404);
+    CHECK(twic::indexSaid(failed) == "theweekinchess.com did not answer: HTTP 404");
+
+    status = 503;
+    failed = twic::fetchIndex().second;
+    CHECK(failed.kind == Kind::Status);
+    CHECK(failed.status == 503);
+    CHECK(twic::indexSaid(failed) == "theweekinchess.com did not answer: HTTP 503");
+
+    // A 429: the host paused, which the sheet's "Try again" will wait for.
+    status = 429;
+    failed = twic::fetchIndex().second;
+    CHECK(failed.kind == Kind::RateLimited);
+    CHECK(failed.host == "127.0.0.1");
+    CHECK(gate.pausedFor(failed.host) > 0ms);
+    CHECK(twic::indexSaid(failed) == "theweekinchess.com asks to wait: too many requests.");
+    CHECK(gate.waitPause(failed.host));
+
+    // A page that lists no issue the program can read.
+    status = 200;
+    failed = twic::fetchIndex().second;
+    CHECK(failed.kind == Kind::Unexpected);
+    CHECK(twic::indexSaid(failed) ==
+          "theweekinchess.com did not answer: The page of issues lists none the program can read.");
+
+    // No server at all: an outage.
+    twic::setServer(fmt::format("http://127.0.0.1:{}", fcg::test::freePort()));
+    failed = twic::fetchIndex().second;
+    CHECK(failed.kind == Kind::Offline);
+    CHECK(failed.status == 0);
+    CHECK(twic::indexSaid(failed) == "theweekinchess.com cannot be reached from here.");
+    twic::setServer("https://theweekinchess.com");
 }

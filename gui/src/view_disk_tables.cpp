@@ -95,8 +95,11 @@ void App::pollTablesDownload() {
             }
             Console::instance().add(trf("The Syzygy tables of 3 to 5 pieces are on the disk: {}", own));
         } else if (end->failed()) {
-            syzygy_error_ = end->error;
-            Console::instance().add(trf("The Syzygy tables' download stopped: {}", end->error), true);
+            syzygy_error_   = end->error;
+            syzygy_failure_ = end->net;
+            Console::instance().add(trf("The Syzygy tables' download stopped: {}", end->error) +
+                                        (end->net.detail.empty() ? std::string() : " (" + end->net.detail + ")"),
+                                    true);
         }
     }
     if (syzygy_download_->generation() != syzygy_generation_ && !diskTablesLocked()) {

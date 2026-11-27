@@ -210,7 +210,7 @@ void App::askOnlineScope() {
 
 void App::onlineCall(std::string what, std::function<lichess::Reply(const std::string& token)> call) {
     if (!lichess_account_) return;
-    play_online_error_.clear();
+    play_online_error_ = {};
     online_calls_.push_back(
         {std::move(what), std::async(std::launch::async, [token = lichess_account_->token, call = std::move(call)] {
              return call(token);
@@ -295,8 +295,9 @@ void App::pollOnlinePlay() {
         if (!isReady(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
-        play_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
-        if (page_ == Page::Board) boardToast(play_online_error_);
+        play_online_what_  = c.what;
+        play_online_error_ = r;
+        if (page_ == Page::Board) boardToast(trf("{}: {}", c.what, lichess::describe(r)));
     }
     std::erase_if(online_calls_, [](const auto& c) { return !c.reply.valid(); });
     if (!lichess_account_) {
@@ -922,7 +923,8 @@ void App::drawPlayLichess() {
         drawOnlineGamesList();
     }
     const ui::TextWrap wrap;
-    if (!play_online_error_.empty()) coloured(play_online_error_, ui::BAD);
+    if (play_online_error_.failed())
+        coloured(trf("{}: {}", play_online_what_, lichess::describe(play_online_error_)), ui::BAD);
     wrapped(TR("What leaves the machine: your seeks and challenges, your moves, your chat messages, draws and "
                "resignations, with your account's token. Nothing else."),
             true);

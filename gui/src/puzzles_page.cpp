@@ -201,6 +201,7 @@ PuzzleRating PuzzlesPage::puzzleRating() {
 void PuzzlesPage::startOffline(std::string source) {
     if (!offline_puzzles_ || offline_puzzles_->busy()) return;
     offline_puzzles_error_.clear();
+    offline_puzzles_failure_ = {};
     offline_puzzles_note_.clear();
     offline_puzzles_since_ = Clock::now();
     offline_puzzles_from_  = 0;
@@ -285,7 +286,8 @@ void PuzzlesPage::poll() {
                 Console::instance().add(trf("Lichess's puzzles kept offline: {} puzzles, {}",
                                             ui::exactCount(state.puzzles), formatBytes(state.bytes)));
             } else if (end->failed()) {
-                offline_puzzles_error_ = end->error;
+                offline_puzzles_error_   = end->error;
+                offline_puzzles_failure_ = end->net;
                 Console::instance().add(trf("Lichess's puzzles offline: the preparation stopped: {}", end->error),
                                         true);
             }
@@ -1761,13 +1763,16 @@ void PuzzlesPage::drawPuzzleStoreCard() {
         if (state.stopped) {
             ImGui::TextUnformatted(
                 trf("An update stopped at {} of {}.", formatBytes(state.stopped_at), formatBytes(state.size)).c_str());
-            if (!offline_puzzles_error_.empty())
+            if (!offline_puzzles_error_.empty()) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_puzzles_error_.c_str());
+                ui::pathTooltip(offline_puzzles_failure_.path);  // the file, out of the sentence (#141)
+            }
             if (ImGui::Button(TR("Go on##offline_puzzles_update"))) startOffline(state.source);
             ImGui::SameLine();
             if (ImGui::Button(TR("Forget it##offline_puzzles"))) {
                 puzzles.forgetStopped();
                 offline_puzzles_error_.clear();
+                offline_puzzles_failure_ = {};
             }
         } else if (offline_puzzles_remove_) {
             ImGui::TextUnformatted(trf("Remove Lichess's puzzles kept offline? It frees {}; having them again means "
@@ -1810,14 +1815,17 @@ void PuzzlesPage::drawPuzzleStoreCard() {
                         : trf("The download stopped at {}: {} puzzles read so far.", formatBytes(state.stopped_at),
                               ui::exactCount(state.kept)))
                 .c_str());
-        if (!offline_puzzles_error_.empty())
+        if (!offline_puzzles_error_.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_puzzles_error_.c_str());
+            ui::pathTooltip(offline_puzzles_failure_.path);  // the file, out of the sentence (#141)
+        }
         if (ImGui::Button(TR("Go on##offline_puzzles"))) startOffline(state.source);
         tip(TR("Reads the rest of the file, from where it stopped."));
         ImGui::SameLine();
         if (ImGui::Button(TR("Start again##offline_puzzles"))) {
             puzzles.forgetStopped();
             offline_puzzles_error_.clear();
+            offline_puzzles_failure_ = {};
         }
         return;
     }
@@ -1838,8 +1846,10 @@ void PuzzlesPage::drawPuzzleStoreCard() {
                            trf("This disk lacks room: free at least {} in {}.",
                                formatBytes(PUZZLES_STORE_BYTES * 2 - free), puzzles.folder().parent_path().string())
                                .c_str());
-    if (!offline_puzzles_error_.empty())
+    if (!offline_puzzles_error_.empty()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_puzzles_error_.c_str());
+        ui::pathTooltip(offline_puzzles_failure_.path);  // the file, out of the sentence (#141)
+    }
     if (primaryButton(trf("Download · {}", formatBytes(PUZZLES_FILE_BYTES)).c_str()))
         startOffline(lichess::puzzlesUrl());
     tip(

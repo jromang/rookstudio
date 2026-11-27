@@ -185,15 +185,19 @@ TaskEnd downloadSyzygy(const fs::path& folder, const std::string& base_url, cons
         // After the host's pause, taking no turn: a file may take minutes, which the online tables' questions to the
         // same host do not wait for.
         const auto got = politeDownload(base_url + f.name, folder / f.name, &progress.current, &job.cancel);
-        if (!got.ok) {  // its cancel stopped it, or it failed
-            end = job.cancel ? TaskEnd::cancel()
-                             : TaskEnd::of(got.error.empty() ? std::string("the download stopped") : got.error);
+        if (!got.ok) {  // its cancel stopped it, or it failed: said without the file's path, kept beside (#141)
+            end = job.cancel ? TaskEnd::cancel() : TaskEnd::of(got.failure);
             break;
         }
         if (!syzygyFileValid(folder / f.name)) {
             std::error_code ec;
             fs::remove(folder / f.name, ec);
-            end = TaskEnd::of(std::string(f.name) + ": not a Syzygy table");
+            NetFailure other;
+            other.kind   = NetFailure::Kind::Unexpected;
+            other.host   = urlHost(base_url);
+            other.path   = folder / f.name;
+            other.detail = std::string(f.name) + ": not a Syzygy table";
+            end          = TaskEnd::of(std::move(other));
             break;
         }
         std::error_code ec;

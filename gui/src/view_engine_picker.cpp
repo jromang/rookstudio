@@ -229,6 +229,7 @@ void App::installPicked(PickerEngine& e, bool keep_old) {
     e.keep_old     = keep_old;
     e.result_error = false;
     e.result.clear();
+    e.result_file.clear();
     if (!e.releases) {
         e.install_when_known = true;
         askReleases(e);
@@ -260,6 +261,7 @@ void App::pickerInstalled(PickerEngine& e, catalogue::InstallResult r) {
     if (!r.ok) {
         e.result       = r.error;
         e.result_error = true;
+        e.result_file  = r.net.path;
         e.for_board    = false;
         return;
     }
@@ -401,6 +403,7 @@ void App::drawEngineUpdates() {
             if (!pe->result.empty() && pe->result_error) {
                 ImGui::PushTextWrapPos(0);
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", pe->result.c_str());
+                ui::pathTooltip(pe->result_file);  // the file, out of the sentence (#141)
                 ImGui::PopTextWrapPos();
             }
         }
@@ -566,9 +569,10 @@ void App::drawEnginePicker() {
             }
             if (!busy && !e.result.empty()) {
                 ImGui::PushTextWrapPos(0);
-                if (e.result_error)
+                if (e.result_error) {
                     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", e.result.c_str());
-                else
+                    ui::pathTooltip(e.result_file);
+                } else
                     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GOOD), "%s", e.result.c_str());
                 ImGui::PopTextWrapPos();
             }
@@ -700,6 +704,7 @@ void App::drawFirstEngineCard(const char* why) {
         if (!gaia->result.empty() && gaia->result_error) {
             ImGui::PushTextWrapPos(0);
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", gaia->result.c_str());
+            ui::pathTooltip(gaia->result_file);
             ImGui::PopTextWrapPos();
         }
     }

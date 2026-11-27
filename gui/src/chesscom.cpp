@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <cctype>
 
+#include <fmt/include/fmt/format.h>
 #include <json.hpp>
+
+#include "https.hpp"
+#include "i18n.hpp"
 
 namespace fcg::chesscom {
 
@@ -97,6 +101,24 @@ std::vector<std::string> monthsToAsk(const std::vector<std::string>& listed, con
             out.insert(std::lower_bound(out.begin(), out.end(), newest), newest);
     }
     return out;
+}
+
+std::pair<std::vector<std::string>, NetFailure> fetchMonths(const std::string& player) {
+    HttpRequest request;
+    request.url    = archivesUrl(player);
+    request.method = "GET";
+    request.headers.emplace_back("Accept", "application/json");
+    std::pair<std::vector<std::string>, NetFailure> out;
+    const auto answer = politeRequest(request);
+    out.second        = netFailureOf(answer, request.url);
+    if (out.second.kind == NetFailure::Kind::None) out.first = parseArchives(answer.body);
+    return out;
+}
+
+std::string monthsSaid(const NetFailure& failure) {
+    if (failure.kind == NetFailure::Kind::NotFound) return TR("chess.com knows no player of that name.");
+    if (auto own = siteSentence(failure, "chess.com"); !own.empty()) return own;
+    return fmt::format("HTTP {}", failure.status);
 }
 
 }  // namespace fcg::chesscom

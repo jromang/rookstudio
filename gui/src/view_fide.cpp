@@ -55,19 +55,19 @@ void App::pollFideCards() {
             fideCards().save();
             a.shown = std::move(got.value);
         } else {
-            a.error = lichess::describe(got);
+            a.error = got;
         }
     }
     if (isReady(a.search)) {
         auto got = a.search.get();
         if (!got.value) {
-            a.error = lichess::describe(got);
+            a.error = got;
         } else if (auto match = lichess::fideMatch(*got.value, a.name)) {
             fideCards().keep(*match, a.name);
             fideCards().save();
             a.shown = std::move(match);
         } else if (got.value->empty()) {
-            a.error = trf("No player called “{}” on FIDE's list.", a.name);
+            a.error = lichess::Failure::own(trf("No player called “{}” on FIDE's list.", a.name));
         } else {
             if (got.value->size() > 12) got.value->resize(12);
             a.choices = std::move(got.value);  // the user chooses
@@ -108,8 +108,8 @@ void App::drawFideAsk(FideAsk& a) {
         ImGui::TextUnformatted(trf("Asking Lichess for {}'s FIDE card…", a.name).c_str());
         ImGui::TextDisabled("%s", a.id > 0 ? TR("Sent: the FIDE id the game gives, without an account.")
                                            : TR("Sent: the name, without an account."));
-    } else if (!a.error.empty()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", a.error.c_str());
+    } else if (a.error.failed()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", lichess::describe(a.error).c_str());
     } else if (a.choices) {
         ImGui::TextUnformatted(trf("Players called like “{}” on FIDE's list: which one is it?", a.name).c_str());
         std::optional<lichess::FideCard> chosen;

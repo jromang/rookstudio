@@ -50,6 +50,34 @@ std::optional<study::DatabaseImport> imported(DatabaseShelf& shelf) {
 
 }  // namespace
 
+TEST_CASE("databases: a database that cannot be opened keeps the store's code up to the list (#141)") {
+    const ScratchDir profile("shelf-unopened");
+    fs::path folder;
+    {
+        JobGroup jobs;
+        DatabaseShelf shelf(jobs, profile);
+        folder = shelf.entries()[shelf.create("Damaged")].folder;
+    }
+    // Its manifest damaged on the disk since: said on the list in the user's words, the code beside them.
+    std::ofstream(folder / "manifest.json", std::ios::binary | std::ios::trunc) << "{ not json";
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
+    REQUIRE(shelf.entries().size() == 1);
+    CHECK_FALSE(shelf.open(0));
+    const auto facts = shelf.facts(0);
+    CHECK(facts.error.code == study::StoreErrc::Damaged);
+    CHECK(facts.error.said == "a file of the database is damaged");
+
+    // A folder that holds no database, added by hand: refused, its code kept as well.
+    const ScratchDir empty("shelf-unopened-empty");
+    fs::create_directories(empty.path() / "Empty.fcgdb");
+    std::ofstream(empty.path() / "Empty.fcgdb" / "manifest.json", std::ios::binary) << "{}";
+    const auto added = shelf.add(empty.path() / "Empty.fcgdb");
+    CHECK_FALSE(shelf.open(added));
+    CHECK(shelf.facts(added).error.code == study::StoreErrc::NotADatabase);
+    CHECK(shelf.facts(added).error.said == "the folder holds no database");
+}
+
 TEST_CASE("databases: made, added, removed, and listed again from databases.json") {
     const ScratchDir profile("shelf-profile");
     std::size_t made = 0;
@@ -525,12 +553,13 @@ TEST_CASE("databases: a damaged opening tree read at a position is said, the oth
         REQUIRE(games.size() == 1);
         CHECK(games[0].first == "Ours");
     }
-    CHECK(read.error == "The opening tree of “Damaged” could not be read: a file of the database is damaged.");
+    CHECK(read.error.said == "The opening tree of “Damaged” could not be read: a file of the database is damaged.");
+    CHECK(read.error.code == study::StoreErrc::Damaged);  // kept for the Tree tab's line and its repair (#141)
     REQUIRE(sources.size() == 1);
     CHECK(sources[0].name == "Ours");
     const auto lines = Console::instance().since(logged);
     CHECK(std::count_if(lines.begin(), lines.end(), [&](const std::string& line) {
-              return line.rfind(read.error, 0) == 0 &&
+              return line.rfind(read.error.said, 0) == 0 &&
                      line.find(records.parent_path().filename().string()) != std::string::npos;
           }) == 1);
 

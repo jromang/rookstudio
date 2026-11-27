@@ -98,7 +98,7 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
         return;
     }
     if (monthReading()) {  // it writes to a database too: one at a time
-        db_message_ = TR("A month of Lichess is being read into a database: import once it has finished.");
+        db_message_ = {TR("A month of Lichess is being read into a database: import once it has finished.")};
         return;
     }
     bool created = false;
@@ -107,7 +107,7 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
             index   = static_cast<int>(s.create(file.stem().stem().string()));  // games.pgn.zst: games
             created = true;
         } catch (const std::exception& e) {
-            db_message_ = e.what();
+            db_message_ = {e.what(), study::errorCode(e)};
             return;
         }
     }
@@ -120,20 +120,21 @@ void App::importIntoDatabase(int index, const std::filesystem::path& file, bool 
     if (const auto db = s.open(static_cast<std::size_t>(index))) start.games = db->snapshot()->games();
     start.bytes = s.facts(static_cast<std::size_t>(index)).bytes;
     if (careBusy(s.entries()[static_cast<std::size_t>(index)].folder)) {
-        db_message_ = trf("“{}” is being compacted: import once it has finished.",
-                          s.entries()[static_cast<std::size_t>(index)].name);
+        db_message_ = {trf("“{}” is being compacted: import once it has finished.",
+                           s.entries()[static_cast<std::size_t>(index)].name)};
         return;
     }
     if (!s.startImport(static_cast<std::size_t>(index), file, db_chessbase_password_, std::move(forget))) {
         const auto facts = s.facts(index);
-        db_message_      = s.import() ? TR("An import runs already: one at a time.")
+        db_message_      = s.import() ? StoreFailure{TR("An import runs already: one at a time.")}
                            : facts.read_only
-                               ? trf("“{}” is read-only while another program writes to it: import into it once it "
-                                     "has finished.",
-                                     s.entries()[static_cast<std::size_t>(index)].name)
+                               ? StoreFailure{trf("“{}” is read-only while another program writes to it: import into "
+                                                  "it once it has finished.",
+                                                  s.entries()[static_cast<std::size_t>(index)].name),
+                                              study::StoreErrc::ReadOnly}
                                : facts.error;
     } else {
-        db_message_.clear();
+        db_message_ = {};
         db_outcome_.reset();
         db_import_start_ = std::move(start);
     }
@@ -145,7 +146,7 @@ void App::pasteGamesInto(int index) {
     SDL_free(clip);
     if (offerLichessLink(text, true)) return;  // a Lichess link: its card (#47)
     if (study::splitGames(text).empty()) {
-        db_message_ = TR("No game in the clipboard.");
+        db_message_ = {TR("No game in the clipboard.")};
         return;
     }
     std::error_code ec;
@@ -155,7 +156,7 @@ void App::pasteGamesInto(int index) {
     try {
         tour::replaceFile(file, text);
     } catch (const std::exception& e) {
-        db_message_ = e.what();
+        db_message_ = {e.what(), study::errorCode(e)};
         return;
     }
     importIntoDatabase(index, file, true);
@@ -192,8 +193,8 @@ void App::pollDatabases() {
                     std::error_code ec;
                     std::filesystem::remove(path, ec);
                 }
-                db_message_ = trf("Nothing imported: {}.", report->read.error);
-                Console::instance().add(db_message_, true);
+                db_message_ = {trf("Nothing imported: {}.", report->read.error)};
+                Console::instance().add(db_message_.said, true);
                 return;  // said on the page, the database gone
             }
         }
@@ -256,35 +257,35 @@ void App::pollDatabases() {
         db_outcome_ = std::move(o);
         db_import_start_.reset();
         if (!report->error.empty()) {
-            db_message_ =
-                trf("Import stopped: {}. The games committed before stay; importing the file again adds the "
-                    "missing ones only.",
-                    storeErrorText(report->error_code, report->error));
+            db_message_ = {trf("Import stopped: {}. The games committed before stay; importing the file again adds "
+                               "the missing ones only.",
+                               storeErrorText(report->error_code, report->error)),
+                           report->error_code};
         } else if (!report->read.error.empty()) {
-            db_message_ = trf("Import of {} stopped: {}.", file, report->read.error);
+            db_message_ = {trf("Import of {} stopped: {}.", file, report->read.error)};
             if (report->added > 0)
-                db_message_ += " " + trn("The {} game read before it stays in the database.",
-                                         "The {} games read before it stay in the database.", report->added,
-                                         ui::exactCount(report->added));
+                db_message_.said += " " + trn("The {} game read before it stays in the database.",
+                                              "The {} games read before it stay in the database.", report->added,
+                                              ui::exactCount(report->added));
         } else if (report->read.cancelled) {
-            db_message_ =
-                trf("Import of {} stopped at your request: {} games kept. Importing the file again adds the "
-                    "missing ones only.",
-                    file, ui::exactCount(report->added));
+            db_message_ = {
+                trf("Import of {} stopped at your request: {} games kept. Importing the file again adds "
+                    "the missing ones only.",
+                    file, ui::exactCount(report->added))};
         } else {
-            db_message_ = trn("Import of {} done: {} game added", "Import of {} done: {} games added", report->added,
-                              file, ui::exactCount(report->added));
+            db_message_ = {trn("Import of {} done: {} game added", "Import of {} done: {} games added", report->added,
+                               file, ui::exactCount(report->added))};
             // The damaged games right after the added ones, which they are among.
             if (report->damaged > 0)
-                db_message_ += trn(", {} of them damaged (kept up to the move that cannot be read)",
-                                   ", {} of them damaged (each kept up to the move that cannot be read)",
-                                   report->damaged, ui::exactCount(report->damaged));
+                db_message_.said += trn(", {} of them damaged (kept up to the move that cannot be read)",
+                                        ", {} of them damaged (each kept up to the move that cannot be read)",
+                                        report->damaged, ui::exactCount(report->damaged));
             if (report->duplicates > 0)
-                db_message_ += trf(", {} already there left out", ui::exactCount(report->duplicates));
-            db_message_ += ".";
+                db_message_.said += trf(", {} already there left out", ui::exactCount(report->duplicates));
+            db_message_.said += ".";
         }
-        Console::instance().add(db_message_, !report->error.empty() || !report->read.error.empty());
-        db_message_.clear();  // said by the banner on the database
+        Console::instance().add(db_message_.said, !report->error.empty() || !report->read.error.empty());
+        db_message_ = {};  // said by the banner on the database
     }
 }
 
@@ -647,7 +648,7 @@ void App::drawDatabases() {
                 try {
                     db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
                 } catch (const std::exception& e) {
-                    db_message_ = e.what();
+                    db_message_ = {e.what(), study::errorCode(e)};
                 }
             });
         }
@@ -671,7 +672,7 @@ void App::drawDatabases() {
             try {
                 db_selected_ = static_cast<int>(s.create(db_name_.data()));
             } catch (const std::exception& e) {
-                db_message_ = e.what();
+                db_message_ = {e.what(), study::errorCode(e)};
             }
             db_naming_      = false;
             db_named_frame_ = ImGui::GetFrameCount();  // its Enter does not open the new database's list
@@ -681,7 +682,7 @@ void App::drawDatabases() {
     }
     if (!db_message_.empty()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(db_message_.c_str());
+        ImGui::TextUnformatted(db_message_.said.c_str());
         ImGui::PopTextWrapPos();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
@@ -790,7 +791,7 @@ void App::drawDatabases() {
     }
     if (!facts.error.empty()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", facts.error.c_str());
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", facts.error.said.c_str());
         ImGui::PopTextWrapPos();
     } else {
         if (ImGui::BeginTable("##db_facts", 2, ImGuiTableFlags_SizingFixedFit)) {
@@ -1198,7 +1199,7 @@ void App::drawGameList() {
             const bool cancelled = *db_view_job_->cancel;
             db_view_job_.reset();
             if (cancelled) return;  // another one is wanted: made at the next frame
-            db_message_ = loggedStoreError(
+            db_message_ = loggedStoreFailure(
                 trf("The games of “{}” could not be listed: {}.", s.entries()[index].name, storeErrorText(e)), e);
             db_list_ = false;
             return;

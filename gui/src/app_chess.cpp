@@ -593,9 +593,11 @@ class App::ModulesContext final : public AppContext {
     SyzygyDownload* tablesDownload() override { return app_.syzygy_download_.get(); }
     const SyzygyDownload::State& tablesHeld() override { return app_.syzygyState(); }
     const std::string& tablesDownloadError() const override { return app_.syzygy_error_; }
+    const NetFailure& tablesDownloadFailure() const override { return app_.syzygy_failure_; }
     void startTablesDownload() override {
         if (!app_.syzygy_download_ || app_.syzygy_download_->busy()) return;
         app_.syzygy_error_.clear();
+        app_.syzygy_failure_ = {};
         app_.syzygy_download_->start();
     }
     void chooseTablesFolder() override { app_.dialogs_.openFolder(Dialogs::Purpose::Tablebases); }

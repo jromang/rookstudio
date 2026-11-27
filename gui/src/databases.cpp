@@ -132,6 +132,12 @@ std::string loggedStoreError(std::string said, const std::exception& e) {
     return said;
 }
 
+StoreFailure loggedStoreFailure(std::string said, const std::exception& e) {
+    return {loggedStoreError(std::move(said), e), study::errorCode(e)};
+}
+
+StoreFailure storeFailureOf(const std::exception& e) { return {storeErrorText(e), study::errorCode(e)}; }
+
 TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t key) {
     TreesAnswer out;
     for (auto source = sources.begin(); source != sources.end();) {
@@ -139,9 +145,9 @@ TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t ke
         try {
             if (source->tree && source->snapshot) one = source->tree->at(*source->snapshot, key);
         } catch (const std::exception& e) {
-            const auto said = loggedStoreError(
+            auto said = loggedStoreFailure(
                 trf("The opening tree of “{}” could not be read: {}.", source->name, storeErrorText(e)), e);
-            if (out.error.empty()) out.error = said;
+            if (out.error.empty()) out.error = std::move(said);
             source = sources.erase(source);
             continue;
         }
@@ -260,7 +266,7 @@ std::size_t DatabaseShelf::create(const std::string& wanted) {
         std::count_if(entries_.begin(), entries_.end(), [](const DatabaseEntry& e) { return !e.source; }));
     entries_.insert(entries_.begin() + own, {name, folder, std::nullopt});
     open_.insert(open_.begin() + own, std::move(db));
-    errors_.insert(errors_.begin() + own, std::string());
+    errors_.insert(errors_.begin() + own, StoreFailure{});
     facts_.insert(facts_.begin() + own, CachedFacts{});
     links_.insert(links_.begin() + own, Link(jobs_));
     if (auto* job = import(); job && job->index >= static_cast<std::size_t>(own)) ++job->index;
@@ -280,7 +286,7 @@ std::size_t DatabaseShelf::add(const fs::path& folder) {
         std::count_if(entries_.begin(), entries_.end(), [](const DatabaseEntry& e) { return !e.source; }));
     entries_.insert(entries_.begin() + own, {name.empty() ? folder.string() : name, folder, std::nullopt});
     open_.insert(open_.begin() + own, nullptr);
-    errors_.insert(errors_.begin() + own, std::string());
+    errors_.insert(errors_.begin() + own, StoreFailure{});
     facts_.insert(facts_.begin() + own, CachedFacts{});
     links_.insert(links_.begin() + own, Link(jobs_));
     if (auto* job = import(); job && job->index >= static_cast<std::size_t>(own)) ++job->index;
@@ -349,7 +355,7 @@ void DatabaseShelf::setLinked(const std::vector<std::pair<std::string, study::Li
     // The user's own first, as they are; then the sources, those listed already keeping what they hold.
     std::vector<DatabaseEntry> entries;
     std::vector<std::shared_ptr<study::Database>> open;
-    std::vector<std::string> errors;
+    std::vector<StoreFailure> errors;
     std::vector<CachedFacts> facts;
     std::vector<Link> links;
     links.reserve(entries_.size() + sources.size());
@@ -408,11 +414,11 @@ bool DatabaseShelf::refreshing(std::size_t index) {
     if (link.refresh.running()) return true;
     try {
         const auto done = link.refresh.take();
-        if (!done.error.empty()) errors_[index] = done.error;
+        if (!done.error.empty()) errors_[index] = {done.error};
         if (done.rebuilt) open_[index] = link.db->database();  // a database read again from the start
     } catch (const std::exception& e) {
         // Said as its errors are, on the list of databases.
-        errors_[index] = loggedStoreError(
+        errors_[index] = loggedStoreFailure(
             trf("“{}” could not be brought up to date: {}.", entries_[index].name, storeErrorText(e)), e);
     }
     facts_[index].generation = ~uint64_t{0};
@@ -435,7 +441,7 @@ std::shared_ptr<study::Database> DatabaseShelf::open(std::size_t index) {
                 }
             }
         } catch (const std::exception& e) {
-            errors_[index] = storeErrorText(e);
+            errors_[index] = storeFailureOf(e);
         }
     }
     if (entries_[index].source && links_[index].db) open_[index] = links_[index].db->database();
@@ -446,7 +452,7 @@ DatabaseFacts DatabaseShelf::facts(std::size_t index) {
     DatabaseFacts out;
     const auto db = open(index);
     if (!db) {
-        out.error = index < errors_.size() ? errors_[index] : std::string();
+        out.error = index < errors_.size() ? errors_[index] : StoreFailure{};
         return out;
     }
     const auto snapshot = db->snapshot();

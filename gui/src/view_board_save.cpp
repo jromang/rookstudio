@@ -173,6 +173,8 @@ void App::drawSaveMenu(ImVec2 under) {
         std::string label, detail;
         std::function<void()> act;
         std::string off;  // why it cannot be chosen; empty when it can
+        // A database's: the store's code of why (#141), for what repairs it; Other for the others.
+        study::StoreErrc off_code = study::StoreErrc::Other;
     };
     std::vector<Choice> choices;
     auto& s           = shelf();
@@ -208,8 +210,14 @@ void App::drawSaveMenu(ImVec2 under) {
                        : trn("{} game", "{} games", static_cast<int>(std::min<uint64_t>(facts.games, 1000000000)),
                              ui::exactCount(facts.games));
         if (from_file && !save_copy_) c.detail += std::string(" · ") + TR("the file left as it is");
-        if (facts.read_only) c.off = TR("read-only: another program writes to it");
-        if (!facts.error.empty()) c.off = facts.error;
+        if (facts.read_only) {
+            c.off      = TR("read-only: another program writes to it");
+            c.off_code = study::StoreErrc::ReadOnly;
+        }
+        if (!facts.error.empty()) {
+            c.off      = facts.error.said;
+            c.off_code = facts.error.code;
+        }
         c.act = [this, i, copy = save_copy_] { (void)saveBoardInto(i, copy); };
         choices.push_back(std::move(c));
     }

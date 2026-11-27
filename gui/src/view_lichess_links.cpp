@@ -149,7 +149,7 @@ bool App::offerLichessLink(const std::string& text, bool databases) {
         if (!lichess::lichessAddress(text)) return false;
         const char* said = TR("RookStudio does not know this Lichess address: nothing was asked of Lichess.");
         boardToast(said);
-        db_message_ = said;
+        db_message_ = {said};
         Console::instance().add(fmt::format("{} {}", said, text), false);
         return true;
     }
@@ -268,12 +268,13 @@ void App::actOnLink() {
         if (index == s.entries().size()) index = s.create(name);
         db = s.open(index);
     } catch (const std::exception& e) {
-        db_message_ = e.what();
+        db_message_ = {e.what(), study::errorCode(e)};
         return;
     }
     if (!db || db->readOnly()) {
-        db_message_ =
-            trf("“{}” is read-only while another program writes to it: import into it once it has finished.", name);
+        db_message_ = {
+            trf("“{}” is read-only while another program writes to it: import into it once it has finished.", name),
+            study::StoreErrc::ReadOnly};
         return;
     }
     LinkJob job;

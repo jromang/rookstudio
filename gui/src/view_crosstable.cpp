@@ -219,7 +219,7 @@ void App::pollTournaments() {
                     }
                 }
             db_message_ =
-                loggedStoreError(trf("The tournaments of “{}” could not be listed: {}.", name, storeErrorText(e)), e);
+                loggedStoreFailure(trf("The tournaments of “{}” could not be listed: {}.", name, storeErrorText(e)), e);
         }
         made.snapshot.reset();  // held by the list kept, if any
     }

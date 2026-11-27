@@ -134,11 +134,23 @@ TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdCons
         if (why.empty()) fs::remove(state_file, ec);
         return TaskEnd::of(std::move(why));
     };
+    // Why the source stopped, as a kind (#141): its words without the file's path, the file beside them.
+    const auto failed = [&](NetFailure::Kind kind, std::string detail, int status = 0) {
+        NetFailure f;
+        f.kind   = kind;
+        f.status = status;
+        f.detail = std::move(detail);
+        if (remote)
+            f.host = urlHost(source);
+        else
+            f.path = source;
+        return TaskEnd::of(std::move(f));
+    };
 
     if (!remote) {
         progress.size = size;
         std::ifstream in(source, std::ios::binary);
-        if (!in) return TaskEnd::of("cannot open " + source);
+        if (!in) return failed(NetFailure::Kind::Unreadable, "cannot open " + source);
         fromPlace();
         in.seekg(static_cast<std::streamoff>(offset));
         std::vector<char> buffer(1 << 20);
@@ -151,7 +163,7 @@ TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdCons
         }
         if (cancel) return stop(TaskEnd::cancel());
         if (!consumer.error().empty()) return stop(TaskEnd::of(consumer.error()));
-        if (!zstd.betweenFrames()) return stop(TaskEnd::of(source + " is cut short"));
+        if (!zstd.betweenFrames()) return stop(failed(NetFailure::Kind::Unreadable, source + " is cut short"));
         return done();
     }
 
@@ -168,6 +180,7 @@ TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdCons
             if (!validator.empty()) request.headers.emplace_back("If-Range", validator);
         }
         std::string refused;
+        int refused_status = 0;  // the status that refused it; 0 for the rest of the file not sent as asked
         HttpStream stream;
         stream.cancel  = &cancel;
         stream.on_head = [&](int status, std::string_view head) {
@@ -201,7 +214,8 @@ TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdCons
                 refused = "the server does not send the rest of the file as asked";
                 return false;
             } else {
-                refused = fmt::format("the server answered {} for {}", status, source);
+                refused        = fmt::format("the server answered {} for {}", status, source);
+                refused_status = status;
                 return false;
             }
             progress.size = size;
@@ -217,7 +231,11 @@ TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdCons
                 saveState();
                 continue;
             }
-            return TaskEnd::of(refused);
+            if (refused_status == 0) return failed(NetFailure::Kind::Unexpected, refused);
+            return failed(refused_status == 404   ? NetFailure::Kind::NotFound
+                          : refused_status == 429 ? NetFailure::Kind::RateLimited
+                                                  : NetFailure::Kind::Status,
+                          refused, refused_status);
         }
         if (result.error.empty() && result.status != 0 && zstd.betweenFrames() && (size == 0 || at == size))
             return done();
@@ -225,7 +243,8 @@ TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdCons
         consumer.commit();
         if (offset > 0) saveState();
         if (attempt >= options.retries)
-            return TaskEnd::of(result.error.empty() ? std::string("the download was cut short") : result.error);
+            return failed(NetFailure::Kind::Offline,
+                          result.error.empty() ? std::string("the download was cut short") : result.error);
         const auto wait = std::chrono::steady_clock::now() + options.retry_wait * (1 << attempt);
         while (std::chrono::steady_clock::now() < wait) {
             if (cancel) return TaskEnd::cancel();

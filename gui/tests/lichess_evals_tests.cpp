@@ -441,7 +441,8 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
         const auto why = reading.finished();
         REQUIRE(why);
-        CHECK(why->error.find("cut short") != std::string::npos);
+        CHECK(why->net.kind == NetFailure::Kind::Unreadable);  // the file beside the words (#141)
+        CHECK(why->net.path == file);
     }
     CHECK(evalsFolder(folder).stopped_at > 0);
 }

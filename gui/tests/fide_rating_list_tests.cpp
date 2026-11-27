@@ -182,6 +182,8 @@ TEST_CASE("fide list: downloaded, read into the profile, not downloaded again; a
         const auto down = wait(fide::start(profile));
         CHECK_FALSE(down.ok);
         CHECK(down.error.find("503") != std::string::npos);
+        CHECK(down.net.kind == NetFailure::Kind::Status);  // kept by its kind, worded translated (#141)
+        CHECK(down.net.status == 503);
         CHECK(fide::readKept(profile)->month == "2026-11");
     }
     // A file downloaded before, read from the disk: its day from the archive.

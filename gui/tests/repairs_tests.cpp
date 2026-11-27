@@ -108,6 +108,48 @@ TEST_CASE("repairs: a token refused (401) offers Link Lichess again…, an error
     CHECK(page.text == "Lichess refuses it");
 }
 
+TEST_CASE("repairs: a 401 to a list asked without the token is Lichess refusing, with Try again, never a link") {
+    // The TV's channels, the arenas', the broadcasts': the page's words name a token, which the request did not carry.
+    const auto refused = failure(lichess::NetError::Unauthorized, 401);
+    const auto page    = lichess::gaveNothing(refused);
+    CHECK(contains(page, "link the account again"));
+    const auto n = lichessNotice(refused, page, withoutToken(), retry(Retry::TvChannels));
+    CHECK(n.level == Notice::Level::Warning);
+    CHECK(n.text == "Lichess gave nothing (Lichess answered 401).");
+    REQUIRE(n.fixes.size() == 1);
+    CHECK(n.fixes[0].kind == Fix::Kind::RetryAfterPause);
+    CHECK(n.fixes[0].label == "Try again");
+    CHECK(static_cast<Retry>(n.fixes[0].value) == Retry::TvChannels);
+    CHECK(noticeTopic(n) == nullptr);  // the link's section is none of its business
+
+    // Lichess's own words, when it gave some, rather than its status.
+    auto said        = refused;
+    said.said        = "No such token";
+    const auto words = lichessNotice(said, lichess::gaveNothing(said), withoutToken(), retry(Retry::ArenaList));
+    CHECK(words.text == "Lichess gave nothing (No such token).");
+    REQUIRE(words.fixes.size() == 1);
+    CHECK(words.fixes[0].label == "Try again");
+
+    // During the host's pause, its Try again counts it down as any other; without a Try again of its page, no button.
+    const auto paused = lichessNotice(refused, page, withoutToken(), retry(Retry::Broadcasts, 42s));
+    REQUIRE(paused.fixes.size() == 1);
+    CHECK(paused.fixes[0].label == "Try again in 0:42");
+    const auto alone = lichessNotice(refused, lichess::describeAlone(refused), withoutToken(), RetryState{});
+    CHECK(alone.fixes.empty());
+    CHECK(alone.text == "Lichess gave nothing (Lichess answered 401).");
+
+    // The same 401 to a request that carries the token keeps its link, the account linked or not.
+    CHECK(lichessNotice(refused, page, linked(), retry(Retry::StudiesList)).fixes.at(0).kind == Fix::Kind::LinkLichess);
+    CHECK(lichessNotice(refused, page, LichessAccess{}, retry(Retry::StudiesList)).fixes.at(0).kind ==
+          Fix::Kind::LinkLichess);
+    // Its other failures are said as they are for any request: an outage's Try again, a pause's countdown.
+    const auto offline = lichessNotice(failure(lichess::NetError::Offline), "Lichess cannot be reached from here.",
+                                       withoutToken(), retry(Retry::TvChannels));
+    CHECK(offline.text == "Lichess cannot be reached from here.");
+    REQUIRE(offline.fixes.size() == 1);
+    CHECK(offline.fixes[0].label == "Try again");
+}
+
 TEST_CASE("repairs: a permission the account lacks (403) is named, with the button that asks for it") {
     const auto n = lichessNotice(failure(lichess::NetError::Forbidden, 403),
                                  "Lichess did not take the changes: the token may not do it.",

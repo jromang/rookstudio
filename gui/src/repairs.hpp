@@ -33,17 +33,25 @@ struct RetryState {
 };
 
 // What a page knows of the Lichess account for a request: linked or not, the permissions its token has, and the one
-// the request needs (empty: none in particular, the token's name only).
+// the request needs (empty: none in particular, the token's name only); whether the request carries the token at all
+// (`token`): a list anyone may read is asked without it, whatever the account (withoutToken()).
 struct LichessAccess {
     bool linked = false;
     std::vector<std::string> scopes;
     std::string needs;
+    bool token = true;
 };
+
+// A request asked without the token, whatever the account (Lichess TV's channels and games, the arenas' list, the
+// broadcasts' list): linking the account, or linking it again, would not change what Lichess answers it.
+[[nodiscard]] LichessAccess withoutToken();
 
 // A Lichess request's failure as a notice. `text` is the page's sentence, kept for what no fix repairs, at `level`.
 // A 401 says the token refused, an error with Link Lichess again… (Link the Lichess account… when none is linked); a
 // 403 for a permission the account lacks names it, with the button that asks for it ("Allow writing studies…"); a 429,
-// an outage or Lichess in trouble (5xx) offer the page's Try again, counting the pause down.
+// an outage or Lichess in trouble (5xx) offer the page's Try again, counting the pause down. A 401 to a request asked
+// without the token (withoutToken()) is Lichess refusing it, in its own words when it gave some, with the page's Try
+// again: no link would change it.
 [[nodiscard]] Notice lichessNotice(const lichess::Failure& failure, std::string text, const LichessAccess& access,
                                    const RetryState& retry, Notice::Level level = Notice::Level::Warning);
 

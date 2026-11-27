@@ -103,7 +103,8 @@ std::optional<Notice> LichessTvPage::channelsNotice() const {
     // Without a list, why none came; with one, why it is not the latest.
     auto text = tv_rows_.value ? trf("The list shown was read earlier: {}.", lichess::describe(tv_rows_))
                                : lichess::gaveNothing(tv_rows_);
-    return lichessNotice(tv_rows_, std::move(text), app_.lichessAccess({}),
+    // Asked without the token: a 401 is Lichess refusing, which no link changes.
+    return lichessNotice(tv_rows_, std::move(text), withoutToken(),
                          retries_.state(Retry::TvChannels, lichess::apiHost()));
 }
 
@@ -656,7 +657,7 @@ void LichessTvPage::drawBoardCard() {
     ImGui::TextDisabled("%s", then.c_str());
     // Why the channel's next game has not come: asked again by itself, a token refused with its repair (#146).
     if (t.error.failed() && ended && !t.stay)
-        drawRepair(lichessNotice(t.error, lichess::describeAlone(t.error), app_.lichessAccess({}), {}), "tv_next");
+        drawRepair(lichessNotice(t.error, lichess::describeAlone(t.error), withoutToken(), {}), "tv_next");
     if (!g && tv_quota_ == 0)
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                            trf("Lichess lets an address follow {} games at once: the rounds and the players followed "

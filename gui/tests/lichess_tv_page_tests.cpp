@@ -539,31 +539,30 @@ TEST_CASE("Lichess TV's module without App: why its channels did not come said w
         });
     };
 
-    // A token refused (401): said as the studies card says it, with Link Lichess again…, which the program carries out.
+    // A 401: the channels are asked without the token, so no link would change it. Lichess refusing, with Try again,
+    // the module's own; nothing given to the program, though an account is linked.
     lichess.refuse = 401;
     REQUIRE(drawn([&] { return tv.channelsNotice().has_value(); }));
     auto notice = *tv.channelsNotice();
-    CHECK(notice.level == Notice::Level::Error);
-    CHECK(notice.text == "Lichess refused the token: it was revoked or has expired.");
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Lichess gave nothing (Lichess answered 401).");
     REQUIRE(notice.fixes.size() == 1);
-    CHECK(notice.fixes[0].kind == Fix::Kind::LinkLichess);
-    CHECK(notice.fixes[0].label == "Link Lichess again…");
-    tv.repair(notice.fixes[0]);
-    REQUIRE(app.repairs.size() == 1);
-    CHECK(app.repairs[0].kind == Fix::Kind::LinkLichess);
+    CHECK(notice.fixes[0].kind == Fix::Kind::RetryAfterPause);
+    CHECK(notice.fixes[0].label == "Try again");
 
     // Lichess in trouble (503): Try again, asked at once, by the module.
     lichess.refuse = 503;
-    tv.repair(retryAfterPauseFix(Retry::TvChannels, host));
+    tv.repair(notice.fixes[0]);
     REQUIRE(drawn([&] {
         const auto n = tv.channelsNotice();
-        return n && n->level == Notice::Level::Warning;
+        return n && n->text != notice.text;
     }));
     notice = *tv.channelsNotice();
+    CHECK(notice.level == Notice::Level::Warning);
     CHECK(notice.text == "Lichess gave nothing (Lichess answered 503).");
     REQUIRE(notice.fixes.size() == 1);
     CHECK(notice.fixes[0].label == "Try again");
-    CHECK(app.repairs.size() == 1);  // the module's own: not the program's
+    CHECK(app.repairs.empty());  // the module's own: not the program's
     int asked      = lichess.channelsAsked();
     lichess.refuse = 429;
     tv.repair(notice.fixes[0]);
@@ -599,7 +598,7 @@ TEST_CASE("Lichess TV's module without App: why its channels did not come said w
         tv.poll();
     }
     CHECK(lichess.channelsAsked() == asked + 1);
-    CHECK(app.repairs.size() == 1);
+    CHECK(app.repairs.empty());
 }
 
 TEST_CASE("Lichess TV's module without App: its requests in the host's pause end at once as it goes (#148)") {

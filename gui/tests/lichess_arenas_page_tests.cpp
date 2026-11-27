@@ -730,17 +730,25 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     };
     const auto listAsked = [&] { return static_cast<int>(lichess.seen("/api/tournament").size()); };
 
-    // A token refused (401): the arenas and the teams' Swiss tournaments say it alike, as the studies card does, with
-    // Link Lichess again…, which the program carries out.
+    // A token refused (401): the teams' Swiss tournaments, asked with the token, say it as the studies card does, with
+    // Link Lichess again…, which the program carries out. The arenas' list is asked without it: Lichess refusing, which
+    // no link changes, with the module's Try again.
     lichess.refuse = 401;
     REQUIRE(drawn([&] { return arenas.listNotice() && arenas.swissesNotice(); }));
-    for (const auto& n : {*arenas.listNotice(), *arenas.swissesNotice()}) {
+    {
+        const auto n = *arenas.swissesNotice();
         CHECK(n.level == Notice::Level::Error);
         CHECK(n.text == "Lichess refused the token: it was revoked or has expired.");
         REQUIRE(n.fixes.size() == 1);
         CHECK(n.fixes[0].kind == Fix::Kind::LinkLichess);
         CHECK(n.fixes[0].label == "Link Lichess again…");
         CHECK(n.fixes[0].path.empty());  // the account has team:read already
+        const auto list = *arenas.listNotice();
+        CHECK(list.level == Notice::Level::Warning);
+        CHECK(list.text == "Lichess gave nothing (Lichess answered 401).");
+        REQUIRE(list.fixes.size() == 1);
+        CHECK(list.fixes[0].kind == Fix::Kind::RetryAfterPause);
+        CHECK(list.fixes[0].label == "Try again");
     }
     arenas.repair(arenas.swissesNotice()->fixes[0]);
     REQUIRE(app.repairs.size() == 1);
@@ -763,7 +771,7 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     arenas.repair(retryAfterPauseFix(Retry::ArenaList, host));
     REQUIRE(drawn([&] {
         const auto n = arenas.listNotice();
-        return listAsked() == asked + 1 && n && n->level == Notice::Level::Warning;
+        return listAsked() == asked + 1 && n && n->text == "Lichess gave nothing (Lichess answered 503).";
     }));
     auto notice = *arenas.listNotice();
     CHECK(notice.text == "Lichess gave nothing (Lichess answered 503).");

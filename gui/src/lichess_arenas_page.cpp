@@ -223,8 +223,8 @@ std::optional<Notice> LichessArenasPage::listNotice() const {
     // Without a list, why none came; with one, why it is not the latest.
     auto text =
         list.value ? trf("The list shown was read earlier: {}.", lichess::describe(list)) : lichess::gaveNothing(list);
-    return lichessNotice(list, std::move(text), app_.lichessAccess({}),
-                         retries_.state(Retry::ArenaList, lichess::apiHost()));
+    // Asked without the token: a 401 is Lichess refusing, which no link changes.
+    return lichessNotice(list, std::move(text), withoutToken(), retries_.state(Retry::ArenaList, lichess::apiHost()));
 }
 
 std::optional<Notice> LichessArenasPage::swissesNotice() const {

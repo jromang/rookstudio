@@ -113,6 +113,8 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
                 return false;
             } else {
                 out.error = fmt::format("the server answered {} for {}", status, url);
+                if (const auto asked = httpHeader(head, "Retry-After"); asked && status == 429)
+                    out.retry_after = retryAfter(*asked);
                 return false;
             }
             if (!f) {

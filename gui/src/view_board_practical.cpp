@@ -424,9 +424,12 @@ void App::drawPractical() {
                        "move…");
             break;
     }
-    if (p.error.failed()) sentence += " " + trf("(Lichess's explorer gave nothing: {})", lichess::describe(p.error));
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", sentence.c_str());
+    if (p.error.failed())  // the explorer wants a token: a token refused, Link Lichess again… (#141)
+        drawRepairNotice(lichessNotice(p.error, trf("Lichess's explorer gave nothing: {}.", lichess::describe(p.error)),
+                                       lichessAccess(), {}),
+                         "practical_error");
     ImGui::TextDisabled("%s", TR("Among the moves the engine puts within 0.3 pawn of its best (or that keep the "
                                  "tables' verdict), the one that scores best against a player of this level, in the "
                                  "games of this level, from 200 games; outside known games, the one that leaves the "

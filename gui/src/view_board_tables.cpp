@@ -211,6 +211,11 @@ void App::drawBoardEndgames() {
             if (ImGui::SmallButton(TR("Ask for this position"))) online_once_.insert(positionKey(fen));
         } else if (t.asking.valid()) {
             ImGui::TextDisabled("%s", TR("Asking Lichess's tables…"));
+        } else if (t.nothing && t.nothing->failed()) {
+            // The pause counted down on Try again, which waits for it; asked again by itself once it is over (#141).
+            drawRepairNotice(lichessNotice(*t.nothing, tablesNothing(*t.nothing, pause), lichessAccess(),
+                                           retryState(Retry::BoardTables, urlHost(lichess::servers().tablebase))),
+                             "tables_nothing");
         } else if (t.nothing) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                tablesNothing(*t.nothing, pause).c_str());

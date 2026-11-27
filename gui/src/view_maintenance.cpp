@@ -1142,10 +1142,16 @@ void App::drawFideListCard() {
                                           fide::monthText(o.kept.month))
                                           .c_str());
         } else if (!o.ok && !o.cancelled && !o.error.empty()) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("FIDE's list could not be taken: {}.", o.error).c_str());
-            ui::pathTooltip(o.net.path);
-            if (ImGui::SmallButton(TR("Try again"))) startFideList();
+            // Try again, counting the site's pause down, and the folder of a file that could not be written (#141).
+            // Its Try again stays whatever the failure, as before.
+            const auto host  = o.net.host.empty() ? std::string("ratings.fide.com") : o.net.host;
+            const auto retry = retryState(Retry::FideList, host);
+            auto notice =
+                netNotice(o.net, trf("FIDE's list could not be taken: {}.", o.error), retry, Notice::Level::Warning);
+            if (notice.fixes.empty() || notice.fixes.front().kind != Fix::Kind::RetryAfterPause)
+                notice.fixes.insert(notice.fixes.begin(),
+                                    retryAfterPauseFix(Retry::FideList, host, retry.pause, retry.queued));
+            drawRepairNotice(notice, "fide_list");
         }
     }
     ImGui::TextDisabled("%s", TR("FIDE gives its list no licence: it stays on your machine, never sent nor shared. "

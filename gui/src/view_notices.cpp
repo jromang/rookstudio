@@ -1,5 +1,5 @@
 // The actionable messages of the setup summary (notice.hpp, setup_checks.hpp) and the fixes they offer: the App
-// carries them out here.
+// carries them out here, the Chess space's repairs too (#141, repairs.hpp).
 
 #include <algorithm>
 
@@ -7,10 +7,124 @@
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "lichess_arenas.hpp"  // scopesAdding()
 #include "setup_checks.hpp"
 #include "ui.hpp"
 
 namespace fcg {
+
+// What the repairs ask of the program (repairs.hpp), answered by App.
+class App::Repairs final : public RepairActions {
+   public:
+    explicit Repairs(App& app) : app_(app) {}
+    void linkLichess(const std::string& scope) override { app_.linkLichessFor(scope); }
+    void retryNow(Retry what) override { app_.retryNow(what); }
+    [[nodiscard]] std::chrono::milliseconds pausedFor(const std::string& host) const override {
+        return HostGate::instance().pausedFor(host);
+    }
+    void checkDatabase(int database) override { app_.openCare(database, CarePart::Checks); }
+    void chooseEngine() override {
+        // The study Board's Analysis tab: its "+ An engine" opened at the next frame, the library's engines and one
+        // to download; with an empty library, the card that offers the first engine (M9, board 2) in its place.
+        app_.toStudyBoard();
+        app_.board_side_tab_ = 1;
+        if (!app_.engines_.empty()) app_.side_menu_open_ = true;
+    }
+    void registerEngineAgain(const std::string& engine) override { app_.registerAgain(engine); }
+
+   private:
+    App& app_;
+};
+
+void App::runDueRetries() {
+    if (retries_.empty()) return;
+    for (const auto what : retries_.due([](const std::string& host) { return HostGate::instance().pausedFor(host); }))
+        retryNow(what);
+}
+
+void App::retryNow(Retry what) {
+    // Each the page's own Try again, as its button took it before (#141).
+    switch (what) {
+        case Retry::None:
+            break;
+        case Retry::TwicIndex:
+            startTwicIndex(false);
+            break;
+        case Retry::ChesscomMonths: {
+            const auto player = chesscom_player_;
+            startChesscomLookup(player);
+            break;
+        }
+        case Retry::LichessMonths:
+            startLichessMonths();
+            break;
+        case Retry::StudiesList:
+            studies_list_of_.clear();
+            studies_list_error_ = {};
+            break;
+        case Retry::FideList:
+            startFideList();
+            break;
+        case Retry::BoardTables:
+            board_tables_.nothing.reset();
+            break;
+        case Retry::OnlineTablebase:
+            online_tb_.reset();
+            break;
+        case Retry::OnlineCloud:
+            online_cloud_.reset();
+            break;
+        case Retry::EndgameCheck:
+            if (endgame_check_) endgame_check_->failure = {};
+            break;
+        case Retry::FileAdd: {
+            // The same files into the same database, while the report that failed still shows.
+            if (!twic_done_ || !twic_done_->download.failed() || twic_done_->urls.empty() || twic_add_) break;
+            const auto& d = *twic_done_;
+            TwicAdd add;
+            add.title          = d.title;
+            add.issues         = d.issues;
+            add.urls           = d.urls;
+            add.wanted         = d.wanted;
+            add.player         = d.player;
+            add.months         = d.months;
+            const auto title   = d.title;
+            const int database = static_cast<int>(d.index);
+            startFileAdd(std::move(add), database, title, nullptr);
+            break;
+        }
+    }
+}
+
+void App::linkLichessFor(const std::string& scope) {
+    if (lichess_link_) return;  // a link waits for the browser already
+    // The studies' permissions as their cards ask for them: writing, reading too unless the user said no to it.
+    if (scope == lichess::SCOPE_STUDY_READ || scope == lichess::SCOPE_STUDY_WRITE) {
+        askStudyPermission(scope == lichess::SCOPE_STUDY_WRITE);
+        return;
+    }
+    // An engine registered with Lichess: read and written, as its card asks (#96).
+    std::vector<std::string> asked = lichess_account_ ? lichess_account_->scopes : std::vector<std::string>{};
+    if (!scope.empty()) asked = lichess::scopesAdding(asked, scope);
+    if (scope == lichess::SCOPE_ENGINE_WRITE) asked = lichess::scopesAdding(asked, lichess::SCOPE_ENGINE_READ);
+    startLichessLink(asked, lichess_account_ ? lichess_account_->username : std::string());
+}
+
+RetryState App::retryState(Retry what, const std::string& host) const {
+    return RetryState{what, host, HostGate::instance().pausedFor(host), retries_.queued(what)};
+}
+
+LichessAccess App::lichessAccess(const std::string& needs) const {
+    LichessAccess access;
+    access.linked = lichess_account_.has_value();
+    if (lichess_account_) access.scopes = lichess_account_->scopes;
+    access.needs = needs;
+    return access;
+}
+
+void App::drawRepairNotice(const Notice& notice, const char* id) {
+    if (const auto* fix = drawNotice(notice, id)) applyFix(*fix);
+}
 
 std::vector<Notice> App::setupNotices() {
     std::vector<Notice> notices;
@@ -189,6 +303,15 @@ void App::applyFix(const Fix& fix) {
             passphrase_then_    = [] {};  // only kept
             open_passphrase_    = true;
             break;
+        case Fix::Kind::LinkLichess:
+        case Fix::Kind::RetryAfterPause:
+        case Fix::Kind::CheckDatabase:
+        case Fix::Kind::ChooseEngine:
+        case Fix::Kind::RegisterEngineAgain: {
+            Repairs repairs(*this);
+            (void)carryOutRepair(fix, repairs, retries_);
+            break;
+        }
     }
 }
 

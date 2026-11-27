@@ -923,8 +923,11 @@ void App::drawPlayLichess() {
         drawOnlineGamesList();
     }
     const ui::TextWrap wrap;
-    if (play_online_error_.failed())
-        coloured(trf("{}: {}", play_online_what_, lichess::describe(play_online_error_)), ui::BAD);
+    if (play_online_error_.failed())  // a notice without a button: online play is never replayed blindly (#141, R17)
+        drawNotice(
+            Notice{
+                Notice::Level::Error, trf("{}: {}", play_online_what_, lichess::describe(play_online_error_)), {}, {}},
+            "play_online_error");
     wrapped(TR("What leaves the machine: your seeks and challenges, your moves, your chat messages, draws and "
                "resignations, with your account's token. Nothing else."),
             true);

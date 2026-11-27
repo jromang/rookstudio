@@ -208,9 +208,10 @@ void App::drawFollowedPlayers() {
     }
     ImGui::TextDisabled("%s", TR("Those your account follows, or added by name. Lichess shows their moves three moves "
                                  "late; eight games at once at most."));
-    if (lichess_status_error_.failed())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           lichess::describeAlone(lichess_status_error_).c_str());
+    if (lichess_status_error_.failed())  // a token refused: Link Lichess again… (#141)
+        drawRepairNotice(
+            lichessNotice(lichess_status_error_, lichess::describeAlone(lichess_status_error_), lichessAccess(), {}),
+            "followed_status");
     ImGui::PopTextWrapPos();
     ui::endCard();
 }

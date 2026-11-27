@@ -598,16 +598,12 @@ void App::drawLichessStudies() {
     if (!shown.empty() && std::none_of(shown.begin(), shown.end(), [&](const auto& s) { return s.id == study_shown_; }))
         study_shown_ = shown.front().id;
     if (!studies_list_ && studies_list_job_.valid()) ImGui::TextDisabled("%s", TR("Asking Lichess…"));
-    if (studies_list_error_.failed()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trf("Lichess did not give the list: {}. What was read before stays.",
-                               lichess::describe(studies_list_error_))
-                               .c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Try again"))) {
-            studies_list_of_.clear();
-            studies_list_error_ = {};
-        }
+    if (studies_list_error_.failed()) {  // a token refused, the pause, an outage: each with its repair (#141)
+        drawRepairNotice(lichessNotice(studies_list_error_,
+                                       trf("Lichess did not give the list: {}. What was read before stays.",
+                                           lichess::describe(studies_list_error_)),
+                                       lichessAccess(), retryState(Retry::StudiesList, lichess::apiHost())),
+                         "studies_list");
     }
     if (shown.empty()) {
         if (studies_list_)
@@ -1046,11 +1042,12 @@ void App::drawSentLine() {
                                                  "changed. Never on its own."));
         }
     }
-    if (study_update_error_.failed()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ui::WARN);
-        ImGui::TextWrapped(
-            "%s", trf("Lichess did not take the changes: {}.", lichess::describe(study_update_error_)).c_str());
-        ImGui::PopStyleColor();
+    if (study_update_error_.failed()) {  // writing the chapter: the permission it needs, a token refused (#141)
+        drawRepairNotice(
+            lichessNotice(study_update_error_,
+                          trf("Lichess did not take the changes: {}.", lichess::describe(study_update_error_)),
+                          lichessAccess(lichess::SCOPE_STUDY_WRITE), {}),
+            "study_update");
     }
 }
 
@@ -1138,10 +1135,12 @@ void App::drawStudySendCard() {
             if (!studies_list_ && studies_list_job_.valid())
                 ImGui::TextDisabled("%s", TR("Asking Lichess for your studies (your name goes)…"));
             else if (!studies_list_ && studies_list_error_.failed())
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess did not give your studies ({}): those read before show here.",
-                                       lichess::describe(studies_list_error_))
-                                       .c_str());
+                drawRepairNotice(lichessNotice(studies_list_error_,
+                                               trf("Lichess did not give your studies ({}): those read before show "
+                                                   "here.",
+                                                   lichess::describe(studies_list_error_)),
+                                               lichessAccess(), retryState(Retry::StudiesList, lichess::apiHost())),
+                                 "send_studies_list");
             ImGui::RadioButton(TR("A new study"), &s.where, 1);
             if (s.where == 1) {
                 ImGui::Indent();

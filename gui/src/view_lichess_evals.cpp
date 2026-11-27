@@ -269,10 +269,9 @@ void App::drawLichessOfflineEvals() {
         if (state.stopped) {
             ImGui::TextUnformatted(
                 trf("An update stopped at {} of {}.", formatBytes(state.stopped_at), formatBytes(state.size)).c_str());
-            if (!offline_evals_error_.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_evals_error_.c_str());
-                ui::pathTooltip(offline_evals_failure_.path);  // the file, out of the sentence (#141)
-            }
+            if (!offline_evals_error_.empty())  // the file out of the sentence, its folder a click away (#141)
+                drawRepairNotice(netNotice(offline_evals_failure_, offline_evals_error_, {}, Notice::Level::Warning),
+                                 "offline_evals_update");
             if (ImGui::Button(TR("Go on##offline_evals_update")))
                 startOfflineEvals(state.source, state.stopped_min_men);
             ImGui::SameLine();
@@ -344,10 +343,9 @@ void App::drawLichessOfflineEvals() {
                        formatBytes(state.stopped_at), ui::exactCount(state.kept), ui::exactCount(state.answering)))
                 .c_str());
         ImGui::TextDisabled("%s", (state.stopped_min_men > 0 ? openings() : std::string(TR("Every position"))).c_str());
-        if (!offline_evals_error_.empty()) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_evals_error_.c_str());
-            ui::pathTooltip(offline_evals_failure_.path);  // the file, out of the sentence (#141)
-        }
+        if (!offline_evals_error_.empty())  // the file out of the sentence, its folder a click away (#141)
+            drawRepairNotice(netNotice(offline_evals_failure_, offline_evals_error_, {}, Notice::Level::Warning),
+                             "offline_evals_stopped");
         if (ImGui::Button(TR("Go on##offline_evals")) || enter) {
             offline_evals_keys_ = false;
             startOfflineEvals(state.source, state.stopped_min_men);
@@ -386,10 +384,9 @@ void App::drawLichessOfflineEvals() {
                            trf("This disk lacks room: free at least {} in {}.", formatBytes(needed - free),
                                evals.folder().parent_path().string())
                                .c_str());
-    if (!offline_evals_error_.empty()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", offline_evals_error_.c_str());
-        ui::pathTooltip(offline_evals_failure_.path);  // the file, out of the sentence (#141)
-    }
+    if (!offline_evals_error_.empty())  // the file out of the sentence, its folder a click away (#141)
+        drawRepairNotice(netNotice(offline_evals_failure_, offline_evals_error_, {}, Notice::Level::Warning),
+                         "offline_evals_error");
     const int min_men = offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0;
     if (ImGui::Button(TR("Download and prepare")) || enter) {
         offline_evals_keys_ = false;

@@ -197,10 +197,20 @@ void App::pollTwic() {
         for (auto& [file, failure] : add.downloads.get()) {
             if (failure.kind != NetFailure::Kind::None) {
                 twic_done_ = TwicDone{};
-                if (failure.cancelled())
+                if (failure.cancelled()) {
                     twic_done_->error = {TR("Cancelled.")};
-                else
-                    twic_done_->download = std::move(failure);
+                } else {
+                    auto& d    = *twic_done_;
+                    d.download = std::move(failure);
+                    // What was asked, for Try again (#141).
+                    d.title  = add.title;
+                    d.index  = add.index;
+                    d.issues = add.issues;
+                    d.urls   = add.urls;
+                    d.wanted = add.wanted;
+                    d.player = add.player;
+                    d.months = add.months;
+                }
                 twic_add_.reset();
                 return;
             }
@@ -303,15 +313,19 @@ void App::drawTwicSheet() {
     const auto there = twic_.added.find(folder);
     const auto added = [&](int n) { return there != twic_.added.end() && there->second.count(n) > 0; };
 
+    bool index_notice = false;  // Close then on a line of its own, out of the notice's fixes
     if (twic_issues_.empty()) {
         if (!twic_index_job_ && twic_error_.kind == NetFailure::Kind::None) startTwicIndex(false);
         if (twic_index_job_) {
             ImGui::TextDisabled("%s", TR("Asking theweekinchess.com for its issues…"));
         } else {
+            // The words and the page's Try again, counting the host's pause down (#141).
             ImGui::PushTextWrapPos();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", twic::indexSaid(twic_error_).c_str());
+            drawRepairNotice(
+                netNotice(twic_error_, twic::indexSaid(twic_error_), retryState(Retry::TwicIndex, twic_error_.host)),
+                "twic_index");
             ImGui::PopTextWrapPos();
-            if (ImGui::Button(TR("Try again"))) startTwicIndex(false);
+            index_notice = true;
         }
     } else {
         if (twic_ticked_.empty() && !added(twic_issues_.front().number))
@@ -394,7 +408,7 @@ void App::drawTwicSheet() {
         }
         ImGui::EndDisabled();
     }
-    ImGui::SameLine();
+    if (!index_notice) ImGui::SameLine();
     if (ImGui::Button(TR("Close"))) twic_sheet_ = false;
 
     drawFileAddProgress();
@@ -411,11 +425,21 @@ void App::drawTwicReport() {
     const auto& d = *twic_done_;
     ui::beginCard("twic_report");
     if (d.failed()) {
+        // A download's: Try again, and the folder of the file concerned, out of the sentence; the database's: its
+        // check for a damaged file, its folder for a full disk (#141).
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(
-            ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-            trf("The games could not be added: {}", d.download.failed() ? describe(d.download) : d.error.said).c_str());
-        ui::pathTooltip(d.download.path);  // the file, out of the sentence (#141)
+        if (d.download.failed()) {
+            drawRepairNotice(netNotice(d.download, trf("The games could not be added: {}", describe(d.download)),
+                                       retryState(Retry::FileAdd, d.download.host)),
+                             "twic_report");
+        } else {
+            auto said = d.error;
+            said.said = trf("The games could not be added: {}", d.error.said);
+            drawRepairNotice(storeNotice(said, static_cast<int>(d.index),
+                                         d.index < shelf().entries().size() ? shelf().entries()[d.index].folder
+                                                                            : std::filesystem::path()),
+                             "twic_report");
+        }
         ImGui::PopTextWrapPos();
     } else {
         ui::inlineIcon(ui::Icon::Check, ui::GOOD);
@@ -598,16 +622,19 @@ void App::drawBroadcastSheet() {
         for (std::size_t i = 0; i < entries.size(); ++i)
             if (!entries[i].source && entries[i].name == new_name) broadcast_target_ = static_cast<int>(i);
     }
+    bool months_notice = false;  // Close then on a line of its own, out of the notice's fixes
     if (lichess_broadcast_months_.empty()) {
         if (!lichess_months_job_ && !lichess_months_error_.failed()) startLichessMonths();
         if (lichess_months_job_) {
             ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its months…"));
         } else {
             ImGui::PushTextWrapPos();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                               monthsFailure(lichess_months_error_).c_str());
+            drawRepairNotice(
+                lichessNotice(lichess_months_error_, monthsFailure(lichess_months_error_), lichessAccess(),
+                              retryState(Retry::LichessMonths, urlHost(lichess::databaseUrl())), Notice::Level::Error),
+                "lichess_months");
             ImGui::PopTextWrapPos();
-            if (ImGui::Button(TR("Try again"))) startLichessMonths();
+            months_notice = true;
         }
     } else {
         const int shown = static_cast<int>(std::min<std::size_t>(lichess_broadcast_months_.size(), 12));
@@ -665,7 +692,7 @@ void App::drawBroadcastSheet() {
         }
         ImGui::EndDisabled();
     }
-    ImGui::SameLine();
+    if (!months_notice) ImGui::SameLine();
     if (ImGui::Button(TR("Close##broadcasts"))) broadcast_sheet_ = false;
     drawFileAddProgress();
     ImGui::PushTextWrapPos();
@@ -728,10 +755,17 @@ void App::drawChesscomSheet() {
     ImGui::EndDisabled();
     if (chesscom_job_) {
         ImGui::TextDisabled("%s", TR("Asking chess.com for the player's months…"));
-    } else if (chesscom_error_.failed() || chesscom_none_) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           chesscom_none_ ? TR("This player has no game on chess.com.")
-                                          : chesscom::monthsSaid(chesscom_error_).c_str());
+    } else if (chesscom_none_) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", TR("This player has no game on chess.com."));
+    } else if (chesscom_error_.failed()) {
+        // A 404 (no such player) has nothing to try again; an outage or the pause, the same lookup (#141).
+        ImGui::PushTextWrapPos();
+        drawRepairNotice(netNotice(chesscom_error_, chesscom::monthsSaid(chesscom_error_),
+                                   retryState(Retry::ChesscomMonths, chesscom_error_.host),
+                                   chesscom_error_.kind == NetFailure::Kind::NotFound ? Notice::Level::Warning
+                                                                                      : Notice::Level::Error),
+                         "chesscom_months");
+        ImGui::PopTextWrapPos();
     } else if (!chesscom_months_.empty()) {
         const auto followed = std::find_if(chesscom_followed_.begin(), chesscom_followed_.end(),
                                            [&](const auto& f) { return f.name == chesscom_player_; });
@@ -902,10 +936,11 @@ void App::drawMonthSheet() {
             ImGui::TextDisabled("%s", TR("Asking database.lichess.org for its months…"));
         } else {
             ImGui::PushTextWrapPos();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                               monthsFailure(lichess_months_error_).c_str());
+            drawRepairNotice(
+                lichessNotice(lichess_months_error_, monthsFailure(lichess_months_error_), lichessAccess(),
+                              retryState(Retry::LichessMonths, urlHost(lichess::databaseUrl())), Notice::Level::Error),
+                "lichess_months");
             ImGui::PopTextWrapPos();
-            if (ImGui::Button(TR("Try again"))) startLichessMonths();
         }
     } else if (!busy) {
         const int shown = static_cast<int>(std::min<std::size_t>(lichess_standard_months_.size(), 12));
@@ -988,8 +1023,13 @@ void App::drawMonthSheet() {
         if (ImGui::SmallButton(TR("Cancel##month"))) month_reading_->cancel();
     } else if (!month_stopped_.empty()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(month_stopped_.c_str());
-        ui::pathTooltip(month_failure_.path);  // a file read from the disk, out of the sentence (#141)
+        if (month_failure_.failed()) {
+            // A file of the disk that could not be read: its folder, the file out of the sentence (#141); Go on above
+            // is the Try again.
+            drawRepairNotice(netNotice(month_failure_, month_stopped_, {}, Notice::Level::Warning), "month_stopped");
+        } else {
+            ImGui::TextUnformatted(month_stopped_.c_str());
+        }
         ImGui::PopTextWrapPos();
     }
     if (ImGui::Button(TR("Close##month"))) month_sheet_ = false;

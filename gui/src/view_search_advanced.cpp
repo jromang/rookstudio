@@ -1380,9 +1380,12 @@ void App::drawPatternTab() {
         }
         if (!pattern_text_active_ && pattern_typed_at_ == 0 && !pattern_error_ && pattern_text_ != written)
             pattern_text_ = written;
-        if (pattern_error_) {
-            box(true, errorText(*pattern_error_),
-                TR("The builder keeps the last version that reads; nothing is searched while the text does not read."));
+        if (pattern_error_) {  // a notice without a button: the text says where to correct it (#141)
+            ImGui::PushTextWrapPos();
+            drawNotice(Notice{Notice::Level::Error, errorText(*pattern_error_), {}, {}}, "pattern_error");
+            ImGui::TextDisabled("%s", TR("The builder keeps the last version that reads; nothing is searched while "
+                                         "the text does not read."));
+            ImGui::PopTextWrapPos();
         }
         ImGui::PushTextWrapPos();
         ImGui::TextUnformatted(TR("The words, as in CQL"));

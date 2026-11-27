@@ -175,6 +175,8 @@ void App::drawSaveMenu(ImVec2 under) {
         std::string off;  // why it cannot be chosen; empty when it can
         // A database's: the store's code of why (#141), for what repairs it; Other for the others.
         study::StoreErrc off_code = study::StoreErrc::Other;
+        int database              = -1;  // its index in the shelf, for its check
+        std::filesystem::path folder{};
     };
     std::vector<Choice> choices;
     auto& s           = shelf();
@@ -218,6 +220,8 @@ void App::drawSaveMenu(ImVec2 under) {
             c.off      = facts.error.said;
             c.off_code = facts.error.code;
         }
+        c.database = static_cast<int>(i);
+        c.folder   = e.folder;
         c.act = [this, i, copy = save_copy_] { (void)saveBoardInto(i, copy); };
         choices.push_back(std::move(c));
     }
@@ -230,6 +234,7 @@ void App::drawSaveMenu(ImVec2 under) {
 
     ImGui::TextDisabled("%s", save_copy_ ? TR("Save a copy of the game") : TR("Save the game"));
     std::function<void()> chosen;
+    std::optional<Fix> repair;
     bool first = true;
     for (std::size_t i = 0; i < choices.size(); ++i) {
         const auto& c = choices[i];
@@ -241,7 +246,15 @@ void App::drawSaveMenu(ImVec2 under) {
         if (!c.off.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("%s", c.off.c_str());
         ImGui::Indent(px(10));
-        ImGui::TextDisabled("%s", (c.off.empty() ? c.detail : c.off).c_str());
+        if (const auto notice = storeNotice({c.off, c.off_code}, c.database, c.folder, Notice::Level::Warning);
+            !c.off.empty() && !notice.fixes.empty()) {
+            // A database that cannot take the game: its check for a damaged file, its folder for a full disk (#141).
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + px(370));
+            if (const auto* fix = drawNotice(notice, "save_off")) repair = *fix;
+            ImGui::PopTextWrapPos();
+        } else {
+            ImGui::TextDisabled("%s", (c.off.empty() ? c.detail : c.off).c_str());
+        }
         ImGui::Unindent(px(10));
         if (first && c.off.empty()) {
             if (keyboard::enterPressed()) chosen = c.act;
@@ -250,9 +263,10 @@ void App::drawSaveMenu(ImVec2 under) {
         ImGui::PopID();
     }
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) ImGui::CloseCurrentPopup();
-    if (chosen) ImGui::CloseCurrentPopup();
+    if (chosen || repair) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
     if (chosen) chosen();
+    if (repair) applyFix(*repair);
 }
 
 }  // namespace fcg

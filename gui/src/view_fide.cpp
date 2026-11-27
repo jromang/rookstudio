@@ -108,8 +108,8 @@ void App::drawFideAsk(FideAsk& a) {
         ImGui::TextUnformatted(trf("Asking Lichess for {}'s FIDE card…", a.name).c_str());
         ImGui::TextDisabled("%s", a.id > 0 ? TR("Sent: the FIDE id the game gives, without an account.")
                                            : TR("Sent: the name, without an account."));
-    } else if (a.error.failed()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", lichess::describe(a.error).c_str());
+    } else if (a.error.failed()) {  // asked without an account: a notice, nothing to repair here (#141)
+        drawRepairNotice(lichessNotice(a.error, lichess::describe(a.error), lichessAccess(), {}), "fide_ask");
     } else if (a.choices) {
         ImGui::TextUnformatted(trf("Players called like “{}” on FIDE's list: which one is it?", a.name).c_str());
         std::optional<lichess::FideCard> chosen;

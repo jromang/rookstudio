@@ -276,8 +276,12 @@ void App::drawToLichessResult(float width) {
         if (t.busy) {
             ImGui::TextDisabled("%s", TR("Asking Lichess…"));
         } else if (t.error.failed()) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("Lichess did not do it: {}", lichess::describe(t.error)).c_str());
+            // A token refused, the bookmarks' permission (#141); nothing asked again on its own.
+            drawRepairNotice(
+                lichessNotice(t.error, trf("Lichess did not do it: {}", lichess::describe(t.error)),
+                              lichessAccess(t.kind == ToLichess::Kind::Bookmark ? lichess::SCOPE_PREFERENCE_WRITE : ""),
+                              {}),
+                "to_lichess_error");
         } else if (t.kind == ToLichess::Kind::Share) {
             ImGui::TextUnformatted(TR("The game is on Lichess; its address is copied."));
             ImGui::TextDisabled("%s", t.url.c_str());

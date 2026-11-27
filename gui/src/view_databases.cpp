@@ -364,9 +364,8 @@ void App::drawFileLines() {
     bool close = ImGui::SmallButton((std::string(TR("Close")) + "##file_lines").c_str());
     if (!v.ready) {
         ImGui::TextDisabled("%s", TR("Reading the file…"));
-    } else if (!v.error.empty()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           trf("The file cannot be read: {}.", v.error).c_str());
+    } else if (!v.error.empty()) {  // a notice without a button: the file is mended out of RookStudio (#141)
+        drawNotice(Notice{Notice::Level::Error, trf("The file cannot be read: {}.", v.error), {}, {}}, "file_lines");
     } else if (v.lines.empty()) {
         ImGui::TextDisabled("%s", TR("The file no longer has this line: it has changed since the import."));
     } else {
@@ -445,9 +444,10 @@ void App::drawImportOutcome(std::size_t index) {
         ImGui::SameLine();
         if (ImGui::Button(TR("Open the database's folder"))) ui::openPath(o.folder);
     } else if (!o.report.read.error.empty()) {
-        // The file could not be read on: what was read before it stays.
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           trf("Import of {} stopped: {}.", file, o.report.read.error).c_str());
+        // The file could not be read on: what was read before it stays. A PGN that does not read is mended out of
+        // RookStudio: a notice without a button (#141).
+        drawNotice(Notice{Notice::Level::Error, trf("Import of {} stopped: {}.", file, o.report.read.error), {}, {}},
+                   "import_read");
         if (o.report.added > 0)
             ImGui::TextDisabled("%s", trn("The {} game read before it stays in the database.",
                                           "The {} games read before it stay in the database.", o.report.added, added)
@@ -682,7 +682,17 @@ void App::drawDatabases() {
     }
     if (!db_message_.empty()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(db_message_.said.c_str());
+        if (db_message_.code != study::StoreErrc::Other && db_message_.code != study::StoreErrc::Cancelled) {
+            // A database's error: its check for a damaged file, its folder for a full disk (#141).
+            const auto& entries = shelf().entries();
+            const bool known    = db_selected_ >= 0 && db_selected_ < static_cast<int>(entries.size());
+            drawRepairNotice(
+                storeNotice(db_message_, known ? db_selected_ : -1,
+                            known ? entries[static_cast<std::size_t>(db_selected_)].folder : std::filesystem::path()),
+                "db_message");
+        } else {
+            ImGui::TextUnformatted(db_message_.said.c_str());
+        }
         ImGui::PopTextWrapPos();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
@@ -789,9 +799,15 @@ void App::drawDatabases() {
         ImGui::TextDisabled("%s", folderText(entries[index].folder).c_str());
         ImGui::PopTextWrapPos();
     }
-    if (!facts.error.empty()) {
+    if (!facts.error.empty()) {  // with its repair: the check of a damaged file, the folder of a full disk (#141)
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", facts.error.said.c_str());
+        // The store's words are a phrase ("a file of the database is damaged"): said in the sentence the Guess page
+        // already uses for a database that does not open.
+        auto said = facts.error;
+        said.said = trf("“{}” cannot be opened: {}", entries[index].name, facts.error.said);
+        drawRepairNotice(storeNotice(said, linked ? -1 : static_cast<int>(index),
+                                     linked ? std::filesystem::path() : entries[index].folder),
+                         "db_error");
         ImGui::PopTextWrapPos();
     } else {
         if (ImGui::BeginTable("##db_facts", 2, ImGuiTableFlags_SizingFixedFit)) {
@@ -840,12 +856,9 @@ void App::drawDatabases() {
     // what to do.
     if (!linked && facts.unreadable > 0) {
         ui::beginCard("db_damaged");
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trn("“{}”: {} damaged game", "“{}”: {} damaged games", facts.unreadable, entries[index].name,
-                               ui::exactCount(facts.unreadable))
-                               .c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("See them##damaged"))) openCare(static_cast<int>(index), CarePart::Checks);
+        ImGui::PushTextWrapPos();
+        drawRepairNotice(damagedGamesNotice(facts.unreadable, static_cast<int>(index)), "db_damaged");
+        ImGui::PopTextWrapPos();
         ui::endCard();
         ImGui::Dummy(ImVec2(0, px(6)));
     }

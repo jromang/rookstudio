@@ -342,10 +342,14 @@ void App::drawLichessScopeAsk() {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                            TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
     } else {
-        if (ask.error.failed())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               lichess::linkRefused(ask.error) ? TR("You refused it on Lichess: nothing changed.")
-                                                               : lichess::gaveNothing(ask.error).c_str());
+        if (ask.error.failed())  // a notice, its repair the card's Allow on Lichess… under it (#141)
+            drawNotice(Notice{Notice::Level::Warning,
+                              lichess::linkRefused(ask.error) ? std::string(TR("You refused it on Lichess: nothing "
+                                                                               "changed."))
+                                                              : lichess::gaveNothing(ask.error),
+                              {},
+                              {}},
+                       "lichess_scope_error");
         if (ui::iconButton("lichess_scope_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
             auto scopes = lichess_account_->scopes;
             if (!lichess_account_->has(ask.scope)) scopes.push_back(ask.scope);
@@ -459,13 +463,12 @@ void App::drawLichessAccount() {
             ImGui::SameLine();
             ImGui::TextWrapped("%s", line);
         }
-        // What went wrong last, and the gesture that mends it (M4, board 2).
-        if (lichess_error_.failed())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               lichess::linkFailed(lichess_error_).c_str());
-        if (ui::iconButton("lichess_link", ui::Icon::External,
-                           !lichess_error_.failed() ? TR("Link the account…") : TR("Try again")))
+        // What went wrong last, and the gesture that mends it (M4, board 2): a notice with Link Lichess again… (#141).
+        if (lichess_error_.failed()) {
+            drawRepairNotice(linkNotice(lichess_error_, lichess::linkFailed(lichess_error_)), "lichess_link_failed");
+        } else if (ui::iconButton("lichess_link", ui::Icon::External, TR("Link the account…"))) {
             startLichessLink();
+        }
         ImGui::TextDisabled("%s", TR("The browser opens on lichess.org: you allow RookStudio there, without giving it "
                                      "a password."));
     }
@@ -1198,9 +1201,12 @@ void App::drawTreeGames() {
     }
     if (explorer_game_job_.valid())
         ImGui::TextDisabled("%s", TR("Asking Lichess for the game…"));
-    else if (explorer_game_error_.failed())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trf("Lichess did not give the game: {}", lichess::describe(explorer_game_error_)).c_str());
+    else if (explorer_game_error_.failed())  // a token refused: Link Lichess again… (#141)
+        drawRepairNotice(
+            lichessNotice(explorer_game_error_,
+                          trf("Lichess did not give the game: {}", lichess::describe(explorer_game_error_)),
+                          lichessAccess(), {}),
+            "explorer_game");
 }
 
 }  // namespace fcg

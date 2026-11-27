@@ -978,8 +978,15 @@ void App::drawLichessEnginesCard() {
     if (const auto error =
             std::find_if(shown.begin(), shown.end(),
                          [&](const lichess::OfferedEngine* o) { return offer_errors_.count(o->engine); });
-        error != shown.end())
-        coloured(lichess::gaveNothing(offer_errors_[(*error)->engine]), ui::WARN);
+        error != shown.end()) {
+        // Its registration gone at Lichess: registered again, under the same name and settings; a token refused or
+        // the permission missing, the link (#141).
+        const auto& name    = (*error)->engine;
+        const auto& failure = offer_errors_[name];
+        drawRepairNotice(engineOfferNotice(failure, lichess::gaveNothing(failure), name, engineIndex(name) >= 0,
+                                           lichessAccess(lichess::SCOPE_ENGINE_WRITE)),
+                         "lichess_engines_error");
+    }
     ImGui::PopTextWrapPos();
     ui::endCard();
     if (!withdraw.empty()) withdrawOffer(withdraw);

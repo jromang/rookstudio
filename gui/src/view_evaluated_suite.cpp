@@ -120,10 +120,9 @@ void App::drawEvaluatedSuite() {
                     ? trf("The reading stopped at {} of {}.", formatBytes(folder.stopped_at), formatBytes(folder.size))
                           .c_str()
                     : trf("The reading stopped at {}.", formatBytes(folder.stopped_at)).c_str());
-            if (!evals_stopped_.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", evals_stopped_.c_str());
-                ui::pathTooltip(evals_failure_.path);  // the file, out of the sentence (#141)
-            }
+            if (!evals_stopped_.empty())  // the file out of the sentence, its folder a click away (#141)
+                drawRepairNotice(netNotice(evals_failure_, evals_stopped_, {}, Notice::Level::Warning),
+                                 "evals_stopped");
             if (ImGui::Button(TR("Go on"))) startEvalsReading(folder.source);
             tip(TR("Downloads and reads the rest, from where it stopped."));
             ImGui::SameLine();

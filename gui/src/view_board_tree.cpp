@@ -940,6 +940,16 @@ void App::drawBoardTree() {
             ImGui::SetTooltip("%s", TR("Its moves and lines with their figures, its structures and plans, key games, "
                                        "novelties and the assistant's summary, in place of the page (Ctrl+K: Opening "
                                        "report)"));
+    } else if (!tree_unread_.empty() && tree_summary_ == tree_unread_.said) {
+        // A tree that cannot be read: its database's check (#139, #141).
+        const auto& entries = shelf().entries();
+        const bool one      = tree_db_ >= 0 && tree_db_ < static_cast<int>(entries.size());
+        ImGui::PushTextWrapPos();
+        drawRepairNotice(
+            storeNotice(tree_unread_, one ? tree_db_ : -1,
+                        one ? entries[static_cast<std::size_t>(tree_db_)].folder : std::filesystem::path()),
+            "tree_unread");
+        ImGui::PopTextWrapPos();
     } else {
         ImGui::PushTextWrapPos();  // a message from Lichess can be long
         ImGui::TextUnformatted(tree_summary_.c_str());
@@ -1277,9 +1287,11 @@ void App::drawTreeNovelty(std::size_t index) {
         }
     }
     auto& n = tree_novelty_;
-    if (!n.error.empty()) {
+    if (!n.error.empty()) {  // with the database's check when a file is damaged (#141)
         const ui::TextWrap wrap;
-        ImGui::TextUnformatted(n.error.said.c_str());
+        drawRepairNotice(
+            storeNotice(n.error, static_cast<int>(index), shelf().entries()[index].folder, Notice::Level::Warning),
+            "tree_novelty");
         return;
     }
     if (!n.ply || *n.ply > path->size()) return;

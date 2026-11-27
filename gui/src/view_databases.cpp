@@ -682,7 +682,17 @@ void App::drawDatabases() {
     }
     if (!db_message_.empty()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextUnformatted(db_message_.said.c_str());
+        if (db_message_.code != study::StoreErrc::Other && db_message_.code != study::StoreErrc::Cancelled) {
+            // A database's error: its check for a damaged file, its folder for a full disk (#141).
+            const auto& entries = shelf().entries();
+            const bool known    = db_selected_ >= 0 && db_selected_ < static_cast<int>(entries.size());
+            drawRepairNotice(
+                storeNotice(db_message_, known ? db_selected_ : -1,
+                            known ? entries[static_cast<std::size_t>(db_selected_)].folder : std::filesystem::path()),
+                "db_message");
+        } else {
+            ImGui::TextUnformatted(db_message_.said.c_str());
+        }
         ImGui::PopTextWrapPos();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
@@ -789,9 +799,11 @@ void App::drawDatabases() {
         ImGui::TextDisabled("%s", folderText(entries[index].folder).c_str());
         ImGui::PopTextWrapPos();
     }
-    if (!facts.error.empty()) {
+    if (!facts.error.empty()) {  // with its repair: the check of a damaged file, the folder of a full disk (#141)
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", facts.error.said.c_str());
+        drawRepairNotice(storeNotice(facts.error, linked ? -1 : static_cast<int>(index),
+                                     linked ? std::filesystem::path() : entries[index].folder),
+                         "db_error");
         ImGui::PopTextWrapPos();
     } else {
         if (ImGui::BeginTable("##db_facts", 2, ImGuiTableFlags_SizingFixedFit)) {
@@ -840,12 +852,9 @@ void App::drawDatabases() {
     // what to do.
     if (!linked && facts.unreadable > 0) {
         ui::beginCard("db_damaged");
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           trn("“{}”: {} damaged game", "“{}”: {} damaged games", facts.unreadable, entries[index].name,
-                               ui::exactCount(facts.unreadable))
-                               .c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("See them##damaged"))) openCare(static_cast<int>(index), CarePart::Checks);
+        ImGui::PushTextWrapPos();
+        drawRepairNotice(damagedGamesNotice(facts.unreadable, static_cast<int>(index)), "db_damaged");
+        ImGui::PopTextWrapPos();
         ui::endCard();
         ImGui::Dummy(ImVec2(0, px(6)));
     }

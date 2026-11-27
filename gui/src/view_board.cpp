@@ -307,8 +307,9 @@ void App::setBoardAnalysis(bool on) {
     }
     if (!engine && !engines_.empty()) engine = &engines_.front();
     if (!engine) {
-        board_.message       = TR("No engine to analyse with: add one on the Engines page.");
-        board_.message_error = true;
+        board_.message         = TR("No engine to analyse yet.");
+        board_.message_error   = false;
+        board_message_fix_for_ = board_.message;  // with Choose an engine… (#141)
         return;
     }
     if (s.engine != engine->name) {
@@ -342,8 +343,9 @@ void App::setBoardThreat(bool on) {
     }
     const auto* engine = analysisEngine();
     if (!engine) {
-        b.message       = TR("No engine to analyse with: add one on the Engines page.");
-        b.message_error = true;
+        b.message              = TR("No engine to analyse yet.");
+        b.message_error        = false;
+        board_message_fix_for_ = b.message;  // with Choose an engine… (#141)
         return;
     }
     if (aidsLocked()) {  // fair play (#48)
@@ -578,8 +580,9 @@ void App::startGameReview() {
     if (engines.empty()) {
         const auto* engine = analysisEngine();
         if (!engine) {
-            b.message       = TR("No engine to analyse with: add one on the Engines page.");
-            b.message_error = true;
+            b.message              = TR("No engine to analyse yet.");
+            b.message_error        = false;
+            board_message_fix_for_ = b.message;  // with Choose an engine… (#141)
             return;
         }
         engines.push_back(engine);
@@ -1034,7 +1037,10 @@ void App::drawBoardPage() {
             drawBoardBroadcastLine();
         }
     }
-    if (!b.message.empty()) {
+    if (!b.message.empty() && b.message == board_message_fix_for_) {
+        // No engine to analyse: the Board's engine picker, a click away (#141).
+        drawRepairNotice(Notice{Notice::Level::Warning, b.message, {}, {chooseEngineFix()}}, "board_message");
+    } else if (!b.message.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, b.message_error ? ui::BAD : ui::MUTED);
         ImGui::TextWrapped("%s", b.message.c_str());
         ImGui::PopStyleColor();

@@ -851,6 +851,10 @@ TEST_CASE("store: the manifest's keys a newer program wrote are kept through eve
     db->replace(3, games[4]);
     db->setDeleted(std::vector<GameId>{7}, true);
     kept(true);
+    auto merged = db->snapshot()->game(10);
+    merged.tags.emplace_back("Annotator", "Ada");
+    db->restore(db->merge({{10, merged, {11}}}));
+    kept(true);
     db->setPlayers(PlayerTable(std::vector<Player>{}, {{1, 2}}));
     kept(true);
     CompactProgress progress;
@@ -860,6 +864,15 @@ TEST_CASE("store: the manifest's keys a newer program wrote are kept through eve
     REQUIRE(db->undoCompaction());
     kept(true);
     REQUIRE(db->compact(progress, cancel, true).done);
+    kept(true);
+    const auto first = db->snapshot()->segmentInfos().front().name;
+    db.reset();
+    cutShort(dir / first / "moves.bin");
+    db = Database::open(dir);
+    REQUIRE(db->snapshot()->unreadable().size() == 1);
+    CHECK(db->keepReadable() > 0);
+    kept(true);
+    REQUIRE(db->undoKeepReadable());
     kept(true);
     db->clear();  // its segments gone, their keys with them
     kept(false);

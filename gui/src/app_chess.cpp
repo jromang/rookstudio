@@ -479,7 +479,7 @@ class App::ModulesContext final : public AppContext {
     void setTrainingSettings(const TrainingSettings& settings) override {
         app_.training_->setTrainingSettings(settings);
     }
-    void showTrainingPage(int part) override { app_.training_->showTrainingPage(part); }
+    void showTrainingPage(TrainingPart part) override { app_.training_->showTrainingPage(part); }
     bool trainingShown() const override { return app_.training_->trainingShown(); }
     void setEnterStartsPuzzles(bool puzzles) override { app_.training_->setEnterStartsPuzzles(puzzles); }
     void reviewOnly(ReviewKind kind) override { app_.training_->reviewOnly(kind); }

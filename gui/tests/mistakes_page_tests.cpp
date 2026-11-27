@@ -133,7 +133,7 @@ class FakeApp final : public MistakesContext {
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
     void setTrainingSettings(const TrainingSettings&) override {}
-    void showTrainingPage(int part) override { training_part = part; }
+    void showTrainingPage(TrainingPart part) override { training_part = part; }
     bool trainingShown() const override { return training_shown; }
     void setEnterStartsPuzzles(bool puzzles) override { enter_puzzles = puzzles; }
     void reviewOnly(ReviewKind kind) override { reviewed_only.push_back(kind); }
@@ -193,7 +193,8 @@ class FakeApp final : public MistakesContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1, review_stopped = 0, names_settings = 0;
+    std::optional<TrainingPart> training_part;
+    int review_stopped = 0, names_settings = 0;
     bool training_shown = false, enter_puzzles = true, live_game = false;
     std::vector<ReviewKind> reviewed_only;
     std::vector<std::string> names{"Tester"};
@@ -592,7 +593,7 @@ TEST_CASE("mistakes page: an answer no engine can judge is said and not counted;
     FocusWords again("mistakes-session");
     page.addFocusWords(again, "mistakes-session");
     CHECK_FALSE(page.onBoard());
-    CHECK(app.training_part == 2);  // the Training page's part instead
+    CHECK(app.training_part == TrainingPart::Mistakes);  // the Training page's part instead
 
     // Without the user's names, the part asks for them first; Ctrl+K's "Your names…", among the mistakes' commands,
     // leads to Settings, where they are set.

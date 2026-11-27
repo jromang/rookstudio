@@ -146,7 +146,7 @@ void GuessPage::addCommands(const PaletteAdd& add, const std::string& training_v
             startGuessBoard();
             return;
         }
-        app_.showTrainingPage(3);
+        app_.showTrainingPage(TrainingPart::GuessMoves);
     });
     if (app_.sessionLock().empty())
         add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
@@ -165,7 +165,9 @@ void GuessPage::addFocusWords(FocusWords& words, const std::string& w) {
 // ---------------------------------------------------------------------------
 // The Training page's part
 
-TrainingKind::Part GuessPage::part() const { return {3, TR("Guess the moves"), "guess", guide::topics::GuessMoves}; }
+TrainingKind::Part GuessPage::part() const {
+    return {TrainingPart::GuessMoves, TR("Guess the moves"), "guess", guide::topics::GuessMoves};
+}
 
 void GuessPage::drawTodayCards(TodayCards& cards) {
     const auto& last = lastRecord();

@@ -117,7 +117,7 @@ class FakeApp final : public VisionContext {
     // The Training page.
     const TrainingSettings& trainingSettings() override { return settings_; }
     void setTrainingSettings(const TrainingSettings&) override {}
-    void showTrainingPage(int part) override { training_part = part; }
+    void showTrainingPage(TrainingPart part) override { training_part = part; }
     bool trainingShown() const override { return false; }
     void setEnterStartsPuzzles(bool) override {}
     void reviewOnly(ReviewKind) override {}
@@ -151,7 +151,7 @@ class FakeApp final : public VisionContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1;
+    std::optional<TrainingPart> training_part;
     bool live_game    = false;
     std::vector<EngineEntry> engines;
 
@@ -312,13 +312,13 @@ TEST_CASE("vision page: thirty seconds of coordinates, a square found with a cli
     CHECK(app.given_back[0].first.aside);
     CHECK(app.given_back[0].first.tab == 2);
     CHECK(app.given_back[0].second);
-    CHECK(app.training_part == 5);
+    CHECK(app.training_part == TrainingPart::Vision);
 
     // The palette: the part, and naming the squares; seen from Black when the part chose it.
     auto palette = commands(page);
     REQUIRE(palette.count("Coordinates: name the square") == 1);
     palette.at("Vision")();
-    CHECK(app.training_part == 5);
+    CHECK(app.training_part == TrainingPart::Vision);
     palette.at("Coordinates: name the square")();
     REQUIRE(page.onBoard());
     CHECK(page.session()->mode == CoordMode::Name);
@@ -473,5 +473,5 @@ TEST_CASE(
           chess::Piece(chess::PieceType::KING, chess::Color::WHITE));
     frames.draw(app, boardPage(page), ImGuiKey_Escape);
     CHECK_FALSE(page.onBoard());
-    CHECK(app.training_part == 5);
+    CHECK(app.training_part == TrainingPart::Vision);
 }

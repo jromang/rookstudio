@@ -65,7 +65,7 @@ class TrainingPage final : public context::Training {
     // starts, the day's review going on.
     [[nodiscard]] const TrainingSettings& trainingSettings() override;
     void setTrainingSettings(const TrainingSettings& settings) override;
-    void showTrainingPage(int part) override;
+    void showTrainingPage(TrainingPart part) override;
     [[nodiscard]] bool trainingShown() const override;
     void setEnterStartsPuzzles(bool puzzles) override { enter_puzzles_ = puzzles; }
     void reviewOnly(ReviewKind kind) override { startReview(kind); }

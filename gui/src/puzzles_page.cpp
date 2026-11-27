@@ -417,7 +417,7 @@ bool PuzzlesPage::startTheme(const std::string& theme) {
 }
 
 void PuzzlesPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
-    add(TR("Puzzles"), training_view, [this] { app_.showTrainingPage(1); });
+    add(TR("Puzzles"), training_view, [this] { app_.showTrainingPage(TrainingPart::Puzzles); });
     if (offline_puzzles_) {
         const auto store = offline_puzzles_->store();
         if (store && puzzleLock().empty()) {
@@ -439,35 +439,35 @@ void PuzzlesPage::addCommands(const PaletteAdd& add, const std::string& training
             add(TR("Cancel the download of Lichess's puzzles"), TR("Training"), [this] { offline_puzzles_->cancel(); });
         } else if (store) {
             add(TR("Update Lichess's puzzles"), TR("Training"), [this] {
-                app_.showTrainingPage(1);
+                app_.showTrainingPage(TrainingPart::Puzzles);
                 offline_puzzles_note_.clear();
                 offline_puzzles_update_ =
                     std::async(std::launch::async, [] { return evalsSize(lichess::puzzlesUrl()); });
             });
             add(TR("Remove Lichess's puzzles…"), TR("Training"), [this] {
-                app_.showTrainingPage(1);
+                app_.showTrainingPage(TrainingPart::Puzzles);
                 offline_puzzles_remove_ = true;
             });
         } else {
             add(TR("Download Lichess's puzzles"), TR("Training"), [this] {
-                app_.showTrainingPage(1);
+                app_.showTrainingPage(TrainingPart::Puzzles);
                 startOffline(lichess::puzzlesUrl());
             });
         }
     }
     add(TR("Puzzles online, from my Lichess account"), "Lichess", [this] {
-        app_.showTrainingPage(1);
+        app_.showTrainingPage(TrainingPart::Puzzles);
         puzzles_online_ = true;
     });
 }
 
 void PuzzlesPage::addFocusWords(FocusWords& words, const std::string& w) {
     words.on({"puzzles-online"}, [&] {  // the Training page's Puzzles part (#80), the puzzles online chosen
-        app_.showTrainingPage(1);
+        app_.showTrainingPage(TrainingPart::Puzzles);
         puzzles_online_ = true;
     });
     words.on({"puzzles-file=*"}, [&] {  // puzzles-file=FILE: Lichess's puzzle database read from it
-        app_.showTrainingPage(1);
+        app_.showTrainingPage(TrainingPart::Puzzles);
         startOffline(w.substr(13));
     });
     words.on({"puzzles-series", "puzzles-series=*"}, [&] {
@@ -1275,7 +1275,9 @@ void PuzzlesPage::drawPuzzleEnd() {
 // ---------------------------------------------------------------------------
 // The Training page
 
-TrainingKind::Part PuzzlesPage::part() const { return {1, TR("Puzzles"), "puzzles", guide::topics::Puzzles}; }
+TrainingKind::Part PuzzlesPage::part() const {
+    return {TrainingPart::Puzzles, TR("Puzzles"), "puzzles", guide::topics::Puzzles};
+}
 
 void PuzzlesPage::drawTodayCards(TodayCards& cards) {
     const auto state = storeState();

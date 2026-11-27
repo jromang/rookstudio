@@ -47,11 +47,10 @@ class TrainingKind : public BoardSession {
     virtual void addFocusWords(FocusWords& words, const std::string& word) = 0;
 
     // Its part of the Training page, for a kind that has one (the repertoires' training is the Openings page's): its
-    // place among the parts (1 Puzzles, 2 My mistakes, 3 Guess the moves, 4 Endgames, 5 Vision, as
-    // context::Training::showTrainingPage() names them; 0: none), its name in the page's title line, the word that
-    // shows it (--focus training-<word>), the guide's section (F1, the title's `?`).
+    // place among the parts (Today: none), its name in the page's title line, the word that shows it (--focus
+    // training-<word>), the guide's section (F1, the title's `?`).
     struct Part {
-        int place         = 0;
+        TrainingPart place = TrainingPart::Today;
         const char* name  = nullptr;
         const char* word  = nullptr;
         const char* topic = nullptr;

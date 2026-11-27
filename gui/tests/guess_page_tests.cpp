@@ -127,8 +127,8 @@ class FakeApp final : public GuessContext {
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
     void setTrainingSettings(const TrainingSettings& settings) override { settings_ = settings; }
-    void showTrainingPage(int part) override { training_part = part; }
-    bool trainingShown() const override { return training_part >= 0; }
+    void showTrainingPage(TrainingPart part) override { training_part = part; }
+    bool trainingShown() const override { return training_part.has_value(); }
     void setEnterStartsPuzzles(bool) override {}
     void reviewOnly(ReviewKind) override {}
     bool reviewRunning() const override { return false; }
@@ -157,7 +157,8 @@ class FakeApp final : public GuessContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1, review_stopped = 0;
+    std::optional<TrainingPart> training_part;
+    int review_stopped = 0;
     bool live_game = false, board_shown = true;
     std::optional<EngineEntry> engine;
     ReplayGame shown;  // the Board's own game
@@ -408,7 +409,7 @@ TEST_CASE("guess page: without an engine nothing starts, and a game at its last 
     CHECK(app.toasts[1] == "No move left to guess after the position shown.");
     runCommand(page, "Guess the moves");
     CHECK_FALSE(page.onBoard());
-    CHECK(app.training_part == 3);
+    CHECK(app.training_part == TrainingPart::GuessMoves);
     // A live game of the user's on Lichess: no game guessed meanwhile, and no random game offered.
     app.live_game = true;
     app.shown_ply = 0;

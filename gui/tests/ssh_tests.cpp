@@ -678,6 +678,7 @@ class FakeServer {
         std::string version = "SSH-2.0-FakeServer_1.0";  // the server's version line
     };
 
+    // On `port`, or with 0 on a port the system gives, which port() tells.
     FakeServer(uint16_t port, Script script) : script_(std::move(script)) {
         REQUIRE(listener_.listen(port).empty());
         thread_ = std::thread([this] {
@@ -693,6 +694,7 @@ class FakeServer {
         quit_ = true;
         if (thread_.joinable()) thread_.join();
     }
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
 
     // What the scenario saw, read once `done`.
     std::atomic_bool done{false};
@@ -1020,18 +1022,18 @@ class FakeServer {
     uint32_t seq_rx_ = 0, seq_tx_ = 0;
 };
 
-const uint16_t SSH_PORT = fcg::test::freePort();
 // The window the client gives a connection the server forwards (patched libssh2, cmake/patch_libssh2.cmake).
 constexpr uint32_t FORWARDED_WINDOW = FCG_LIBSSH2_FORWARD_WINDOW;
-const uint16_t WEB_PORT             = fcg::test::freePorts(3);  // and the next two
-constexpr uint32_t LOCALHOST_IP = 0x7F000001;
+constexpr uint32_t LOCALHOST_IP     = 0x7F000001;
 
-TunnelSettings loopback(const std::string& pinned) {
+// The tunnel to the test's SSH server on `ssh_port`, relaying the viewers to `web_port`: the test's web server's, or
+// a port nothing listens on (freePort(): a free port nothing is started on).
+TunnelSettings loopback(uint16_t ssh_port, const std::string& pinned, uint16_t web_port = fcg::test::freePort()) {
     TunnelSettings s;
     s.host        = "127.0.0.1";
-    s.port        = SSH_PORT;
+    s.port        = ssh_port;
     s.user        = "nokey";
-    s.local_port  = WEB_PORT;
+    s.local_port  = web_port;
     s.pinned      = pinned;
     s.first_retry = 30s;  // no second attempt within a test
     return s;
@@ -1072,7 +1074,7 @@ int64_t ownCpuMs() {
 
 TEST_CASE("Tunnel: a viewer's request relayed to the web server and back, through each cipher, with a rekey") {
     WebServer web;
-    REQUIRE(web.start(WEB_PORT).empty());
+    REQUIRE(web.start(0).empty());
     struct Case {
         const char* ciphers;
         const char* macs;
@@ -1100,9 +1102,9 @@ TEST_CASE("Tunnel: a viewer's request relayed to the web server and back, throug
             script.before_kexinit = {Writer().byte(IGNORE_DATA).string("before").take()};
             script.in_kex         = Writer().byte(IGNORE_DATA).string("during").take();
         }
-        FakeServer server(SSH_PORT, script);
+        FakeServer server(0, script);
         SshTunnel tunnel;
-        tunnel.start(loopback(fingerprint(serverKey().blob)));
+        tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
         CHECK(waitUntil([&] { return !server.answer.empty() && tunnel.status().connections == 0; }));
         const auto status = tunnel.status();
         CHECK(status.state == TunnelState::OnAir);
@@ -1126,9 +1128,9 @@ TEST_CASE("Tunnel: a host key not the one pinned, or not the one trusted before,
     const auto known = dir / "known_hosts.json";
 
     {
-        FakeServer server(SSH_PORT, {});
+        FakeServer server(0, {});
         SshTunnel tunnel;
-        tunnel.start(loopback("SHA256:notTheKey"));
+        tunnel.start(loopback(server.port(), "SHA256:notTheKey"));
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
         CHECK(tunnel.status().error.find("not the one expected") != std::string::npos);
         CHECK(tunnel.status().url.empty());
@@ -1136,28 +1138,28 @@ TEST_CASE("Tunnel: a host key not the one pinned, or not the one trusted before,
     // First use: trusted and kept.
     {
         WebServer web;
-        REQUIRE(web.start(WEB_PORT).empty());
-        FakeServer server(SSH_PORT, {});
-        auto settings        = loopback("");
+        REQUIRE(web.start(0).empty());
+        FakeServer server(0, {});
+        auto settings        = loopback(server.port(), "", web.port());
         settings.known_hosts = known;
         SshTunnel tunnel;
         tunnel.start(settings);
         CHECK(waitUntil([&] { return !server.answer.empty(); }));
         CHECK(tunnel.status().state == TunnelState::OnAir);
-        CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == fingerprint(serverKey().blob));
+        CHECK(knownHostKey(known, "127.0.0.1", server.port()) == fingerprint(serverKey().blob));
     }
     // Then another key: refused, the new one offered to the user.
     {
-        rememberHostKey(known, "127.0.0.1", SSH_PORT, "SHA256:anotherKey");
-        FakeServer server(SSH_PORT, {});
-        auto settings        = loopback("");
+        FakeServer server(0, {});
+        rememberHostKey(known, "127.0.0.1", server.port(), "SHA256:anotherKey");
+        auto settings        = loopback(server.port(), "");
         settings.known_hosts = known;
         SshTunnel tunnel;
         tunnel.start(settings);
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
         CHECK(tunnel.status().new_key == fingerprint(serverKey().blob));
         CHECK(tunnel.status().error.find("changed") != std::string::npos);
-        CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == "SHA256:anotherKey");
+        CHECK(knownHostKey(known, "127.0.0.1", server.port()) == "SHA256:anotherKey");
     }
     std::filesystem::remove_all(dir);
 }
@@ -1171,27 +1173,27 @@ TEST_CASE("Tunnel: a host key is trusted, or offered to the user, only once it s
     script.bad_signature = true;
     // First use: the key that did not sign is not kept (it was before its signature was checked).
     {
-        FakeServer server(SSH_PORT, script);
-        auto settings        = loopback("");
+        FakeServer server(0, script);
+        auto settings        = loopback(server.port(), "");
         settings.known_hosts = known;
         SshTunnel tunnel;
         tunnel.start(settings);
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
         CHECK(tunnel.status().error.find("signature is not valid") != std::string::npos);
         CHECK(tunnel.status().new_key.empty());
-        CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == "");
+        CHECK(knownHostKey(known, "127.0.0.1", server.port()) == "");
     }
     // Another key known: the one that did not sign is not offered to be trusted.
     {
-        REQUIRE(rememberHostKey(known, "127.0.0.1", SSH_PORT, "SHA256:anotherKey"));
-        FakeServer server(SSH_PORT, script);
-        auto settings        = loopback("");
+        FakeServer server(0, script);
+        REQUIRE(rememberHostKey(known, "127.0.0.1", server.port(), "SHA256:anotherKey"));
+        auto settings        = loopback(server.port(), "");
         settings.known_hosts = known;
         SshTunnel tunnel;
         tunnel.start(settings);
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
         CHECK(tunnel.status().new_key.empty());
-        CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == "SHA256:anotherKey");
+        CHECK(knownHostKey(known, "127.0.0.1", server.port()) == "SHA256:anotherKey");
     }
     std::filesystem::remove_all(dir);
 }
@@ -1205,8 +1207,8 @@ TEST_CASE("Tunnel: known hosts that cannot be read, or none to keep keys in, sto
     const std::string broken = R"({"example.org:22": "SHA256:aaa",)";
     std::ofstream(known) << broken;
     {
-        FakeServer server(SSH_PORT, {});
-        auto settings        = loopback("");
+        FakeServer server(0, {});
+        auto settings        = loopback(server.port(), "");
         settings.known_hosts = known;
         SshTunnel tunnel;
         tunnel.start(settings);
@@ -1217,9 +1219,9 @@ TEST_CASE("Tunnel: known hosts that cannot be read, or none to keep keys in, sto
     }
     // Neither a key pinned nor a file to keep it in: refused, not trusted every time.
     {
-        FakeServer server(SSH_PORT, {});
+        FakeServer server(0, {});
         SshTunnel tunnel;
-        tunnel.start(loopback(""));
+        tunnel.start(loopback(server.port(), ""));
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
         CHECK(tunnel.status().error.find("cannot be checked") != std::string::npos);
     }
@@ -1229,9 +1231,9 @@ TEST_CASE("Tunnel: known hosts that cannot be read, or none to keep keys in, sto
 TEST_CASE("Tunnel: a server that wants a key is an error trying again cannot mend") {
     FakeServer::Script script;
     script.refuse_auth = true;
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
     CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Failed; }));
     CHECK(tunnel.status().error.find("publickey") != std::string::npos);
 }
@@ -1244,9 +1246,9 @@ TEST_CASE("Tunnel: a packet length that wrapped, or a KEXINIT too short for its 
                             clear.seal("\x14" "0123456789abcde", 0)}) {
         FakeServer::Script script;
         script.raw_first = raw;
-        FakeServer server(SSH_PORT, script);
+        FakeServer server(0, script);
         SshTunnel tunnel;
-        tunnel.start(loopback(fingerprint(serverKey().blob)));
+        tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Reconnecting; }));
         const auto error = tunnel.status().error;
         const bool told =
@@ -1260,8 +1262,8 @@ TEST_CASE("Sockets: a socket asked nothing, that hung up, does not end the wait 
     // A connection whose other side closed, and this side shut its writing: poll reports a hang-up for it even when
     // asked nothing, and returned at once, again and again (a processor spent on the tunnel's loop).
     net::TcpListener listener;
-    REQUIRE(listener.listen(WEB_PORT).empty());
-    const auto client_fd = net::connectTo(LOCALHOST_IP, WEB_PORT);
+    REQUIRE(listener.listen(0).empty());
+    const auto client_fd = net::connectTo(LOCALHOST_IP, listener.port());
     REQUIRE(client_fd);
     net::Socket client(*client_fd);
     const auto accepted = listener.accept(2000);
@@ -1273,8 +1275,8 @@ TEST_CASE("Sockets: a socket asked nothing, that hung up, does not end the wait 
     std::this_thread::sleep_for(50ms);
     client.shutdownWrite();
     net::TcpListener idle_listener;
-    REQUIRE(idle_listener.listen(WEB_PORT + 1).empty());
-    const auto idle_fd = net::connectTo(LOCALHOST_IP, WEB_PORT + 1);
+    REQUIRE(idle_listener.listen(0).empty());
+    const auto idle_fd = net::connectTo(LOCALHOST_IP, idle_listener.port());
     REQUIRE(idle_fd);
     net::Socket idle(*idle_fd);
     for (const bool alone : {true, false}) {
@@ -1313,13 +1315,15 @@ TEST_CASE("Sockets: a listener on port 0 takes a port the system gives, and tell
 }
 
 TEST_CASE("Sockets: a connection refused on this machine is told within the time given") {
-    // On Windows a refused connect takes two seconds or so unless bounded; elsewhere it is told at once.
+    // On Windows a refused connect takes two seconds or so unless bounded; elsewhere it is told at once. A port known
+    // before anything listens on it (freePort()): refused first, then listened on.
+    const auto port  = fcg::test::freePort();
     const auto start = std::chrono::steady_clock::now();
-    CHECK_FALSE(net::connectTo(LOCALHOST_IP, WEB_PORT + 2, 200).has_value());
+    CHECK_FALSE(net::connectTo(LOCALHOST_IP, port, 200).has_value());
     CHECK(std::chrono::steady_clock::now() - start < 1500ms);
     net::TcpListener listener;
-    REQUIRE(listener.listen(WEB_PORT + 2).empty());
-    const auto fd = net::connectTo(LOCALHOST_IP, WEB_PORT + 2, 200);
+    REQUIRE(listener.listen(port).empty());
+    const auto fd = net::connectTo(LOCALHOST_IP, port, 200);
     REQUIRE(fd);
     net::Socket socket(*fd);
     CHECK(listener.accept(2000).has_value());
@@ -1329,7 +1333,7 @@ TEST_CASE("Tunnel: a viewer's connection that hung up while the server's window 
     // The forwarded connection's window is 0: the web server's answer waits in its socket, which hangs up once the
     // server sent the end of the request. The tunnel must wait without spinning until the window opens.
     WebServer web;
-    REQUIRE(web.start(WEB_PORT).empty());
+    REQUIRE(web.start(0).empty());
     std::atomic_bool holding{false}, release{false};
     std::string answer;
     FakeServer::Script script;
@@ -1350,9 +1354,9 @@ TEST_CASE("Tunnel: a viewer's connection that hung up while the server's window 
         }
         server.send(Writer().byte(CHANNEL_CLOSE).u32(channel).take());
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return holding.load() || server.done.load(); }));
     const auto cpu_before = ownCpuMs();
     std::this_thread::sleep_for(1000ms);
@@ -1378,9 +1382,9 @@ TEST_CASE("Tunnel: the strict key exchange enforced until the server's first NEW
         } else {
             script.in_kex = ignore;
         }
-        FakeServer server(SSH_PORT, script);
+        FakeServer server(0, script);
         SshTunnel tunnel;
-        tunnel.start(loopback(fingerprint(serverKey().blob)));
+        tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
         CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Reconnecting; }));
         CHECK_MESSAGE(tunnel.status().error.find("strict") != std::string::npos, tunnel.status().error);
         CHECK(waitUntil([&] { return server.done.load(); }));
@@ -1397,9 +1401,9 @@ TEST_CASE("Tunnel: the strict key exchange enforced until the server's first NEW
             script.in_kex = Writer().byte(SERVICE_ACCEPT).string("ssh-userauth").take();
         }
         script.on_air = [](FakeServer&) {};
-        FakeServer server(SSH_PORT, script);
+        FakeServer server(0, script);
         SshTunnel tunnel;
-        tunnel.start(loopback(fingerprint(serverKey().blob)));
+        tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
         CHECK(waitUntil([&] { return tunnel.status().url == "https://abc123.lhr.life"; }));
         CHECK(tunnel.status().state == TunnelState::OnAir);
         tunnel.stop();
@@ -1414,9 +1418,9 @@ TEST_CASE("Tunnel: a server's DISCONNECT reason reaches the status without its e
         const std::string reason = "bye\x1b[2J\x1b]0;pwned\x07\xc2\x9b" "0m";
         server.send(Writer().byte(DISCONNECT).u32(11).string(reason).string("").take());
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
     CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Reconnecting; }));
     const auto error = tunnel.status().error;
     CHECK(error.find("bye?[2J?]0;pwned??0m") != std::string::npos);
@@ -1434,8 +1438,8 @@ TEST_CASE("Tunnel: a server that sends what is never taken makes the connection 
             // The client went before the end.
         }
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob));
     settings.max_memory = 1 << 20;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -1473,8 +1477,8 @@ TEST_CASE("Tunnel: a server that asks for answers while it keeps a key exchange 
             // The client went before the end.
         }
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob));
     settings.max_memory = 1 << 20;
     settings.keepalive  = 1s;
     SshTunnel tunnel;
@@ -1507,7 +1511,7 @@ void openForwarded(FakeServer& server, uint32_t sender) {
 TEST_CASE("Tunnel: 40 viewers' connections relayed at once, 40 more waiting, 40 in libssh2's queue, the next refused") {
     // A web server that takes connections and never answers: the relayed ones stay.
     net::TcpListener silent;
-    REQUIRE(silent.listen(WEB_PORT).empty());
+    REQUIRE(silent.listen(0).empty());
     constexpr uint32_t MAX_CHANNELS = 40;
     std::atomic_bool relayed{false}, finished{false};
     std::atomic_int confirmed{0};
@@ -1550,9 +1554,9 @@ TEST_CASE("Tunnel: 40 viewers' connections relayed at once, 40 more waiting, 40 
         }
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), silent.port()));
     CHECK(waitUntil([&] { return tunnel.status().connections == static_cast<int>(MAX_CHANNELS); }));
     relayed = true;
     REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }, 90s));
@@ -1582,7 +1586,7 @@ TEST_CASE("Tunnel: viewers' connections the server never closes are forgotten, a
     // CLOSE would name a number it does not give again), and they count only while it waits, for a while at most
     // (another call may read what comes instead). The next viewers are served.
     WebServer web;
-    REQUIRE(web.start(WEB_PORT).empty());
+    REQUIRE(web.start(0).empty());
     constexpr uint32_t MAX_CHANNELS = 40;
     std::atomic_int answered_later{0};
     FakeServer::Script script;
@@ -1605,8 +1609,8 @@ TEST_CASE("Tunnel: viewers' connections the server never closes are forgotten, a
             if (base != 1000) answered_later += answered > 0 ? 1 : 0;
         }
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings          = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings          = loopback(server.port(), fingerprint(serverKey().blob), web.port());
     settings.close_timeout = 1s;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -1640,13 +1644,14 @@ void closeForwarded(FakeServer& server, uint32_t sender, uint32_t channel) {
 class Sink {
    public:
     Sink(std::string answer, bool while_reading) : answer_(std::move(answer)), while_reading_(while_reading) {
-        REQUIRE(listener_.listen(WEB_PORT).empty());
+        REQUIRE(listener_.listen(0).empty());
         thread_ = std::thread([this] { run(); });
     }
     ~Sink() {
         quit_ = true;
         thread_.join();
     }
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
     std::atomic<std::size_t> received{0};
     // What it received.
     std::string content() {
@@ -1707,7 +1712,7 @@ TEST_CASE("Tunnel: viewers who send more than the web server takes are let go, e
     // web server takes what it sends or not, and let go once the tunnel keeps more than its budget for it: libssh2's
     // memory stays far below the 4 MiB allowed here.
     net::TcpListener silent;  // takes the connections, never reads them
-    REQUIRE(silent.listen(WEB_PORT).empty());
+    REQUIRE(silent.listen(0).empty());
     constexpr uint32_t RELAYED = 40, WAITING = 40, UPLOADERS = 4;
     std::atomic_bool relayed{false}, finished{false};
     std::vector<uint32_t> windows;
@@ -1767,8 +1772,8 @@ TEST_CASE("Tunnel: viewers who send more than the web server takes are let go, e
         }
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob), silent.port());
     settings.max_memory = 4 << 20;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -1847,7 +1852,7 @@ TEST_CASE("Tunnel: one-byte packets on a connection waiting its turn: the viewer
     // connection waiting its turn was not read at all: 53,000 one-byte packets, well within its window, ended a
     // session of 4 MiB. Each is read into the tunnel's own buffers now, a byte for a byte, until its budget.
     net::TcpListener silent;  // takes the connections, never reads them: the relayed ones stay
-    REQUIRE(silent.listen(WEB_PORT).empty());
+    REQUIRE(silent.listen(0).empty());
     constexpr uint32_t RELAYED = 40;
     std::atomic_bool relayed{false}, finished{false};
     std::atomic<std::size_t> sent{0};
@@ -1865,8 +1870,8 @@ TEST_CASE("Tunnel: one-byte packets on a connection waiting its turn: the viewer
         closedMeanwhile(server, closed);
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob), silent.port());
     settings.max_memory = 4 << 20;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -1891,7 +1896,7 @@ TEST_CASE("Tunnel: one-byte packets on a relayed connection the web server does 
     // session may hold. The sockets are filled first, in large packets: as much as a first viewer's upload took
     // before it was let go, its budget and a little more left out.
     net::TcpListener silent;  // takes the connections, never reads them
-    REQUIRE(silent.listen(WEB_PORT).empty());
+    REQUIRE(silent.listen(0).empty());
     std::atomic_bool finished{false};
     std::atomic<std::size_t> first{0}, filled{0}, sent{0};
     std::set<uint32_t> closed;
@@ -1907,8 +1912,8 @@ TEST_CASE("Tunnel: one-byte packets on a relayed connection the web server does 
         closedMeanwhile(server, closed);
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob), silent.port());
     settings.max_memory = 4 << 20;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -1951,8 +1956,8 @@ TEST_CASE("Tunnel: a read whose window adjustment did not go at once is called a
         closeForwarded(server, 200, channel);
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob), web.port());
     settings.send_limit = 16;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -2004,9 +2009,9 @@ TEST_CASE("Tunnel: a viewer's upload while the server does not read costs no pro
         closeForwarded(server, 200, channel);
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return holding.load() || server.done.load(); }));
     std::this_thread::sleep_for(100ms);  // the upload read as far as it can be
     const auto cpu_before = ownCpuMs();
@@ -2052,9 +2057,9 @@ TEST_CASE("Tunnel: a viewer's bytes, merged by libssh2 as they wait, reach the w
         }
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }, 90s));
     const auto got = web.content();
     std::size_t same = 0;
@@ -2085,9 +2090,9 @@ TEST_CASE("Tunnel: the session's text and error text, come together, are read in
         while (!seen) server.poll(50ms);
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
     CHECK(waitUntil([&] { return tunnel.status().url == "https://interleaved.lhr.life"; }));
     CHECK_MESSAGE(tunnel.status().url == "https://interleaved.lhr.life", tunnel.status().url);
     seen = true;
@@ -2122,8 +2127,8 @@ TEST_CASE("Tunnel: one-byte packets while the server reads nothing: libssh2 hold
         adjusted = server.adjusted[200];
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob), web.port());
     settings.max_memory = 1 << 20;
     SshTunnel tunnel;
     tunnel.start(settings);
@@ -2152,13 +2157,14 @@ namespace {
 class FirstAnswered {
    public:
     explicit FirstAnswered(std::size_t answer) : answer_(answer, 'a') {
-        REQUIRE(listener_.listen(WEB_PORT).empty());
+        REQUIRE(listener_.listen(0).empty());
         thread_ = std::thread([this] { run(); });
     }
     ~FirstAnswered() {
         quit_ = true;
         thread_.join();
     }
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
 
    private:
     struct Connection {
@@ -2254,9 +2260,9 @@ TEST_CASE("Tunnel: every viewer's window filled while the server reads nothing s
         }
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return finished.load() || server.done.load(); }, 90s));
     MESSAGE(sent.load(), " bytes went while the server read nothing");
     const auto status = tunnel.status();
@@ -2292,9 +2298,9 @@ TEST_CASE("Tunnel: a request of the server's while it reads nothing costs no pro
         }
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return holding.load() || server.done.load(); }));
     std::this_thread::sleep_for(100ms);
     const auto cpu_before = ownCpuMs();
@@ -2318,7 +2324,7 @@ TEST_CASE("Tunnel: a keepalive that went in part is sent on, though the server t
     // (libssh2 sends it 2 s later), which a tunnel waiting for the server's silence never sent. Every wait is bounded
     // by what it awaits.
     WebServer web;
-    REQUIRE(web.start(WEB_PORT).empty());
+    REQUIRE(web.start(0).empty());
     std::atomic_bool finished{false};
     std::atomic_int keepalives_meanwhile{0};
     std::string answer;
@@ -2362,8 +2368,8 @@ TEST_CASE("Tunnel: a keepalive that went in part is sent on, though the server t
         }
         finished = true;
     };
-    FakeServer server(SSH_PORT, script);
-    auto settings       = loopback(fingerprint(serverKey().blob));
+    FakeServer server(0, script);
+    auto settings       = loopback(server.port(), fingerprint(serverKey().blob), web.port());
     settings.keepalive  = 1s;
     settings.send_limit = 40;
     SshTunnel tunnel;
@@ -2399,9 +2405,9 @@ void stopWhileHalfSent(bool request, bool viewer) {
         holding = true;
         while (!stopped) std::this_thread::sleep_for(20ms);
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return holding.load() || server.done.load(); }, 30s));
     CHECK(holding.load());
     CHECK(tunnel.status().state == TunnelState::OnAir);
@@ -2439,9 +2445,9 @@ TEST_CASE("Tunnel: stopped with a packet half sent, the goodbye still goes once 
         while (!reading) std::this_thread::sleep_for(20ms);
         // Then the server reads all that comes, until the DISCONNECT (untilGone).
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob), web.port()));
     REQUIRE(waitUntil([&] { return holding.load() || server.done.load(); }, 30s));
     CHECK(tunnel.status().state == TunnelState::OnAir);
     std::thread stopping([&] { tunnel.stop(); });
@@ -2466,9 +2472,9 @@ TEST_CASE("Tunnel: what cannot be read ends the connection, though the session c
         server.sendRaw(randomBytes(64));
         corrupted = true;
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
     REQUIRE(waitUntil([&] { return corrupted.load() || server.done.load(); }));
     CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Reconnecting; }, 5s));
     const auto error = tunnel.status().error;
@@ -2487,9 +2493,9 @@ TEST_CASE("Tunnel: server text in libssh2's traces is not taken for libssh2's ow
         clear.seal(Writer().byte(DEBUG_TEXT).boolean(true).string("Failure Event: -18 - fake too").string("").take(),
                    0) +
         std::string("\xFF\xFF\xFF\xFC", 4) + std::string(8, 'A');
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
     CHECK(waitUntil([&] {
         const auto state = tunnel.status().state;
         return state == TunnelState::Reconnecting || state == TunnelState::Failed;
@@ -2506,21 +2512,23 @@ TEST_CASE("Tunnel: a host key without a fingerprint is never trusted, nor kept")
     std::filesystem::remove_all(dir);
     std::filesystem::create_directories(dir);
     const auto known = dir / "known_hosts.json";
+    // No server: the port only names the host in the known hosts.
+    constexpr uint16_t port = 2222;
     // Pinned, or trusted on first use: refused, nothing kept, no key offered to trust.
-    auto refusal = checkHostKey(loopback("SHA256:pinned"), "");
+    auto refusal = checkHostKey(loopback(port, "SHA256:pinned"), "");
     REQUIRE(refusal);
     CHECK(refusal->reason.find("fingerprint") != std::string::npos);
     CHECK(refusal->new_key.empty());
-    auto first        = loopback("");
+    auto first        = loopback(port, "");
     first.known_hosts = known;
     refusal           = checkHostKey(first, "");
     REQUIRE(refusal);
     CHECK(refusal->reason.find("fingerprint") != std::string::npos);
     CHECK(refusal->new_key.empty());
-    CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == "");
+    CHECK(knownHostKey(known, "127.0.0.1", port) == "");
     // A fingerprint: trusted the first time and kept, the same one afterwards, another refused and offered.
     CHECK_FALSE(checkHostKey(first, "SHA256:aaa").has_value());
-    CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == "SHA256:aaa");
+    CHECK(knownHostKey(known, "127.0.0.1", port) == "SHA256:aaa");
     CHECK_FALSE(checkHostKey(first, "SHA256:aaa").has_value());
     refusal = checkHostKey(first, "SHA256:bbb");
     REQUIRE(refusal);
@@ -2528,7 +2536,7 @@ TEST_CASE("Tunnel: a host key without a fingerprint is never trusted, nor kept")
     CHECK(refusal->new_key == "SHA256:bbb");
     // And none again, a key kept: refused, the key kept as it was.
     CHECK(checkHostKey(first, "").has_value());
-    CHECK(knownHostKey(known, "127.0.0.1", SSH_PORT) == "SHA256:aaa");
+    CHECK(knownHostKey(known, "127.0.0.1", port) == "SHA256:aaa");
     std::filesystem::remove_all(dir);
 }
 
@@ -2542,9 +2550,9 @@ TEST_CASE("Tunnel: the public address is forgotten once the connection is lost")
         while (!release) std::this_thread::sleep_for(20ms);
         server.send(Writer().byte(DISCONNECT).u32(11).string("going away").string("").take());
     };
-    FakeServer server(SSH_PORT, script);
+    FakeServer server(0, script);
     SshTunnel tunnel;
-    tunnel.start(loopback(fingerprint(serverKey().blob)));
+    tunnel.start(loopback(server.port(), fingerprint(serverKey().blob)));
     CHECK(waitUntil([&] { return tunnel.status().url == "https://abc123.lhr.life"; }));
     release = true;
     CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Reconnecting; }));
@@ -2553,9 +2561,9 @@ TEST_CASE("Tunnel: the public address is forgotten once the connection is lost")
 }
 
 TEST_CASE("Tunnel: no server: reconnecting, with the reason") {
-    // Nothing listens on this port.
+    // Nothing listens on this port (freePort(): a free port nothing is started on).
     SshTunnel tunnel;
-    tunnel.start(loopback(""));
+    tunnel.start(loopback(fcg::test::freePort(), ""));
     CHECK(waitUntil([&] { return tunnel.status().state == TunnelState::Reconnecting; }));
     CHECK_FALSE(tunnel.status().error.empty());
     tunnel.stop();
@@ -2595,13 +2603,13 @@ TEST_CASE("Tunnel: the broadcaster runs it with the web page only, and stops it 
     Broadcaster broadcaster;
     BroadcastSettings settings;
     settings.tunnel    = true;
-    settings.tunnel_to = loopback("");  // nothing listens there: it keeps trying
+    settings.tunnel_to = loopback(fcg::test::freePort(), "");  // nothing listens there: it keeps trying
     // Without the web page: no tunnel.
     broadcaster.configure(settings);
     CHECK(broadcaster.tunnel().state == TunnelState::Off);
 
     settings.web      = true;
-    settings.web_port = WEB_PORT;
+    settings.web_port = fcg::test::freePort();  // the broadcaster is told its web page's port before it listens
     broadcaster.configure(settings);
     CHECK(broadcaster.tunnel().state != TunnelState::Off);
     CHECK(waitUntil([&] { return broadcaster.tunnel().state == TunnelState::Reconnecting; }));

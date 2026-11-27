@@ -24,6 +24,7 @@
 #include "../../tournament/tests/polyglot_writer.hpp"
 #include "app.hpp"
 #include "console.hpp"
+#include "engine_watchdog.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "headless.hpp"
@@ -1295,6 +1296,116 @@ TEST_CASE(
     game.join();
     if (woken) CHECK(ended.get().code == fastchess::engine::process::Status::ERR);
     engine.terminate();
+}
+
+TEST_CASE("the engine watchdog wakes the read of an engine that ended on its own: a look later, once, never reaped") {
+    // As above, a process the engine leaves behind keeps its output open; but the engine ends on its own (a crash, in
+    // a game in nodes), and nobody stops it (#145).
+    const test::ScratchDir dir("engine-ended-kept");
+    const auto script = dir / "engine.sh";
+    const auto left   = dir / "left.pid";
+    std::ofstream(script) << "#!/bin/sh\n(sleep 60 & echo $! > \"$1\")\nread line\nexit 3\n";
+    fs::permissions(script, fs::perms::owner_all);
+    fastchess::engine::process::Process engine;
+    REQUIRE(engine.init(dir.string(), script.string(), left.string(), "ended"));
+    int behind = 0;
+    REQUIRE(test::waitUntil([&] { return (std::ifstream(left) >> behind) && behind > 0; }));
+    // Another engine, which runs on: never woken.
+    const auto sleeper = dir / "running.sh";
+    std::ofstream(sleeper) << "#!/bin/sh\nexec sleep 60\n";
+    fs::permissions(sleeper, fs::perms::owner_all);
+    fastchess::engine::process::Process running;
+    REQUIRE(running.init(dir.string(), sleeper.string(), "", "running"));
+
+    EngineWatchdog watchdog(0ms);  // it looks when asked
+    CHECK(watchdog.look() == 0);
+
+    std::promise<fastchess::engine::process::Result> read;
+    auto ended = read.get_future();
+    std::thread game([&] {
+        std::vector<fastchess::engine::process::Line> lines;
+        read.set_value(engine.readOutput(lines, "bestmove", 0ms));  // no time limit
+    });
+    REQUIRE(engine.writeInput("go\n"));  // it ends
+    const auto pid = static_cast<int>(engine.pid());
+    REQUIRE(waitChildEnded(pid, 20s));
+    CHECK(childEnded(pid));
+    // Found ended, not woken yet: a read that sees the end of the output by itself has until the next look.
+    CHECK(watchdog.look() == 0);
+    CHECK(ended.wait_for(0ms) == std::future_status::timeout);
+    // Found ended again: its read is woken.
+    CHECK(watchdog.look() == 1);
+    const bool woken = ended.wait_for(20s) == std::future_status::ready;
+    CHECK(woken);
+    // Once, while it is listed; and not reaped: fastchess reaps it, when it next asks whether the engine runs.
+    CHECK(watchdog.look() == 0);
+    CHECK(childEnded(pid));
+    std::vector<fastchess::engine::process::Line> lines;
+    CHECK(running.readOutput(lines, "bestmove", 50ms).code == fastchess::engine::process::Status::TIMEOUT);
+
+    ::kill(behind, SIGKILL);  // what kept the output open: the read ends now in any case
+    game.join();
+    if (woken) CHECK(ended.get().code == fastchess::engine::process::Status::ERR);
+    CHECK_FALSE(engine.alive());
+    CHECK_FALSE(childEnded(pid));  // reaped by fastchess
+    engine.terminate();
+    running.forceKill();
+    running.terminate();
+    CHECK(watchdog.look() == 0);
+}
+
+TEST_CASE(
+    "a game in nodes whose engine crashes while another process keeps its output open ends, and the match goes on "
+    "(#145)") {
+    // As in #142's test, but nobody stops the engine: it crashes on its own at its second move, the read of that move
+    // without a time limit (#145). A process it left behind keeps its output open, as an engine another game started
+    // at the moment its pipes were made would: the end of its output never comes. Only the engine's first process
+    // crashes: started again ("Restart an engine that crashes"), it plays the next games.
+    const test::ScratchDir dir("engine-crash-kept");
+    const auto script = dir / "crasher.sh";
+    const auto left   = dir / "left.pid";
+    {
+        std::ofstream out(script);
+        out << "#!/bin/sh\n"
+            << "if mkdir '" << (dir / "crashed").string() << "' 2>/dev/null; then\n"
+            << "    (sleep 60 & echo $! > '" << left.string() << "')\n"
+            << "    export FCG_MOCK_CRASH_AFTER=2\n"
+            << "fi\n"
+            << "exec '" << randomMover() << "'\n";
+    }
+    fs::permissions(script, fs::perms::owner_all);
+    auto engines      = randomEngines();
+    engines[0].cmd    = script.string();
+    auto setup        = randomSetup(4);
+    setup.concurrency = 1;
+    Harness h;
+    REQUIRE(h.run.start(setup, engines, topologyFromCores({{0, 0}, {0, 1}}), dir / "runs").empty());
+
+    // The first game ends, though the end of the crashed engine's output does not come.
+    const bool ended = h.waitFor([&] {
+        const auto* t = h.run.tournament();
+        return t && t->resultOf(0).has_value();
+    });
+    int behind       = 0;
+    std::ifstream(left) >> behind;
+    if (behind > 0) ::kill(behind, SIGKILL);  // what kept the output open: the game ends now in any case
+    REQUIRE(ended);
+    const auto* t    = h.run.tournament();
+    const auto first = t->resultOf(0);
+    REQUIRE(first);
+    CHECK(first->termination == fastchess::MatchTermination::DISCONNECT);
+    CHECK(first->scoreOf(0) == 0);  // A, the engine that crashed, lost it
+    CHECK(first->plies >= 2);       // in the middle of the game
+
+    // The match goes on, A started again.
+    REQUIRE(h.waitFinished());
+    CHECK(h.run.error().empty());
+    CHECK(t->results().size() == 4);
+    for (uint64_t n = 1; n < 4; ++n) {
+        const auto r = t->resultOf(n);
+        REQUIRE(r);
+        CHECK(r->termination != fastchess::MatchTermination::DISCONNECT);
+    }
 }
 #endif
 

@@ -4,7 +4,9 @@
 // With FCG_MOCK_STDERR=TEXT it writes "TEXT <move>" on its error output at each move (followed by
 // FCG_MOCK_STDERR_PAD dots, when set), and with FCG_MOCK_STDERR_FLOOD=N, N lines of 1000 characters there before its
 // uciok: from 70 on, more than a pipe holds. With FCG_MOCK_STDERR_CRASH=N, at its first "go" it writes a line on its
-// output, then at once N lines of 1000 characters on its error output ("crash report I/N"), and ends.
+// output, then at once N lines of 1000 characters on its error output ("crash report I/N"), and ends. With
+// FCG_MOCK_CRASH_AFTER=N it ends at its Nth "go", after "info string crashing" and without a move: an engine that
+// crashes in the middle of a game.
 //
 // With FCG_MOCK_SLOW_UCIOK=MS it waits MS milliseconds before its uciok, and with FCG_MOCK_SLOW_READY=MS before
 // each readyok: an engine slow to load its network or its hash table. With FCG_MOCK_MOVE_MS=MS it thinks MS
@@ -51,6 +53,7 @@ bool chess960 = false;  // UCI_Chess960 set (FCG_MOCK_CHESS960)
 std::mutex out_mutex;   // the output, shared with a timed search's thread (FCG_MOCK_MOVETIME)
 std::atomic<int> search_id{0};
 int searches_done = 0;  // FCG_MOCK_QUIT_AFTER
+int goes          = 0;  // FCG_MOCK_CRASH_AFTER
 
 // An analysis's move given: the end of the program after so many, with FCG_MOCK_QUIT_AFTER.
 void searched() {
@@ -223,6 +226,10 @@ void uci_line(Board &board, const std::string &line) {
         std::cout << "bestmove " << uci::moveToUci(infinite_best, chess960) << std::endl;
         searched();
     } else if (tokens[0] == "go") {
+        if (const char* crash = std::getenv("FCG_MOCK_CRASH_AFTER"); crash && ++goes >= std::atoi(crash)) {
+            std::cout << "info string crashing" << std::endl;
+            std::_Exit(3);
+        }
         if (const char *crash = std::getenv("FCG_MOCK_STDERR_CRASH")) {
             std::cout << "info string crashing" << std::endl;
             std::string report;

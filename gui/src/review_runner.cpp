@@ -95,9 +95,16 @@ void ReviewRunner::start(Setup setup) {
         state_.level.assign(n, state_.pass - 1);
         state_.done.assign(n, false);
         offers_.clear();
+        // Resumed with all the passes its ceiling asks for (a stop that came as its last pass ended): complete as it
+        // is, nothing searched again, rather than a pass beyond the ceiling.
+        if (state_.pass >= reviewPasses(ceiling_) || state_.pass >= 13) state_.running = false;
     }
     reproducible_ = setup.reproducible;
-    thread_       = std::thread([this, setup = std::move(setup), positions = std::move(positions)]() mutable {
+    {
+        std::lock_guard lock(mutex_);
+        if (!state_.running) return;
+    }
+    thread_ = std::thread([this, setup = std::move(setup), positions = std::move(positions)]() mutable {
         if (setup.reproducible)
             runReproducible(std::move(setup), std::move(positions));
         else

@@ -472,6 +472,18 @@ TEST_CASE(
     CHECK(resumed.settled.passes == 2);
     checkSame(one.settled, resumed.settled);
 
+    // Resumed with all its passes, as a stop that came as the last pass ended leaves it (macOS CI, once): complete as
+    // it is, nothing searched again, rather than a third pass beyond the ceiling.
+    setup.resume = one.settled;
+    runner.start(setup);
+    ReviewRunner::State complete;
+    version = 0;
+    (void)runner.state(complete, version);
+    CHECK_FALSE(complete.running);
+    CHECK(complete.settled.passes == 2);
+    checkSame(one.settled, complete.settled);
+    CHECK(boardThreads() == before);
+
     // The time per position on one engine process, its hash kept: what the same position gets depends on what was
     // searched before it.
     ReviewRunner::Setup timed = setup;

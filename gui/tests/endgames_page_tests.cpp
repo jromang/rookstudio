@@ -46,6 +46,7 @@
 #include "noon_clock.hpp"
 #include "online_cache.hpp"
 #include "puzzles.hpp"
+#include "repairs.hpp"
 #include "scripted_server.hpp"
 #include "syzygy_download.hpp"
 #include "tablebases.hpp"
@@ -181,6 +182,20 @@ class FakeApp final : public EndgamesContext {
     void startTablesDownload() override { ++downloads; }
     void chooseTablesFolder() override { ++folder_dialogs; }
 
+    // The repairs (#146): no account, no pause; the fixes the program was given.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess a;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string&) const override { return std::chrono::milliseconds(0); }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
+    // The tables' download stopped: why, as the program keeps it.
+    void stopDownload(std::string said, NetFailure failure) {
+        download_error_   = std::move(said);
+        download_failure_ = std::move(failure);
+    }
+
     // What the module was told, and what the test sets.
     int frame_ = 0;
     std::vector<std::string> toasts;
@@ -203,6 +218,7 @@ class FakeApp final : public EndgamesContext {
     std::vector<std::string> themes_started;
     std::string paths;
     int pieces = 3;
+    std::vector<Fix> repairs;
 
    private:
     fs::path profile_;
@@ -637,4 +653,37 @@ TEST_CASE(
     CHECK(app.jobs().parked() == 1);
     tables.letGo();
     REQUIRE(waitUntil([&] { return app.jobs().poll() == 0; }, 30s));
+}
+
+TEST_CASE("endgames page: the tables' download stopped, said as a notice, the folder of its file a click away (#146)") {
+    ScratchDir profile("endgames-download-notice");
+    FakeApp app(profile);
+    EndgamesPage page(app);
+    CHECK_FALSE(page.tablesDownloadNotice());
+
+    // A file that could not be written: its path out of the words, in their tooltip, its folder offered.
+    const fs::path file = profile.path() / "syzygy" / "KQvK.rtbw";
+    NetFailure unwritable;
+    unwritable.kind = NetFailure::Kind::Unwritable;
+    unwritable.path = file;
+    app.stopDownload("The download stopped: the file could not be written (is the disk full?).", unwritable);
+    auto notice = page.tablesDownloadNotice();
+    REQUIRE(notice);
+    CHECK(notice->level == Notice::Level::Warning);
+    CHECK(notice->text.find("KQvK") == std::string::npos);
+    CHECK(notice->detail == file.string());
+    REQUIRE(notice->fixes.size() == 1);  // Go on, under it, is the card's own
+    CHECK(notice->fixes[0].kind == Fix::Kind::OpenFolder);
+    CHECK(notice->fixes[0].path == file.parent_path().string());
+
+    // An outage, or the host's pause: its words in orange, Go on under them, nothing else.
+    NetFailure offline;
+    offline.kind = NetFailure::Kind::Offline;
+    offline.host = "tablebase.lichess.ovh";
+    app.stopDownload("tablebase.lichess.ovh cannot be reached from here.", offline);
+    notice = page.tablesDownloadNotice();
+    REQUIRE(notice);
+    CHECK(notice->level == Notice::Level::Warning);
+    CHECK(notice->text == "tablebase.lichess.ovh cannot be reached from here.");
+    CHECK(notice->fixes.empty());
 }

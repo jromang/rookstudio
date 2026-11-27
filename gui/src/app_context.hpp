@@ -792,7 +792,8 @@ class EndgamesContext : public virtual context::Program,
                         public virtual context::Lichess,
                         public virtual context::Mistakes,
                         public virtual context::Puzzles,
-                        public virtual context::DiskTables {};
+                        public virtual context::DiskTables,
+                        public virtual context::Repairs {};
 
 // What board vision asks of the program (vision_page.hpp).
 class VisionContext : public virtual context::Program,

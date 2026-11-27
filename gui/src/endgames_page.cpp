@@ -39,6 +39,7 @@
 #include "mistakes.hpp"
 #include "online_cache.hpp"
 #include "puzzles.hpp"
+#include "repairs.hpp"
 #include "tablebases.hpp"
 #include "training.hpp"
 #include "ui.hpp"
@@ -573,10 +574,8 @@ void EndgamesPage::drawSyzygyDownloadCard() {
             ImGui::TextUnformatted(trf("The download stopped at {} of {}: {} files of {}.", formatBytes(state.bytes),
                                        formatBytes(total), state.files, syzygy345Files().size())
                                        .c_str());
-            if (const auto& error = app_.tablesDownloadError(); !error.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", error.c_str());
-                ui::pathTooltip(app_.tablesDownloadFailure().path);  // the file, out of the sentence (#141)
-            }
+            if (const auto notice = tablesDownloadNotice())  // the file out of the sentence (#141), its folder (#146)
+                if (const auto* fix = drawNotice(*notice, "syzygy_error")) app_.repair(*fix);
             if (ImGui::Button(TR("Go on##syzygy_download"))) startSyzygyDownload();
             tip(TR("The files missing, one after the other; a file cut short goes on from where it stopped."));
         }
@@ -584,6 +583,12 @@ void EndgamesPage::drawSyzygyDownloadCard() {
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for each file to tablebase.lichess.ovh."));
     ImGui::PopTextWrapPos();
     ui::endCard();
+}
+
+std::optional<Notice> EndgamesPage::tablesDownloadNotice() const {
+    const auto& error = app_.tablesDownloadError();
+    if (error.empty()) return std::nullopt;
+    return netNotice(app_.tablesDownloadFailure(), error, {}, Notice::Level::Warning);
 }
 
 void EndgamesPage::drawEndgamesFromGames() {

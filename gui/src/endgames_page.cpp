@@ -684,7 +684,7 @@ bool EndgamesPage::startEndgame(const EndgameEntry& entry) {
 
 bool EndgamesPage::startReview() {
     if (!endgameLock().empty()) return false;
-    const auto day = trainingDay(epochNow());
+    const auto day = trainingDay(app_.now());
     std::vector<const EndgameCard*> due;
     for (const auto& [key, c] : endgameRecord().cards)
         if (c.card.due <= day.end && endgameNeed(c.fen).empty()) due.push_back(&c);
@@ -900,7 +900,7 @@ void EndgamesPage::endgameJudge(chess::Move move) {
             r.fault_pending = true;
             r.changes.push_back({san + "?", r.judged->after});
             // The position before the fault: a card of the day's review, back tomorrow (unless it is the card played).
-            const auto now = epochNow();
+            const auto now = app_.now();
             const auto key = positionKey(board.getFen());
             auto& cards    = endgameRecord().cards;
             if (!(t.review && key == positionKey(t.fen))) {
@@ -1037,7 +1037,7 @@ void EndgamesPage::endgameEnded(EndgameOutcome outcome) {
             board.makeMove(m);
         }
     }
-    const auto now         = epochNow();
+    const auto now         = app_.now();
     auto& record           = endgameRecord();
     const bool lost_anyway = r.moves.empty() && outcome == EndgameOutcome::Lost;
     // Stopped: a try only when it had a fault; a card played again is not graded, still due.
@@ -1455,7 +1455,7 @@ void EndgamesPage::drawEndgameColumn() {
                         true);
             if (t.review && r.next_review > 0) {
                 const auto days =
-                    std::max<int64_t>(1, (r.next_review - epochNow() + study::fsrs::DAY / 2) / study::fsrs::DAY);
+                    std::max<int64_t>(1, (r.next_review - app_.now() + study::fsrs::DAY / 2) / study::fsrs::DAY);
                 wrapped(days == 1 ? std::string(TR("It comes back tomorrow."))
                                   : trn("It comes back in {} day.", "It comes back in {} days.",
                                         static_cast<uint64_t>(days), days),
@@ -1631,7 +1631,7 @@ void EndgamesPage::drawEndgameEnd() {
 ReviewCount EndgamesPage::reviewCount() {
     ReviewCount out;
     out.kind       = ReviewKind::Endgames;
-    const auto day = trainingDay(epochNow());
+    const auto day = trainingDay(app_.now());
     const auto& r  = endgameRecord();
     out.due        = endgameCardsDue(r, day.end);
     out.tomorrow   = endgameCardsDue(r, day.end + study::fsrs::DAY) - out.due;

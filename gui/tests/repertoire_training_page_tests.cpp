@@ -38,6 +38,7 @@
 #include "databases.hpp"
 #include "focus_words.hpp"
 #include "jobs.hpp"
+#include "noon_clock.hpp"
 #include "repertoire_training_page.hpp"
 #include "repertoires.hpp"
 #include "test_support.hpp"
@@ -67,6 +68,7 @@ class FakeApp final : public RepertoireTrainingContext {
     DatabaseShelf& shelf() override { return shelf_; }
     void toast(const std::string& text) override { toasts.push_back(text); }
     JobGroup& jobs() override { return jobs_; }
+    int64_t now() const override { return clock_.now(); }  // noon: far from the training day's end
 
     // The Board taken by a session: what it was before, as the test made it, given back at the end.
     std::string sessionLock() const override { return live_game ? "Locked" : ""; }
@@ -176,6 +178,7 @@ class FakeApp final : public RepertoireTrainingContext {
    private:
     fs::path profile_;
     JobGroup jobs_;
+    fcg::test::NoonClock clock_;
     DatabaseShelf shelf_;  // after its jobs: gone before them
     RepertoireShelf repertoires_;
     TrainingSettings settings_;
@@ -329,7 +332,7 @@ TEST_CASE("repertoire training page: a right and a wrong answer graded and kept,
     FakeApp app(profile);
     Frames frames;
     RepertoireTrainingPage page(app);
-    const auto now    = epochNow();
+    const auto now    = app.now();
     const auto index  = najdorf(app, now);
     const auto& entry = app.repertoires().entries()[index];
 
@@ -471,7 +474,7 @@ TEST_CASE("repertoire training page: a move added to the repertoire from a wrong
     FakeApp app(profile);
     Frames frames;
     RepertoireTrainingPage page(app);
-    const auto index  = najdorf(app, epochNow());
+    const auto index  = najdorf(app, app.now());
     const auto& entry = app.repertoires().entries()[index];
     const auto pgn    = readFile(entry.file);
 
@@ -532,7 +535,7 @@ TEST_CASE("repertoire training page: the day's review of its positions due, back
     FakeApp app(profile);
     Frames frames;
     RepertoireTrainingPage page(app);
-    const auto index = najdorf(app, epochNow());
+    const auto index = najdorf(app, app.now());
 
     // The day's review starts the repertoire's session of its position due alone.
     app.review = true;
@@ -564,7 +567,7 @@ TEST_CASE("repertoire training page: a live game locks it, a correspondence posi
     FakeApp app(profile);
     Frames frames;
     RepertoireTrainingPage page(app);
-    const auto index  = najdorf(app, epochNow());
+    const auto index  = najdorf(app, app.now());
     const auto& entry = app.repertoires().entries()[index];
 
     // A game of the user's played live on Lichess: nothing starts, the card says why (fair play, #48).
@@ -660,7 +663,7 @@ TEST_CASE("repertoire training page: a database whose tree cannot be read: the s
     // The session starts all the same, its new positions in the repertoire's order; why, at the Board's corner and in
     // the log.
     const auto logged = Console::instance().added();
-    const auto index  = najdorf(app, epochNow());
+    const auto index  = najdorf(app, app.now());
     FocusWords words("training");
     page.addFocusWords(words, "training");
     REQUIRE(page.onBoard());

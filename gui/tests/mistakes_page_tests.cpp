@@ -44,6 +44,7 @@
 #include "mistakes_page.hpp"
 #include "mock_engines.hpp"
 #include "model.hpp"
+#include "noon_clock.hpp"
 #include "review_runner.hpp"
 #include "test_support.hpp"
 #include "training.hpp"
@@ -88,6 +89,7 @@ class FakeApp final : public MistakesContext {
     DatabaseShelf& shelf() override { return shelf_; }
     void toast(const std::string& text) override { toasts.push_back(text); }
     JobGroup& jobs() override { return jobs_; }
+    int64_t now() const override { return clock_.now(); }  // noon: far from the training day's end
 
     // The Board taken by a session: what it was before, as the test made it, given back at the end.
     std::string sessionLock() const override { return live_game ? "Locked" : ""; }
@@ -207,6 +209,7 @@ class FakeApp final : public MistakesContext {
    private:
     fs::path profile_;
     JobGroup jobs_;
+    fcg::test::NoonClock clock_;
     DatabaseShelf shelf_;  // after its jobs: gone before them
     TrainingSettings settings_;
     AnalysisSettings analysis_;

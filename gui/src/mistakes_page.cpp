@@ -243,7 +243,7 @@ std::map<std::string, std::size_t> MistakesPage::mistakeKinds(uint32_t since) {
 }
 
 MistakeCounts MistakesPage::mistakeDayCounts(const std::string* kind) {
-    return mistakeCounts(mistakeExercises(kind), trainingDay(epochNow()),
+    return mistakeCounts(mistakeExercises(kind), trainingDay(app_.now()),
                          static_cast<std::size_t>(std::max(0, app_.trainingSettings().new_per_day)));
 }
 
@@ -406,7 +406,7 @@ void MistakesPage::poll() {
                     e.database = u.database;
                     e.folder   = u.folder;
                     e.game_id  = u.id;
-                    e.reviewed = epochNow();
+                    e.reviewed = app_.now();
                 }
                 const auto key = reviewKey(u.game);
                 putExercises(mistakeRecord(), key,
@@ -587,7 +587,7 @@ TrainingKind::Part MistakesPage::part() const {
 
 void MistakesPage::drawTodayCards(TodayCards& cards) {
     const auto all = mistakeExercises();
-    const auto c   = mistakeCounts(all, trainingDay(epochNow()), 0);
+    const auto c   = mistakeCounts(all, trainingDay(app_.now()), 0);
     cards.card("##training_kind_mistakes", ui::Icon::Target, TR("My mistakes"),
                TR("Your reviewed games' mistakes, turned into exercises."),
                app_.userNames().empty() ? std::string(TR("your names first"))
@@ -638,7 +638,7 @@ void MistakesPage::drawPart() {
     const auto counts = mistakeDayCounts(kind);
     ImGui::Dummy(ImVec2(0, px(2)));
     if (!all.empty()) {
-        const auto every = mistakeCounts(all, trainingDay(epochNow()), 0);
+        const auto every = mistakeCounts(all, trainingDay(app_.now()), 0);
         bigCount(ui::exactCount(every.exercises), trn("exercise", "exercises", every.exercises) + ", " +
                                                       trn("from {} game", "from {} games", every.games, every.games));
         ImGui::SameLine(0, px(30));
@@ -670,7 +670,7 @@ void MistakesPage::drawPart() {
         ImGui::Dummy(ImVec2(0, px(4)));
         const auto list = mistakeExercises(kind);
         std::vector<const MistakeExercise*> rows(list.begin(), list.end());
-        const auto day = trainingDay(epochNow());
+        const auto day = trainingDay(app_.now());
         std::stable_sort(rows.begin(), rows.end(), [&](const auto* a, const auto* b) {
             // The due first, then the new, the latest games first; then the known, the soonest first.
             const auto rank = [&](const MistakeExercise* e) {
@@ -772,7 +772,7 @@ std::string MistakesPage::mistakeLock() const { return app_.sessionLock(); }
 
 bool MistakesPage::startMistakes(bool review, bool new_only) {
     if (!mistakeLock().empty()) return false;
-    const auto day          = trainingDay(epochNow());
+    const auto day          = trainingDay(app_.now());
     const std::string* kind = review || mistake_kind_.empty() ? nullptr : &mistake_kind_;
     const auto list         = mistakeExercises(kind);
     const auto counts =
@@ -912,7 +912,7 @@ void MistakesPage::mistakeJudged() {
 void MistakesPage::mistakeGrade(bool right) {
     auto& r        = *mistake_;
     auto& e        = r.exercises[r.current];
-    const auto now = epochNow();
+    const auto now = app_.now();
     r.rating       = study::gradeOf(right, r.hinted, r.seconds);
     auto& record   = mistakeRecord();
     if (const auto it = record.exercises.find(e.key); it != record.exercises.end()) {
@@ -1342,7 +1342,7 @@ void MistakesPage::drawMistakeColumn() {
             else if (r.next_again)
                 after = TR("Asked again in this session, then on its day.");
             else {
-                const auto day = trainingDay(epochNow());
+                const auto day = trainingDay(app_.now());
                 after          = trf("Back {}.", whenText(r.next_review, day.end));
             }
             ImGui::TextDisabled("%s", after.c_str());
@@ -1402,7 +1402,7 @@ void MistakesPage::drawMistakeColumn() {
                 if (const auto said = reviewSaid(e, board); !said.empty()) wrapped(said, true);
                 if (!r.retry && !r.practice)
                     wrapped(r.next_again ? std::string(TR("It comes back a few exercises later, then tomorrow."))
-                                         : trf("Back {}.", whenText(r.next_review, trainingDay(epochNow()).end)),
+                                         : trf("Back {}.", whenText(r.next_review, trainingDay(app_.now()).end)),
                             true);
             }
             ImGui::PopTextWrapPos();

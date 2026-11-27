@@ -47,6 +47,7 @@
 #include "repertoire_training_page.hpp"
 #include "review_bridge.hpp"
 #include "review_runner.hpp"
+#include "training.hpp"
 #include "training_page.hpp"
 #include "twic.hpp"
 #include "vision_page.hpp"
@@ -67,6 +68,9 @@ class App::ModulesContext final : public AppContext {
     DatabaseShelf& shelf() override { return app_.shelf(); }
     void toast(const std::string& text) override { app_.boardToast(text); }
     JobGroup& jobs() override { return app_.jobs_; }
+
+    // The clock the training is scheduled by.
+    int64_t now() const override { return epochNow(); }
 
     // The pages.
     void showLichessPage() override {

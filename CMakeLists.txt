@@ -322,20 +322,6 @@ if(FCG_STUDY_BENCH)
     fcg_add_program(fcg-study-bench WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/study/bench/main.cpp LIBRARIES fcg_study)
 endif()
 
-if(FCG_FUZZ)
-    # What a database is made of, changed after it was written (#102): a segment's files, its edits, its table of
-    # names; and what the store imports: a PGN file plain or compressed, a ChessBase archive. Linked with the study
-    # layer alone, built with the window or without it. Each target fuzz_<name> from fuzz/<name>.cpp, its seeds in
-    # fuzz/corpus/<name>.
-    foreach(name segment edits players import chessbase)
-        add_executable(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
-                                    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
-        target_link_libraries(fuzz_${name} PRIVATE fcg_study)
-        target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
-        list(APPEND FCG_FUZZ_NAMES ${name})
-    endforeach()
-endif()
-
 # ---------------------------------------------------------------------------
 # Commentary: the assistant's facts, comments and review, ported from the Rust prototype (no UI)
 # ---------------------------------------------------------------------------
@@ -931,20 +917,41 @@ if(FCG_BUILD_GUI)
                                                               FCG_WB_MOVER="$<TARGET_FILE_NAME:fcg_wb_mover>"
                                                               FCG_GUI_PROGRAM="$<TARGET_FILE:fastchess-gui>")
     endif()
+endif()
 
-    if(FCG_FUZZ)
-        # What others send the program: a web request, the tunnel server's text, a TLCS datagram, a PGN book (to
-        # Polyglot), an EPD book or suite; and what fastchess' own readers take of them through the program: a PGN
-        # book, an engine's info line; and a game's PGN as the study layer reads and writes it. Each target fuzz_<name>
-        # from fuzz/<name>.cpp, its seeds in fuzz/corpus/<name>.
-        foreach(name web_request tunnel_text tlcs_message pgn_book epd_book app_pgn engine_info pgn_reader)
-            add_executable(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
-                                        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
-            target_link_libraries(fuzz_${name} PRIVATE fcg_lib)
-            target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
-            list(APPEND FCG_FUZZ_NAMES ${name})
-        endforeach()
+# ---------------------------------------------------------------------------
+# Fuzz targets
+# ---------------------------------------------------------------------------
+
+# Each target fuzz_<name> from fuzz/<name>.cpp, its seeds in fuzz/corpus/<name>, linked with the smallest library that
+# has what it reads (name|library):
+# - fastchess' core library: an engine's info line, read by fastchess' parsers;
+# - the tournament layer: a PGN book turned into a Polyglot book, an EPD book or suite, and a PGN book as fastchess'
+#   own reader takes it through the book inspection;
+# - the study layer: what a database is made of, changed after it was written (#102): a segment's files, its edits,
+#   its table of names; what the store imports: a PGN file plain or compressed, a ChessBase archive; and a game's PGN
+#   as the study layer reads and writes it;
+# - the window's library, built with the window only: what others send the program: a web request, the tunnel
+#   server's text, a TLCS datagram.
+# Compiled as our sources are (C++20), whatever library they link.
+if(FCG_FUZZ)
+    set(FCG_FUZZ_LIBRARIES engine_info|fastchess_core
+                           pgn_book|fcg_tournament epd_book|fcg_tournament app_pgn|fcg_tournament
+                           segment|fcg_study edits|fcg_study players|fcg_study import|fcg_study chessbase|fcg_study
+                           pgn_reader|fcg_study)
+    if(FCG_BUILD_GUI)
+        list(APPEND FCG_FUZZ_LIBRARIES web_request|fcg_lib tunnel_text|fcg_lib tlcs_message|fcg_lib)
     endif()
+    foreach(fuzz IN LISTS FCG_FUZZ_LIBRARIES)
+        string(REPLACE "|" ";" fuzz "${fuzz}")
+        list(GET fuzz 0 name)
+        list(GET fuzz 1 library)
+        fcg_add_program(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
+                        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp LIBRARIES ${library})
+        target_compile_features(fuzz_${name} PRIVATE cxx_std_20)
+        target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
+        list(APPEND FCG_FUZZ_NAMES ${name})
+    endforeach()
 endif()
 
 # The test programs and the fuzz targets, each listed here only. The tests target builds the test programs (and the

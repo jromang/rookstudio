@@ -199,10 +199,8 @@ struct TournamentSpec {
     }
     [[nodiscard]] bool coloursLocked() const noexcept { return colours != Colours::Alternate; }
 
-    [[nodiscard]] std::string pgnFile() const { return pgn_file.empty() ? "games.pgn" : pgn_file; }
-    [[nodiscard]] std::string chessbasePgnFile() const {
-        return pgn_chessbase_file.empty() ? "games-chessbase.pgn" : pgn_chessbase_file;
-    }
+    [[nodiscard]] std::string pgnFile() const;
+    [[nodiscard]] std::string chessbasePgnFile() const;
 
     // A team match: the name of team `team` (0: A, 1: B), and its participants' ids in the list's order, the withdrawn
     // and replaced ones too unless `active_only`.

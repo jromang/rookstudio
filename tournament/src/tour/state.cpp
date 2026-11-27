@@ -14,6 +14,7 @@
 
 #include "book_adapter.hpp"
 #include "engine_text.hpp"
+#include "journal_events.hpp"
 #include "pairing.hpp"
 #include "pgn_book.hpp"
 #include "sprt_rules.hpp"
@@ -24,9 +25,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr const char* SPEC_FILE    = "tournament.json";
-constexpr const char* JOURNAL_FILE = "journal.jsonl";
-constexpr const char* READ_ONLY    = "this tournament is open in another program, and only shown here";
+constexpr const char* READ_ONLY = "this tournament is open in another program, and only shown here";
 
 // The file every game is also appended to (TournamentSpec::pgn_out) is a .pgn file: a tournament folder from
 // elsewhere must not make the program append its text to any file at all (a shell's startup file...).
@@ -42,14 +41,14 @@ std::vector<nlohmann::json> withoutUndoneEdits(const std::vector<nlohmann::json>
     std::vector<nlohmann::json> out;
     out.reserve(events.size());
     for (const auto& e : events) {
-        if (e.value("t", std::string{}) != "edit_undone") {
+        if (eventTypeOf(e) != EventType::EditUndone) {
             out.push_back(e);
             continue;
         }
         for (auto i = out.size(); i-- > 0;) {
-            if (!isEditEvent(out[i].value("t", std::string{}))) continue;
+            if (!isEditEvent(eventTypeOf(out[i]))) continue;
             const auto completed = [](const nlohmann::json& x) {
-                return x.value("t", std::string{}) == "finished" && x.value("why", std::string{}) == "complete";
+                return eventTypeOf(x) == EventType::Finished && x.value("why", std::string{}) == "complete";
             };
             out.erase(std::remove_if(out.begin() + static_cast<std::ptrdiff_t>(i) + 1, out.end(), completed),
                       out.end());
@@ -61,19 +60,18 @@ std::vector<nlohmann::json> withoutUndoneEdits(const std::vector<nlohmann::json>
 }
 
 nlohmann::json toJson(const GameResult& r) {
-    nlohmann::json j = {{"t", "game_finished"},
-                        {"encounter", r.encounter},
-                        {"game", r.game},
-                        {"white", r.white},
-                        {"black", r.black},
-                        {"result", r.result},
-                        {"termination", static_cast<int>(r.termination)},
-                        {"reason", r.reason},
-                        {"plies", r.plies},
-                        {"ms", r.duration_ms},
-                        {"pgn", {r.pgn.offset, r.pgn.length}},
-                        {"cb", {r.pgn_chessbase.offset, r.pgn_chessbase.length}},
-                        {"at", r.finished_at}};
+    auto j = journalEvent(EventType::GameFinished, {{"encounter", r.encounter},
+                                                    {"game", r.game},
+                                                    {"white", r.white},
+                                                    {"black", r.black},
+                                                    {"result", r.result},
+                                                    {"termination", static_cast<int>(r.termination)},
+                                                    {"reason", r.reason},
+                                                    {"plies", r.plies},
+                                                    {"ms", r.duration_ms},
+                                                    {"pgn", {r.pgn.offset, r.pgn.length}},
+                                                    {"cb", {r.pgn_chessbase.offset, r.pgn_chessbase.length}},
+                                                    {"at", r.finished_at}});
     if (!r.pv_warnings.empty()) j["pv"] = r.pv_warnings;
     if (r.unbalanced != 0) j["unbalanced"] = r.unbalanced;
     if (r.set) {
@@ -255,20 +253,20 @@ TournamentState::Replayed TournamentState::replay(const std::vector<nlohmann::js
     std::set<uint64_t> done, dropped;
 
     for (const auto& e : withoutUndoneEdits(events)) {
-        const auto type = e.value("t", std::string{});
-        if (type == "game_finished") {
+        const auto type = eventTypeOf(e);
+        if (type == EventType::GameFinished) {
             const auto r = resultFromJson(e);
             if (done.insert(r.number()).second) results.push_back(r);
         } else if (isEditEvent(type)) {
             effects(e, spec, schedule, results, done, dropped);
             if (out.finished && out.finish_reason == "complete") out.finished = false;
-        } else if (type == "round_paired" || type == "tiebreak_added") {
+        } else if (type == EventType::RoundPaired || type == EventType::TiebreakAdded) {
             roundEventTo(e, spec, schedule);
-            if (type == "round_paired") {
+            if (type == EventType::RoundPaired) {
                 for (const auto& id : e.value("byes", std::vector<int>{})) out.byes[id]++;
                 if (e.contains("bracket")) out.last_bracket = e.at("bracket").get<std::vector<std::vector<int>>>();
             }
-        } else if (type == "finished") {
+        } else if (type == EventType::Finished) {
             out.finished      = true;
             out.finish_reason = e.value("why", std::string{});
         }
@@ -462,23 +460,24 @@ void TournamentState::load() {
     for (std::size_t i = 0; i < events.size(); ++i) {
         const auto& e = events[i];
         try {
-            const auto type = e.at("t").get<std::string>();
-            if (type == "games_voided" && e.value("network", false)) network_voids_ += e.at("games").size();
-            if (type == "encounter_started") {
+            const auto name = e.at("t").get<std::string>();
+            const auto type = eventType(name);
+            if (type == EventType::GamesVoided && e.value("network", false)) network_voids_ += e.at("games").size();
+            if (type == EventType::EncounterStarted) {
                 readStarted(e);
             } else if (isEditEvent(type)) {
                 applyEvent(e);
-            } else if (type == "round_paired" || type == "tiebreak_added") {
+            } else if (type == EventType::RoundPaired || type == EventType::TiebreakAdded) {
                 applyRoundEvent(e);
-            } else if (type == "game_finished") {
+            } else if (type == EventType::GameFinished) {
                 const auto result            = resultFromJson(e);
                 journaled[result.pgn.offset] = {result.pgn, result.pgn_chessbase};
                 apply(result);
-            } else if (type == "finished") {
+            } else if (type == EventType::Finished) {
                 finished_      = true;
                 finish_reason_ = e.value("why", std::string{});
                 imported       = imported || finish_reason_ == "imported";
-            } else if (type == "pgn_out") {
+            } else if (type == EventType::PgnOut) {
                 // With "begun", the start of a write (with "pgn" empty, which older versions read as such); without,
                 // its end, or a write of older versions.
                 for (const auto& offset : e.at("pgn")) written_out.insert(offset.get<uint64_t>());
@@ -488,7 +487,7 @@ void TournamentState::load() {
                     out_begun.reset();
                 }
             } else {
-                throw std::runtime_error("unknown event \"" + type + "\"");
+                throw std::runtime_error("unknown event \"" + name + "\"");
             }
         } catch (const std::exception& ex) {
             throw std::runtime_error((dir_ / JOURNAL_FILE).string() + ", event " + std::to_string(i + 1) + ": " +
@@ -538,7 +537,7 @@ void TournamentState::load() {
     if (!finished_ && schedule_.size() && !gamesLeft()) {
         finished_      = true;
         finish_reason_ = "complete";
-        if (journal_) journal_->append({{"t", "finished"}, {"why", finish_reason_}});
+        if (journal_) journal_->append(journalEvent(EventType::Finished, {{"why", finish_reason_}}));
     }
 
     if (spec_.book.size > 0 && changedSince(spec_.conditions.opening.file, spec_.book)) {
@@ -605,7 +604,7 @@ void TournamentState::rebuildOpen() {
 
 void TournamentState::effects(const nlohmann::json& event, TournamentSpec& spec, Schedule& schedule,
                               std::vector<GameResult>& results, std::set<uint64_t>& done, std::set<uint64_t>& dropped) {
-    const auto type = event.at("t").get<std::string>();
+    const auto type = eventTypeOf(event);
     applyEditEvent(event, spec, schedule);
 
     const auto voidWhere = [&](auto involves, bool replay, const std::string& why) {
@@ -618,11 +617,11 @@ void TournamentState::effects(const nlohmann::json& event, TournamentSpec& spec,
         }
     };
 
-    if (type == "participant_replaced") {
+    if (type == EventType::ParticipantReplaced) {
         // The new engine plays again every game of the old one.
         const int old = event.at("old").get<int>();
         voidWhere([&](const GameResult& r) { return r.white == old || r.black == old; }, true, "replaced");
-    } else if (type == "participant_withdrawn") {
+    } else if (type == EventType::ParticipantWithdrawn) {
         const int id = event.at("participant").get<int>();
         // Games of started encounters it has not played will not be played.
         const auto at = std::min(event.at("at").get<uint32_t>(), schedule.size().value_or(0));
@@ -636,7 +635,7 @@ void TournamentState::effects(const nlohmann::json& event, TournamentSpec& spec,
         if (event.value("void_played", false)) {
             voidWhere([&](const GameResult& r) { return r.white == id || r.black == id; }, false, "withdrawn");
         }
-    } else if (type == "games_voided") {
+    } else if (type == EventType::GamesVoided) {
         const bool replay = event.value("replay", true);
         const auto why    = event.value("why", std::string{});
         for (const auto& g : event.at("games")) {
@@ -644,7 +643,7 @@ void TournamentState::effects(const nlohmann::json& event, TournamentSpec& spec,
             voidWhere([&](const GameResult& r) { return r.number() == n; }, replay, why);
             if (!replay && !done.count(n)) dropped.insert(n);
         }
-    } else if (type == "result_set") {
+    } else if (type == EventType::ResultSet) {
         const auto result = event.at("result").get<std::string>();
         if (!validResult(result)) throw std::runtime_error("a result is 1-0, 0-1 or 1/2-1/2");
         const auto why = event.value("why", std::string{});
@@ -680,7 +679,7 @@ std::shared_ptr<const TournamentSpec> TournamentState::specSnapshot() const {
 }
 
 void TournamentState::roundEventTo(const nlohmann::json& event, const TournamentSpec& spec, Schedule& schedule) {
-    const auto type  = event.at("t").get<std::string>();
+    const auto type  = eventTypeOf(event);
     const auto round = event.at("round").get<uint32_t>();
     const int cycles = spec.format == Format::Knockout ? std::max(1, spec.cycles) : 1;
 
@@ -693,7 +692,7 @@ void TournamentState::roundEventTo(const nlohmann::json& event, const Tournament
         e.second = cycle % 2 == 1 ? b : a;
         encounters.push_back(e);
     };
-    if (type == "round_paired") {
+    if (type == EventType::RoundPaired) {
         for (const auto& p : event.at("pairs")) {
             for (int c = 1; c <= cycles; ++c) add(p.at(0).get<int>(), p.at(1).get<int>(), static_cast<uint32_t>(c));
         }
@@ -706,7 +705,7 @@ void TournamentState::roundEventTo(const nlohmann::json& event, const Tournament
 
 void TournamentState::applyRoundEvent(const nlohmann::json& event) {
     roundEventTo(event, spec_, schedule_);
-    if (event.at("t") == "round_paired") {
+    if (eventTypeOf(event) == EventType::RoundPaired) {
         round_ = event.at("round").get<uint32_t>();
         for (const auto& id : event.value("byes", std::vector<int>{})) byes_[id]++;
         if (event.contains("bracket")) brackets_[round_] = event.at("bracket").get<std::vector<std::vector<int>>>();
@@ -789,7 +788,7 @@ void TournamentState::pairIfReady() {
         if (p.active) players.push_back(p.id);
     }
 
-    nlohmann::json event = {{"t", "round_paired"}, {"round", round_ + 1}};
+    auto event           = journalEvent(EventType::RoundPaired, {{"round", round_ + 1}});
     const auto pairsJson = [](const RoundPairing& p) {
         nlohmann::json pairs = nlohmann::json::array();
         for (const auto& [a, b] : p.pairs) pairs.push_back({a, b});
@@ -836,8 +835,8 @@ void TournamentState::pairIfReady() {
                 winners.push_back(*winner);
                 continue;
             }
-            const nlohmann::json tiebreak = {
-                {"t", "tiebreak_added"}, {"round", round_}, {"pair", {a, b}}, {"index", tiebreaks(a, b) + 1}};
+            const auto tiebreak = journalEvent(EventType::TiebreakAdded,
+                                               {{"round", round_}, {"pair", {a, b}}, {"index", tiebreaks(a, b) + 1}});
             journal_->append(tiebreak);
             applyRoundEvent(tiebreak);
             tiebreak_added = true;
@@ -993,7 +992,7 @@ void TournamentState::undoEdit() {
     if (!undo_ || (!undo_->results_only && undo_->claims != claims_)) {
         throw std::runtime_error("a game started since the last change, which can no longer be undone");
     }
-    journal_->append({{"t", "edit_undone"}});
+    journal_->append(journalEvent(EventType::EditUndone));
 
     auto& u = *undo_;
     // The results then; those recorded since come after them and are kept.
@@ -1024,7 +1023,7 @@ void TournamentState::undoEdit() {
         // The edit had reopened a finished tournament.
         finished_      = true;
         finish_reason_ = "complete";
-        journal_->append({{"t", "finished"}, {"why", finish_reason_}});
+        journal_->append(journalEvent(EventType::Finished, {{"why", finish_reason_}}));
     }
     keepOwnBooks();
     writeOut(lock);
@@ -1071,8 +1070,8 @@ GameTask TournamentState::makeTask(uint32_t encounter, int game) {
     if (it == started_.end()) {
         const auto opening = openingFor(*enc);
         const auto text    = toText(opening, frc());
-        journal_->append(
-            {{"t", "encounter_started"}, {"encounter", encounter}, {"fen", text.fen}, {"moves", text.moves}});
+        journal_->append(journalEvent(EventType::EncounterStarted,
+                                      {{"encounter", encounter}, {"fen", text.fen}, {"moves", text.moves}}));
         it = started_.emplace(encounter, opening).first;
     }
     auto opening = it->second;
@@ -1081,11 +1080,9 @@ GameTask TournamentState::makeTask(uint32_t encounter, int game) {
         if (second == second_.end()) {
             const auto own  = openingFor(*enc, 1);
             const auto text = toText(own, frc());
-            journal_->append({{"t", "encounter_started"},
-                              {"encounter", encounter},
-                              {"game", 1},
-                              {"fen", text.fen},
-                              {"moves", text.moves}});
+            journal_->append(
+                journalEvent(EventType::EncounterStarted,
+                             {{"encounter", encounter}, {"game", 1}, {"fen", text.fen}, {"moves", text.moves}}));
             second = second_.emplace(encounter, own).first;
         }
         opening = second->second;
@@ -1381,20 +1378,19 @@ bool TournamentState::replaceUnbalanced(uint32_t encounter) {
     nlohmann::json games = nlohmann::json::array();
     games.push_back(nlohmann::json::array({encounter, 0}));
     games.push_back(nlohmann::json::array({encounter, 1}));
-    const nlohmann::json voided = {
-        {"t", "games_voided"}, {"games", games}, {"replay", true}, {"why", UNBALANCED_REASON}};
+    const auto voided =
+        journalEvent(EventType::GamesVoided, {{"games", games}, {"replay", true}, {"why", UNBALANCED_REASON}});
     journal_->append(voided);
     applyEvent(voided);
     // The user's last change is no longer the last edit of the journal: undoing it would undo this void instead.
     undo_.reset();
-    journal_->append({{"t", "encounter_started"}, {"encounter", encounter}, {"fen", text.fen}, {"moves", text.moves}});
+    journal_->append(journalEvent(EventType::EncounterStarted,
+                                  {{"encounter", encounter}, {"fen", text.fen}, {"moves", text.moves}}));
     started_[encounter] = book.at(index);
     if (second) {
-        journal_->append({{"t", "encounter_started"},
-                          {"encounter", encounter},
-                          {"game", 1},
-                          {"fen", second->second.fen},
-                          {"moves", second->second.moves}});
+        journal_->append(journalEvent(
+            EventType::EncounterStarted,
+            {{"encounter", encounter}, {"game", 1}, {"fen", second->second.fen}, {"moves", second->second.moves}}));
         second_[encounter] = book.at(second->first);
     }
     ++replaced_;
@@ -1420,12 +1416,11 @@ bool TournamentState::voidCutGames(const std::vector<uint64_t>& numbers, const s
         if (counts) games.push_back(nlohmann::json::array({n / 2, n % 2}));
     }
     if (games.empty()) return false;
-    const nlohmann::json voided = {{"t", "games_voided"},
-                                   {"games", games},
-                                   {"replay", true},
-                                   {"why", std::string(NETWORK_REASON) + ": " + machine},
-                                   {"network", true},
-                                   {"machine", machine}};
+    const auto voided = journalEvent(EventType::GamesVoided, {{"games", games},
+                                                              {"replay", true},
+                                                              {"why", std::string(NETWORK_REASON) + ": " + machine},
+                                                              {"network", true},
+                                                              {"machine", machine}});
     journal_->append(voided);
     applyEvent(voided);
     undo_.reset();  // the user's last change is no longer the journal's last edit
@@ -1442,7 +1437,7 @@ void TournamentState::finishIfComplete() {
     if (finished_ || !schedule_.size() || hasWorkLocked() || !running_.empty()) return;
     finished_      = true;
     finish_reason_ = "complete";
-    journal_->append({{"t", "finished"}, {"why", finish_reason_}});
+    journal_->append(journalEvent(EventType::Finished, {{"why", finish_reason_}}));
 }
 
 void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
@@ -1488,7 +1483,7 @@ void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
             } catch (const std::exception& e) {
                 error = e.what();
             }
-            if (settled) journal_->append({{"t", "pgn_out"}, {"pgn", cut.offsets}});
+            if (settled) journal_->append(journalEvent(EventType::PgnOut, {{"pgn", cut.offsets}}));
             lock.lock();
             out_error_ = error;
             if (!error.empty()) break;
@@ -1558,14 +1553,16 @@ void TournamentState::writeOut(std::unique_lock<std::mutex>& lock) {
         try {
             if (error.empty()) {
                 appendShared(out, text, [&](uint64_t at) {
-                    nlohmann::json begun = {{"t", "pgn_out"},     {"pgn", nlohmann::json::array()},
-                                            {"begun", offsets},   {"at", at},
-                                            {"len", text.size()}, {"cb", chessbase}};
+                    auto begun = journalEvent(EventType::PgnOut, {{"pgn", nlohmann::json::array()},
+                                                                  {"begun", offsets},
+                                                                  {"at", at},
+                                                                  {"len", text.size()},
+                                                                  {"cb", chessbase}});
                     if (!set.empty()) begun["set"] = set;
                     journal(begun);
                     begun_at = at;
                 });
-                journal({{"t", "pgn_out"}, {"pgn", offsets}});
+                journal(journalEvent(EventType::PgnOut, {{"pgn", offsets}}));
             }
         } catch (const std::exception& e) {
             if (journal_failed) throw;
@@ -1612,7 +1609,7 @@ bool TournamentState::settleOut(const nlohmann::json& begun,
         out_error_ = e.what();
         return false;
     }
-    journal_->append({{"t", "pgn_out"}, {"pgn", begun.at("begun")}});
+    journal_->append(journalEvent(EventType::PgnOut, {{"pgn", begun.at("begun")}}));
     return true;
 }
 
@@ -1638,7 +1635,7 @@ void TournamentState::checkSprt() {
 
     finished_      = true;
     finish_reason_ = verdict == fastchess::SPRT_H1 ? "sprt_h1" : "sprt_h0";
-    journal_->append({{"t", "finished"}, {"why", finish_reason_}});
+    journal_->append(journalEvent(EventType::Finished, {{"why", finish_reason_}}));
 }
 
 bool TournamentState::wanted(const GameTask& task) const {
@@ -1769,25 +1766,26 @@ bool TournamentState::follow(const nlohmann::json& e, uint64_t end) {
     if (!read_only_) throw std::logic_error("only a read-only tournament follows another program's journal");
     const Bump bump{version_};
     std::lock_guard<std::mutex> lock(mutex_);
-    const auto type = e.at("t").get<std::string>();
+    const auto name = e.at("t").get<std::string>();
+    const auto type = eventType(name);
     // What the writer wrote: undoing an edit needs what it changed, which only a fresh open knows.
-    if (type == "edit_undone") return false;
-    if (type == "games_voided" && e.value("network", false)) network_voids_ += e.at("games").size();
-    if (type == "encounter_started") {
+    if (type == EventType::EditUndone) return false;
+    if (type == EventType::GamesVoided && e.value("network", false)) network_voids_ += e.at("games").size();
+    if (type == EventType::EncounterStarted) {
         readStarted(e);
     } else if (isEditEvent(type)) {
         applyEvent(e);
-    } else if (type == "round_paired" || type == "tiebreak_added") {
+    } else if (type == EventType::RoundPaired || type == EventType::TiebreakAdded) {
         applyRoundEvent(e);
-    } else if (type == "game_finished") {
+    } else if (type == EventType::GameFinished) {
         const auto result = resultFromJson(e);
         replica_.running.erase(result.number());
         apply(result);
-    } else if (type == "finished") {
+    } else if (type == EventType::Finished) {
         finished_      = true;
         finish_reason_ = e.value("why", std::string{});
-    } else if (type != "pgn_out") {
-        throw std::runtime_error("unknown event \"" + type + "\"");
+    } else if (type != EventType::PgnOut) {
+        throw std::runtime_error("unknown event \"" + name + "\"");
     }
     journal_size_ = std::max(journal_size_, end);
     return true;

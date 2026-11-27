@@ -8,6 +8,8 @@
 #include <mutex>
 #include <system_error>
 
+#include "journal_events.hpp"
+
 #ifdef _WIN32
 #    ifndef WIN32_LEAN_AND_MEAN
 #        define WIN32_LEAN_AND_MEAN
@@ -29,8 +31,6 @@ namespace fcg::tour {
 namespace fs = std::filesystem;
 
 namespace {
-
-constexpr const char* LOCK_FILE = "tournament.lock";
 
 #ifndef _WIN32
 // The permissions of a file this program makes, less the umask: written by its owner only, read by anyone.

@@ -7,6 +7,7 @@
 #include <set>
 
 #include <tour/files.hpp>
+#include <tour/journal_events.hpp>
 
 #include "i18n.hpp"
 #include "machine_jobs.hpp"
@@ -59,14 +60,14 @@ std::string shellPath(RemoteShell shell, std::string path) {
 
 // The files of a tournament's folder that are not its own state: they stay where they are.
 bool keptHere(const std::string& name) {
-    static const std::set<std::string> here = {"tournament.json", "tournament.lock", "control.json",
-                                               PLACE_FILE,        "rookstudio.log",  "control.sock"};
+    static const std::set<std::string> here = {tour::SPEC_FILE, tour::LOCK_FILE,  "control.json",
+                                               PLACE_FILE,      "rookstudio.log", "control.sock"};
     return here.count(name) > 0 || name.ends_with(".part");
 }
 
 // The files copied back from the machine: those that grow as the tournament plays.
 bool copiedBack(const std::string& name) {
-    return name == "journal.jsonl" || name.ends_with(".pgn") || name == "processor.tsv" || name == "lichess.json";
+    return name == tour::JOURNAL_FILE || name.ends_with(".pgn") || name == "processor.tsv" || name == "lichess.json";
 }
 
 }  // namespace
@@ -285,7 +286,7 @@ bool startOnMachine(SshClient& client, const Machine& machine, const fs::path& l
         error = client.error().message;
         return false;
     }
-    const bool resumed_there = client.stat(sftpPath(remoteJoin(remote_dir, "journal.jsonl"))).has_value();
+    const bool resumed_there = client.stat(sftpPath(remoteJoin(remote_dir, tour::JOURNAL_FILE))).has_value();
     std::error_code ec;
     for (const auto& entry : fs::directory_iterator(local_dir, ec)) {
         const auto file = entry.path().filename().string();
@@ -302,7 +303,7 @@ bool startOnMachine(SshClient& client, const Machine& machine, const fs::path& l
         std::ofstream out(spec_file, std::ios::binary | std::ios::trunc);
         out << spec_json;
     }
-    const bool written = client.upload(spec_file, sftpPath(remoteJoin(remote_dir, "tournament.json")));
+    const bool written = client.upload(spec_file, sftpPath(remoteJoin(remote_dir, tour::SPEC_FILE)));
     fs::remove(spec_file, ec);
     if (!written) {
         error = client.error().message;

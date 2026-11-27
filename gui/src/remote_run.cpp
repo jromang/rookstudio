@@ -6,6 +6,8 @@
 #include <set>
 #include <thread>
 
+#include <tour/journal_events.hpp>
+
 #include "console.hpp"
 #include "control_child.hpp"
 #include "i18n.hpp"
@@ -186,8 +188,9 @@ void RemoteRun::apply(const nlohmann::json& m) {
                 reopen();
                 return;
             }
-            const auto type = m.at("event").value("t", std::string{});
-            if (tour::isEditEvent(type) || type == "round_paired" || type == "tiebreak_added") {
+            const auto type = tour::eventTypeOf(m.at("event"));
+            if (tour::isEditEvent(type) || type == tour::EventType::RoundPaired ||
+                type == tour::EventType::TiebreakAdded) {
                 observer_->updateParticipants(replica_->spec());
                 info_.total_games  = replica_->totalGames().value_or(0);
                 info_.participants = static_cast<int>(replica_->spec().participants.size());

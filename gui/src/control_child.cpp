@@ -15,6 +15,7 @@
 #endif
 
 #include <tour/files.hpp>
+#include <tour/journal_events.hpp>
 
 namespace fcg {
 
@@ -257,7 +258,7 @@ bool SocketChannel::write(const std::string& line) {
 }
 
 void SocketChannel::replayJournal(uint64_t from) {
-    std::ifstream in(dir_ / "journal.jsonl", std::ios::binary);
+    std::ifstream in(dir_ / tour::JOURNAL_FILE, std::ios::binary);
     if (!in || !in.seekg(static_cast<std::streamoff>(from))) return;
     uint64_t at = from;
     for (std::string line; std::getline(in, line);) {

@@ -8,6 +8,7 @@
 
 #include <json.hpp>
 
+#include "journal_events.hpp"
 #include "summary.hpp"
 
 namespace fcg::tour {
@@ -37,7 +38,7 @@ Incidents IncidentScanner::scan(const fs::path& root, int64_t since_ms, std::chr
     std::map<fs::path, Journal> kept;
     const auto now = fs::file_time_type::clock::now();
     for (const auto& dir : tournamentDirs(root)) {
-        const auto file = dir / "journal.jsonl";
+        const auto file = dir / JOURNAL_FILE;
         std::error_code ec;
         const auto written = fs::last_write_time(file, ec);
         if (ec || now - written > window) continue;
@@ -52,7 +53,7 @@ Incidents IncidentScanner::scan(const fs::path& root, int64_t since_ms, std::chr
         if (!journal.named) {
             journal.named = true;
             try {
-                std::ifstream in(dir / "tournament.json", std::ios::binary);
+                std::ifstream in(dir / SPEC_FILE, std::ios::binary);
                 const auto spec = nlohmann::json::parse(in);
                 for (const auto& p : spec.value("participants", nlohmann::json::array())) addName(p, journal.names);
             } catch (const std::exception&) {

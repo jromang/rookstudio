@@ -6,6 +6,7 @@
 #include <core/crc32.hpp>
 
 #include "files.hpp"
+#include "journal_events.hpp"
 
 namespace fcg::tour {
 
@@ -115,7 +116,7 @@ void to_json(nlohmann::json& j, const TournamentSpec& s) {
     // Version 4: a team match. Versions up to 0.5.9 would take its format for a match's, and refuse its participants
     // without saying why.
     // Version 5: a match with locked colours. Versions up to 0.6.2 would alternate them.
-    const bool named = s.pgnFile() != "games.pgn" || s.chessbasePgnFile() != "games-chessbase.pgn";
+    const bool named = s.pgnFile() != OLD_PGN_FILE || s.chessbasePgnFile() != OLD_CHESSBASE_PGN_FILE;
     const bool own_books =
         std::any_of(s.participants.begin(), s.participants.end(), [](const Participant& p) { return !p.book.empty(); });
     const bool teams  = s.format == Format::TeamMatch;
@@ -255,6 +256,12 @@ std::string fileStemOf(const std::string& name) {
         stem.resize(end);
     }
     return fileNameOf(stem);
+}
+
+std::string TournamentSpec::pgnFile() const { return pgn_file.empty() ? OLD_PGN_FILE : pgn_file; }
+
+std::string TournamentSpec::chessbasePgnFile() const {
+    return pgn_chessbase_file.empty() ? OLD_CHESSBASE_PGN_FILE : pgn_chessbase_file;
 }
 
 void namePgnFiles(TournamentSpec& spec) {

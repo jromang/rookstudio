@@ -57,11 +57,9 @@ struct Impact {
     std::string error;  // why the edit cannot be made; empty when it can
 };
 
-// The event for `edit`, made at position `at`; `new_id` is the id a new participant gets.
+// The event for `edit`, made at position `at`; `new_id` is the id a new participant gets. Its type is one of the edits
+// (isEditEvent(), journal_events.hpp).
 [[nodiscard]] nlohmann::json editEvent(const Edit& edit, uint32_t at, int new_id, const TournamentSpec& spec);
-
-// True for the journal events editEvent() makes.
-[[nodiscard]] bool isEditEvent(const std::string& type);
 
 // Applies what an edit event does to the participants and the schedule. What it does to the results (voided
 // games, games to play again or not at all) is the TournamentState's business. Throws on an invalid event.

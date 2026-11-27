@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -26,6 +27,7 @@
 #include "keyboard.hpp"
 #include "notation_view.hpp"
 #include "portable.hpp"
+#include "profile_entries.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
 
@@ -173,47 +175,52 @@ void App::saveRecentGames() const {
 
 void App::loadRecentGames() {
     if (options_.scripted) return;
-    std::ifstream in(storage_.root() / "recent.json", std::ios::binary);
-    if (!in) return;
-    nlohmann::json all;
-    try {
-        all = nlohmann::json::parse(in);
-    } catch (const std::exception&) {
-        return;  // a file cut short: the games of the session before are let go
-    }
-    if (!all.is_array()) return;
-    for (const auto& j : all) {
-        if (!j.is_object()) continue;
-        const auto read = study::readPgnGame(j.value("pgn", std::string()));
-        if (!read.tree) continue;
+    // Read game by game, the types checked (#136): a game written with a value of another type (by another version, by
+    // hand) is set aside and said, the others kept; a file cut short is copied aside and said.
+    const auto file = storage_.root() / "recent.json";
+    const auto all  = readProfileJson(file, nlohmann::json::value_t::array);
+    if (!all) return;
+    ProfileEntries entries(file);
+    for (std::size_t i = 0; i < all->size(); ++i) {
+        const auto& j = (*all)[i];
         RecentGame r;
-        r.title    = j.value("title", std::string());
-        r.where    = j.value("where", std::string());
-        r.tree     = *read.tree;
-        r.line     = j.value("line", -1);
-        r.ply      = j.value("ply", 0);
-        r.chess960 = j.value("chess960", read.chess960);
-        if (const auto c = j.find("changes"); c != j.end() && c->is_object()) {
-            r.changes.count    = c->value("count", 0);
-            r.changes.lost     = c->value("lost", false);
-            r.changes.saved_in = c->value("saved_in", std::string());
-        }
-        if (const auto o = j.find("origin"); o != j.end() && o->is_object()) {
-            BoardOrigin origin;
-            origin.folder = std::filesystem::path(portable::resolved(o->value("folder", std::string())));
-            origin.name   = o->value("name", std::string());
-            origin.linked = o->value("linked", false);
-            origin.id     = o->value("id", study::GameId{0});
-            r.origin      = std::move(origin);
-        }
-        if (const auto sent = j.find("sent"); sent != j.end()) {
-            r.sent = lichess::sentOf(*sent);
-            if (const auto c = j.find("since_sent"); r.sent && c != j.end() && c->is_object()) {
-                r.since_sent.count = c->value("count", 0);
-                r.since_sent.lost  = c->value("lost", false);
+        bool current = false;
+        bool kept    = false;
+        entries.entry(fmt::format("#{}", i + 1), [&] {
+            if (!j.is_object()) throw std::runtime_error("not an object");
+            const auto read = study::readPgnGame(j.value("pgn", std::string()));
+            if (!read.tree) return;  // a game that does not read: let go, as before
+            r.title    = j.value("title", std::string());
+            r.where    = j.value("where", std::string());
+            r.tree     = *read.tree;
+            r.line     = j.value("line", -1);
+            r.ply      = j.value("ply", 0);
+            r.chess960 = j.value("chess960", read.chess960);
+            if (const auto c = j.find("changes"); c != j.end() && c->is_object()) {
+                r.changes.count    = c->value("count", 0);
+                r.changes.lost     = c->value("lost", false);
+                r.changes.saved_in = c->value("saved_in", std::string());
             }
-        }
-        if (j.value("current", false) && !boardHasGame(board_)) {
+            if (const auto o = j.find("origin"); o != j.end() && o->is_object()) {
+                BoardOrigin origin;
+                origin.folder = std::filesystem::path(portable::resolved(o->value("folder", std::string())));
+                origin.name   = o->value("name", std::string());
+                origin.linked = o->value("linked", false);
+                origin.id     = o->value("id", study::GameId{0});
+                r.origin      = std::move(origin);
+            }
+            if (const auto sent = j.find("sent"); sent != j.end()) {
+                r.sent = lichess::sentOf(*sent);
+                if (const auto c = j.find("since_sent"); r.sent && c != j.end() && c->is_object()) {
+                    r.since_sent.count = c->value("count", 0);
+                    r.since_sent.lost  = c->value("lost", false);
+                }
+            }
+            current = j.value("current", false);
+            kept    = true;
+        });
+        if (!kept) continue;
+        if (current && !boardHasGame(board_)) {
             // The game the board showed, on it again, the page shown at the start kept.
             const auto page = page_;
             recent_games_.push_front(std::move(r));
@@ -224,6 +231,7 @@ void App::loadRecentGames() {
             recent_games_.push_back(std::move(r));
         }
     }
+    entries.sayUnread();
 }
 
 void App::restoreRecentGame(std::size_t index) {

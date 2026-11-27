@@ -1226,6 +1226,14 @@ TEST_CASE("Machine runs: where a tournament plays, kept in its folder here") {
     CHECK(place->machine == "m1");
     CHECK(place->name == "test-box");
     CHECK(place->dir == "/srv/fcg/tournaments/t");
+
+    // A value of another type (another version, by hand): none, rather than json's type_error stopping the program at
+    // launch (#136); the tournament is taken as one played here.
+    {
+        std::ofstream out(dir / "machine.json", std::ios::binary | std::ios::trunc);
+        out << R"({"machine": 5, "name": "test-box", "dir": "/srv/fcg/tournaments/t"})";
+    }
+    CHECK_FALSE(readMachinePlace(dir).has_value());
     fs::remove_all(dir);
 }
 

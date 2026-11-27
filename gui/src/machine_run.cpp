@@ -9,6 +9,7 @@
 #include <tour/files.hpp>
 #include <tour/journal_events.hpp>
 
+#include "console.hpp"
 #include "i18n.hpp"
 #include "machine_jobs.hpp"
 #include "ssh_tunnel.hpp"
@@ -76,9 +77,14 @@ std::optional<MachinePlace> readMachinePlace(const fs::path& dir) {
     const auto json = readJson<nlohmann::json>(dir / PLACE_FILE);
     if (!json || !json->is_object()) return std::nullopt;
     MachinePlace p;
-    p.machine = json->value("machine", std::string());
-    p.name    = json->value("name", std::string());
-    p.dir     = json->value("dir", std::string());
+    try {
+        p.machine = json->value("machine", std::string());
+        p.name    = json->value("name", std::string());
+        p.dir     = json->value("dir", std::string());
+    } catch (const std::exception&) {  // a value of another type (#136): said, the tournament taken as not on a machine
+        Console::instance().add(trf("{} could not be read", (dir / PLACE_FILE).string()), true);
+        return std::nullopt;
+    }
     if (p.machine.empty() || p.dir.empty()) return std::nullopt;
     return p;
 }

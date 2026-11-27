@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -151,5 +152,12 @@ std::optional<MatchSetup> readSavedSetup(const std::filesystem::path& file);
 // (POSIX) before anything is written to it.
 bool writeJson(const std::filesystem::path& file, const nlohmann::json& value, std::string* error = nullptr,
                bool backup = false, bool owner_only = false);
+
+// JSON lines (#117): `line` appended to `file` as one line, made if need be; false when it could not be written, said
+// on the Console with the reason, as a profile file that cannot be saved is.
+bool appendJsonLine(const std::filesystem::path& file, const nlohmann::json& line);
+// Each line of `file` that is a JSON object, in order; the others (a line cut short by a crash) passed over. Nothing
+// when the file is missing.
+void forEachJsonLine(const std::filesystem::path& file, const std::function<void(const nlohmann::json&)>& line);
 
 }  // namespace fcg

@@ -7,6 +7,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 
+#include <study/fsrs_json.hpp>
 #include <tour/files.hpp>
 #include <tour/util.hpp>
 
@@ -53,20 +54,10 @@ TrainingFile readTrainingFile(const fs::path& repertoire) {
             entries.entry("cards/" + key, [&] {
                 const uint64_t k = std::stoull(key, nullptr, 16);  // a position's key, as hexKey() writes it
                 study::CardMemory m;
-                m.moves           = j.value("moves", std::string());
-                m.since           = j.value("since", int64_t{0});
-                const int state   = j.value("state", 1);
-                m.card.state      = state == 2   ? study::fsrs::State::Review
-                                    : state == 3 ? study::fsrs::State::Relearning
-                                                 : study::fsrs::State::Learning;
-                m.card.step       = j.value("step", 0);
-                m.card.stability  = j.value("stability", 0.0);
-                m.card.difficulty = j.value("difficulty", 0.0);
-                m.card.due        = j.value("due", int64_t{0});
-                m.card.last       = j.value("last", int64_t{0});
-                m.card.reps       = j.value("reps", 0);
-                m.card.lapses     = j.value("lapses", 0);
-                out.memories[k]   = std::move(m);  // read whole first: nothing kept of an entry set aside
+                m.moves         = j.value("moves", std::string());
+                m.since         = j.value("since", int64_t{0});
+                m.card          = j.get<study::fsrs::Card>();  // its fields among the memory's
+                out.memories[k] = std::move(m);                // read whole first: nothing kept of an entry set aside
             });
         }
     }
@@ -77,16 +68,10 @@ TrainingFile readTrainingFile(const fs::path& repertoire) {
 bool writeTrainingFile(const fs::path& repertoire, const TrainingFile& file) {
     nlohmann::json cards = nlohmann::json::object();
     for (const auto& [key, m] : file.memories) {
-        cards[hexKey(key)] = {{"moves", m.moves},
-                              {"since", m.since},
-                              {"state", static_cast<int>(m.card.state)},
-                              {"step", m.card.step},
-                              {"stability", m.card.stability},
-                              {"difficulty", m.card.difficulty},
-                              {"due", m.card.due},
-                              {"last", m.card.last},
-                              {"reps", m.card.reps},
-                              {"lapses", m.card.lapses}};
+        nlohmann::json one = m.card;  // its fields among the memory's
+        one["moves"]       = m.moves;
+        one["since"]       = m.since;
+        cards[hexKey(key)] = std::move(one);
     }
     const nlohmann::json json = {{"version", 1}, {"answer_ms", file.answer_ms}, {"cards", std::move(cards)}};
     return writeJson(trainingFileOf(repertoire), json);
@@ -96,8 +81,7 @@ void appendReview(const fs::path& repertoire, uint64_t key, int64_t at, study::f
                   const std::string& played) {
     const nlohmann::json line = {
         {"key", hexKey(key)}, {"at", at}, {"rating", static_cast<int>(rating)}, {"ms", ms}, {"played", played}};
-    std::ofstream out(reviewsFileOf(repertoire), std::ios::binary | std::ios::app);
-    out << line.dump() << '\n';
+    (void)appendJsonLine(reviewsFileOf(repertoire), line);
 }
 
 TrainingSettings readTrainingSettings(const fs::path& profile) {

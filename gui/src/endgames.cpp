@@ -10,6 +10,7 @@
 #include <pyrrhic/tbprobe.h>
 #include <json.hpp>
 #include <matchmaking/syzygy.hpp>
+#include <study/fsrs_json.hpp>
 
 #include "i18n.hpp"
 #include "profile_entries.hpp"
@@ -491,17 +492,7 @@ EndgameRecord readEndgameRecord(const fs::path& folder) {
                 card.goal            = c.value("goal", "win") == "draw" ? EndgameGoal::Draw : EndgameGoal::Win;
                 card.mate            = c.value("mate", false);
                 card.since           = c.value("since", int64_t{0});
-                const int state      = c.value("state", 1);
-                card.card.state      = state == 2   ? study::fsrs::State::Review
-                                       : state == 3 ? study::fsrs::State::Relearning
-                                                    : study::fsrs::State::Learning;
-                card.card.step       = c.value("step", 0);
-                card.card.stability  = c.value("stability", 0.0);
-                card.card.difficulty = c.value("difficulty", 0.0);
-                card.card.due        = c.value("due", int64_t{0});
-                card.card.last       = c.value("last", int64_t{0});
-                card.card.reps       = c.value("reps", 0);
-                card.card.lapses     = c.value("lapses", 0);
+                card.card            = c.get<study::fsrs::Card>();  // its fields among the card's
                 if (card.fen.empty()) return;
                 try {
                     (void)chess::Board(card.fen);
@@ -529,21 +520,16 @@ bool writeEndgameRecord(const fs::path& folder, const EndgameRecord& record) {
                        {"last", e.last},
                        {"missed_last", e.missed_last}};
     nlohmann::json cards = nlohmann::json::object();
-    for (const auto& [key, c] : record.cards)
-        cards[key] = {{"fen", c.fen},
-                      {"entry", c.entry},
-                      {"title", c.title},
-                      {"goal", c.goal == EndgameGoal::Draw ? "draw" : "win"},
-                      {"mate", c.mate},
-                      {"since", c.since},
-                      {"state", static_cast<int>(c.card.state)},
-                      {"step", c.card.step},
-                      {"stability", c.card.stability},
-                      {"difficulty", c.card.difficulty},
-                      {"due", c.card.due},
-                      {"last", c.card.last},
-                      {"reps", c.card.reps},
-                      {"lapses", c.card.lapses}};
+    for (const auto& [key, c] : record.cards) {
+        nlohmann::json one = c.card;  // its fields among the card's
+        one.update({{"fen", c.fen},
+                    {"entry", c.entry},
+                    {"title", c.title},
+                    {"goal", c.goal == EndgameGoal::Draw ? "draw" : "win"},
+                    {"mate", c.mate},
+                    {"since", c.since}});
+        cards[key] = std::move(one);
+    }
     return writeJson(folder / "record.json", {{"version", 1},
                                               {"results", std::move(results)},
                                               {"cards", std::move(cards)},

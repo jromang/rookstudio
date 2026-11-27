@@ -266,21 +266,17 @@ std::optional<std::string> OpeningBook::move(const chess::Board& board) {
 void appendPlayedGame(const fs::path& folder, const PlayedGame& game) {
     std::error_code ec;
     fs::create_directories(folder, ec);
-    std::ofstream out(folder / "games.jsonl", std::ios::binary | std::ios::app);
-    out << nlohmann::json(game).dump() << '\n';
+    (void)appendJsonLine(folder / "games.jsonl", game);
 }
 
 std::vector<PlayedGame> readPlayedGames(const fs::path& folder) {
     std::vector<PlayedGame> out;
-    std::ifstream in(folder / "games.jsonl", std::ios::binary);
-    for (std::string line; std::getline(in, line);) {
-        const auto j = nlohmann::json::parse(line, nullptr, false);
-        if (j.is_discarded() || !j.is_object()) continue;
+    forEachJsonLine(folder / "games.jsonl", [&](const nlohmann::json& j) {
         try {
             out.push_back(j.get<PlayedGame>());
         } catch (const std::exception&) {
         }
-    }
+    });
     return out;
 }
 

@@ -7,6 +7,7 @@
 
 #include <json.hpp>
 
+#include <study/fsrs_json.hpp>
 #include <tour/files.hpp>
 
 #include "i18n.hpp"
@@ -295,11 +296,7 @@ PuzzleRecord readPuzzleRecord(const fs::path& folder) {
         out.rating          = r;
     }
     {
-        std::ifstream in(folder / "results.jsonl", std::ios::binary);
-        std::string line;
-        while (std::getline(in, line)) {
-            const auto j = nlohmann::json::parse(line, nullptr, false);
-            if (j.is_discarded() || !j.is_object()) continue;
+        forEachJsonLine(folder / "results.jsonl", [&](const nlohmann::json& j) {
             PuzzleResult r;
             r.id     = j.value("id", "");
             r.at     = j.value("at", int64_t{0});
@@ -314,7 +311,7 @@ PuzzleRecord readPuzzleRecord(const fs::path& folder) {
                 for (const auto& t : *it)
                     if (t.is_string()) r.themes.push_back(t.get<std::string>());
             if (!r.id.empty()) out.add(r);
-        }
+        });
     }
     if (const auto j = readJsonFile(folder / "review.json")) {
         if (const auto cards = j->find("cards"); cards != j->end() && cards->is_object()) {
@@ -323,18 +320,8 @@ PuzzleRecord readPuzzleRecord(const fs::path& folder) {
                 PuzzleCard card;
                 card.puzzle = puzzleOf(c.value("puzzle", nlohmann::json::object()));
                 if (card.puzzle.id.empty()) card.puzzle.id = id;
-                card.since           = c.value("since", int64_t{0});
-                const int state      = c.value("state", 1);
-                card.card.state      = state == 2   ? study::fsrs::State::Review
-                                       : state == 3 ? study::fsrs::State::Relearning
-                                                    : study::fsrs::State::Learning;
-                card.card.step       = c.value("step", 0);
-                card.card.stability  = c.value("stability", 0.0);
-                card.card.difficulty = c.value("difficulty", 0.0);
-                card.card.due        = c.value("due", int64_t{0});
-                card.card.last       = c.value("last", int64_t{0});
-                card.card.reps       = c.value("reps", 0);
-                card.card.lapses     = c.value("lapses", 0);
+                card.since = c.value("since", int64_t{0});
+                card.card  = c.get<study::fsrs::Card>();  // its fields among the puzzle's
                 if (card.puzzle.moves.size() >= 2) out.cards[id] = std::move(card);
             }
         }
@@ -348,8 +335,7 @@ void appendPuzzleResult(const fs::path& folder, const PuzzleResult& r) {
     const nlohmann::json line = {{"id", r.id},         {"at", r.at},        {"win", r.win},       {"rating", r.rating},
                                  {"before", r.before}, {"after", r.after},  {"themes", r.themes}, {"ms", r.ms},
                                  {"online", r.online}, {"review", r.review}};
-    std::ofstream out(folder / "results.jsonl", std::ios::binary | std::ios::app);
-    out << line.dump() << '\n';
+    (void)appendJsonLine(folder / "results.jsonl", line);
 }
 
 bool writePuzzleRating(const fs::path& folder, const PuzzleRating& r) {
@@ -368,16 +354,10 @@ bool writePuzzleCards(const fs::path& folder, const std::map<std::string, Puzzle
     fs::create_directories(folder, ec);
     nlohmann::json out = nlohmann::json::object();
     for (const auto& [id, c] : cards) {
-        out[id] = {{"puzzle", puzzleJson(c.puzzle)},
-                   {"since", c.since},
-                   {"state", static_cast<int>(c.card.state)},
-                   {"step", c.card.step},
-                   {"stability", c.card.stability},
-                   {"difficulty", c.card.difficulty},
-                   {"due", c.card.due},
-                   {"last", c.card.last},
-                   {"reps", c.card.reps},
-                   {"lapses", c.card.lapses}};
+        nlohmann::json one = c.card;  // its fields among the puzzle's
+        one["puzzle"]      = puzzleJson(c.puzzle);
+        one["since"]       = c.since;
+        out[id]            = std::move(one);
     }
     return writeJson(folder / "review.json", {{"version", 1}, {"cards", std::move(out)}});
 }

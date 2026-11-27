@@ -1,5 +1,6 @@
 #include "storage.hpp"
 
+#include <cerrno>
 #include <fstream>
 #include <system_error>
 
@@ -84,6 +85,24 @@ bool writeJson(const fs::path& file, const nlohmann::json& value, std::string* e
     } catch (const std::exception& e) {
         if (error) *error = e.what();
         return false;
+    }
+}
+
+bool appendJsonLine(const fs::path& file, const nlohmann::json& line) {
+    std::ofstream out(file, std::ios::binary | std::ios::app);
+    out << line.dump() << '\n';
+    out.close();
+    if (!out.fail()) return true;
+    const auto why = std::generic_category().message(errno);
+    Console::instance().add(trf("Cannot save {}: {}", file.string(), why), true);
+    return false;
+}
+
+void forEachJsonLine(const fs::path& file, const std::function<void(const nlohmann::json&)>& line) {
+    std::ifstream in(file, std::ios::binary);
+    for (std::string text; std::getline(in, text);) {
+        const auto j = nlohmann::json::parse(text, nullptr, false);
+        if (!j.is_discarded() && j.is_object()) line(j);
     }
 }
 

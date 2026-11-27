@@ -464,6 +464,35 @@ TEST_CASE("maintenance: a database checked, its damaged games and segments found
     CHECK(db->check(progress, cancel).cancelled);
 }
 
+TEST_CASE("maintenance: a game's signature changed on the disk is found by the check, not a bit it does not use") {
+    auto db        = edited("maint-signature");
+    const auto dir = db->folder();
+    const auto seg = db->snapshot()->segmentInfos().front().name;
+    db.reset();
+    // Game 4's 24 bytes: the plies its home pawns left at, its material, its flags (known, promoted), two unused.
+    const auto sig      = dir / seg / "sig.bin";
+    const auto original = readFile(sig);
+    struct Change {
+        std::size_t at = 0;
+        uint8_t bits   = 0;
+        bool found     = false;
+    };
+    for (const auto& c : std::vector<Change>{{3, 0x01, true},   // the ply the d-pawn left at
+                                             {17, 0x10, true},  // Black's knights
+                                             {21, 0x02, true},  // promoted
+                                             {21, 0x04, false},
+                                             {22, 0xFF, false}}) {
+        CAPTURE(c.at);
+        const auto at = 4 * 24 + c.at;
+        overwrite(sig, at, static_cast<char>(original[at] ^ c.bits));
+        CheckProgress progress;
+        std::atomic<bool> cancel{false};
+        const auto report = Database::open(dir)->check(progress, cancel);
+        CHECK(report.damaged == (c.found ? std::vector<GameId>{4} : std::vector<GameId>{}));
+        overwrite(sig, at, original[at]);
+    }
+}
+
 TEST_CASE("maintenance: a compaction takes the games deleted and the old versions out, numbers and tree kept") {
     auto db        = edited("maint-compact");
     const auto dir = db->folder();

@@ -5,7 +5,6 @@
 #include <bit>
 #include <cerrno>
 #include <charconv>
-#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -17,11 +16,9 @@
 #include <chess.hpp>
 #include <json.hpp>
 
-#include "mapped_file.hpp"
-#include "parallel.hpp"
 #include "scan_board.hpp"
+#include "store_detail.hpp"
 #include "store_error.hpp"
-#include "tree.hpp"
 
 #ifndef _WIN32
 #    include <fcntl.h>
@@ -32,104 +29,14 @@ namespace fcg::study {
 
 namespace fs = std::filesystem;
 
+using namespace store;
+
 namespace {
 
-constexpr std::array<char, 8> MAGIC{'F', 'C', 'G', 'S', 'E', 'G', '1', '\0'};
-constexpr uint32_t VERSION        = 2;  // 2: sig.bin, the games' signatures
-constexpr std::size_t SIG_BYTES   = 24;
-constexpr uint8_t SIG_KNOWN       = 1;
-constexpr uint8_t SIG_PROMOTED    = 2;
-constexpr const char* MANIFEST    = "manifest.json";
-constexpr std::size_t HEADER_SIZE = 32;
-
 std::function<void(std::string_view)> g_fault_hook;
-void step(std::string_view name) {
-    if (g_fault_hook) g_fault_hook(name);
-}
 
-// The header columns of a segment of n games, each 8-byte aligned, in this order.
-enum Column : int {
-    WHITE,
-    BLACK,
-    EVENT,
-    SITE,
-    ROUND,
-    ANNOTATOR,
-    TIME_CONTROL,  // names (u32)
-    DATE,
-    PLIES,  // u32
-    WHITE_ELO,
-    BLACK_ELO,
-    ECO,
-    FLAGS,   // u16
-    RESULT,  // u8
-    KEY,     // u64: duplicateKey()
-    MOVES,   // u64, n + 1 offsets
-    ANNEX,   // u64, n + 1 offsets
-    COLUMNS
-};
-constexpr int NAME_COLUMNS = 7;
 constexpr std::array<std::string_view, NAME_COLUMNS> NAME_TAGS{"White", "Black",     "Event",      "Site",
                                                                "Round", "Annotator", "TimeControl"};
-
-std::size_t columnBytes(int column, std::size_t n) {
-    if (column <= PLIES) return 4 * n;
-    if (column <= FLAGS) return 2 * n;
-    if (column == RESULT) return n;
-    if (column == KEY) return 8 * n;
-    return 8 * (n + 1);
-}
-
-std::array<std::size_t, COLUMNS + 1> layout(std::size_t n) {
-    std::array<std::size_t, COLUMNS + 1> at{};
-    std::size_t p = HEADER_SIZE;
-    for (int c = 0; c < COLUMNS; ++c) {
-        at[static_cast<std::size_t>(c)] = p;
-        p += (columnBytes(c, n) + 7) & ~std::size_t{7};
-    }
-    at[COLUMNS] = p;
-    return at;
-}
-
-template <typename T>
-T readAt(const uint8_t* base, std::size_t offset, std::size_t i) {
-    T v;
-    std::memcpy(&v, base + offset + i * sizeof(T), sizeof(T));
-    return v;
-}
-
-void putVarint(std::string& out, uint64_t v) {
-    while (v >= 0x80) {
-        out += static_cast<char>(0x80 | (v & 0x7F));
-        v >>= 7;
-    }
-    out += static_cast<char>(v);
-}
-uint64_t getVarint(const uint8_t*& p, const uint8_t* end) {
-    uint64_t v = 0;
-    for (int shift = 0; p < end && shift < 64; shift += 7) {
-        const uint8_t b = *p++;
-        v |= uint64_t{b & 0x7Fu} << shift;
-        if (!(b & 0x80)) return v;
-    }
-    throw std::runtime_error("damaged annex record");
-}
-void putText(std::string& out, std::string_view s) {
-    putVarint(out, s.size());
-    out.append(s);
-}
-std::string getText(const uint8_t*& p, const uint8_t* end) {
-    const auto size = getVarint(p, end);
-    if (size > static_cast<uint64_t>(end - p)) throw std::runtime_error("damaged annex record");
-    std::string s(reinterpret_cast<const char*>(p), static_cast<std::size_t>(size));
-    p += size;
-    return s;
-}
-uint64_t zigzag(int64_t v) { return (static_cast<uint64_t>(v) << 1) ^ static_cast<uint64_t>(v >> 63); }
-int64_t unzigzag(uint64_t v) { return static_cast<int64_t>(v >> 1) ^ -static_cast<int64_t>(v & 1); }
-
-// The annex: what the columns do not hold.
-enum AnnexPart : uint8_t { ANNEX_FEN = 1, ANNEX_TAGS = 2, ANNEX_TEXT = 4, ANNEX_CLOCKS = 8, ANNEX_EVALS = 16 };
 
 // A rating as the columns keep it: 1 to 65535, written as such; 0 for anything else.
 uint16_t number16(std::string_view s) {
@@ -137,6 +44,134 @@ uint16_t number16(std::string_view s) {
     const auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
     const bool ok      = ec == std::errc() && p == s.data() + s.size() && v > 0 && v < 65536 && std::to_string(v) == s;
     return ok ? static_cast<uint16_t>(v) : uint16_t{0};
+}
+
+// Game `g` as record k of a new segment: the ids of its names (`name_id`, which adds those the database has not), its
+// numbers, its moves and its signature (made from its moves when the import has not), and in its annex the tags the
+// columns do not hold, its start position, text, clocks and evaluations.
+template <typename NameId>
+void putGame(SegmentBytes& segment, std::size_t k, const ImportedGame& g, uint64_t key, NameId&& name_id) {
+    std::array<std::string, NAME_COLUMNS> names;
+    std::string date, white_elo, black_elo, eco;
+    std::vector<std::pair<std::string, std::string>> others;
+    for (const auto& [tag, value] : g.tags) {
+        const auto column = std::find(NAME_TAGS.begin(), NAME_TAGS.end(), tag);
+        // A site that is the game's own address (Lichess's) would add a name for each game: kept in the annex with the
+        // other tags.
+        const bool own_address = tag == "Site" && (value.rfind("https://", 0) == 0 || value.rfind("http://", 0) == 0);
+        if (column != NAME_TAGS.end() && !own_address) {
+            auto& slot = names[static_cast<std::size_t>(column - NAME_TAGS.begin())];
+            if (slot.empty()) {
+                slot = value;
+                std::replace(slot.begin(), slot.end(), '\n', ' ');
+                continue;
+            }
+        }
+        if (tag == "Date" && date.empty() && packDate(value) && dateText(packDate(value)) == value) {
+            date = value;
+            continue;
+        }
+        if (tag == "WhiteElo" && white_elo.empty() && number16(value)) {
+            white_elo = value;
+            continue;
+        }
+        if (tag == "BlackElo" && black_elo.empty() && number16(value)) {
+            black_elo = value;
+            continue;
+        }
+        if (tag == "ECO" && eco.empty() && packEco(value)) {
+            eco = value;
+            continue;
+        }
+        if (tag == "Result" || tag == "FEN") continue;  // the result's column, the annex's FEN
+        others.emplace_back(tag, value);
+    }
+    for (int c = 0; c < NAME_COLUMNS; ++c)
+        segment.put(static_cast<Column>(c), k, name_id(names[static_cast<std::size_t>(c)]));
+    segment.put(DATE, k, packDate(date));
+    segment.put(PLIES, k, g.plies);
+    segment.put(WHITE_ELO, k, number16(white_elo));
+    segment.put(BLACK_ELO, k, number16(black_elo));
+    segment.put(ECO, k, packEco(eco));
+    uint16_t flags = 0;
+    if (g.annotated) flags |= GAME_ANNOTATED;
+    if (g.damaged) flags |= GAME_DAMAGED;
+    if (g.chess960) flags |= GAME_CHESS960;
+    if (!g.start_fen.empty()) flags |= GAME_FEN;
+    if (!g.clocks.empty()) flags |= GAME_CLOCKS;
+    if (!g.evals.empty()) flags |= GAME_EVALS;
+    segment.put(FLAGS, k, flags);
+    segment.put(RESULT, k, static_cast<uint8_t>(g.result));
+    segment.put(KEY, k, key);
+    segment.start(k);
+    segment.moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
+    auto signature = g.signature;
+    if (!signature) {
+        ScanBoard start;
+        if (start.setFen(
+                g.start_fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(g.start_fen),
+                g.chess960))
+            signature = signatureOf(start, g.moves, g.plies);
+    }
+    if (signature) segment.signature(k, *signature);
+    uint8_t parts = 0;
+    if (!g.start_fen.empty()) parts |= ANNEX_FEN;
+    if (!others.empty()) parts |= ANNEX_TAGS;
+    if (!g.text.empty()) parts |= ANNEX_TEXT;
+    if (!g.clocks.empty()) parts |= ANNEX_CLOCKS;
+    if (!g.evals.empty()) parts |= ANNEX_EVALS;
+    if (parts) {
+        auto& annex = segment.annex;
+        annex += static_cast<char>(parts);
+        if (parts & ANNEX_FEN) putText(annex, g.start_fen);
+        if (parts & ANNEX_TAGS) {
+            putVarint(annex, others.size());
+            for (const auto& [tag, value] : others) {
+                putText(annex, tag);
+                putText(annex, value);
+            }
+        }
+        if (parts & ANNEX_TEXT) putText(annex, g.text);
+        if (parts & ANNEX_CLOCKS) {
+            putVarint(annex, g.clocks.size());
+            for (std::size_t c = 0; c < g.clocks.size(); ++c)
+                putVarint(annex, zigzag(int64_t{g.clocks[c]} - (c >= 2 ? g.clocks[c - 2] : 0)));
+        }
+        if (parts & ANNEX_EVALS) {
+            putVarint(annex, g.evals.size());
+            for (const auto e : g.evals) putVarint(annex, zigzag(e));
+        }
+    }
+}
+
+std::string playersName(uint64_t generation) {
+    char name[32];
+    std::snprintf(name, sizeof name, "players-%06llu.bin", static_cast<unsigned long long>(generation));
+    return name;
+}
+
+// A table of names without the name ids past a database's `names` (a file damaged or made by hand): no spelling of its,
+// and the callers index arrays of names() entries with them (#102).
+PlayerTable spellingsWithin(PlayerTable table, uint32_t names) {
+    const auto past = [&](uint32_t id) { return id >= names; };
+    if (std::none_of(table.players().begin(), table.players().end(),
+                     [&](const Player& p) { return std::any_of(p.spellings.begin(), p.spellings.end(), past); }))
+        return table;
+    auto players = table.players();
+    for (auto& p : players) std::erase_if(p.spellings, past);
+    std::erase_if(players, [](const Player& p) { return p.spellings.empty(); });  // as withPlayer() leaves none
+    return PlayerTable(std::move(players), table.apart());
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The store's own parts (store_detail.hpp).
+
+namespace store {
+
+void step(std::string_view name) {
+    if (g_fault_hook) g_fault_hook(name);
 }
 
 void syncFolder([[maybe_unused]] const fs::path& dir) {
@@ -149,7 +184,6 @@ void syncFolder([[maybe_unused]] const fs::path& dir) {
 #endif
 }
 
-// What a write the system refused tells the window: the disk full (errno), or another reason.
 StoreErrc writeErrc(int error) noexcept {
 #ifdef EDQUOT
     if (error == EDQUOT) return StoreErrc::DiskFull;  // the user's quota: full as far as they are concerned
@@ -160,7 +194,6 @@ StoreErrc writeErrc(const std::error_code& ec) noexcept {
     return ec == std::errc::no_space_on_device ? StoreErrc::DiskFull : StoreErrc::Other;
 }
 
-// A change refused: another program writes to the database (it holds the folder's lock).
 StoreError readOnlyError(const fs::path& dir) {
     return StoreError(StoreErrc::ReadOnly, dir.string() + ": read-only, another program writes to it");
 }
@@ -178,15 +211,12 @@ void writeFile(const fs::path& file, std::string_view bytes) {
                          "cannot write " + file.string() + " (is the disk full?)");
 }
 
-constexpr std::array<char, 8> EDITS_MAGIC{'F', 'C', 'G', 'E', 'D', 'I', 'T', '1'};
-
 std::string editsName(uint64_t generation) {
     char name[32];
     std::snprintf(name, sizeof name, "edits-%06llu.bin", static_cast<unsigned long long>(generation));
     return name;
 }
 
-// The edits a manifest names: the games replaced (their versions' places) and the games deleted.
 std::string editsBytes(const std::vector<Snapshot::Version>& replaced, const std::vector<uint64_t>& deleted) {
     std::vector<uint64_t> ids;
     for (std::size_t w = 0; w < deleted.size(); ++w)
@@ -207,180 +237,131 @@ std::string editsBytes(const std::vector<Snapshot::Version>& replaced, const std
     return out;
 }
 
-std::string playersName(uint64_t generation) {
-    char name[32];
-    std::snprintf(name, sizeof name, "players-%06llu.bin", static_cast<unsigned long long>(generation));
-    return name;
-}
-
 std::string segmentName(uint64_t number) {
     char name[32];
     std::snprintf(name, sizeof name, "seg-%06llu", static_cast<unsigned long long>(number));
     return name;
 }
 
-// A table of names without the name ids past a database's `names` (a file damaged or made by hand): no spelling of its,
-// and the callers index arrays of names() entries with them (#102).
-PlayerTable spellingsWithin(PlayerTable table, uint32_t names) {
-    const auto past = [&](uint32_t id) { return id >= names; };
-    if (std::none_of(table.players().begin(), table.players().end(),
-                     [&](const Player& p) { return std::any_of(p.spellings.begin(), p.spellings.end(), past); }))
-        return table;
-    auto players = table.players();
-    for (auto& p : players) std::erase_if(p.spellings, past);
-    std::erase_if(players, [](const Player& p) { return p.spellings.empty(); });  // as withPlayer() leaves none
-    return PlayerTable(std::move(players), table.apart());
+std::string SegmentWriter::write(const SegmentBytes& segment) {
+    std::string name;
+    {
+        std::lock_guard lock(numbers_);
+        name = segmentName(next_number_++);
+    }
+    const auto tmp = dir_ / (name + ".tmp");
+    under_way_     = name;
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+    fs::create_directories(tmp, ec);
+    if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
+    writeFile(tmp / "cols.bin", segment.cols);
+    writeFile(tmp / "moves.bin", segment.moves);
+    writeFile(tmp / "annex.bin", segment.annex);
+    writeFile(tmp / "names.bin", segment.names);
+    writeFile(tmp / "sig.bin", segment.sig);
+    syncFolder(tmp);
+    step("rename segment");
+    fs::rename(tmp, dir_ / name, ec);
+    if (ec) throw std::runtime_error("cannot rename " + tmp.string() + ": " + ec.message());
+    under_way_.clear();
+    written_.push_back(name);
+    step("sync folder");
+    syncFolder(dir_);
+    return name;
 }
 
-}  // namespace
+void SegmentWriter::discard() {
+    std::error_code ec;
+    for (const auto& name : written_) fs::remove_all(dir_ / name, ec);
+    if (!under_way_.empty()) fs::remove_all(dir_ / (under_way_ + ".tmp"), ec);
+    written_.clear();
+    under_way_.clear();
+}
 
-// ---------------------------------------------------------------------------------------------------------------------
+Manifest Manifest::read(const fs::path& dir) {
+    std::string text;
+    {
+        // Closed before the manifest is replaced: Windows does not rename over an open file.
+        std::ifstream in(dir / MANIFEST, std::ios::binary);
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    return parse(text, dir);
+}
 
-class Segment {
-   public:
-    // `names_known`: false for names written as "?" in place of names lost (Database::keepReadable()).
-    Segment(const fs::path& dir, uint32_t expected_games, uint32_t expected_names, bool names_known = true)
-        : cols_(dir / "cols.bin"),
-          moves_(dir / "moves.bin"),
-          annex_(dir / "annex.bin"),
-          names_(dir / "names.bin"),
-          names_known_(names_known) {
-        const auto* c = cols_.data();
-        cols_data_    = c;
-        if (cols_.size() < HEADER_SIZE || std::memcmp(c, MAGIC.data(), MAGIC.size()) != 0)
-            throw std::runtime_error(dir.string() + ": not a segment");
-        version_ = readAt<uint32_t>(c, 8, 0);
-        if (version_ > VERSION) throw std::runtime_error(dir.string() + ": a newer format");
-        games_      = readAt<uint32_t>(c, 12, 0);
-        name_count_ = readAt<uint32_t>(c, 16, 0);
-        if (games_ != expected_games || name_count_ != expected_names)
-            throw std::runtime_error(dir.string() + ": not the segment the manifest names");
-        at_ = layout(games_);
-        if (cols_.size() != at_[COLUMNS]) throw std::runtime_error(dir.string() + ": damaged columns");
-        if (readAt<uint64_t>(c, at_[MOVES], games_) != moves_.size() ||
-            readAt<uint64_t>(c, at_[ANNEX], games_) != annex_.size())
-            throw std::runtime_error(dir.string() + ": damaged games");
-        name_offsets_.reserve(name_count_ + 1);
-        name_offsets_.push_back(0);
-        for (std::size_t i = 0; i < names_.size(); ++i) {
-            if (names_.data()[i] == '\n') name_offsets_.push_back(static_cast<uint32_t>(i + 1));
-        }
-        if (name_offsets_.size() != name_count_ + std::size_t{1})
-            throw std::runtime_error(dir.string() + ": damaged names");
-        if (version_ >= 2) {
-            sig_ = MappedFile(dir / "sig.bin");
-            if (sig_.size() != std::size_t{games_} * SIG_BYTES)
-                throw std::runtime_error(dir.string() + ": damaged signatures");
-        }
+Manifest Manifest::parse(std::string_view text, const fs::path& dir) {
+    nlohmann::json j;
+    try {
+        j = nlohmann::json::parse(text);
+    } catch (const std::exception& e) {
+        throw StoreError(StoreErrc::Damaged, (dir / MANIFEST).string() + ": " + e.what());
     }
+    if (j.value("format", "") != "rookstudio-database")
+        throw StoreError(StoreErrc::NotADatabase, dir.string() + " is not a database");
+    if (j.value("version", 0u) > VERSION)
+        throw StoreError(StoreErrc::NewerFormat, dir.string() + ": a database of a newer program");
+    const auto damaged = [&] { return StoreError(StoreErrc::Damaged, dir.string() + ": damaged manifest"); };
+    Manifest m;
+    m.version      = j.value("version", 0u);
+    m.generation   = j.value("generation", uint64_t{0});
+    uint64_t games = 0, names = 0;  // of the segments before
+    for (const auto& s : j.at("segments")) {
+        Entry e;
+        e.name  = s.at("name").get<std::string>();
+        e.games = s.at("games").get<uint32_t>();
+        e.names = s.at("names").get<uint32_t>();
+        // No commit writes more: seven names a game at most (a segment that cannot be read would make room for each).
+        if (e.games > SEGMENT_GAMES || e.names > 7 * SEGMENT_GAMES + 1 || names > UINT32_MAX - e.names) throw damaged();
+        e.versions      = s.value("versions", false);
+        e.unknown_names = s.value("unknown_names", false);
+        e.source        = s.value("source", std::string());
+        for (const auto& [key, value] : s.items())
+            if (key != "name" && key != "games" && key != "names" && key != "versions" && key != "unknown_names" &&
+                key != "source")
+                e.others[key] = value;
+        if (!e.versions) games += e.games;
+        names += e.names;
+        m.segments.push_back(std::move(e));
+    }
+    // Every game names its players, if only with the empty name: games without any name are a manifest made up, whose
+    // games' name ids could not read as no name (Snapshot::rowIds()).
+    if (games > 0 && names == 0) throw damaged();
+    m.edits = j.value("edits", std::string());
+    if (j.contains("edits_generation")) m.edits_generation = j.at("edits_generation").get<uint64_t>();
+    m.players = j.value("players", std::string());
+    for (const auto& [key, value] : j.items())
+        if (key != "format" && key != "version" && key != "generation" && key != "segments" && key != "edits" &&
+            key != "edits_generation" && key != "players")
+            m.others[key] = value;
+    return m;
+}
 
-    // A segment that cannot be read, in its place (Database::load()): the games and names the manifest gives it, its
-    // records read as one empty game (record 0, `blank_name` its names), its names those of its names.bin when that
-    // still reads with the manifest's count, else "?".
-    struct Unreadable {};
-    Segment(Unreadable, const fs::path& dir, uint32_t games, uint32_t names, uint32_t blank_name, bool names_known)
-        : version_(VERSION), games_(games), name_count_(names), unreadable_(true) {
-        at_ = layout(1);
-        blank_.assign(at_[COLUMNS], 0);
-        for (int c = 0; c < NAME_COLUMNS; ++c)
-            std::memcpy(blank_.data() + at_[static_cast<std::size_t>(c)], &blank_name, sizeof blank_name);
-        blank_[at_[RESULT]] = static_cast<uint8_t>('*');
-        cols_data_          = blank_.data();
-        names_known_        = names_known && readNames(dir / "names.bin", names, names_, name_offsets_);
+std::string Manifest::text() const {
+    nlohmann::json j = others;
+    j["format"]      = "rookstudio-database";
+    j["version"]     = version;
+    j["generation"]  = generation;
+    auto list        = nlohmann::json::array();
+    for (const auto& s : segments) {
+        nlohmann::json e = s.others;
+        e["name"]        = s.name;
+        e["games"]       = s.games;
+        e["names"]       = s.names;
+        if (s.versions) e["versions"] = true;
+        if (!s.source.empty()) e["source"] = s.source;
+        if (s.unknown_names) e["unknown_names"] = true;
+        list.push_back(std::move(e));
     }
+    j["segments"] = std::move(list);
+    if (!edits.empty()) j["edits"] = edits;
+    if (edits_generation) j["edits_generation"] = *edits_generation;
+    if (!players.empty()) j["players"] = players;
+    return j.dump(1);
+}
 
-    // Whether `file` holds `count` names, one a line: their offsets then, and the file mapped.
-    static bool readNames(const fs::path& file, uint32_t count, MappedFile& names, std::vector<uint32_t>& offsets) {
-        try {
-            names = MappedFile(file);
-        } catch (const std::exception&) {
-            return false;
-        }
-        offsets.clear();
-        offsets.reserve(std::size_t{count} + 1);
-        offsets.push_back(0);
-        for (std::size_t i = 0; i < names.size(); ++i)
-            if (names.data()[i] == '\n') offsets.push_back(static_cast<uint32_t>(i + 1));
-        if (offsets.size() == std::size_t{count} + 1 && (names.size() == 0 || names.data()[names.size() - 1] == '\n'))
-            return true;
-        names = MappedFile();
-        offsets.clear();
-        return false;
-    }
+void Manifest::write(const fs::path& dir) const { tour::replaceFile(dir / MANIFEST, text()); }
 
-    [[nodiscard]] uint32_t games() const noexcept { return games_; }
-    [[nodiscard]] uint32_t nameCount() const noexcept { return name_count_; }
-    [[nodiscard]] std::string_view name(uint32_t local) const {
-        if (name_offsets_.empty()) return "?";  // lost with a segment that cannot be read
-        const auto from = name_offsets_[local], to = name_offsets_[local + 1] - 1;
-        return {reinterpret_cast<const char*>(names_.data()) + from, to - from};
-    }
-    // Whether its names read as they were written ("?" in place of names lost otherwise).
-    [[nodiscard]] bool namesKnown() const noexcept { return names_known_; }
-    // A segment that could not be read: its records are one empty game.
-    [[nodiscard]] bool unreadable() const noexcept { return unreadable_; }
-    template <typename T>
-    [[nodiscard]] T value(Column column, std::size_t i) const {
-        return readAt<T>(cols_data_, at_[column], i);
-    }
-    // A record's moves and annex; none when its offsets are out of order or past its file (a damaged or crafted
-    // segment, whose bytes are not checked when it opens: offsetsSound() tells it, the game reads as damaged).
-    [[nodiscard]] std::span<const uint8_t> moves(std::size_t i) const {
-        const auto from = value<uint64_t>(MOVES, i), to = value<uint64_t>(MOVES, i + 1);
-        if (from > to || to > moves_.size()) return {};
-        return {moves_.data() + from, static_cast<std::size_t>(to - from)};
-    }
-    [[nodiscard]] std::span<const uint8_t> annex(std::size_t i) const {
-        const auto from = value<uint64_t>(ANNEX, i), to = value<uint64_t>(ANNEX, i + 1);
-        if (from > to || to > annex_.size()) return {};
-        return {annex_.data() + from, static_cast<std::size_t>(to - from)};
-    }
-    [[nodiscard]] uint32_t version() const noexcept { return version_; }
-    // The files' bytes, for a check and a compaction.
-    [[nodiscard]] std::size_t movesBytes() const noexcept { return moves_.size(); }
-    [[nodiscard]] std::size_t annexBytes() const noexcept { return annex_.size(); }
-    [[nodiscard]] std::size_t bytes() const noexcept {
-        return cols_.size() + moves_.size() + annex_.size() + names_.size() + sig_.size();
-    }
-    [[nodiscard]] std::string_view namesText() const noexcept {
-        return {reinterpret_cast<const char*>(names_.data()), names_.size()};
-    }
-    // A record's offsets within its files: false when they are not (a damaged file).
-    [[nodiscard]] bool offsetsSound(std::size_t i) const {
-        const auto mf = value<uint64_t>(MOVES, i), mt = value<uint64_t>(MOVES, i + 1);
-        const auto af = value<uint64_t>(ANNEX, i), at = value<uint64_t>(ANNEX, i + 1);
-        return mf <= mt && mt <= moves_.size() && af <= at && at <= annex_.size();
-    }
-    // The signature's bytes as stored, null in a segment of the first format.
-    [[nodiscard]] const uint8_t* signatureBytes(std::size_t i) const {
-        return sig_.data() ? sig_.data() + i * SIG_BYTES : nullptr;
-    }
-    [[nodiscard]] std::optional<GameSignature> signature(std::size_t i) const {
-        if (!sig_.data()) return std::nullopt;  // a segment of the first format
-        const uint8_t* p = sig_.data() + i * SIG_BYTES;
-        if (!(p[21] & SIG_KNOWN)) return std::nullopt;
-        GameSignature g;
-        std::memcpy(g.home.data(), p, 16);
-        for (int j = 0; j < 5; ++j) {
-            g.material[2 * j]     = p[16 + j] & 0x0F;
-            g.material[2 * j + 1] = p[16 + j] >> 4;
-        }
-        g.promoted = (p[21] & SIG_PROMOTED) != 0;
-        return g;
-    }
-
-   private:
-    MappedFile cols_, moves_, annex_, names_, sig_;
-    const uint8_t* cols_data_ = nullptr;  // the columns: cols.bin's, or the empty game's of a segment not read
-    std::vector<uint8_t> blank_;          // that empty game's columns
-    uint32_t version_    = 0;
-    uint32_t games_      = 0;
-    uint32_t name_count_ = 0;
-    bool names_known_    = true;
-    bool unreadable_     = false;
-    std::array<std::size_t, COLUMNS + 1> at_{};
-    std::vector<uint32_t> name_offsets_;
-};
+}  // namespace store
 
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -543,10 +524,9 @@ HeaderRow recordRow(const Snapshot& snap, const Segment& segment, std::size_t i)
     return row;
 }
 
-// Everything kept of a segment's record i (Snapshot::game()). A record that does not read whole (its offsets out of its
-// files, its annex record cut short or made up) throws std::runtime_error when `strict` (the check); else it gives its
-// headers and what could be read before the damage, marked damaged (#102).
-ImportedGame recordGame(const Snapshot& snap, const Segment& segment, std::size_t i, bool strict) {
+}  // namespace
+
+ImportedGame store::recordGame(const Snapshot& snap, const Segment& segment, std::size_t i, bool strict) {
     const auto r = recordRow(snap, segment, i);
     ImportedGame g;
     const auto tag = [&](std::string_view name, std::string_view value) {
@@ -637,8 +617,6 @@ ImportedGame recordGame(const Snapshot& snap, const Segment& segment, std::size_
     if (g.evals.size() > g.plies) g.evals.resize(g.plies);
     return g;
 }
-
-}  // namespace
 
 HeaderRow Snapshot::row(GameId id) const {
     const auto [segment, i] = locate(id);
@@ -844,15 +822,6 @@ std::optional<uint32_t> Snapshot::blankName() const {
     return std::nullopt;
 }
 
-CheckReport unreadableReport(const Snapshot& snapshot) {
-    CheckReport report;
-    report.games    = snapshot.games() - snapshot.deletedCount();
-    report.segments = snapshot.unreadable();
-    report.damaged  = snapshot.unreadableIds();
-    for (const auto id : report.damaged) ++report.damaged_sources[snapshot.source(id)];
-    return report;
-}
-
 std::vector<Snapshot::SegmentInfo> Snapshot::segmentInfos() const {
     std::vector<SegmentInfo> out;
     std::size_t logical = 0;
@@ -891,11 +860,7 @@ std::shared_ptr<Database> Database::create(const fs::path& dir) {
     fs::create_directories(dir, ec);
     if (ec) throw std::runtime_error("cannot create the folder " + dir.string());
     auto db = std::make_shared<Database>(dir);
-    nlohmann::json manifest{{"format", "rookstudio-database"},
-                            {"version", VERSION},
-                            {"generation", 0},
-                            {"segments", nlohmann::json::array()}};
-    tour::replaceFile(dir / MANIFEST, manifest.dump(1));
+    Manifest().write(dir);  // no segment, generation 0
     db->load();
     return db;
 }
@@ -923,8 +888,7 @@ bool Database::refresh() {
     std::lock_guard writing(write_mutex_);  // current_ changes under it, as for a change
     uint64_t generation = 0;
     try {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        generation = nlohmann::json::parse(in).value("generation", uint64_t{0});
+        generation = Manifest::read(dir_).generation;
     } catch (const std::exception&) {
         return false;  // being replaced as it was read: read again next time
     }
@@ -938,20 +902,9 @@ bool Database::refresh() {
 }
 
 void Database::load(bool clean, int tries) {
-    nlohmann::json manifest;
-    try {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest = nlohmann::json::parse(in);
-    } catch (const std::exception& e) {
-        throw StoreError(StoreErrc::Damaged, (dir_ / MANIFEST).string() + ": " + e.what());
-    }
-    if (manifest.value("format", "") != "rookstudio-database")
-        throw StoreError(StoreErrc::NotADatabase, dir_.string() + " is not a database");
-    if (manifest.value("version", 0u) > VERSION)
-        throw StoreError(StoreErrc::NewerFormat, dir_.string() + ": a database of a newer program");
-
-    auto snap         = std::make_shared<Snapshot>();
-    snap->generation_ = manifest.value("generation", uint64_t{0});
+    const auto manifest = Manifest::read(dir_);
+    auto snap           = std::make_shared<Snapshot>();
+    snap->generation_   = manifest.generation;
     std::vector<std::string> named;
     uint64_t next_segment = 1;  // the numbers the segments there take, and the next one
     // A segment that cannot be read (a file of it cut short, missing, or not a segment's: damaged while the database
@@ -962,23 +915,20 @@ void Database::load(bool clean, int tries) {
         bool names_known = true;
     };
     std::vector<Unread> unread;
-    for (const auto& s : manifest.at("segments")) {
-        const auto name       = s.at("name").get<std::string>();
-        const auto games      = s.at("games").get<uint32_t>();
-        const auto names      = s.at("names").get<uint32_t>();
-        // No commit writes more: seven names a game at most (a segment that cannot be read would make room for each).
-        if (games > SEGMENT_GAMES || names > 7 * SEGMENT_GAMES + 1 || snap->names_ > UINT32_MAX - names)
-            throw StoreError(StoreErrc::Damaged, dir_.string() + ": damaged manifest");
-        const bool versions   = s.value("versions", false);
-        const bool names_lost = s.value("unknown_names", false);  // written as "?" by keepReadable()
+    for (const auto& s : manifest.segments) {
+        const auto& name      = s.name;
+        const auto games      = s.games;
+        const auto names      = s.names;
+        const bool versions   = s.versions;
+        const bool names_lost = s.unknown_names;  // written as "?" by keepReadable()
         std::shared_ptr<const Segment> segment;
         try {
             segment = std::make_shared<const Segment>(dir_ / name, games, names, !names_lost);
         } catch (const std::exception& e) {
             segment = std::make_shared<const Segment>(Segment::Unreadable{}, dir_ / name, games, names, 0, !names_lost);
             unread.push_back({snap->segments_.size(),
-                              {name, versions ? GameId{0} : snap->games_, games, versions, e.what(),
-                               s.value("source", std::string()), names == 0 || segment->namesKnown()},
+                              {name, versions ? GameId{0} : snap->games_, games, versions, e.what(), s.source,
+                               names == 0 || segment->namesKnown()},
                               !names_lost});
             // A file missing, or one changed: said apart (sig.bin only where its format has one, as the error says).
             const std::string why = e.what();
@@ -999,31 +949,26 @@ void Database::load(bool clean, int tries) {
         snap->names_ += names;
         snap->segments_.push_back(std::move(segment));
         snap->segment_names_.push_back(name);
-        snap->sources_.push_back(s.value("source", std::string()));
+        snap->sources_.push_back(s.source);
         snap->versions_.push_back(versions);
         named.push_back(name);
         unsigned long long number = 0;
         std::sscanf(name.c_str(), "seg-%llu", &number);
         next_segment = std::max<uint64_t>(next_segment, number + 1);
     }
-    // Every game names its players, if only with the empty name: games without any name are a manifest made up, whose
-    // games' name ids could not read as no name (rowIds()).
-    if (snap->games_ > 0 && snap->names_ == 0)
-        throw StoreError(StoreErrc::Damaged, dir_.string() + ": damaged manifest");
     // Read-only, a segment that the other program removed as it committed (a compaction's, an undoing's) is no damage:
     // read again once its manifest has settled.
     if (!lock_ && !unread.empty() && tries > 0) {
         uint64_t now = snap->generation_ + 1;  // a manifest being replaced as it is read has changed too
         try {
-            std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-            now = nlohmann::json::parse(in).value("generation", uint64_t{0});
+            now = Manifest::read(dir_).generation;
         } catch (const std::exception&) {
         }
         if (now != snap->generation_) return load(clean, tries - 1);
     }
     // The edits it names: the games replaced and those deleted.
-    const auto edits        = manifest.value("edits", std::string());
-    snap->edits_generation_ = manifest.value("edits_generation", uint64_t{0});
+    const auto& edits       = manifest.edits;
+    snap->edits_generation_ = manifest.edits_generation.value_or(0);
     if (!edits.empty()) {
         std::ifstream in(dir_ / edits, std::ios::binary);
         const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -1056,7 +1001,7 @@ void Database::load(bool clean, int tries) {
         for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
     }
     // The table of names it names.
-    const auto players = manifest.value("players", std::string());
+    const auto& players = manifest.players;
     if (!players.empty()) {
         std::ifstream in(dir_ / players, std::ios::binary);
         if (!in) throw StoreError(StoreErrc::Damaged, (dir_ / players).string() + ": missing");
@@ -1069,10 +1014,9 @@ void Database::load(bool clean, int tries) {
     if (!unread.empty()) {
         const auto blank = snap->blankName().value_or(0);
         for (auto& u : unread) {
-            const auto& entry        = manifest.at("segments")[u.index];
             snap->segments_[u.index] = std::make_shared<const Segment>(
                 Segment::Unreadable{}, dir_ / u.bad.name, static_cast<uint32_t>(u.bad.games),
-                entry.at("names").get<uint32_t>(), blank, u.names_known);
+                manifest.segments[u.index].names, blank, u.names_known);
             snap->unreadable_segments_.push_back(std::move(u.bad));
         }
     }
@@ -1126,196 +1070,60 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         names_indexed_ = true;
     }
     std::vector<std::string> added;                     // the names this append adds, all segments
-    std::vector<std::string> made;                      // the segments it wrote
+    SegmentWriter writer(dir_, mutex_, next_segment_);  // the segments it writes
+    const auto& made = writer.written();
     std::vector<std::pair<uint32_t, uint32_t>> counts;  // their games and names
-    nlohmann::json manifest;
-    {
-        // Closed before the manifest is replaced: Windows does not rename over an open file.
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest = nlohmann::json::parse(in);
-    }
-    const auto edits_before   = manifest.value("edits", std::string());
-    const auto players_before = manifest.value("players", std::string());
+    auto manifest             = Manifest::read(dir_);
+    const auto edits_before   = manifest.edits;
+    const auto players_before = manifest.players;
     std::string edits_written, players_written;
     bool committed = false;
     try {
         for (std::size_t from = 0; from < games.size(); from += SEGMENT_GAMES) {
             const std::size_t n     = std::min(SEGMENT_GAMES, games.size() - from);
             const auto names_before = added.size();
-            const auto at           = layout(n);
-            std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
-            std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
-            const auto put32 = [&](std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, 4); };
-            const auto put   = [&](Column column, std::size_t i, auto v) {
-                std::memcpy(cols.data() + at[column] + i * sizeof(v), &v, sizeof(v));
-            };
-            put32(8, VERSION);
-            put32(12, static_cast<uint32_t>(n));
-            for (std::size_t k = 0; k < n; ++k) {
-                const auto& g = games[from + k];
-                std::array<std::string, NAME_COLUMNS> names;
-                std::string date, white_elo, black_elo, eco;
-                std::vector<std::pair<std::string, std::string>> others;
-                for (const auto& [tag, value] : g.tags) {
-                    const auto column = std::find(NAME_TAGS.begin(), NAME_TAGS.end(), tag);
-                    // A site that is the game's own address (Lichess's) would add a name for each game: kept in
-                    // the annex with the other tags.
-                    const bool own_address =
-                        tag == "Site" && (value.rfind("https://", 0) == 0 || value.rfind("http://", 0) == 0);
-                    if (column != NAME_TAGS.end() && !own_address) {
-                        auto& slot = names[static_cast<std::size_t>(column - NAME_TAGS.begin())];
-                        if (slot.empty()) {
-                            slot = value;
-                            std::replace(slot.begin(), slot.end(), '\n', ' ');
-                            continue;
-                        }
-                    }
-                    if (tag == "Date" && date.empty() && packDate(value) && dateText(packDate(value)) == value) {
-                        date = value;
-                        continue;
-                    }
-                    if (tag == "WhiteElo" && white_elo.empty() && number16(value)) {
-                        white_elo = value;
-                        continue;
-                    }
-                    if (tag == "BlackElo" && black_elo.empty() && number16(value)) {
-                        black_elo = value;
-                        continue;
-                    }
-                    if (tag == "ECO" && eco.empty() && packEco(value)) {
-                        eco = value;
-                        continue;
-                    }
-                    if (tag == "Result" || tag == "FEN") continue;  // the result's column, the annex's FEN
-                    others.emplace_back(tag, value);
-                }
-                for (int c = 0; c < NAME_COLUMNS; ++c)
-                    put(static_cast<Column>(c), k, nameId(names[static_cast<std::size_t>(c)], added));
-                put(DATE, k, packDate(date));
-                put(PLIES, k, g.plies);
-                put(WHITE_ELO, k, number16(white_elo));
-                put(BLACK_ELO, k, number16(black_elo));
-                put(ECO, k, packEco(eco));
-                uint16_t flags = 0;
-                if (g.annotated) flags |= GAME_ANNOTATED;
-                if (g.damaged) flags |= GAME_DAMAGED;
-                if (g.chess960) flags |= GAME_CHESS960;
-                if (!g.start_fen.empty()) flags |= GAME_FEN;
-                if (!g.clocks.empty()) flags |= GAME_CLOCKS;
-                if (!g.evals.empty()) flags |= GAME_EVALS;
-                put(FLAGS, k, flags);
-                put(RESULT, k, static_cast<uint8_t>(g.result));
-                put(KEY, k, keys[from + k]);
-                put(MOVES, k, static_cast<uint64_t>(moves.size()));
-                moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
-                auto signature = g.signature;
-                if (!signature) {
-                    ScanBoard start;
-                    if (start.setFen(g.start_fen.empty() ? std::string_view(chess::constants::STARTPOS)
-                                                         : std::string_view(g.start_fen),
-                                     g.chess960))
-                        signature = signatureOf(start, g.moves, g.plies);
-                }
-                if (signature) {
-                    char* out = sig.data() + k * SIG_BYTES;
-                    std::memcpy(out, signature->home.data(), 16);
-                    for (int j = 0; j < 5; ++j)
-                        out[16 + j] = static_cast<char>((signature->material[2 * j] & 0x0F) |
-                                                        (std::min<uint8_t>(signature->material[2 * j + 1], 15) << 4));
-                    out[21] = static_cast<char>(SIG_KNOWN | (signature->promoted ? SIG_PROMOTED : 0));
-                }
-                put(ANNEX, k, static_cast<uint64_t>(annex.size()));
-                uint8_t parts = 0;
-                if (!g.start_fen.empty()) parts |= ANNEX_FEN;
-                if (!others.empty()) parts |= ANNEX_TAGS;
-                if (!g.text.empty()) parts |= ANNEX_TEXT;
-                if (!g.clocks.empty()) parts |= ANNEX_CLOCKS;
-                if (!g.evals.empty()) parts |= ANNEX_EVALS;
-                if (parts) {
-                    annex += static_cast<char>(parts);
-                    if (parts & ANNEX_FEN) putText(annex, g.start_fen);
-                    if (parts & ANNEX_TAGS) {
-                        putVarint(annex, others.size());
-                        for (const auto& [tag, value] : others) {
-                            putText(annex, tag);
-                            putText(annex, value);
-                        }
-                    }
-                    if (parts & ANNEX_TEXT) putText(annex, g.text);
-                    if (parts & ANNEX_CLOCKS) {
-                        putVarint(annex, g.clocks.size());
-                        for (std::size_t c = 0; c < g.clocks.size(); ++c)
-                            putVarint(annex, zigzag(int64_t{g.clocks[c]} - (c >= 2 ? g.clocks[c - 2] : 0)));
-                    }
-                    if (parts & ANNEX_EVALS) {
-                        putVarint(annex, g.evals.size());
-                        for (const auto e : g.evals) putVarint(annex, zigzag(e));
-                    }
-                }
-            }
-            put(MOVES, n, static_cast<uint64_t>(moves.size()));
-            put(ANNEX, n, static_cast<uint64_t>(annex.size()));
+            SegmentBytes segment(n);
+            for (std::size_t k = 0; k < n; ++k)
+                putGame(segment, k, games[from + k], keys[from + k],
+                        [&](const std::string& name) { return nameId(name, added); });
             const auto new_names = static_cast<uint32_t>(added.size() - names_before);
-            put32(16, new_names);
-            std::string names_text;
-            for (std::size_t a = names_before; a < added.size(); ++a) names_text += added[a] + "\n";
-
-            std::string name;
-            {
-                std::lock_guard lock(mutex_);  // the numbers a compaction takes too, without the writers' lock
-                name = segmentName(next_segment_++);
-            }
-            const auto tmp = dir_ / (name + ".tmp");
-            std::error_code ec;
-            fs::remove_all(tmp, ec);
-            fs::create_directories(tmp, ec);
-            if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
-            made.push_back(name);
-            writeFile(tmp / "cols.bin", cols);
-            writeFile(tmp / "moves.bin", moves);
-            writeFile(tmp / "annex.bin", annex);
-            writeFile(tmp / "names.bin", names_text);
-            writeFile(tmp / "sig.bin", sig);
-            syncFolder(tmp);
-            step("rename segment");
-            fs::rename(tmp, dir_ / name, ec);
-            if (ec) throw std::runtime_error("cannot rename " + tmp.string() + ": " + ec.message());
-            step("sync folder");
-            syncFolder(dir_);
+            for (std::size_t a = names_before; a < added.size(); ++a) segment.names += added[a] + "\n";
+            segment.finish(new_names);
+            writer.write(segment);
             counts.emplace_back(static_cast<uint32_t>(n), new_names);
         }
         for (std::size_t s = 0; s < made.size(); ++s) {
-            nlohmann::json entry{{"name", made[s]}, {"games", counts[s].first}, {"names", counts[s].second}};
-            if (versions) entry["versions"] = true;
-            if (!source.empty()) entry["source"] = source;
-            manifest["segments"].push_back(std::move(entry));
+            Manifest::Entry entry;
+            entry.name     = made[s];
+            entry.games    = counts[s].first;
+            entry.names    = counts[s].second;
+            entry.versions = versions;
+            entry.source   = source;
+            manifest.segments.push_back(std::move(entry));
         }
         if (players) {
             players_written = playersName(current_->generation_ + 1);
             writeFile(dir_ / players_written, players->bytes());
-            manifest["players"] = players_written;
+            manifest.players = players_written;
         }
         if (replaced || deleted) {
             edits_written = editsName(current_->generation_ + 1);
             writeFile(dir_ / edits_written,
                       editsBytes(replaced ? *replaced : current_->replaced_, deleted ? *deleted : current_->deleted_));
-            manifest["edits"]            = edits_written;
-            manifest["edits_generation"] = current_->generation_ + 1;
+            manifest.edits            = edits_written;
+            manifest.edits_generation = current_->generation_ + 1;
         }
-        manifest["generation"] = current_->generation_ + 1;
+        manifest.generation = current_->generation_ + 1;
         step("write manifest");
-        tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+        manifest.write(dir_);
         committed = true;
         step("manifest written");
     } catch (const std::exception&) {
         if (committed) throw;  // the games are in: nothing to undo
         // The disk refused: the database as before, the names this append gave forgotten.
         for (const auto& name : added) name_ids_.erase(name);
+        writer.discard();
         std::error_code ec;
-        for (const auto& name : made) {
-            fs::remove_all(dir_ / name, ec);
-            fs::remove_all(dir_ / (name + ".tmp"), ec);
-        }
         if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
         if (!players_written.empty()) fs::remove(dir_ / players_written, ec);
         throw;
@@ -1478,25 +1286,6 @@ void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
 // ---------------------------------------------------------------------------------------------------------------------
 // Merges and their undoing.
 
-namespace {
-
-void setBit(std::vector<uint64_t>& bits, GameId id, bool on) {
-    if (bits.size() <= id / 64) {
-        if (!on) return;
-        bits.resize(id / 64 + 1, 0);
-    }
-    if (on)
-        bits[id / 64] |= uint64_t{1} << (id % 64);
-    else
-        bits[id / 64] &= ~(uint64_t{1} << (id % 64));
-}
-
-void trim(std::vector<uint64_t>& bits) {
-    while (!bits.empty() && bits.back() == 0) bits.pop_back();
-}
-
-}  // namespace
-
 std::vector<GameState> Database::merge(std::vector<Merge> merges) {
     if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
@@ -1580,25 +1369,21 @@ void Database::setPlayers(PlayerTable table) {
 void Database::clear() {
     if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
-    const auto before = snapshot();
-    nlohmann::json manifest;
-    {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest = nlohmann::json::parse(in);
-    }
-    const auto edits_before   = manifest.value("edits", std::string());
-    const auto players_before = manifest.value("players", std::string());
+    const auto before         = snapshot();
+    auto manifest             = Manifest::read(dir_);
+    const auto edits_before   = manifest.edits;
+    const auto players_before = manifest.players;
     // As a database just made, its generation going on; every game taken out, as edits do: what was built from the
     // games before (an opening tree) no longer holds, nor what the window keeps by generation. A compaction under way
     // stops before its commit for it.
-    const uint64_t generation    = before->generation_ + 1;
-    manifest["segments"]         = nlohmann::json::array();
-    manifest["edits_generation"] = generation;
-    manifest["generation"]       = generation;
-    manifest.erase("edits");
-    manifest.erase("players");
+    const uint64_t generation = before->generation_ + 1;
+    manifest.segments.clear();
+    manifest.edits_generation = generation;
+    manifest.generation       = generation;
+    manifest.edits.clear();
+    manifest.players.clear();
     step("write manifest");
-    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    manifest.write(dir_);
     step("manifest written");
     auto snap               = std::make_shared<Snapshot>();
     snap->generation_       = generation;
@@ -1637,683 +1422,6 @@ void Database::removeReleased(bool closing) {
         fs::remove_all(dir_ / r.name, ec);
         return !ec || closing;
     });
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The check.
-
-namespace {
-
-// Whether segment record i reads as it was written: its names within the database's, its offsets within its files,
-// its annex whole, its moves replayed to their end, its signature and its key made again the same.
-bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
-    try {
-        for (int c = 0; c < NAME_COLUMNS; ++c)
-            if (segment.value<uint32_t>(static_cast<Column>(c), i) >= snap.names()) return false;
-        if (!segment.offsetsSound(i)) return false;
-        const auto game  = recordGame(snap, segment, i, true);  // throws on a damaged annex
-        const auto flags = segment.value<uint16_t>(FLAGS, i);
-        ScanBoard board;
-        const bool start = board.setFen(
-            game.start_fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(game.start_fen),
-            game.chess960);
-        if (!start) {
-            if (!(flags & GAME_DAMAGED) || game.plies != 0 || !game.moves.empty()) return false;
-        } else {
-            SignatureMaker signature(board);
-            Cursor cursor(game.moves, game.plies);
-            for (uint32_t ply = 0;; ++ply) {
-                const int code = cursor.next(board);
-                if (code == Cursor::END) break;
-                const auto move = board.decode(code);
-                signature.before(board, move, ply);
-                board.play(move);
-            }
-            // Every ply read, and nothing after them.
-            if (cursor.ply() < game.plies || cursor.bytes() != game.moves.size()) return false;
-            if (const auto* stored = segment.signatureBytes(i); stored && (stored[21] & SIG_KNOWN)) {
-                const auto again = signature.finish(board);
-                if (std::memcmp(stored, again.home.data(), 16) != 0) return false;
-                for (int j = 0; j < 5; ++j)
-                    if (stored[16 + j] != static_cast<uint8_t>((again.material[2 * j] & 0x0F) |
-                                                               (std::min<uint8_t>(again.material[2 * j + 1], 15) << 4)))
-                        return false;
-                if (((stored[21] & SIG_PROMOTED) != 0) != again.promoted) return false;
-            }
-        }
-        // A name lost with a segment that cannot be read reads "?": the key made of it cannot be made again.
-        const bool known =
-            snap.nameKnown(segment.value<uint32_t>(WHITE, i)) && snap.nameKnown(segment.value<uint32_t>(BLACK, i)) &&
-            snap.nameKnown(segment.value<uint32_t>(EVENT, i)) && snap.nameKnown(segment.value<uint32_t>(SITE, i)) &&
-            snap.nameKnown(segment.value<uint32_t>(ROUND, i));
-        return !known || duplicateKey(game) == segment.value<uint64_t>(KEY, i);
-    } catch (const std::exception&) {
-        return false;
-    }
-}
-
-}  // namespace
-
-CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& cancel, int threads) const {
-    const auto started = std::chrono::steady_clock::now();
-    const auto snap    = snapshot();
-    CheckReport report;
-    const auto infos = snap->segmentInfos();
-    uint64_t total   = 0;
-    for (const auto& info : infos) total += info.games;
-    progress.total = total;
-    progress.done  = 0;
-    threads        = threadCount(threads);
-    // The game a record is the current version of, if any.
-    std::map<std::pair<uint32_t, uint32_t>, GameId> current_version;
-    for (const auto& v : snap->replaced_) current_version[{v.segment, v.local}] = v.id;
-    const auto replaced = [&](GameId id) {
-        const auto v = std::lower_bound(snap->replaced_.begin(), snap->replaced_.end(), id,
-                                        [](const Snapshot::Version& r, GameId x) { return r.id < x; });
-        return v != snap->replaced_.end() && v->id == id;
-    };
-    std::vector<GameId> damaged;
-    std::mutex found;
-    std::atomic<uint64_t> checked{0};
-    for (std::size_t s = 0; s < infos.size() && !cancel; ++s) {
-        const auto& info = infos[s];
-        // The game record i is, when it is one as the database reads it; none for an old version.
-        const auto gameOf = [&](std::size_t i) -> std::optional<GameId> {
-            if (info.versions) {
-                const auto it = current_version.find({static_cast<uint32_t>(s), static_cast<uint32_t>(i)});
-                if (it == current_version.end()) return std::nullopt;
-                return it->second;
-            }
-            const GameId id = info.first + i;
-            if (replaced(id)) return std::nullopt;
-            return id;
-        };
-        std::shared_ptr<const Segment> segment;
-        const auto names = snap->segments_[s]->nameCount();
-        try {
-            segment = std::make_shared<const Segment>(dir_ / info.name, info.games, names);
-        } catch (const std::exception& e) {
-            MappedFile file;
-            std::vector<uint32_t> offsets;
-            const bool names_kept =
-                names == 0 || Segment::readNames(dir_ / info.name / "names.bin", names, file, offsets);
-            report.segments.push_back(
-                {info.name, info.first, info.games, info.versions, e.what(), info.source, names_kept});
-            for (std::size_t i = 0; i < info.games; ++i)
-                if (const auto id = gameOf(i); id && !snap->deletedByEdit(*id)) damaged.push_back(*id);
-            progress.done += info.games;
-            continue;
-        }
-        if (segment->version() < 2 && info.games > 0) report.signatures = false;
-        std::atomic<std::size_t> next{0};
-        const auto parts = std::min<std::size_t>(static_cast<std::size_t>(threads), info.games / 4096 + 1);
-        onThreads(static_cast<int>(parts), [&](int) {
-            std::vector<GameId> mine;
-            for (;;) {
-                const auto from = next.fetch_add(4096);
-                if (from >= info.games || cancel.load(std::memory_order_relaxed)) break;
-                const auto to = std::min<std::size_t>(from + 4096, info.games);
-                for (std::size_t i = from; i < to; ++i) {
-                    const auto id = gameOf(i);
-                    if (!id || snap->deleted(*id)) continue;  // an old version, or a game no one reads
-                    ++checked;
-                    if (!recordSound(*snap, *segment, i)) mine.push_back(*id);
-                }
-                progress.done += to - from;
-            }
-            std::lock_guard lock(found);
-            damaged.insert(damaged.end(), mine.begin(), mine.end());
-        });
-    }
-    report.games     = checked.load();
-    report.cancelled = cancel.load();
-    std::sort(damaged.begin(), damaged.end());
-    damaged.erase(std::unique(damaged.begin(), damaged.end()), damaged.end());
-    for (const auto id : damaged) ++report.damaged_sources[snap->source(id)];
-    report.damaged = std::move(damaged);
-    try {
-        const auto tree = Tree::open(dir_);
-        report.tree     = tree && !tree->stale(*snap) && tree->games() == snap->games();
-    } catch (const std::exception&) {
-        report.tree = false;
-    }
-    report.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-    return report;
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The compaction.
-
-namespace {
-
-// Whether a deleted game's record still holds its moves or its annex: what a compaction takes away.
-bool heldDeleted(const Snapshot& snap, GameId id) { return snap.deleted(id) && snap.storedBytes(id) > 0; }
-
-// Whether a logical segment holds a game replaced, or a deleted game not emptied yet.
-bool staleSegment(const Snapshot& snap, const Snapshot::SegmentInfo& info) {
-    if (info.versions) return false;
-    for (GameId id = info.first; id < info.first + info.games; ++id)
-        if (snap.state(id).version || heldDeleted(snap, id)) return true;
-    return false;
-}
-
-}  // namespace
-
-CompactPlan Database::compactPlan() const {
-    const auto snap = snapshot();
-    CompactPlan plan;
-    if (!snap->unreadable().empty()) return plan;  // keepReadable() first: those segments cannot be copied
-    const auto infos = snap->segmentInfos();
-    // What the segments written again take now, and what their new files will take.
-    uint64_t before = 0, after = 0;
-    for (std::size_t s = 0; s < infos.size(); ++s) {
-        const auto& info = infos[s];
-        const auto& seg  = *snap->segments_[s];
-        if (info.versions) {
-            if (info.games == 0) continue;  // its names only: compacted already
-            plan.segments.push_back(info.name);
-            before += seg.bytes();
-            after += layout(0)[COLUMNS] + seg.namesText().size();
-            continue;
-        }
-        if (!staleSegment(*snap, info)) continue;
-        plan.segments.push_back(info.name);
-        uint64_t kept = layout(info.games)[COLUMNS] + seg.namesText().size() + uint64_t{info.games} * SIG_BYTES;
-        for (GameId id = info.first; id < info.first + info.games; ++id) {
-            if (snap->deleted(id)) {
-                if (snap->storedBytes(id) > 0) ++plan.deleted;
-                continue;
-            }
-            if (snap->state(id).version) ++plan.replaced;
-            kept += snap->storedBytes(id);
-        }
-        before += seg.bytes();
-        after += kept;
-    }
-    if (plan.segments.empty()) return CompactPlan{};
-    plan.needed = after;
-    plan.bytes  = before > after ? before - after : 0;
-    return plan;
-}
-
-namespace {
-
-// A segment's files written in folder `tmp`: `n` records, each copied from (segment, record) or emptied when deleted,
-// its names those of `names`. A record without a segment is a game set aside whose record could not be read: no
-// headers, its names `blank_name`.
-struct RecordSource {
-    const Segment* segment = nullptr;
-    std::size_t index      = 0;
-    bool emptied           = false;  // a deleted game: its headers only
-};
-
-void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records, std::string_view names,
-                  uint32_t name_count, const std::atomic<bool>& cancel, std::atomic<uint64_t>& done,
-                  uint32_t blank_name = 0) {
-    const auto n  = records.size();
-    const auto at = layout(n);
-    std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
-    std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
-    const auto put32 = [&](std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, 4); };
-    const auto put   = [&](Column column, std::size_t i, auto v) {
-        std::memcpy(cols.data() + at[column] + i * sizeof(v), &v, sizeof(v));
-    };
-    put32(8, VERSION);
-    put32(12, static_cast<uint32_t>(n));
-    put32(16, name_count);
-    for (std::size_t k = 0; k < n; ++k) {
-        if ((k & 0xFFF) == 0 && cancel.load(std::memory_order_relaxed))
-            throw StoreError(StoreErrc::Cancelled, "cancelled");
-        const auto& r = records[k];
-        if (!r.segment) {  // set aside: nothing kept of it but its number
-            for (int c = 0; c < NAME_COLUMNS; ++c) put(static_cast<Column>(c), k, blank_name);
-            put(RESULT, k, static_cast<uint8_t>('*'));
-            put(MOVES, k, static_cast<uint64_t>(moves.size()));
-            put(ANNEX, k, static_cast<uint64_t>(annex.size()));
-            ++done;
-            continue;
-        }
-        const auto& seg = *r.segment;
-        for (int c = 0; c < NAME_COLUMNS; ++c)
-            put(static_cast<Column>(c), k, seg.value<uint32_t>(static_cast<Column>(c), r.index));
-        put(DATE, k, seg.value<uint32_t>(DATE, r.index));
-        put(WHITE_ELO, k, seg.value<uint16_t>(WHITE_ELO, r.index));
-        put(BLACK_ELO, k, seg.value<uint16_t>(BLACK_ELO, r.index));
-        put(ECO, k, seg.value<uint16_t>(ECO, r.index));
-        put(RESULT, k, seg.value<uint8_t>(RESULT, r.index));
-        put(KEY, k, seg.value<uint64_t>(KEY, r.index));
-        put(MOVES, k, static_cast<uint64_t>(moves.size()));
-        put(ANNEX, k, static_cast<uint64_t>(annex.size()));
-        if (r.emptied) {
-            put(PLIES, k, uint32_t{0});
-            put(FLAGS, k, uint16_t{0});
-        } else {
-            put(PLIES, k, seg.value<uint32_t>(PLIES, r.index));
-            put(FLAGS, k, seg.value<uint16_t>(FLAGS, r.index));
-            const auto m = seg.moves(r.index), a = seg.annex(r.index);
-            moves.append(reinterpret_cast<const char*>(m.data()), m.size());
-            annex.append(reinterpret_cast<const char*>(a.data()), a.size());
-            if (const auto* bytes = seg.signatureBytes(r.index)) {
-                std::memcpy(sig.data() + k * SIG_BYTES, bytes, SIG_BYTES);
-            } else {
-                // A segment of the first format: the signature made from the moves.
-                ScanBoard start;
-                const auto flags = seg.value<uint16_t>(FLAGS, r.index);
-                std::string fen;
-                if (flags & GAME_FEN) {
-                    const uint8_t* p   = a.data();
-                    const uint8_t* end = p + a.size();
-                    if (p < end && (*p++ & ANNEX_FEN)) fen = getText(p, end);
-                }
-                if (start.setFen(fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(fen),
-                                 flags & GAME_CHESS960))
-                    if (const auto signature = signatureOf(start, m, seg.value<uint32_t>(PLIES, r.index))) {
-                        char* out = sig.data() + k * SIG_BYTES;
-                        std::memcpy(out, signature->home.data(), 16);
-                        for (int j = 0; j < 5; ++j)
-                            out[16 + j] =
-                                static_cast<char>((signature->material[2 * j] & 0x0F) |
-                                                  (std::min<uint8_t>(signature->material[2 * j + 1], 15) << 4));
-                        out[21] = static_cast<char>(SIG_KNOWN | (signature->promoted ? SIG_PROMOTED : 0));
-                    }
-            }
-        }
-        ++done;
-    }
-    put(MOVES, n, static_cast<uint64_t>(moves.size()));
-    put(ANNEX, n, static_cast<uint64_t>(annex.size()));
-    std::error_code ec;
-    fs::remove_all(tmp, ec);
-    fs::create_directories(tmp, ec);
-    if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
-    writeFile(tmp / "cols.bin", cols);
-    writeFile(tmp / "moves.bin", moves);
-    writeFile(tmp / "annex.bin", annex);
-    writeFile(tmp / "names.bin", names);
-    writeFile(tmp / "sig.bin", sig);
-    syncFolder(tmp);
-}
-
-}  // namespace
-
-Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& cancel, bool one_at_a_time) {
-    Compacted out;
-    if (!lock_) {
-        out.error      = readOnlyError(dir_).what();
-        out.error_code = StoreErrc::ReadOnly;
-        return out;
-    }
-    // One compaction at a time. The segments are written without the writers' lock, from the snapshot of when it
-    // starts: games added meanwhile are kept; a game replaced or deleted meanwhile stops it (compact again).
-    std::lock_guard compacting(compact_mutex_);
-    auto snap = snapshot();
-    if (!snap->unreadable().empty()) {
-        out.error      = "a segment cannot be read: keep what can be read first";
-        out.error_code = StoreErrc::Damaged;
-        return out;
-    }
-    const auto infos = snap->segmentInfos();
-    const auto plan  = compactPlan();
-    std::vector<std::string> unremoved;  // one segment at a time: old files still mapped, removed at the end
-    if (plan.segments.empty()) {
-        out.done = true;
-        return out;
-    }
-    if (!one_at_a_time) {
-        std::error_code ec;
-        const auto space = fs::space(dir_, ec);
-        if (!ec && space.available < plan.needed + (uint64_t{64} << 20)) {
-            out.error      = "disk full";
-            out.error_code = StoreErrc::DiskFull;
-            return out;
-        }
-    }
-    std::string manifest_text;
-    {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest_text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    }
-    const auto old_edits = nlohmann::json::parse(manifest_text).value("edits", std::string());
-    // The steps: all the segments at once; or each logical segment, then the segments of versions.
-    std::vector<std::size_t> logical_stale, versions;
-    for (std::size_t s = 0; s < infos.size(); ++s) {
-        if (infos[s].versions) {
-            if (infos[s].games > 0) versions.push_back(s);
-        } else if (staleSegment(*snap, infos[s])) {
-            logical_stale.push_back(s);
-        }
-    }
-    std::vector<std::vector<std::size_t>> steps;
-    if (one_at_a_time) {
-        for (const auto s : logical_stale) steps.push_back({s});
-        if (!versions.empty()) steps.push_back(versions);
-    } else {
-        auto all = logical_stale;
-        all.insert(all.end(), versions.begin(), versions.end());
-        steps.push_back(all);
-    }
-    progress.segments = logical_stale.size() + versions.size();
-    progress.segment  = 0;
-    auto replaced     = snap->replaced_;  // what stays replaced, the segments folded so far taken out
-    std::vector<std::string> old_files, new_files;
-    uint64_t old_bytes    = 0;
-    std::string edits_now = old_edits;  // the edits file the manifest names
-    std::string manifest_after;
-    for (const auto& batch : steps) {
-        std::vector<std::pair<std::size_t, std::string>> written;  // a segment's index, its new folder
-        std::string edits_written;
-        std::string tmp_now;
-        const auto clean = [&] {
-            std::error_code ec;
-            for (const auto& [s, name] : written) fs::remove_all(dir_ / name, ec);
-            if (!tmp_now.empty()) fs::remove_all(dir_ / tmp_now, ec);
-            if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
-        };
-        try {
-            for (const auto s : batch) {
-                ++progress.segment;
-                progress.games   = 0;
-                const auto& info = infos[s];
-                const auto& seg  = *snap->segments_[s];
-                std::vector<RecordSource> records;
-                if (!info.versions) {
-                    records.reserve(info.games);
-                    for (GameId id = info.first; id < info.first + info.games; ++id) {
-                        const auto [where, i] = snap->locate(id);
-                        records.push_back({where, i, snap->deleted(id)});
-                    }
-                }
-                std::string name;
-                {
-                    std::lock_guard lock(mutex_);  // the numbers the appends take too
-                    name = segmentName(next_segment_++);
-                }
-                tmp_now = name + ".tmp";
-                writeSegment(dir_ / tmp_now, records, seg.namesText(), seg.nameCount(), cancel, progress.games);
-                step("rename segment");
-                std::error_code ec;
-                fs::rename(dir_ / tmp_now, dir_ / name, ec);
-                if (ec) throw std::runtime_error("cannot rename " + (dir_ / tmp_now).string());
-                tmp_now.clear();
-                written.emplace_back(s, name);
-            }
-            syncFolder(dir_);
-            if (cancel) throw StoreError(StoreErrc::Cancelled, "cancelled");
-        } catch (const std::exception& e) {
-            // Nothing of this step committed: its files go. Those of the steps before stay committed.
-            clean();
-            out.cancelled  = cancel.load();
-            out.error      = out.cancelled ? std::string() : std::string(e.what());
-            out.error_code = out.cancelled ? StoreErrc::Other : errorCode(e);
-            return out;
-        }
-        {
-            // The commit, under the writers' lock: the manifest as it is now (the segments added meanwhile kept)
-            // naming the new segments, the edits without the versions folded in, the edits generation kept: the
-            // games read the same, and the opening tree holds.
-            std::lock_guard writing(write_mutex_);
-            try {
-                if (snapshot()->editsGeneration() != snap->editsGeneration())
-                    throw std::runtime_error("a game was replaced or deleted meanwhile");
-                nlohmann::json next;
-                {
-                    std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-                    next = nlohmann::json::parse(in);
-                }
-                for (const auto& [s, name] : written) {
-                    auto& entry   = next["segments"][s];
-                    entry["name"] = name;
-                    if (infos[s].versions) {
-                        entry["games"] = 0;
-                    } else {
-                        const auto first = infos[s].first, last = first + infos[s].games;
-                        std::erase_if(replaced,
-                                      [&](const Snapshot::Version& v) { return v.id >= first && v.id < last; });
-                    }
-                }
-                const auto generation = next.value("generation", uint64_t{0}) + 1;
-                if (!replaced.empty() || !snap->deleted_.empty()) {
-                    edits_written = editsName(generation);
-                    writeFile(dir_ / edits_written, editsBytes(replaced, snap->deleted_));
-                    next["edits"] = edits_written;
-                } else {
-                    next.erase("edits");
-                }
-                next["generation"] = generation;
-                step("write manifest");
-                tour::replaceFile(dir_ / MANIFEST, next.dump(1));
-                manifest_after = next.dump(1);
-            } catch (const std::exception& e) {
-                clean();
-                out.error      = e.what();
-                out.error_code = errorCode(e);
-                return out;
-            }
-            // Committed: read again, the old files kept for now.
-            step("manifest written");
-            load(false);
-            keys_indexed_ = false;
-        }
-        std::vector<std::string> step_old;
-        for (const auto& [s, name] : written) {
-            step_old.push_back(infos[s].name);
-            new_files.push_back(name);
-            old_bytes += snap->segments_[s]->bytes();
-        }
-        if (!edits_written.empty()) new_files.push_back(edits_written);
-        if (edits_now != edits_written && !edits_now.empty()) step_old.push_back(edits_now);
-        edits_now = edits_written;
-        if (one_at_a_time) {
-            for (const auto& name : step_old) {
-                std::error_code ec;
-                fs::remove_all(dir_ / name, ec);
-                if (ec) unremoved.push_back(name);  // Windows: mapped by the snapshot of the start
-            }
-        } else {
-            old_files.insert(old_files.end(), step_old.begin(), step_old.end());
-        }
-    }
-    // What was given back: the old segments' bytes less the new ones'.
-    const auto now     = snapshot();
-    uint64_t new_bytes = 0;
-    for (const auto& name : new_files)
-        for (std::size_t s = 0; s < now->segment_names_.size(); ++s)
-            if (now->segment_names_[s] == name) new_bytes += now->segments_[s]->bytes();
-    out.bytes = old_bytes > new_bytes ? old_bytes - new_bytes : 0;
-    out.done  = true;
-    if (one_at_a_time) {
-        // The start's snapshot let go: what Windows kept mapped can go now (what a reader still maps, at the next open).
-        snap.reset();
-        for (const auto& name : unremoved) {
-            std::error_code ec;
-            fs::remove_all(dir_ / name, ec);
-        }
-        return out;
-    }
-    // Undoing it puts the manifest before back, unless something was committed since: the segments added meanwhile
-    // would go with it.
-    Leftovers left;
-    left.manifest   = now->generation() == snap->generation() + 1 ? manifest_text : std::string();
-    left.generation = now->generation();
-    left.files      = old_files;
-    left.new_files  = new_files;
-    std::lock_guard lock(mutex_);
-    leftovers_   = std::move(left);
-    out.undoable = !leftovers_->manifest.empty();
-    return out;
-}
-
-bool Database::compactionUndoable() const {
-    std::lock_guard lock(mutex_);
-    return leftovers_ && !leftovers_->manifest.empty() && current_->generation_ == leftovers_->generation;
-}
-
-bool Database::undoCompaction() {
-    std::lock_guard compacting(compact_mutex_);
-    std::lock_guard writing(write_mutex_);
-    nlohmann::json manifest;
-    {
-        std::lock_guard lock(mutex_);
-        if (!leftovers_ || leftovers_->manifest.empty() || current_->generation_ != leftovers_->generation)
-            return false;
-        manifest               = nlohmann::json::parse(leftovers_->manifest);
-        manifest["generation"] = current_->generation_ + 1;  // readers see a commit
-    }
-    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
-    std::vector<std::string> made;
-    {
-        std::lock_guard lock(mutex_);
-        made = leftovers_->new_files;
-        leftovers_.reset();
-    }
-    load(true);  // the compaction's files, no longer named, go
-    // Again, once the snapshot that mapped them is let go (Windows removes no mapped file); a reader holding it
-    // still leaves them to the next open.
-    for (const auto& name : made) {
-        std::error_code ec;
-        fs::remove_all(dir_ / name, ec);
-    }
-    keys_indexed_ = false;
-    return true;
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The segments that cannot be read, written again (#97).
-
-uint64_t Database::keepReadable(std::span<const GameId> damaged) {
-    if (!lock_) throw readOnlyError(dir_);
-    std::lock_guard compacting(compact_mutex_);
-    std::lock_guard writing(write_mutex_);
-    const auto snap = snapshot();
-    // What is set aside: the games that cannot be read, and the damaged ones given.
-    auto deleted       = snap->deleted_;
-    uint64_t set_aside = 0;
-    const auto aside   = [&](GameId id) {
-        if (id >= snap->games_ || (id / 64 < deleted.size() && (deleted[id / 64] >> (id % 64) & 1))) return;
-        setBit(deleted, id, true);
-        ++set_aside;
-    };
-    for (const auto id : snap->unreadableIds()) aside(id);
-    for (const auto id : damaged) aside(id);
-    if (snap->unreadable_segments_.empty() && set_aside == 0) return 0;
-
-    std::string manifest_text;
-    {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest_text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    }
-    auto manifest             = nlohmann::json::parse(manifest_text);
-    const auto old_edits      = manifest.value("edits", std::string());
-    const uint64_t generation = snap->generation_ + 1;
-    const auto blank          = snap->blankName();
-    const uint32_t blank_name = blank.value_or(snap->names_);  // none: a name "" added after the others
-    std::vector<std::string> written, old_files;
-    std::string tmp_now, edits_written;
-    try {
-        const auto made = [&](std::vector<RecordSource> records, std::string_view names, uint32_t count) {
-            std::string name;
-            {
-                std::lock_guard lock(mutex_);  // the numbers the appends take too
-                name = segmentName(next_segment_++);
-            }
-            tmp_now = name + ".tmp";
-            std::atomic<bool> go_on{false};
-            std::atomic<uint64_t> done{0};
-            writeSegment(dir_ / tmp_now, records, names, count, go_on, done, blank_name);
-            step("rename segment");
-            std::error_code ec;
-            fs::rename(dir_ / tmp_now, dir_ / name, ec);
-            if (ec) throw std::runtime_error("cannot rename " + (dir_ / tmp_now).string() + ": " + ec.message());
-            tmp_now.clear();
-            written.push_back(name);
-            return name;
-        };
-        for (std::size_t s = 0; s < snap->segments_.size(); ++s) {
-            const auto& segment = *snap->segments_[s];
-            if (!segment.unreadable()) continue;
-            // Its names as they read, or "?" for each when they cannot: the later games' ids of names hold.
-            std::string names;
-            if (segment.namesKnown()) {
-                names = segment.namesText();
-            } else {
-                names.reserve(std::size_t{segment.nameCount()} * 2);
-                for (uint32_t k = 0; k < segment.nameCount(); ++k) names += "?\n";
-            }
-            auto& entry = manifest["segments"][s];
-            old_files.push_back(entry.at("name").get<std::string>());
-            entry["name"] = made(std::vector<RecordSource>(segment.games()), names, segment.nameCount());
-            if (!segment.namesKnown() && segment.nameCount() > 0) entry["unknown_names"] = true;
-        }
-        if (!blank && !snap->unreadable_segments_.empty())  // a segment of names only, as a compaction leaves them
-            manifest["segments"].push_back(
-                {{"name", made({}, "\n", 1)}, {"games", 0}, {"names", 1}, {"versions", true}});
-        syncFolder(dir_);
-        edits_written = editsName(generation);
-        writeFile(dir_ / edits_written, editsBytes(snap->replaced_, deleted));
-        manifest["edits"]            = edits_written;
-        manifest["edits_generation"] = generation;
-        manifest["generation"]       = generation;
-        step("write manifest");
-        tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
-    } catch (const std::exception&) {
-        // Nothing committed: what it wrote goes, the database as before.
-        std::error_code ec;
-        for (const auto& name : written) fs::remove_all(dir_ / name, ec);
-        if (!tmp_now.empty()) fs::remove_all(dir_ / tmp_now, ec);
-        if (!edits_written.empty()) fs::remove(dir_ / edits_written, ec);
-        throw;
-    }
-    // Committed: read again, the damaged files kept until the database is closed (or the commit undone).
-    step("manifest written");
-    load(false);
-    keys_indexed_  = false;
-    names_indexed_ = false;
-    name_ids_.clear();
-    if (!old_edits.empty() && old_edits != edits_written) old_files.push_back(old_edits);
-    Leftovers left;
-    left.manifest   = manifest_text;
-    left.generation = generation;
-    left.files      = std::move(old_files);
-    left.new_files  = std::move(written);
-    left.new_files.push_back(edits_written);
-    std::lock_guard lock(mutex_);
-    if (kept_)  // an earlier one's, no longer undone: its files go at closing all the same
-        dropped_.insert(dropped_.end(), kept_->files.begin(), kept_->files.end());
-    kept_ = std::move(left);
-    return set_aside;
-}
-
-bool Database::keepReadableUndoable() const {
-    std::lock_guard lock(mutex_);
-    return kept_ && !kept_->manifest.empty() && current_->generation_ == kept_->generation;
-}
-
-bool Database::undoKeepReadable() {
-    std::lock_guard compacting(compact_mutex_);
-    std::lock_guard writing(write_mutex_);
-    nlohmann::json manifest;
-    std::vector<std::string> made;
-    {
-        std::lock_guard lock(mutex_);
-        if (!kept_ || kept_->manifest.empty() || current_->generation_ != kept_->generation) return false;
-        manifest               = nlohmann::json::parse(kept_->manifest);
-        manifest["generation"] = current_->generation_ + 1;  // readers see a commit
-    }
-    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
-    {
-        std::lock_guard lock(mutex_);
-        made = kept_->new_files;
-        kept_.reset();
-    }
-    load(true);                      // the files it wrote, no longer named, go; those it set aside are named again
-    for (const auto& name : made) {  // again, once their snapshot is let go (Windows removes no mapped file)
-        std::error_code ec;
-        fs::remove_all(dir_ / name, ec);
-    }
-    keys_indexed_  = false;
-    names_indexed_ = false;
-    name_ids_.clear();
-    return true;
 }
 
 void Database::dropLeftovers() {

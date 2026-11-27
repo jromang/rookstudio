@@ -15,6 +15,7 @@
 #include <system_error>
 #include <vector>
 
+#include <json.hpp>
 #include <study/import.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
@@ -659,4 +660,223 @@ TEST_CASE("store: the files a database writes are the same bytes as before the f
         now[fs::relative(entry.path(), dir).generic_string()] = {bytes.size(), h};
     }
     CHECK(now == before);
+}
+
+namespace {
+
+// A folder's entries, the lock left out, each its path, size and bytes in the order of their paths, hashed (FNV-1a):
+// what a change leaves in a database's folder, the files it removed or kept included.
+uint64_t folderHash(const fs::path& dir) {
+    std::map<std::string, std::string> entries;
+    for (const auto& entry : fs::recursive_directory_iterator(dir)) {
+        const auto name = fs::relative(entry.path(), dir).generic_string();
+        if (entry.is_directory())
+            entries[name + "/"];
+        else if (name != "tournament.lock")
+            entries[name] = fcg::test::readFile(entry.path());
+    }
+    uint64_t h     = 0xcbf29ce484222325ULL;
+    const auto mix = [&](std::string_view bytes) {
+        for (const unsigned char c : bytes) h = (h ^ c) * 0x100000001b3ULL;
+        h = (h ^ 0xFF) * 0x100000001b3ULL;
+    };
+    for (const auto& [name, bytes] : entries) {
+        mix(name);
+        mix(std::to_string(bytes.size()));
+        mix(bytes);
+    }
+    return h;
+}
+
+// Its first half only, as a disk's damage leaves it.
+void cutShort(const fs::path& file) {
+    const auto bytes = fcg::test::readFile(file);
+    REQUIRE(bytes.size() > 1);
+    std::ofstream(file, std::ios::binary | std::ios::trunc) << bytes.substr(0, bytes.size() / 2);
+}
+
+}  // namespace
+
+TEST_CASE("store: every change a database commits writes the same bytes as before the store's building blocks (#112)") {
+    // Each way the store writes, in turn: a database made, appends (with and without a source, duplicates left out),
+    // a replacement, deletions and their undoing, a merge and its undoing, a table of names, a compaction, its
+    // undoing, one segment at a time, Keep what can be read (a segment whose names are lost), its undoing, again with
+    // a check's damaged games, the database emptied and filled again; then a database whose games all have names, a
+    // segment of the empty name added for its games set aside. The folder hashed after each, no snapshot held (the
+    // files a change removes or keeps count too). The code of 2dae534f, before the SegmentWriter and the typed
+    // Manifest, gave these hashes. Made again only for a change of the format, saying why in the commit.
+    const std::vector<std::pair<std::string, uint64_t>> before{
+        {"create", 0x4d7b4efc5399c27b},
+        {"append", 0x20bec23454383213},
+        {"append, duplicates left out", 0x404d16685e68bfe9},
+        {"append without a source", 0x3aeefc1ddacd079d},
+        {"replace", 0xa90dd22bb0b2a546},
+        {"delete", 0x40d9d43bbbdc7e9b},
+        {"delete undone", 0x5136997fc2d6e786},
+        {"merge", 0x7b64b1765d3af86a},
+        {"merge undone", 0x8e6250f6d5f4a698},
+        {"players", 0xb64acf0480e9cbee},
+        {"compact", 0x2f74a4905decc07b},
+        {"compaction undone", 0x31492e7dfefa8962},
+        {"compact one segment at a time", 0x44b0fa84654bb7a7},
+        {"closed", 0x44b0fa84654bb7a7},
+        {"keep what can be read", 0x457b48b99afc3ba4},
+        {"keep what can be read undone", 0x7f92a9cf28b18647},
+        {"keep what can be read, a check's damaged games", 0x199b0a3e07c3343c},
+        {"clear", 0x02c03b7e49169000},
+        {"append after clear", 0x0466cf160136e768},
+        {"closed again", 0x5a82ccfbc48a1394},
+        {"every name given", 0x750393d511c180c3},
+        {"keep what can be read, a segment of the empty name", 0x4e1c0d5869579f1c},
+        {"closed", 0x832a51f3ac462c77},
+    };
+    std::vector<std::pair<std::string, uint64_t>> now;
+    const auto games = fixtureGames();
+    CompactProgress progress;
+    std::atomic<bool> cancel{false};
+    {
+        const ScratchDir dir("store-every-change.fcgdb");
+        const auto mark = [&](const char* stage) { now.emplace_back(stage, folderHash(dir)); };
+        auto db         = Database::create(dir);
+        mark("create");
+        db->append(games, true, "/x/games.pgn");
+        mark("append");
+        auto random = fcg::test::randomGames(400, 7, 6);
+        random.insert(random.end(), games.begin(), games.begin() + 5);  // the database has them: left out
+        CHECK(db->append(random, false, "/x/random.pgn").duplicates == 5);
+        mark("append, duplicates left out");
+        db->append({games.begin() + 10, games.begin() + 12}, true);
+        mark("append without a source");
+        db->replace(5, games[7]);
+        mark("replace");
+        db->setDeleted(std::vector<GameId>{3, 9, 11, 200}, true);
+        mark("delete");
+        db->setDeleted(std::vector<GameId>{9}, false);
+        mark("delete undone");
+        auto merged = db->snapshot()->game(130);
+        merged.tags.emplace_back("Annotator", "Ada");
+        const auto states = db->merge({{130, merged, {131, 132}}});
+        mark("merge");
+        db->restore(states);
+        mark("merge undone");
+        Player player;
+        player.name      = "Someone, Anyone";
+        player.fide      = 123;
+        player.spellings = {db->snapshot()->rowIds(0).white, db->snapshot()->rowIds(1).black};
+        db->setPlayers(PlayerTable(std::vector<Player>{player}, {{1, 2}}));
+        mark("players");
+        REQUIRE(db->compact(progress, cancel).done);
+        mark("compact");
+        REQUIRE(db->undoCompaction());
+        mark("compaction undone");
+        REQUIRE(db->compact(progress, cancel, true).done);
+        mark("compact one segment at a time");
+        const auto second = db->snapshot()->segmentInfos()[1].name;
+        db.reset();
+        mark("closed");
+        cutShort(dir / second / "names.bin");
+        db = Database::open(dir);
+        REQUIRE(db->snapshot()->unreadable().size() == 1);
+        CHECK(db->keepReadable() == 399);
+        mark("keep what can be read");
+        REQUIRE(db->undoKeepReadable());
+        mark("keep what can be read undone");
+        CHECK(db->keepReadable(std::vector<GameId>{20, 21}) == 401);
+        mark("keep what can be read, a check's damaged games");
+        db->clear();
+        mark("clear");
+        db->append({games.begin(), games.begin() + 3}, true, "/x/again.pgn");
+        mark("append after clear");
+        db.reset();
+        mark("closed again");
+    }
+    {
+        const ScratchDir dir("store-every-name.fcgdb");
+        const auto mark = [&](const char* stage) { now.emplace_back(stage, folderHash(dir)); };
+        auto named      = fcg::test::randomGames(30, 11, 6);
+        for (std::size_t i = 0; i < named.size(); ++i) {
+            auto& tags = named[i].tags;
+            tags.emplace_back("White", "Moreau, Claire " + std::to_string(i % 4));
+            tags.emplace_back("Black", "Duval, Marc " + std::to_string(i % 5));
+            tags.emplace_back("Site", "Lyon");
+            tags.emplace_back("Annotator", "Club team");
+            tags.emplace_back("TimeControl", "5400+30");
+        }
+        auto db = Database::create(dir);
+        for (std::size_t from = 0; from < named.size(); from += 10)
+            db->append({named.begin() + static_cast<std::ptrdiff_t>(from),
+                        named.begin() + static_cast<std::ptrdiff_t>(from + 10)},
+                       true, "/x/club.pgn");
+        const auto second = db->snapshot()->segmentInfos()[1].name;
+        db.reset();
+        mark("every name given");
+        cutShort(dir / second / "moves.bin");
+        db = Database::open(dir);
+        REQUIRE(db->snapshot()->unreadable().size() == 1);
+        CHECK(db->keepReadable() == 10);
+        mark("keep what can be read, a segment of the empty name");
+        db.reset();
+        mark("closed");
+    }
+    REQUIRE(now.size() == before.size());
+    for (std::size_t i = 0; i < now.size(); ++i) {
+        CAPTURE(before[i].first);
+        CHECK(now[i].first == before[i].first);
+        CHECK(now[i].second == before[i].second);
+    }
+}
+
+TEST_CASE("store: the manifest's keys a newer program wrote are kept through every change (#112)") {
+    const ScratchDir dir("store-newer-keys.fcgdb");
+    const auto games = fcg::test::randomGames(40, 5, 6);
+    {
+        auto db = Database::create(dir);
+        db->append({games.begin(), games.begin() + 20}, true, "/x/first.pgn");
+        db->append({games.begin() + 20, games.end()}, true, "/x/second.pgn");
+    }
+    // Keys of its own at the top and in a segment's entry: this program reads past them and writes them back.
+    auto manifest                       = nlohmann::json::parse(fcg::test::readFile(dir / "manifest.json"));
+    manifest["newer"]                   = {{"index", "index-000002.bin"}, {"level", 3}};
+    manifest["segments"][1]["checksum"] = "c0ffee";
+    std::ofstream(dir / "manifest.json", std::ios::binary | std::ios::trunc) << manifest.dump(1);
+    const auto kept = [&](bool entry) {
+        const auto now = nlohmann::json::parse(fcg::test::readFile(dir / "manifest.json"));
+        CHECK(now.value("newer", nlohmann::json()) == manifest["newer"]);
+        if (entry) CHECK(now["segments"][1].value("checksum", "") == "c0ffee");
+    };
+    auto db = Database::open(dir);
+    CHECK(db->snapshot()->games() == 40);
+    db->append(fcg::test::randomGames(5, 6, 6), true);
+    kept(true);
+    db->replace(3, games[4]);
+    db->setDeleted(std::vector<GameId>{7}, true);
+    kept(true);
+    auto merged = db->snapshot()->game(10);
+    merged.tags.emplace_back("Annotator", "Ada");
+    db->restore(db->merge({{10, merged, {11}}}));
+    kept(true);
+    db->setPlayers(PlayerTable(std::vector<Player>{}, {{1, 2}}));
+    kept(true);
+    CompactProgress progress;
+    std::atomic<bool> cancel{false};
+    REQUIRE(db->compact(progress, cancel).done);
+    kept(true);
+    REQUIRE(db->undoCompaction());
+    kept(true);
+    REQUIRE(db->compact(progress, cancel, true).done);
+    kept(true);
+    const auto first = db->snapshot()->segmentInfos().front().name;
+    db.reset();
+    cutShort(dir / first / "moves.bin");
+    db = Database::open(dir);
+    REQUIRE(db->snapshot()->unreadable().size() == 1);
+    CHECK(db->keepReadable() > 0);
+    kept(true);
+    REQUIRE(db->undoKeepReadable());
+    kept(true);
+    db->clear();  // its segments gone, their keys with them
+    kept(false);
+    CHECK(nlohmann::json::parse(fcg::test::readFile(dir / "manifest.json"))["segments"].empty());
+    db.reset();
+    CHECK(Database::open(dir)->snapshot()->games() == 0);
 }

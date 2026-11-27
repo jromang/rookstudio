@@ -53,6 +53,7 @@
 #include "openings.hpp"
 #include "pgn_file.hpp"
 #include "pgn_out.hpp"
+#include "rounds.hpp"
 #include "schedule.hpp"
 #include "start_failures.hpp"
 #include "unbalanced.hpp"
@@ -310,16 +311,9 @@ class TournamentState {
     static void effects(const nlohmann::json& event, TournamentSpec& spec, Schedule& schedule,
                         std::vector<GameResult>& results, std::set<uint64_t>& done, std::set<uint64_t>& dropped);
     void rebuildStats();
-    void pairIfReady();                                 // Swiss, knockout: the next round when one is due
+    // Swiss, knockout: the next round (or a knockout's tiebreaks) when one is due, journaled and applied.
+    void pairIfReady();
     void applyRoundEvent(const nlohmann::json& event);  // round_paired, tiebreak_added; mutex_ held
-    [[nodiscard]] double pairPoints(int a, int b, uint32_t round) const;  // a's points against b in a round
-    // Knockout, the place of `a` and `b` in the round being played: the tiebreak pairs of games it was given, whether
-    // all its games are played (or dropped), and who goes through once they are (nullopt while level: another
-    // tiebreak is due). mutex_ held.
-    [[nodiscard]] int tiebreaks(int a, int b) const;
-    [[nodiscard]] bool placeOver(int a, int b) const;
-    [[nodiscard]] std::optional<int> placeWinner(int a, int b) const;
-    static void roundEventTo(const nlohmann::json& event, const TournamentSpec& spec, Schedule& schedule);
     void rebuildOpen();
     [[nodiscard]] bool hasWorkLocked() const;
     [[nodiscard]] bool gamesLeft() const;  // games to claim, finished or not; mutex_ held
@@ -399,9 +393,6 @@ class TournamentState {
     std::map<uint32_t, std::size_t> half_;                   // encounter -> index in results_ of its first game
     std::map<std::pair<int, int>, fastchess::Stats> pairs_;  // (lower id, higher id), lower id's point of view
 
-    std::map<int, int> byes_;
-    std::map<uint32_t, std::vector<std::vector<int>>> brackets_;
-    uint32_t round_ = 0;           // Swiss, knockout: last round paired
     std::set<uint64_t> dropped_;   // games that will not be played (withdrawn participant, voided without replay)
     std::set<uint64_t> running_;   // claimed by the runner, not finished
     uint32_t next_encounter_ = 0;  // first encounter never started
@@ -427,8 +418,10 @@ class TournamentState {
     bool finished_ = false;
     std::string finish_reason_;
 
-    // spec_.pgn_out's: it reads the members above (declared before it), under mutex_.
+    // spec_.pgn_out's, and the rounds of a Swiss or a knockout: they read the members above (declared before them),
+    // under mutex_.
     PgnOutWriter pgn_out_;
+    Rounds rounds_;
 };
 
 }  // namespace fcg::tour

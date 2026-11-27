@@ -15,7 +15,6 @@
 #include "book_adapter.hpp"
 #include "engine_text.hpp"
 #include "journal_events.hpp"
-#include "pairing.hpp"
 #include "pgn_book.hpp"
 #include "sprt_rules.hpp"
 
@@ -186,7 +185,7 @@ TournamentState::Replayed TournamentState::replay(const std::vector<nlohmann::js
         if (out.finished && out.finish_reason == "complete") out.finished = false;
     };
     reader.round = [&](const nlohmann::json& e) {
-        roundEventTo(e, spec, schedule);
+        Rounds::addEncounters(e, spec, schedule);
         if (eventTypeOf(e) == EventType::RoundPaired) {
             for (const auto& id : e.value("byes", std::vector<int>{})) out.byes[id]++;
             if (e.contains("bracket")) out.last_bracket = e.at("bracket").get<std::vector<std::vector<int>>>();
@@ -283,7 +282,8 @@ TournamentState::TournamentState(fs::path dir, TournamentSpec spec)
       pgn_path_(dir_ / spec_.pgnFile()),
       chessbase_path_(dir_ / spec_.chessbasePgnFile()),
       schedule_(spec_),
-      pgn_out_({spec_, results_, done_, dropped_, finished_, pgn_path_, chessbase_path_}) {
+      pgn_out_({spec_, results_, done_, dropped_, finished_, pgn_path_, chessbase_path_}),
+      rounds_({spec_, schedule_, results_, done_, dropped_}) {
     const auto& s = spec_.conditions.sprt;
     if (spec_.format == Format::Match && s.enabled) {
         sprt_ = fastchess::SPRT(s.alpha, s.beta, s.elo0, s.elo1, s.model, true);
@@ -598,194 +598,28 @@ std::shared_ptr<const TournamentSpec> TournamentState::specSnapshot() const {
     return spec_snapshot_;
 }
 
-void TournamentState::roundEventTo(const nlohmann::json& event, const TournamentSpec& spec, Schedule& schedule) {
-    const auto type  = eventTypeOf(event);
-    const auto round = event.at("round").get<uint32_t>();
-    const int cycles = spec.format == Format::Knockout ? std::max(1, spec.cycles) : 1;
-
-    std::vector<Encounter> encounters;
-    const auto add = [&](int a, int b, uint32_t cycle) {
-        Encounter e;
-        e.round  = round;
-        e.cycle  = cycle;
-        e.first  = cycle % 2 == 1 ? a : b;
-        e.second = cycle % 2 == 1 ? b : a;
-        encounters.push_back(e);
-    };
-    if (type == EventType::RoundPaired) {
-        for (const auto& p : event.at("pairs")) {
-            for (int c = 1; c <= cycles; ++c) add(p.at(0).get<int>(), p.at(1).get<int>(), static_cast<uint32_t>(c));
-        }
-    } else {
-        const auto& p = event.at("pair");
-        add(p.at(0).get<int>(), p.at(1).get<int>(), static_cast<uint32_t>(cycles + event.at("index").get<int>()));
-    }
-    schedule.append(encounters);
-}
-
 void TournamentState::applyRoundEvent(const nlohmann::json& event) {
-    roundEventTo(event, spec_, schedule_);
-    if (eventTypeOf(event) == EventType::RoundPaired) {
-        round_ = event.at("round").get<uint32_t>();
-        for (const auto& id : event.value("byes", std::vector<int>{})) byes_[id]++;
-        if (event.contains("bracket")) brackets_[round_] = event.at("bracket").get<std::vector<std::vector<int>>>();
-    }
+    Rounds::addEncounters(event, spec_, schedule_);
+    rounds_.apply(event);
     rebuildOpen();
-}
-
-double TournamentState::pairPoints(int a, int b, uint32_t round) const {
-    double points = 0;
-    for (const auto& r : results_) {
-        if (r.voided) continue;
-        const bool between = (r.white == a && r.black == b) || (r.white == b && r.black == a);
-        if (between && schedule_.at(r.encounter) && schedule_.at(r.encounter)->round == round) points += r.scoreOf(a);
-    }
-    return points;
-}
-
-namespace {
-
-bool between(const Encounter& e, int a, int b) {
-    return (e.first == a && e.second == b) || (e.first == b && e.second == a);
-}
-
-}  // namespace
-
-int TournamentState::tiebreaks(int a, int b) const {
-    int n           = 0;
-    const auto size = schedule_.size().value_or(0);
-    for (uint32_t e = 0; e < size; ++e) {
-        const auto enc = schedule_.at(e);
-        if (enc->round == round_ && between(*enc, a, b) &&
-            enc->cycle > static_cast<uint32_t>(std::max(1, spec_.cycles))) {
-            ++n;
-        }
-    }
-    return n;
-}
-
-bool TournamentState::placeOver(int a, int b) const {
-    const auto size = schedule_.size().value_or(0);
-    for (uint32_t e = 0; e < size; ++e) {
-        const auto enc = schedule_.at(e);
-        if (enc->round != round_ || !between(*enc, a, b)) continue;
-        for (int g = 0; g < 2; ++g) {
-            const auto n = uint64_t{e} * 2 + g;
-            if (!done_.count(n) && !dropped_.count(n)) return false;
-        }
-    }
-    return true;
-}
-
-std::optional<int> TournamentState::placeWinner(int a, int b) const {
-    const double sa = pairPoints(a, b, round_), sb = pairPoints(b, a, round_);
-    if (sa != sb) return sa > sb ? a : b;
-    if (tiebreaks(a, b) < 10) return std::nullopt;
-
-    // Ten tiebreaks without a winner: the higher seed goes through.
-    const auto seed = [&](int id) {
-        const auto& ps = spec_.participants;
-        return std::find_if(ps.begin(), ps.end(), [&](const Participant& p) { return p.id == id; }) - ps.begin();
-    };
-    return seed(a) <= seed(b) ? a : b;
 }
 
 void TournamentState::pairIfReady() {
     if (!pairedAsItGoes(spec_.format) || finished_ || !journal_) return;
-
-    // The round being played must be over: every game of it played (or dropped).
-    const auto size = schedule_.size().value_or(0);
-    for (uint32_t e = 0; e < size; ++e) {
-        if (schedule_.at(e)->round != round_) continue;
-        for (int g = 0; g < 2; ++g) {
-            const auto n = uint64_t{e} * 2 + g;
-            if (!done_.count(n) && !dropped_.count(n)) return;
-        }
+    for (const auto& event : rounds_.next()) {
+        journal_->append(event);
+        applyRoundEvent(event);
     }
-
-    std::vector<int> players;
-    for (const auto& p : spec_.participants) {
-        if (p.active) players.push_back(p.id);
-    }
-
-    auto event           = journalEvent(EventType::RoundPaired, {{"round", round_ + 1}});
-    const auto pairsJson = [](const RoundPairing& p) {
-        nlohmann::json pairs = nlohmann::json::array();
-        for (const auto& [a, b] : p.pairs) pairs.push_back({a, b});
-        return pairs;
-    };
-
-    if (spec_.format == Format::Swiss) {
-        if (round_ >= static_cast<uint32_t>(spec_.rounds)) return;
-        std::map<int, double> score;
-        for (const auto& r : results_) {
-            if (r.voided) continue;
-            score[r.white] += r.scoreOf(r.white);
-            score[r.black] += r.scoreOf(r.black);
-        }
-        std::set<int> had_bye;
-        for (const auto& [id, n] : byes_) {
-            score[id] += n;
-            had_bye.insert(id);
-        }
-        std::set<std::pair<int, int>> played;
-        for (uint32_t e = 0; e < size; ++e) {
-            const auto enc = schedule_.at(e);
-            played.insert({std::min(enc->first, enc->second), std::max(enc->first, enc->second)});
-        }
-        const auto pairing = swissPairing(players, score, played, had_bye);
-        event["pairs"]     = pairsJson(pairing);
-        event["byes"]      = pairing.byes;
-    } else if (round_ == 0) {
-        const auto pairing = knockoutFirstRound(players);
-        event["pairs"]     = pairsJson(pairing);
-        event["byes"]      = pairing.byes;
-        event["bracket"]   = pairing.bracket;
-    } else {
-        // Who won each place of the round; tied matches get another pair of games first, all at once.
-        std::vector<int> winners;
-        bool tiebreak_added = false;
-        for (const auto& place : brackets_[round_]) {
-            if (place.size() == 1) {
-                winners.push_back(place[0]);
-                continue;
-            }
-            const int a = place[0], b = place[1];
-            if (const auto winner = placeWinner(a, b)) {
-                winners.push_back(*winner);
-                continue;
-            }
-            const auto tiebreak = journalEvent(EventType::TiebreakAdded,
-                                               {{"round", round_}, {"pair", {a, b}}, {"index", tiebreaks(a, b) + 1}});
-            journal_->append(tiebreak);
-            applyRoundEvent(tiebreak);
-            tiebreak_added = true;
-        }
-        if (tiebreak_added) return;      // the round goes on
-        if (winners.size() < 2) return;  // the final is over
-
-        std::vector<std::vector<int>> bracket;
-        nlohmann::json pairs = nlohmann::json::array();
-        for (std::size_t i = 0; i + 1 < winners.size(); i += 2) {
-            bracket.push_back({winners[i], winners[i + 1]});
-            pairs.push_back({winners[i], winners[i + 1]});
-        }
-        event["pairs"]   = pairs;
-        event["bracket"] = bracket;
-    }
-
-    journal_->append(event);
-    applyRoundEvent(event);
 }
 
 std::map<int, int> TournamentState::byes() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return byes_;
+    return rounds_.byes();
 }
 
 std::map<uint32_t, std::vector<std::vector<int>>> TournamentState::brackets() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return brackets_;
+    return rounds_.brackets();
 }
 
 Impact TournamentState::preview(const Edit& edit) const {
@@ -820,7 +654,7 @@ Impact TournamentState::previewLocked(const Edit& edit) const {
             }
             // The rounds after it were paired from the results: a game of theirs is the last one a result can change.
             const auto enc = schedule_.at(encounter);
-            if (spec_.format == Format::Knockout && (!enc || enc->round != round_)) {
+            if (spec_.format == Format::Knockout && (!enc || enc->round != rounds_.round())) {
                 impact.error = "in a knockout, only the games of the round being played can have their result set";
                 return impact;
             }
@@ -1415,8 +1249,9 @@ std::set<std::string> TournamentState::enginesLeft() const {
     }
 
     // The last round of a Swiss is paired: no encounter will be added, its schedule is known as a round robin's is.
+    const auto round = rounds_.round();
     const bool last_swiss_round =
-        spec_.format == Format::Swiss && round_ > 0 && round_ >= static_cast<uint32_t>(spec_.rounds);
+        spec_.format == Format::Swiss && round > 0 && round >= static_cast<uint32_t>(spec_.rounds);
 
     if (!finished_ && (schedule_.editable() || last_swiss_round)) {
         // The games of started encounters, then the encounters never started, until every participant is seen:
@@ -1442,13 +1277,13 @@ std::set<std::string> TournamentState::enginesLeft() const {
             add(*e);
         }
         active = std::move(left);
-    } else if (!finished_ && spec_.format == Format::Knockout && brackets_.count(round_)) {
+    } else if (!finished_ && spec_.format == Format::Knockout && rounds_.brackets().count(round)) {
         // A knockout: the players of the round being played, less those who lost their match of it already, while
         // the other matches of the round go on. The next rounds are not known, but they are played among these.
         std::set<int> in;
-        for (const auto& place : brackets_.at(round_)) {
-            if (place.size() == 2 && placeOver(place[0], place[1])) {
-                if (const auto winner = placeWinner(place[0], place[1])) {
+        for (const auto& place : rounds_.brackets().at(round)) {
+            if (place.size() == 2 && rounds_.placeOver(place[0], place[1])) {
+                if (const auto winner = rounds_.placeWinner(place[0], place[1])) {
                     in.insert(*winner);
                     continue;
                 }

@@ -99,7 +99,7 @@ const std::vector<LevelMove>* App::practicalLevelAt(const chess::Board& board, b
     if (const auto it = p.level.find(key); it != p.level.end()) return &it->second;
     if (!ask || p.level_failed.count(key) > 0 || p.explorer_job.valid() || p.db_job.valid()) return nullptr;
     p.job_key = key;
-    p.error.clear();
+    p.error   = {};
     if (online) {
         // What leaves the machine: the position and the level, to Lichess's explorer, with the account's token.
         lichess::ExplorerQuery q;
@@ -136,7 +136,7 @@ void App::drawPractical() {
             p.level[p.job_key] = levelMoves(*a.value);
         } else {
             p.level_failed.insert(p.job_key);
-            p.error = lichess::describe(a);
+            p.error = a;
         }
     }
     if (isReady(p.db_job)) {
@@ -424,7 +424,7 @@ void App::drawPractical() {
                        "move…");
             break;
     }
-    if (!p.error.empty()) sentence += " " + trf("(Lichess's explorer gave nothing: {})", p.error);
+    if (p.error.failed()) sentence += " " + trf("(Lichess's explorer gave nothing: {})", lichess::describe(p.error));
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", sentence.c_str());
     ImGui::TextDisabled("%s", TR("Among the moves the engine puts within 0.3 pawn of its best (or that keep the "

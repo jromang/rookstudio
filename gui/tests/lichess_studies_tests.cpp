@@ -638,3 +638,35 @@ TEST_CASE("Lichess studies: a state of the wrong types keeps what reads, the res
     CHECK(said[0].find("could not be read: kept as") != std::string::npos);
     CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }
+
+TEST_CASE(
+    "Lichess studies: each failure of the list and of a chapter's changes told by its kind, kept as it came (#141)") {
+    using namespace std::chrono_literals;
+    AnsweringServer server;
+    REQUIRE(server.ok());
+    HostGate::instance().setPause(50ms);
+    struct Case {
+        int status;
+        const char* body;
+        NetError net;
+    };
+    for (const auto& [status, body, net] :
+         {Case{401, R"({"error":"No such token"})", NetError::Unauthorized},
+          Case{403, R"({"error":"Missing scope"})", NetError::Forbidden}, Case{404, "{}", NetError::NotFound},
+          Case{429, "{}", NetError::RateLimited}, Case{503, "<html>down</html>", NetError::Server}}) {
+        CAPTURE(status);
+        server.answer(status, body);
+        const Failure list = userStudies(USER, "allowed");
+        CHECK(list.net == net);
+        const Failure update = updateChapterMoves("study001", "Chap0001", "1. e4 *", "allowed");
+        CHECK(update.net == net);
+        if (net == NetError::RateLimited) CHECK(HostGate::instance().waitPause("127.0.0.1"));
+    }
+    // What the page says of a token refused, from the failure kept rather than from words kept.
+    server.answer(401, R"({"error":"No such token"})");
+    const Failure refused = updateChapterMoves("study001", "Chap0001", "1. e4 *", "revoked");
+    CHECK(describe(refused) == "Lichess refused the token: link the account again");
+    pointNowhere();
+    CHECK(userStudies(USER, "allowed").net == NetError::Offline);
+    CHECK(updateChapterMoves("study001", "Chap0001", "1. e4 *", "allowed").net == NetError::Offline);
+}

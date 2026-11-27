@@ -1077,7 +1077,9 @@ class App {
         std::future<lichess::Reply> reply;
     };
     std::vector<OnlineCall> online_calls_;  // under way
-    std::string play_online_error_;         // the last request refused, said where the user plays
+    // The last request refused, said where the user plays: what it asked, and Lichess's failure as it came (#141).
+    std::string play_online_what_;
+    lichess::Failure play_online_error_;
     std::array<char, 32> online_user_{};    // "Challenge a player": the name typed
     bool online_user_focus_     = false;    // the field takes the keys at the next frame (Ctrl+K)
     bool online_resume_checked_ = false;    // the game kept from the last session looked for among those in progress
@@ -1423,7 +1425,7 @@ class App {
         std::future<std::vector<LevelMove>> db_job;
         std::future<lichess::Answer<lichess::Explorer>> explorer_job;
         std::string job_key;
-        std::string error;  // why the explorer gave nothing
+        lichess::Failure error;  // why the explorer gave nothing, as it came (#141)
         std::unique_ptr<Analyser> engine;
         std::string engine_name;
         std::string
@@ -2103,7 +2105,7 @@ class App {
         std::string url;                                  // the game shared
         std::optional<lichess::OpenChallenge> challenge;  // its links
         lichess::ChallengeClock clock;
-        std::string error;
+        lichess::Failure error;  // why Lichess did not do it, as it came (#141)
     };
     std::optional<ToLichess> to_lichess_;  // what was asked last, under the board until closed
     std::future<lichess::Answer<std::string>> lichess_share_job_;
@@ -2128,7 +2130,7 @@ class App {
     lichess::StudiesState studies_;
     bool studies_loaded_ = false;
     std::optional<std::vector<lichess::StudyInfo>> studies_list_;  // the account's, asked once the card opens
-    std::string studies_list_error_;
+    lichess::Failure studies_list_error_;                          // as it came (#141), worded where it is said
     std::string studies_list_of_;  // the account and the permission the list was asked with
     std::future<lichess::Answer<std::vector<lichess::StudyInfo>>> studies_list_job_;
     std::string study_shown_;                                                   // the study whose chapters show
@@ -2183,7 +2185,7 @@ class App {
     lichess::SentRecord study_update_;                     // what they send
     uint64_t study_update_serial_ = 0;
     int study_update_count_       = 0;
-    std::string study_update_error_;
+    lichess::Failure study_update_error_;  // as it came (#141), worded where it is said
     bool study_update_after_link_ = false;
     std::string study_origin_seen_;  // the database game last looked for among the games sent
     int study_popup_frame_ = -10;    // the last frame a list was open over the send card: its Escape not the card's
@@ -2937,7 +2939,8 @@ class App {
     std::vector<lichess::ExplorerGame> tree_games_;  // those of the answer shown
     int tree_games_source_ = -1;                     // 0 the masters', 1 Lichess's
     std::future<lichess::Answer<std::string>> explorer_game_job_;
-    std::string explorer_game_title_, explorer_game_fen_, explorer_game_error_;
+    std::string explorer_game_title_, explorer_game_fen_;
+    lichess::Failure explorer_game_error_;  // as it came (#141), worded where it is said
     void pollExplorerMonths();
     void drawTreeGames();
     void drawTreeMonths(const std::string& key);  // a move's months, as a line in its row
@@ -2951,7 +2954,7 @@ class App {
         std::future<lichess::Answer<std::vector<lichess::FideCard>>> search;
         std::optional<std::vector<lichess::FideCard>> choices;  // namesakes: the user chooses
         std::optional<lichess::FideCard> shown;
-        std::string error;
+        lichess::Failure error;  // Lichess's as it came (#141); no namesake on the list, in its own words
     };
     std::optional<FideAsk> fide_ask_;
     bool fide_popup_ = false;  // opened the next frame

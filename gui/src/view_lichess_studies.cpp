@@ -213,7 +213,7 @@ void App::pollStudies() {
         auto answer = studies_list_job_.get();
         if (answer.value) {
             studies_list_ = std::move(*answer.value);
-            studies_list_error_.clear();
+            studies_list_error_ = {};
             bool renamed = false;  // the names Lichess has now
             for (const auto& s : *studies_list_) {
                 if (auto* r = studies_.find(s.id); r && r->name != s.name) {
@@ -223,7 +223,7 @@ void App::pollStudies() {
             }
             if (renamed) saveStudiesState();
         } else {
-            studies_list_error_ = lichess::describe(answer);
+            studies_list_error_ = answer;
         }
     }
     // A study read, imported too.
@@ -361,7 +361,7 @@ void App::pollStudies() {
     if (isReady(study_update_job_)) {
         const auto answer = study_update_job_.get();
         if (answer.value) {
-            study_update_error_.clear();
+            study_update_error_ = {};
             for (auto& r : studies_.sent) {
                 if (r.chapter != study_update_.chapter) continue;
                 r.pgn  = study_update_.pgn;
@@ -380,7 +380,7 @@ void App::pollStudies() {
             saveStudiesState();
             boardToast(TR("The chapter on Lichess has the game's changes now"));
         } else {
-            study_update_error_ = lichess::describe(answer);
+            study_update_error_ = answer;
         }
     }
     // Lichess's page answered: what waited for the permission goes on, or says why not.
@@ -598,14 +598,15 @@ void App::drawLichessStudies() {
     if (!shown.empty() && std::none_of(shown.begin(), shown.end(), [&](const auto& s) { return s.id == study_shown_; }))
         study_shown_ = shown.front().id;
     if (!studies_list_ && studies_list_job_.valid()) ImGui::TextDisabled("%s", TR("Asking Lichess…"));
-    if (!studies_list_error_.empty()) {
-        ImGui::TextColored(
-            ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-            trf("Lichess did not give the list: {}. What was read before stays.", studies_list_error_).c_str());
+    if (studies_list_error_.failed()) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                           trf("Lichess did not give the list: {}. What was read before stays.",
+                               lichess::describe(studies_list_error_))
+                               .c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Try again"))) {
             studies_list_of_.clear();
-            studies_list_error_.clear();
+            studies_list_error_ = {};
         }
     }
     if (shown.empty()) {
@@ -991,7 +992,7 @@ void App::sendStudyChanges() {
     study_update_.tags   = lichess::gameTags(b.tree);
     study_update_serial_ = board_game_serial_;
     study_update_count_  = b.changes.count;
-    study_update_error_.clear();
+    study_update_error_  = {};
     const auto tags =
         study_update_.tags != b.sent->tags ? lichess::tagsPgn(study_update_.tags, b.sent->tags) : std::string();
     study_update_job_ = std::async(std::launch::async, [study = study_update_.study, chapter = study_update_.chapter,
@@ -1045,9 +1046,10 @@ void App::drawSentLine() {
                                                  "changed. Never on its own."));
         }
     }
-    if (!study_update_error_.empty()) {
+    if (study_update_error_.failed()) {
         ImGui::PushStyleColor(ImGuiCol_Text, ui::WARN);
-        ImGui::TextWrapped("%s", trf("Lichess did not take the changes: {}.", study_update_error_).c_str());
+        ImGui::TextWrapped(
+            "%s", trf("Lichess did not take the changes: {}.", lichess::describe(study_update_error_)).c_str());
         ImGui::PopStyleColor();
     }
 }
@@ -1135,11 +1137,11 @@ void App::drawStudySendCard() {
             ImGui::EndDisabled();
             if (!studies_list_ && studies_list_job_.valid())
                 ImGui::TextDisabled("%s", TR("Asking Lichess for your studies (your name goes)…"));
-            else if (!studies_list_ && !studies_list_error_.empty())
-                ImGui::TextColored(
-                    ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                    trf("Lichess did not give your studies ({}): those read before show here.", studies_list_error_)
-                        .c_str());
+            else if (!studies_list_ && studies_list_error_.failed())
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                                   trf("Lichess did not give your studies ({}): those read before show here.",
+                                       lichess::describe(studies_list_error_))
+                                       .c_str());
             ImGui::RadioButton(TR("A new study"), &s.where, 1);
             if (s.where == 1) {
                 ImGui::Indent();

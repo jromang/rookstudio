@@ -104,7 +104,7 @@ void App::pollToLichess() {
                 ImGui::SetClipboardText(answer.value->c_str());
                 Console::instance().add(trf("The game is on Lichess, its address copied: {}", *answer.value));
             } else {
-                to_lichess_->error = lichess::describe(answer);
+                to_lichess_->error = answer;
             }
         }
     }
@@ -115,14 +115,14 @@ void App::pollToLichess() {
             if (answer.value)
                 to_lichess_->challenge = std::move(answer.value);
             else
-                to_lichess_->error = lichess::describe(answer);
+                to_lichess_->error = answer;
         }
     }
     if (isReady(lichess_bookmark_job_)) {
         const auto answer = lichess_bookmark_job_.get();
         if (to_lichess_ && to_lichess_->kind == ToLichess::Kind::Bookmark) {
             to_lichess_->busy = false;
-            if (!answer.value) to_lichess_->error = lichess::describe(answer);
+            if (!answer.value) to_lichess_->error = answer;
         }
         if (answer.value) Console::instance().add(TR("The game is in your bookmarks on Lichess"));
     }
@@ -275,9 +275,9 @@ void App::drawToLichessResult(float width) {
         ImGui::PushTextWrapPos(0);
         if (t.busy) {
             ImGui::TextDisabled("%s", TR("Asking Lichess…"));
-        } else if (!t.error.empty()) {
+        } else if (t.error.failed()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("Lichess did not do it: {}", t.error).c_str());
+                               trf("Lichess did not do it: {}", lichess::describe(t.error)).c_str());
         } else if (t.kind == ToLichess::Kind::Share) {
             ImGui::TextUnformatted(TR("The game is on Lichess; its address is copied."));
             ImGui::TextDisabled("%s", t.url.c_str());

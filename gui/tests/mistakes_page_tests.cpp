@@ -594,10 +594,19 @@ TEST_CASE("mistakes page: an answer no engine can judge is said and not counted;
     CHECK_FALSE(page.onBoard());
     CHECK(app.training_part == 2);  // the Training page's part instead
 
-    // Without the user's names, the part asks for them first.
+    // Without the user's names, the part asks for them first; Ctrl+K's "Your names…", among the mistakes' commands,
+    // leads to Settings, where they are set.
     app.live_game = false;
     app.names.clear();
     frames.draw(app, [&] { page.drawPart(); });
     REQUIRE(app.names_drawn.size() == 1);
     CHECK(app.names_drawn[0] == "training_names");
+    page.addCommands(
+        [&](const std::string& label, const std::string& where, const std::function<void()>& run) {
+            if (label != "Your names…") return;
+            CHECK(where == "Settings");
+            run();
+        },
+        "Study");
+    CHECK(app.names_settings == 1);
 }

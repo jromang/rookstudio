@@ -73,7 +73,7 @@ function(fcg_add_program target)
 endfunction()
 
 # A test program: a program that links, after the libraries it tests, what the test programs share (fcg_test_support).
-# Its name goes in FCG_TEST_PROGRAMS too (at the end), for the tests target and test_programs.txt.
+# Name it in FCG_TEST_PROGRAMS too, at the end of this file, for the tests target and test_programs.txt.
 function(fcg_add_test_program target)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "LIBRARIES")
     fcg_add_program(${target} ${arg_UNPARSED_ARGUMENTS} LIBRARIES ${arg_LIBRARIES} fcg_test_support)

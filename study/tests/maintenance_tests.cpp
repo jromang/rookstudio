@@ -11,6 +11,7 @@
 #include <study/duplicates.hpp>
 #include <study/import_into.hpp>
 #include <study/query.hpp>
+#include <study/result_char.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
@@ -34,7 +35,6 @@ const char* const OTHER =
     "1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. e3 O-O 5. Bd3 d5 6. Nf3 c5 7. O-O dxc4 8. Bxc4 Nbd7 9. Qe2 b6 10. Rd1 cxd4 "
     "11. exd4 Bb7";
 
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "1/2-1/2" : "*"; }
 
 // A game as a source writes it: its tags as given, its moves, its result.
 ImportedGame game(const std::vector<std::pair<std::string, std::string>>& tags, const std::string& moves, char result,

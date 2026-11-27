@@ -194,6 +194,10 @@ std::string pgnTagValue(std::string_view value) {
     return out;
 }
 
+std::string pgnTagPair(std::string_view name, std::string_view value) {
+    return std::string("[").append(name).append(" \"").append(pgnTagValue(value)).append("\"]\n");
+}
+
 std::pair<std::size_t, std::size_t> pgnTagLine(std::string_view game, std::string_view tag) {
     const auto prefix = std::string("[").append(tag).append(" \"");
     for (std::size_t at = 0; at < game.size();) {

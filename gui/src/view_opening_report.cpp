@@ -19,6 +19,7 @@
 #include <commentary/fact_parts.hpp>
 #include <study/dossier.hpp>
 #include <study/import.hpp>
+#include <study/result_char.hpp>
 #include <study/scan_board.hpp>
 #include <tour/util.hpp>
 
@@ -265,8 +266,6 @@ std::string evalText(const ReportEval& e) {
     if (e.mate) return fmt::format("#{}", *e.mate);
     return e.cp ? fmt::format("{:+.2f}", *e.cp / 100.0) : std::string();
 }
-
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "½-½" : "*"; }
 
 // The explorer's key of a question, as the Tree tab makes it: the same answer serves both.
 std::string explorerKey(const lichess::ExplorerQuery& q, int source) {
@@ -1288,7 +1287,7 @@ void App::drawReportKeyGames() {
         std::vector<std::string> where;
         if (!row.event.empty() && row.event != "?") where.emplace_back(row.event);
         if (row.date >> 9) where.push_back(std::to_string(row.date >> 9));
-        where.push_back(resultText(row.result));
+        where.push_back(study::shownResult(row.result));
         where.push_back(trn("{} move", "{} moves", static_cast<int>((row.plies + 1) / 2), (row.plies + 1) / 2));
         std::string w_text;
         for (const auto& part : where) w_text += (w_text.empty() ? "" : " · ") + part;
@@ -1727,7 +1726,7 @@ publish::Document openingReportDocument(const ReportView& view, const std::vecto
             const std::string event(row.event);
             t.table.rows.push_back({{fmt::format("{} – {}", snap.shownName(ids.white), snap.shownName(ids.black))},
                                     {event == "?" ? std::string() : event},
-                                    {resultText(row.result)},
+                                    {study::shownResult(row.result)},
                                     {why, publish::FontId::Regular, publish::MUTED_COLOUR}});
         }
         d.blocks.push_back(std::move(t));

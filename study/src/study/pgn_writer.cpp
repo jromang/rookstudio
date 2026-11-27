@@ -243,9 +243,7 @@ std::string assistantComment(const ReplayMove& m, bool assistant_mark) {
 std::string writePgnGame(const GameTree& tree, const PgnWriteOptions& options) {
     const auto& game    = tree.main;
     const bool chess960 = options.chess960;
-    const auto tag      = [](const std::string& name, const std::string& value) {
-        return fmt::format("[{} \"{}\"]\n", name, tour::pgnTagValue(value));
-    };
+    const auto tag      = tour::pgnTagPair;
     const auto value = [&](const char* name, const char* fallback) {
         const auto v = game.header(name);
         return v.empty() ? std::string(fallback) : v;

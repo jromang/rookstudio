@@ -80,6 +80,8 @@ inline std::function<std::size_t(std::size_t size)> appendSharedCut;
 
 // A tag value as PGN writes it between the quotes: its quotes and backslashes escaped.
 [[nodiscard]] std::string pgnTagValue(std::string_view value);
+// A tag pair as PGN writes it, with its line end: [Name "value"], the value escaped (pgnTagValue()).
+[[nodiscard]] std::string pgnTagPair(std::string_view name, std::string_view value);
 
 // The line of a tag in the tags of one game's PGN text: [begin, end) without its line ending; npos when it has none.
 [[nodiscard]] std::pair<std::size_t, std::size_t> pgnTagLine(std::string_view game, std::string_view tag);

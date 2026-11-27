@@ -428,7 +428,7 @@ std::string tagsPgn(const Tags& now, const Tags& before) {
     std::string out;
     std::set<std::string> named;
     for (const auto& [name, value] : now) {
-        out += fmt::format("[{} \"{}\"]\n", name, tour::pgnTagValue(value));
+        out += tour::pgnTagPair(name, value);
         named.insert(name);
     }
     for (const auto& [name, value] : before)

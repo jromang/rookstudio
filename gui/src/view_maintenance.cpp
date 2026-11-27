@@ -17,6 +17,7 @@
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/background.hpp>
+#include <study/result_char.hpp>
 #include <tour/util.hpp>
 
 #include "app.hpp"
@@ -43,8 +44,6 @@ std::string sourceOf(const study::Snapshot& snap, study::GameId id) {
     if (label.empty()) label = study::sourceLabel({}, snap.game(id));
     return label.empty() ? std::string("—") : label;
 }
-
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "½-½" : "*"; }
 
 // How long a task took: milliseconds under a second.
 std::string tookText(double seconds) {
@@ -863,7 +862,7 @@ void App::drawCareDuplicates(std::size_t index) {
                 ImGui::SameLine();
                 std::string where_game(first.event);
                 if (!first.round.empty()) where_game += (where_game.empty() ? "" : ", ") + trf("r. {}", first.round);
-                where_game += " · " + resultText(first.result);
+                where_game += " · " + study::shownResult(first.result);
                 ImGui::TextDisabled("· %s", where_game.c_str());
                 ImGui::TableNextColumn();
                 std::string sources;
@@ -881,9 +880,9 @@ void App::drawCareDuplicates(std::size_t index) {
                 if (group.kind == study::DuplicateKind::Results) {
                     std::string results, said;
                     for (const auto id : group.games) {
-                        results += (results.empty() ? "" : " / ") + resultText(snap->numbers(id).result);
+                        results += (results.empty() ? "" : " / ") + study::shownResult(snap->numbers(id).result);
                         said += (said.empty() ? "" : "\n") +
-                                trf("{} in {}", resultText(snap->numbers(id).result), sourceOf(*snap, id));
+                                trf("{} in {}", study::shownResult(snap->numbers(id).result), sourceOf(*snap, id));
                     }
                     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                        trf("results {}: to see", results).c_str());
@@ -925,7 +924,7 @@ void App::drawCarePair(std::size_t index) {
     std::string title = fmt::format("{} – {}", snap->shownName(ids.white), snap->shownName(ids.black));
     if (!first.event.empty()) title += " · " + std::string(first.event);
     if (!first.round.empty()) title += " · " + trf("round {}", first.round);
-    title += " · " + resultText(merged.result);
+    title += " · " + study::shownResult(merged.result);
     ImGui::TextUnformatted(title.c_str());
     ImGui::PopFont();
     ImGui::SameLine();

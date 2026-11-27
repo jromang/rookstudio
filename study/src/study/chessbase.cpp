@@ -22,6 +22,7 @@
 #include "mapped_file.hpp"
 #include "pgn_reader.hpp"
 #include "pgn_writer.hpp"
+#include "result_char.hpp"
 #include "scan_board.hpp"
 #include "signature.hpp"
 
@@ -978,7 +979,7 @@ ImportedGame importedGame(const ChessBaseGame& game) {
     out.chess960        = game.chess960;
     const bool standard = main.start_fen.empty() || main.start_fen == chess::constants::STARTPOS;
     out.start_fen       = standard ? std::string() : main.start_fen;
-    out.result    = main.result == "1-0" ? '1' : main.result == "0-1" ? '0' : main.result == "1/2-1/2" ? '=' : '*';
+    out.result          = resultChar(main.result);
     out.damaged   = game.damaged;
     out.annotated = !game.tree.variations.empty() || !main.pre_comment.empty();
 

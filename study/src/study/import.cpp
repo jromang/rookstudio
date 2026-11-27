@@ -12,6 +12,7 @@
 
 #include "pgn_lexer.hpp"
 #include "pgn_reader.hpp"
+#include "result_char.hpp"
 #include "scan_board.hpp"
 #include "sources.hpp"
 
@@ -206,8 +207,7 @@ bool readImportedGame(std::string_view text, ImportedGame& out) {
         }
         value = utf8Text(value);
         if (word.text == "FEN") out.start_fen = value;
-        if (word.text == "Result")
-            out.result = value == "1-0" ? '1' : value == "0-1" ? '0' : value == "1/2-1/2" ? '=' : '*';
+        if (word.text == "Result") out.result = resultChar(value);
         if (word.text == "Variant") {
             std::string v = value;
             std::transform(v.begin(), v.end(), v.begin(),

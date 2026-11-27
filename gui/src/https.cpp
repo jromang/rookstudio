@@ -241,26 +241,6 @@ class Connection {
         return true;
     }
 
-    // Everything the server sends until it closes the connection; false on a timeout or an error.
-    bool receiveAll(std::string& out) {
-        unsigned char buffer[4096];
-        while (true) {
-            const int n = tls_ ? mbedtls_ssl_read(&ssl_, buffer, sizeof(buffer))
-                               : mbedtls_net_recv_timeout(&net_, buffer, sizeof(buffer), timeout_ms_);
-            if (n > 0) {
-                out.append(reinterpret_cast<const char*>(buffer), static_cast<std::size_t>(n));
-                continue;
-            }
-            if (n == 0 || n == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) return true;
-            if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE ||
-                n == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) {
-                continue;
-            }
-            // Some servers just close the socket once the answer is sent.
-            return n == MBEDTLS_ERR_NET_CONN_RESET && !out.empty();
-        }
-    }
-
     // Up to `size` bytes, waiting `wait_ms` at most for the first: their number, 0 once the server closed, -1 when
     // nothing came in time, -2 on an error. A TLS read that times out leaves the connection unusable, so the socket
     // is awaited instead, and a record that has begun to come is read whole (within the timeout of open()).
@@ -331,6 +311,57 @@ class Connection {
     bool tls_            = false;
     uint32_t timeout_ms_ = 20000;
 };
+
+// The connection to `url`'s server opened, through the proxy the environment names for it (HTTPS only: plain HTTP is
+// for the tests, on this machine). An error message, empty once open; "cancelled" when `cancel` ended the wait.
+std::string connect(Connection& connection, const Url& url, int timeout_s, const std::atomic<bool>* cancel) {
+    const auto proxy = url.tls ? proxyFor(url.host) : std::nullopt;
+    if (proxy && !proxy->error.empty()) return proxy->error;
+    return connection.open(url, proxy, timeout_s * 1000, cancel);
+}
+
+// How a request's body goes: of a length its Content-Length gives, or in chunks as it is made (httpUpload).
+enum class Body { Sized, Chunked };
+
+// The head of `request` to `url`: its request line and its headers, up to the blank line that ends them. A body of a
+// length is announced by its Content-Length, but for a method that sends none (GET, HEAD, DELETE…) when it has none:
+// a Content-Length there is what RFC 9110 (8.6) asks a client not to send. POST, PUT and PATCH say 0.
+std::string requestHead(const HttpRequest& request, const Url& url, Body body) {
+    std::string head =
+        fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url.path, url.host, USER_AGENT);
+    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
+    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
+    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
+    if (body == Body::Chunked) {
+        head += "Transfer-Encoding: chunked\r\n";
+    } else if (!request.body.empty() || request.method == "POST" || request.method == "PUT" ||
+               request.method == "PATCH") {
+        head += fmt::format("Content-Length: {}\r\n", request.body.size());
+    }
+    return head + "Connection: close\r\n\r\n";
+}
+
+// What leaves the machine, in the log (R16): the address asked, with what it carries (a FEN, a player's name), and
+// whether the account's token went with it, never the token itself.
+void logRequest(const HttpRequest& request) {
+    Console::instance().add(
+        fmt::format("{} {}{}", request.method, request.url, request.token.empty() ? "" : " (with the account's token)"),
+        false, "network");
+}
+
+// `request` sent to `url` on `connection`, the one way every request starts: in the log first (unless it is not
+// `logged`), then the connection opened (connect()), its head written (requestHead()), and its body when it is of a
+// length (a chunked one is the caller's to send). An error message, empty once sent; "cancelled", and nothing sent nor
+// logged, when `cancel` is set already.
+std::string sendRequest(Connection& connection, const HttpRequest& request, const Url& url, Body body,
+                        const std::atomic<bool>* cancel) {
+    if (cancel && cancel->load()) return "cancelled";
+    if (request.logged) logRequest(request);
+    if (auto error = connect(connection, url, request.timeout_s, cancel); !error.empty()) return error;
+    if (!connection.send(requestHead(request, url, body)) || (body == Body::Sized && !connection.send(request.body)))
+        return "the request could not be sent to " + url.host;
+    return {};
+}
 
 }  // namespace
 
@@ -427,61 +458,24 @@ HttpResult httpPost(const HttpRequest& request) {
     return httpRequest(post);
 }
 
-HttpResult httpRequest(const HttpRequest& request) {
-    HttpResult result;
-    const auto url = parseUrl(request.url);
-    if (!url) {
-        result.error = "not an http or https URL: " + request.url;
-        return result;
-    }
-
-    // HTTPS only: plain HTTP is for the tests, on this machine.
-    const auto proxy = url->tls ? proxyFor(url->host) : std::nullopt;
-    if (proxy && !proxy->error.empty()) {
-        result.error = proxy->error;
-        return result;
-    }
-    Connection connection;
-    if (auto error = connection.open(*url, proxy, request.timeout_s * 1000); !error.empty()) {
-        result.error = std::move(error);
-        return result;
-    }
-    std::string head = fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url->path,
-                                   url->host, USER_AGENT);
-    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
-    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
-    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    if ((request.method != "GET" && request.method != "HEAD") || !request.body.empty()) {
-        head += fmt::format("Content-Length: {}\r\n", request.body.size());
-    }
-    head += "Connection: close\r\n\r\n";
-    if (!connection.send(head) || !connection.send(request.body)) {
-        result.error = "the request could not be sent to " + url->host;
-        return result;
-    }
-    std::string answer;
-    if (!connection.receiveAll(answer) && answer.empty()) {
-        result.error = "no answer from " + url->host + " in time";
-        return result;
-    }
-
-    // "HTTP/1.1 200 OK", headers, a blank line, the body.
-    const auto headers_end = answer.find("\r\n\r\n");
-    const auto space       = answer.find(' ');
-    if (answer.rfind("HTTP/", 0) != 0 || headers_end == std::string::npos || space == std::string::npos) {
-        result.error = "not an HTTP answer from " + url->host;
-        return result;
-    }
-    try {
-        result.status = std::stoi(answer.substr(space + 1, 3));
-    } catch (...) {
-        result.error = "not an HTTP answer from " + url->host;
-        return result;
-    }
-    result.head        = answer.substr(0, headers_end);
-    const auto headers = lower(result.head);
-    result.body        = answer.substr(headers_end + 4);
-    if (headers.find("\r\ntransfer-encoding: chunked") != std::string::npos) result.body = unchunk(result.body);
+HttpResult httpRequest(const HttpRequest& request, const std::atomic<bool>* cancel) {
+    // The stream's way, which a cancel ends at once: its answer kept whole, a redirection's as it is.
+    std::string head, body;
+    HttpStream stream;
+    stream.cancel    = cancel;
+    stream.idle_s    = request.timeout_s;
+    stream.redirects = 0;
+    stream.on_head   = [&](int, std::string_view h) {
+        head = h;
+        return true;
+    };
+    stream.on_data = [&](std::string_view data) {
+        body.append(data);
+        return true;
+    };
+    auto result = httpStream(request, stream);
+    result.head = std::move(head);
+    result.body = std::move(body);
     return result;
 }
 
@@ -509,27 +503,9 @@ bool redirection(int status) {
 HttpResult streamOnce(const HttpRequest& request, const Url& url, const HttpStream& stream, bool follow,
                       std::string& location) {
     HttpResult result;
-    const auto proxy = url.tls ? proxyFor(url.host) : std::nullopt;
-    if (proxy && !proxy->error.empty()) {
-        result.error = proxy->error;
-        return result;
-    }
     Connection connection;
-    if (auto error = connection.open(url, proxy, request.timeout_s * 1000, stream.cancel); !error.empty()) {
+    if (auto error = sendRequest(connection, request, url, Body::Sized, stream.cancel); !error.empty()) {
         result.error = std::move(error);
-        return result;
-    }
-    std::string head =
-        fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url.path, url.host, USER_AGENT);
-    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
-    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
-    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    if (request.method != "GET" || !request.body.empty()) {
-        head += fmt::format("Content-Length: {}\r\n", request.body.size());
-    }
-    head += "Connection: close\r\n\r\n";
-    if (!connection.send(head) || !connection.send(request.body)) {
-        result.error = "the request could not be sent to " + url.host;
         return result;
     }
 
@@ -704,24 +680,9 @@ HttpResult httpUpload(const HttpRequest& request, const HttpUpload& upload, bool
         result.error = "not an http or https URL: " + request.url;
         return result;
     }
-    const auto proxy = url->tls ? proxyFor(url->host) : std::nullopt;
-    if (proxy && !proxy->error.empty()) {
-        result.error = proxy->error;
-        return result;
-    }
     Connection connection;
-    if (auto error = connection.open(*url, proxy, request.timeout_s * 1000, upload.cancel); !error.empty()) {
+    if (auto error = sendRequest(connection, request, *url, Body::Chunked, upload.cancel); !error.empty()) {
         result.error = std::move(error);
-        return result;
-    }
-    std::string head = fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url->path,
-                                   url->host, USER_AGENT);
-    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
-    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
-    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    head += "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
-    if (!connection.send(head)) {
-        result.error = "the request could not be sent to " + url->host;
         return result;
     }
     const auto stopped = [&] { return upload.cancel && upload.cancel->load(std::memory_order_relaxed); };
@@ -989,6 +950,7 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
         };
         const auto result = httpStream(request, stream);
         const bool closed = !f || std::fclose(f.release()) == 0;
+        out.status        = result.status;
         if (other_file) {
             fs::remove(part, ec);
             fs::remove(tag, ec);
@@ -1074,17 +1036,14 @@ void HostGate::setPause(std::chrono::milliseconds pause) {
     pause_ = pause;
 }
 
-// What leaves the machine, in the log (R16): the address asked, with what it carries (a FEN, a player's name), and
-// whether the account's token went with it, never the token itself.
-static void logRequest(const HttpRequest& request) {
-    Console::instance().add(
-        fmt::format("{} {}{}", request.method, request.url, request.token.empty() ? "" : " (with the account's token)"),
-        false, "network");
+std::string urlHost(std::string_view url) {
+    const auto u = parseUrl(url);
+    return u ? u->host : std::string();
 }
 
 HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* cancel) {
     const auto url = parseUrl(request.url);
-    if (!url) return httpRequest(request);
+    if (!url) return httpRequest(request, cancel);
     auto& gate      = HostGate::instance();
     const auto lock = gate.turn(url->host, cancel);
     if (!lock.owns_lock()) {
@@ -1092,8 +1051,7 @@ HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* ca
         result.error = "cancelled";
         return result;
     }
-    logRequest(request);
-    auto result = httpRequest(request);
+    auto result = httpRequest(request, cancel);
     if (result.status == 429) gate.tooMany(url->host);
     return result;
 }
@@ -1107,10 +1065,24 @@ HttpResult politeStream(const HttpRequest& request, const HttpStream& stream) {
         result.error = "cancelled";
         return result;
     }
-    logRequest(request);
     auto result = httpStream(request, stream);
     if (result.status == 429) gate.tooMany(url->host);
     return result;
+}
+
+Download politeDownload(const std::string& url, const std::filesystem::path& file, DownloadProgress* progress,
+                        const std::atomic<bool>* cancel, std::string_view sha256) {
+    const auto host = urlHost(url);
+    if (host.empty()) return httpDownload(url, file, progress, cancel, sha256);
+    auto& gate = HostGate::instance();
+    if (!gate.waitPause(host, cancel)) {
+        Download out;
+        out.error = "cancelled";
+        return out;
+    }
+    auto out = httpDownload(url, file, progress, cancel, sha256);
+    if (out.status == 429) gate.tooMany(host);
+    return out;
 }
 
 }  // namespace fcg

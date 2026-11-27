@@ -1,8 +1,15 @@
 #pragma once
 
-// HTTP and HTTPS requests, for the lichess broadcasts and the check for a new version: Mbed TLS, linked in, trusting
-// only the root certificates of tls_roots.cpp, and a client of the little HTTP/1.1 they need. HTTPS goes through
-// the proxy the environment names, if any.
+// HTTP and HTTPS requests, for Lichess, GitHub, the downloads and the check for a new version: Mbed TLS, linked in,
+// trusting only the root certificates of tls_roots.cpp, and a client of the little HTTP/1.1 they need. HTTPS goes
+// through the proxy the environment names, if any.
+//
+// Every request goes one way: its connection opened by one connect(), its head written by one requestHead(), its
+// answer read as it comes (httpStream), so that a cancel closes the connection within a quarter of a second whatever
+// the entry point. Each request sent is said in the log (R16: what leaves the machine is visible). The polite entry
+// points add what Lichess asks of its clients (HostGate): a short request waits for its host's turn, one at a time;
+// a stream or a download takes no turn, since it may last minutes, but waits as the others for the host's pause
+// after a 429, and a 429 it gets pauses the host.
 
 #include <atomic>
 #include <chrono>
@@ -32,13 +39,17 @@ struct HttpRequest {
     std::string token;         // sent as "Authorization: Bearer <token>" when not empty
     std::string content_type;  // of the body
     std::string body;
-    int timeout_s      = 20;
+    int timeout_s      = 20;  // to connect, and then without a byte of the answer
     std::string method = "POST";
     std::vector<std::pair<std::string, std::string>> headers;  // more of them: (name, value)
+    // Said in the log when it is sent. False only for a request sent again every few seconds whose sender says once,
+    // in its own words, what it sends (the broadcast relay's pushes, the external engine's long polls).
+    bool logged = true;
 };
 
-// The request, sent with the User-Agent "fastchess-gui/<version>".
-[[nodiscard]] HttpResult httpRequest(const HttpRequest& request);
+// The request, sent with the User-Agent "RookStudio/<version>", its answer whole (a redirection's too: not followed).
+// `cancel`, when set, stops it within a quarter of a second, the connection closed ("cancelled").
+[[nodiscard]] HttpResult httpRequest(const HttpRequest& request, const std::atomic<bool>* cancel = nullptr);
 // The same, as a POST.
 [[nodiscard]] HttpResult httpPost(const HttpRequest& request);
 
@@ -142,6 +153,7 @@ struct Download {
     std::string error;  // "cancelled" when `cancel` stopped it
     uint64_t bytes = 0;
     bool resumed   = false;  // went on from where an earlier try stopped
+    int status     = 0;      // the server's last answer, 0 when there was none
 };
 
 // `url` saved as `file`, its folder made if need be. Written to <file>.part, which a later call resumes from where it
@@ -150,6 +162,9 @@ struct Download {
 [[nodiscard]] Download httpDownload(const std::string& url, const std::filesystem::path& file,
                                     DownloadProgress* progress = nullptr, const std::atomic<bool>* cancel = nullptr,
                                     std::string_view sha256 = {});
+
+// The host of an http:// or https:// URL, without its port, as HostGate names it; empty when it is not one.
+[[nodiscard]] std::string urlHost(std::string_view url);
 
 // The SHA-256 of a file, in hexadecimal; empty when it cannot be read.
 [[nodiscard]] std::string sha256File(const std::filesystem::path& file);
@@ -181,10 +196,16 @@ class HostGate {
     std::chrono::milliseconds pause_{60000};
 };
 
-// httpRequest in its host's turn, once its pause is over; a 429 pauses the host.
+// httpRequest in its host's turn, once its pause is over; a 429 pauses the host. `cancel` ends the wait for the turn or
+// the pause, and the request itself.
 [[nodiscard]] HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* cancel = nullptr);
 // httpStream once its host's pause is over, taking no turn (Lichess lets a few streams stay open beside the
 // requests); a 429 pauses the host.
 [[nodiscard]] HttpResult politeStream(const HttpRequest& request, const HttpStream& stream);
+// httpDownload once its host's pause is over, taking no turn: a download may last minutes, and its host's short
+// requests do not wait for it; a 429 pauses the host.
+[[nodiscard]] Download politeDownload(const std::string& url, const std::filesystem::path& file,
+                                      DownloadProgress* progress = nullptr, const std::atomic<bool>* cancel = nullptr,
+                                      std::string_view sha256 = {});
 
 }  // namespace fcg

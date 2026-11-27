@@ -2,6 +2,7 @@
 // asks for, against servers on this machine whose answers the tests write.
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -9,6 +10,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <random>
@@ -21,6 +23,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include "assistant_models.hpp"
+#include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "net.hpp"
@@ -366,14 +369,21 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
     gate.setPause(pause);
     std::mutex mutex;
     std::chrono::steady_clock::time_point refused_at{}, next_at{};
+    // The requests being answered, counted up to their answer's last byte: a client goes on once it has it, without
+    // waiting for the server to close the connection.
+    std::atomic<int> answering{0}, most{0};
     const auto port = fcg::test::freePort();
     ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        const int now = ++answering;
+        for (int seen = most.load(); now > seen && !most.compare_exchange_weak(seen, now);) {
+        }
         const auto path = requestPath(head);
         if (path == "/busy") {
             {
                 std::lock_guard lock(mutex);
                 refused_at = std::chrono::steady_clock::now();
             }
+            --answering;
             c.sendAll("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n");
             return;
         }
@@ -382,6 +392,7 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
             next_at = std::chrono::steady_clock::now();
         }
         std::this_thread::sleep_for(20ms);  // room for another request to come meanwhile, were one let through
+        --answering;
         c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     });
     REQUIRE(server.ok());
@@ -397,7 +408,7 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
     }
     for (auto& t : clients) t.join();
     CHECK(answered == 12);
-    CHECK(server.maxOpen() == 1);
+    CHECK(most == 1);
 
     // A 429: the host's next request waits for the pause to end.
     CHECK(politeRequest(get(fmt::format("http://127.0.0.1:{}/busy", port))).status == 429);
@@ -417,6 +428,188 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
     HttpStream stream;
     stream.cancel = &cancel;
     CHECK(politeStream(get("http://paused.invalid/api/stream/event"), stream).error == "cancelled");
+    CHECK(gate.pausedFor("paused.invalid") > 59s);
+}
+
+TEST_CASE("HTTP: one head for every way to ask, no Content-Length where no body goes, each request in the log") {
+    std::mutex mutex;
+    std::map<std::string, std::string> heads;  // path -> the head received
+    const auto port = fcg::test::freePort();
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        const auto end = head.find("\r\n\r\n");
+        // The body read whole before the answer (Windows: scripted_server.hpp).
+        if (!httpHeader(std::string_view(head).substr(0, end), "Transfer-Encoding")) {
+            (void)requestBody(head, c);
+        } else if (head.find("0\r\n\r\n", end + 4) == std::string::npos) {
+            (void)c.readUntil("0\r\n\r\n", 1 << 16, 5000);
+        }
+        {
+            std::lock_guard lock(mutex);
+            heads[requestPath(head)] = head.substr(0, end + 2);
+        }
+        c.sendAll(head.rfind("HEAD ", 0) == 0 ? "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n"
+                                              : "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+    });
+    REQUIRE(server.ok());
+    const auto base = fmt::format("http://127.0.0.1:{}", port);
+    const auto ask  = [&](const char* method, const std::string& path, std::string body = {}) {
+        auto request   = get(base + path);
+        request.method = method;
+        request.body   = std::move(body);
+        return request;
+    };
+    const auto dir = fs::temp_directory_path() / "heads";
+    fs::remove_all(dir);
+    const auto from = Console::instance().added();
+
+    CHECK(httpRequest(ask("GET", "/request-get")).body == "ok");
+    const auto head = httpRequest(ask("HEAD", "/request-head"));
+    CHECK(head.status == 200);
+    CHECK(head.body.empty());
+    CHECK(httpRequest(ask("DELETE", "/request-delete")).status == 200);
+    CHECK(httpRequest(ask("POST", "/request-post-empty")).status == 200);
+    auto form         = ask("POST", "/request-post", "a=1");
+    form.token        = "secret";
+    form.content_type = "application/x-www-form-urlencoded";
+    CHECK(httpRequest(form).body == "ok");
+    CHECK(politeRequest(ask("GET", "/polite-get")).status == 200);
+    CHECK(httpStream(ask("GET", "/stream-get"), HttpStream{}).status == 200);
+    CHECK(httpStream(ask("HEAD", "/stream-head"), HttpStream{}).status == 200);
+    CHECK(httpDownload(base + "/download", dir / "download").ok);
+    HttpUpload upload;
+    upload.next = [](std::chrono::milliseconds) -> std::optional<std::string> { return std::nullopt; };
+    CHECK(httpUpload(ask("POST", "/upload"), upload).status == 200);
+    auto quiet   = ask("POST", "/quiet", "x");
+    quiet.logged = false;
+    CHECK(httpRequest(quiet).status == 200);
+
+    std::lock_guard lock(mutex);
+    REQUIRE(heads.size() == 11);
+    const auto length = [&](const char* path) { return httpHeader(heads[path], "Content-Length"); };
+    // No body, and a method that sends none: no Content-Length (RFC 9110, 8.6), whatever the way it was asked.
+    for (const char* path : {"/request-get", "/request-head", "/request-delete", "/polite-get", "/stream-get",
+                             "/stream-head", "/download"}) {
+        CAPTURE(path);
+        CHECK_FALSE(length(path));
+    }
+    CHECK(length("/request-post-empty") == std::optional<std::string>("0"));
+    CHECK(length("/request-post") == std::optional<std::string>("3"));
+    CHECK_FALSE(length("/upload"));
+    CHECK(httpHeader(heads["/upload"], "Transfer-Encoding") == std::optional<std::string>("chunked"));
+    CHECK(httpHeader(heads["/request-post"], "Authorization") == std::optional<std::string>("Bearer secret"));
+    // The same head otherwise: its request line, the host, the program's name, the connection closed after.
+    for (const auto& [path, received] : heads) {
+        CAPTURE(path);
+        CHECK(received.find(" " + path + " HTTP/1.1\r\n") != std::string::npos);
+        CHECK(httpHeader(received, "Host") == std::optional<std::string>("127.0.0.1"));
+        CHECK(httpHeader(received, "User-Agent").value_or("").rfind("RookStudio/", 0) == 0);
+        CHECK(httpHeader(received, "Connection") == std::optional<std::string>("close"));
+    }
+
+    // Each request in the log as it leaves (R16), whatever the way: whether the token went, never the token; a
+    // request not `logged` left out.
+    const auto lines  = Console::instance().since(from);
+    const auto logged = [&](const std::string& line) { return std::count(lines.begin(), lines.end(), line); };
+    for (const char* line :
+         {"GET /request-get", "HEAD /request-head", "DELETE /request-delete", "POST /request-post-empty",
+          "GET /polite-get", "GET /stream-get", "HEAD /stream-head", "GET /download", "POST /upload"}) {
+        const std::string text(line);
+        const auto space = text.find(' ');
+        CHECK_MESSAGE(logged(text.substr(0, space + 1) + base + text.substr(space + 1)) == 1, line);
+    }
+    CHECK(logged("POST " + base + "/request-post (with the account's token)") == 1);
+    for (const auto& line : lines) {
+        CHECK(line.find("secret") == std::string::npos);
+        CHECK(line.find("/quiet") == std::string::npos);
+    }
+}
+
+TEST_CASE("HTTP: a request cancelled ends at once, its connection closed, long before its limit") {
+    std::atomic<bool> asked{false}, closed{false};
+    const auto port = fcg::test::freePort();
+    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+        asked = true;
+        // Never an answer: the read ends when the client closes the connection (or when the server stops).
+        (void)c.readUntil("\x01never", 1, 60000);
+        closed = true;
+    });
+    REQUIRE(server.ok());
+    for (const bool polite : {true, false}) {
+        CAPTURE(polite);
+        asked  = false;
+        closed = false;
+        std::atomic<bool> cancel{false};
+        // Cancelled once the server has the request: what an impatient user or a page left does.
+        std::thread canceller([&] {
+            if (waitUntil([&] { return asked.load(); })) cancel = true;
+        });
+        const auto request = get(fmt::format("http://127.0.0.1:{}/api/account", port));
+        REQUIRE(request.timeout_s == 20);
+        const auto start  = std::chrono::steady_clock::now();
+        const auto result = polite ? politeRequest(request, &cancel) : httpRequest(request, &cancel);
+        const auto took   = std::chrono::steady_clock::now() - start;
+        canceller.join();
+        CHECK(result.error == "cancelled");
+        CHECK(result.status == 0);
+        CHECK(took < 10s);
+        CHECK(waitUntil([&] { return closed.load(); }));
+    }
+}
+
+TEST_CASE("HTTP: a download takes no turn of its host, waits for its pause, and a 429 pauses it") {
+    auto& gate = HostGate::instance();
+    gate.setPause(300ms);
+    std::atomic<bool> holding{false}, release{false};
+    const auto port = fcg::test::freePort();
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        const auto path = requestPath(head);
+        if (path == "/busy.zip") {
+            c.sendAll("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n");
+        } else if (path == "/big.zip") {
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nab");
+            holding = true;
+            waitUntil([&] { return release.load(); });
+            c.sendAll("cd");
+        } else {
+            c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+        }
+    });
+    REQUIRE(server.ok());
+    const auto base = fmt::format("http://127.0.0.1:{}", port);
+    const auto dir  = fs::temp_directory_path() / "polite-downloads";
+    fs::remove_all(dir);
+
+    // A download under way: the host's short requests go meanwhile, in their turns.
+    Download got;
+    std::thread downloading([&] { got = politeDownload(base + "/big.zip", dir / "big.zip"); });
+    REQUIRE(waitUntil([&] { return holding.load(); }));
+    std::atomic<bool> give_up{false};  // were the turn held, the request would wait for it: given up then
+    std::thread watchdog([&] {
+        (void)waitUntil([&] { return give_up.load(); });
+        give_up = true;
+    });
+    CHECK(politeRequest(get(base + "/games"), &give_up).status == 200);
+    give_up = true;
+    watchdog.join();
+    release = true;
+    downloading.join();
+    CHECK(got.ok);
+    CHECK(got.status == 200);
+    CHECK(readFile(dir / "big.zip") == "abcd");
+
+    // A 429: the host pauses, and the next download waits for the pause to end.
+    const auto busy = politeDownload(base + "/busy.zip", dir / "busy.zip");
+    CHECK_FALSE(busy.ok);
+    CHECK(busy.status == 429);
+    CHECK(gate.pausedFor("127.0.0.1") > 0ms);
+    CHECK(politeDownload(base + "/small.zip", dir / "small.zip").ok);
+    CHECK(gate.pausedFor("127.0.0.1") == 0ms);
+
+    // In a pause, a download cancelled goes nowhere.
+    gate.setPause(60s);
+    gate.tooMany("paused.invalid");
+    std::atomic<bool> cancel{true};
+    CHECK(politeDownload("http://paused.invalid/big.zip", dir / "paused.zip", nullptr, &cancel).error == "cancelled");
     CHECK(gate.pausedFor("paused.invalid") > 59s);
 }
 

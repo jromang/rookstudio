@@ -10,6 +10,7 @@
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "search_fields.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -29,7 +30,7 @@ void set(std::array<char, N>& a, const std::string& s) {
 
 }  // namespace
 
-nlohmann::json App::keptSearchJson(const KeptSearch& k) {
+nlohmann::json keptSearchJson(const KeptSearch& k) {
     const auto& f           = k.fields;
     nlohmann::json material = nlohmann::json::array();
     for (const auto& m : f.material) material.push_back(text(m));
@@ -73,7 +74,7 @@ nlohmann::json App::keptSearchJson(const KeptSearch& k) {
               {"said", f.structure.said}}}};
 }
 
-App::KeptSearch App::keptSearchFrom(const nlohmann::json& j) {
+KeptSearch keptSearchFrom(const nlohmann::json& j) {
     KeptSearch k;
     k.name       = j.value("name", std::string());
     auto& f      = k.fields;

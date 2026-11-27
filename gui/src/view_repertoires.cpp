@@ -198,12 +198,21 @@ void App::drawOpeningsPage() {
         coverage_job_     = std::move(job);
     }
     if (coverage_job_ && coverage_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        coverage_    = coverage_job_->done.get();
+        coverage_error_.clear();
+        try {
+            coverage_ = coverage_job_->done.get();
+        } catch (const std::exception& e) {
+            // A database's tree that cannot be read: not measured, why on its line and in the log; measured again
+            // once the repertoire or the databases change.
+            coverage_.reset();
+            coverage_error_ = loggedStoreError(trf("The coverage could not be measured: {}.", storeErrorText(e)), e);
+        }
         coverage_of_ = coverage_job_->of;
         coverage_job_.reset();
     }
     if (!coverage_ || coverage_of_ != of) {
-        ImGui::TextDisabled("%s", TR("Measuring…"));
+        const bool failed = coverage_of_ == of && !coverage_error_.empty();
+        ImGui::TextDisabled("%s", failed ? coverage_error_.c_str() : TR("Measuring…"));
         ImGui::EndChild();
         return;
     }

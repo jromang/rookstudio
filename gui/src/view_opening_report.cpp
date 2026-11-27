@@ -468,7 +468,16 @@ void App::pollOpeningReport() {
             }
         }
     }
-    if (r.job.valid() && r.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) r.job.get();
+    if (r.job.valid() && r.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        try {
+            r.job.get();
+        } catch (const std::exception& e) {
+            // Not made to its end (a database that cannot be read): stopped as a cancelled one is, why on its line,
+            // the sections made so far kept.
+            r.said      = loggedStoreError(trf("The report could not be made: {}.", storeErrorText(e)), e);
+            r.cancelled = true;
+        }
+    }
     // A database's tree built meanwhile (its fix): the report made again with it.
     if (!r.job.valid() && !r.stale.empty()) {
         auto& s = shelf();

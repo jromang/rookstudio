@@ -225,7 +225,16 @@ void App::pollDossier() {
     // Another page shown (the rail, a command): the dossier steps aside.
     if (d.shown && page_ != d.over) d.shown = false;
     if (d.job.valid() && d.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto report = d.job.get();
+        DossierReport report;
+        try {
+            report = d.job.get();
+        } catch (const std::exception& e) {
+            // Not made (a database that cannot be read): stopped as a cancelled one is, why on its line; made again
+            // when asked.
+            d.said = loggedStoreError(trf("The dossier could not be made: {}.", storeErrorText(e)), e);
+            if (d.remake) startDossier();
+            return;
+        }
         // A choice it kept in the tables stays kept, and undone by Ctrl+Z, even when it is made again at once.
         if (!report.tables_before.empty()) d.undo = report.tables_before;
         if (!report.error.empty()) d.said = trf("Not kept in the tables of names: {}", report.error);
@@ -325,9 +334,17 @@ void App::lookForDossierNames(const std::string& query) {
     if (letters < 3) words.clear();
     auto& job = dossier_names_job_;
     if (job && job->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto found = job->done.get();
-        if (!*job->cancel && job->of == words) {
-            dossier_names_    = std::move(found);
+        try {
+            auto found = job->done.get();
+            if (!*job->cancel && job->of == words) {
+                dossier_names_    = std::move(found);
+                dossier_names_of_ = job->of;
+            }
+        } catch (const std::exception& e) {
+            // The palette has no line for it: said in the log, the words not looked for again until they change.
+            (void)loggedStoreError(
+                trf("The players named “{}” could not be looked for: {}.", job->of, storeErrorText(e)), e);
+            dossier_names_.clear();
             dossier_names_of_ = job->of;
         }
         job.reset();

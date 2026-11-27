@@ -377,10 +377,33 @@ void App::startCareKeep(std::size_t index, std::vector<study::GameId> damaged) {
 void App::pollCare() {
     pollFideList();
     if (!care_job_ || care_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
-    auto job = std::move(care_job_);
-    job->done.get();
+    auto job         = std::move(care_job_);
     const auto index = indexOf(shelf(), job->folder);
     const bool here  = care_ && care_->folder == job->folder;
+    try {
+        job->done.get();
+    } catch (const std::exception& e) {
+        // A task that stopped (a database that cannot be read, the disk): said where it was asked, as a refusal is;
+        // a search stops as a cancelled one does, started again by its button.
+        const auto said = loggedStoreError(trf("Not done: {}.", storeErrorText(e)), e);
+        if (job->crosstable && crosstable_ && crosstable_->folder == job->folder) {
+            crosstable_->error = said;
+        } else if (here) {
+            // A full disk during a compaction: its card says so, and what to do.
+            if (job->kind == CareJob::Kind::Compact)
+                care_->disk_full = study::errorCode(e) == study::StoreErrc::DiskFull;
+            if (job->kind != CareJob::Kind::Compact || !care_->disk_full) care_->error = said;
+            if (job->kind == CareJob::Kind::Duplicates) {
+                care_->duplicates.emplace().cancelled = true;
+                care_->duplicates_of                  = job->generation;
+            } else if (job->kind == CareJob::Kind::Names) {
+                care_->names.emplace().cancelled = true;
+                care_->names_of                  = job->generation;
+                care_->names_list                = job->names_list;
+            }
+        }
+        return;
+    }
     switch (job->kind) {
         case CareJob::Kind::Duplicates:
             if (here) {  // a search cancelled kept too: it does not start again by itself
@@ -1632,7 +1655,12 @@ void App::drawCareChecks(std::size_t index) {
     ImGui::TextUnformatted(TR("Compact"));
     // What it gives back, made in the background once for each snapshot (it reads every game's place).
     if (c.plan_job && c.plan_job->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        c.plan = c.plan_job->get();
+        try {
+            c.plan = c.plan_job->get();
+        } catch (const std::exception& e) {
+            c.error = loggedStoreError(
+                trf("What compacting would give back could not be counted: {}.", storeErrorText(e)), e);
+        }
         c.plan_job.reset();
     }
     if (!c.plan_job && c.plan_of != snap->generation()) {

@@ -144,7 +144,15 @@ void App::drawPractical() {
             p.error = lichess::describe(a);
         }
     }
-    if (ready(p.db_job)) p.level[p.job_key] = p.db_job.get();
+    if (ready(p.db_job)) {
+        try {
+            p.level[p.job_key] = p.db_job.get();
+        } catch (const std::exception& e) {
+            // A database's tree that cannot be read: no moves for that position, not asked again; why in the log.
+            p.level_failed.insert(p.job_key);
+            (void)loggedStoreError(trf("The practical moves could not be read: {}.", storeErrorText(e)), e);
+        }
+    }
 
     // The line: on or off, the level, the speed, where the games come from.
     const bool online      = lichess_account_ && !lichess_account_->token.empty();

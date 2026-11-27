@@ -27,6 +27,7 @@
 #include "i18n.hpp"
 #include "publish_reports.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -163,7 +164,10 @@ const App::TournamentsKept* App::tournamentsOf(std::size_t database, bool start)
     const auto& folder  = s.entries()[database].folder;
     const auto it       = tournament_lists_.find(folder);
     const bool current  = it != tournament_lists_.end() && it->second.generation == snapshot->generation();
-    if (!current && start) {
+    const auto failed   = tournaments_failed_.find(folder);
+    // A list that could not be made is made again once the database changed (its maintenance, a new import).
+    const bool refused = failed != tournaments_failed_.end() && failed->second == snapshot->generation();
+    if (!current && start && !refused) {
         const auto* job    = dbTournamentsJob();
         const bool running = job && job->folder == folder && job->generation == snapshot->generation();
         if (!running) {
@@ -191,13 +195,31 @@ const App::TournamentsKept* App::tournamentsOf(std::size_t database, bool start)
 void App::pollTournaments() {
     if (db_tournaments_job_.ready()) {
         auto& made = db_tournaments_job_.state();
-        auto list  = db_tournaments_job_.take();
-        if (!list.cancelled) {
-            TournamentsKept kept;
-            kept.generation                = made.generation;
-            kept.snapshot                  = made.snapshot;
-            kept.list                      = std::make_shared<const study::TournamentList>(std::move(list));
-            tournament_lists_[made.folder] = std::move(kept);
+        try {
+            auto list = db_tournaments_job_.take();
+            if (!list.cancelled) {
+                TournamentsKept kept;
+                kept.generation                = made.generation;
+                kept.snapshot                  = made.snapshot;
+                kept.list                      = std::make_shared<const study::TournamentList>(std::move(list));
+                tournament_lists_[made.folder] = std::move(kept);
+            }
+        } catch (const std::exception& e) {
+            // Not made (a database that cannot be read): said on the page of the databases, which the list leaves
+            // when it shows there; not made again for that snapshot.
+            tournaments_failed_[made.folder] = made.generation;
+            auto& s                          = shelf();
+            std::string name                 = made.folder.filename().string();
+            for (std::size_t i = 0; i < s.entries().size(); ++i)
+                if (s.entries()[i].folder == made.folder) {
+                    name = s.entries()[i].name;
+                    if (db_tournaments_ && db_selected_ == static_cast<int>(i)) {
+                        db_tournaments_ = false;
+                        db_list_        = false;
+                    }
+                }
+            db_message_ =
+                loggedStoreError(trf("The tournaments of “{}” could not be listed: {}.", name, storeErrorText(e)), e);
         }
         made.snapshot.reset();  // held by the list kept, if any
     }
@@ -583,10 +605,17 @@ void App::pollCrosstable() {
     if (!crosstable_) return;
     auto& c = *crosstable_;
     if (c.job.valid() && c.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto input = c.job.get();
-        if (!*c.cancel) {
-            c.input = std::move(input);
-            remakeCrosstable();
+        try {
+            auto input = c.job.get();
+            if (!*c.cancel) {
+                if (!c.input) c.error.clear();  // without its games, its error line could only say why they were not
+                c.input = std::move(input);
+                remakeCrosstable();
+            }
+        } catch (const std::exception& e) {
+            // Its games not read (a database that cannot be read): said on its error line, read again once the
+            // database changed.
+            if (!*c.cancel) c.error = loggedStoreError(trf("Its games could not be read: {}.", storeErrorText(e)), e);
         }
     }
     // The database changed (a merge, names brought together, a game copied in): read again.
@@ -597,8 +626,15 @@ void App::pollCrosstable() {
                 if (const auto db = s.open(i); db && db->snapshot()->generation() != c.generation) startCrosstable();
     }
     if (c.looking.valid() && c.looking.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto found = c.looking.get();
-        if (!*c.look_cancel) c.found = std::move(found);
+        try {
+            auto found = c.looking.get();
+            if (!*c.look_cancel) c.found = std::move(found);
+        } catch (const std::exception& e) {
+            if (!*c.look_cancel)
+                c.error = loggedStoreError(
+                    trf("The missing games could not be looked for in your other databases: {}.", storeErrorText(e)),
+                    e);
+        }
     }
 }
 
@@ -1078,7 +1114,12 @@ void App::drawStudyCrosstable() {
         return;
     }
     if (!c.input) {
-        ImGui::TextDisabled("%s", TR("Reading its games…"));
+        if (c.error.empty()) {
+            ImGui::TextDisabled("%s", TR("Reading its games…"));
+        } else {  // its error line: the games could not be read
+            const ui::TextWrap wrap;
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", c.error.c_str());
+        }
         return;
     }
     const auto& t    = c.table;

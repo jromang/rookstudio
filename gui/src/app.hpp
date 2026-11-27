@@ -96,7 +96,6 @@
 #include "qr.hpp"
 #include "remote_run.hpp"
 #include "repertoires.hpp"
-#include "review_queue.hpp"
 #include "review_tables.hpp"
 #include "run.hpp"
 #include "stats.hpp"
@@ -136,9 +135,9 @@ class LichessTvPage;
 class MistakesPage;
 class PuzzlesPage;
 class RepertoireTrainingPage;
+class TrainingPage;
 class VisionPage;
 struct CommentaryReview;
-struct TrainingSettings;
 
 class EngineHub;
 
@@ -929,65 +928,35 @@ class App {
     // A line of moves from the start (SAN) shown on the board, at its end, the tree beside it.
     void showLineOnBoard(const std::vector<std::string>& line, const std::string& title);
 
+    // The Training page (#80, mockup M12, boards 1 to 3): a module of its own (training_page.hpp, #107), made by
+    // initChessModules() with the kinds of training below, which plug into it (training_kind.hpp): its parts, the day's
+    // review across the kinds, its lines on the Home page, the page offered once, the training's settings
+    // (training.json), why a session cannot start now, its palette commands and --focus words; it answers
+    // context::Training, and holds which session holds the Board. Declared before the kinds, gone after them. Its
+    // hooks in fastchess-gui's pages, which do not include its header: the page (view_shell.cpp), the guide's section
+    // of the part shown (view_palette.cpp).
+    std::unique_ptr<TrainingPage> training_;
+    void drawTraining();
+    [[nodiscard]] const char* trainingGuideTopic() const;
+
     // The repertoires' training (#76, mockup M11, board 1): a module of its own (repertoire_training_page.hpp, #107),
     // made by initChessModules(): each repertoire's cards and memories counted for the day, the Openings page's
     // training card, a session on the Board page (a training session, below), the day's review of the positions due,
-    // the Home page's line, Ctrl+K. The Openings page, the Training page, the day's review and the Home page reach it
-    // directly.
+    // the Home page's line, Ctrl+K. The Openings page reaches it directly, the Training page as a kind of training.
     std::unique_ptr<RepertoireTrainingPage> rep_training_;
-    // The training's settings (training.json, training.hpp; context::Training), read once: a right answer going on by
-    // itself, the new positions a day, the moves of theory in a game guessed. Kept, but not by a run for screenshots.
-    std::unique_ptr<TrainingSettings> training_settings_;
-    TrainingSettings& trainingSettings();
-    void saveTrainingSettings();
-    // Why a session cannot start now, empty when it can.
-    [[nodiscard]] std::string trainingLock() const;
-    [[nodiscard]] bool trainingHidesAids() const;  // a question: the tree, the engines, the notes hidden
-    void drawTrainingHome();                       // the Home page's "In progress": the positions to review
-    [[nodiscard]] bool trainingDue();
-
-    // The Training page (#80, mockup M12, board 1; view_training_page.cpp): its Today part (the day's review, the kinds
-    // of exercises, the puzzles to start) and its Puzzles part (the puzzles module's, below). Offered once on the Home
-    // page of a view that lacks it.
-    int training_tab_            = 0;      // 0 Today, 1 Puzzles
-    int training_offer_          = -1;     // the page offered once: -1 not known yet, 0 to offer, 1 done
-    bool training_enter_puzzles_ = false;  // Enter starts the puzzles, not the review: a choice of theirs was clicked
-    bool training_scroll_        = false;  // the page brought to its puzzles (Ctrl+K)
-    void drawTraining();
-    void drawTrainingToday();
-    void drawReviewCard(bool& enter);
-    void drawTrainingOffer();  // the Home page: the Training page offered once to a view without it
-    [[nodiscard]] bool trainingOffered() const;
-    void answerTrainingOffer(bool add);
-    // The day's review (review_queue.hpp): what each kind has due, "Review all" taking them one after the other.
-    [[nodiscard]] ReviewDay reviewDay();
-    [[nodiscard]] ReviewCount reviewCount(ReviewKind kind);
-    // Its session of the cards due, on the Board page; false when it has none. A kind that plugs in adds its case.
-    bool startReviewOf(ReviewKind kind, std::size_t repertoire = 0);
-    void startReview(std::optional<ReviewKind> only = std::nullopt);
-    struct ReviewStep {
-        ReviewKind kind        = ReviewKind::Repertoire;
-        std::size_t repertoire = 0;  // its index, for the repertoire's sessions
-    };
-    std::deque<ReviewStep> review_chain_;  // what "Review all" takes after the session shown
-    bool review_running_ = false;          // the session shown is one of them: its end goes on, or back to Training
-    bool nextReview();                     // the next one started; false when none is left
-    [[nodiscard]] std::string reviewNextLabel();  // "Next: 4 missed puzzles"
-    void drawReviewNext(bool enter);              // at a session's end: go on, or back to the Training page
-    void drawReviewHome();                        // the Home page's "In progress": one count, a click reviews
 
     // Puzzles (#80, mockup M12, board 1): a module of its own (puzzles_page.hpp, #107), made by initChessModules():
     // Lichess's database offline, the batch online, the user's puzzles and their results by theme, the Training page's
-    // Puzzles part, a series on the Board page (a training session, below). The Training page, the day's review and
-    // the endgames' mates reach it directly.
+    // Puzzles part, a series on the Board page (a training session, below). The Training page reaches it as a kind of
+    // training, the endgames' mates through context::Puzzles.
     std::unique_ptr<PuzzlesPage> puzzles_;
 
     // Your mistakes as exercises and guessing the moves (#81, mockup M12, board 2), each a module of its own
     // (mistakes_page.hpp, guess_page.hpp, #107), made by initChessModules(): the exercises the user's reviewed games
     // give, looked for in the background, their games without a review reviewed in the background, the Training page's
     // part "My mistakes", a session of exercises on the Board page; a game guessed on the Board page, the part "Guess
-    // the moves". The Training page, the day's review, the Home page, the endgames of the user's games, a guided
-    // visit's card (#94) and the Play page's games reach them directly.
+    // the moves". The Training page reaches them as kinds of training; the endgames of the user's games, a guided
+    // visit's card (#94) and the Play page's games directly.
     std::unique_ptr<MistakesPage> mistakes_;
     std::unique_ptr<GuessPage> guessing_;
 
@@ -995,17 +964,17 @@ class App {
     // kind, and App's hooks in fastchess-gui's Board page (view_board.cpp) and the guide's section of the page ask it.
     // Each kind is a module of its own and its own session (the repertoires' training, the puzzles', the mistakes', a
     // game guessed, an endgame, a vision exercise), which takes the Board through context::SessionBoard
-    // (app_context.hpp).
+    // (app_context.hpp); the Training page knows which holds it.
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
     // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
     // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
-    // another game on the Board, the session left there; another session starting, the one that holds the Board
-    // closed, the Board page staying; the guide's section of its page (none when no session holds the Board).
+    // another game on the Board, the session left there; the guide's section of its page (none when no session holds
+    // the Board); a question asked: the tree, the engines, the notes hidden.
     bool drawBoardSession();
     bool boardSessionMove(chess::Move move);
     void leaveBoardSession();
-    void closeBoardSession();
     [[nodiscard]] const char* sessionGuideTopic() const;
+    [[nodiscard]] bool trainingHidesAids() const;
 
     // The user's names (Settings › Your names, and the linked Lichess account's, #81; view_names.cpp): a game where
     // one of them plays is the user's (the mistakes' exercises, a player's dossier, an opening report, the Play page).
@@ -1037,12 +1006,12 @@ class App {
     // Endgames against the tablebases and the mates (#82, mockup M12, board 3), a module of its own
     // (endgames_page.hpp, #107), made by initChessModules(): the Training page's part "Endgames" (what answers, the
     // catalogue, the endgames of the user's games, the mates of Lichess's puzzles), an endgame on the Board page, the
-    // endgames missed in the day's review. The Training page, the day's review and the Home page reach it directly.
+    // endgames missed in the day's review. The Training page reaches it as a kind of training.
     std::unique_ptr<EndgamesPage> endgames_;
     // Board vision (#82, mockup M12, board 3), a module of its own (vision_page.hpp, #107), made by
     // initChessModules(): the Training page's part "Vision", the coordinates, a game played blindfold against the Play
     // page's opponent, a line read in one's head, each a session on the Board page; the records in vision.json. The
-    // Training page and the Home page reach it directly.
+    // Training page reaches it as a kind of training.
     std::unique_ptr<VisionPage> vision_;
 
     // Playing against an engine (#83, mockup M12, board 4; engine_play.hpp, view_play.cpp): the Play page's choice

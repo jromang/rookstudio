@@ -18,6 +18,7 @@
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
+#include "training_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -61,7 +62,7 @@ void App::drawChessHome() {
     const bool tournaments = v.holds(views::PageId::Tournaments);
 
     // The Training page offered once to a view made before it (#80); then the Play page (#83).
-    drawTrainingOffer();
+    training_->drawOffer();
     drawPlayOffer();
     // The arena or the Swiss the user is in from here, first (R3, #95).
     arenas_->drawHome();
@@ -266,7 +267,7 @@ void App::drawChessHome() {
     // kind in one count (#76, #80).
     const bool importing = job != nullptr;
     const auto assistant = assistantStatus();
-    const bool training  = trainingDue();
+    const bool training  = training_->due();
     // A game on Lichess played here, the challenges received (#84): first.
     const bool online =
         (online_game_ && !online_game_->ended && !online_game_->state.over()) || !online_incoming_.empty();
@@ -280,7 +281,7 @@ void App::drawChessHome() {
         if (online) drawOnlineHome();
         if (bot) bot_->drawRunning(true);
         if (engine_offered) drawLichessEngineRunning(true);
-        if (training) drawTrainingHome();
+        if (training) training_->drawHome();
         for (const auto& task : b.review_tasks) {
             const auto& done  = task.state.done;
             const auto count  = std::count(done.begin(), done.end(), true);

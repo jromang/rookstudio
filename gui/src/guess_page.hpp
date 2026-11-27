@@ -1,10 +1,11 @@
 #pragma once
 
 // Guessing the moves of a game (#81, mockup M12, board 2), a module of its own out of App (#107; mistakes.hpp holds its
-// data): the Training page's part "Guess the moves" (a game drawn at random from a database and a filter, or the
-// Board page's game), a game replayed on the Board page from the chosen side, a move to guess at each of its turns,
-// scored by the analysis engine (a session of the Board's, board_session.hpp), the games guessed kept in the profile,
-// the Home page's line, its palette commands and --focus words.
+// data): the Training page's part "Guess the moves" and its card (a kind of training of the page's,
+// training_kind.hpp: a game drawn at random from a database and a filter, or the Board page's game), a game replayed
+// on the Board page from the chosen side, a move to guess at each of its turns, scored by the analysis engine (a
+// session of the Board's, board_session.hpp), the games guessed kept in the profile, the Home page's line, its palette
+// commands and --focus words.
 //
 // What it needs of the program around it, it asks of its context (GuessContext, app_context.hpp): App's, or a test's.
 
@@ -20,13 +21,13 @@
 #include <chess.hpp>
 
 #include "app_context.hpp"
-#include "board_session.hpp"
 #include "focus_words.hpp"
 #include "mistakes.hpp"
+#include "training_kind.hpp"
 
 namespace fcg {
 
-class GuessPage final : public BoardSession {
+class GuessPage final : public TrainingKind {
    public:
     explicit GuessPage(GuessContext& app);
     ~GuessPage() override;
@@ -36,23 +37,25 @@ class GuessPage final : public BoardSession {
     // Once a frame, whatever shows: a game drawn at random that came, the theory looked for, the searches after the
     // game's move and the guess.
     void poll();
-    // The Training page's part "Guess the moves": a game at random (its database, filter and side), the Board page's
-    // game.
-    void drawPart();
+    // The Training page's part "Guess the moves" (TrainingKind): a game at random (its database, filter and side), the
+    // Board page's game; its card on the Today part (the last game guessed).
+    [[nodiscard]] Part part() const override;
+    void drawPart() override;
+    void drawTodayCards(TodayCards& cards) override;
     // The Home page's "In progress", while a game is guessed: its points, Back to the game guessed.
-    void drawHomeLine();
+    void drawHomeLine() override;
     // Its entries of the command palette (Ctrl+K): the Board page's game from the position shown, else the part (in the
     // view `training_view`); a random game.
-    void addCommands(const PaletteAdd& add, const std::string& training_view);
-    // Its --focus words, tried where App's table has them (app_chess.cpp): guess-board, guess-random. `word` is the
-    // word `words` was made with.
-    void addFocusWords(FocusWords& words, const std::string& word);
+    void addCommands(const PaletteAdd& add, const std::string& training_view) override;
+    // Its --focus words, tried where the Training page has them (training_page.cpp): guess-board, guess-random. `word`
+    // is the word `words` was made with.
+    void addFocusWords(FocusWords& words, const std::string& word) override;
 
     // The last game guessed (guess/games.jsonl), read once; none before the first.
     [[nodiscard]] const std::optional<GuessRecord>& lastRecord();
 
     // A game guessed holds the Board; it, while it does.
-    [[nodiscard]] bool onBoard() const { return guess_ != nullptr; }
+    [[nodiscard]] bool onBoard() const override { return guess_ != nullptr; }
     [[nodiscard]] const GuessRun* session() const { return guess_.get(); }
 
     // The Board's hooks while a game guessed holds it (BoardSession).

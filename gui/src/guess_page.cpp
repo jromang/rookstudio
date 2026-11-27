@@ -218,6 +218,15 @@ void GuessPage::addFocusWords(FocusWords& words, const std::string& w) {
 // ---------------------------------------------------------------------------
 // The Training page's part
 
+TrainingKind::Part GuessPage::part() const { return {3, TR("Guess the moves"), "guess", guide::topics::GuessMoves}; }
+
+void GuessPage::drawTodayCards(TodayCards& cards) {
+    const auto& last = lastRecord();
+    cards.card("##training_kind_guess", ui::Icon::Eye, TR("Guess the moves"),
+               TR("A game of a database, a side, move by move; the engine scores."),
+               last ? trf("the last: {} points of {}", last->points, last->max) : std::string(TR("not tried yet")));
+}
+
 void GuessPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::GuessMoves);
     bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&

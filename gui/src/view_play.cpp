@@ -29,6 +29,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "mistakes_page.hpp"
+#include "training_page.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -1735,7 +1736,7 @@ void App::answerPlayOffer(bool add) {
 void App::drawPlayOffer() {
     if (play_offer_ < 0) play_offer_ = playOffered() ? 1 : 0;
     if (play_offer_ != 0 || views_.empty() || view().holds(views::PageId::Play)) return;
-    if (training_offer_ == 0 && !view().holds(views::PageId::Training)) return;  // one offer at a time
+    if (training_->offerPending() && !view().holds(views::PageId::Training)) return;  // one offer at a time
     beginTinted("##play_offer", ui::ACCENT);
     ImGui::PushTextWrapPos();
     ui::inlineIcon(ui::Icon::Play, ImGui::GetColorU32(ImGuiCol_Text));

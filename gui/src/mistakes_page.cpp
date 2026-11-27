@@ -316,6 +316,17 @@ ReviewCount MistakesPage::reviewCount() {
 
 bool MistakesPage::startReview() { return startMistakes(true); }
 
+std::string MistakesPage::reviewNextLabel(std::size_t) {
+    const auto n = reviewCount().due;
+    return trn("Next: {} mistake of your games", "Next: {} mistakes of your games", n, ui::exactCount(n));
+}
+
+std::string MistakesPage::dueWords(std::size_t n) const {
+    return trn("mistake of your games", "mistakes of your games", n);
+}
+
+const char* MistakesPage::reviewOnlyLabel() const { return TR("Only my mistakes"); }
+
 void MistakesPage::drawHomeLine() {
     if (!mistake_) return;
     const auto& m    = *mistake_;
@@ -347,6 +358,8 @@ void MistakesPage::addCommands(const PaletteAdd& add, const std::string& trainin
                 mistake_unreviewed_.size(), mistake_unreviewed_.size()),
             TR("Training"), [this] { startMistakeReviews(); });
     if (mistake_reviews_) add(TR("Cancel the reviews of my games"), TR("Training"), [this] { cancelMistakeReviews(); });
+    // The user's names, which the exercises come from: Settings › Your names.
+    add(TR("Your names…"), TR("Settings"), [this] { app_.showNamesSettings(); });
 }
 
 void MistakesPage::addFocusWords(FocusWords& words, const std::string& w) {
@@ -611,6 +624,21 @@ void MistakesPage::drawMistakeReviewsCard() {
 
 // ---------------------------------------------------------------------------
 // The Training page's part
+
+TrainingKind::Part MistakesPage::part() const { return {2, TR("My mistakes"), "mistakes", guide::topics::Mistakes}; }
+
+void MistakesPage::drawTodayCards(TodayCards& cards) {
+    const auto all = mistakeExercises();
+    const auto c   = mistakeCounts(all, trainingDay(epochNow()), 0);
+    cards.card("##training_kind_mistakes", ui::Icon::Target, TR("My mistakes"),
+               TR("Your reviewed games' mistakes, turned into exercises."),
+               app_.userNames().empty() ? std::string(TR("your names first"))
+               : c.exercises == 0
+                   ? std::string(TR("none yet"))
+                   : trn("{} exercise", "{} exercises", c.exercises, ui::exactCount(c.exercises)) + " " +
+                         trn("from {} game", "from {} games", c.games, c.games) +
+                         (c.fresh > 0 ? " · " + trn("{} new", "{} new", c.fresh, c.fresh) : std::string()));
+}
 
 void MistakesPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::Mistakes);

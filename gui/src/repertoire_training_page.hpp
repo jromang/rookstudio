@@ -7,7 +7,8 @@
 // list; a session on the Board page, whose column becomes the training's (a session of the Board's,
 // board_session.hpp): the opponent's moves played along the repertoire, the answer graded without a button, the move
 // played added to the repertoire from a wrong answer (Ctrl+Z takes it back), the end and the moves missed; the day's
-// review of each repertoire's positions due; the Home page's line; its palette commands and --focus words.
+// review of each repertoire's positions due (a kind of training of the Training page's, training_kind.hpp, without a
+// part of its own there); the Home page's line; its palette commands and --focus words.
 //
 // What it needs of the program around it, it asks of its context (RepertoireTrainingContext, app_context.hpp): App's,
 // or a test's. The repertoires stay App's (the Board's star, the opening report, the Play page and the prints read and
@@ -31,14 +32,14 @@
 #include <study/training.hpp>
 
 #include "app_context.hpp"
-#include "board_session.hpp"
 #include "focus_words.hpp"
 #include "review_queue.hpp"
 #include "training.hpp"
+#include "training_kind.hpp"
 
 namespace fcg {
 
-class RepertoireTrainingPage final : public BoardSession {
+class RepertoireTrainingPage final : public TrainingKind {
    public:
     explicit RepertoireTrainingPage(RepertoireTrainingContext& app);
     ~RepertoireTrainingPage() override;
@@ -54,27 +55,32 @@ class RepertoireTrainingPage final : public BoardSession {
     [[nodiscard]] std::string listLine(std::size_t index);
     [[nodiscard]] std::size_t cardCount(std::size_t index);
     // The Home page's "In progress", while a session runs: where it is, Back to the session.
-    void drawHomeLine();
-    // Its entries of the command palette (Ctrl+K): a session of each repertoire, its new positions alone, the
-    // training's two settings.
-    void addCommands(const PaletteAdd& add);
-    // Its --focus words, tried where App's table has them (app_chess.cpp): training, training-new (a session of the
-    // active repertoire). `word` is the word `words` was made with.
-    void addFocusWords(FocusWords& words, const std::string& word);
+    void drawHomeLine() override;
+    // Its entries of the command palette (Ctrl+K), among the Openings page's: a session of each repertoire, its new
+    // positions alone, the training's two settings.
+    void addOpeningsCommands(const PaletteAdd& add);
+    // Its --focus words, tried where the Training page has them (training_page.cpp): training, training-new (a session
+    // of the active repertoire). `word` is the word `words` was made with.
+    void addFocusWords(FocusWords& words, const std::string& word) override;
 
     // The day's review (#80): the repertoires' positions due today and after, how long one takes; the repertoires that
-    // have positions due today, in the list's order; a repertoire's session of its positions due (false when none is
-    // due, or none can start now); "Next: 4 positions of “Najdorf”" (empty when there is no such repertoire).
-    [[nodiscard]] ReviewCount reviewCount();
+    // have positions due today, in the list's order, a step of "Review all" each (TrainingKind); a repertoire's session
+    // of its positions due (false when none is due, or none can start now); "Next: 4 positions of “Najdorf”" (empty
+    // when there is no such repertoire).
+    [[nodiscard]] ReviewCount reviewCount() override;
     [[nodiscard]] std::vector<std::size_t> dueRepertoires();
     bool startReview(std::size_t repertoire);
-    [[nodiscard]] std::string reviewNextLabel(std::size_t repertoire);
+    [[nodiscard]] std::string reviewNextLabel(std::size_t repertoire) override;
+    [[nodiscard]] std::optional<ReviewKind> reviewKind() const override { return ReviewKind::Repertoire; }
+    [[nodiscard]] std::vector<std::size_t> reviewSteps() override { return dueRepertoires(); }
+    bool startReviewStep(std::size_t repertoire) override { return startReview(repertoire); }
+    [[nodiscard]] std::string dueWords(std::size_t n) const override;
     // The positions the repertoires train, by the side that trains them (0 White, 1 Black): App answers
     // context::Repertoires with them, and the user's mistakes leave them out.
     [[nodiscard]] std::array<std::unordered_set<uint64_t>, 2> repertoirePositions();
 
     // A session holds the Board; it, while it does.
-    [[nodiscard]] bool onBoard() const { return training_ != nullptr; }
+    [[nodiscard]] bool onBoard() const override { return training_ != nullptr; }
     [[nodiscard]] const TrainingRun* session() const { return training_.get(); }
 
     // The Board's hooks while a session holds it (BoardSession).

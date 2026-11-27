@@ -99,12 +99,7 @@ const char* App::guideSection() const {
         case Page::Lichess:
             return LichessPage;
         case Page::Training:
-            return training_tab_ == 1   ? Puzzles
-                   : training_tab_ == 2 ? Mistakes
-                   : training_tab_ == 3 ? GuessMoves
-                   : training_tab_ == 4 ? Endgames
-                   : training_tab_ == 5 ? Vision
-                                        : TrainingPage;
+            return trainingGuideTopic();  // the part shown's (#80, the Training page's module, #107)
         case Page::Play:
             return PlayEngine;
         case Page::Count:  // the views' sheet

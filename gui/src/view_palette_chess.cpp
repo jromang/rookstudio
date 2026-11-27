@@ -14,18 +14,14 @@
 
 #include "app.hpp"
 #include "assistant_service.hpp"
-#include "endgames_page.hpp"
-#include "guess_page.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "lichess_months.hpp"
 #include "lichess_tv_page.hpp"
-#include "mistakes_page.hpp"
-#include "puzzles_page.hpp"
 #include "repertoire_training_page.hpp"
+#include "training_page.hpp"
 #include "ui.hpp"
-#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -164,7 +160,7 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
                     board_side_tab_ = 2;
                 });
     // The repertoires' training (#76), its module's (#107): a session of each, its new positions alone, its settings.
-    rep_training_->addCommands(add);
+    rep_training_->addOpeningsCommands(add);
     // Playing against an engine (#83): the Play page; a game's commands while it lasts, a rematch after it.
     add(TR("Play against an engine"), where(Page::Play), page(Page::Play));
     if (engine_game_ && !engine_game_->over && !engine_game_->waiting && board_.match && board_.match_state.running) {
@@ -261,28 +257,12 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
                 });
         }
     }
-    // The Training page (#80): the page, the day's review, each theme's puzzles, Lichess's database, the batch online.
-    add(TR("Training"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_ = 0;
-    });
-    if (const auto day = reviewDay(); day.due() > 0 && trainingLock().empty())
-        add(trn("Review all · {} to review today", "Review all · {} to review today", day.due(),
-                ui::exactCount(day.due())),
-            TR("Training"), [this] { startReview(); });
-    // The puzzles, their module's (#107): the Puzzles part, each theme's, the database's commands, the puzzles online.
-    puzzles_->addCommands(add, where(Page::Training));
-    // Your mistakes as exercises, guessing the moves (#81), their modules' (#107): the part, the day's review of the
-    // mistakes, today's exercises, the games reviewed in the background; the user's names; the Board page's game, a
-    // random game.
-    mistakes_->addCommands(add, where(Page::Training));
-    add(TR("Your names…"), TR("Settings"), page(Page::Settings));
-    guessing_->addCommands(add, where(Page::Training));
-    // The endgames against the tables, the mates, board vision (#82), their modules' (#107): the parts, each endgame of
-    // the catalogue, the missed ones, those of the user's games, the tables' download; the coordinates, blindfold, a
-    // line read in one's head.
-    endgames_->addCommands(add, where(Page::Training));
-    vision_->addCommands(add, where(Page::Training));
+    // The Training page (#80), its module's (#107): the page, the day's review, then each kind's with its part (the
+    // puzzles: each theme's, Lichess's database, the batch online; the user's mistakes: the day's review of them,
+    // today's exercises, the games reviewed in the background, the user's names; guessing the moves: the Board page's
+    // game, a random game; the endgames: each of the catalogue, the missed ones, those of the user's games, the tables'
+    // download, the mates; board vision: the coordinates, blindfold, a line read in one's head).
+    training_->addCommands(add, where(Page::Training));
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The practical moves against a human of a level (#94), in the Analysis tab.
     add(board_.settings.practical ? TR("Practical moves: off") : TR("Practical moves against a human of a level"),

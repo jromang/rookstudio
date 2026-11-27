@@ -23,9 +23,13 @@
       "version": "3.4.18",
       "purl": "pkg:github/libsdl-org/sdl@release-3.4.18",
       "licenses": [{ "license": { "id": "Zlib" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/libsdl-org/SDL.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/libsdl-org/SDL.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "release-3.4.18" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "829a65d769d935c4852f8159e964312c0957260a" }
       ]
     },
@@ -36,9 +40,13 @@
       "version": "1.92.9-docking",
       "purl": "pkg:github/ocornut/imgui@v1.92.9-docking",
       "licenses": [{ "license": { "id": "MIT" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/ocornut/imgui.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "7af17518117f40103be7c2b68312a496e7dc3e1de6d3ce985df36c612fb05506" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/ocornut/imgui/archive/9b4eb24cee2071e61dc1f9ef3e5228097cdde720.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/ocornut/imgui.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "v1.92.9-docking" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/ocornut/imgui/archive/9b4eb24cee2071e61dc1f9ef3e5228097cdde720.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "9b4eb24cee2071e61dc1f9ef3e5228097cdde720" }
       ]
     },
@@ -49,9 +57,13 @@
       "version": "1.0",
       "purl": "pkg:github/epezent/implot@v1.0",
       "licenses": [{ "license": { "id": "MIT" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/epezent/implot.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "20ca14d5a46f36a650746096c74eba8bea99c9432cd3c877343b96b17a6ae566" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/epezent/implot/releases/download/v1.0/implot-v1.0.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/epezent/implot.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "v1.0" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/epezent/implot/releases/download/v1.0/implot-v1.0.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "524f9fcd48d76c13fdf94c5ffbba8787a1ff7e39" }
       ]
     },
@@ -108,9 +120,13 @@
       "description": "Decompression of .zst game files: the decoder alone, in C.",
       "purl": "pkg:github/facebook/zstd@v1.5.7",
       "licenses": [{ "expression": "BSD-3-Clause OR GPL-2.0-only" }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/facebook/zstd.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/facebook/zstd.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "v1.5.7" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "f8745da6ff1ad1e7bab384bd1f9d742439278e99" }
       ]
     },
@@ -122,9 +138,13 @@
       "description": "Decompression of .gz and .zip game files: inflate alone.",
       "purl": "pkg:github/madler/zlib@v1.3.2",
       "licenses": [{ "license": { "id": "Zlib" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/madler/zlib.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/madler/zlib.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "v1.3.2" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "da607da739fa6047df13e66a2af6b8bec7c2a498" }
       ]
     },
@@ -136,9 +156,13 @@
       "description": "Reading of .7z game archives (Lumbra's Gigabase): the LZMA SDK's 7z reader and LZMA/LZMA2 decoders, in C, from 7-Zip's sources.",
       "purl": "pkg:github/ip7z/7zip@24.09",
       "licenses": [{ "license": { "name": "Public domain (LZMA SDK)" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/ip7z/7zip.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "49c05169f49572c1128453579af1632a952409ced028259381dac30726b6133a" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/ip7z/7zip/releases/download/24.09/7z2409-src.tar.xz" },
+        { "type": "vcs", "url": "https://github.com/ip7z/7zip.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "24.09" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/ip7z/7zip/releases/download/24.09/7z2409-src.tar.xz" },
         { "name": "fastchess-gui:commit", "value": "e5431fa6f5505e385c6f9367260717e9c47dc2ee" }
       ]
     },
@@ -150,9 +174,13 @@
       "description": "The assistant's language model runtime, with ggml 1.0.0: shared libraries, the backends loaded at run time, run in a child process of the program.",
       "purl": "pkg:github/ggml-org/llama.cpp@b12604",
       "licenses": [{ "license": { "id": "MIT" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/ggml-org/llama.cpp.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "770e1927f3fc66b834bb1f45e2f6e2a482dc151fda21a1ad0acabbe96a494502" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/ggml-org/llama.cpp/archive/46eb1742db6d2caec1bfa848c5702b1bdcc815e5.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/ggml-org/llama.cpp.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "b12604" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/ggml-org/llama.cpp/archive/46eb1742db6d2caec1bfa848c5702b1bdcc815e5.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "46eb1742db6d2caec1bfa848c5702b1bdcc815e5" }
       ]
     },
@@ -164,9 +192,13 @@
       "description": "The Vulkan headers ggml's Vulkan backend is cross-built for Windows with, and an import library for vulkan-1.dll made from them.",
       "purl": "pkg:github/KhronosGroup/Vulkan-Headers@vulkan-sdk-1.4.363.0",
       "licenses": [{ "expression": "Apache-2.0 OR MIT" }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/KhronosGroup/Vulkan-Headers.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "9044fbb356160e43201dc2094acb44c8a906722a63a35f48fc0f051579db9bb6" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/KhronosGroup/Vulkan-Headers/archive/6802bb4733b63ed5efd3adb308a6c885ef180ea1.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/KhronosGroup/Vulkan-Headers.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "vulkan-sdk-1.4.363.0" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/KhronosGroup/Vulkan-Headers/archive/6802bb4733b63ed5efd3adb308a6c885ef180ea1.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "6802bb4733b63ed5efd3adb308a6c885ef180ea1" }
       ]
     },
@@ -178,9 +210,13 @@
       "description": "The SPIR-V headers ggml's Vulkan backend is cross-built for Windows with.",
       "purl": "pkg:github/KhronosGroup/SPIRV-Headers@vulkan-sdk-1.4.363.0",
       "licenses": [{ "license": { "id": "MIT" } }],
-      "externalReferences": [{ "type": "vcs", "url": "https://github.com/KhronosGroup/SPIRV-Headers.git" }],
+      "hashes": [{ "alg": "SHA-256", "content": "a9bb9c48713245eacf97cc539b6f1d45405a92d8813f8b82e635f0a085ee9898" }],
+      "externalReferences": [
+        { "type": "distribution", "url": "https://github.com/KhronosGroup/SPIRV-Headers/archive/496543121ce6419f23d6fa5d7194ba66c36212d2.tar.gz" },
+        { "type": "vcs", "url": "https://github.com/KhronosGroup/SPIRV-Headers.git" }
+      ],
       "properties": [
-        { "name": "fastchess-gui:pin", "value": "vulkan-sdk-1.4.363.0" },
+        { "name": "fastchess-gui:pin", "value": "https://github.com/KhronosGroup/SPIRV-Headers/archive/496543121ce6419f23d6fa5d7194ba66c36212d2.tar.gz" },
         { "name": "fastchess-gui:commit", "value": "496543121ce6419f23d6fa5d7194ba66c36212d2" }
       ]
     },

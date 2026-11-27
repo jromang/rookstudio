@@ -1,0 +1,60 @@
+name: Linux build dependencies
+description: >-
+  Ninja, ccache, a compiler and the headers SDL builds the window and its audio with, from the main Ubuntu archive.
+  One package list for every job, so that each builds the SDL the release has. The repository must be checked out
+  before (a local action).
+
+inputs:
+  compiler:
+    description: >-
+      The compiler's package: g++-<version> from Ubuntu's archive, clang-<version> from LLVM's (with its runtime
+      libraries, which the sanitizers and libFuzzer need), or mingw-w64 for the Windows cross-build.
+    required: true
+  gui-headers:
+    description: >-
+      The headers SDL builds the window and its audio with (X11, Wayland, OpenGL, D-Bus, udev, PipeWire, PulseAudio,
+      ALSA); "false" for the Windows cross-build, which needs none.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Use the main Ubuntu archive
+      # The runners' Azure mirror can stay unresolvable for hours; the main archive does not depend on it.
+      shell: bash
+      run: |
+        sudo sed -i -e 's#mirror+file:/etc/apt/apt-mirrors.txt#http://archive.ubuntu.com/ubuntu/#' \
+          -e 's#http://azure.archive.ubuntu.com/ubuntu/*#http://archive.ubuntu.com/ubuntu/#' \
+          /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+        echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
+        # The runner's resolver can fail on Ubuntu's hosts alone: public resolvers then.
+        if ! getent hosts archive.ubuntu.com > /dev/null; then
+          sudo mkdir -p /etc/systemd/resolved.conf.d
+          printf '[Resolve]\nDNS=1.1.1.1 8.8.8.8\n' | sudo tee /etc/systemd/resolved.conf.d/fallback.conf
+          sudo systemctl restart systemd-resolved
+          getent hosts archive.ubuntu.com || true
+        fi
+
+    - name: Install the compiler and the headers
+      shell: bash
+      env:
+        COMPILER: ${{ inputs.compiler }}
+        GUI_HEADERS: ${{ inputs.gui-headers }}
+      run: |
+        packages=(ninja-build ccache "${COMPILER}")
+        if [[ "${COMPILER}" =~ ^clang-([0-9]+)$ ]]; then
+          # LLVM's own archive, for the runner's Ubuntu release.
+          llvm="${BASH_REMATCH[1]}"
+          codename=$(. /etc/os-release && echo "${VERSION_CODENAME}")
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+          echo "deb https://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${llvm} main" \
+            | sudo tee "/etc/apt/sources.list.d/llvm-${llvm}.list"
+          packages+=("libclang-rt-${llvm}-dev")
+        fi
+        if [ "${GUI_HEADERS}" = true ]; then
+          packages+=(libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev
+                     libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev
+                     libdrm-dev libgbm-dev libdbus-1-dev libudev-dev libpipewire-0.3-dev libpulse-dev libasound2-dev)
+        fi
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends "${packages[@]}"

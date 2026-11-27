@@ -40,28 +40,10 @@ jobs:
         with:
           fetch-depth: 0  # the tags, for git describe
 
-      - name: Use the main Ubuntu archive
-        # The runners' Azure mirror can stay unresolvable for hours; the main archive does not depend on it.
-        run: |
-          sudo sed -i -e 's#mirror+file:/etc/apt/apt-mirrors.txt#http://archive.ubuntu.com/ubuntu/#' \
-            -e 's#http://azure.archive.ubuntu.com/ubuntu/*#http://archive.ubuntu.com/ubuntu/#' \
-            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
-          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
-          # The runner's resolver can fail on Ubuntu's hosts alone: public resolvers then.
-          if ! getent hosts archive.ubuntu.com > /dev/null; then
-            sudo mkdir -p /etc/systemd/resolved.conf.d
-            printf '[Resolve]\nDNS=1.1.1.1 8.8.8.8\n' | sudo tee /etc/systemd/resolved.conf.d/fallback.conf
-            sudo systemctl restart systemd-resolved
-            getent hosts archive.ubuntu.com || true
-          fi
-
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build g++-12 \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
-            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev \
-            libdrm-dev libgbm-dev libdbus-1-dev libudev-dev
+        uses: ./.github/actions/linux-deps
+        with:
+          compiler: g++-12
 
       - name: The build tool's version
         # Its MD5, as Scan gives it: the cache's key, so that a new release is downloaded once.

@@ -50,6 +50,35 @@ function(fcg_drop_isa_note target)
     endif()
 endfunction()
 
+# The warnings our sources compile with, linked by each of our libraries (first, so that the options stay where they
+# were) and by the programs that ask for them; not the dependencies', nor the vendored fastchess' command line tool.
+add_library(fcg_warnings INTERFACE)
+target_compile_options(fcg_warnings INTERFACE -Wall -Wextra)
+
+# A program: add_executable's arguments (WIN32, MACOSX_BUNDLE, the sources), then the libraries it links after
+# LIBRARIES; WARNINGS links fcg_warnings. On Windows, libgcc and libstdc++ are linked in: a program needs no MinGW DLL
+# beside it.
+function(fcg_add_program target)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "WARNINGS" "" "LIBRARIES")
+    add_executable(${target} ${arg_UNPARSED_ARGUMENTS})
+    if(arg_WARNINGS)
+        target_link_libraries(${target} PRIVATE fcg_warnings)
+    endif()
+    if(arg_LIBRARIES)
+        target_link_libraries(${target} PRIVATE ${arg_LIBRARIES})
+    endif()
+    if(WIN32)
+        target_link_options(${target} PRIVATE -static -static-libgcc -static-libstdc++)
+    endif()
+endfunction()
+
+# A test program: a program that links, after the libraries it tests, what the test programs share (fcg_test_support).
+# Name it in FCG_TEST_PROGRAMS too, at the end of this file, for the tests target and test_programs.txt.
+function(fcg_add_test_program target)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "LIBRARIES")
+    fcg_add_program(${target} ${arg_UNPARSED_ARGUMENTS} LIBRARIES ${arg_LIBRARIES} fcg_test_support)
+endfunction()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ccache, when installed: a file compiled once with the same flags, in this build folder or another, is not compiled
@@ -142,7 +171,7 @@ target_include_directories(fastchess_core PUBLIC
     ${FC_APP}/third_party
     ${FC_APP}/third_party/fmt/include
 )
-target_compile_options(fastchess_core PRIVATE -Wall -Wextra)
+target_link_libraries(fastchess_core PRIVATE fcg_warnings)
 
 find_package(Threads REQUIRED)
 target_link_libraries(fastchess_core PUBLIC Threads::Threads)
@@ -179,13 +208,9 @@ if(GIT_FOUND)
 endif()
 
 # The upstream command line tool, built from the same core library.
-add_executable(fastchess ${FC_APP}/src/main.cpp)
-target_link_libraries(fastchess PRIVATE fastchess_core)
+fcg_add_program(fastchess ${FC_APP}/src/main.cpp LIBRARIES fastchess_core)
 set_target_properties(fastchess PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 fcg_drop_isa_note(fastchess)
-if(WIN32)
-    target_link_options(fastchess PRIVATE -static -static-libgcc -static-libstdc++)
-endif()
 
 # ---------------------------------------------------------------------------
 # Tournament layer: schedules, journal, results, runner (no UI)
@@ -195,7 +220,7 @@ file(GLOB FCG_TOURNAMENT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/t
 add_library(fcg_tournament STATIC ${FCG_TOURNAMENT_SOURCES})
 target_compile_features(fcg_tournament PUBLIC cxx_std_20)
 target_include_directories(fcg_tournament PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tournament/src)
-target_compile_options(fcg_tournament PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_tournament PRIVATE fcg_warnings)
 target_link_libraries(fcg_tournament PUBLIC fastchess_core)
 # The program's name where the tournament layer writes it (engine logs, a rating list's header, the book adapter's
 # messages), set by each repository: tournament/src stays the same in fastchess-gui's.
@@ -220,45 +245,37 @@ if(FCG_BUILD_TESTS)
     target_link_libraries(fcg_test_support INTERFACE fcg_tournament)
 
     # fastchess' own mock engine, so the integration tests play real (random) games.
-    add_executable(fcg_random_mover ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/mock/random_mover.cpp)
+    fcg_add_program(fcg_random_mover ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/mock/random_mover.cpp)
     target_include_directories(fcg_random_mover PRIVATE ${FC_APP}/third_party)
     set_target_properties(fcg_random_mover PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-    if(WIN32)
-        target_link_options(fcg_random_mover PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
 
     file(GLOB FCG_TOURNAMENT_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/*.cpp)
-    add_executable(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES})
-    target_link_libraries(fcg-tournament-tests PRIVATE fcg_tournament fcg_test_support)
+    fcg_add_test_program(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES} LIBRARIES fcg_tournament)
     add_dependencies(fcg-tournament-tests fcg_random_mover)
     target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
                                                               FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
-    if(WIN32)
-        target_link_options(fcg-tournament-tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
 endif()
 
 # ---------------------------------------------------------------------------
 # What the study layer's imports decompress: zstd (decompression only) and zlib (inflate only)
 # ---------------------------------------------------------------------------
 
+# Each dependency is pinned by a commit, or by its archive's SHA-256: the release's own archive where the project
+# publishes one, else GitHub's archive of the commit the version's tag names (the version said above it).
 include(FetchContent)
 FetchContent_Declare(zstd
-    GIT_REPOSITORY https://github.com/facebook/zstd.git
-    GIT_TAG v1.5.7
-    SOURCE_SUBDIR fcg-no-cmake
-    GIT_SHALLOW TRUE)
+    URL https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+    URL_HASH SHA256=eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3
+    SOURCE_SUBDIR fcg-no-cmake)
 FetchContent_Declare(zlib
-    GIT_REPOSITORY https://github.com/madler/zlib.git
-    GIT_TAG v1.3.2
-    SOURCE_SUBDIR fcg-no-cmake
-    GIT_SHALLOW TRUE)
+    URL https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz
+    URL_HASH SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
+    SOURCE_SUBDIR fcg-no-cmake)
 # The LZMA SDK's decoders and 7z reader (public domain), from 7-Zip's sources: .7z archives, Lumbra's Gigabase.
 FetchContent_Declare(lzma
-    GIT_REPOSITORY https://github.com/ip7z/7zip.git
-    GIT_TAG 24.09
-    SOURCE_SUBDIR fcg-no-cmake
-    GIT_SHALLOW TRUE)
+    URL https://github.com/ip7z/7zip/releases/download/24.09/7z2409-src.tar.xz
+    URL_HASH SHA256=49c05169f49572c1128453579af1632a952409ced028259381dac30726b6133a
+    SOURCE_SUBDIR fcg-no-cmake)
 FetchContent_MakeAvailable(zstd zlib lzma)
 
 # The decoder alone, in C, without its assembly (one source set on every system) or threads.
@@ -293,36 +310,16 @@ file(GLOB FCG_STUDY_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/
 add_library(fcg_study STATIC ${FCG_STUDY_SOURCES})
 target_compile_features(fcg_study PUBLIC cxx_std_20)
 target_include_directories(fcg_study PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/study/src)
-target_compile_options(fcg_study PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_study PRIVATE fcg_warnings)
 target_link_libraries(fcg_study PUBLIC fcg_tournament PRIVATE fcg_zstd fcg_zlib fcg_lzma)
 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_STUDY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/tests/*.cpp)
-    add_executable(fcg-study-tests ${FCG_STUDY_TEST_SOURCES})
-    target_link_libraries(fcg-study-tests PRIVATE fcg_study fcg_test_support)
-    if(WIN32)
-        target_link_options(fcg-study-tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
+    fcg_add_test_program(fcg-study-tests ${FCG_STUDY_TEST_SOURCES} LIBRARIES fcg_study)
 endif()
 
 if(FCG_STUDY_BENCH)
-    add_executable(fcg-study-bench ${CMAKE_CURRENT_SOURCE_DIR}/study/bench/main.cpp)
-    target_link_libraries(fcg-study-bench PRIVATE fcg_study)
-    target_compile_options(fcg-study-bench PRIVATE -Wall -Wextra)
-endif()
-
-if(FCG_FUZZ)
-    # What a database is made of, changed after it was written (#102): a segment's files, its edits, its table of
-    # names; and what the store imports: a PGN file plain or compressed, a ChessBase archive. Linked with the study
-    # layer alone, built with the window or without it. Each target fuzz_<name> from fuzz/<name>.cpp, its seeds in
-    # fuzz/corpus/<name>.
-    foreach(name segment edits players import chessbase)
-        add_executable(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
-                                    ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
-        target_link_libraries(fuzz_${name} PRIVATE fcg_study)
-        target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
-        list(APPEND FCG_FUZZ_NAMES ${name})
-    endforeach()
+    fcg_add_program(fcg-study-bench WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/study/bench/main.cpp LIBRARIES fcg_study)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -341,7 +338,7 @@ add_custom_command(
 add_library(fcg_commentary STATIC ${FCG_COMMENTARY_SOURCES} ${FCG_OPENINGS_CPP})
 target_compile_features(fcg_commentary PUBLIC cxx_std_20)
 target_include_directories(fcg_commentary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src)
-target_compile_options(fcg_commentary PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_commentary PRIVATE fcg_warnings)
 target_link_libraries(fcg_commentary PUBLIC fcg_tournament fcg_study)
 
 # ---------------------------------------------------------------------------
@@ -357,11 +354,10 @@ if(FCG_ASSISTANT)
     # missing. The CPU backend in every variant x86-64 processors need, the best one chosen at run time.
     # b12604: the first build with the fixes of a crafted model's out-of-bounds write (CVE-2026-133710: hrm_text's
     # loader, which any GGUF the user chooses could reach) and of a grammar's repetition whose maximum is below its
-    # minimum (CVE-2026-137057); back to a version tag once one has them (v1.0.0 has not).
+    # minimum (CVE-2026-137057); back to a version tag once one has them (v1.0.0 has not). Its commit's archive.
     FetchContent_Declare(llama
-        GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
-        GIT_TAG b12604
-        GIT_SHALLOW TRUE)
+        URL https://github.com/ggml-org/llama.cpp/archive/46eb1742db6d2caec1bfa848c5702b1bdcc815e5.tar.gz
+        URL_HASH SHA256=770e1927f3fc66b834bb1f45e2f6e2a482dc151fda21a1ad0acabbe96a494502)
     set(FCG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS ON)
     set(GGML_BACKEND_DL ON CACHE BOOL "" FORCE)
@@ -380,16 +376,15 @@ if(FCG_ASSISTANT)
     if(FCG_ASSISTANT_VULKAN AND CMAKE_CROSSCOMPILING AND MINGW)
         # Cross-built for Windows, the Vulkan SDK's parts for the target are made here: its headers and SPIRV-Headers,
         # fetched; an import library for vulkan-1.dll, the loader every GPU driver installs, made from the headers'
-        # prototypes (only the functions ggml calls become imports); and the host's glslc.
+        # prototypes (only the functions ggml calls become imports); and the host's glslc. Both at vulkan-sdk-1.4.363.0,
+        # their commits' archives.
         FetchContent_Declare(vulkan_headers
-            GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
-            GIT_TAG vulkan-sdk-1.4.363.0
-            GIT_SHALLOW TRUE
+            URL https://github.com/KhronosGroup/Vulkan-Headers/archive/6802bb4733b63ed5efd3adb308a6c885ef180ea1.tar.gz
+            URL_HASH SHA256=9044fbb356160e43201dc2094acb44c8a906722a63a35f48fc0f051579db9bb6
             SOURCE_SUBDIR fcg-no-cmake)
         FetchContent_Declare(SPIRV-Headers
-            GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
-            GIT_TAG vulkan-sdk-1.4.363.0
-            GIT_SHALLOW TRUE
+            URL https://github.com/KhronosGroup/SPIRV-Headers/archive/496543121ce6419f23d6fa5d7194ba66c36212d2.tar.gz
+            URL_HASH SHA256=a9bb9c48713245eacf97cc539b6f1d45405a92d8813f8b82e635f0a085ee9898
             OVERRIDE_FIND_PACKAGE)
         FetchContent_MakeAvailable(vulkan_headers SPIRV-Headers)
         file(STRINGS ${vulkan_headers_SOURCE_DIR}/include/vulkan/vulkan_core.h prototypes
@@ -414,7 +409,13 @@ if(FCG_ASSISTANT)
         set(Vulkan_GLSLC_EXECUTABLE ${FCG_GLSLC} CACHE FILEPATH "" FORCE)
     endif()
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+    # llama.cpp and ggml ask git for the commit they are built from (their version headers): their archive has none,
+    # and git would answer with the repository the build folder is in. They say "unknown" instead, the same at every
+    # commit of ours (git says twice, in the configuration's output, that it found no repository).
+    set(FCG_GIT_CEILING "$ENV{GIT_CEILING_DIRECTORIES}")
+    set(ENV{GIT_CEILING_DIRECTORIES} "${FETCHCONTENT_BASE_DIR}")
     FetchContent_MakeAvailable(llama)
+    set(ENV{GIT_CEILING_DIRECTORIES} "${FCG_GIT_CEILING}")
     set(BUILD_SHARED_LIBS ${FCG_BUILD_SHARED_LIBS})
     # Its libraries beside the programs (llama.cpp puts them in bin/): where ggml looks for its backends, and where
     # Windows finds a program's DLLs; elsewhere the programs' run path ($ORIGIN) does.
@@ -504,7 +505,7 @@ if(FCG_ASSISTANT)
     add_library(fcg_assistant STATIC ${FCG_ASSISTANT_SOURCES})
     target_compile_features(fcg_assistant PUBLIC cxx_std_20)
     target_include_directories(fcg_assistant PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assistant/src)
-    target_compile_options(fcg_assistant PRIVATE -Wall -Wextra)
+    target_link_libraries(fcg_assistant PRIVATE fcg_warnings)
     target_link_libraries(fcg_assistant PUBLIC fcg_commentary PRIVATE llama fcg_jinja)
     target_compile_definitions(fcg_assistant PUBLIC FCG_ASSISTANT=1)
     if(FCG_ASSISTANT_VULKAN)
@@ -515,23 +516,15 @@ if(FCG_ASSISTANT)
     endif()
 
     if(FCG_ASSISTANT_EVAL)
-        add_executable(fcg-assistant-eval ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp)
-        target_link_libraries(fcg-assistant-eval PRIVATE fcg_assistant fcg_study)
-        target_compile_options(fcg-assistant-eval PRIVATE -Wall -Wextra)
-        if(WIN32)
-            target_link_options(fcg-assistant-eval PRIVATE -static -static-libgcc -static-libstdc++)
-        endif()
+        fcg_add_program(fcg-assistant-eval WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp
+                        LIBRARIES fcg_assistant fcg_study)
     endif()
 endif()
 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_COMMENTARY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/tests/*.cpp)
-    add_executable(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES})
     # fcg_study reads the compressed reference files.
-    target_link_libraries(fcg-commentary-tests PRIVATE fcg_commentary fcg_study fcg_test_support)
-    if(WIN32)
-        target_link_options(fcg-commentary-tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
+    fcg_add_test_program(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES} LIBRARIES fcg_commentary fcg_study)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -558,20 +551,20 @@ if(FCG_BUILD_GUI)
     set(SDL_RENDER ON CACHE BOOL "" FORCE)
     set(SDL_AUDIO ON CACHE BOOL "" FORCE)
 
+    # SDL's source release names its revision (REVISION.txt, SDL_GetRevision()'s): SDL does not ask git, which would
+    # answer with the repository the build folder is in.
     FetchContent_Declare(sdl3
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-3.4.18
-        GIT_SHALLOW TRUE)
+        URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+        URL_HASH SHA256=9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3)
+    # v1.92.9-docking, its commit's archive.
     FetchContent_Declare(imgui
-        GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.92.9-docking
-        SOURCE_SUBDIR fcg-no-cmake
-        GIT_SHALLOW TRUE)
+        URL https://github.com/ocornut/imgui/archive/9b4eb24cee2071e61dc1f9ef3e5228097cdde720.tar.gz
+        URL_HASH SHA256=7af17518117f40103be7c2b68312a496e7dc3e1de6d3ce985df36c612fb05506
+        SOURCE_SUBDIR fcg-no-cmake)
     FetchContent_Declare(implot
-        GIT_REPOSITORY https://github.com/epezent/implot.git
-        GIT_TAG v1.0
-        SOURCE_SUBDIR fcg-no-cmake
-        GIT_SHALLOW TRUE)
+        URL https://github.com/epezent/implot/releases/download/v1.0/implot-v1.0.tar.gz
+        URL_HASH SHA256=20ca14d5a46f36a650746096c74eba8bea99c9432cd3c877343b96b17a6ae566
+        SOURCE_SUBDIR fcg-no-cmake)
     FetchContent_Declare(nanosvg
         GIT_REPOSITORY https://github.com/memononen/nanosvg.git
         GIT_TAG 239e102ec2c691f2902e20ace2ed36ee4a35cfe6
@@ -699,13 +692,12 @@ if(FCG_BUILD_GUI)
     file(GLOB FCG_BOARD3D_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/board3d/*.cpp)
     option(FCG_BOARD3D_VIEWER "Build fcg-board3d, the 3D board's viewer" OFF)
     if(FCG_BOARD3D_VIEWER)
-        add_executable(fcg-board3d ${CMAKE_CURRENT_SOURCE_DIR}/tools/board3d/viewer.cpp ${FCG_BOARD3D_SOURCES})
+        fcg_add_program(fcg-board3d WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/tools/board3d/viewer.cpp ${FCG_BOARD3D_SOURCES}
+                        LIBRARIES imgui_lib)
         target_compile_features(fcg-board3d PRIVATE cxx_std_20)
         target_include_directories(fcg-board3d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src)
         target_include_directories(fcg-board3d SYSTEM PRIVATE ${stb_SOURCE_DIR})
-        target_link_libraries(fcg-board3d PRIVATE imgui_lib)
         target_compile_definitions(fcg-board3d PRIVATE FCG_BOARD3D_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-        target_compile_options(fcg-board3d PRIVATE -Wall -Wextra)
     endif()
 
     add_library(fcg_md4c STATIC ${md4c_SOURCE_DIR}/src/md4c.c)
@@ -728,7 +720,7 @@ if(FCG_BUILD_GUI)
     target_compile_definitions(fcg_libssh2 PRIVATE HAVE_CONFIG_H LIBSSH2_MBEDTLS LIBSSH2_MBEDTLS_H LIBSSH2DEBUG)
     set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa/mbedtls_psa.c
                                 ${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa/ed25519.c PROPERTIES
-                                COMPILE_OPTIONS "-Wall;-Wextra")
+                                COMPILE_OPTIONS "$<TARGET_PROPERTY:fcg_warnings,INTERFACE_COMPILE_OPTIONS>")
     target_link_libraries(fcg_libssh2 PRIVATE tfpsacrypto)
     if(WIN32)
         target_link_libraries(fcg_libssh2 PUBLIC ws2_32)
@@ -857,7 +849,7 @@ if(FCG_BUILD_GUI)
         ${stb_SOURCE_DIR}
         ${qrcodegen_SOURCE_DIR}/cpp
     )
-    target_compile_options(fcg_lib PRIVATE -Wall -Wextra)
+    target_link_libraries(fcg_lib PRIVATE fcg_warnings)
     target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}${FCG_VERSION_SUFFIX}")
     # The commentary library too, without the assistant's runtime: the Board page's reference games read it.
     target_link_libraries(fcg_lib PUBLIC fcg_study fcg_commentary fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2
@@ -882,18 +874,14 @@ if(FCG_BUILD_GUI)
 
     # The program, rookstudio (RookStudio.app on macOS); its target keeps fastchess-gui's name, for its releases to
     # merge.
-    add_executable(fastchess-gui WIN32 MACOSX_BUNDLE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/main.cpp
-                   ${FCG_PLATFORM_SOURCES})
+    fcg_add_program(fastchess-gui WIN32 MACOSX_BUNDLE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/main.cpp
+                    ${FCG_PLATFORM_SOURCES} LIBRARIES fcg_lib)
     if(APPLE)
         set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME RookStudio)
     else()
         set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME rookstudio)
     endif()
-    target_link_libraries(fastchess-gui PRIVATE fcg_lib)
     fcg_drop_isa_note(fastchess-gui)
-    if(WIN32)
-        target_link_options(fastchess-gui PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
     if(APPLE)
         set_target_properties(fastchess-gui PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/mac/Info.plist.in
@@ -906,26 +894,19 @@ if(FCG_BUILD_GUI)
 
     if(FCG_BUILD_TESTS)
         file(GLOB FCG_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/*.cpp)
-        add_executable(fastchess-gui-tests ${FCG_TEST_SOURCES})
         # Mbed TLS too: the SSH tests play the server's part with its cryptography. And the libssh2 backend's
         # functions, which they call directly.
-        target_link_libraries(fastchess-gui-tests PRIVATE fcg_lib mbedtls fcg_libssh2 fcg_test_support)
+        fcg_add_test_program(fastchess-gui-tests ${FCG_TEST_SOURCES} LIBRARIES fcg_lib mbedtls fcg_libssh2)
         target_include_directories(fastchess-gui-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa)
         target_include_directories(fastchess-gui-tests SYSTEM PRIVATE ${libssh2_SOURCE_DIR}/src)
         # A WinBoard engine for the tests of the adapter.
-        add_executable(fcg_wb_mover ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/wb_mover.cpp)
+        fcg_add_program(fcg_wb_mover ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/wb_mover.cpp)
         set_target_properties(fcg_wb_mover PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-        if(WIN32)
-            target_link_options(fcg_wb_mover PRIVATE -static -static-libgcc -static-libstdc++)
-        endif()
 
         if(FCG_ASSISTANT)
             # A language model that answers at once, for the tests of the assistant's process.
-            add_executable(fcg_mock_assistant ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/assistant.cpp)
-            target_link_libraries(fcg_mock_assistant PRIVATE fcg_assistant)
-            if(WIN32)
-                target_link_options(fcg_mock_assistant PRIVATE -static -static-libgcc -static-libstdc++)
-            endif()
+            fcg_add_program(fcg_mock_assistant ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/assistant.cpp
+                            LIBRARIES fcg_assistant)
             add_dependencies(fastchess-gui-tests fcg_mock_assistant)
             target_compile_definitions(fastchess-gui-tests
                                        PRIVATE FCG_MOCK_ASSISTANT="$<TARGET_FILE_NAME:fcg_mock_assistant>")
@@ -935,24 +916,42 @@ if(FCG_BUILD_GUI)
         target_compile_definitions(fastchess-gui-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
                                                               FCG_WB_MOVER="$<TARGET_FILE_NAME:fcg_wb_mover>"
                                                               FCG_GUI_PROGRAM="$<TARGET_FILE:fastchess-gui>")
-        if(WIN32)
-            target_link_options(fastchess-gui-tests PRIVATE -static -static-libgcc -static-libstdc++)
-        endif()
     endif()
+endif()
 
-    if(FCG_FUZZ)
-        # What others send the program: a web request, the tunnel server's text, a TLCS datagram, a PGN book (to
-        # Polyglot), an EPD book or suite; and what fastchess' own readers take of them through the program: a PGN
-        # book, an engine's info line; and a game's PGN as the study layer reads and writes it. Each target fuzz_<name>
-        # from fuzz/<name>.cpp, its seeds in fuzz/corpus/<name>.
-        foreach(name web_request tunnel_text tlcs_message pgn_book epd_book app_pgn engine_info pgn_reader)
-            add_executable(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
-                                        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp)
-            target_link_libraries(fuzz_${name} PRIVATE fcg_lib)
-            target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
-            list(APPEND FCG_FUZZ_NAMES ${name})
-        endforeach()
+# ---------------------------------------------------------------------------
+# Fuzz targets
+# ---------------------------------------------------------------------------
+
+# Each target fuzz_<name> from fuzz/<name>.cpp, its seeds in fuzz/corpus/<name>, linked with the smallest library that
+# has what it reads (name|library):
+# - fastchess' core library: an engine's info line, read by fastchess' parsers;
+# - the tournament layer: a PGN book turned into a Polyglot book, an EPD book or suite, and a PGN book as fastchess'
+#   own reader takes it through the book inspection;
+# - the study layer: what a database is made of, changed after it was written (#102): a segment's files, its edits,
+#   its table of names; what the store imports: a PGN file plain or compressed, a ChessBase archive; and a game's PGN
+#   as the study layer reads and writes it;
+# - the window's library, built with the window only: what others send the program: a web request, the tunnel
+#   server's text, a TLCS datagram.
+# Compiled as our sources are (C++20), whatever library they link.
+if(FCG_FUZZ)
+    set(FCG_FUZZ_LIBRARIES engine_info|fastchess_core
+                           pgn_book|fcg_tournament epd_book|fcg_tournament app_pgn|fcg_tournament
+                           segment|fcg_study edits|fcg_study players|fcg_study import|fcg_study chessbase|fcg_study
+                           pgn_reader|fcg_study)
+    if(FCG_BUILD_GUI)
+        list(APPEND FCG_FUZZ_LIBRARIES web_request|fcg_lib tunnel_text|fcg_lib tlcs_message|fcg_lib)
     endif()
+    foreach(fuzz IN LISTS FCG_FUZZ_LIBRARIES)
+        string(REPLACE "|" ";" fuzz "${fuzz}")
+        list(GET fuzz 0 name)
+        list(GET fuzz 1 library)
+        fcg_add_program(fuzz_${name} ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/${name}.cpp
+                        ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/version.cpp LIBRARIES ${library})
+        target_compile_features(fuzz_${name} PRIVATE cxx_std_20)
+        target_link_options(fuzz_${name} PRIVATE -fsanitize=fuzzer)
+        list(APPEND FCG_FUZZ_NAMES ${name})
+    endforeach()
 endif()
 
 # The test programs and the fuzz targets, each listed here only. The tests target builds the test programs (and the

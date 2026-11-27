@@ -190,6 +190,8 @@ class Frames {
         io.IniFilename = nullptr;
         io.DisplaySize = ImVec2(1280, 900);
         io.DeltaTime   = 1.0f / 60.0f;
+        // On macOS Dear ImGui swaps Ctrl and Cmd by default: the Ctrl events the tests send are meant as Ctrl.
+        io.ConfigMacOSXBehaviors = false;
     }
     ~Frames() { ImGui::DestroyContext(context_); }
     Frames(const Frames&)            = delete;

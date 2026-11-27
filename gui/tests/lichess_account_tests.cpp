@@ -333,7 +333,8 @@ TEST_CASE("Lichess account: each failure of the token's requests told by its kin
     std::mutex mutex;
     std::pair<int, std::string> next{200, "{}"};  // what the server answers next
     const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+        (void)requestBody(head, c);  // the token's test and revocation post it: read whole (Windows: scripted_server.hpp)
         std::pair<int, std::string> now;
         {
             std::lock_guard lock(mutex);

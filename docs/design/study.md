@@ -189,12 +189,14 @@ the opening tree, a dossier and an opening report set a game's start with `start
 games as damaged, as before, and so does the list (#119): a record that does not read whole has `GAME_DAMAGED` in its
 row's flags (`Snapshot::row()`, its plies then no more than its codes' bytes) and the filter of damaged games finds it
 (`Snapshot::damaged()`), both reading its annex as `game()` does without making anything of it; `numbers()` keeps the
-flags as they were written, the filters and sorts that read every game reading no annex. A table of names read with name ids past the names (a damaged file) leaves them out. A
-test changes a segment's offsets and annex bytes, sixty times at random and once each kind on purpose, then lists,
-reads and writes every game, searches, builds and asks the tree, makes a dossier and an opening report, and checks.
-libFuzzer targets do the same with what a database is made of (`fuzz/segment.cpp`, `edits.cpp`, `players.cpp`: changes
-applied to sound files made from games of our own, then every game read, the list, a search, a dossier and the check)
-and with what the store imports (`import.cpp`: PGN, plain or compressed; `chessbase.cpp`: a CBV or 2CBV archive).
+flags as they were written, the filters and sorts that read every game reading no annex. A table of names read with
+name ids past the names (a damaged file) leaves them out. A test changes a segment's offsets and annex bytes, sixty
+times at random and once each kind on purpose, then lists, reads and writes every game, searches, builds and asks the
+tree, makes a dossier and an opening report, and checks. libFuzzer targets do the same with what a database is made of
+(`fuzz/segment.cpp`, `edits.cpp`, `players.cpp`: changes applied to sound files made from games of our own, then every
+game read, the list, a search, a dossier and the check, the list saying a game damaged as it reads) and with what the
+store imports (`import.cpp`: PGN, plain or compressed; `chessbase.cpp`: a CBV or 2CBV archive; `chessbase_files.cpp`: a
+CBH database in its own files; `chessbase_enciphered.cpp`: a .cbz or a .2cbz with its password, #119).
 
 ### The compaction
 

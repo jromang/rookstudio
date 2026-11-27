@@ -832,6 +832,8 @@ MockServer::~MockServer() {
     if (thread_.joinable()) thread_.join();
 }
 
+uint16_t MockServer::port() const { return listener_->tcp.port(); }
+
 std::vector<std::string> MockServer::commands() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return commands_;

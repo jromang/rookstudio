@@ -142,13 +142,13 @@ TEST_CASE("broadcast: a TLCS client logs on and receives the game, the crosstabl
     // anything counts, FEATURE: PING for its keepalive, its own numbered PING acknowledged, "XTIME: <cs> otim <cs>",
     // and the FEN after each move, sent before the move.
     TlcsServer server;
-    const uint16_t port = fcg::test::freePort();
+    const uint16_t port = fcg::test::freePort();  // UDP: known before the server binds it, it has no port() to read
     REQUIRE(server.start(port).empty());
     server.publish(sample(), -1);
     std::this_thread::sleep_for(300ms);
 
     net::UdpSocket client;
-    REQUIRE(client.bind(fcg::test::freePort()).empty());
+    REQUIRE(client.bind(0).empty());
     const net::Endpoint to{0x7F000001, port};
     client.send(to, "LOGONv15:tester");
 
@@ -208,13 +208,13 @@ TEST_CASE("broadcast: a TLCS client logs on and receives the game, the crosstabl
 
 TEST_CASE("broadcast: TLCS tells the end of the game it follows, even once the next game took its slot") {
     TlcsServer server;
-    const uint16_t port = fcg::test::freePort();
+    const uint16_t port = fcg::test::freePort();  // UDP: known before the server binds it, it has no port() to read
     REQUIRE(server.start(port).empty());
     server.publish(sample(), -1);
     std::this_thread::sleep_for(300ms);
 
     net::UdpSocket client;
-    REQUIRE(client.bind(fcg::test::freePort()).empty());
+    REQUIRE(client.bind(0).empty());
     const net::Endpoint to{0x7F000001, port};
     client.send(to, "LOGONv15:tester");
 
@@ -268,13 +268,13 @@ TEST_CASE("broadcast: TLCS tells the end of the game it follows, even once the n
 TEST_CASE("broadcast: TLCS sends one numbered command at a time, in order, the PV lines unnumbered") {
     // node-tlcv drops a numbered command lower than one it already has: the next one waits for the ACK.
     TlcsServer server;
-    const uint16_t port = fcg::test::freePort();
+    const uint16_t port = fcg::test::freePort();  // UDP: known before the server binds it, it has no port() to read
     REQUIRE(server.start(port).empty());
     server.publish(sample(), -1);
     std::this_thread::sleep_for(300ms);
 
     net::UdpSocket client;
-    REQUIRE(client.bind(fcg::test::freePort()).empty());
+    REQUIRE(client.bind(0).empty());
     const net::Endpoint to{0x7F000001, port};
     client.send(to, "LOGONv15:tester");
 
@@ -311,13 +311,13 @@ TEST_CASE("broadcast: TLCS answers a logon with a few bytes until the client pro
     // A LOGON may come from a forged address: the game and the crosstable only go to a client that acknowledges
     // the number of the first command, which it can only know by receiving it.
     TlcsServer server;
-    const uint16_t port = fcg::test::freePort();
+    const uint16_t port = fcg::test::freePort();  // UDP: known before the server binds it, it has no port() to read
     REQUIRE(server.start(port).empty());
     server.publish(sample(), -1);
     std::this_thread::sleep_for(300ms);
 
     net::UdpSocket client;
-    REQUIRE(client.bind(fcg::test::freePort()).empty());
+    REQUIRE(client.bind(0).empty());
     const net::Endpoint to{0x7F000001, port};
     client.send(to, "LOGONv15:tester");
     std::vector<std::string> received;
@@ -389,7 +389,7 @@ TEST_CASE("broadcast: TLCS reads a datagram, numbered or not") {
 
 TEST_CASE("broadcast: TLCS logons are limited in rate") {
     TlcsServer server;
-    const uint16_t port = fcg::test::freePort();
+    const uint16_t port = fcg::test::freePort();  // UDP: known before the server binds it, it has no port() to read
     REQUIRE(server.start(port).empty());
     std::this_thread::sleep_for(200ms);
 
@@ -427,7 +427,8 @@ TEST_CASE("broadcast: TLCS logons are limited in rate") {
 
 TEST_CASE("broadcast: TLCS with lanes serves each concurrent game on its own port, the crosstable after every game") {
     TlcsServer server;
-    const uint16_t port = fcg::test::freePorts(2);  // the next one for the second lane
+    // UDP, the next port for the second lane: known before the server binds them.
+    const uint16_t port = fcg::test::freePorts(2);
     REQUIRE(server.start(port, true).empty());
     CHECK(server.ports() == std::vector<uint16_t>{port});
 
@@ -474,9 +475,9 @@ TEST_CASE("broadcast: TLCS with lanes serves each concurrent game on its own por
         }
     };
     Viewer first, second, silent;
-    REQUIRE(first.socket.bind(fcg::test::freePort()).empty());
-    REQUIRE(second.socket.bind(fcg::test::freePort()).empty());
-    REQUIRE(silent.socket.bind(fcg::test::freePort()).empty());
+    REQUIRE(first.socket.bind(0).empty());
+    REQUIRE(second.socket.bind(0).empty());
+    REQUIRE(silent.socket.bind(0).empty());
     first.to  = {0x7F000001, port};
     second.to = silent.to = {0x7F000001, static_cast<uint16_t>(port + 1)};
     silent.acks           = false;
@@ -528,7 +529,7 @@ TEST_CASE("broadcast: TLCS with lanes serves each concurrent game on its own por
 }
 
 TEST_CASE("broadcast: TLCS lanes say when the port of a game is in use") {
-    const uint16_t port = fcg::test::freePorts(2);
+    const uint16_t port = fcg::test::freePorts(2);  // UDP, the second lane's taken first: known before anything binds
     net::UdpSocket taken;
     REQUIRE(taken.bind(port + 1).empty());
     TlcsServer server;
@@ -544,13 +545,14 @@ TEST_CASE("broadcast: TLCS lanes say when the port of a game is in use") {
 }
 
 TEST_CASE("broadcast: a port in use is said to be") {
-    const uint16_t udp_port = fcg::test::freePort(), tcp_port = fcg::test::freePort();
+    const uint16_t udp_port = fcg::test::freePort();  // a UDP socket has no port() to read
     net::UdpSocket a, b;
     REQUIRE(a.bind(udp_port).empty());
     CHECK_FALSE(b.bind(udp_port).empty());
 
     net::TcpListener c, d;
-    REQUIRE(c.listen(tcp_port).empty());
+    REQUIRE(c.listen(0).empty());
+    const uint16_t tcp_port = c.port();
     CHECK_FALSE(d.listen(tcp_port).empty());
 
     TlcsServer tlcs;
@@ -561,8 +563,8 @@ TEST_CASE("broadcast: a port in use is said to be") {
 
 TEST_CASE("broadcast: the web page and its state") {
     WebServer server;
-    const uint16_t port = fcg::test::freePort();
-    REQUIRE(server.start(port).empty());
+    REQUIRE(server.start(0).empty());
+    const uint16_t port = server.port();
     server.publish(sample());
 
     const auto get = [&](const std::string& path) {
@@ -620,8 +622,8 @@ TEST_CASE("broadcast: the web page and its state") {
 
 TEST_CASE("broadcast: the web server answers GET of its own paths only, and bounds what a client holds") {
     WebServer server;
-    const uint16_t port = fcg::test::freePort();
-    REQUIRE(server.start(port).empty());
+    REQUIRE(server.start(0).empty());
+    const uint16_t port = server.port();
     server.publish(sample());
 
     const auto ask = [&](const std::string& request) {
@@ -758,8 +760,8 @@ TEST_CASE("broadcast: the web server reads a request's line and headers") {
 
 TEST_CASE("broadcast: the viewers are counted from their requests, all from one address behind a tunnel") {
     WebServer server;
-    const uint16_t port = fcg::test::freePort();
-    REQUIRE(server.start(port).empty());
+    REQUIRE(server.start(0).empty());
+    const uint16_t port = server.port();
     server.publish(sample());
     // Four viewers polling once a second, through one proxy: one address, as cloudflared's.
     for (int second = 0; second < 3; ++second) {
@@ -1154,8 +1156,8 @@ TEST_CASE("broadcast: the web page offers the PGN file, the games recorded only,
     }
 
     WebServer server;
-    const uint16_t port = fcg::test::freePort();
-    REQUIRE(server.start(port).empty());
+    REQUIRE(server.start(0).empty());
+    const uint16_t port = server.port();
     auto s = sample();
     server.publish(s);
 
@@ -1343,8 +1345,8 @@ TEST_CASE("broadcast: the web page's extras, and its policy allowing Discord's f
     CHECK(extra.size() < plain.size() + 4000);
 
     WebServer server;
-    const uint16_t port = fcg::test::freePort();
-    REQUIRE(server.start(port).empty());
+    REQUIRE(server.start(0).empty());
+    const uint16_t port = server.port();
     server.publish(sample());
     const auto ask = [&](const std::string& request) {
         const auto fd = net::connectTo(0x7F000001, port);
@@ -1416,7 +1418,7 @@ TEST_CASE("broadcast: the web page's extras, and its policy allowing Discord's f
 }
 
 TEST_CASE("broadcast: the broadcaster takes the chat link and the Discord server ID only when they pass the checks") {
-    const uint16_t port = fcg::test::freePort();
+    const uint16_t port = fcg::test::freePort();  // the broadcaster is told its web page's port before it listens
     const auto page     = [&] {
         const auto fd = net::connectTo(0x7F000001, port);
         if (!fd) return std::string();

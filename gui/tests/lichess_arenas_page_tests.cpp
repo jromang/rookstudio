@@ -29,7 +29,6 @@
 #include "crosstables.hpp"
 #include "databases.hpp"
 #include "focus_words.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "jobs.hpp"
 #include "lichess_account.hpp"
@@ -240,10 +239,8 @@ const char* const LIST = R"({
 // status, the games' PGN and their streams, open until the test ends. Every name invented.
 class FakeLichess {
    public:
-    FakeLichess()
-        : port_(freePort()),
-          server_(port_, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
-        const auto base    = fmt::format("http://127.0.0.1:{}", port_);
+    FakeLichess() : server_(0, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
+        const auto base    = fmt::format("http://127.0.0.1:{}", server_.port());
         lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
     }
     ~FakeLichess() {
@@ -354,7 +351,6 @@ class FakeLichess {
         }
     }
 
-    uint16_t port_;
     std::mutex mutex_;
     std::vector<Seen> seen_;
     std::atomic<bool> joined_{false}, quit_{false};

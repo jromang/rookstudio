@@ -78,6 +78,7 @@ class FakeServer {
         thread_.join();
     }
     [[nodiscard]] bool ok() const { return ok_; }
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
     [[nodiscard]] std::vector<Request> requests() {
         std::lock_guard<std::mutex> lock(mutex_);
         return requests_;
@@ -151,9 +152,8 @@ TEST_CASE("lichess: the same tags in progress and finished, clocks sent once, ro
 }
 
 TEST_CASE("lichess: a broadcast made, its rounds filled up to 64 games, over HTTP") {
-    const uint16_t port = fcg::test::freePort();
     std::atomic<int> rounds{0};
-    FakeServer server(port, [&](const FakeServer::Request& r) -> std::string {
+    FakeServer server(0, [&](const FakeServer::Request& r) -> std::string {
         if (r.path == "/broadcast/new") return R"({"tour":{"id":"TOUR0001"},"rounds":[]})";
         if (r.path == "/broadcast/TOUR0001/new") {
             const auto id = "ROUND00" + std::to_string(++rounds);
@@ -161,6 +161,7 @@ TEST_CASE("lichess: a broadcast made, its rounds filled up to 64 games, over HTT
         }
         return R"({"games":[]})";
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
 
     const auto dir = fs::temp_directory_path() / "fcg-lichess-relay";
@@ -284,7 +285,7 @@ TEST_CASE("lichess: the relay's failures told by their kind and what failed, in 
     CHECK(relayError(s) == "The games could not be pushed to Lichess: Invalid PGN");
     server.answer(503, "<html>down</html>");
     CHECK(relayError(pushed()) == "The games could not be pushed to Lichess: Lichess answered 503");
-    // No answer: without the network's words, which go to the log.
+    // No answer: without the network's words, which go to the log (freePort(): a free port nothing is started on).
     s = ended(fmt::format("http://127.0.0.1:{}", fcg::test::freePort()), "");
     CHECK(s.error.net == lichess::NetError::Offline);
     CHECK(relayError(s) == "The broadcast could not be made on Lichess: Lichess cannot be reached");
@@ -294,10 +295,9 @@ TEST_CASE("lichess: the relay's failures told by their kind and what failed, in 
 }
 
 TEST_CASE("lichess: stopping returns at once, the last push made on the relay's thread") {
-    const uint16_t port = fcg::test::freePort();
     std::atomic<int> pushes{0};
     std::atomic<bool> pushing{false};
-    FakeServer server(port, [&](const FakeServer::Request& r) -> std::string {
+    FakeServer server(0, [&](const FakeServer::Request& r) -> std::string {
         if (r.path.find("/push") != std::string::npos) {
             pushing = true;
             std::this_thread::sleep_for(1500ms);  // a slow lichess
@@ -305,6 +305,7 @@ TEST_CASE("lichess: stopping returns at once, the last push made on the relay's 
         }
         return R"({"games":[]})";
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto dir = fs::temp_directory_path() / "fcg-lichess-stop";
     fs::remove_all(dir);
@@ -335,9 +336,9 @@ TEST_CASE("lichess: stopping returns at once, the last push made on the relay's 
 
 TEST_CASE("net: a connection that cannot be made gives up in time") {
     // A listener that never accepts: once its queue is full, connecting waits for nothing.
-    const uint16_t port = fcg::test::freePort();
     net::TcpListener listener;
-    REQUIRE(listener.listen(port).empty());
+    REQUIRE(listener.listen(0).empty());
+    const auto port = listener.port();
     std::vector<net::Handle> open;
     std::string error;
     bool timed_out = false;
@@ -355,7 +356,7 @@ TEST_CASE("net: a connection that cannot be made gives up in time") {
     CHECK(timed_out);
     for (const auto fd : open) net::TcpConnection close(fd);
 
-    // Nobody on the port: refused at once.
+    // Nobody on the port: refused at once (freePort(): a free port nothing is started on).
     const auto start = std::chrono::steady_clock::now();
     CHECK_FALSE(net::connectHost("127.0.0.1", std::to_string(fcg::test::freePort()), 5000, error));
     CHECK(std::chrono::steady_clock::now() - start < 3s);
@@ -439,6 +440,7 @@ class FakeProxy {
         thread_.join();
     }
     [[nodiscard]] bool ok() const { return ok_; }
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
     [[nodiscard]] std::vector<std::string> requests() {
         std::lock_guard<std::mutex> lock(mutex_);
         return requests_;
@@ -533,16 +535,15 @@ TEST_CASE("proxy: the variables read as curl reads them, NO_PROXY names passed b
 
 TEST_CASE("proxy: HTTPS goes through a CONNECT tunnel, TLS naming the server, the password never told") {
     ProxyEnvironment environment;
-    const uint16_t port   = fcg::test::freePort();
-    const uint16_t nobody = fcg::test::freePort();  // nothing listens there
+    const uint16_t nobody = fcg::test::freePort();  // nothing listens there: a free port nothing is started on
     // lichess.invalid cannot be reached directly: a request that went past the proxy would fail at once.
     const HttpRequest request{"https://lichess.invalid/api/broadcast/round/abcdefgh/push", "token", "text/plain", "x",
                               5};
 
     SUBCASE("tunnel opened: TLS over it, with the server's name") {
-        FakeProxy proxy(port, "HTTP/1.1 200 Connection established\r\n\r\n");
+        FakeProxy proxy(0, "HTTP/1.1 200 Connection established\r\n\r\n");
         REQUIRE(proxy.ok());
-        ProxyEnvironment::set("HTTPS_PROXY", fmt::format("http://jean:s3cret@127.0.0.1:{}", port));
+        ProxyEnvironment::set("HTTPS_PROXY", fmt::format("http://jean:s3cret@127.0.0.1:{}", proxy.port()));
         const auto result = httpPost(request);
         // The fake proxy goes no further than the ClientHello.
         CHECK(result.status == 0);
@@ -562,9 +563,9 @@ TEST_CASE("proxy: HTTPS goes through a CONNECT tunnel, TLS naming the server, th
     }
 
     SUBCASE("tunnel refused: told, without the user nor the password") {
-        FakeProxy proxy(port, "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
+        FakeProxy proxy(0, "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
         REQUIRE(proxy.ok());
-        ProxyEnvironment::set("https_proxy", fmt::format("jean:s3cret@127.0.0.1:{}", port));
+        ProxyEnvironment::set("https_proxy", fmt::format("jean:s3cret@127.0.0.1:{}", proxy.port()));
         const auto result = httpPost(request);
         CHECK(result.status == 0);
         CHECK_MESSAGE(result.error.find("refused the connection to lichess.invalid: 407") != std::string::npos,
@@ -574,9 +575,9 @@ TEST_CASE("proxy: HTTPS goes through a CONNECT tunnel, TLS naming the server, th
     }
 
     SUBCASE("a host of NO_PROXY reached directly, and plain HTTP never goes through the proxy") {
-        FakeProxy proxy(port, "HTTP/1.1 200 Connection established\r\n\r\n");
+        FakeProxy proxy(0, "HTTP/1.1 200 Connection established\r\n\r\n");
         REQUIRE(proxy.ok());
-        ProxyEnvironment::set("ALL_PROXY", fmt::format("http://127.0.0.1:{}", port));
+        ProxyEnvironment::set("ALL_PROXY", fmt::format("http://127.0.0.1:{}", proxy.port()));
         ProxyEnvironment::set("NO_PROXY", "example.com, 127.0.0.1");
         auto result = httpPost({fmt::format("https://127.0.0.1:{}/", nobody), "", "text/plain", "x", 5});
         CHECK_MESSAGE(result.error.find("cannot connect to 127.0.0.1") != std::string::npos, result.error);

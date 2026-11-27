@@ -18,7 +18,6 @@
 #include <libssh2.h>  // before windows.h: it includes winsock2.h
 
 #include "ed25519.h"
-#include "free_ports.hpp"
 #include "libssh2_backend.hpp"
 #include "machine_jobs.hpp"
 #include "machine_run.hpp"
@@ -39,12 +38,6 @@ using fcg::test::readFile;
 using fcg::test::ScratchDir;
 
 namespace {
-
-// The mock SSH server's port, free when the process first asks (each test case may run in a process of its own).
-uint16_t machinePort() {
-    static const uint16_t port = fcg::test::freePort();
-    return port;
-}
 
 // Throwaway keys made for these tests by ssh-keygen: an Ed25519 key and an RSA key in OpenSSH's format, encrypted
 // with the passphrase "chess" (bcrypt and aes256-ctr), an RSA key in PKCS #1's PEM, and an ECDSA key, which the
@@ -174,11 +167,12 @@ std::string quotedAfter(const std::string& command, const std::string& word) {
     return command.substr(start, command.find('\'', start) - start);
 }
 
-SshTarget loopbackTarget(const fs::path& dir) {
+// The test's mock SSH server, on the port it was given (MockServer(0, ...): the system's).
+SshTarget loopbackTarget(const fs::path& dir, uint16_t port) {
     SshTarget t;
     t.name        = "test-box";
     t.host        = "127.0.0.1";
-    t.port        = machinePort();
+    t.port        = port;
     t.user        = "tester";
     t.auth        = SshAuth::KeyFile;
     t.known_hosts = dir / "known_hosts.json";
@@ -692,9 +686,9 @@ TEST_CASE("SSH client: logs in with an Ed25519 or RSA key file, a passphrase mis
     ssh::MockServer::Options options;
     options.keys = {ssh::publicKeyBlob(ED25519_PUB), ssh::publicKeyBlob(RSA_PUB)};
     options.root = dir;
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
 
-    auto target       = loopbackTarget(dir);
+    auto target       = loopbackTarget(dir, server.port());
     target.key_file   = dir / "ed";
     target.passphrase = "chess";
     {
@@ -738,8 +732,8 @@ TEST_CASE("SSH client: a host key that changed refused, the new one offered to t
     const ScratchDir dir("hostkey");
     ssh::MockServer::Options options;
     options.root = dir;
-    ssh::MockServer server(machinePort(), options);
-    auto target = loopbackTarget(dir);
+    ssh::MockServer server(0, options);
+    auto target = loopbackTarget(dir, server.port());
     REQUIRE(rememberHostKey(target.known_hosts, target.host, target.port, "SHA256:another"));
     SshClient client;
     CHECK_FALSE(client.connect(target));
@@ -776,9 +770,9 @@ TEST_CASE("SSH client: commands with their output, error output and exit code; a
         }
         return reply;
     };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
     const auto hello = client.run("hello", 5s);
     REQUIRE(hello);
     CHECK(hello->out == "hello\n");
@@ -817,9 +811,9 @@ TEST_CASE("SSH client: SFTP folders, files, renames over a file, a copy each way
     fs::create_directories(root);
     ssh::MockServer::Options options;
     options.root = root;
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
 
     CHECK(client.makeDirs("rookstudio/books"));
     CHECK(client.makeDirs("rookstudio/books"));  // there already
@@ -875,9 +869,9 @@ TEST_CASE("SSH client: a copy cut by the network resumes where it stopped") {
         ssh::MockServer::Options options;
         options.root      = root;
         options.cut_after = 1024 * 1024;  // a third of the way
-        ssh::MockServer server(machinePort(), options);
+        ssh::MockServer server(0, options);
         SshClient client;
-        REQUIRE(client.connect(loopbackTarget(dir)));
+        REQUIRE(client.connect(loopbackTarget(dir, server.port())));
         CHECK_FALSE(client.upload(dir / "KRPvKR.rtbw", "KRPvKR.rtbw"));
         CHECK(client.error().kind == SshError::Kind::Network);
     }
@@ -886,9 +880,9 @@ TEST_CASE("SSH client: a copy cut by the network resumes where it stopped") {
     CHECK(left < content.size());
     ssh::MockServer::Options options;
     options.root = root;
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
     uint64_t first = 0;
     CHECK(client.upload(dir / "KRPvKR.rtbw", "KRPvKR.rtbw", [&](uint64_t done, uint64_t) {
         if (first == 0) first = done;
@@ -910,12 +904,12 @@ TEST_CASE("Machine jobs: the test finds the system, Install copies the program a
     ssh::MockServer::Options options;
     options.root = root;
     options.exec = [root](const std::string& command) { return linuxBox(root, command); };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
 
     Machine m;
     m.name = "test-box";
     m.host = "127.0.0.1";
-    m.port = machinePort();
+    m.port = server.port();
     m.user = "tester";
     {
         MachineJob job(MachineJob::Kind::Test, targetOf(m, dir, ""),
@@ -970,11 +964,11 @@ TEST_CASE("Machine jobs: a Windows machine's cmd told, its probe and engines' co
         }
         return reply;
     };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     Machine m;
     m.name = "win-box";
     m.host = "127.0.0.1";
-    m.port = machinePort();
+    m.port = server.port();
     m.user = "tester";
     SshClient client;
     REQUIRE(client.connect(targetOf(m, dir, "")));
@@ -1005,11 +999,11 @@ TEST_CASE("Machine jobs: engines' paths checked there: missing, a folder, mute, 
     ssh::MockServer::Options options;
     options.root = root;
     options.exec = [root](const std::string& command) { return linuxBox(root, command); };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     Machine m;
     m.name         = "test-box";
     m.host         = "127.0.0.1";
-    m.port         = machinePort();
+    m.port         = server.port();
     m.user         = "tester";
     m.system.shell = RemoteShell::Posix;
     m.engines      = {{"Mock", "/engines/mock", -1, "", ""},
@@ -1056,11 +1050,11 @@ TEST_CASE("Machine jobs: books and tablebases compared, the missing ones pushed,
     ssh::MockServer::Options options;
     options.root = root;
     options.exec = [root](const std::string& command) { return linuxBox(root, command); };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     Machine m;
     m.name         = "test-box";
     m.host         = "127.0.0.1";
-    m.port         = machinePort();
+    m.port         = server.port();
     m.user         = "tester";
     m.system.shell = RemoteShell::Posix;
     FilesRequest request;
@@ -1125,12 +1119,13 @@ tour::Participant participant(int id, const std::string& name, const std::string
     return p;
 }
 
-Machine linuxMachine() {
+// Its SSH server on `port`: the test's mock server's, when it has one.
+Machine linuxMachine(int port = 22) {
     Machine m;
     m.id             = "m1";
     m.name           = "test-box";
     m.host           = "127.0.0.1";
-    m.port           = machinePort();
+    m.port           = port;
     m.user           = "tester";
     m.folder         = "fcg";
     m.system.shell   = RemoteShell::Posix;
@@ -1258,8 +1253,8 @@ TEST_CASE("Machine runs: prepared and started there, refused without the program
         }
         return linuxBox(root, command);
     };
-    ssh::MockServer server(machinePort(), options);
-    auto m = linuxMachine();
+    ssh::MockServer server(0, options);
+    auto m = linuxMachine(server.port());
 
     tour::TournamentSpec spec;
     spec.participants.push_back(participant(1, "Alpha", "/opt/alpha"));
@@ -1269,7 +1264,7 @@ TEST_CASE("Machine runs: prepared and started there, refused without the program
     const auto json              = nlohmann::json(spec).dump();
 
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
     std::string error;
     std::vector<std::string> notes;
     // The book is not there yet.
@@ -1307,9 +1302,9 @@ TEST_CASE("Machine runs: the tournament's files copied back as they grow, writte
     writeFile(local / "tournament.json", "{\"local\":true}");
     ssh::MockServer::Options options;
     options.root = root;
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
     std::string error;
     auto copied = MachineSync::pass(client, "/fcg/tournaments/t", local, error);
     REQUIRE_MESSAGE(copied, error);
@@ -1353,8 +1348,8 @@ TEST_CASE("Machine runs: the control channel through SSH, and a process that is 
         }
         return reply;
     };
-    ssh::MockServer server(machinePort(), options);
-    auto target = loopbackTarget(dir);
+    ssh::MockServer server(0, options);
+    auto target = loopbackTarget(dir, server.port());
     auto status = std::make_shared<LinkStatus>();
     {
         SshLink link(target, viaSh("exec fcg --attach 'playing'"), nullptr, status, std::chrono::seconds(2));
@@ -1669,13 +1664,13 @@ TEST_CASE("Machine jobs: an engine copied with its folder, each file's hash chec
         }
         return linuxBox(root, command);
     };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
 
     EngineEntry alpha;
     alpha.name    = "Alpha";
     alpha.cmd     = (here / "alpha/alpha").string();
     alpha.options = {{"EvalFile", (here / "alpha/nn-test.nnue").string()}};
-    auto m        = linuxMachine();
+    auto m        = linuxMachine(server.port());
     MachineEngine by_hand;
     by_hand.engine   = "Alpha";
     by_hand.path     = "/opt/alpha";
@@ -1683,7 +1678,7 @@ TEST_CASE("Machine jobs: an engine copied with its folder, each file's hash chec
     m.engines        = {by_hand};
     const std::map<std::string, std::string> protocols{{"Alpha", "uci"}};
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
     JobState state;
 
     // A different build there, at a path outside the machine's folder.
@@ -1815,14 +1810,14 @@ TEST_CASE("Machine jobs: an engine's copy cut by the network resumes; a Windows 
         }
         return linuxBox(root, command);
     };
-    ssh::MockServer server(machinePort(), options);
+    ssh::MockServer server(0, options);
     EngineEntry alpha;
     alpha.name = "Alpha";
     alpha.cmd  = (here / "alpha/alpha").string();
-    auto m     = linuxMachine();
+    auto m     = linuxMachine(server.port());
     {
         SshClient client;
-        REQUIRE(client.connect(loopbackTarget(dir)));
+        REQUIRE(client.connect(loopbackTarget(dir, server.port())));
         JobState state;
         JobResult cut;
         copyEngine(client, m, planEngineCopy(alpha, m), {}, state, cut);
@@ -1832,7 +1827,7 @@ TEST_CASE("Machine jobs: an engine's copy cut by the network resumes; a Windows 
     CHECK(fs::exists(root / "home/tester/fcg/engines/Alpha/alpha.part"));
     {
         SshClient client;
-        REQUIRE(client.connect(loopbackTarget(dir)));
+        REQUIRE(client.connect(loopbackTarget(dir, server.port())));
         JobState state;
         JobResult resumed;
         copyEngine(client, m, planEngineCopy(alpha, m), {}, state, resumed);
@@ -1851,7 +1846,7 @@ TEST_CASE("Machine jobs: an engine's copy cut by the network resumes; a Windows 
     auto plan        = planEngineCopy(alpha, m, here / "win/alpha.exe");
     plan.with_folder = true;
     SshClient client;
-    REQUIRE(client.connect(loopbackTarget(dir)));
+    REQUIRE(client.connect(loopbackTarget(dir, server.port())));
     JobState state;
     JobResult refused;
     const auto before = server.written.load();

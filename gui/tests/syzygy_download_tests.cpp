@@ -14,7 +14,6 @@
 
 #include <fmt/include/fmt/format.h>
 
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "scripted_server.hpp"
 #include "syzygy_download.hpp"
@@ -67,8 +66,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     std::atomic<bool> broken{false};
     std::mutex mutex;
     std::vector<std::string> asked;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path  = requestPath(head);
         const auto name  = path.substr(path.rfind('/') + 1);
         const auto range = httpHeader(head, "Range");
@@ -95,6 +93,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
         const std::size_t to = cut >= 0 ? static_cast<std::size_t>(cut) : content.size();
         if (to > from) c.sendAll(std::string_view(content).substr(from, to - from));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto folder = fs::temp_directory_path() / "syzygy";
     fs::remove_all(folder);
@@ -155,11 +154,11 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
 }
 
 TEST_CASE("Syzygy download: a folder that cannot be written said by its kind, the file beside the words (#141)") {
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         (void)requestBody(head, c);
         c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     // A file stands where the folder would be made: nothing can be written there.
     const auto blocker = fs::temp_directory_path() / "syzygy-blocked";

@@ -33,7 +33,7 @@ void answer(net::TcpConnection& c, int status, const std::string& body, const ch
 // A server whose answers depend on the request's path, which it keeps with the request's head.
 struct Lichess {
     explicit Lichess(std::function<void(const std::string& path, const std::string& head, net::TcpConnection&)> serve)
-        : port(fcg::test::freePort()), server(port, [this, serve](const std::string& head, net::TcpConnection& c) {
+        : server(0, [this, serve](const std::string& head, net::TcpConnection& c) {
               const auto path = requestPath(head);
               {
                   std::lock_guard lock(mutex);
@@ -43,7 +43,7 @@ struct Lichess {
               serve(path, head, c);
           }) {
         REQUIRE(server.ok());
-        const auto base = fmt::format("http://127.0.0.1:{}", port);
+        const auto base = fmt::format("http://127.0.0.1:{}", server.port());
         servers()       = Servers{base, base + "/tb", base + "/explorer"};
         HostGate::instance().setPause(50ms);
     }
@@ -59,7 +59,6 @@ struct Lichess {
         std::lock_guard lock(mutex);
         return heads.empty() ? std::string() : heads.back();
     }
-    uint16_t port;
     std::mutex mutex;
     std::vector<std::string> paths, heads;
     ScriptedServer server;
@@ -371,7 +370,7 @@ TEST_CASE("Lichess: each failure of the cloud, the tables and the explorer told 
     CHECK(tablebase(KK).net == NetError::NotFound);
     CHECK(explorer(player).net == NetError::NotFound);
 
-    // Nothing listens: no answer.
+    // Nothing listens: no answer (freePort(): a free port nothing is started on).
     const auto nobody = fmt::format("http://127.0.0.1:{}", freePort());
     servers()         = Servers{nobody, nobody + "/tb", nobody + "/explorer"};
     CHECK(tablebase(KK).net == NetError::Offline);

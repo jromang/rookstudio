@@ -13,7 +13,6 @@
 #include <fmt/include/fmt/format.h>
 
 #include "board_text.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "online_cache.hpp"
 #include "review_bridge.hpp"
@@ -150,8 +149,7 @@ TEST_CASE("review tables: the positions asked, and the review held to the answer
 TEST_CASE("review tables: asked one at a time, kept in the profile, asked once") {
     std::mutex mutex;
     std::vector<std::string> asked;
-    const uint16_t port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = head.substr(4, head.find(' ', 4) - 4);
         {
             std::lock_guard lock(mutex);
@@ -163,6 +161,7 @@ TEST_CASE("review tables: asked one at a time, kept in the profile, asked once")
         else
             answer(c, 200, R"({"category":"unknown","moves":[]})");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto base    = fmt::format("http://127.0.0.1:{}", port);
     lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};

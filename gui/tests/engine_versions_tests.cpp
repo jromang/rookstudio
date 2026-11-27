@@ -18,7 +18,6 @@
 #include "engine_downloads.hpp"
 #include "engine_versions.hpp"
 #include "engines.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "mock_engines.hpp"
 #include "scripted_server.hpp"
@@ -177,10 +176,9 @@ TEST_CASE("engine versions: a deleted version a tournament asks for again, downl
     const std::string name = "sample-engine";
 #endif
     // GitHub, on this machine: the release's file at the address GitHub gives its files.
-    const auto port = freePort();
     std::mutex mutex;
     std::vector<std::string> asked;
-    ScriptedServer github(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer github(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         {
             std::lock_guard lock(mutex);
@@ -192,6 +190,7 @@ TEST_CASE("engine versions: a deleted version a tournament asks for again, downl
                               body.size()) +
                   body);
     });
+    const auto port = github.port();
     REQUIRE(github.ok());
     const auto cpu = detectCpu();
     Engine engine;

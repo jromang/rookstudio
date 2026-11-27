@@ -14,7 +14,6 @@
 #include <json.hpp>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_board.hpp"
@@ -320,8 +319,7 @@ TEST_CASE("Lichess board: a game's stream read into its state, its board, its cl
 TEST_CASE("Lichess board: the requests of a game and of a challenge, and Lichess's reasons") {
     std::mutex mutex;
     std::vector<Seen> seen;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -337,6 +335,7 @@ TEST_CASE("Lichess board: the requests of a game and of a challenge, and Lichess
         }
         c.sendAll(reply(200, R"({"ok": true})"));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api     = fmt::format("http://127.0.0.1:{}", port);
     const auto played = boardMove("tok", "gAme1234", "e2e4", true);
@@ -379,8 +378,7 @@ TEST_CASE("Lichess board: a real-time seek held open, called back by closing it;
     std::vector<Seen> seen;
     std::atomic<bool> closed_by_client{false};
     std::atomic<int> mode{0};  // 0 held until the client closes, 1 taken at once, 2 refused
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -401,6 +399,7 @@ TEST_CASE("Lichess board: a real-time seek held open, called back by closing it;
         }
         closed_by_client = waitClosed(c);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {
@@ -441,8 +440,7 @@ TEST_CASE("Lichess board: a challenge kept alive until Lichess says how it ended
     std::vector<Seen> seen;
     std::atomic<int> mode{0};  // 0 declined, 1 held until the client closes
     std::atomic<bool> closed_by_client{false};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -468,6 +466,7 @@ TEST_CASE("Lichess board: a challenge kept alive until Lichess says how it ended
         }
         closed_by_client = waitClosed(c);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {
@@ -523,8 +522,7 @@ TEST_CASE("Lichess board: a challenge kept alive until Lichess says how it ended
 
 TEST_CASE("Lichess board: a game's stream heard, opened again after a cut, stopped at the game's end") {
     std::atomic<int> opened{0};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path == "/api/board/game/stream/unknown1") {
             c.sendAll(reply(404, R"({"error": "Not found"})"));
@@ -555,6 +553,7 @@ TEST_CASE("Lichess board: a game's stream heard, opened again after a cut, stopp
             "winc": 5000, "binc": 5000, "status": "mate", "winner": "black"})") +
                   LAST_CHUNK);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {
@@ -668,8 +667,7 @@ TEST_CASE("Lichess board: each failure of a request, a seek, a challenge and a g
 }
 
 TEST_CASE("Lichess board: the event stream opened with the right to play, its challenges heard") {
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         if (requestPath(head) != "/api/stream/event") {
             c.sendAll(reply(404, "{}"));
             return;
@@ -681,6 +679,7 @@ TEST_CASE("Lichess board: the event stream opened with the right to play, its ch
             "compat": {"board": true}})"));
         (void)waitClosed(c);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {

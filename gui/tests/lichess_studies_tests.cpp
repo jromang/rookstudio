@@ -21,7 +21,6 @@
 #include "answering_server.hpp"
 #include "assistant_notes.hpp"
 #include "console.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_studies.hpp"
@@ -66,7 +65,7 @@ struct Lichess {
         std::string method, path, authorization, body;
     };
     Lichess()
-        : port(freePort()), server(port, [this](const std::string& head, net::TcpConnection& c) {
+        : server(0, [this](const std::string& head, net::TcpConnection& c) {
               Seen s;
               s.method          = head.substr(0, head.find(' '));
               s.path            = requestPath(head);
@@ -147,7 +146,7 @@ struct Lichess {
                   type, extra, s.method == "HEAD" ? 0 : body.size(), body));
           }) {
         REQUIRE(server.ok());
-        servers().api = fmt::format("http://127.0.0.1:{}", port);
+        servers().api = fmt::format("http://127.0.0.1:{}", server.port());
     }
     ~Lichess() { servers() = Servers{}; }
     std::vector<Seen> requests() {
@@ -156,7 +155,6 @@ struct Lichess {
     }
     std::mutex mutex;
     std::vector<Seen> seen;
-    uint16_t port;
     ScriptedServer server;
 };
 

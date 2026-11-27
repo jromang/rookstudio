@@ -15,7 +15,6 @@
 #include "board_view.hpp"
 #include "broadcast.hpp"
 #include "engine_logos.hpp"
-#include "free_ports.hpp"
 #include "net.hpp"
 #include "piece_sets.hpp"
 #include "portable.hpp"
@@ -400,8 +399,8 @@ TEST_CASE("logos: state.json has those of the tournament's engines, and the serv
     CHECK(webPage().size() < 80000);
 
     WebServer server;
-    const uint16_t port = fcg::test::freePort();
-    REQUIRE(server.start(port).empty());
+    REQUIRE(server.start(0).empty());
+    const uint16_t port = server.port();
     server.publish(s);
     const auto png = logos::png(picture(8, 8));
     server.setLogos({{"Alpha", "logo/0123abcd.png", png}, {"Beta", "../x.png", png}});

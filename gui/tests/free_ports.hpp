@@ -1,10 +1,15 @@
 #pragma once
 
-// Ports for the tests' servers and clients, free when they are asked for: each test case may run in a process of its
-// own, at the same time as the others, and another run of the tests may be going on. A block of consecutive ports
-// drawn at random below the systems' ephemeral ranges (Linux's starts at 32768, macOS' and Windows' at 49152), so that
-// no outgoing connection takes one meanwhile, each bound for TCP and UDP to check it, then let go. A port handed out
-// once in a process is not handed out again in it.
+// Ports known before anything listens there: a program or a process told its port, a UDP port, a port nothing must
+// listen on. A test's own server listens on port 0 instead, and the test reads the port it was given (port()): the
+// system holds that port from the moment it gives it, while a port found free here may be taken by another test
+// process before it is used.
+//
+// Free when they are asked for: each test case may run in a process of its own, at the same time as the others, and
+// another run of the tests may be going on. A block of consecutive ports drawn at random below the systems' ephemeral
+// ranges (Linux's starts at 32768, macOS' and Windows' at 49152), so that no outgoing connection takes one meanwhile,
+// each bound for TCP and UDP to check it, then let go. A port handed out once in a process is not handed out again in
+// it.
 
 #include <chrono>
 #include <cstdint>

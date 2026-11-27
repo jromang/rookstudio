@@ -60,9 +60,8 @@ void answer(net::TcpConnection& c, int status, const std::string& body) {
 struct Tables {
     std::mutex mutex;
     std::vector<std::string> asked;
-    uint16_t port = freePort();
     ScriptedServer server{
-        port, [this](const std::string& head, net::TcpConnection& c) {
+        0, [this](const std::string& head, net::TcpConnection& c) {
             const auto path = head.substr(4, head.find(' ', 4) - 4);
             {
                 std::lock_guard lock(mutex);
@@ -85,7 +84,7 @@ struct Tables {
         }};
     Tables() {
         REQUIRE(server.ok());
-        const auto base    = fmt::format("http://127.0.0.1:{}", port);
+        const auto base    = fmt::format("http://127.0.0.1:{}", server.port());
         lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};
         HostGate::instance().setPause(50ms);
     }
@@ -266,7 +265,7 @@ TEST_CASE("endgames tab: the profile's answers read before any request, an unkno
 TEST_CASE("endgames tab and check: an outage said as one, never as a position the tables do not know") {
     const auto profile = fs::temp_directory_path() / "board-tables-outage";
     fs::remove_all(profile);
-    // Nothing listens: Lichess's tables out of reach.
+    // Nothing listens: Lichess's tables out of reach (freePort(): a free port nothing is started on).
     const auto nobody  = fmt::format("http://127.0.0.1:{}", freePort());
     lichess::servers() = lichess::Servers{nobody, nobody + "/tb", nobody + "/explorer"};
     bool sent          = false;

@@ -1060,7 +1060,7 @@ TEST_CASE("headless: the tournament is broadcast over TLCS and as live files") {
     storage.saveEngines(randomEngines());
     REQUIRE(writeJson(profile / "setup-file.json", randomSetup(40)));
 
-    const uint16_t tlcs_port = fcg::test::freePort();
+    const uint16_t tlcs_port = fcg::test::freePort();  // UDP, told to the broadcast before it binds
     HeadlessBroadcast broadcast;
     broadcast.tlcs_port   = tlcs_port;
     broadcast.live_dir    = (profile / "live").string();
@@ -1074,7 +1074,7 @@ TEST_CASE("headless: the tournament is broadcast over TLCS and as live files") {
 
     // A viewer: logs on until the server answers, then acknowledges and keeps what it receives.
     net::UdpSocket client;
-    REQUIRE(client.bind(fcg::test::freePort()).empty());
+    REQUIRE(client.bind(0).empty());
     const net::Endpoint to{0x7F000001, tlcs_port};
     std::vector<std::string> received;
     bool logged_on   = false;

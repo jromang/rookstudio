@@ -234,8 +234,7 @@ TEST_CASE("evaluations: the book: the window, the depth, the plies, one per vari
 }
 
 TEST_CASE("evaluations: the database's size asked by its first byte") {
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         if (httpHeader(head, "Range") == "bytes=0-0")
             c.sendAll(
                 "HTTP/1.1 206 Partial Content\r\nLast-Modified: Sun, 01 Nov 2026 17:23:27 GMT\r\n"
@@ -243,6 +242,7 @@ TEST_CASE("evaluations: the database's size asked by its first byte") {
         else
             c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto size = evalsSize(fmt::format("http://127.0.0.1:{}/lichess_db_eval.jsonl.zst", port));
     CHECK_FALSE(size.failed());
@@ -272,6 +272,7 @@ TEST_CASE("evaluations: the database's size not known, each failure told by its 
     // An answer without the size: not what the server sends.
     server.answer(200, "");
     CHECK(evalsSize(url).net == lichess::NetError::BadAnswer);
+    // Nothing listens there (freePort(): a free port nothing is started on).
     const auto nobody = evalsSize(fmt::format("http://127.0.0.1:{}/lichess_db_eval.jsonl.zst", fcg::test::freePort()));
     CHECK(nobody.net == lichess::NetError::Offline);
     CHECK(lichess::describe(nobody) == "Lichess cannot be reached");
@@ -292,8 +293,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
     std::atomic<bool> released{false};
     std::mutex mutex;
     std::vector<std::string> asked;  // "Range|If-Range" of each request
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto range = httpHeader(head, "Range"), if_range = httpHeader(head, "If-Range");
         {
             std::lock_guard lock(mutex);
@@ -323,6 +323,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         }
         if (to > from) c.sendAll(std::string_view(content).substr(from, to - from));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto url    = fmt::format("http://127.0.0.1:{}/lichess_db_eval.jsonl.zst", port);
     const auto folder = fs::temp_directory_path() / "evaluations";

@@ -16,7 +16,6 @@
 #include "answering_server.hpp"
 #include "console.hpp"
 #include "fide_cards.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "scripted_server.hpp"
 
@@ -31,8 +30,7 @@ namespace fs = std::filesystem;
 TEST_CASE("FIDE cards: a player by id, a search by name, the match, and what leaves the machine") {
     std::mutex mutex;
     std::vector<std::string> asked;
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         {
             std::lock_guard lock(mutex);
@@ -56,6 +54,7 @@ TEST_CASE("FIDE cards: a player by id, a search by name, the match, and what lea
             c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto before = servers().api;
     servers().api     = fmt::format("http://127.0.0.1:{}", port);

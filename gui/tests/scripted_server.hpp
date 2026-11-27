@@ -22,7 +22,8 @@ namespace fcg::test {
 using namespace std::chrono_literals;
 
 // Each connection served on a thread of its own by `serve`, given the request's head: it writes what it wants,
-// waiting where it wants. Counts the connections served at once.
+// waiting where it wants. Counts the connections served at once. On `port`, or with 0 on a port the system gives
+// (taken until the server goes: no other process draws it meanwhile), which port() tells.
 class ScriptedServer {
    public:
     using Serve = std::function<void(const std::string& head, net::TcpConnection& c)>;
@@ -57,6 +58,8 @@ class ScriptedServer {
     ScriptedServer& operator=(const ScriptedServer&) = delete;
 
     [[nodiscard]] bool ok() const { return ok_; }
+    // The port it listens on, 0 when it could not.
+    [[nodiscard]] uint16_t port() const { return listener_.port(); }
     [[nodiscard]] int maxOpen() const { return max_open_; }
 
    private:

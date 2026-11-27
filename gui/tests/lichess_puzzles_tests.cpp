@@ -19,7 +19,6 @@
 
 #include "answering_server.hpp"
 #include "console.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_puzzles.hpp"
@@ -156,8 +155,7 @@ TEST_CASE("lichess puzzles: a batch asked for, its results sent in one request t
     std::mutex mutex;
     std::vector<Seen> seen;
     std::atomic<int> status{200};
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         Seen s;
         s.line            = head.substr(0, head.find("\r\n"));
         s.authorization   = httpHeader(head, "Authorization").value_or("");
@@ -188,6 +186,7 @@ TEST_CASE("lichess puzzles: a batch asked for, its results sent in one request t
             c.sendAll(reply(200, j.dump()));
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     HostGate::instance().setPause(50ms);

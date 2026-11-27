@@ -135,14 +135,14 @@ TEST_CASE("TWIC: the page of issues that gives none keeps why by its kind, worde
     auto& gate = HostGate::instance();
     gate.setPause(50ms);  // the host's minute after a 429, shorter for the test
     std::atomic<int> status{200};
-    const auto port = fcg::test::freePort();
-    fcg::test::ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    fcg::test::ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         (void)fcg::test::requestBody(head, c);
         if (status == 200)
             c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\n<html></html>");
         else
             c.sendAll(fmt::format("HTTP/1.1 {} No\r\nContent-Length: 0\r\n\r\n", status.load()));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     twic::setServer(fmt::format("http://127.0.0.1:{}", port));
 
@@ -175,7 +175,7 @@ TEST_CASE("TWIC: the page of issues that gives none keeps why by its kind, worde
     CHECK(twic::indexSaid(failed) ==
           "theweekinchess.com did not answer: The page of issues lists none the program can read.");
 
-    // No server at all: an outage.
+    // No server at all: an outage (freePort(): a free port nothing is started on).
     twic::setServer(fmt::format("http://127.0.0.1:{}", fcg::test::freePort()));
     failed = twic::fetchIndex().second;
     CHECK(failed.kind == Kind::Offline);

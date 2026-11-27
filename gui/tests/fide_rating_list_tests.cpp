@@ -14,7 +14,6 @@
 #include <fmt/include/fmt/format.h>
 
 #include "fide_rating_list.hpp"
-#include "free_ports.hpp"
 #include "scripted_server.hpp"
 #include "test_support.hpp"
 #include "zip.hpp"
@@ -51,11 +50,10 @@ std::string list(const std::string& rating_column = "SRtng") {
 // FIDE's download: the list as a zip, dated by its Last-Modified.
 struct FakeFide {
     explicit FakeFide(std::string body, std::string modified = "Sun, 22 Nov 2026 22:03:51 GMT", int status = 200)
-        : port(freePort()),
-          zip(std::move(body)),
+        : zip(std::move(body)),
           modified_(std::move(modified)),
           status_(status),
-          server(port, [this](const std::string& head, net::TcpConnection& c) {
+          server(0, [this](const std::string& head, net::TcpConnection& c) {
               ++requests;
               if (head.rfind("GET /download/players_list.zip ", 0) != 0 || status_ != 200) {
                   c.sendAll(fmt::format("HTTP/1.1 {} X\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
@@ -68,10 +66,9 @@ struct FakeFide {
                         zip);
           }) {
         REQUIRE(server.ok());
-        fide::setServer(fmt::format("http://127.0.0.1:{}", port));
+        fide::setServer(fmt::format("http://127.0.0.1:{}", server.port()));
     }
     ~FakeFide() { fide::setServer("https://ratings.fide.com"); }
-    uint16_t port;
     std::string zip;
     std::string modified_;
     int status_;

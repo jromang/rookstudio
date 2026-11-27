@@ -18,7 +18,6 @@
 #include <json.hpp>
 #include <tour/util.hpp>
 
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_bot.hpp"
@@ -299,8 +298,7 @@ TEST_CASE("Lichess bot: the account asked, the upgrade, Lichess's refusal") {
     std::mutex mutex;
     std::vector<Seen> seen;
     std::atomic<int> upgrades{0};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -317,6 +315,7 @@ TEST_CASE("Lichess bot: the account asked, the upgrade, Lichess's refusal") {
             c.sendAll(reply(404, "{}"));
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api    = fmt::format("http://127.0.0.1:{}", port);
     const auto facts = botAccount("bot-token");
@@ -341,8 +340,7 @@ TEST_CASE("Lichess bot: the account asked, the upgrade, Lichess's refusal") {
 
 TEST_CASE("Lichess bot: a game played by the engine through the Bot API, its words, a draw and a takeback declined") {
     FakeGame game;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(game.mutex);
@@ -395,6 +393,7 @@ TEST_CASE("Lichess bot: a game played by the engine through the Bot API, its wor
             if (n == 1 && game.moves.size() >= 2) return;
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     BotPlay play;
@@ -444,8 +443,7 @@ TEST_CASE("Lichess bot: an engine that cannot start aborts the game before both 
     std::mutex mutex;
     std::vector<std::string> posts;
     std::atomic<bool> stop{false};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         if (s.line.rfind("POST", 0) == 0) {
             std::lock_guard lock(mutex);
@@ -470,6 +468,7 @@ TEST_CASE("Lichess bot: an engine that cannot start aborts the game before both 
             std::this_thread::sleep_for(20ms);
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     BotPlay play;
@@ -497,8 +496,7 @@ TEST_CASE("Lichess bot: the victory claimed once the opponent left long enough")
     std::mutex mutex;
     std::vector<std::string> posts;
     std::atomic<bool> claimed{false};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         if (s.line.rfind("POST", 0) == 0) {
             {
@@ -530,6 +528,7 @@ TEST_CASE("Lichess bot: the victory claimed once the opponent left long enough")
                         "\n") +
                   LAST_CHUNK);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     BotPlay play;

@@ -11,7 +11,6 @@
 #include <json.hpp>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_playing.hpp"
 #include "scripted_server.hpp"
@@ -92,8 +91,7 @@ TEST_CASE("Lichess playing: the event stream's lines, games only") {
 
 TEST_CASE("Lichess playing: the stream heard on its own thread; a refused token stops it") {
     std::atomic<bool> refuse{false};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         if (requestPath(head) != "/api/stream/event" || refuse) {
             c.sendAll("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
             return;
@@ -107,6 +105,7 @@ TEST_CASE("Lichess playing: the stream heard on its own thread; a refused token 
                         "Connection: close\r\n\r\n{}",
                         body.size(), body));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {
@@ -158,8 +157,7 @@ TEST_CASE("Lichess playing: a finished game brought into a database, once") {
 1. e4 { [%eval 0.2] [%clk 0:03:00] } 1... e5 { [%eval 0.25] [%clk 0:03:00] } 2. Qh5 { [%eval -0.1] } 2... Nc6 { [%eval 0.0] }
 3. Bc4 { [%eval -0.1] } 3... Nf6 { [%eval 6.0] } 4. Qxf7# 1-0
 )";
-    const auto port       = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path    = requestPath(head);
         const bool aborted = path.rfind("/game/export/abor1234", 0) == 0;
         if (path.rfind("/game/export/abcd1234", 0) != 0 && !aborted) {
@@ -173,6 +171,7 @@ TEST_CASE("Lichess playing: a finished game brought into a database, once") {
                         "Connection: close\r\n\r\n{}",
                         body.size(), body));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api  = fmt::format("http://127.0.0.1:{}", port);
     const auto dir = std::filesystem::temp_directory_path() / "fcg-lichess-finished";

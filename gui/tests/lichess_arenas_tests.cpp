@@ -23,7 +23,6 @@
 #include <study/store.hpp>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_account.hpp"
 #include "lichess_arenas.hpp"
@@ -367,8 +366,7 @@ TEST_CASE("Lichess arenas: the conditions as Lichess judges them, the user's fig
     // Against a server: the token sent when there is one, the standing's page; an anonymous answer judges nothing.
     std::mutex mutex;
     std::vector<Seen> seen;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -376,6 +374,7 @@ TEST_CASE("Lichess arenas: the conditions as Lichess judges them, the user's fig
         }
         c.sendAll(reply(200, s.authorization.empty() ? std::string(ARENA) : arenaWithToken(true, false)));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api       = fmt::format("http://127.0.0.1:{}", port);
     const auto anyone   = arenaOf("rap1d100");
@@ -455,8 +454,7 @@ TEST_CASE("Lichess arenas: joined again each minute while waiting, the lock betw
     // The requests: joining with pairMeAsap and the token, pausing.
     std::mutex mutex;
     std::vector<Seen> seen;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -468,6 +466,7 @@ TEST_CASE("Lichess arenas: joined again each minute while waiting, the lock betw
         }
         c.sendAll(reply(200, R"({"ok":true})"));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api    = fmt::format("http://127.0.0.1:{}", port);
     const auto join  = joinArena("tok", "rap1d100");
@@ -529,8 +528,7 @@ TEST_CASE("Lichess arenas: berserk only before the user's first move where the a
     // Lichess refuses it after the first move: its words said.
     std::vector<std::string> paths;
     std::mutex mutex;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s2 = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -541,6 +539,7 @@ TEST_CASE("Lichess arenas: berserk only before the user's first move where the a
         else
             c.sendAll(reply(200, R"({"ok":true})"));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api    = fmt::format("http://127.0.0.1:{}", port);
     const auto early = berserk("tok", "aRena001");
@@ -636,8 +635,7 @@ TEST_CASE("Lichess Swiss: the user's teams, their Swiss tournaments, the next ro
     // Against a server: the teams with the token (403 without the permission), a team's list, a standing.
     std::mutex mutex;
     std::vector<Seen> seen;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto s = readRequest(head, c);
         {
             std::lock_guard lock(mutex);
@@ -658,6 +656,7 @@ TEST_CASE("Lichess Swiss: the user's teams, their Swiss tournaments, the next ro
         else
             c.sendAll(reply(404, R"({"error":"Not found"})"));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api       = fmt::format("http://127.0.0.1:{}", port);
     const auto refused  = teamsOf("RS_Sample", "tok");
@@ -708,8 +707,7 @@ TEST_CASE("Lichess arenas: the standing waits its minute after a 429, a game's s
     HostGate::instance().setPause(700ms);  // a minute, short for the test
     std::atomic<int> arena_asked{0};
     std::atomic<bool> sent_during_pause{false};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path.rfind("/api/tournament/", 0) == 0) {
             if (++arena_asked == 1) {
@@ -738,6 +736,7 @@ TEST_CASE("Lichess arenas: the standing waits its minute after a 429, a game's s
         (void)waitUntil([] { return false; }, 1500ms);
         c.sendAll(LAST_CHUNK);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     GameStream game("tok", "aRena001");
@@ -766,8 +765,7 @@ TEST_CASE("Lichess arenas: the standing waits its minute after a 429, a game's s
 
 TEST_CASE("Lichess arenas: an arena game's stream cut is opened again, tried after 1 s, then 2 s") {
     std::atomic<int> opened{0};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path.find("/chat") != std::string::npos) {
             c.sendAll(reply(200, "[]"));
@@ -784,6 +782,7 @@ TEST_CASE("Lichess arenas: an arena game's stream cut is opened again, tried aft
         (void)waitUntil([] { return false; }, 300ms);
         c.sendAll(LAST_CHUNK);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     GameStream game("tok", "aRena002");
@@ -815,8 +814,7 @@ TEST_CASE("Lichess arenas: an arena game's stream cut is opened again, tried aft
 }
 
 TEST_CASE("Lichess arenas: a finished arena game kept in the user's Lichess database, its event the arena's") {
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         if (requestPath(head).rfind("/game/export/aRena001", 0) == 0)
             c.sendAll(reply(200,
                             "[Event \"Hourly Rapid Arena\"]\n[Site \"https://lichess.org/aRena001\"]\n"
@@ -827,6 +825,7 @@ TEST_CASE("Lichess arenas: a finished arena game kept in the user's Lichess data
         else
             c.sendAll(reply(404, ""));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api  = fmt::format("http://127.0.0.1:{}", port);
     const auto dir = fs::temp_directory_path() / "arena-account";

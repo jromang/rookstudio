@@ -47,14 +47,14 @@ TEST_CASE("chess.com: the player's months that cannot be had keep why by their k
     auto& gate = HostGate::instance();
     gate.setPause(50ms);  // the host's minute after a 429, shorter for the test
     std::atomic<int> status{200};
-    const auto port = fcg::test::freePort();
-    fcg::test::ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    fcg::test::ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         (void)fcg::test::requestBody(head, c);
         if (status == 200)
             c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 16\r\n\r\n{\"archives\": []}");
         else
             c.sendAll(fmt::format("HTTP/1.1 {} No\r\nContent-Length: 0\r\n\r\n", status.load()));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     chesscom::setServer(fmt::format("http://127.0.0.1:{}", port));
 
@@ -83,7 +83,7 @@ TEST_CASE("chess.com: the player's months that cannot be had keep why by their k
     CHECK(months.empty());
     CHECK(failed.kind == Kind::None);
 
-    // No server at all: an outage.
+    // No server at all: an outage (freePort(): a free port nothing is started on).
     chesscom::setServer(fmt::format("http://127.0.0.1:{}", fcg::test::freePort()));
     failed = chesscom::fetchMonths("someone").second;
     CHECK(failed.kind == Kind::Offline);

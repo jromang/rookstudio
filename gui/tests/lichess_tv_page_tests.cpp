@@ -27,7 +27,6 @@
 #include "console.hpp"
 #include "databases.hpp"
 #include "focus_words.hpp"
-#include "free_ports.hpp"
 #include "jobs.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_settings.hpp"
@@ -149,9 +148,8 @@ class FakeLichess {
     };
     explicit FakeLichess(std::map<std::string, Game> games)
         : games_(std::move(games)),
-          port_(freePort()),
-          server_(port_, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
-        const auto base    = fmt::format("http://127.0.0.1:{}", port_);
+          server_(0, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
+        const auto base    = fmt::format("http://127.0.0.1:{}", server_.port());
         lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
     }
     ~FakeLichess() {
@@ -241,7 +239,6 @@ class FakeLichess {
     std::set<std::string> ended_;
     std::atomic<int> streams_{0};
     std::atomic<bool> quit_{false};
-    uint16_t port_;
     ScriptedServer server_;  // last: stopped first, its threads using what is above
 };
 

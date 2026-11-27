@@ -190,7 +190,6 @@ TEST_CASE("Lichess HTTP: one request builder, a form or JSON for its body") {
 }
 
 TEST_CASE("Lichess HTTP: a request sent and read, each failure with its kind") {
-    const auto port = freePort();
     // Each path answers as Lichess does: a value, or a refusal with its words.
     static const std::map<std::string, std::pair<int, std::string>> ANSWERS = {
         {"/rating", {200, R"({"rating":1850})"}},
@@ -203,13 +202,14 @@ TEST_CASE("Lichess HTTP: a request sent and read, each failure with its kind") {
         {"/garbage", {200, "<html>Not JSON</html>"}},
         {"/other", {200, R"({"name":"x"})"}},
     };
-    ScriptedServer server(port, [](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [](const std::string& head, net::TcpConnection& c) {
         const auto it = ANSWERS.find(requestPath(head));
         if (it == ANSWERS.end())
             answer(c, 500, "{}");
         else
             answer(c, it->second.first, it->second.second);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     HostGate::instance().setPause(50ms);
     const auto base = fmt::format("http://127.0.0.1:{}", port);
@@ -260,7 +260,7 @@ TEST_CASE("Lichess HTTP: a request sent and read, each failure with its kind") {
     CHECK(none.net == NetError::BadAnswer);
     CHECK_FALSE(none.value);
 
-    // No answer: nothing listens there.
+    // No answer: nothing listens there (freePort(): a free port nothing is started on).
     const auto nobody = call<Rating>(request("GET", fmt::format("http://127.0.0.1:{}/rating", freePort())), ratingOf);
     CHECK(nobody.net == NetError::Offline);
     CHECK(nobody.status == 0);
@@ -292,6 +292,7 @@ TEST_CASE("Lichess HTTP: a failure taken from another request's answer") {
 }
 
 TEST_CASE("Lichess HTTP: a host's outage logged once, when it starts, and again after it answered") {
+    // A port known before anything listens there (freePort()): nothing, then a server for a while, then nothing.
     const auto port   = freePort();
     const auto nobody = fmt::format("http://127.0.0.1:{}", port);
     // The outage's lines: "GET <address>: <the network's words>", apart from the line of each request sent.

@@ -21,7 +21,6 @@
 #include <study/store.hpp>
 #include <study/tree.hpp>
 
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "practical.hpp"
 #include "scripted_server.hpp"
@@ -102,8 +101,7 @@ TEST_CASE("practical moves: the candidates within 0.3 pawn of the best, never a 
 TEST_CASE("practical moves: the level's games from Lichess's explorer, the best score from 200 games") {
     std::mutex mutex;
     std::string asked;
-    const uint16_t port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         {
             std::lock_guard lock(mutex);
             asked = head.substr(4, head.find(' ', 4) - 4);
@@ -117,6 +115,7 @@ TEST_CASE("practical moves: the level's games from Lichess's explorer, the best 
                R"({"uci":"d2d4","san":"d4","white":60,"draws":5,"black":40},)"
                R"({"uci":"e1g1","san":"O-O","white":90,"draws":3,"black":40}],"topGames":[]})");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto base    = fmt::format("http://127.0.0.1:{}", port);
     lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer"};

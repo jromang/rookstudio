@@ -95,8 +95,7 @@ TEST_CASE("HTTP: a stream's lines come as they are sent, chunked or up to the en
     for (const bool chunked : {true, false}) {
         CAPTURE(chunked);
         std::atomic<bool> got_first{false}, streamed{false};
-        const auto port = fcg::test::freePort();
-        ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+        ScriptedServer server(0, [&](const std::string&, net::TcpConnection& c) {
             const auto piece = [&](std::string_view data) {
                 return c.sendAll(chunked ? fmt::format("{:x}\r\n{}\r\n", data.size(), data) : std::string(data));
             };
@@ -110,6 +109,7 @@ TEST_CASE("HTTP: a stream's lines come as they are sent, chunked or up to the en
             piece("3}\n");
             if (chunked) c.sendAll("0\r\n\r\n");
         });
+        const auto port = server.port();
         REQUIRE(server.ok());
         std::vector<std::string> lines;
         LineSplitter splitter([&](std::string_view line) {
@@ -136,11 +136,11 @@ TEST_CASE("HTTP: a stream's lines come as they are sent, chunked or up to the en
 
 TEST_CASE("HTTP: a stream ended by its cancel flag, by its reader, or by a server that says nothing") {
     std::atomic<bool> release{false};
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string&, net::TcpConnection& c) {
         c.sendAll("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n");
         waitUntil([&] { return release.load(); });  // and nothing more
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto request = get(fmt::format("http://127.0.0.1:{}/api/stream/event", port));
 
@@ -175,7 +175,8 @@ TEST_CASE("HTTP: a stream ended by its cancel flag, by its reader, or by a serve
 }
 
 TEST_CASE("HTTP: redirections followed, the token sent to its own site only, a loop given up") {
-    const uint16_t a = fcg::test::freePorts(2), b = a + 1;
+    // The servers' ports, once they listen: the first one's answers name the second one's.
+    std::atomic<uint16_t> a{0}, b{0};
     std::mutex mutex;
     std::vector<std::string> seen;  // "port path authorization"
     const auto record = [&](uint16_t port, const std::string& head) {
@@ -184,24 +185,27 @@ TEST_CASE("HTTP: redirections followed, the token sent to its own site only, a l
         seen.push_back(fmt::format("{} {} {}", port, path, httpHeader(head, "Authorization").value_or("-")));
         return path;
     };
-    ScriptedServer first(a, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer first(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = record(a, head);
         if (path == "/start") {
             c.sendAll("HTTP/1.1 302 Found\r\nLocation: next?x=1\r\nContent-Length: 0\r\n\r\n");
         } else if (path == "/next?x=1") {
-            c.sendAll(fmt::format("HTTP/1.1 307 Temporary Redirect\r\nlocation: http://127.0.0.1:{}/final\r\n\r\n", b));
+            c.sendAll(fmt::format("HTTP/1.1 307 Temporary Redirect\r\nlocation: http://127.0.0.1:{}/final\r\n\r\n",
+                                  b.load()));
         } else if (path == "/loop") {
             c.sendAll("HTTP/1.1 301 Moved Permanently\r\nLocation: /loop\r\nContent-Length: 0\r\n\r\n");
         }
     });
-    ScriptedServer second(b, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer second(0, [&](const std::string& head, net::TcpConnection& c) {
         record(b, head);
         c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndone");
     });
     REQUIRE(first.ok());
     REQUIRE(second.ok());
+    a = first.port();
+    b = second.port();
 
-    auto request  = get(fmt::format("http://127.0.0.1:{}/start", a));
+    auto request  = get(fmt::format("http://127.0.0.1:{}/start", a.load()));
     request.token = "secret";
     std::string body;
     HttpStream stream;
@@ -213,13 +217,13 @@ TEST_CASE("HTTP: redirections followed, the token sent to its own site only, a l
     CHECK(result.error.empty());
     CHECK(result.status == 200);
     CHECK(body == "done");
-    CHECK(seen == std::vector<std::string>{fmt::format("{} /start Bearer secret", a),
-                                           fmt::format("{} /next?x=1 Bearer secret", a),
-                                           fmt::format("{} /final -", b)});
+    CHECK(seen == std::vector<std::string>{fmt::format("{} /start Bearer secret", a.load()),
+                                           fmt::format("{} /next?x=1 Bearer secret", a.load()),
+                                           fmt::format("{} /final -", b.load())});
 
     // A loop: five redirections followed, the sixth given as the answer.
     seen.clear();
-    result = httpStream(get(fmt::format("http://127.0.0.1:{}/loop", a)), HttpStream{});
+    result = httpStream(get(fmt::format("http://127.0.0.1:{}/loop", a.load())), HttpStream{});
     CHECK(result.error.empty());
     CHECK(result.status == 301);
     CHECK(seen.size() == 6);
@@ -238,8 +242,7 @@ TEST_CASE("HTTP: a download cut short or cancelled goes on from where it stopped
     std::atomic<bool> released{false};
     std::mutex mutex;
     std::vector<std::string> asked;  // "Range|If-Range" of each request
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto range = httpHeader(head, "Range"), if_range = httpHeader(head, "If-Range");
         {
             std::lock_guard lock(mutex);
@@ -277,6 +280,7 @@ TEST_CASE("HTTP: a download cut short or cancelled goes on from where it stopped
         }
         if (to > from) c.sendAll(std::string_view(content).substr(from, to - from));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto dir = fs::temp_directory_path() / "downloads";
     fs::remove_all(dir);
@@ -367,8 +371,7 @@ TEST_CASE("HTTP: a download that stops keeps why by its kind and its file, worde
     using Kind = NetFailure::Kind;
     auto& gate = HostGate::instance();
     gate.setPause(50ms);  // the host's minute after a 429, shorter for the test
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         (void)requestBody(head, c);
         const auto path = requestPath(head);
         if (path == "/missing")
@@ -380,6 +383,7 @@ TEST_CASE("HTTP: a download that stops keeps why by its kind and its file, worde
         else
             c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto base = fmt::format("http://127.0.0.1:{}", port);
     const auto dir  = fs::temp_directory_path() / "download-kinds";
@@ -402,7 +406,7 @@ TEST_CASE("HTTP: a download that stops keeps why by its kind and its file, worde
     CHECK(describe(got.failure) == "127.0.0.1 asks to wait: too many requests");
     CHECK(gate.waitPause(got.failure.host));
 
-    // No server at all: an outage.
+    // No server at all: an outage (freePort(): a free port nothing is started on).
     got = httpDownload(fmt::format("http://127.0.0.1:{}/file", fcg::test::freePort()), dir / "nowhere.zip");
     CHECK(got.failure.kind == Kind::Offline);
     CHECK(describe(got.failure) == "127.0.0.1 cannot be reached from here");
@@ -446,8 +450,7 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
     // The requests being answered, counted up to their answer's last byte: a client goes on once it has it, without
     // waiting for the server to close the connection.
     std::atomic<int> answering{0}, most{0};
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const int now = ++answering;
         for (int seen = most.load(); now > seen && !most.compare_exchange_weak(seen, now);) {
         }
@@ -469,6 +472,7 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
         --answering;
         c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
 
     std::atomic<int> answered{0};
@@ -534,13 +538,13 @@ TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bound
     // than the pause (a minute; the tests make it shorter), never less: Lichess asks for a full minute.
     auto& gate = HostGate::instance();
     gate.setPause(50ms);
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         if (requestPath(head) == "/later")
             c.sendAll("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 1\r\nContent-Length: 0\r\n\r\n");
         else
             c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto later = fmt::format("http://127.0.0.1:{}/later", port);
     CHECK(politeRequest(get(later)).status == 429);
@@ -567,8 +571,7 @@ TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bound
 TEST_CASE("HTTP: one head for every way to ask, no Content-Length where no body goes, each request in the log") {
     std::mutex mutex;
     std::map<std::string, std::string> heads;  // path -> the head received
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto end = head.find("\r\n\r\n");
         // The body read whole before the answer (Windows: scripted_server.hpp).
         if (!httpHeader(std::string_view(head).substr(0, end), "Transfer-Encoding")) {
@@ -583,6 +586,7 @@ TEST_CASE("HTTP: one head for every way to ask, no Content-Length where no body 
         c.sendAll(head.rfind("HEAD ", 0) == 0 ? "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n"
                                               : "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto base = fmt::format("http://127.0.0.1:{}", port);
     const auto ask  = [&](const char* method, const std::string& path, std::string body = {}) {
@@ -659,13 +663,13 @@ TEST_CASE("HTTP: one head for every way to ask, no Content-Length where no body 
 
 TEST_CASE("HTTP: a request cancelled ends at once, its connection closed, long before its limit") {
     std::atomic<bool> asked{false}, closed{false};
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string&, net::TcpConnection& c) {
         asked = true;
         // Never an answer: the read ends when the client closes the connection (or when the server stops).
         (void)c.readUntil("\x01never", 1, 60000);
         closed = true;
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     for (const bool polite : {true, false}) {
         CAPTURE(polite);
@@ -693,8 +697,7 @@ TEST_CASE("HTTP: a download takes no turn of its host, waits for its pause, and 
     auto& gate = HostGate::instance();
     gate.setPause(300ms);
     std::atomic<bool> holding{false}, release{false};
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path == "/busy.zip") {
             c.sendAll("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n");
@@ -707,6 +710,7 @@ TEST_CASE("HTTP: a download takes no turn of its host, waits for its pause, and 
             c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto base = fmt::format("http://127.0.0.1:{}", port);
     const auto dir  = fs::temp_directory_path() / "polite-downloads";
@@ -813,11 +817,11 @@ TEST_CASE("assistant models: a model comes into the profile, checked against its
         std::ofstream(profile / "reference", std::ios::binary) << content;
     }
     const auto hash = sha256File(profile / "reference");
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string&, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string&, net::TcpConnection& c) {
         c.sendAll(fmt::format("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", content.size()));
         c.sendAll(content);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto url = fmt::format("http://127.0.0.1:{}/small.gguf", port);
     const AssistantModel small{"small", "small.gguf", "unused", hash, content.size(), "MIT", "English"};

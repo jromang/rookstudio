@@ -11,7 +11,6 @@
 #include <fmt/include/fmt/format.h>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
 #include "lichess_broadcasts.hpp"
@@ -45,8 +44,7 @@ struct Servers_ {
 }  // namespace
 
 TEST_CASE("Lichess broadcasts: those on now and those to come") {
-    const auto port = freePort();
-    ScriptedServer server(port, [](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [](const std::string& head, net::TcpConnection& c) {
         CHECK(requestPath(head) == "/api/broadcast/top?page=1");
         const std::string body =
             R"({"active":[{"tour":{"id":"qEXour3L","name":"Total Chess | Semifinals","slug":"s","info":{"format":"KO",)"
@@ -60,6 +58,7 @@ TEST_CASE("Lichess broadcasts: those on now and those to come") {
                         "Connection: close\r\n\r\n{}",
                         body.size(), body));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ local(port);
     const auto list = topBroadcasts();
@@ -80,11 +79,10 @@ TEST_CASE("Lichess broadcasts: those on now and those to come") {
 }
 
 TEST_CASE("Lichess broadcasts: a round followed, its games as they change, the stream opened again after a break") {
-    const auto port = freePort();
     std::atomic<int> connections{0};
     std::atomic<bool> release{false};
     std::atomic<int> snapshots{0};
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path == "/api/broadcast/round/R1.pgn") {
             // The round as it stands: then, after a break, finished on board 1.
@@ -117,6 +115,7 @@ TEST_CASE("Lichess broadcasts: a round followed, its games as they change, the s
         }
         (void)waitUntil([&] { return release.load(); });  // open, nothing changing
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ local(port);
     RoundFollower::setRetry(10ms, 50ms);
@@ -144,10 +143,10 @@ TEST_CASE("Lichess broadcasts: a round followed, its games as they change, the s
 }
 
 TEST_CASE("Lichess broadcasts: a round Lichess does not have") {
-    const auto port = freePort();
-    ScriptedServer server(port, [](const std::string&, net::TcpConnection& c) {
+    ScriptedServer server(0, [](const std::string&, net::TcpConnection& c) {
         c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ local(port);
     RoundFollower::setRetry(10ms, 40ms);
@@ -161,10 +160,10 @@ TEST_CASE("Lichess broadcasts: a round Lichess does not have") {
 }
 
 TEST_CASE("Lichess broadcasts: a round refused without a token allowed to read broadcasts says so") {
-    const auto port = freePort();
-    ScriptedServer server(port, [](const std::string&, net::TcpConnection& c) {
+    ScriptedServer server(0, [](const std::string&, net::TcpConnection& c) {
         c.sendAll("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ local(port);
     RoundFollower::setRetry(10ms, 40ms);
@@ -178,10 +177,9 @@ TEST_CASE("Lichess broadcasts: a round refused without a token allowed to read b
 }
 
 TEST_CASE("Lichess broadcasts: a tournament's players, its team standings, and a search with the token") {
-    const auto port = freePort();
     std::atomic<int> searches{0};
     std::string authorization;
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         const auto ok   = [&](const std::string& body) {
             c.sendAll(
@@ -211,6 +209,7 @@ TEST_CASE("Lichess broadcasts: a tournament's players, its team standings, and a
             c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ servers_(port);
 
@@ -252,7 +251,6 @@ TEST_CASE("Lichess broadcasts: a tournament's players, its team standings, and a
 }
 
 TEST_CASE("Lichess broadcasts: a whole tournament followed, its rounds told apart, with no round export first") {
-    const auto port = freePort();
     std::atomic<int> exports{0};
     std::string asked;
     std::mutex mutex;
@@ -264,7 +262,7 @@ TEST_CASE("Lichess broadcasts: a whole tournament followed, its rounds told apar
             "[GameURL \"https://lichess.org/broadcast/open/round-{}/{}/g{}{}\"]\n\n1. e4 e5 {}\n\n\n",
             round, board, board, board, result, round, round_id, round, round_id, round, board, result);
     };
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path.rfind("/api/broadcast/round/", 0) == 0) ++exports;
         if (path == "/api/stream/broadcast/tour/TOUR0001.pgn") {
@@ -281,6 +279,7 @@ TEST_CASE("Lichess broadcasts: a whole tournament followed, its rounds told apar
         }
         c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ servers_(port);
     RoundFollower follower("TOUR0001", "allowed", true);
@@ -298,10 +297,9 @@ TEST_CASE("Lichess broadcasts: a whole tournament followed, its rounds told apar
 }
 
 TEST_CASE("Lichess broadcasts: a round's tournament and names, from its address") {
-    const auto port = freePort();
     std::string asked, authorization;
     std::mutex mutex;
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         {
             std::lock_guard lock(mutex);
             asked         = requestPath(head);
@@ -315,6 +313,7 @@ TEST_CASE("Lichess broadcasts: a round's tournament and names, from its address"
                         "Connection: close\r\n\r\n{}",
                         body.size(), body));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ servers_(port);
     const auto entry =
@@ -330,9 +329,8 @@ TEST_CASE("Lichess broadcasts: a round's tournament and names, from its address"
 }
 
 TEST_CASE("Lichess broadcasts: a stream cut once open is opened again, no failure said") {
-    const auto port = freePort();
     std::atomic<int> streams{0};
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         if (requestPath(head) == "/api/broadcast/round/R1.pgn") {
             c.sendAll("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
             return;
@@ -343,6 +341,7 @@ TEST_CASE("Lichess broadcasts: a stream cut once open is opened again, no failur
             "HTTP/1.1 200 OK\r\nContent-Type: application/x-chess-pgn\r\nTransfer-Encoding: chunked\r\n"
             "Connection: close\r\n\r\n5\r\n[Ev");
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     Servers_ local(port);
     RoundFollower::setRetry(10ms, 40ms);

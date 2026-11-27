@@ -260,8 +260,7 @@ TEST_CASE("Lichess TV: the game the Board goes on to") {
 TEST_CASE("Lichess TV: the card, a channel's games and the next game, asked of a server") {
     std::mutex mutex;
     std::vector<std::string> heads, bodies;
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         // The body: what came with the head, then the rest.
         std::string body = head.substr(head.find("\r\n\r\n") + 4);
@@ -296,6 +295,7 @@ TEST_CASE("Lichess TV: the card, a channel's games and the next game, asked of a
             c.sendAll(reply(404, "{}"));
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     // The card: the channels, then their featured games by their ids, in one request.
@@ -343,7 +343,7 @@ TEST_CASE("Lichess TV: the card, a channel's games and the next game, asked of a
     next = askTvNext("blitz", "game0003", {}, true);
     REQUIRE(next.value);
     CHECK(next.value->game == "game0013");
-    // Lichess not there: said.
+    // Lichess not there: said (freePort(): a free port nothing is started on).
     servers().api = fmt::format("http://127.0.0.1:{}", freePort());
     CHECK_FALSE(tvRows().value);
     CHECK(tvList("blitz").net == NetError::Offline);
@@ -364,8 +364,7 @@ TEST_CASE("Lichess TV: the games of an address followed a few at a time, as Lich
             "[Black \"Player_B\"]\n[Result \"{}\"]\n\n1. e4 e5 {}\n",
             id, over ? "1-0" : "*", over ? "2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0" : "*");
     };
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         const auto id   = path.substr(path.rfind('/') + 1).substr(0, 8);
         if (path.rfind("/game/export/", 0) == 0 && ended.count(id)) {
@@ -392,6 +391,7 @@ TEST_CASE("Lichess TV: the games of an address followed a few at a time, as Lich
             c.sendAll(reply(404, "{}"));
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {

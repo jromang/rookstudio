@@ -11,7 +11,6 @@
 #include <fmt/include/fmt/format.h>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_share.hpp"
 #include "scripted_server.hpp"
@@ -58,8 +57,7 @@ TEST_CASE("lichess share: a game imported without an account, a position played 
     };
     std::mutex mutex;
     std::vector<Seen> seen;
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         Seen s;
         s.line            = head.substr(0, head.find("\r\n"));
         s.authorization   = httpHeader(head, "Authorization").value_or("");
@@ -94,6 +92,7 @@ TEST_CASE("lichess share: a game imported without an account, a position played 
             c.sendAll(reply(404, "{}"));
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto before = servers().api;
     servers().api     = fmt::format("http://127.0.0.1:{}", port);

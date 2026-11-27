@@ -13,7 +13,6 @@
 #include <study/store.hpp>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_links.hpp"
 #include "scripted_server.hpp"
@@ -42,7 +41,7 @@ const char* const TWO_GAMES =
 // Lichess, as far as these tests need it: a study's export, one game's, and a broadcast that wants an account.
 struct Lichess {
     Lichess()
-        : port(freePort()), server(port, [this](const std::string& head, net::TcpConnection& c) {
+        : server(0, [this](const std::string& head, net::TcpConnection& c) {
               const auto path = requestPath(head);
               {
                   std::lock_guard lock(mutex);
@@ -68,7 +67,7 @@ struct Lichess {
                               status, body.size(), body));
           }) {
         REQUIRE(server.ok());
-        servers().api = fmt::format("http://127.0.0.1:{}", port);
+        servers().api = fmt::format("http://127.0.0.1:{}", server.port());
     }
     ~Lichess() { servers() = Servers{}; }
     std::string lastHead() {
@@ -77,7 +76,6 @@ struct Lichess {
     }
     std::mutex mutex;
     std::vector<std::string> paths, heads;
-    uint16_t port;
     ScriptedServer server;
 };
 

@@ -45,7 +45,7 @@ void answer(net::TcpConnection& c, int status, const std::string& body) {
 // GitHub: its answers by path (the API's and the files'), and what was asked of it.
 struct FakeGitHub {
     FakeGitHub()
-        : port(freePort()), server(port, [this](const std::string& head, net::TcpConnection& c) {
+        : server(0, [this](const std::string& head, net::TcpConnection& c) {
               const auto line = head.substr(0, head.find("\r\n"));  // "GET /path HTTP/1.1"
               const auto path = line.substr(4, line.rfind(' ') - 4);
               std::lock_guard lock(mutex);
@@ -57,7 +57,7 @@ struct FakeGitHub {
           }) {
         REQUIRE(server.ok());
     }
-    [[nodiscard]] std::string url() const { return fmt::format("http://127.0.0.1:{}", port); }
+    [[nodiscard]] std::string url() const { return fmt::format("http://127.0.0.1:{}", server.port()); }
     void set(const std::string& path, const std::string& body, int status = 200) {
         std::lock_guard lock(mutex);
         answers[path] = {status, body};
@@ -67,7 +67,6 @@ struct FakeGitHub {
         return asked;
     }
 
-    uint16_t port;
     std::mutex mutex;
     std::map<std::string, std::pair<int, std::string>> answers;
     std::vector<std::string> asked;
@@ -236,7 +235,7 @@ TEST_CASE("engine downloads: the latest release, the list when it is a side rele
     CHECK(absent.failure == GitHubFailure::NoRepository);
     CHECK(describe(absent) == "GitHub has no repository test/mover");
 
-    // No answer: GitHub named, the network's words in the log.
+    // No answer: GitHub named, the network's words in the log (freePort(): a free port nothing is started on).
     const auto nobody = fetchReleases(engine, cpu, fmt::format("http://127.0.0.1:{}", freePort()));
     CHECK(nobody.failure == GitHubFailure::Offline);
     CHECK(describe(nobody) == "GitHub cannot be reached");

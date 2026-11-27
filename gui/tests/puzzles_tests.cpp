@@ -19,7 +19,6 @@
 #include <json.hpp>
 
 #include "console.hpp"
-#include "free_ports.hpp"
 #include "https.hpp"
 #include "puzzles.hpp"
 #include "scripted_server.hpp"
@@ -180,8 +179,7 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
     std::atomic<bool> released{false};
     std::mutex mutex;
     std::vector<std::string> asked;  // "Range|If-Range" of each request
-    const auto port = fcg::test::freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto range = httpHeader(head, "Range"), if_range = httpHeader(head, "If-Range");
         {
             std::lock_guard lock(mutex);
@@ -210,6 +208,7 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
         }
         if (to > from) c.sendAll(std::string_view(content).substr(from, to - from));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     const auto url    = fmt::format("http://127.0.0.1:{}/lichess_db_puzzle.csv.zst", port);
     const auto folder = fs::temp_directory_path() / "puzzles-download";

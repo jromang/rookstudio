@@ -119,11 +119,12 @@ struct FakeLichess {
         bool whole = false;  // its last chunk came
     };
 
-    FakeLichess() : FakeLichess(freePort()) {}
-    explicit FakeLichess(uint16_t p)
-        : port(p), server(port, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
+    // On a port the system gives, or on `port`.
+    FakeLichess() : FakeLichess(0) {}
+    explicit FakeLichess(uint16_t port)
+        : server(port, [this](const std::string& head, net::TcpConnection& c) { serve(head, c); }) {
         REQUIRE(server.ok());
-        const auto base = fmt::format("http://127.0.0.1:{}", port);
+        const auto base = fmt::format("http://127.0.0.1:{}", server.port());
         servers()       = Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
     }
     ~FakeLichess() { servers() = Servers{}; }
@@ -248,7 +249,6 @@ struct FakeLichess {
         return answers;
     }
 
-    uint16_t port;
     std::mutex mutex;
     std::deque<Poll> polls;
     std::vector<std::string> poll_bodies, poll_auth, requests, registrations;
@@ -829,6 +829,7 @@ TEST_CASE("external engine: what a job holds is checked before the engine reads 
 
 TEST_CASE("external engine: offline, it waits for the network and resumes by itself") {
     ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");
+    // A port known before anything listens there (freePort()): nothing at first, then Lichess on it.
     const auto port = freePort();
     const auto base = fmt::format("http://127.0.0.1:{}", port);
     servers()       = Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
@@ -883,8 +884,7 @@ TEST_CASE("external engine: too many requests, or the work host in trouble: offl
 TEST_CASE("external engine: each failure of the registration's requests told by its kind") {
     std::mutex mutex;
     std::pair<int, std::string> next{200, "{}"};  // what the server answers next
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         (void)requestBody(head, c);  // read whole before the answer (Windows: scripted_server.hpp)
         std::pair<int, std::string> now;
         {
@@ -893,6 +893,7 @@ TEST_CASE("external engine: each failure of the registration's requests told by 
         }
         c.sendAll(reply(now.first, now.second));
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     HostGate::instance().setPause(50ms);
@@ -936,7 +937,7 @@ TEST_CASE("external engine: each failure of the registration's requests told by 
     CHECK(own.net == NetError::None);
     CHECK(own.failed());
     CHECK(describe(own) == registrationProblem(bad));
-    // Nothing listens: no answer.
+    // Nothing listens: no answer (freePort(): a free port nothing is started on).
     servers().api = fmt::format("http://127.0.0.1:{}", freePort());
     CHECK(registerEngine(TOKEN, r).net == NetError::Offline);
     CHECK(withdrawEngine(TOKEN, "eei_Sample000001").net == NetError::Offline);

@@ -393,7 +393,7 @@ TEST_CASE("opening report: Lichess's answers kept for offline, by the Tree tab's
 }
 
 TEST_CASE("opening report: Lichess unanswered said offline only when it cannot be reached, another failure in words") {
-    // Nothing listens: the explorer out of reach.
+    // Nothing listens: the explorer out of reach (freePort(): a free port nothing is started on).
     const auto nobody  = fmt::format("http://127.0.0.1:{}", fcg::test::freePort());
     lichess::servers() = lichess::Servers{nobody, nobody + "/tb", nobody + "/explorer"};
     lichess::ExplorerQuery q;

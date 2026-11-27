@@ -53,7 +53,7 @@ std::string valueOf(const std::string& text, const std::string& name) {
 // revocation.
 struct FakeLichess {
     FakeLichess()
-        : port(fcg::test::freePort()), server(port, [this](const std::string& head, net::TcpConnection& c) {
+        : server(0, [this](const std::string& head, net::TcpConnection& c) {
               // The body: what came with the head, and the rest.
               const auto split = head.find("\r\n\r\n");
               std::string body = head.substr(split + 4);
@@ -86,10 +86,9 @@ struct FakeLichess {
               }
           }) {
         REQUIRE(server.ok());
-        servers().api = fmt::format("http://127.0.0.1:{}", port);
+        servers().api = fmt::format("http://127.0.0.1:{}", server.port());
     }
     ~FakeLichess() { servers() = Servers{}; }
-    uint16_t port;
     std::mutex mutex;
     std::string challenge, posted, asked;  // asked: Lichess's page, as the browser was given it
     bool revoked         = false;
@@ -355,8 +354,7 @@ TEST_CASE("Lichess account: the card's words for a link that failed, Lichess out
 TEST_CASE("Lichess account: each failure of the token's requests told by its kind") {
     std::mutex mutex;
     std::pair<int, std::string> next{200, "{}"};  // what the server answers next
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         (void)requestBody(head, c);  // the token's test and revocation post it: read whole (Windows: scripted_server.hpp)
         std::pair<int, std::string> now;
         {
@@ -365,6 +363,7 @@ TEST_CASE("Lichess account: each failure of the token's requests told by its kin
         }
         answer(c, now.first, now.second);
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     HostGate::instance().setPause(50ms);
@@ -396,7 +395,7 @@ TEST_CASE("Lichess account: each failure of the token's requests told by its kin
     answering(401, R"({"error":"No such token"})");
     CHECK(accountName("lio_x").net == NetError::Unauthorized);
     CHECK(describe(lichess::revoke("lio_x")) == "Lichess refused the token: link the account again");
-    // Nothing listens: no answer.
+    // Nothing listens: no answer (freePort(): a free port nothing is started on).
     servers().api      = fmt::format("http://127.0.0.1:{}", freePort());
     const auto offline = accountName("lio_x");
     CHECK(offline.net == NetError::Offline);

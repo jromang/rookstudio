@@ -37,7 +37,6 @@
 #include "endgames.hpp"
 #include "endgames_page.hpp"
 #include "focus_words.hpp"
-#include "free_ports.hpp"
 #include "guide.hpp"
 #include "https.hpp"
 #include "jobs.hpp"
@@ -306,9 +305,8 @@ struct Tables {
     std::vector<std::string> asked;
     int refused   = 0;
     bool hold     = false;
-    uint16_t port = freePort();
     ScriptedServer server{
-        port, [this](const std::string& head, net::TcpConnection& c) {
+        0, [this](const std::string& head, net::TcpConnection& c) {
             const auto path = head.substr(4, head.find(' ', 4) - 4);
             int status      = 200;
             {
@@ -335,7 +333,7 @@ struct Tables {
         }};
     Tables() {
         REQUIRE(server.ok());
-        const auto base    = fmt::format("http://127.0.0.1:{}", port);
+        const auto base    = fmt::format("http://127.0.0.1:{}", server.port());
         lichess::servers() = lichess::Servers{base, base + "/tb", base + "/explorer", base + "/engine"};
         HostGate::instance().setPause(50ms);
     }

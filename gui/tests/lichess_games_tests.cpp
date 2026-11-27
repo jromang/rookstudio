@@ -18,7 +18,6 @@
 #include <study/store.hpp>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_games.hpp"
 #include "scripted_server.hpp"
@@ -70,7 +69,7 @@ std::vector<Exported> lichessGames(int count, int from, uint32_t seed) {
 // Lichess's export: the games from `since` on, a piece at a time, chunked; slowly when asked.
 struct Export {
     explicit Export(std::vector<Exported> all)
-        : games(std::move(all)), port(freePort()), server(port, [this](const std::string& head, net::TcpConnection& c) {
+        : games(std::move(all)), server(0, [this](const std::string& head, net::TcpConnection& c) {
               const auto path = requestPath(head);
               {
                   std::lock_guard lock(mutex);
@@ -103,7 +102,7 @@ struct Export {
               c.sendAll("0\r\n\r\n");
           }) {
         REQUIRE(server.ok());
-        servers().api = fmt::format("http://127.0.0.1:{}", port);
+        servers().api = fmt::format("http://127.0.0.1:{}", server.port());
     }
     ~Export() { servers() = Servers{}; }
     std::string lastPath() {
@@ -114,7 +113,6 @@ struct Export {
     std::atomic<bool> slow{false};
     std::mutex mutex;
     std::vector<std::string> paths;
-    uint16_t port;
     ScriptedServer server;
 };
 
@@ -253,8 +251,7 @@ TEST_CASE("Lichess games: the speeds and the moment asked for, and the new games
 
     // The count: the games after the latest one held, as lines of NDJSON, their moves and tags left out.
     std::string asked;
-    const auto port = freePort();
-    ScriptedServer counter(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer counter(0, [&](const std::string& head, net::TcpConnection& c) {
         asked                  = requestPath(head);
         const std::string body = "{\"id\":\"a\"}\n{\"id\":\"b\"}\n{\"id\":\"c\"}\n";
         c.sendAll(
@@ -262,6 +259,7 @@ TEST_CASE("Lichess games: the speeds and the moment asked for, and the new games
                         "Connection: close\r\n\r\n{}",
                         body.size(), body));
     });
+    const auto port = counter.port();
     REQUIRE(counter.ok());
     servers().api    = fmt::format("http://127.0.0.1:{}", port);
     const auto count = countNewGames(db->folder(), "Me", "", filters);

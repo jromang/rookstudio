@@ -11,7 +11,6 @@
 #include <json.hpp>
 
 #include "answering_server.hpp"
-#include "free_ports.hpp"
 #include "lichess_api.hpp"
 #include "lichess_players.hpp"
 #include "scripted_server.hpp"
@@ -148,8 +147,7 @@ TEST_CASE("Lichess players: a game's stream that sends the game again from its s
 
 TEST_CASE("Lichess players: a game followed from its start to its end") {
     std::atomic<int> exports{0};
-    const auto port = freePort();
-    ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
+    ScriptedServer server(0, [&](const std::string& head, net::TcpConnection& c) {
         const auto path = requestPath(head);
         if (path.rfind("/game/export/game0001", 0) == 0) {
             c.sendAll(httpOk("application/x-chess-pgn", exports++ == 0 ? ONGOING : FINISHED));
@@ -165,6 +163,7 @@ TEST_CASE("Lichess players: a game followed from its start to its end") {
             c.sendAll("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         }
     });
+    const auto port = server.port();
     REQUIRE(server.ok());
     servers().api = fmt::format("http://127.0.0.1:{}", port);
     {

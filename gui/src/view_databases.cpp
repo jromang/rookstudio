@@ -1176,7 +1176,20 @@ void App::drawGameList() {
         db_view_job_ = std::move(job);
     }
     if (db_view_job_ && db_view_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto view = db_view_job_->done.get();
+        study::View view;
+        try {
+            view = db_view_job_->done.get();
+        } catch (const std::exception& e) {
+            // Not made (a file of the database that cannot be read): said on the page of the databases, where its
+            // maintenance checks it; made again when the list is opened again.
+            const bool cancelled = *db_view_job_->cancel;
+            db_view_job_.reset();
+            if (cancelled) return;  // another one is wanted: made at the next frame
+            db_message_ = loggedStoreError(
+                trf("The games of “{}” could not be listed: {}.", s.entries()[index].name, storeErrorText(e)), e);
+            db_list_ = false;
+            return;
+        }
         if (!*db_view_job_->cancel) {
             db_view_ms_ =
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - db_view_job_->started)

@@ -13,6 +13,7 @@
 #include <study/names.hpp>
 #include <tour/files.hpp>
 
+#include "console.hpp"
 #include "i18n.hpp"
 #include "portable.hpp"
 
@@ -121,6 +122,14 @@ std::string storeErrorText(const std::exception_ptr& e) {
     } catch (...) {
     }
     return TR("an unknown error");
+}
+
+std::string loggedStoreError(std::string said, const std::exception& e) {
+    if (study::errorCode(e) == study::StoreErrc::Other)
+        Console::instance().add(said, true);  // the store's text is in it
+    else
+        Console::instance().add(said + " (" + e.what() + ")", true);
+    return said;
 }
 
 DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot) {
@@ -360,10 +369,16 @@ bool DatabaseShelf::refreshing(std::size_t index) {
     if (index >= links_.size() || links_[index].refresh.idle()) return false;
     auto& link = links_[index];
     if (link.refresh.running()) return true;
-    const auto done = link.refresh.take();
-    if (!done.error.empty()) errors_[index] = done.error;
+    try {
+        const auto done = link.refresh.take();
+        if (!done.error.empty()) errors_[index] = done.error;
+        if (done.rebuilt) open_[index] = link.db->database();  // a database read again from the start
+    } catch (const std::exception& e) {
+        // Said as its errors are, on the list of databases.
+        errors_[index] = loggedStoreError(
+            trf("“{}” could not be brought up to date: {}.", entries_[index].name, storeErrorText(e)), e);
+    }
     facts_[index].generation = ~uint64_t{0};
-    if (done.rebuilt) open_[index] = link.db->database();  // a database read again from the start
     return false;
 }
 
@@ -485,7 +500,15 @@ bool DatabaseShelf::startImport(std::size_t index, const fs::path& file, const s
 std::optional<study::DatabaseImport> DatabaseShelf::finishedImport() {
     if (!import_.ready()) return std::nullopt;
     const auto index = import_.state().index;
-    auto done        = import_.take();
+    ImportDone done;
+    try {
+        done = import_.take();
+    } catch (const std::exception& e) {
+        // Its task stopped (looking for the duplicates, building the tree): its report says why as it says a refusal
+        // of the disk, on the page and in the log, the games committed before staying.
+        done.report.error      = e.what();
+        done.report.error_code = study::errorCode(e);
+    }
     if (index < facts_.size()) facts_[index].generation = ~uint64_t{0};  // its tree now
     import_duplicates_ = std::move(done.duplicates);
     return std::move(done.report);
@@ -539,7 +562,17 @@ bool DatabaseShelf::pollTreeJob() {
     bool ended = false;
     if (tree_job_.ready()) {
         const auto index = tree_job_.state().index;
-        (void)tree_job_.take();
+        // A build that failed leaves the tree stale, built again at the next edit: the page has no place for why, the
+        // log says it.
+        const auto name = index < entries_.size() ? entries_[index].name : std::string();
+        try {
+            const auto built = tree_job_.take();
+            if (!built.error.empty())
+                Console::instance().add(trf("The opening tree of “{}” could not be built: {}.", name, built.error),
+                                        true);
+        } catch (const std::exception& e) {
+            (void)loggedStoreError(trf("The opening tree of “{}” could not be built: {}.", name, storeErrorText(e)), e);
+        }
         if (index < facts_.size()) facts_[index].generation = ~uint64_t{0};  // its tree now
         if (index < entries_.size()) trees_.erase(entries_[index].folder);
         ended = true;

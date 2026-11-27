@@ -1328,7 +1328,14 @@ void App::drawBoardReferences() {
         references_job_ = std::move(job);
     }
     if (references_job_ && references_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        references_         = references_job_->done.get();
+        try {
+            references_ = references_job_->done.get();
+        } catch (const std::exception& e) {
+            // A database that cannot be read: none listed, why at the Board's corner; looked for again at another
+            // position or once the databases change.
+            references_ = {};
+            boardToast(loggedStoreError(trf("The reference games could not be read: {}.", storeErrorText(e)), e));
+        }
         references_sources_ = std::move(references_job_->sources);
         references_of_      = references_job_->of;
         references_job_.reset();

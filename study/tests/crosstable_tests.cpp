@@ -2,7 +2,8 @@
 // tie-breaks of C.07 checked against tournaments worked by hand from FIDE's definitions (a round robin, a Swiss with a
 // forfeit, byes and a withdrawal, direct encounters), a database's tournaments listed with their systems, and every
 // figure of tournaments of our own compared with a count made apart (a forfeit, a missing game, a player under two
-// names, games that came twice). Players' names are invented, and so is the FIDE list.
+// names, games that came twice); steps of the crosstable's builder run alone. Players' names are invented, and so is
+// the FIDE list.
 #include <doctest/doctest.hpp>
 
 #include <algorithm>
@@ -18,6 +19,7 @@
 #include <vector>
 
 #include <study/crosstable.hpp>
+#include <study/crosstable_detail.hpp>
 #include <study/fide_list.hpp>
 #include <study/players.hpp>
 #include <study/store.hpp>
@@ -1305,4 +1307,92 @@ TEST_CASE("crosstable: results set by hand, a broadcast being played, the system
         CHECK(row(rules, "Kim, Seo-yeon").k == 20);
         CHECK_FALSE(row(rules, "Kim, Seo-yeon").k_listed);
     }
+}
+
+TEST_CASE("crosstable: the builder's steps alone: two names found before any round is read, results set by hand") {
+    using crosstable::CrosstableBuilder;
+    std::vector<CrossPlayer> players;
+    for (const auto* name : {"Okafor, Daniel", "Okafor, D.", "Navarro, Lucia", "Petersen, Mads", "Petersen, M.",
+                             "Kim, Seo-yeon", "Kim, S."}) {
+        CrossPlayer p;
+        p.name = name;
+        players.push_back(p);
+    }
+    const auto game = [](uint32_t w, uint32_t b, int round, char result) {
+        CrossGame g;
+        g.white       = w;
+        g.black       = b;
+        g.round.round = round;
+        g.result      = result;
+        g.plies       = 60;
+        return g;
+    };
+    // "Okafor, Daniel" plays rounds 1 to 3, "Okafor, D." rounds 4 and 5, never against each other: one player under
+    // two names. "Petersen, M." plays round 3, within "Petersen, Mads"'s rounds; "Kim, S." plays "Kim, Seo-yeon".
+    const std::vector<CrossGame> games{game(0, 2, 1, '1'), game(3, 5, 1, '='), game(5, 0, 2, '0'), game(2, 3, 2, '1'),
+                                       game(0, 3, 3, '='), game(4, 2, 3, '0'), game(1, 2, 4, '='), game(3, 6, 4, '1'),
+                                       game(6, 5, 4, '0'), game(5, 1, 5, '*'), game(2, 3, 5, '0')};
+    {
+        CrosstableBuilder builder(players, games, {});
+        builder.findTwoNames();
+        const auto& two = builder.table().two_names;
+        REQUIRE(two.size() == 1);
+        CHECK(two[0].a == 0);
+        CHECK(two[0].b == 1);
+        CHECK(two[0].a_from == 1);
+        CHECK(two[0].a_to == 3);
+        CHECK(two[0].b_from == 4);
+        CHECK(two[0].b_to == 5);
+        CHECK(builder.doubled() == std::vector<bool>{true, true, false, false, false, false, false});
+    }
+    // Results set by hand, as the window keeps them: the game without a result, named Black first, takes it seen from
+    // White's side; a game the data does not have is added; a round alone keeps its points; a name of no player and
+    // a result not known are left out.
+    CrossOptions options;
+    options.hand = {HandResult{"Okafor, D.", "Kim, Seo-yeon", 5, '1', 0},
+                    HandResult{"Kim, S.", "Navarro, Lucia", 2, '=', 0}, HandResult{"Petersen, M.", "", 4, '*', 0.5},
+                    HandResult{"Nobody, Else", "Kim, S.", 1, '1', 0},
+                    HandResult{"Kim, S.", "Okafor, Daniel", 3, '*', 0}};
+    CrosstableBuilder builder(players, games, options);
+    builder.setHandResults();
+    const auto& t = builder.table();
+    REQUIRE(t.games.size() == games.size() + 1);
+    CHECK(t.games[9].white == 5);
+    CHECK(t.games[9].result == '0');
+    CHECK(t.games[9].hand);
+    const auto& added = t.games.back();
+    CHECK(added.white == 6);
+    CHECK(added.black == 2);
+    CHECK(added.round.round == 2);
+    CHECK(added.result == '=');
+    CHECK(added.hand);
+    CHECK(added.plies == 2);
+    CHECK(added.ref == UINT64_MAX);
+    CHECK(builder.alonePoints() == std::map<std::pair<uint32_t, int>, double>{{{4, 4}, 0.5}});
+    for (std::size_t i = 0; i < games.size(); ++i)
+        if (i != 9) CHECK_FALSE(t.games[i].hand);
+}
+
+TEST_CASE("crosstable: a Buchholz cut takes a voluntary unplayed round first, then the highest (C.07 16.5)") {
+    using crosstable::Contribution;
+    using crosstable::cutSum;
+    const auto played = [](double score, double points) {
+        Contribution c;
+        c.opponent = score;
+        c.bh       = score;
+        c.sb       = score * points;
+        return c;
+    };
+    auto vur = played(2.5, 0.5);
+    vur.vur  = true;
+    const std::vector<Contribution> parts{played(3, 1), played(2, 0.5), vur, played(4, 0)};
+    // The least significant value is 2, but the voluntary unplayed round goes first: 3 + 2 + 4.
+    CHECK(cutSum(parts, false, 1, 0) == doctest::Approx(9));
+    // The median: the highest (4) goes too.
+    CHECK(cutSum(parts, false, 1, 1) == doctest::Approx(5));
+    // Without a VUR, the least significant value: Buchholz's lowest, Sonneborn-Berger's of the lowest opponent.
+    const std::vector<Contribution> played_only{played(3, 1), played(2, 0.5), played(2.5, 0), played(4, 0)};
+    CHECK(cutSum(played_only, false, 1, 0) == doctest::Approx(9.5));
+    CHECK(cutSum(played_only, true, 1, 0) == doctest::Approx(3));  // 3 + 0 + 0: the 1 of the opponent of 2 cut
+    CHECK(cutSum(played_only, true, 0, 0) == doctest::Approx(4));
 }

@@ -837,7 +837,13 @@ void App::pollExport() {
     if (!export_) return;
     auto& e = *export_;
     if (e.job.valid() && e.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        const auto error = e.job.get();
+        std::string error;
+        try {
+            error = e.job.get();
+        } catch (const std::exception& ex) {
+            // A database that cannot be read: said on its error line.
+            error = loggedStoreError(trf("The games could not be read: {}.", storeErrorText(ex)), ex);
+        }
         if (error.empty()) {
             e.saved = e.saving;
             e.said  = trf("Saved: {}", shortPath(e.saving));

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <string>
 
+#include <study/import_into.hpp>
 #include <study/store.hpp>
 
 #include "twic.hpp"

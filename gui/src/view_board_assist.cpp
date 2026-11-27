@@ -178,8 +178,15 @@ std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
         }
     }
     if (theory_job_ && theory_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        board_theory_ = theory_job_->done.get();
-        theory_of_    = theory_job_->of;
+        try {
+            board_theory_ = theory_job_->done.get();
+        } catch (const std::exception& e) {
+            // The database's tree that cannot be read: the review without its theory; why in the log, the panel having
+            // no line for it.
+            board_theory_ = {};
+            (void)loggedStoreError(trf("The theory of the game could not be read: {}.", storeErrorText(e)), e);
+        }
+        theory_of_ = theory_job_->of;
         theory_job_.reset();
         board_commentary_of_.clear();  // made again with it
         b.review_key.clear();          // and the symbols with it

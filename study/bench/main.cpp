@@ -75,6 +75,7 @@
 #include <study/evals_index.hpp>
 #include <study/fide_list.hpp>
 #include <study/import.hpp>
+#include <study/import_into.hpp>
 #include <study/mapped_file.hpp>
 #include <study/names.hpp>
 #include <study/opening_report.hpp>

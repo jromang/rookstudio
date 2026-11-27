@@ -7,10 +7,12 @@
 // Escape and the way back to the Openings page; a move added to the repertoire from a wrong answer, Ctrl+Z taking it
 // back, Retry; the day's review of its positions due and the way back to the Training page; the failure paths: a
 // session locked by a live game on Lichess, the positions of a correspondence game left out, an answer that could not
-// be kept said over the Board.
+// be kept said over the Board, a database whose opening tree cannot be read (the session in the repertoire's order,
+// why said).
 
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -32,6 +34,7 @@
 
 #include "app_context.hpp"
 #include "board_view.hpp"
+#include "console.hpp"
 #include "databases.hpp"
 #include "focus_words.hpp"
 #include "jobs.hpp"
@@ -62,7 +65,7 @@ class FakeApp final : public RepertoireTrainingContext {
     bool scripted() const override { return false; }
     fs::path profileDir() const override { return profile_; }
     DatabaseShelf& shelf() override { return shelf_; }
-    void toast(const std::string&) override {}
+    void toast(const std::string& text) override { toasts.push_back(text); }
     JobGroup& jobs() override { return jobs_; }
 
     // The Board taken by a session: what it was before, as the test made it, given back at the end.
@@ -159,6 +162,7 @@ class FakeApp final : public RepertoireTrainingContext {
     int taken = 0, board_page = 0, picks_dropped = 0, typed_dropped = 0, move_fields = 0, tabs = 0, asked_again = 0;
     int fair_play_banners = 0, settings_saved = 0, openings_page = 0, review_next = 0, training_part = -1;
     std::string board_title, message;
+    std::vector<std::string> toasts;
     bool board_tree = false, flip = false, board_moves = false, tree_tab = false;
     std::size_t tints = 0, arrows = 0;
     ReplayGame game;
@@ -615,4 +619,53 @@ TEST_CASE("repertoire training page: a live game locks it, a correspondence posi
     CHECK_FALSE(page.onBoard());
     CHECK(app.left.size() == 1);
     CHECK(app.given_back.empty());
+}
+
+TEST_CASE("repertoire training page: a database whose tree cannot be read: the session in the repertoire's order") {
+    ScratchDir profile("repertoire-training-tree");
+    FakeApp app(profile);
+    RepertoireTrainingPage page(app);
+    // A database of games through the repertoire's positions, its opening tree built by the import...
+    const auto file = profile / "games.pgn";
+    {
+        std::ofstream out(file, std::ios::binary);
+        out << "[Event \"Club\"]\n[Result \"1-0\"]\n\n1. e4 c5 2. Nf3 d6 1-0\n\n"
+               "[Event \"Club\"]\n[Result \"0-1\"]\n\n1. d4 Nf6 0-1\n";
+    }
+    auto& shelf     = app.shelf();
+    const auto base = shelf.create("Games");
+    REQUIRE(shelf.startImport(base, file));
+    std::optional<study::DatabaseImport> report;
+    REQUIRE(waitUntil([&] { return (report = shelf.finishedImport()).has_value(); }));
+    REQUIRE(report->added == 2);
+    REQUIRE(shelf.facts(base).tree);
+    // ...then its records overwritten, their header left: the tree opens, a position read in it is a damaged one.
+    fs::path records;
+    for (const auto& entry : fs::directory_iterator(shelf.entries()[base].folder))
+        if (entry.is_directory() && entry.path().filename().string().rfind("tree-", 0) == 0)
+            records = entry.path() / "records.bin";
+    REQUIRE(fs::exists(records));
+    {
+        const auto size = fs::file_size(records);
+        REQUIRE(size > 32);
+        std::fstream bytes(records, std::ios::in | std::ios::out | std::ios::binary);
+        bytes.seekp(32);
+        const std::string junk(static_cast<std::size_t>(size - 32), '\xff');
+        bytes.write(junk.data(), static_cast<std::streamsize>(junk.size()));
+    }
+
+    // The session starts all the same, its new positions in the repertoire's order; why, at the Board's corner and in
+    // the log.
+    const auto logged = Console::instance().added();
+    const auto index  = najdorf(app, epochNow());
+    FocusWords words("training");
+    page.addFocusWords(words, "training");
+    REQUIRE(page.onBoard());
+    REQUIRE(questionAsked(page));
+    CHECK(page.session()->session->total() == 3);
+    CHECK(page.cardCount(index) == 3);
+    REQUIRE(app.toasts.size() == 1);
+    CHECK(app.toasts[0] == "The new positions come in the repertoire's order: a damaged tree.");
+    const auto lines = Console::instance().since(logged);
+    CHECK(std::find(lines.begin(), lines.end(), app.toasts[0]) != lines.end());
 }

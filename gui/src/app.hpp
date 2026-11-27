@@ -919,6 +919,7 @@ class App {
     std::optional<CoverageJob> coverage_job_;
     std::optional<study::Coverage> coverage_;
     std::string coverage_of_;
+    std::string coverage_error_;  // why the coverage of coverage_of_ could not be measured
     int coverage_depth_ = 0;  // 0 the ends of the lines, 1 move 10, 2 move 15
     std::set<std::filesystem::path> coverage_left_;  // the databases the coverage is not measured on (folders)
     bool rep_naming_    = false;
@@ -1718,6 +1719,7 @@ class App {
         std::shared_ptr<const study::TournamentList> list;
     };
     std::map<std::filesystem::path, TournamentsKept> tournament_lists_;
+    std::map<std::filesystem::path, uint64_t> tournaments_failed_;  // by database: the snapshot a list failed for
     Job<study::TournamentList, DbTournamentsState> db_tournaments_job_{jobs_};
     // The list being made, none when none is.
     [[nodiscard]] const DbTournamentsState* dbTournamentsJob() const {

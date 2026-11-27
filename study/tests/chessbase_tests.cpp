@@ -15,6 +15,7 @@
 #include <study/chessbase.hpp>
 #include <study/chessbase_detail.hpp>
 #include <study/import.hpp>
+#include <study/import_into.hpp>
 #include <study/pgn_reader.hpp>
 
 #include "test_games.hpp"

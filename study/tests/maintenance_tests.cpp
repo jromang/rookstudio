@@ -9,6 +9,7 @@
 #include <vector>
 
 #include <study/duplicates.hpp>
+#include <study/import_into.hpp>
 #include <study/query.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>

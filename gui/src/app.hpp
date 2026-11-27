@@ -2374,7 +2374,9 @@ class App {
         double since = 0;
         std::optional<lichess::Tablebase> answer;
         bool online = false;
-        std::string error;  // why Lichess gave nothing
+        // Lichess's answer without a verdict, why: a failure (an outage, a 429, a refusal), or none (the position is
+        // unknown to the tables). Nothing more is asked for the position until "Try again" (a 429's pause aside).
+        std::optional<lichess::Failure> nothing;
         std::future<lichess::Answer<lichess::Tablebase>> asking;
         std::string asking_fen;
         std::map<std::string, std::vector<std::string>> lines;
@@ -2749,7 +2751,8 @@ class App {
         bool allowed = false, not_now = false;              // Lichess's tables for this check, or not now
         int from_disk = 0, from_profile = 0, from_lichess = 0;  // the positions each source told, Lichess's asked
         std::map<std::string, TablesSays> told;                 // by FEN: a position two games reached is asked once
-        std::string error;                                      // Lichess's, the check waiting for "Try again"
+        std::string error;                                      // why the games could not be read
+        lichess::Failure failure;  // Lichess's tables', the check waiting for "Try again" (a 429's for the pause)
         std::optional<EndgameCheckSummary> summary;
     };
     std::unique_ptr<EndgameCheckRun> endgame_check_;

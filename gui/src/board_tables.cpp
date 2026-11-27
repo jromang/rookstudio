@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "endgames.hpp"
+#include "https.hpp"
 #include "i18n.hpp"
 #include "online_cache.hpp"
 
@@ -234,6 +235,34 @@ lichess::Answer<std::vector<std::string>> keptOrAskedLine(const std::filesystem:
     auto a = lichess::tablebaseMainline(fen, cancel);
     if (a.value && !a.value->empty()) keepTablebaseLine(root, fen, *a.value);
     return a;
+}
+
+std::chrono::milliseconds tablesPause() {
+    return HostGate::instance().pausedFor(urlHost(lichess::servers().tablebase));
+}
+
+std::string tablesNothing(const lichess::Failure& answer, std::chrono::milliseconds pause) {
+    if (answer.net == lichess::NetError::RateLimited && pause.count() > 0) {
+        const auto s = std::chrono::duration_cast<std::chrono::seconds>(pause).count();
+        return trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {}:{:02}.", s / 60,
+                   s % 60);
+    }
+    if (answer.failed()) return lichess::gaveNothing(answer);
+    return TR("Lichess's tables do not know this position.");
+}
+
+bool tablesAskAgain(const lichess::Failure& answer, std::chrono::milliseconds pause) {
+    return answer.net == lichess::NetError::RateLimited && pause.count() == 0;
+}
+
+std::optional<std::optional<int>> checkedVerdict(const lichess::Answer<lichess::Tablebase>& answer,
+                                                 std::string_view fen) {
+    if (answer.failed()) return std::nullopt;
+    std::optional<int> says;
+    if (answer.value && answer.value->outcome != lichess::Outcome::Unknown)
+        if (const auto r = outcomeResult(answer.value->outcome))
+            says = *r * (fen.find(" b ") == std::string_view::npos ? 1 : -1);  // the side to move's, made White's
+    return says;
 }
 
 }  // namespace fcg

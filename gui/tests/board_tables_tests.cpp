@@ -263,6 +263,67 @@ TEST_CASE("endgames tab: the profile's answers read before any request, an unkno
     fs::remove_all(profile);
 }
 
+TEST_CASE("endgames tab and check: an outage said as one, never as a position the tables do not know") {
+    const auto profile = fs::temp_directory_path() / "board-tables-outage";
+    fs::remove_all(profile);
+    // Nothing listens: Lichess's tables out of reach.
+    const auto nobody  = fmt::format("http://127.0.0.1:{}", freePort());
+    lichess::servers() = lichess::Servers{nobody, nobody + "/tb", nobody + "/explorer"};
+    bool sent          = false;
+    const auto offline = keptOrAskedTables(profile, ROOK_ENDING, sent);
+    lichess::servers() = lichess::Servers{};
+    CHECK(sent);
+    CHECK_FALSE(offline.value);
+    CHECK(offline.net == lichess::NetError::Offline);
+    CHECK(offline.error.empty());  // what the tab and the check read: an outage was taken for a position unknown
+    CHECK(tablesNothing(offline, 0ms) == "Lichess cannot be reached from here.");
+    CHECK_FALSE(tablesAskAgain(offline, 0ms));          // "Try again"
+    CHECK_FALSE(checkedVerdict(offline, ROOK_ENDING));  // the check keeps the failure: no "no verdict" recorded
+    CHECK_FALSE(cachedTablebase(profile, ROOK_ENDING));
+
+    // A 429: the host's pause told while it lasts, the tables asked again once it is over.
+    lichess::Failure too_many;
+    too_many.net    = lichess::NetError::RateLimited;
+    too_many.status = 429;
+    CHECK(tablesNothing(too_many, 42s) ==
+          "Too many requests in a short time: Lichess asked for a pause. Trying again in 0:42.");
+    CHECK(tablesNothing(too_many, 75s) ==
+          "Too many requests in a short time: Lichess asked for a pause. Trying again in 1:15.");
+    CHECK_FALSE(tablesAskAgain(too_many, 42s));
+    CHECK(tablesAskAgain(too_many, 0ms));
+    CHECK_FALSE(checkedVerdict(lichess::failedWith<lichess::Tablebase>(too_many), ROOK_ENDING));
+    // Another failure in its words, waiting for "Try again", whatever another request's pause.
+    lichess::Failure down;
+    down.net    = lichess::NetError::Server;
+    down.status = 503;
+    CHECK(tablesNothing(down, 0ms) == "Lichess gave nothing (Lichess answered 503).");
+    CHECK(tablesNothing(down, 42s) == "Lichess gave nothing (Lichess answered 503).");
+    CHECK_FALSE(tablesAskAgain(down, 0ms));
+    CHECK_FALSE(checkedVerdict(lichess::failedWith<lichess::Tablebase>(down), ROOK_ENDING));
+    fs::remove_all(profile);
+}
+
+TEST_CASE("endgames tab and check: a position the tables do not know, and their verdicts from White's side") {
+    Tables lichess;
+    const auto profile = fs::temp_directory_path() / "board-tables-verdicts";
+    fs::remove_all(profile);
+    bool sent           = false;
+    const char* unknown = "8/8/8/4k3/8/8/2PPP3/4K3 w - - 0 1";
+    const auto none     = keptOrAskedTables(profile, unknown, sent);
+    REQUIRE(none.value);
+    CHECK_FALSE(none.failed());
+    CHECK(tablesNothing(none, 0ms) == "Lichess's tables do not know this position.");
+    CHECK_FALSE(tablesAskAgain(none, 0ms));
+    const auto says = checkedVerdict(none, unknown);
+    REQUIRE(says);       // no failure: the position is done with...
+    CHECK_FALSE(*says);  // ...without a verdict
+    // A draw, White to move; Black to move and mating: -1.
+    using Verdict = std::optional<std::optional<int>>;
+    CHECK(checkedVerdict(keptOrAskedTables(profile, ROOK_ENDING, sent), ROOK_ENDING) == Verdict(0));
+    CHECK(checkedVerdict(keptOrAskedTables(profile, AFTER_RXH7, sent), AFTER_RXH7) == Verdict(-1));
+    fs::remove_all(profile);
+}
+
 TEST_CASE("endgames tab: the disk's tables answer as Lichess does, their line followed to the end") {
     const auto root = test::sourcePath();
 #ifdef _WIN32

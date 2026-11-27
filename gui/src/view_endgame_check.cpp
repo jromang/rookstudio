@@ -20,7 +20,6 @@
 #include "endgame_check.hpp"
 #include "endgames.hpp"
 #include "guide.hpp"
-#include "https.hpp"
 #include "i18n.hpp"
 #include "lichess_api.hpp"
 #include "online_cache.hpp"
@@ -147,22 +146,25 @@ void App::pollEndgameCheck() {
         c.checks  = std::move(read.checks);
     }
     if (c.summary || !c.error.empty()) return;
+    // Lichess's tables failed: "Try again" asks again; after a 429, the host's pause over.
+    if (c.failure.failed()) {
+        if (!tablesAskAgain(c.failure, tablesPause())) return;
+        c.failure = {};
+    }
 
     // Lichess's answer for the position a check waits for.
     if (isReady(c.asking)) {
         auto a          = c.asking.get();
         auto& check     = *c.checks[c.asking_game];
         const auto& fen = check.fen(c.asking_ply);
-        if (!a.value && !a.error.empty()) {
-            c.error = a.error;  // "Try again" asks it again
+        const auto says = checkedVerdict(a, fen);
+        if (!says) {
+            c.failure = a;  // the position asked again once the failure is over: not "no verdict"
             return;
         }
         ++c.from_lichess;
-        TablesSays says;
-        if (a.value && a.value->outcome != lichess::Outcome::Unknown)
-            if (const auto r = outcomeResult(a.value->outcome)) says = *r * sideSign(fen);
-        c.told[fen] = says;
-        check.give(c.asking_ply, says);
+        c.told[fen] = *says;
+        check.give(c.asking_ply, *says);
     }
     if (c.asking.valid() || c.consent) return;
 
@@ -319,20 +321,10 @@ void App::drawEndgameCheck() {
                 c.not_now = true;
                 c.consent = false;
             }
-        } else if (!c.error.empty()) {
-            const auto pause = HostGate::instance().pausedFor("tablebase.lichess.ovh");
-            if (pause.count() > 0) {
-                const auto s = std::chrono::duration_cast<std::chrono::seconds>(pause).count();
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Too many requests in a short time: Lichess asked for a pause. Trying again in "
-                                       "{}:{:02}.",
-                                       s / 60, s % 60)
-                                       .c_str());
-            } else {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess's tables gave nothing: {}", c.error).c_str());
-            }
-            if (ImGui::SmallButton(TR("Try again"))) c.error.clear();
+        } else if (c.failure.failed()) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               tablesNothing(c.failure, tablesPause()).c_str());
+            if (ImGui::SmallButton(TR("Try again"))) c.failure = {};
             ImGui::SameLine();
         } else if (c.asking.valid()) {
             ImGui::TextDisabled("%s", TR("Asking Lichess's tables…"));

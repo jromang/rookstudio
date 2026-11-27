@@ -11,7 +11,8 @@
 // The PGN files are named after the tournament when it is created (spec.pgn_file, spec.pgn_chessbase_file); those
 // of the tournaments of 0.4.12 and earlier are games.pgn and games-chessbase.pgn. Both are written in the order
 // games end, and the journal finds every game by its place in them. The PGN file of the user's (spec.pgn_out) gets
-// them in schedule order instead: see writeOut().
+// them in schedule order instead: see pgn_out.hpp. The names of the files, and of the journal's events, are in
+// journal_events.hpp.
 //
 // A finished game is written to both PGN files first, then to the journal, each synced to disk. The PGN files are
 // written without the state's lock, so the journal may list games out of their order there; it points to each by
@@ -51,6 +52,7 @@
 #include "model.hpp"
 #include "openings.hpp"
 #include "pgn_file.hpp"
+#include "pgn_out.hpp"
 #include "schedule.hpp"
 #include "start_failures.hpp"
 #include "unbalanced.hpp"
@@ -350,18 +352,6 @@ class TournamentState {
     [[nodiscard]] bool ownOpenings() const noexcept;
     // An encounter_started line of the journal, read when the tournament is opened or followed; mutex_ held.
     void readStarted(const nlohmann::json& e);
-    // Appends to spec_.pgn_out the finished games every game before which, in the schedule, is written there or
-    // will not be played: the two games of an encounter side by side, rounds in order. A replayed game is written
-    // when it ends; at the end of the tournament, everything left. Journaled ("pgn_out") before and after each
-    // write, so a resume carries on, and a crash in the middle neither writes games twice nor loses them.
-    // A failure is kept for pgnOutError() and tried again next time. `lock` holds mutex_, and is released while
-    // the games are written.
-    void writeOut(std::unique_lock<std::mutex>& lock);
-    // When the tournament is opened: a write to spec_.pgn_out whose start the journal has but not its end (a crash
-    // in between). True when its games are in the file (completed if the write was cut short), which is then
-    // journaled; false when they are to be written again. `journaled`: the places of the games in the tournament's
-    // PGN files, by pgnPath() offset.
-    bool settleOut(const nlohmann::json& begun, const std::map<uint64_t, std::pair<PgnSpan, PgnSpan>>& journaled);
 
     // What the last edit changed, to undo it (see canUndo()).
     struct UndoPoint {
@@ -417,24 +407,6 @@ class TournamentState {
     uint32_t next_encounter_ = 0;  // first encounter never started
     std::deque<std::pair<uint32_t, int>> open_;  // games of started encounters still to play
 
-    // spec_.pgn_out
-    std::vector<std::size_t> out_held_;  // indexes in results_ of the games not written there yet, voided included
-    std::set<uint64_t> out_written_;     // numbers of the games written there
-    uint64_t out_floor_ = 0;             // every game number below is written there, done or dropped
-    std::string out_error_;
-    bool out_writing_ = false;  // a thread is writing there, without the lock
-    bool out_again_   = false;  // games may have become ready meanwhile
-    // A write there journaled as begun that failed (a disk full) and may have left part of its text: the next one
-    // completes it, rather than write the text again after a game cut off.
-    struct OutCut {
-        std::vector<std::size_t> games;  // indexes in results_
-        nlohmann::json offsets;          // their pgnPath() offsets, as journaled
-        std::string file;                // spec_.pgn_out then
-        uint64_t at = 0;                 // where it went
-        std::string text;
-    };
-    std::optional<OutCut> out_cut_;
-
     std::optional<UndoPoint> undo_;
     uint64_t claims_ = 0;  // games claimed since the tournament was opened
 
@@ -454,6 +426,9 @@ class TournamentState {
     fastchess::SPRT sprt_;
     bool finished_ = false;
     std::string finish_reason_;
+
+    // spec_.pgn_out's: it reads the members above (declared before it), under mutex_.
+    PgnOutWriter pgn_out_;
 };
 
 }  // namespace fcg::tour

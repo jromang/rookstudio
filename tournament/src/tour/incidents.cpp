@@ -1,13 +1,14 @@
 #include "incidents.hpp"
 
 #include <algorithm>
-#include <cstdlib>
 #include <fstream>
 #include <string>
-#include <string_view>
 
 #include <json.hpp>
 
+#include "game_result.hpp"
+#include "journal.hpp"
+#include "journal_events.hpp"
 #include "summary.hpp"
 
 namespace fcg::tour {
@@ -37,7 +38,7 @@ Incidents IncidentScanner::scan(const fs::path& root, int64_t since_ms, std::chr
     std::map<fs::path, Journal> kept;
     const auto now = fs::file_time_type::clock::now();
     for (const auto& dir : tournamentDirs(root)) {
-        const auto file = dir / "journal.jsonl";
+        const auto file = dir / JOURNAL_FILE;
         std::error_code ec;
         const auto written = fs::last_write_time(file, ec);
         if (ec || now - written > window) continue;
@@ -52,68 +53,53 @@ Incidents IncidentScanner::scan(const fs::path& root, int64_t since_ms, std::chr
         if (!journal.named) {
             journal.named = true;
             try {
-                std::ifstream in(dir / "tournament.json", std::ios::binary);
+                std::ifstream in(dir / SPEC_FILE, std::ios::binary);
                 const auto spec = nlohmann::json::parse(in);
                 for (const auto& p : spec.value("participants", nlohmann::json::array())) addName(p, journal.names);
             } catch (const std::exception&) {
             }
         }
 
-        // What was appended since the last scan, up to its last complete line.
-        if (size > journal.read) {
-            std::ifstream in(file, std::ios::binary);
-            in.seekg(static_cast<std::streamoff>(journal.read));
-            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            std::size_t pos = 0;
-            for (auto end = text.find('\n'); end != std::string::npos; pos = end + 1, end = text.find('\n', pos)) {
-                const std::string_view line(text.data() + pos, end - pos);
-                if (line.find("\"participant_added\"") != std::string_view::npos ||
-                    line.find("\"participant_replaced\"") != std::string_view::npos) {
-                    try {
-                        addName(nlohmann::json::parse(line).value("participant", nlohmann::json()), journal.names);
-                    } catch (const std::exception&) {
-                    }
-                    continue;
-                }
-                // The games an engine on a machine lost to the network: not its incidents.
-                if (line.find("\"games_voided\"") != std::string_view::npos &&
-                    line.find("\"network\":true") != std::string_view::npos) {
-                    try {
-                        const auto event = nlohmann::json::parse(line);  // kept: the loop reads into it
+        // What was appended since the last scan, up to its last complete line. A line that does not read as its type
+        // says is passed over.
+        const auto line = [&](uint64_t, uint64_t, const nlohmann::json& event) {
+            try {
+                switch (eventTypeOf(event)) {
+                    case EventType::ParticipantAdded:
+                    case EventType::ParticipantReplaced:
+                        addName(event.value("participant", nlohmann::json()), journal.names);
+                        break;
+                    case EventType::GamesVoided:
+                        // The games an engine on a machine lost to the network: not its incidents.
+                        if (!event.value("network", false)) break;
                         for (const auto& g : event.at("games")) {
                             const auto n = g.at(0).get<uint64_t>() * 2 + g.at(1).get<uint64_t>();
                             for (auto& f : journal.found) {
                                 if (f.number == n) f.network = true;
                             }
                         }
-                    } catch (const std::exception&) {
+                        break;
+                    case EventType::GameFinished: {
+                        const auto game = gameResultFromJson(event);
+                        if (!incident(game.termination)) break;
+                        Found found;
+                        found.at     = game.finished_at;
+                        found.how    = game.termination;
+                        found.plies  = game.plies;
+                        found.number = game.number();
+                        // The side that lost; a draw (a timeout against a bare king) has no loser.
+                        if (game.result == "1-0") found.loser = game.black;
+                        if (game.result == "0-1") found.loser = game.white;
+                        journal.found.push_back(found);
+                        break;
                     }
-                    continue;
+                    default:
+                        break;
                 }
-                // Most lines are games that ended normally: told by their termination, without parsing them.
-                if (line.find("\"game_finished\"") == std::string_view::npos) continue;
-                const auto key = line.find("\"termination\":");
-                if (key == std::string_view::npos) continue;
-                const auto how =
-                    static_cast<MatchTermination>(std::atoi(std::string(line.substr(key + 14, 3)).c_str()));
-                if (!incident(how)) continue;
-                try {
-                    const auto event = nlohmann::json::parse(line);
-                    Found found;
-                    found.at    = event.value("at", int64_t{0});
-                    found.how   = how;
-                    found.plies = event.value("plies", 0u);
-                    found.number = event.value("encounter", uint64_t{0}) * 2 + event.value("game", uint64_t{0});
-                    // The side that lost; a draw (a timeout against a bare king) has no loser.
-                    const auto result = event.value("result", std::string());
-                    if (result == "1-0") found.loser = event.value("black", -1);
-                    if (result == "0-1") found.loser = event.value("white", -1);
-                    journal.found.push_back(found);
-                } catch (const std::exception&) {
-                }
+            } catch (const std::exception&) {
             }
-            journal.read += pos;
-        }
+        };
+        if (size > journal.read) journal.read = tour::Journal::readFrom(file, journal.read, line);
 
         std::erase_if(journal.found, [&](const auto& f) { return f.at < since_ms; });
         kept.emplace(file, std::move(journal));

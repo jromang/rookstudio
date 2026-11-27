@@ -6,6 +6,7 @@
 
 #include <json.hpp>
 
+#include "journal_events.hpp"
 #include "model.hpp"
 #include "pgn_file.hpp"
 
@@ -81,8 +82,8 @@ uint32_t durationMs(const std::string& text) {
 
 bool isLegacyRun(const fs::path& dir) {
     std::error_code ec;
-    return fs::is_regular_file(dir / "config.json", ec) && fs::is_regular_file(dir / "games.pgn", ec) &&
-           !fs::exists(dir / "tournament.json", ec);
+    return fs::is_regular_file(dir / "config.json", ec) && fs::is_regular_file(dir / OLD_PGN_FILE, ec) &&
+           !fs::exists(dir / SPEC_FILE, ec);
 }
 
 std::vector<fs::path> legacyRuns(const fs::path& root) {
@@ -118,9 +119,9 @@ void importLegacyRun(const fs::path& dir) {
     spec.name     = a + " vs " + b;
     spec.format   = Format::Match;
 
-    const auto games    = splitGames(readFile(dir / "games.pgn"));
-    const auto cb_games = fs::exists(dir / "games-chessbase.pgn") ? splitGames(readFile(dir / "games-chessbase.pgn"))
-                                                                  : std::vector<PgnGame>{};
+    const auto games    = splitGames(readFile(dir / OLD_PGN_FILE));
+    const auto cb_games = fs::exists(dir / OLD_CHESSBASE_PGN_FILE) ? splitGames(readFile(dir / OLD_CHESSBASE_PGN_FILE))
+                                                                   : std::vector<PgnGame>{};
 
     nlohmann::json journal = nlohmann::json::array();
     std::map<uint64_t, bool> seen;
@@ -139,37 +140,38 @@ void importLegacyRun(const fs::path& dir) {
         if (!seen.emplace(uint64_t{encounter} * 2 + game, true).second) continue;
 
         const auto term = termination(h.count("Termination") ? h.at("Termination") : "");
-        journal.push_back({{"t", "game_finished"},
-                           {"encounter", encounter},
-                           {"game", game},
-                           {"white", white == a ? 0 : 1},
-                           {"black", white == a ? 1 : 0},
-                           {"result", result},
-                           {"termination", static_cast<int>(term)},
-                           {"reason", h.count("Termination") ? h.at("Termination") : ""},
-                           {"plies", h.count("PlyCount") ? std::atoi(h.at("PlyCount").c_str()) : 0},
-                           {"ms", durationMs(h.count("GameDuration") ? h.at("GameDuration") : "")},
-                           {"pgn", {games[i].span.offset, games[i].span.length}},
-                           {"cb", i < cb_games.size() ? nlohmann::json{cb_games[i].span.offset, cb_games[i].span.length}
-                                                      : nlohmann::json{0, 0}},
-                           {"at", 0}});
+        journal.push_back(
+            journalEvent(EventType::GameFinished,
+                         {{"encounter", encounter},
+                          {"game", game},
+                          {"white", white == a ? 0 : 1},
+                          {"black", white == a ? 1 : 0},
+                          {"result", result},
+                          {"termination", static_cast<int>(term)},
+                          {"reason", h.count("Termination") ? h.at("Termination") : ""},
+                          {"plies", h.count("PlyCount") ? std::atoi(h.at("PlyCount").c_str()) : 0},
+                          {"ms", durationMs(h.count("GameDuration") ? h.at("GameDuration") : "")},
+                          {"pgn", {games[i].span.offset, games[i].span.length}},
+                          {"cb", i < cb_games.size() ? nlohmann::json{cb_games[i].span.offset, cb_games[i].span.length}
+                                                     : nlohmann::json{0, 0}},
+                          {"at", 0}}));
     }
-    journal.push_back({{"t", "finished"}, {"why", "imported"}});
+    journal.push_back(journalEvent(EventType::Finished, {{"why", "imported"}}));
 
     // The journal first: a folder with a journal but no tournament.json is still seen as legacy and imported again.
     {
-        std::ofstream out(dir / "journal.jsonl", std::ios::binary | std::ios::trunc);
+        std::ofstream out(dir / JOURNAL_FILE, std::ios::binary | std::ios::trunc);
         for (const auto& event : journal)
             out << event.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) << '\n';
-        if (!out) throw std::runtime_error("cannot write " + (dir / "journal.jsonl").string());
+        if (!out) throw std::runtime_error("cannot write " + (dir / JOURNAL_FILE).string());
     }
     {
-        const auto tmp = dir / "tournament.json.tmp";
+        const auto tmp = dir / (std::string(SPEC_FILE) + ".tmp");
         std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
         out << nlohmann::json(spec).dump(4, ' ', false, nlohmann::json::error_handler_t::replace) << '\n';
         out.close();
         if (!out) throw std::runtime_error("cannot write " + tmp.string());
-        fs::rename(tmp, dir / "tournament.json");
+        fs::rename(tmp, dir / SPEC_FILE);
     }
 }
 

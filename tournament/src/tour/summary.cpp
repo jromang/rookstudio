@@ -4,6 +4,7 @@
 #include <fstream>
 
 #include "journal.hpp"
+#include "journal_events.hpp"
 #include "schedule.hpp"
 #include "standings.hpp"
 #include "state.hpp"
@@ -48,7 +49,7 @@ std::vector<Summary::Score> scoresOf(const TournamentSpec& spec, const Tournamen
 
 std::optional<Summary> summarize(const fs::path& dir) {
     try {
-        std::ifstream in(dir / "tournament.json", std::ios::binary);
+        std::ifstream in(dir / SPEC_FILE, std::ios::binary);
         if (!in) return std::nullopt;
 
         Summary s;
@@ -57,7 +58,7 @@ std::optional<Summary> summarize(const fs::path& dir) {
 
         // A damaged line does not hide the tournament from the list; opening it reports the line.
         std::vector<std::string> damaged;
-        const auto replayed = TournamentState::replay(Journal::read(dir / "journal.jsonl", false, &damaged), s.spec);
+        const auto replayed = TournamentState::replay(Journal::read(dir / JOURNAL_FILE, false, &damaged), s.spec);
         s.played            = replayed.played;
         s.total             = replayed.total;
         s.finished          = replayed.finished;
@@ -74,7 +75,7 @@ std::vector<fs::path> tournamentDirs(const fs::path& root) {
     std::error_code ec;
     // increment(ec): a folder that cannot be read further (a network drive gone...) ends the list, it does not throw.
     for (fs::directory_iterator it(root, ec), last; !ec && it != last; it.increment(ec)) {
-        if (it->is_directory(ec) && fs::is_regular_file(it->path() / "tournament.json", ec)) dirs.push_back(it->path());
+        if (it->is_directory(ec) && fs::is_regular_file(it->path() / SPEC_FILE, ec)) dirs.push_back(it->path());
     }
     std::sort(dirs.begin(), dirs.end(), [](const auto& a, const auto& b) { return a.filename() > b.filename(); });
     return dirs;
@@ -94,10 +95,10 @@ std::vector<Summary> SummaryCache::list(const fs::path& root) {
     for (const auto& dir : tournamentDirs(root)) {
         Entry now;
         std::error_code ec;
-        now.journal_size = fs::file_size(dir / "journal.jsonl", ec);
+        now.journal_size = fs::file_size(dir / JOURNAL_FILE, ec);
         if (ec) now.journal_size = 0;
-        now.journal_time = fs::last_write_time(dir / "journal.jsonl", ec);
-        now.spec_time    = fs::last_write_time(dir / "tournament.json", ec);
+        now.journal_time = fs::last_write_time(dir / JOURNAL_FILE, ec);
+        now.spec_time    = fs::last_write_time(dir / SPEC_FILE, ec);
 
         const auto it = entries_.find(dir);
         if (it != entries_.end() && it->second.journal_size == now.journal_size &&

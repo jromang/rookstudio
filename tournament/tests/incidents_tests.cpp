@@ -6,6 +6,7 @@
 #include <json.hpp>
 
 #include <tour/incidents.hpp>
+#include <tour/state.hpp>
 
 using namespace fcg::tour;
 namespace fs = std::filesystem;
@@ -21,10 +22,24 @@ fs::path tournament(const fs::path& root, const std::string& name) {
     return dir;
 }
 
+// A game's journal line, as the tournament writes it.
+std::string gameLine(int white, int black, const char* result, MatchTermination how, int64_t at, unsigned plies = 0,
+                     uint32_t encounter = 0, int g = 0) {
+    GameResult r;
+    r.encounter   = encounter;
+    r.game        = g;
+    r.white       = white;
+    r.black       = black;
+    r.result      = result;
+    r.termination = how;
+    r.reason      = "x";
+    r.plies       = plies;
+    r.finished_at = at;
+    return gameResultJson(r).dump();
+}
+
 void game(const fs::path& dir, MatchTermination how, int64_t at, bool complete = true) {
-    const nlohmann::json event = {
-        {"t", "game_finished"}, {"result", "1-0"}, {"termination", static_cast<int>(how)}, {"reason", "x"}, {"at", at}};
-    std::ofstream(dir / "journal.jsonl", std::ios::app) << event.dump() << (complete ? "\n" : "");
+    std::ofstream(dir / "journal.jsonl", std::ios::app) << gameLine(0, 1, "1-0", how, at) << (complete ? "\n" : "");
 }
 
 }  // namespace
@@ -80,10 +95,7 @@ TEST_CASE("incidents: by engine, the losers named, the losses on time in the fir
     std::ofstream(dir / "tournament.json") << spec.dump();
 
     const auto played = [&](int white, int black, const char* result, MatchTermination how, unsigned plies) {
-        const nlohmann::json event = {{"t", "game_finished"}, {"white", white}, {"black", black},
-                                      {"result", result},     {"plies", plies}, {"termination", static_cast<int>(how)},
-                                      {"reason", "x"},        {"at", 5000}};
-        std::ofstream(dir / "journal.jsonl", std::ios::app) << event.dump() << "\n";
+        std::ofstream(dir / "journal.jsonl", std::ios::app) << gameLine(white, black, result, how, 5000, plies) << "\n";
     };
     played(0, 1, "0-1", MatchTermination::TIMEOUT, 12);   // Alpha, on time in the first moves
     played(1, 0, "1-0", MatchTermination::TIMEOUT, 30);   // Alpha again
@@ -119,16 +131,8 @@ TEST_CASE("incidents: a game an engine on a machine lost to the network is not i
     fs::remove_all(root);
     const auto dir = tournament(root, "20261115-100000_net");
     const auto lost = [&](uint32_t encounter, int g) {
-        const nlohmann::json event = {{"t", "game_finished"},
-                                      {"encounter", encounter},
-                                      {"game", g},
-                                      {"white", 0},
-                                      {"black", 1},
-                                      {"result", "1-0"},
-                                      {"termination", static_cast<int>(MatchTermination::DISCONNECT)},
-                                      {"reason", "x"},
-                                      {"at", 5000}};
-        std::ofstream(dir / "journal.jsonl", std::ios::app) << event.dump() << "\n";
+        std::ofstream(dir / "journal.jsonl", std::ios::app)
+            << gameLine(0, 1, "1-0", MatchTermination::DISCONNECT, 5000, 0, encounter, g) << "\n";
     };
     lost(0, 0);
     lost(0, 1);

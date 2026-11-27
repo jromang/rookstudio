@@ -9,6 +9,7 @@
 #include <tuple>
 
 #include "journal.hpp"
+#include "journal_events.hpp"
 #include "ratinglist.hpp"
 #include "state.hpp"
 
@@ -168,7 +169,7 @@ class Builder {
 void readTournament(const fs::path& dir, GameDb& db, Builder& builder) {
     TournamentSpec spec;
     try {
-        std::ifstream in(dir / "tournament.json", std::ios::binary);
+        std::ifstream in(dir / SPEC_FILE, std::ios::binary);
         if (!in) return;
         spec = nlohmann::json::parse(in).get<TournamentSpec>();
     } catch (const std::exception&) {
@@ -178,7 +179,7 @@ void readTournament(const fs::path& dir, GameDb& db, Builder& builder) {
 
     TournamentState::Replayed replayed;
     try {
-        replayed = TournamentState::replay(Journal::read(dir / "journal.jsonl", false), spec);
+        replayed = TournamentState::replay(Journal::read(dir / JOURNAL_FILE, false), spec);
     } catch (const std::exception&) {
         return;
     }

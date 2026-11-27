@@ -161,7 +161,7 @@ struct TournamentSpec {
     bool opening_per_round = false;
 
     // A PGN file of the user's, outside the folder, that every game is also appended to, in schedule order (see
-    // TournamentState::writeOut()); empty = none. Several tournaments may share it.
+    // pgn_out.hpp); empty = none. Several tournaments may share it.
     std::string pgn_out;
     bool pgn_out_chessbase = false;  // [%eval] [%emt] comments rather than cutechess' {+0.35/18 1.234s}
 
@@ -199,10 +199,8 @@ struct TournamentSpec {
     }
     [[nodiscard]] bool coloursLocked() const noexcept { return colours != Colours::Alternate; }
 
-    [[nodiscard]] std::string pgnFile() const { return pgn_file.empty() ? "games.pgn" : pgn_file; }
-    [[nodiscard]] std::string chessbasePgnFile() const {
-        return pgn_chessbase_file.empty() ? "games-chessbase.pgn" : pgn_chessbase_file;
-    }
+    [[nodiscard]] std::string pgnFile() const;
+    [[nodiscard]] std::string chessbasePgnFile() const;
 
     // A team match: the name of team `team` (0: A, 1: B), and its participants' ids in the list's order, the withdrawn
     // and replaced ones too unless `active_only`.

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include "journal_events.hpp"
+
 namespace fcg::tour {
 
 namespace {
@@ -140,11 +142,6 @@ void from_json(const nlohmann::json& j, Edit& e) {
     if (const auto it = j.find("remote"); it != j.end() && it->is_object()) e.remote = it->get<RemoteEngine>();
 }
 
-bool isEditEvent(const std::string& type) {
-    return type == "participant_added" || type == "participant_replaced" || type == "participant_withdrawn" ||
-           type == "cycles_changed" || type == "games_voided" || type == "result_set";
-}
-
 nlohmann::json editEvent(const Edit& edit, uint32_t at, int new_id, const TournamentSpec& spec) {
     switch (edit.kind) {
         case Edit::Kind::AddParticipant: {
@@ -156,7 +153,8 @@ nlohmann::json editEvent(const Edit& edit, uint32_t at, int new_id, const Tourna
             p.gpu         = edit.gpu;
             p.remote      = edit.remote;
             p.team        = spec.format == Format::TeamMatch && edit.team == 1 ? 1 : 0;
-            return {{"t", "participant_added"}, {"at", at}, {"participant", p}, {"catch_up", edit.catch_up}};
+            return journalEvent(EventType::ParticipantAdded,
+                                {{"at", at}, {"participant", p}, {"catch_up", edit.catch_up}});
         }
         case Edit::Kind::ReplaceParticipant: {
             Participant p;
@@ -167,32 +165,32 @@ nlohmann::json editEvent(const Edit& edit, uint32_t at, int new_id, const Tourna
             p.gpu         = edit.gpu;
             p.remote      = edit.remote;
             if (const auto* old = spec.participant(edit.participant)) p.team = old->team;
-            return {{"t", "participant_replaced"}, {"at", at}, {"old", edit.participant}, {"participant", p}};
+            return journalEvent(EventType::ParticipantReplaced,
+                                {{"at", at}, {"old", edit.participant}, {"participant", p}});
         }
         case Edit::Kind::Withdraw:
-            return {{"t", "participant_withdrawn"},
-                    {"at", at},
-                    {"participant", edit.participant},
-                    {"void_played", edit.void_played}};
+            return journalEvent(EventType::ParticipantWithdrawn,
+                                {{"at", at}, {"participant", edit.participant}, {"void_played", edit.void_played}});
         case Edit::Kind::SetCycles:
-            return {{"t", "cycles_changed"}, {"at", at}, {"cycles", edit.cycles}};
+            return journalEvent(EventType::CyclesChanged, {{"at", at}, {"cycles", edit.cycles}});
         case Edit::Kind::VoidGames: {
             nlohmann::json games = nlohmann::json::array();
             for (const auto& [e, g] : edit.games) games.push_back({e, g});
-            return {{"t", "games_voided"}, {"games", games}, {"replay", edit.replay}, {"why", edit.why}};
+            return journalEvent(EventType::GamesVoided, {{"games", games}, {"replay", edit.replay}, {"why", edit.why}});
         }
         case Edit::Kind::SetResult: {
             nlohmann::json games = nlohmann::json::array();
             for (const auto& [e, g] : edit.games) games.push_back({e, g});
-            return {{"t", "result_set"}, {"games", games}, {"result", edit.result}, {"why", edit.why}};
+            return journalEvent(EventType::ResultSet, {{"games", games}, {"result", edit.result}, {"why", edit.why}});
         }
     }
     return {};
 }
 
 void applyEditEvent(const nlohmann::json& event, TournamentSpec& spec, Schedule& schedule) {
-    const auto type = event.at("t").get<std::string>();
-    if (type == "games_voided" || type == "result_set") return;  // results only
+    const auto name = event.at("t").get<std::string>();
+    const auto type = eventType(name);
+    if (type == EventType::GamesVoided || type == EventType::ResultSet) return;  // results only
     if (!schedule.editable()) throw std::runtime_error("a match cannot be edited this way");
 
     const auto size = schedule.size().value_or(0);
@@ -200,7 +198,7 @@ void applyEditEvent(const nlohmann::json& event, TournamentSpec& spec, Schedule&
     // The cycle being played when the edit was made (0: nothing started yet).
     const uint32_t current = at > 0 ? schedule.at(at - 1)->cycle : 0;
 
-    if (type == "participant_added") {
+    if (type == EventType::ParticipantAdded) {
         const auto p = event.at("participant").get<Participant>();
         if (spec.participant(p.id)) throw std::runtime_error("participant id already used");
         // Its board would have no opponent.
@@ -226,7 +224,7 @@ void applyEditEvent(const nlohmann::json& event, TournamentSpec& spec, Schedule&
         return;
     }
 
-    if (type == "participant_replaced") {
+    if (type == EventType::ParticipantReplaced) {
         const int old_id = event.at("old").get<int>();
         auto* old        = spec.participant(old_id);
         if (!old || !old->active) throw std::runtime_error("no active participant to replace");
@@ -239,7 +237,7 @@ void applyEditEvent(const nlohmann::json& event, TournamentSpec& spec, Schedule&
         return;
     }
 
-    if (type == "participant_withdrawn") {
+    if (type == EventType::ParticipantWithdrawn) {
         const int id = event.at("participant").get<int>();
         auto* p      = spec.participant(id);
         if (!p || !p->active) throw std::runtime_error("no active participant to withdraw");
@@ -248,7 +246,7 @@ void applyEditEvent(const nlohmann::json& event, TournamentSpec& spec, Schedule&
         return;
     }
 
-    if (type == "cycles_changed") {
+    if (type == EventType::CyclesChanged) {
         const int cycles = event.at("cycles").get<int>();
         if (cycles < 1) throw std::runtime_error("a tournament needs at least one cycle");
         const auto last = schedule.lastCycle();
@@ -263,7 +261,7 @@ void applyEditEvent(const nlohmann::json& event, TournamentSpec& spec, Schedule&
         return;
     }
 
-    throw std::runtime_error("unknown edit \"" + type + "\"");
+    throw std::runtime_error("unknown edit \"" + name + "\"");
 }
 
 }  // namespace fcg::tour

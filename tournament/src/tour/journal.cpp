@@ -52,6 +52,28 @@ std::vector<nlohmann::json> Journal::read(const fs::path& file, bool repair, std
     return events;
 }
 
+uint64_t Journal::readFrom(const fs::path& file, uint64_t from, const Listener& line) {
+    std::ifstream in(file, std::ios::binary);
+    if (!in || !in.seekg(static_cast<std::streamoff>(from))) return from;
+    uint64_t at = from;
+    for (std::string text; std::getline(in, text);) {
+        if (in.eof()) break;  // its newline not written yet
+        const uint64_t end = at + text.size() + 1;
+        if (text.find_first_not_of(" \t\r") != std::string::npos) {
+            nlohmann::json event;
+            bool read = true;
+            try {
+                event = nlohmann::json::parse(text);
+            } catch (const nlohmann::json::exception&) {
+                read = false;  // damaged
+            }
+            if (read) line(at, end, event);
+        }
+        at = end;
+    }
+    return at;
+}
+
 Journal::Journal(const fs::path& file) {
     // A partial last line that could not be cut (read() without repair, or the cut failed) becomes a line of its
     // own, which read() reports, instead of spoiling the next one.

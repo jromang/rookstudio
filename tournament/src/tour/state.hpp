@@ -11,7 +11,8 @@
 // The PGN files are named after the tournament when it is created (spec.pgn_file, spec.pgn_chessbase_file); those
 // of the tournaments of 0.4.12 and earlier are games.pgn and games-chessbase.pgn. Both are written in the order
 // games end, and the journal finds every game by its place in them. The PGN file of the user's (spec.pgn_out) gets
-// them in schedule order instead: see writeOut().
+// them in schedule order instead: see pgn_out.hpp. The names of the files, and of the journal's events, are in
+// journal_events.hpp.
 //
 // A finished game is written to both PGN files first, then to the journal, each synced to disk. The PGN files are
 // written without the state's lock, so the journal may list games out of their order there; it points to each by
@@ -46,15 +47,20 @@
 
 #include "edits.hpp"
 #include "files.hpp"
+#include "game_result.hpp"
 #include "journal.hpp"
 #include "model.hpp"
 #include "openings.hpp"
 #include "pgn_file.hpp"
+#include "pgn_out.hpp"
+#include "rounds.hpp"
 #include "schedule.hpp"
 #include "start_failures.hpp"
 #include "unbalanced.hpp"
 
 namespace fcg::tour {
+
+struct JournalReader;  // journal_events.hpp
 
 // One game handed to the runner.
 struct GameTask {
@@ -67,69 +73,6 @@ struct GameTask {
     // 0-based game number in the tournament, stable across resumes.
     [[nodiscard]] uint64_t number() const noexcept { return uint64_t{encounter.index} * 2 + game; }
 };
-
-// The Termination tag of a game whose result the operator set, and the reason the views give for its end.
-inline constexpr const char* OPERATOR_TERMINATION = "adjudicated by the operator";
-inline constexpr const char* OPERATOR_REASON      = "Adjudicated by the operator";
-
-// A result set by hand (a "result_set" edit, see Edit::Kind::SetResult): why, and how the game ended as played.
-struct ResultSet {
-    std::string why;
-    std::string played_result;  // "*": the operator ended the game while it was played
-    fastchess::MatchTermination played_termination = fastchess::MatchTermination::NORMAL;
-    std::string played_reason;
-};
-
-// A finished, scored game, as kept in the journal.
-// Why the games an engine on a machine lost to a broken connection were voided, before the machine's name.
-inline constexpr const char* NETWORK_REASON = "connection to its machine lost";
-
-struct GameResult {
-    uint32_t encounter = 0;
-    int game           = 0;
-    int white          = 0;  // participant ids
-    int black          = 0;
-    std::string result;  // "1-0", "0-1" or "1/2-1/2"
-    fastchess::MatchTermination termination = fastchess::MatchTermination::NORMAL;
-    std::string reason;
-    uint32_t plies       = 0;
-    uint32_t duration_ms = 0;
-    PgnSpan pgn;              // in the cutechess-style PGN file (spec.pgnFile())
-    PgnSpan pgn_chessbase;    // in the ChessBase one
-    int64_t finished_at = 0;  // unix time, milliseconds
-    // What fastchess' PV checks found (an illegal PV move, a mate PV that does not mate...): (ply, warning).
-    std::vector<std::pair<uint32_t, std::string>> pv_warnings;
-    // The opening was unbalanced (unbalanced.hpp), as the tournament's rule tells it when the game ended: +1 for White,
-    // -1 for Black, 0 not, or not looked for.
-    int unbalanced = 0;
-
-    // No longer counted (replay requested, participant replaced or withdrawn); kept to be shown as such.
-    bool voided = false;
-    std::string void_reason;
-
-    // Set when the operator set the result by hand: result, termination (ADJUDICATION) and reason (OPERATOR_REASON)
-    // are then theirs, and this keeps how the game ended as played. The PGN files keep the game as played:
-    // countedPgn() gives its text as it counts.
-    std::optional<ResultSet> set;
-
-    [[nodiscard]] uint64_t number() const noexcept { return uint64_t{encounter} * 2 + game; }
-
-    // Score of participant `id` in this game: 1, 0.5 or 0.
-    [[nodiscard]] double scoreOf(int id) const noexcept;
-};
-
-// The comment a game whose result was set by hand gets before its result (see countedPgn()): the reason, and how it
-// ended as played. Empty for another game.
-[[nodiscard]] std::string setResultComment(const GameResult& r);
-
-// The PGN text of a game as it counts, from its text in the tournament's PGN files: a game whose result was set by
-// hand gets that result, the Termination tag OPERATOR_TERMINATION and setResultComment() before the result; another
-// game comes back as it is. What the exports and the replay read, as voided games are left out of them.
-[[nodiscard]] std::string countedPgn(std::string text, const GameResult& r);
-
-// A game as its journal line keeps it ("game_finished"), and back; the latter throws on a line that is none.
-[[nodiscard]] nlohmann::json gameResultJson(const GameResult& result);
-[[nodiscard]] GameResult gameResultFromJson(const nlohmann::json& j);
 
 // The statistics of one complete encounter (its two games), from participant `pov`'s point of view, pentanomial
 // counts included.
@@ -354,6 +297,10 @@ class TournamentState {
     TournamentState(std::filesystem::path dir, TournamentSpec spec);
 
     void load();  // replays the journal
+    // What load() and follow() do with the journal's events, as they were journaled: openings, edits, rounds and the
+    // end applied to the state. Its handlers hold `this`: called under mutex_, or by load() before another thread has
+    // the state.
+    [[nodiscard]] JournalReader applying();
     [[nodiscard]] Impact previewLocked(const Edit& edit) const;  // preview(), mutex_ held
     // Returns true when the result completes its encounter.
     bool apply(const GameResult& result);
@@ -364,16 +311,9 @@ class TournamentState {
     static void effects(const nlohmann::json& event, TournamentSpec& spec, Schedule& schedule,
                         std::vector<GameResult>& results, std::set<uint64_t>& done, std::set<uint64_t>& dropped);
     void rebuildStats();
-    void pairIfReady();                                 // Swiss, knockout: the next round when one is due
+    // Swiss, knockout: the next round (or a knockout's tiebreaks) when one is due, journaled and applied.
+    void pairIfReady();
     void applyRoundEvent(const nlohmann::json& event);  // round_paired, tiebreak_added; mutex_ held
-    [[nodiscard]] double pairPoints(int a, int b, uint32_t round) const;  // a's points against b in a round
-    // Knockout, the place of `a` and `b` in the round being played: the tiebreak pairs of games it was given, whether
-    // all its games are played (or dropped), and who goes through once they are (nullopt while level: another
-    // tiebreak is due). mutex_ held.
-    [[nodiscard]] int tiebreaks(int a, int b) const;
-    [[nodiscard]] bool placeOver(int a, int b) const;
-    [[nodiscard]] std::optional<int> placeWinner(int a, int b) const;
-    static void roundEventTo(const nlohmann::json& event, const TournamentSpec& spec, Schedule& schedule);
     void rebuildOpen();
     [[nodiscard]] bool hasWorkLocked() const;
     [[nodiscard]] bool gamesLeft() const;  // games to claim, finished or not; mutex_ held
@@ -406,18 +346,6 @@ class TournamentState {
     [[nodiscard]] bool ownOpenings() const noexcept;
     // An encounter_started line of the journal, read when the tournament is opened or followed; mutex_ held.
     void readStarted(const nlohmann::json& e);
-    // Appends to spec_.pgn_out the finished games every game before which, in the schedule, is written there or
-    // will not be played: the two games of an encounter side by side, rounds in order. A replayed game is written
-    // when it ends; at the end of the tournament, everything left. Journaled ("pgn_out") before and after each
-    // write, so a resume carries on, and a crash in the middle neither writes games twice nor loses them.
-    // A failure is kept for pgnOutError() and tried again next time. `lock` holds mutex_, and is released while
-    // the games are written.
-    void writeOut(std::unique_lock<std::mutex>& lock);
-    // When the tournament is opened: a write to spec_.pgn_out whose start the journal has but not its end (a crash
-    // in between). True when its games are in the file (completed if the write was cut short), which is then
-    // journaled; false when they are to be written again. `journaled`: the places of the games in the tournament's
-    // PGN files, by pgnPath() offset.
-    bool settleOut(const nlohmann::json& begun, const std::map<uint64_t, std::pair<PgnSpan, PgnSpan>>& journaled);
 
     // What the last edit changed, to undo it (see canUndo()).
     struct UndoPoint {
@@ -465,31 +393,10 @@ class TournamentState {
     std::map<uint32_t, std::size_t> half_;                   // encounter -> index in results_ of its first game
     std::map<std::pair<int, int>, fastchess::Stats> pairs_;  // (lower id, higher id), lower id's point of view
 
-    std::map<int, int> byes_;
-    std::map<uint32_t, std::vector<std::vector<int>>> brackets_;
-    uint32_t round_ = 0;           // Swiss, knockout: last round paired
     std::set<uint64_t> dropped_;   // games that will not be played (withdrawn participant, voided without replay)
     std::set<uint64_t> running_;   // claimed by the runner, not finished
     uint32_t next_encounter_ = 0;  // first encounter never started
     std::deque<std::pair<uint32_t, int>> open_;  // games of started encounters still to play
-
-    // spec_.pgn_out
-    std::vector<std::size_t> out_held_;  // indexes in results_ of the games not written there yet, voided included
-    std::set<uint64_t> out_written_;     // numbers of the games written there
-    uint64_t out_floor_ = 0;             // every game number below is written there, done or dropped
-    std::string out_error_;
-    bool out_writing_ = false;  // a thread is writing there, without the lock
-    bool out_again_   = false;  // games may have become ready meanwhile
-    // A write there journaled as begun that failed (a disk full) and may have left part of its text: the next one
-    // completes it, rather than write the text again after a game cut off.
-    struct OutCut {
-        std::vector<std::size_t> games;  // indexes in results_
-        nlohmann::json offsets;          // their pgnPath() offsets, as journaled
-        std::string file;                // spec_.pgn_out then
-        uint64_t at = 0;                 // where it went
-        std::string text;
-    };
-    std::optional<OutCut> out_cut_;
 
     std::optional<UndoPoint> undo_;
     uint64_t claims_ = 0;  // games claimed since the tournament was opened
@@ -510,6 +417,11 @@ class TournamentState {
     fastchess::SPRT sprt_;
     bool finished_ = false;
     std::string finish_reason_;
+
+    // spec_.pgn_out's, and the rounds of a Swiss or a knockout: they read the members above (declared before them),
+    // under mutex_.
+    PgnOutWriter pgn_out_;
+    Rounds rounds_;
 };
 
 }  // namespace fcg::tour

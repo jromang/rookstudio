@@ -88,7 +88,9 @@ struct GameMoves {
 [[nodiscard]] uint16_t packEco(std::string_view eco);
 [[nodiscard]] std::string ecoText(uint16_t eco);
 
-class Segment;
+namespace store {
+class Segment;  // a segment as it is read (store_detail.hpp)
+}
 
 // A game's place as the edits leave it: its version (none: as it was added) and whether it is deleted. What undoing an
 // edit puts back (Database::restore()).
@@ -207,7 +209,7 @@ class Snapshot {
 
    private:
     friend class Database;
-    [[nodiscard]] std::pair<const Segment*, std::size_t> locate(GameId id) const;
+    [[nodiscard]] std::pair<const store::Segment*, std::size_t> locate(GameId id) const;
     [[nodiscard]] std::size_t segmentOf(GameId id) const;  // the segment that added it (an index in segments_)
     // Deleted by an edit, the games that cannot be read left out: what the edits write and undo.
     [[nodiscard]] bool deletedByEdit(GameId id) const noexcept {
@@ -220,7 +222,7 @@ class Snapshot {
     // has that name, else "?"; none when it has neither.
     [[nodiscard]] std::optional<uint32_t> blankName() const;
 
-    std::vector<std::shared_ptr<const Segment>> segments_;  // all of them, those of versions included
+    std::vector<std::shared_ptr<const store::Segment>> segments_;  // all of them, those of versions included
     std::vector<std::size_t> logical_;                      // the segments that add games, in order
     std::vector<uint64_t> first_game_;                      // of each segment that adds games
     std::vector<uint32_t> first_name_;                      // of each segment
@@ -439,7 +441,7 @@ class Database {
     // The segments clear() took out, while snapshots taken before it still read them (under the writers' lock).
     struct Released {
         std::string name;
-        std::weak_ptr<const Segment> segment;
+        std::weak_ptr<const store::Segment> segment;
     };
     std::vector<Released> released_;
 };

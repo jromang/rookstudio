@@ -137,7 +137,6 @@ class FakeApp final : public PuzzlesContext {
     void dropScopeAsk() override {}
     const lichess::Profile* lichessProfile() const override { return nullptr; }
     void askLichessProfile() override {}
-    void askLichessProfileOnce() override {}
     bool liveGameOn() const override { return live_game; }
 
     // What the module was told, and what the test sets.

@@ -14,6 +14,7 @@
 #include "i18n.hpp"
 #include "lichess_profile.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -43,29 +44,23 @@ int64_t today() { return static_cast<int64_t>(std::time(nullptr)) / 86400; }
 }  // namespace
 
 void App::pollLichessProfile() {
-    if (!lichess_account_ || (lichess_profile_ && lichess_profile_->username != lichess_account_->username)) {
+    // Another account, or none: its profile, its failure and its request forgotten.
+    if (!lichess_account_ ||
+        (lichess_profile_.value && lichess_profile_.value->username != lichess_account_->username)) {
         lichess_profile_.reset();
         lichess_figures_.clear();
         lichess_profile_loaded_ = false;
         if (!lichess_account_) return;
     }
-    // What the profile kept, the first time.
-    if (!lichess_profile_ && !lichess_profile_loaded_) {
+    // What the profile kept, the first time, as old as it is.
+    if (!lichess_profile_.value && !lichess_profile_loaded_) {
         lichess_profile_loaded_ = true;
-        if (auto kept = lichess::keptProfile(storage_.root()); kept && kept->username == lichess_account_->username)
-            lichess_profile_ = std::move(kept);
-    }
-    if (lichess_profile_job_.valid() &&
-        lichess_profile_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto answer = lichess_profile_job_.get();
-        if (answer.value) {
-            lichess_profile_ = std::move(*answer.value);
-            lichess::keepProfile(storage_.root(), *lichess_profile_);
-            lichess_profile_error_ = {};
-        } else {
-            lichess_profile_error_ = answer;
+        if (auto kept = lichess::keptProfile(storage_.root()); kept && kept->username == lichess_account_->username) {
+            const auto age = lichess::profileAge(*kept, std::time(nullptr));
+            lichess_profile_.keep(std::move(*kept), age);
         }
     }
+    if (lichess_profile_.poll()) lichess::keepProfile(storage_.root(), *lichess_profile_.value);
     if (lichess_figures_job_.valid() &&
         lichess_figures_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
         auto [key, answer]    = lichess_figures_job_.get();
@@ -73,44 +68,26 @@ void App::pollLichessProfile() {
     }
 }
 
-void App::askArenaProfile() {
-    // The user's figures for the conditions (#46's profile), read again when they are ten minutes old.
-    pollLichessProfile();
-    if (!lichess_account_ || options_.scripted) return;
-    const auto now   = std::chrono::steady_clock::now();
-    const bool stale = !lichess_profile_ || std::time(nullptr) - lichess_profile_->read_at > 600;
-    if (stale && !lichess_profile_job_.valid() &&
-        (lichess_profile_asked_.time_since_epoch().count() == 0 ||
-         now - lichess_profile_asked_ > std::chrono::minutes(10))) {
-        lichess_profile_asked_ = now;
-        lichess_profile_job_ = std::async(std::launch::async,
-                                          [token = lichess_account_->token] { return lichess::accountProfile(token); });
-    }
+void App::askLichessProfile() {
+    if (lichess_account_ && lichess_profile_.due())
+        lichess_profile_.ask([token = lichess_account_->token](const TaskState<>& state) {
+            return lichess::accountProfile(token, &state.cancel);
+        });
 }
 
 void App::drawLichessAccountPanel() {
     if (!lichess_account_) return;
-    pollLichessProfile();
-    // Asked again when what is shown is ten minutes old, at most once in ten minutes.
-    const auto now   = std::chrono::steady_clock::now();
-    const bool stale = !lichess_profile_ || std::time(nullptr) - lichess_profile_->read_at > 600;
-    if (stale && !lichess_profile_job_.valid() &&
-        (lichess_profile_asked_.time_since_epoch().count() == 0 ||
-         now - lichess_profile_asked_ > std::chrono::minutes(10))) {
-        lichess_profile_asked_ = now;
-        lichess_profile_job_ = std::async(std::launch::async,
-                                          [token = lichess_account_->token] { return lichess::accountProfile(token); });
-    }
-    if (!lichess_profile_) {
-        ImGui::TextDisabled("%s", lichess_profile_error_.failed() ? lichess::gaveNothing(lichess_profile_error_).c_str()
-                                                                  : TR("Asking Lichess…"));
+    askLichessProfile();
+    if (!lichess_profile_.value) {
+        ImGui::TextDisabled(
+            "%s", lichess_profile_.failed() ? lichess::gaveNothing(lichess_profile_).c_str() : TR("Asking Lichess…"));
         return;
     }
-    const auto& p = *lichess_profile_;
+    const auto& p = *lichess_profile_.value;
     ImGui::TextDisabled("%s", trf("read {} · kept a day", agoText(p.read_at)).c_str());
-    if (lichess_profile_error_.failed()) {  // what is shown was read earlier
+    if (lichess_profile_.failed()) {  // what is shown was read earlier
         ImGui::SameLine();
-        ImGui::TextDisabled("· %s", lichess::describeAlone(lichess_profile_error_).c_str());
+        ImGui::TextDisabled("· %s", lichess::describeAlone(lichess_profile_).c_str());
     }
 
     // A card per speed: its rating, its games, its curve, what it did lately; a click shows its figures.
@@ -123,7 +100,7 @@ void App::drawLichessAccountPanel() {
     for (int i = 0; i < count; ++i) {
         const auto& s = p.speeds[static_cast<std::size_t>(i)];
         if (i > 0) ImGui::SameLine(0, gap);
-        ImGui::PushID(i);
+        const ui::Id id(i);
         const ImVec2 at = ImGui::GetCursorScreenPos();
         if (ImGui::InvisibleButton("##speed", ImVec2(w, h))) lichess_speed_ = i;
         const bool chosen  = lichess_speed_ == i;
@@ -180,7 +157,6 @@ void App::drawLichessAccountPanel() {
         }
         if (!lately.empty()) dl->AddText(ImVec2(at.x + pad, at.y + px(84)), tone, lately.c_str());
         if (hovered) ImGui::SetTooltip("%s", trf("{}: its figures", speedName(s.key)).c_str());
-        ImGui::PopID();
     }
 
     // The figures of the speed chosen, asked when it is first shown.
@@ -194,35 +170,38 @@ void App::drawLichessAccountPanel() {
             });
     }
     const float half = (ImGui::GetContentRegionAvail().x - px(14)) * 0.5f;
-    ImGui::BeginChild("##lichess_figures", ImVec2(half, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
-    ImGui::TextUnformatted(trf("{} · its figures", speedName(chosen.key)).c_str());
-    const auto row = [&](const char* name, const std::string& value) {
-        ImGui::TextDisabled("%s", name);
-        ImGui::SameLine(px(170));
-        ImGui::TextUnformatted(value.c_str());
-    };
-    if (chosen.games == 0) {
-        ImGui::TextDisabled("%s", TR("No game in this speed yet."));
-    } else if (figures == lichess_figures_.end()) {
-        ImGui::TextDisabled("%s", TR("Asking Lichess…"));
-    } else if (!figures->second.value) {
-        ImGui::TextDisabled("%s", lichess::gaveNothing(figures->second).c_str());
-    } else {
-        const auto& f = *figures->second.value;
-        if (f.highest > 0)
-            row(TR("Best rating"), f.highest_at.empty() ? ui::exactCount(f.highest)
-                                                        : trf("{}, on {}", ui::exactCount(f.highest), f.highest_at));
-        if (f.best_win > 0) row(TR("Best win"), trf("against {}", ui::exactCount(f.best_win)));
-        if (f.streak > 0)
-            row(TR("Longest winning streak"), trn("{} win", "{} wins", static_cast<uint64_t>(f.streak), f.streak));
-        row(TR("Results"),
-            fmt::format("+{} ={} −{}", ui::exactCount(f.win), ui::exactCount(f.draw), ui::exactCount(f.loss)));
-        if (f.seconds > 0) row(TR("Time played"), trf("{} h", ui::exactCount(f.seconds / 3600)));
+    {
+        const ui::Child box("##lichess_figures", ImVec2(half, 0),
+                            ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::TextUnformatted(trf("{} · its figures", speedName(chosen.key)).c_str());
+        const auto row = [&](const char* name, const std::string& value) {
+            ImGui::TextDisabled("%s", name);
+            ImGui::SameLine(px(170));
+            ImGui::TextUnformatted(value.c_str());
+        };
+        if (chosen.games == 0) {
+            ImGui::TextDisabled("%s", TR("No game in this speed yet."));
+        } else if (figures == lichess_figures_.end()) {
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
+        } else if (!figures->second.value) {
+            ImGui::TextDisabled("%s", lichess::gaveNothing(figures->second).c_str());
+        } else {
+            const auto& f = *figures->second.value;
+            if (f.highest > 0)
+                row(TR("Best rating"), f.highest_at.empty()
+                                           ? ui::exactCount(f.highest)
+                                           : trf("{}, on {}", ui::exactCount(f.highest), f.highest_at));
+            if (f.best_win > 0) row(TR("Best win"), trf("against {}", ui::exactCount(f.best_win)));
+            if (f.streak > 0)
+                row(TR("Longest winning streak"), trn("{} win", "{} wins", static_cast<uint64_t>(f.streak), f.streak));
+            row(TR("Results"),
+                fmt::format("+{} ={} −{}", ui::exactCount(f.win), ui::exactCount(f.draw), ui::exactCount(f.loss)));
+            if (f.seconds > 0) row(TR("Time played"), trf("{} h", ui::exactCount(f.seconds / 3600)));
+        }
     }
-    ImGui::EndChild();
     ImGui::SameLine(0, px(14));
     // The last days.
-    ImGui::BeginChild("##lichess_activity", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    const ui::Child box("##lichess_activity", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
     ImGui::TextUnformatted(TR("These last days"));
     if (p.activity.empty()) ImGui::TextDisabled("%s", TR("Nothing played lately."));
     for (std::size_t i = 0; i < p.activity.size() && i < 3; ++i) {
@@ -239,11 +218,9 @@ void App::drawLichessAccountPanel() {
                                 a.puzzles_win);
         if (a.studies > 0)
             line += " · " + trn("{} study updated", "{} studies updated", static_cast<uint64_t>(a.studies), a.studies);
-        ImGui::PushTextWrapPos();
+        const ui::TextWrap wrap;
         ImGui::TextDisabled("%s", line.c_str());
-        ImGui::PopTextWrapPos();
     }
-    ImGui::EndChild();
 }
 
 }  // namespace fcg

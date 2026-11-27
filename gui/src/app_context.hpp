@@ -213,11 +213,10 @@ class Account {
     [[nodiscard]] virtual std::string scopeAsked() const = 0;
     virtual void askScope(const std::string& scope)      = 0;
     virtual void dropScopeAsk()                          = 0;
-    // The profile, none until read; read again when ten minutes old (nothing asked while scripted); asked once when
-    // none is known, for the puzzle rating it holds (#80), kept a day.
+    // The profile, none until read, kept a day: asked of Lichess when what is shown is ten minutes old, once in ten
+    // minutes at most, wherever it shows (the arenas' conditions, the puzzle rating it holds, #80).
     [[nodiscard]] virtual const lichess::Profile* lichessProfile() const = 0;
     virtual void askLichessProfile()                                     = 0;
-    virtual void askLichessProfileOnce()                                 = 0;
 };
 
 // The game the user plays on the Board through Lichess's Board API (#84), as App holds it, for the frame: its id, the

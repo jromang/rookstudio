@@ -218,8 +218,8 @@ void App::startLichessSync() {
 void App::drawLichessHomeCard() {
     // The home's Lichess card (M0, M4): the account, a player's games and their sync, the broadcasts live. Lichess is
     // asked from here only once the user has turned to it (an account linked, a player's games imported).
-    ui::beginCard("chess_lichess");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("chess_lichess");
+    const ui::TextWrap wrap;
     ImGui::TextUnformatted("Lichess");
     ImGui::SameLine();
     ImGui::TextDisabled("%s",
@@ -236,8 +236,7 @@ void App::drawLichessHomeCard() {
         // The new games, counted when the Home page opens, at most once an hour, if the user chose it (M4, board 3).
         if (lichess_.count_new && !lichess_sync_) {
             const auto now = std::chrono::steady_clock::now();
-            if (!lichess_count_job_.valid() &&
-                (lichess_counted_.time_since_epoch().count() == 0 || now - lichess_counted_ > std::chrono::hours(1))) {
+            if (!lichess_count_job_.valid() && dueAfter(lichess_counted_, std::chrono::hours(1), now)) {
                 lichess_counted_ = now;
                 lichess_count_job_ =
                     std::async(std::launch::async, [folder = shelf().entries()[*base].folder, player = lichess_.player,
@@ -276,16 +275,13 @@ void App::drawLichessHomeCard() {
             std::stable_sort(active.begin(), active.end(),
                              [](const auto& x, const auto& y) { return x.tour.tier > y.tour.tier; });
             for (std::size_t i = 0; i < active.size() && i < 3; ++i) {
-                ImGui::PushID(static_cast<int>(i));
+                const ui::Id id(static_cast<int>(i));
                 ImGui::TextUnformatted(trf("Live: {} · {}", active[i].tour.name, active[i].round.name).c_str());
                 ImGui::SameLine();
                 if (ImGui::SmallButton(TR("Follow"))) followBroadcast(active[i]);
-                ImGui::PopID();
             }
         }
     }
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::askBroadcasts() {
@@ -900,15 +896,15 @@ void App::drawLichessPage() {
     // The page opens: the followed studies asked whether they changed (#79, M11 point 10), a HEAD each, at most every
     // five minutes.
     const int frame = ImGui::GetFrameCount();
-    if (frame - lichess_page_frame_ > 1 &&
-        (study_checked_.time_since_epoch().count() == 0 ||
-         std::chrono::steady_clock::now() - study_checked_ > std::chrono::minutes(5)))
+    if (!drawnLately(lichess_page_frame_, frame, 2) &&
+        dueAfter(study_checked_, std::chrono::minutes(5), std::chrono::steady_clock::now()))
         checkFollowedStudies();
     lichess_page_frame_ = frame;
-    ImGui::PushTextWrapPos();
-    ImGui::TextDisabled("%s", TR("Everything here is optional: RookStudio works without an account and without the "
-                                 "Internet. What goes to Lichess is said where you decide it."));
-    ImGui::PopTextWrapPos();
+    {
+        const ui::TextWrap wrap;
+        ImGui::TextDisabled("%s", TR("Everything here is optional: RookStudio works without an account and without the "
+                                     "Internet. What goes to Lichess is said where you decide it."));
+    }
     ImGui::Dummy(ImVec2(0, px(6)));
     if (lichess_scope_ask_ && lichess_account_) {
         drawLichessScopeAsk();
@@ -917,56 +913,59 @@ void App::drawLichessPage() {
     const float avail = ImGui::GetContentRegionAvail().x;
     const bool two    = avail > px(900);
     const float col   = two ? (avail - px(14)) / 2 : avail;
-    ImGui::BeginChild("##lichess_left", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);
     {
-        ui::TopicRegion topic(guide::topics::LichessLink);
-        drawLichessAccount();
-    }
-    drawListenOffer();  // the right to hear the user's games start and end (#48)
-    ImGui::Dummy(ImVec2(0, px(8)));
-    {
-        ui::TopicRegion topic(guide::topics::LichessGames);
-        drawLichessGames();
-    }
-    ImGui::Dummy(ImVec2(0, px(8)));
-    {
-        ui::TopicRegion topic(guide::topics::LichessStudies);
-        drawLichessStudies();  // the user's studies (#79)
-    }
-    ImGui::Dummy(ImVec2(0, px(8)));
-    drawPrepCard();  // a game prepared against an opponent (#52)
-    ImGui::EndChild();
-    if (two) ImGui::SameLine(0, px(14));
-    ImGui::BeginChild("##lichess_right", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);
-    {
-        ui::TopicRegion topic(guide::topics::LichessBroadcasts);
-        drawLichessBroadcasts();
+        const ui::Child left("##lichess_left", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);
+        {
+            ui::TopicRegion topic(guide::topics::LichessLink);
+            drawLichessAccount();
+        }
+        drawListenOffer();  // the right to hear the user's games start and end (#48)
         ImGui::Dummy(ImVec2(0, px(8)));
-        if (!followed_rounds_.empty()) {
-            drawLichessFollowed();
+        {
+            ui::TopicRegion topic(guide::topics::LichessGames);
+            drawLichessGames();
+        }
+        ImGui::Dummy(ImVec2(0, px(8)));
+        {
+            ui::TopicRegion topic(guide::topics::LichessStudies);
+            drawLichessStudies();  // the user's studies (#79)
+        }
+        ImGui::Dummy(ImVec2(0, px(8)));
+        drawPrepCard();  // a game prepared against an opponent (#52)
+    }
+    if (two) ImGui::SameLine(0, px(14));
+    {
+        const ui::Child right("##lichess_right", ImVec2(col, 0), ImGuiChildFlags_AutoResizeY);
+        {
+            ui::TopicRegion topic(guide::topics::LichessBroadcasts);
+            drawLichessBroadcasts();
+            ImGui::Dummy(ImVec2(0, px(8)));
+            if (!followed_rounds_.empty()) {
+                drawLichessFollowed();
+                ImGui::Dummy(ImVec2(0, px(8)));
+            }
+        }
+        arenas_->drawCard();  // Lichess's arenas and the user's teams' Swiss tournaments (#95)
+        ImGui::Dummy(ImVec2(0, px(8)));
+        tv_->drawCard();  // Lichess TV's channels (#86)
+        ImGui::Dummy(ImVec2(0, px(8)));
+        drawFollowedPlayers();  // the players followed live (#50)
+        ImGui::Dummy(ImVec2(0, px(8)));
+        {
+            ui::TopicRegion topic(guide::topics::OfflineEvals);
+            drawLichessOfflineEvals();  // Lichess's evaluations kept offline (#58)
+        }
+        ImGui::Dummy(ImVec2(0, px(8)));
+        if (std::any_of(offers().begin(), offers().end(),
+                        [](const lichess::OfferedEngine& o) { return !o.id.empty(); })) {
+            drawLichessEnginesCard();  // the engines offered to lichess.org's analysis board (#96)
             ImGui::Dummy(ImVec2(0, px(8)));
         }
+        {
+            ui::TopicRegion topic(guide::topics::LichessOnline);
+            drawLichessOnline();
+        }
     }
-    arenas_->drawCard();  // Lichess's arenas and the user's teams' Swiss tournaments (#95)
-    ImGui::Dummy(ImVec2(0, px(8)));
-    tv_->drawCard();  // Lichess TV's channels (#86)
-    ImGui::Dummy(ImVec2(0, px(8)));
-    drawFollowedPlayers();  // the players followed live (#50)
-    ImGui::Dummy(ImVec2(0, px(8)));
-    {
-        ui::TopicRegion topic(guide::topics::OfflineEvals);
-        drawLichessOfflineEvals();  // Lichess's evaluations kept offline (#58)
-    }
-    ImGui::Dummy(ImVec2(0, px(8)));
-    if (std::any_of(offers().begin(), offers().end(), [](const lichess::OfferedEngine& o) { return !o.id.empty(); })) {
-        drawLichessEnginesCard();  // the engines offered to lichess.org's analysis board (#96)
-        ImGui::Dummy(ImVec2(0, px(8)));
-    }
-    {
-        ui::TopicRegion topic(guide::topics::LichessOnline);
-        drawLichessOnline();
-    }
-    ImGui::EndChild();
     // The evaluations' card asked for (Ctrl+K): the page scrolled to it.
     if (offline_evals_y_ >= 0) {
         ImGui::SetScrollFromPosY(offline_evals_y_ - ImGui::GetWindowPos().y, 0.0f);

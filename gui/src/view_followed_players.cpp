@@ -80,7 +80,7 @@ void App::pollFollowedPlayers() {
     // Their status, every fifteen seconds while the card or their mosaic shows.
     const bool mosaic = broadcast_round_ == lichess::PLAYERS_MOSAIC;
     const int frame   = ImGui::GetFrameCount();
-    const bool shown  = frame - lichess_players_drawn_ < 3 || (mosaic && frame - broadcast_drawn_ < 3);
+    const bool shown  = drawnLately(lichess_players_drawn_, frame) || (mosaic && drawnLately(broadcast_drawn_, frame));
     if (ready(lichess_status_job_)) {
         auto answer = lichess_status_job_.get();
         if (answer.value) {
@@ -93,8 +93,7 @@ void App::pollFollowedPlayers() {
     const auto names = followedPlayers();
     const auto now   = std::chrono::steady_clock::now();
     if (shown && !names.empty() && !lichess_status_job_.valid() &&
-        (lichess_status_asked_.time_since_epoch().count() == 0 ||
-         now - lichess_status_asked_ > std::chrono::seconds(15))) {
+        dueAfter(lichess_status_asked_, std::chrono::seconds(15), now)) {
         lichess_status_asked_ = now;
         lichess_status_job_   = std::async(std::launch::async, [names] { return lichess::playerStatuses(names); });
     }

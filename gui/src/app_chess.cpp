@@ -183,20 +183,9 @@ class App::ModulesContext final : public AppContext {
     }
     void dropScopeAsk() override { app_.lichess_scope_ask_.reset(); }
     const lichess::Profile* lichessProfile() const override {
-        return app_.lichess_profile_ ? &*app_.lichess_profile_ : nullptr;
+        return app_.lichess_profile_.value ? &*app_.lichess_profile_.value : nullptr;
     }
-    void askLichessProfile() override { app_.askArenaProfile(); }
-    void askLichessProfileOnce() override {
-        // As the Home page reads it: kept a day, asked once when none is known (the puzzles' rating, #80).
-        if (!app_.lichess_account_) return;
-        app_.pollLichessProfile();
-        if (!app_.lichess_profile_ && !app_.lichess_profile_job_.valid() &&
-            app_.lichess_profile_asked_.time_since_epoch().count() == 0) {
-            app_.lichess_profile_asked_ = std::chrono::steady_clock::now();
-            app_.lichess_profile_job_   = std::async(
-                std::launch::async, [token = app_.lichess_account_->token] { return lichess::accountProfile(token); });
-        }
-    }
+    void askLichessProfile() override { app_.askLichessProfile(); }
 
     // The user's games on Lichess.
     const std::vector<lichess::PlayingGame>& playingGames() const override { return app_.lichess_playing_; }
@@ -821,6 +810,7 @@ void App::initChessServers() {
 
 void App::pollChess() {
     pollLichess();             // a link, a sync, the broadcasts: whatever page shows
+    pollLichessProfile();      // the account's profile: its answer, the copy kept on disk, another account (#46)
     pollLinkJob();             // a Lichess link pasted: its game asked, its import
     pollLichessPlaying();      // the user's games in progress on Lichess, and what they lock (#48)
     pollFollowedPlayers();     // the players followed live, their games in the mosaic (#50)

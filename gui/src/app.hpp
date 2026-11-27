@@ -94,6 +94,7 @@
 #include "publish_game.hpp"
 #include "publish_gif.hpp"
 #include "qr.hpp"
+#include "refreshing.hpp"
 #include "remote_run.hpp"
 #include "repertoires.hpp"
 #include "review_tables.hpp"
@@ -2001,17 +2002,17 @@ class App {
         std::string said;  // its outcome
     };
     std::optional<LinkJob> link_job_;
-    // The linked account on the Home page (#46, mockup M8): its profile, kept a day; a speed's figures.
-    std::optional<lichess::Profile> lichess_profile_;
+    // The linked account on the Home page (#46, mockup M8): its profile, kept a day, read again when ten minutes old
+    // (askLichessProfile(), #111); a speed's figures.
+    Refreshing<lichess::Profile> lichess_profile_{jobs_, lichess::PROFILE_EVERY, Refresh::WhenStale};
     bool lichess_profile_loaded_ = false;
-    std::future<lichess::Answer<lichess::Profile>> lichess_profile_job_;
-    lichess::Failure lichess_profile_error_;
-    std::chrono::steady_clock::time_point lichess_profile_asked_{};
-    int lichess_speed_ = 1;  // the speed whose figures show: blitz
+    int lichess_speed_           = 1;  // the speed whose figures show: blitz
     std::map<std::string, lichess::Answer<lichess::PerfFigures>> lichess_figures_;
     std::future<std::pair<std::string, lichess::Answer<lichess::PerfFigures>>> lichess_figures_job_;
-    void pollLichessProfile();
-    void askArenaProfile();  // the user's figures for a tournament's conditions (#95): read again when ten minutes old
+    void pollLichessProfile();  // once a frame: the account changed, the copy kept on disk, an answer that came
+    // The profile asked of Lichess when what is shown is ten minutes old, once in ten minutes at most: the Home page's
+    // card, the Play page's line, the arenas' conditions and the puzzles' rating ask it alike.
+    void askLichessProfile();
     void drawLichessAccountPanel();
     // Fair play (#48, mockup M8, board "Fairplay"): the user's games in progress on Lichess. A live one locks every
     // aid on every position; a correspondence game the engine, the cloud, the tables and the assistant on the whole of

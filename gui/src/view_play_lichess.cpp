@@ -488,9 +488,9 @@ void App::startSeek() {
     if (!lichess::seekAllowed(ask.clock)) return;
     ask.rated = s.seek_rated;
     // The opponents around the user's rating in that speed, when it is known and sure.
-    if (s.seek_range > 0 && lichess_profile_) {
+    if (s.seek_range > 0 && lichess_profile_.value) {
         const auto speed = lichess::speedOf(ask.clock);
-        for (const auto& r : lichess_profile_->speeds)
+        for (const auto& r : lichess_profile_.value->speeds)
             if (r.key == speed && r.games > 0 && !r.provisional) {
                 ask.rating_min = std::max(600, r.rating - s.seek_range);
                 ask.rating_max = r.rating + s.seek_range;
@@ -819,8 +819,8 @@ std::string App::onlineOpponent() const {
 void App::drawPlayLichess() {
     const ui::TopicRegion topic(guide::topics::PlayLichess);
     if (!lichess_account_) {
-        beginTinted("##online_no_account", ui::ACCENT);
-        ImGui::PushTextWrapPos();
+        const ui::Tinted card("##online_no_account", ui::ACCENT);
+        const ui::TextWrap wrap;
         heading(TR("Playing on Lichess needs your account linked"));
         wrapped(TR("RookStudio plays your games through Lichess's Board API, with your account. Everything else in "
                    "RookStudio works without it."),
@@ -833,26 +833,15 @@ void App::drawPlayLichess() {
             ImGui::SameLine();
             if (ImGui::Button(TR("The Lichess page ›"))) page_ = Page::Lichess;
         }
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     if (!onlineScope()) return drawOnlineScopeCard();
-    pollLichessProfile();
     // The account and its ratings in the speeds played here, asked when they are ten minutes old.
+    askLichessProfile();
     {
-        const auto now   = SteadyClock::now();
-        const bool stale = !lichess_profile_ || std::time(nullptr) - lichess_profile_->read_at > 600;
-        if (stale && !lichess_profile_job_.valid() && !options_.scripted &&
-            (lichess_profile_asked_.time_since_epoch().count() == 0 ||
-             now - lichess_profile_asked_ > std::chrono::minutes(10))) {
-            lichess_profile_asked_ = now;
-            lichess_profile_job_   = std::async(
-                std::launch::async, [token = lichess_account_->token] { return lichess::accountProfile(token); });
-        }
         std::string line = lichess_account_->username;
-        if (lichess_profile_)
-            for (const auto& r : lichess_profile_->speeds)
+        if (lichess_profile_.value)
+            for (const auto& r : lichess_profile_.value->speeds)
                 if ((r.key == "rapid" || r.key == "classical" || r.key == "correspondence") && r.games > 0)
                     line +=
                         " · " + trf("{} {}", speedName(r.key), std::to_string(r.rating) + (r.provisional ? "?" : ""));
@@ -922,17 +911,17 @@ void App::drawPlayLichess() {
     }
     // The game being played: back to it.
     if (online_game_ && !online_game_->ended && !online_game_->state.over()) {
-        beginTinted("##online_going", ui::ACCENT);
-        ImGui::PushTextWrapPos();
-        wrapped(online_game_->shown
-                    ? trf("Your game against {} is being played on the Board.", onlineOpponent())
-                    : trf("Your game against {} goes on: it waits for you on the Board.", onlineOpponent()));
-        if (primaryButton(TR("Back to it##online"))) backToOnlineGame();
-        ImGui::PopTextWrapPos();
-        endTinted();
+        {
+            const ui::Tinted card("##online_going", ui::ACCENT);
+            const ui::TextWrap wrap;
+            wrapped(online_game_->shown
+                        ? trf("Your game against {} is being played on the Board.", onlineOpponent())
+                        : trf("Your game against {} goes on: it waits for you on the Board.", onlineOpponent()));
+            if (primaryButton(TR("Back to it##online"))) backToOnlineGame();
+        }
         ImGui::Dummy(ImVec2(0, px(6)));
     }
-    if (ImGui::BeginTable("##online_columns", 2, ImGuiTableFlags_SizingStretchProp)) {
+    if (const ui::Table columns("##online_columns", 2, ImGuiTableFlags_SizingStretchProp); columns) {
         ImGui::TableSetupColumn("##seek", ImGuiTableColumnFlags_WidthStretch, 1.25f);
         ImGui::TableSetupColumn("##challenge", ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableNextRow();
@@ -942,14 +931,12 @@ void App::drawPlayLichess() {
         drawChallengeCard();
         ImGui::Dummy(ImVec2(0, px(4)));
         drawOnlineGamesList();
-        ImGui::EndTable();
     }
-    ImGui::PushTextWrapPos();
+    const ui::TextWrap wrap;
     if (!play_online_error_.empty()) coloured(play_online_error_, ui::BAD);
     wrapped(TR("What leaves the machine: your seeks and challenges, your moves, your chat messages, draws and "
                "resignations, with your account's token. Nothing else."),
             true);
-    ImGui::PopTextWrapPos();
 }
 
 void App::drawOnlineScopeCard() {
@@ -1003,72 +990,74 @@ void App::drawOnlineScopeCard() {
 void App::drawSeekCard(bool& enter) {
     auto& s      = onlineSettings();
     bool changed = false;
-    ui::beginCard("##online_seek");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("##online_seek");
+    const ui::TextWrap wrap;
     heading(TR("Seek a game"));
     const auto chosen = s.seekClock();
     const float label = ImGui::GetCursorPosX() +
                         std::max({ImGui::CalcTextSize(TR("Rapid")).x, ImGui::CalcTextSize(TR("Classical")).x,
                                   ImGui::CalcTextSize(TR("Correspondence")).x}) +
                         px(14);
-    ImGui::BeginDisabled(online_seek_ != nullptr);
-    for (const auto& row : seekRows()) {
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("%s", speedName(row.speed));
-        ImGui::SameLine(label);
-        bool first = true;
-        for (const auto& clock : row.clocks) {
-            // "1 day · 2 · 3 · 5 · 7 · 10 · 14 days", as the mockup writes them.
-            const auto label_text = clock.days == 1 || clock.days == 14
-                                        ? trn("{} day", "{} days", clock.days, clock.days)
-                                    : clock.days > 0 ? std::to_string(clock.days)
-                                                     : lichess::clockText(clock);
-            if (!first) ui::sameLineOrWrap(ImGui::CalcTextSize(label_text.c_str()).x + px(24), px(4));
-            first = false;
-            if (chip(label_text.c_str(), clock == chosen,
-                     fmt::format("seek{}_{}_{}", clock.minutes, clock.increment, clock.days).c_str())) {
-                s.seek_minutes   = clock.minutes;
-                s.seek_increment = clock.increment;
-                s.seek_days      = clock.days;
-                changed          = true;
+    {
+        const ui::Disabled seeking(online_seek_ != nullptr);
+        for (const auto& row : seekRows()) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", speedName(row.speed));
+            ImGui::SameLine(label);
+            bool first = true;
+            for (const auto& clock : row.clocks) {
+                // "1 day · 2 · 3 · 5 · 7 · 10 · 14 days", as the mockup writes them.
+                const auto label_text = clock.days == 1 || clock.days == 14
+                                            ? trn("{} day", "{} days", clock.days, clock.days)
+                                        : clock.days > 0 ? std::to_string(clock.days)
+                                                         : lichess::clockText(clock);
+                if (!first) ui::sameLineOrWrap(ImGui::CalcTextSize(label_text.c_str()).x + px(24), px(4));
+                first = false;
+                if (chip(label_text.c_str(), clock == chosen,
+                         fmt::format("seek{}_{}_{}", clock.minutes, clock.increment, clock.days).c_str())) {
+                    s.seek_minutes   = clock.minutes;
+                    s.seek_increment = clock.increment;
+                    s.seek_days      = clock.days;
+                    changed          = true;
+                }
+                if (clock.days > 0) tip(lichess::clockText(clock));
             }
-            if (clock.days > 0) tip(lichess::clockText(clock));
         }
     }
-    ImGui::EndDisabled();
     wrapped(
         TR("Blitz and bullet are not sought from a program: Lichess keeps them for its site. Blitz stays possible as "
            "a direct challenge, beside."),
         true);
-    ImGui::BeginDisabled(online_seek_ != nullptr);
-    if (ImGui::Checkbox(TR("Rated##seek"), &s.seek_rated)) changed = true;
-    // The opponents around the user's rating in that speed.
-    ImGui::SameLine(0, px(16));
-    std::optional<int> rating;
-    if (lichess_profile_)
-        for (const auto& r : lichess_profile_->speeds)
-            if (r.key == lichess::speedOf(chosen) && r.games > 0 && !r.provisional) rating = r.rating;
-    if (rating) {
-        int range = s.seek_range;
-        ImGui::SetNextItemWidth(px(120));
-        const auto text = range > 0 ? trf("± {}", range) : std::string(TR("anyone"));
-        if (ImGui::SliderInt("##seek_range", &range, 0, 500, text.c_str(), ImGuiSliderFlags_AlwaysClamp)) {
-            s.seek_range = range / 50 * 50;
-            changed      = true;
+    {
+        const ui::Disabled seeking(online_seek_ != nullptr);
+        if (ImGui::Checkbox(TR("Rated##seek"), &s.seek_rated)) changed = true;
+        // The opponents around the user's rating in that speed.
+        ImGui::SameLine(0, px(16));
+        std::optional<int> rating;
+        if (lichess_profile_.value)
+            for (const auto& r : lichess_profile_.value->speeds)
+                if (r.key == lichess::speedOf(chosen) && r.games > 0 && !r.provisional) rating = r.rating;
+        if (rating) {
+            int range = s.seek_range;
+            ImGui::SetNextItemWidth(px(120));
+            const auto text = range > 0 ? trf("± {}", range) : std::string(TR("anyone"));
+            if (ImGui::SliderInt("##seek_range", &range, 0, 500, text.c_str(), ImGuiSliderFlags_AlwaysClamp)) {
+                s.seek_range = range / 50 * 50;
+                changed      = true;
+            }
+            ImGui::SameLine();
+            ImGui::AlignTextToFramePadding();
+            if (s.seek_range > 0)
+                ImGui::TextUnformatted(trf("Opponent rated from {} to {} (your rating ± {})",
+                                           std::max(600, *rating - s.seek_range), *rating + s.seek_range, s.seek_range)
+                                           .c_str());
+            else
+                ImGui::TextDisabled("%s", TR("Opponents of any rating: paired fastest"));
+        } else {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", TR("Opponents of any rating, your rating in this speed not being sure yet"));
         }
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        if (s.seek_range > 0)
-            ImGui::TextUnformatted(trf("Opponent rated from {} to {} (your rating ± {})",
-                                       std::max(600, *rating - s.seek_range), *rating + s.seek_range, s.seek_range)
-                                       .c_str());
-        else
-            ImGui::TextDisabled("%s", TR("Opponents of any rating: paired fastest"));
-    } else {
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("%s", TR("Opponents of any rating, your rating in this speed not being sure yet"));
     }
-    ImGui::EndDisabled();
     // Seek: the event stream first, as Lichess asks (not to miss the game's start).
     const bool stream = lichess_events_ && lichess_events_->connected();
     const bool lock   = liveGameOn() != nullptr;
@@ -1092,7 +1081,7 @@ void App::drawSeekCard(bool& enter) {
             wrapped(TR("One of your games is being played live: no seek meanwhile."), true);
     } else {
         // Seeking: since when, called back by Escape.
-        beginTinted("##seeking", ui::ACCENT);
+        const ui::Tinted seeking("##seeking", ui::ACCENT);
         const auto& ask  = online_seek_->ask();
         std::string what = kindText(ask.rated, lichess::speedOf(ask.clock), ask.clock);
         if (ask.rating_min > 0) what += " · " + fmt::format("{}–{}", ask.rating_min, ask.rating_max);
@@ -1105,11 +1094,8 @@ void App::drawSeekCard(bool& enter) {
         wrapped(TR("The seek lives while RookStudio holds it open; it stops if RookStudio closes. The game found opens "
                    "on the Board."),
                 true);
-        endTinted();
     }
     if (!online_seek_said_.empty()) wrapped(online_seek_said_, true);
-    ImGui::PopTextWrapPos();
-    ui::endCard();
     if (changed) saveOnlineSettings();
 }
 

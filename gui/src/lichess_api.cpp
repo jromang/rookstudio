@@ -104,6 +104,14 @@ Servers& servers() {
     return s;
 }
 
+std::string apiHost() {
+    std::string_view url = servers().api;
+    if (const auto scheme = url.find("://"); scheme != std::string_view::npos) url.remove_prefix(scheme + 3);
+    return std::string(url.substr(0, url.find_first_of(":/")));
+}
+
+std::chrono::milliseconds apiPause() { return HostGate::instance().pausedFor(apiHost()); }
+
 std::string urlEncode(std::string_view value) {
     static constexpr char HEX[] = "0123456789ABCDEF";
     std::string out;

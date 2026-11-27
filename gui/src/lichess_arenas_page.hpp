@@ -30,9 +30,11 @@
 #include "app_context.hpp"
 #include "focus_words.hpp"
 #include "lichess_arenas.hpp"
+#include "lichess_arenas_schedule.hpp"
 #include "lichess_players.hpp"
 #include "lichess_playing.hpp"
 #include "lichess_tv.hpp"
+#include "refreshing.hpp"
 
 namespace fcg {
 
@@ -115,10 +117,9 @@ class LichessArenasPage {
 
    private:
     struct ArenaCard {
-        lichess::Answer<std::vector<lichess::ArenaInfo>> list;
-        std::future<lichess::Answer<std::vector<lichess::ArenaInfo>>> job;
-        std::chrono::steady_clock::time_point asked{};
-        int drawn = -1000;  // the frame that drew the card last
+        explicit ArenaCard(JobGroup& jobs) : list(jobs, lichess::ARENA_LIST_EVERY) {}
+        Refreshing<std::vector<lichess::ArenaInfo>> list;  // asked while the card shows, every minute
+        int drawn = -1000;                                 // the frame that drew the card last
         // The user's teams' Swiss tournaments: their teams, then each one's Swiss tournaments (team:read).
         lichess::Answer<std::vector<lichess::SwissInfo>> swisses;
         std::future<std::pair<lichess::Answer<std::vector<lichess::SwissInfo>>, std::size_t>> swiss_job;  // and teams
@@ -231,7 +232,7 @@ class LichessArenasPage {
     [[nodiscard]] std::string arenaTimeLeft() const;  // "31 min"
 
     ArenasContext& app_;
-    ArenaCard arena_card_;
+    ArenaCard arena_card_{app_.jobs()};
     float arena_card_y_ = -1;  // the card asked for (Ctrl+K, --focus): the page scrolled to it
     std::optional<TourFollow> tour_follow_;
     std::optional<ArenaPlay> arena_play_;

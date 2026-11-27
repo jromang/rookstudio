@@ -28,6 +28,7 @@
 
 #include <tour/files.hpp>
 
+#include "background.hpp"
 #include "imported_game.hpp"
 #include "players.hpp"
 #include "scan_board.hpp"
@@ -250,10 +251,7 @@ class Snapshot {
 // report call it on threads that catch nothing.
 [[nodiscard]] bool startOf(const Snapshot& snapshot, GameId id, uint16_t flags, ScanBoard& board);
 
-struct CheckProgress {
-    std::atomic<uint64_t> done{0};  // of the games read
-    std::atomic<uint64_t> total{0};
-};
+using CheckProgress = JobProgress;  // of the games read
 
 // What checking a database found (Database::check()): every segment read again from the disk, every game's moves
 // replayed, its signature and its key (a hash of its headers and moves) made again and compared with the stored ones.

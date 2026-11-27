@@ -19,6 +19,7 @@
 #include <string_view>
 #include <vector>
 
+#include "background.hpp"
 #include "fide_list.hpp"
 #include "store.hpp"
 
@@ -67,10 +68,7 @@ struct PlayerProposal {
     int year_min = 0, year_max = 0;
 };
 
-struct NamesProgress {
-    std::atomic<uint64_t> done{0};
-    std::atomic<uint64_t> total{0};
-};
+using NamesProgress = JobProgress;
 
 struct NamesAnalysis {
     std::vector<Spelling> spellings;

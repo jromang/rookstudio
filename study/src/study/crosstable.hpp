@@ -22,6 +22,7 @@
 #include <string_view>
 #include <vector>
 
+#include "background.hpp"
 #include "store.hpp"
 
 namespace fcg::study {
@@ -290,10 +291,7 @@ struct TournamentList {
     bool cancelled  = false;
 };
 
-struct TournamentProgress {
-    std::atomic<uint64_t> done{0};
-    std::atomic<uint64_t> total{0};
-};
+using TournamentProgress = JobProgress;
 
 // The tournaments of `snapshot`, on `threads` threads (0: the machine's). A group of games is one when it has three
 // players or more and its rounds are told (or each of its players met each other): online games are none. `cancel`

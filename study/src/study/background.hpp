@@ -2,9 +2,18 @@
 
 // The study's work beside the tournaments: a thread that enters the background runs at the lowest priority, and so do
 // the threads the study starts from it (imports, the opening tree, searches, lists), so that the engines of a
-// tournament, processes of their own, keep the machine first.
+// tournament, processes of their own, keep the machine first; and what such a task tells as it goes.
+
+#include <atomic>
+#include <cstdint>
 
 namespace fcg::study {
+
+// What a long task tells the window as it goes (#117): its work done, of its total (0 while not known).
+struct JobProgress {
+    std::atomic<uint64_t> done{0};
+    std::atomic<uint64_t> total{0};
+};
 
 // Lowers the calling thread, and marks it: the study's threads it starts are lowered too.
 void enterBackground() noexcept;

@@ -8,6 +8,10 @@
 #include <fstream>
 #include <string_view>
 
+#ifndef _WIN64  // as ProcessInformation
+#    include <unistd.h>
+#endif
+
 #include <cli/sanitize.hpp>
 #include <core/config/config.hpp>
 #include <core/globals/globals.hpp>
@@ -1012,15 +1016,36 @@ std::string RunController::undoEdit() {
 }
 
 void stopEngineProcess(int64_t pid) {
+#ifdef _WIN64  // as ProcessInformation
     fastchess::process_list.lock();
     for (const auto& process : fastchess::process_list) {
-#ifdef _WIN64  // as ProcessInformation
         if (static_cast<int64_t>(GetProcessId(process.identifier)) == pid) TerminateProcess(process.identifier, 1);
-#else
-        if (process.identifier == pid) (void)killProcessTree(process.identifier);
-#endif
     }
     fastchess::process_list.unlock();
+#else
+    bool stopped = false;
+    fastchess::process_list.lock();
+    for (const auto& process : fastchess::process_list) {
+        if (process.identifier == pid) stopped = killProcessTree(process.identifier);
+    }
+    fastchess::process_list.unlock();
+    if (!stopped) return;
+    // Its game sees the engine gone when its output ends, which may never come (#142): fastchess makes an engine's
+    // pipes close-on-exec only after it made them, and an engine another game started meanwhile keeps their ends
+    // open. The game's wait for the engine is ended as well, as fastchess ends them all on a Ctrl+C
+    // (writeToOpenPipes()): the game ends as the engine's disconnection, which the operator's end then records. Once
+    // the engine has ended, so that fastchess, which then asks whether it still runs before it talks to it again (its
+    // "isready", without an end of its output either), finds it gone. Under the list's lock, the descriptor is the
+    // engine's; the engine no longer listed, its game saw it gone.
+    (void)waitChildEnded(static_cast<int>(pid), std::chrono::seconds(2));
+    fastchess::process_list.lock();
+    for (const auto& process : fastchess::process_list) {
+        if (process.identifier != pid) continue;
+        const uint64_t wake                 = 1;
+        [[maybe_unused]] const auto written = ::write(process.fd_write, &wake, sizeof wake);
+    }
+    fastchess::process_list.unlock();
+#endif
 }
 
 std::string RunController::endGame(int slot, uint64_t number, const std::string& result, const std::string& why) {

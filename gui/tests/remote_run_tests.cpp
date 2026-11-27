@@ -3,11 +3,16 @@
 
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
+#include <string>
 #include <thread>
+
+#include <json.hpp>
 
 #include "child_process.hpp"
 #include "console.hpp"
@@ -134,6 +139,52 @@ struct Harness {
         return false;
     }
 };
+
+// A file's last `most` bytes: the end of what a process wrote, told when a test case fails.
+std::string endOf(const fs::path& file, std::size_t most = 4000) {
+    std::ifstream in(file, std::ios::binary);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return text.size() > most ? "..." + text.substr(text.size() - most) : text;
+}
+
+// How the window's run ended, as its process said in its "end" event (none: it said nothing).
+std::string endSaid(const RemoteRun& run) {
+    const auto& e = run.end();
+    return "the window's run: state " + std::to_string(static_cast<int>(run.state())) + ", error '" + run.error() +
+           "'; the process's end: exit code " + std::to_string(e.exit_code) + ", error '" + e.error + "', abnormal " +
+           std::to_string(e.abnormal) + ", stopped by the user " + std::to_string(e.stopped_by_user) + ", finished " +
+           std::to_string(e.finished) + ", stalled " + std::to_string(e.stalled) +
+           (e.failed_engine.empty() ? std::string() : ", " + e.failed_engine + " failed: " + e.failed_reason);
+}
+
+// What a wait on game `number` ran out on: what the window's copy holds of the game, the journal's lines of it, how
+// the run and its process stand, and the end of the process's log.
+std::string gameSaid(const Harness& h, const fs::path& dir, uint64_t number) {
+    std::string out    = "game " + std::to_string(number) + " in the window's copy: ";
+    const auto* copy   = h.run.tournament();
+    const auto result  = copy ? copy->resultOf(number) : std::nullopt;
+    const auto running = h.run.status().running;
+    if (result) {
+        out += result->result + " (" + result->reason + "), " +
+               (result->set ? "set by the operator (" + result->set->why + ")" : "not set by the operator");
+    } else {
+        out += "no result";
+    }
+    out += std::find(running.begin(), running.end(), number) != running.end() ? ", playing" : ", not playing";
+    if (copy) {
+        out += "; its results " + std::to_string(copy->results().size()) + ", its journal " +
+               std::to_string(copy->journalSize()) + " bytes";
+    }
+    out += "\nthe journal's lines of the game:";
+    std::ifstream journal(dir / "journal.jsonl", std::ios::binary);
+    for (std::string line; std::getline(journal, line);) {
+        const auto j = nlohmann::json::parse(line, nullptr, false);
+        if (j.is_object() && j.value("encounter", int64_t{-1}) == static_cast<int64_t>(number / 2) &&
+            j.value("game", int64_t{-1}) == static_cast<int64_t>(number % 2))
+            out += "\n" + line;
+    }
+    return out + "\n" + endSaid(h.run) + "\nthe process's log ends with:\n" + endOf(dir / "rookstudio.log");
+}
 
 }  // namespace
 
@@ -295,6 +346,7 @@ TEST_CASE("remote: a game ended by the operator, then the window going away stop
         }));
         const auto number = slot.game_id - 1;
         CHECK(h.run.endGame(playing, number, "1/2-1/2", "a test").empty());
+        INFO(gameSaid(h, dir, number));
         REQUIRE(h.waitFor([&] {
             const auto r = h.run.tournament()->resultOf(number);
             return r && r->set;

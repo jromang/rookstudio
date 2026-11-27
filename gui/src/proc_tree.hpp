@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <vector>
 
 namespace fcg {
@@ -14,6 +15,11 @@ namespace fcg {
 // already: its pid may be another process's now). False then. Windows needs none of this: an engine's job ends what
 // it started.
 bool killProcessTree(int pid);
+
+// Until the process `pid`, a child of this program, has ended (not reaped: waitid's WNOWAIT leaves it to whoever reaps
+// it), `most` at the longest. True once it has, or when it is not such a child any more (reaped already); false when
+// it still runs after `most`.
+bool waitChildEnded(int pid, std::chrono::milliseconds most);
 
 // The processes `pid` started that have not ended (Linux and macOS; none elsewhere).
 [[nodiscard]] std::vector<int> childProcesses(int pid);

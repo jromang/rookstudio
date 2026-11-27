@@ -56,12 +56,13 @@ struct HeaderRow {
     uint16_t white_elo = 0;
     uint16_t black_elo = 0;
     uint16_t eco       = 0;  // 0 none, else 1 + A00..E99 counted from 0
-    uint16_t flags     = 0;
+    uint16_t flags     = 0;  // GAME_DAMAGED too for a record found damaged since it was imported (Snapshot::row())
     uint32_t plies     = 0;
     char result        = '*';
 };
 
-// A game's numbers, without its names: what filters and sorts read of every game.
+// A game's numbers, without its names: what filters and sorts read of every game. Its flags as they were written: a
+// record found damaged since says it in Snapshot::damaged().
 struct HeaderNumbers {
     uint32_t date      = 0;
     uint32_t plies     = 0;
@@ -123,8 +124,13 @@ class Snapshot {
     [[nodiscard]] uint64_t editsGeneration() const noexcept {
         return unreadable_edits_ ? unreadable_edits_ : edits_generation_;
     }
+    // A record that does not read whole (a damaged or crafted segment: its offsets out of its files, its annex cut
+    // short) has GAME_DAMAGED in its row's flags, as game() reads it damaged; its plies no more than its codes' bytes.
     [[nodiscard]] HeaderRow row(GameId id) const;
     [[nodiscard]] HeaderNumbers numbers(GameId id) const;
+    // Whether the game reads as damaged (game().damaged): so marked when it was imported, or found so since. Reads its
+    // annex without making anything of it: what the list's filter of damaged games asks of each game.
+    [[nodiscard]] bool damaged(GameId id) const;
     [[nodiscard]] GameMoves gameMoves(GameId id) const;
     // The ids of a game's names, for the filters and sorts that read names once: each below names(), an id past them
     // (a damaged or crafted segment) read as no name.

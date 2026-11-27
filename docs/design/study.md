@@ -184,7 +184,10 @@ names reads as no name (`rowIds()`), an edits file's counts are compared with it
 manifest that gives a segment more games than a commit writes, or games without any name, is refused. The searches,
 the opening tree, a dossier and an opening report set a game's start with `startOf()`, which reads its FEN alone
 (`Snapshot::startFen()`) and tells a damaged one without an exception: their threads catch none. The check tells these
-games as damaged, as before. A table of names read with name ids past the names (a damaged file) leaves them out. A
+games as damaged, as before, and so does the list (#119): a record that does not read whole has `GAME_DAMAGED` in its
+row's flags (`Snapshot::row()`, its plies then no more than its codes' bytes) and the filter of damaged games finds it
+(`Snapshot::damaged()`), both reading its annex as `game()` does without making anything of it; `numbers()` keeps the
+flags as they were written, the filters and sorts that read every game reading no annex. A table of names read with name ids past the names (a damaged file) leaves them out. A
 test changes a segment's offsets and annex bytes, sixty times at random and once each kind on purpose, then lists,
 reads and writes every game, searches, builds and asks the tree, makes a dossier and an opening report, and checks.
 libFuzzer targets do the same with what a database is made of (`fuzz/segment.cpp`, `edits.cpp`, `players.cpp`: changes

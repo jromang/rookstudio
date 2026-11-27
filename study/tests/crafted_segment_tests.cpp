@@ -87,7 +87,8 @@ std::vector<ImportedGame> gamesOfOurOwn() {
 
 // Everything the pages do with a database, on the snapshot given: the list (its rows, a filter by names, sorts), every
 // game read and written as PGN, the searches, the opening tree built and asked, a player's dossier, an opening report
-// and the check. Nothing of it may crash or throw; the check finds the games given as damaged.
+// and the check. Nothing of it may crash or throw; the list (its rows' flags, its filter of damaged games) and the
+// check find the games given as damaged, the list each game damaged as it reads.
 void everything(Database& db, const std::vector<GameId>& damaged) {
     const auto snap = db.snapshot();
     std::atomic<bool> cancel{false};
@@ -98,7 +99,9 @@ void everything(Database& db, const std::vector<GameId>& damaged) {
     (void)makeView(snap, named, SortBy::White);
     (void)makeView(snap, Filter{}, SortBy::Date, true);
     (void)makeView(snap, Filter{}, SortBy::Event);
+    std::vector<GameId> read_damaged;
     for (GameId id = 0; id < snap->games(); ++id) {
+        CAPTURE(id);
         const auto row   = snap->row(id);
         const auto names = snap->rowIds(id);
         CHECK(names.white < snap->names());
@@ -111,8 +114,20 @@ void everything(Database& db, const std::vector<GameId>& damaged) {
         (void)snap->tag(id, "Site");
         (void)snap->startFen(id);
         (void)snap->storedBytes(id);
-        (void)row;
+        // The list says a game damaged as it reads, found so since its import or not (#119).
+        CHECK(((row.flags & GAME_DAMAGED) != 0) == game.damaged);
+        CHECK(snap->damaged(id) == game.damaged);
+        CHECK(row.plies <= snap->gameMoves(id).codes.size());
+        if (game.damaged) read_damaged.push_back(id);
     }
+    for (const auto id : damaged) {
+        CAPTURE(id);
+        CHECK(std::binary_search(read_damaged.begin(), read_damaged.end(), id));
+    }
+    // The list's filter of damaged games gives them all, and only them.
+    Filter damaged_only;
+    damaged_only.damaged = true;
+    CHECK(makeView(snap, damaged_only, SortBy::Number).ids == read_damaged);
 
     ScanBoard start;
     REQUIRE(start.setFen(chess::constants::STARTPOS, false));

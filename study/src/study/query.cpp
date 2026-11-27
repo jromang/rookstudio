@@ -185,7 +185,8 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
             const auto row = snapshot->numbers(id);
             if (filter.result && row.result != filter.result) continue;
             if (filter.annotated && !(row.flags & GAME_ANNOTATED)) continue;
-            if (filter.damaged && !(row.flags & GAME_DAMAGED)) continue;
+            // Damaged when imported, or found so since (#119).
+            if (filter.damaged && !snapshot->damaged(id)) continue;
             if (filter.elo_min && (row.white_elo < filter.elo_min || row.black_elo < filter.elo_min)) continue;
             if ((filter.date_from || filter.date_to) &&
                 (row.date == 0 || (filter.date_from && row.date < filter.date_from) ||

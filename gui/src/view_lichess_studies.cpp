@@ -486,7 +486,7 @@ void App::openStudyChapter(const std::string& id, std::size_t index) {
 
 void App::drawLichessStudies() {
     loadStudiesState();
-    ui::beginCard("lichess_studies");
+    const ui::Card card("lichess_studies");
     ImGui::PushTextWrapPos();
     // The card folds; its first opening asks for the permission to read the private studies.
     bool open = studies_.shown;
@@ -549,7 +549,6 @@ void App::drawLichessStudies() {
             ImGui::PopID();
         }
         ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     if (!lichess_account_) {
@@ -558,7 +557,6 @@ void App::drawLichessStudies() {
         if (!lichess_link_ && ui::iconButton("studies_link", ui::Icon::External, TR("Link the account…")))
             startLichessLink({lichess::SCOPE_STUDY_READ});
         ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // The permission to read the private and unlisted studies: asked here, once.
@@ -685,7 +683,6 @@ void App::drawLichessStudies() {
                                  "changed?), nothing downloaded. Your token goes with them once RookStudio may read "
                                  "your studies."));
     ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::drawStudyDetail(const lichess::StudyInfo& study) {

@@ -1713,8 +1713,8 @@ void PuzzlesPage::drawPuzzleStoreCard() {
     const ui::TopicRegion topic(guide::topics::Puzzles);
     auto& puzzles    = *offline_puzzles_;
     const auto state = puzzles.state();
-    ui::beginCard("##puzzle_store");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("##puzzle_store");
+    const ui::TextWrap wrap;
     ui::inlineIcon(ui::Icon::Download, ImGui::GetColorU32(ImGuiCol_Text));
     ImGui::SameLine();
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
@@ -1763,8 +1763,6 @@ void PuzzlesPage::drawPuzzleStoreCard() {
                             TR("Read while it downloads. Cut short (Cancel, the network, the program closed), the "
                                "download goes on from where it stopped."));
         if (ImGui::Button(TR("Cancel##offline_puzzles"))) puzzles.cancel();
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // Ready: what is kept, Update, Remove them.
@@ -1819,8 +1817,6 @@ void PuzzlesPage::drawPuzzleStoreCard() {
             if (offline_puzzles_update_.valid()) ImGui::TextDisabled("%s", TR("Asking database.lichess.org…"));
             if (!offline_puzzles_note_.empty()) ImGui::TextDisabled("%s", offline_puzzles_note_.c_str());
         }
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // A preparation cut short.
@@ -1840,8 +1836,6 @@ void PuzzlesPage::drawPuzzleStoreCard() {
             puzzles.forgetStopped();
             offline_puzzles_error_.clear();
         }
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // Before: the file, its size, the disk.
@@ -1873,19 +1867,16 @@ void PuzzlesPage::drawPuzzleStoreCard() {
     tip(TR("lichess_db_puzzle.csv.zst, from database.lichess.org: read from the disk, nothing is downloaded."));
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file to database.lichess.org, its size "
                                  "said before. Then nothing."));
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void PuzzlesPage::drawPuzzleThemes() {
     const auto& r = puzzleRecord();
-    ui::beginCard("##puzzle_results");
+    const ui::Card card("##puzzle_results");
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(TR("Your results by theme"));
     ImGui::PopFont();
     if (r.themes.empty()) {
         ImGui::TextDisabled("%s", TR("None yet: each puzzle answered counts for its themes."));
-        ui::endCard();
         return;
     }
     std::vector<std::pair<std::string, ThemeResults>> rows(r.themes.begin(), r.themes.end());
@@ -1907,7 +1898,6 @@ void PuzzlesPage::drawPuzzleThemes() {
         }
         ImGui::EndTable();
     }
-    ui::endCard();
 }
 
 }  // namespace fcg

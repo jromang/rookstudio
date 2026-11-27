@@ -886,8 +886,8 @@ void App::drawEngineGameCard() {
     const ui::TopicRegion topic(guide::topics::EngineGame);
     auto& b        = board_;
     const auto& st = b.match_state;
-    beginTinted("##engine_game", ui::ACCENT);
-    ImGui::PushTextWrapPos();
+    const ui::Tinted tinted("##engine_game", ui::ACCENT);
+    const ui::TextWrap wrap;
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.1f);
     wrapped(trf("Against {} · {}", g.kept.engine, strengthText(g.kept.strength)));
     ImGui::PopFont();
@@ -914,8 +914,6 @@ void App::drawEngineGameCard() {
             wrapped(play_error_);
             ImGui::PopStyleColor();
         }
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     if (!b.watching) {
@@ -923,8 +921,6 @@ void App::drawEngineGameCard() {
         wrapped(TR("Your game goes on meanwhile, your clock running when it is your move."));
         ImGui::PopStyleColor();
         if (primaryButton(TR("Back to the game##engine_game"))) backToEngineGame();
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     // Whose move, the draw offered.
@@ -996,8 +992,6 @@ void App::drawEngineGameCard() {
     } else {
         ImGui::TextDisabled("%s", TR("The aids are shown: the game is marked “with aids”."));
     }
-    ImGui::PopTextWrapPos();
-    endTinted();
 }
 
 void App::drawEngineGameEnd() {

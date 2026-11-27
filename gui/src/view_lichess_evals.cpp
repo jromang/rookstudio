@@ -20,6 +20,7 @@
 #include "lichess_months.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -178,14 +179,14 @@ void App::drawLichessOfflineEvals() {
         offline_evals_focus_ = false;
         offline_evals_keys_  = true;
     }
-    ui::beginCard("lichess_offline_evals");
+    const ui::Card card("lichess_offline_evals");
     // Enter: when the card is under the mouse, or was brought into view by Ctrl+K.
     const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::GetIO().WantTextInput &&
                        !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
                        (offline_evals_keys_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows));
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
         offline_evals_keys_ = false;  // a click elsewhere: Enter is another card's
-    ImGui::PushTextWrapPos();
+    const ui::TextWrap wrap;
     ui::inlineIcon(ui::Icon::Download, ImGui::GetColorU32(ImGuiCol_Text));
     ImGui::SameLine();
     ImGui::PushFont(ui::titleFont(), ImGui::GetFontSize() * 1.1f);
@@ -247,8 +248,6 @@ void App::drawLichessOfflineEvals() {
                                      "Cut short (Cancel, the network, the program closed), the download goes on from "
                                      "where it stopped."));
         if (ImGui::Button(TR("Cancel##offline_evals"))) evals.cancel();
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
 
@@ -323,8 +322,6 @@ void App::drawLichessOfflineEvals() {
         bullet(TR("Tree: an Eval. column beside each move."));
         ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file to database.lichess.org, "
                                      "its size said before. Then nothing."));
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
 
@@ -353,8 +350,6 @@ void App::drawLichessOfflineEvals() {
             evals.forgetStopped();
             offline_evals_error_.clear();
         }
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     ImGui::TextUnformatted(TR("What is kept"));
@@ -400,8 +395,6 @@ void App::drawLichessOfflineEvals() {
     tip(TR("lichess_db_eval.jsonl.zst, from database.lichess.org: read from the disk, nothing is downloaded."));
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file to database.lichess.org, its size "
                                  "said before. Then nothing."));
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 }  // namespace fcg

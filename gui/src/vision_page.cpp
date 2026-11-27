@@ -736,7 +736,7 @@ void VisionPage::drawVisionBoard(float size) {
 void VisionPage::drawVisionColumn() {
     auto& v = *vision_;
     const ui::TopicRegion topic(guide::topics::Vision);
-    ImGui::PushTextWrapPos();
+    const ui::TextWrap wrap;
     switch (v.kind) {
         case VKind::Coordinates: {
             beginTinted("##coord_card", ui::CARD_BD);
@@ -931,19 +931,16 @@ void VisionPage::drawVisionColumn() {
                 startBlindfold();
             else
                 startHeadLines();
-            ImGui::PopTextWrapPos();
             return;
         }
         ImGui::SameLine();
         if (ImGui::Button((std::string(TR("Back to the Training page")) + " · " + TR("Esc")).c_str())) {
             closeVision(true);
-            ImGui::PopTextWrapPos();
             return;
         }
     } else if (ImGui::Button(TR("Stop · Esc"))) {
         finishVision(true);
     }
-    ImGui::PopTextWrapPos();
 }
 
 // ---------------------------------------------------------------------------

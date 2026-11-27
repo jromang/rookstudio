@@ -1702,8 +1702,8 @@ void LichessArenasPage::drawArenaOver(bool home) {
         if (ImGui::SmallButton(TR("See it##arena_over"))) chooseArena(a.id, a.name);
         return;
     }
-    beginTinted("##arena_over", ui::GOOD);
-    ImGui::PushTextWrapPos();
+    const ui::Tinted tinted("##arena_over", ui::GOOD, TINT);
+    const ui::TextWrap wrap;
     ui::inlineIcon(ui::Icon::Trophy, ui::GOOD);
     ImGui::SameLine();
     coloured(title, ui::GOOD);
@@ -1726,12 +1726,8 @@ void LichessArenasPage::drawArenaOver(bool home) {
     if (ImGui::Button(TR("Close##arena_over"))) {
         app_.letGoHeld(a.id);
         dropArena();
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
-    ImGui::PopTextWrapPos();
-    endTinted();
 }
 
 void LichessArenasPage::drawSwissPart() {

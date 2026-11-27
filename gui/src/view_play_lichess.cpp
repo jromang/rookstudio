@@ -1648,8 +1648,8 @@ void App::drawOnlineGameEnd() {
     const ui::TopicRegion topic(guide::topics::LichessGame);
     // Its stream stopped before its end: Lichess does not know the game any more, or refused the token.
     if (!s.over()) {
-        beginTinted("##online_lost", ui::WARN);
-        ImGui::PushTextWrapPos();
+        const ui::Tinted tinted("##online_lost", ui::WARN);
+        const ui::TextWrap wrap;
         coloured(trf("Lichess no longer answers for your game against {}: {}.", onlineOpponent(),
                      lichess::describe(s.failure)),
                  ui::WARN);
@@ -1658,12 +1658,8 @@ void App::drawOnlineGameEnd() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Close##online_lost"))) {
             online_game_.reset();
-            ImGui::PopTextWrapPos();
-            endTinted();
             return;
         }
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     const auto& them = og.white ? s.black : s.white;
@@ -1709,8 +1705,8 @@ void App::drawOnlineGameEnd() {
         title = TR("Draw");
     else
         title = won ? TR("You won") : lost ? TR("You lost") : TR("Game over");
-    beginTinted("##online_end", ui::ACCENT);
-    ImGui::PushTextWrapPos();
+    const ui::Tinted tinted("##online_end", ui::ACCENT);
+    const ui::TextWrap wrap;
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.25f);
     wrapped(title);
     ImGui::PopFont();
@@ -1723,8 +1719,6 @@ void App::drawOnlineGameEnd() {
     if (lichess::tournamentGame(s)) {
         if (primaryButton(TR("Back to the tournament##online_end"))) {
             if (!arenas_->backToTournament(s.swiss)) page_ = Page::Play;
-            ImGui::PopTextWrapPos();
-            endTinted();
             return;
         }
         ImGui::SameLine();
@@ -1736,8 +1730,6 @@ void App::drawOnlineGameEnd() {
             play_part_          = 1;
             page_               = Page::Play;
             startSeek();
-            ImGui::PopTextWrapPos();
-            endTinted();
             return;
         }
         ImGui::SameLine();
@@ -1749,13 +1741,9 @@ void App::drawOnlineGameEnd() {
     ImGui::SameLine();
     if (ImGui::Button(TR("Close##online_end"))) {
         closeOnlineGame();
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     tip(TR("The game stays on the board as any game; it comes into your Lichess database as your finished games do."));
-    ImGui::PopTextWrapPos();
-    endTinted();
 }
 
 // ---------------------------------------------------------------------------

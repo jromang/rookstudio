@@ -657,8 +657,8 @@ void LichessBotPage::drawBoardCard() {
     const bool same = bot_game_ && bot_game_->id() == bot_shown_id_;
     const auto& st  = bot_state_;
     const auto& s   = st.game;
-    beginTinted("##bot_game", ui::ACCENT);
-    ImGui::PushTextWrapPos();
+    const ui::Tinted tinted("##bot_game", ui::ACCENT, TINT);
+    const ui::TextWrap wrap;
     ui::inlineIcon(ui::Icon::Bot, ui::ACCENT);
     ImGui::SameLine();
     const auto* engine = botEngine();
@@ -681,8 +681,6 @@ void LichessBotPage::drawBoardCard() {
         if (s.moves.size() >= 2)
             wrapped(trf("The game goes into the database “Lichess · {}”.", bot_account_->username), true);
         if (ImGui::SmallButton(TR("Close##bot_game"))) bot_shown_ = false;
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     if (s.full)
@@ -734,8 +732,6 @@ void LichessBotPage::drawBoardCard() {
         if (ImGui::SmallButton(TR("Put offline##bot_game"))) setBotOnline(false);
         tip(TR("No new challenge; this game goes on to its end."));
     }
-    ImGui::PopTextWrapPos();
-    endTinted();
 }
 
 // ---------------------------------------------------------------------------

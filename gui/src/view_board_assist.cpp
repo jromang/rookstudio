@@ -277,11 +277,14 @@ void App::drawReviewTables() {
                                       review_tables_job_->done->load(), review_tables_job_->total)
                                       .c_str());
     } else if (review_tables_taught_ > 0) {
-        if (review_tables_error_.failed())
-            ImGui::TextDisabled("%s", trf("Lichess's tables could not be asked to the end ({}): the engine judged the "
-                                          "moves they did not answer for.",
-                                          lichess::describe(review_tables_error_))
-                                          .c_str());
+        if (review_tables_error_.failed())  // a notice, Try again for an outage or the tables' pause (#146)
+            drawRepairNotice(
+                lichessNotice(review_tables_error_,
+                              trf("Lichess's tables could not be asked to the end ({}): the engine judged "
+                                  "the moves they did not answer for.",
+                                  lichess::describe(review_tables_error_)),
+                              lichessAccess(), retryState(Retry::ReviewTables, urlHost(lichess::servers().tablebase))),
+                "review_tables");
         else
             ImGui::TextDisabled("%s", trn("The endgame judged by Lichess's tables: {} position of seven pieces or "
                                           "fewer, each move by what it does to the exact result.",

@@ -607,14 +607,14 @@ void App::pollCrosstable() {
         try {
             auto input = c.job.get();
             if (!*c.cancel) {
-                if (!c.input) c.error.clear();  // without its games, its error line could only say why they were not
+                if (!c.input) c.error = {};  // without its games, its error line could only say why they were not
                 c.input = std::move(input);
                 remakeCrosstable();
             }
         } catch (const std::exception& e) {
             // Its games not read (a database that cannot be read): said on its error line, read again once the
             // database changed.
-            if (!*c.cancel) c.error = loggedStoreError(trf("Its games could not be read: {}.", storeErrorText(e)), e);
+            if (!*c.cancel) c.error = loggedStoreFailure(trf("Its games could not be read: {}.", storeErrorText(e)), e);
         }
     }
     // The database changed (a merge, names brought together, a game copied in): read again.
@@ -630,11 +630,19 @@ void App::pollCrosstable() {
             if (!*c.look_cancel) c.found = std::move(found);
         } catch (const std::exception& e) {
             if (!*c.look_cancel)
-                c.error = loggedStoreError(
+                c.error = loggedStoreFailure(
                     trf("The missing games could not be looked for in your other databases: {}.", storeErrorText(e)),
                     e);
         }
     }
+}
+
+int App::crosstableDatabase() {
+    if (!crosstable_) return -1;
+    const auto& s = shelf();
+    for (std::size_t i = 0; i < s.entries().size(); ++i)
+        if (s.entries()[i].folder == crosstable_->folder) return static_cast<int>(i);
+    return -1;
 }
 
 void App::remakeCrosstable() {
@@ -1115,9 +1123,9 @@ void App::drawStudyCrosstable() {
     if (!c.input) {
         if (c.error.empty()) {
             ImGui::TextDisabled("%s", TR("Reading its games…"));
-        } else {  // its error line: the games could not be read
+        } else {  // its error line: the games could not be read, a damaged file with its check (#146)
             const ui::TextWrap wrap;
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", c.error.c_str());
+            drawRepairNotice(storeNotice(c.error, crosstableDatabase()), "crosstable_error");
         }
         return;
     }
@@ -1173,9 +1181,9 @@ void App::drawStudyCrosstable() {
         ImGui::TextUnformatted(c.said.c_str());
         ImGui::PopTextWrapPos();
     }
-    if (!c.error.empty()) {
+    if (!c.error.empty()) {  // a notice: a damaged file with its check (#146)
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", c.error.c_str());
+        drawRepairNotice(storeNotice(c.error, crosstableDatabase()), "crosstable_error");
         ImGui::PopTextWrapPos();
     }
     if (care_job_ && care_job_->crosstable) ImGui::TextDisabled("%s", TR("Writing in the database…"));
@@ -1283,7 +1291,7 @@ void App::drawStudyCrosstable() {
                                 shelf().rebuildTree(index);
                             }
                         } catch (const std::exception& e) {
-                            c.error = e.what();
+                            c.error = storeFailureOf(e);
                         }
                         c.found->erase(c.found->begin() + static_cast<std::ptrdiff_t>(k));
                         ImGui::EndDisabled();

@@ -25,6 +25,14 @@ enum class Retry : int {
     OnlineCloud,      // the Board's line of Lichess's cloud
     EndgameCheck,     // a tournament's endgame check, its position to Lichess's tables
     FileAdd,          // the downloads of the sources' sheet that failed (TWIC, chess.com, Lichess's broadcasts)
+    // #146: the Lichess page's other cards, the opening report; a module's own are asked again by it (OwnRetries).
+    Broadcasts,       // the Broadcasts card's list of official broadcasts
+    BroadcastSearch,  // the Broadcasts card's search, its words again
+    ReportExplorer,   // the opening report's questions to Lichess's explorer that gave nothing
+    TvChannels,       // Lichess TV's card: each channel's featured game (its module's)
+    ArenaList,        // the Lichess tournaments card: the arenas in progress and to come (its module's)
+    TeamSwisses,      // the same card: the user's teams' Swiss tournaments (its module's)
+    ReviewTables,     // a review's endgame: the positions Lichess's tables did not answer, asked again
 };
 
 // What fixes a problem. The App carries it out (App::applyFix); the views only show its button.
@@ -118,6 +126,9 @@ struct Notice {
 // text wrapped, then its fixes, small buttons on the next line. `id` tells its buttons from another notice's.
 // Returns the fix clicked, or nullptr.
 const Fix* drawNotice(const Notice& notice, const char* id);
+// Its fixes alone, from where the cursor is, as drawNotice() draws them under its text: for a card that says the
+// notice's words its own way (the opening report's states, #146). Returns the fix clicked, or nullptr.
+const Fix* drawFixes(const Notice& notice, const char* id);
 
 // drawNotice() of each, the fix clicked (if any) in `clicked`. Returns true when one was.
 bool drawNotices(const std::vector<Notice>& notices, const char* id, Fix& clicked);

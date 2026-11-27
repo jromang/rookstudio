@@ -79,13 +79,18 @@ Notice lichessNotice(const lichess::Failure& failure, std::string text, const Li
     return n;
 }
 
-Notice linkNotice(const lichess::Failure& failure, std::string text) {
+Notice linkNotice(const lichess::Failure& failure, std::string text, const std::filesystem::path& unwritten) {
     Notice n{Notice::Level::Warning, std::move(text), {}, {}};
     if (failure.net == lichess::NetError::Unauthorized) {
         n.level = Notice::Level::Error;
         n.text  = TR("Lichess refused the token: it was revoked or has expired.");
     }
     if (failure.failed()) n.fixes.push_back(linkLichessFix({}, true));
+    if (failure.failed() && !unwritten.empty()) {
+        n.level  = Notice::Level::Error;
+        n.detail = unwritten.string();  // the file, out of the words
+        n.fixes.push_back(openFolderFix(unwritten.parent_path().string()));
+    }
     return n;
 }
 
@@ -162,21 +167,41 @@ bool RetryQueue::queued(Retry what) const {
     return std::any_of(queued_.begin(), queued_.end(), [&](const auto& q) { return q.first == what; });
 }
 
+void carryOutRetry(const Fix& fix, RetryQueue& queue, const PausedFor& paused_for, const AskAgain& ask) {
+    const auto what = static_cast<Retry>(fix.value);
+    if (what == Retry::None || queue.queued(what)) return;  // asked already: nothing more is sent
+    if (paused_for(fix.path).count() > 0) {
+        queue.queue(what, fix.path);
+    } else {
+        ask(what);
+    }
+}
+
+RetryState OwnRetries::state(Retry what, const std::string& host) const {
+    return RetryState{what, host, paused_for_(host), queue_.queued(what)};
+}
+
+bool OwnRetries::carryOut(const Fix& fix) {
+    if (fix.kind != Fix::Kind::RetryAfterPause) return false;
+    carryOutRetry(fix, queue_, paused_for_, ask_);
+    return true;
+}
+
+void OwnRetries::poll() {
+    if (queue_.empty()) return;
+    for (const auto what : queue_.due(paused_for_)) ask_(what);
+}
+
 bool carryOutRepair(const Fix& fix, RepairActions& actions, RetryQueue& queue) {
     switch (fix.kind) {
         case Fix::Kind::LinkLichess:
             actions.linkLichess(fix.path);
             return true;
-        case Fix::Kind::RetryAfterPause: {
-            const auto what = static_cast<Retry>(fix.value);
-            if (what == Retry::None || queue.queued(what)) return true;  // asked already: nothing more is sent
-            if (actions.pausedFor(fix.path).count() > 0) {
-                queue.queue(what, fix.path);
-            } else {
-                actions.retryNow(what);
-            }
+        case Fix::Kind::RetryAfterPause:
+            carryOutRetry(
+                fix, queue, [&](const std::string& host) { return actions.pausedFor(host); },
+                [&](Retry what) { actions.retryNow(what); });
             return true;
-        }
         case Fix::Kind::CheckDatabase:
             actions.checkDatabase(fix.index);
             return true;

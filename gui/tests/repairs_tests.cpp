@@ -1,5 +1,5 @@
 // The Chess space's errors with what repairs them (#141): each failure a page keeps made into its notice, and the
-// repairs carried out, a Try again during its host's pause queued until it ends.
+// repairs carried out, a Try again during its host's pause queued until it ends, a module's own too (#146).
 
 #include <doctest/doctest.hpp>
 
@@ -298,6 +298,22 @@ TEST_CASE("repairs: a link that failed offers Link Lichess again…, a token ref
     CHECK(no.level == Notice::Level::Warning);
     CHECK(no.text == "You refused it.");
     CHECK(no.fixes.size() == 1);
+
+    // The account received but its file not written (#146): the file out of the words, its folder a click away.
+    const fs::path file = fs::path("profile") / "lichess-account.json";
+    const auto unkept =
+        linkNotice(lichess::Failure::own("The account could not be kept: the file could not be "
+                                         "written (is the disk full?)."),
+                   "The account could not be kept: the file could not be written (is the disk full?).", file);
+    CHECK(unkept.level == Notice::Level::Error);
+    CHECK_FALSE(contains(unkept.text, "lichess-account.json"));
+    CHECK(unkept.detail == file.string());
+    REQUIRE(unkept.fixes.size() == 2);
+    CHECK(unkept.fixes[0].kind == Fix::Kind::LinkLichess);  // the repair first,
+    CHECK(unkept.fixes[1].kind == Fix::Kind::OpenFolder);   // then the folder
+    CHECK(unkept.fixes[1].path == file.parent_path().string());
+    // Nothing failed: nothing to open.
+    CHECK(linkNotice(lichess::Failure{}, "", file).fixes.empty());
 }
 
 TEST_CASE("repairs: the cases no gesture repairs stay notices without a button") {
@@ -357,4 +373,60 @@ TEST_CASE("repairs: a Try again during the pause is queued and sent once, when i
     // The labels of the other repairs.
     CHECK(chooseEngineFix().label == "Choose an engine…");
     CHECK(contains(chooseEngineFix().tooltip, "engine picker"));
+}
+
+TEST_CASE("repairs: a module's own Try again, at once, or queued through its host's pause and asked once (#146)") {
+    std::map<std::string, std::chrono::milliseconds> pauses;
+    std::vector<Retry> asked;
+    OwnRetries retries(
+        [&](const std::string& host) {
+            const auto it = pauses.find(host);
+            return it == pauses.end() ? 0ms : it->second;
+        },
+        [&](Retry what) { asked.push_back(what); });
+
+    // Outside a pause: asked at once.
+    CHECK(retries.state(Retry::TvChannels, "lichess.org").pause == 0ms);
+    CHECK(retries.carryOut(retryAfterPauseFix(Retry::TvChannels, "lichess.org")));
+    CHECK(asked == std::vector<Retry>{Retry::TvChannels});
+
+    // During its host's pause: counted down on its button; a click queues it, nothing asked before the pause ends.
+    pauses["lichess.org"] = 42s;
+    auto state            = retries.state(Retry::ArenaList, "lichess.org");
+    CHECK(state.what == Retry::ArenaList);
+    CHECK(state.host == "lichess.org");
+    CHECK(state.pause == 42s);
+    CHECK_FALSE(state.queued);
+    const auto during = lichessNotice(failure(lichess::NetError::RateLimited, 429), "", linked(), state);
+    REQUIRE(during.fixes.size() == 1);
+    CHECK(during.fixes[0].label == "Try again in 0:42");
+    CHECK(retries.carryOut(during.fixes[0]));
+    CHECK(retries.carryOut(during.fixes[0]));  // a second click: still once
+    retries.poll();
+    CHECK(asked.size() == 1);
+    CHECK(retries.queued(Retry::ArenaList));
+    state = retries.state(Retry::ArenaList, "lichess.org");
+    CHECK(state.queued);
+    const auto queued = lichessNotice(failure(lichess::NetError::RateLimited, 429), "", linked(), state);
+    REQUIRE(queued.fixes.size() == 1);
+    CHECK(queued.fixes[0].label == "Asks again in 0:42");
+    CHECK(queued.fixes[0].disabled);
+    // Another host's pause holds nothing of this one's.
+    CHECK(retries.state(Retry::TvChannels, "tablebase.lichess.ovh").pause == 0ms);
+
+    // The pause over: asked once.
+    pauses["lichess.org"] = 0ms;
+    retries.poll();
+    CHECK(asked == std::vector<Retry>{Retry::TvChannels, Retry::ArenaList});
+    CHECK_FALSE(retries.queued(Retry::ArenaList));
+    retries.poll();
+    CHECK(asked.size() == 2);
+
+    // Not a Try again: left to the program (context::Repairs::repair()).
+    CHECK_FALSE(retries.carryOut(linkLichessFix()));
+    CHECK_FALSE(retries.carryOut(openFolderFix("/x")));
+    CHECK_FALSE(retries.carryOut(checkDatabaseFix(1)));
+    // A Try again that names nothing: nothing asked.
+    CHECK(retries.carryOut(retryAfterPauseFix(Retry::None, "lichess.org")));
+    CHECK(asked.size() == 2);
 }

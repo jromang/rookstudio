@@ -388,7 +388,7 @@ void App::pollCare() {
         // a search stops as a cancelled one does, started again by its button.
         auto failure = loggedStoreFailure(trf("Not done: {}.", storeErrorText(e)), e);
         if (job->crosstable && crosstable_ && crosstable_->folder == job->folder) {
-            crosstable_->error = std::move(failure.said);
+            crosstable_->error = std::move(failure);  // with its code: a damaged file offers its check (#146)
         } else if (here) {
             // A full disk during a compaction: its card says so, and what to do.
             if (job->kind == CareJob::Kind::Compact) care_->disk_full = failure.code == study::StoreErrc::DiskFull;
@@ -468,7 +468,7 @@ void App::pollCare() {
         case CareJob::Kind::Restore:
             if (!job->error.empty()) {
                 if (job->crosstable && crosstable_ && crosstable_->folder == job->folder)
-                    crosstable_->error = trf("Not done: {}.", job->error.said);
+                    crosstable_->error = {trf("Not done: {}.", job->error.said), job->error.code};
                 else if (here)
                     care_->error = {trf("Not done: {}.", job->error.said), job->error.code};
                 break;
@@ -481,7 +481,7 @@ void App::pollCare() {
                 }
                 if (crosstable_ && crosstable_->folder == job->folder) {
                     crosstable_->said = job->said;
-                    crosstable_->error.clear();
+                    crosstable_->error = {};
                 }
             } else if (here) {
                 if (job->undo) care_->undo.push_back(std::move(*job->undo));

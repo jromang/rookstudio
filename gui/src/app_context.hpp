@@ -16,7 +16,7 @@
 // on the Board from a session, the Board's own game, the Syzygy tables of the disk and their download, the Play page's
 // opponent, the Openings page and its repertoires, the user's correspondence games on Lichess, the Board as the
 // repertoires' training asks on it, the views and the pages offered once, the Training page among the program's pages,
-// the clock the training is scheduled by.
+// the clock the training is scheduled by, the repairs of the errors a module says.
 // A module's context is the facets it needs (TvContext, ArenasContext, BotContext, PuzzlesContext, MistakesContext,
 // GuessContext, EndgamesContext, VisionContext, RepertoireTrainingContext, TrainingPageContext); App answers them all
 // (AppContext, by App::ModulesContext, app_chess.cpp), and a test only those of the module it builds, with a fake of
@@ -27,6 +27,7 @@
 // business.
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -54,7 +55,9 @@ struct BookEntry;
 class CrosstableStore;
 class DatabaseShelf;
 struct EngineEntry;
+struct Fix;
 class JobGroup;
+struct LichessAccess;
 struct LichessSettings;
 struct MistakeExercise;
 class PieceAtlas;
@@ -699,6 +702,23 @@ class Clock {
     [[nodiscard]] virtual int64_t now() const = 0;
 };
 
+// The repairs of the errors a module says (#146; repairs.hpp, drawn as notices in place of their lines): what the
+// linked account allows a request, how long a host still pauses after a 429, and the fixes that act out of the module
+// (Link Lichess again…, Open the folder, Check the database…), carried out as those of App's pages. A Try again is the
+// module's own (OwnRetries), asked once the host's pause read here is over.
+class Repairs {
+   public:
+    virtual ~Repairs() = default;
+
+    // The linked account, for a request that needs the permission `needs` (empty: none in particular): whether one is
+    // linked and what its token may do, never the token.
+    [[nodiscard]] virtual LichessAccess lichessAccess(const std::string& needs) const = 0;
+    // How long `host` still pauses after a 429 (HostGate); zero when it does not.
+    [[nodiscard]] virtual std::chrono::milliseconds pausedFor(const std::string& host) const = 0;
+    // A fix of a notice the module drew, other than its Try again, carried out by the program.
+    virtual void repair(const Fix& fix) = 0;
+};
+
 }  // namespace context
 
 // What Lichess TV asks of the program (lichess_tv_page.hpp).
@@ -706,7 +726,8 @@ class TvContext : public virtual context::Program,
                   public virtual context::Pages,
                   public virtual context::Board,
                   public virtual context::Mosaic,
-                  public virtual context::Lichess {};
+                  public virtual context::Lichess,
+                  public virtual context::Repairs {};
 
 // What Lichess's arenas and Swiss tournaments ask of the program (lichess_arenas_page.hpp).
 class ArenasContext : public virtual context::Program,
@@ -717,7 +738,8 @@ class ArenasContext : public virtual context::Program,
                       public virtual context::LinkedAccount,
                       public virtual context::Account,
                       public virtual context::FairPlay,
-                      public virtual context::Playing {};
+                      public virtual context::Playing,
+                      public virtual context::Repairs {};
 
 // What the Lichess bot asks of the program (lichess_bot_page.hpp).
 class BotContext : public virtual context::Program,
@@ -770,7 +792,8 @@ class EndgamesContext : public virtual context::Program,
                         public virtual context::Lichess,
                         public virtual context::Mistakes,
                         public virtual context::Puzzles,
-                        public virtual context::DiskTables {};
+                        public virtual context::DiskTables,
+                        public virtual context::Repairs {};
 
 // What board vision asks of the program (vision_page.hpp).
 class VisionContext : public virtual context::Program,

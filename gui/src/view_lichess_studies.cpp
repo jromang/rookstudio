@@ -324,8 +324,9 @@ void App::pollStudies() {
                                                              nowSeconds() * 1000, nowSeconds() * 1000});
             }
             if (answer.failed() || !answer.value || answer.value->chapter.empty()) {
-                s.error =
-                    answer.failed() ? lichess::describe(answer) : std::string(TR("Lichess made no chapter of it"));
+                // Lichess's failure kept as it came (#146), said with its repair; the program's own words otherwise.
+                s.failure = answer;
+                if (!answer.failed()) s.error = trf("Not sent: {}.", TR("Lichess made no chapter of it"));
                 if (answer.value && !answer.value->created && answer.value->chapters >= 0)  // a full study, counted
                     studies_.record(answer.value->study, s.going.study_name).chapters = answer.value->chapters;
             } else {
@@ -394,9 +395,9 @@ void App::pollStudies() {
             if (!studyToken(true).empty())
                 startStudySend();
             else {
-                study_send_->error   = !lichess_error_.failed() ? std::string(TR("Lichess gave no permission to write "
-                                                                                 "in your studies: nothing was sent."))
-                                                                : lichess::describe(lichess_error_);
+                study_send_->failure = lichess_error_;  // the link's failure, as it came (#146)
+                if (!lichess_error_.failed())
+                    study_send_->error = TR("Lichess gave no permission to write in your studies: nothing was sent.");
                 study_send_->refused = lichess::linkRefused(lichess_error_);
             }
         }
@@ -905,6 +906,7 @@ void App::startStudySend() {
     if (!study_send_ || study_send_job_.valid()) return;
     auto& s = *study_send_;
     s.error.clear();
+    s.failure = {};
     s.refused = false;
     if (toLichessLock(true)) {
         s.error =
@@ -1201,10 +1203,20 @@ void App::drawStudySendCard() {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s",
                                    TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back "
                                       "here."));
-            } else if (!s.error.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   s.refused ? TR("You refused it on Lichess: nothing was sent.")
-                                             : trf("Not sent: {}.", s.error).c_str());
+            } else if (s.refused) {  // the user's no: the Send button asks again
+                drawNotice(Notice{Notice::Level::Warning, TR("You refused it on Lichess: nothing was sent."), {}, {}},
+                           "study_send_error");
+            } else if (s.failure.failed()) {
+                // Lichess's failure as it came, with its repair (#146): a token refused, Link Lichess again…; the
+                // permission to write missing, Allow writing studies…; the game sent once Lichess gave it.
+                const auto notice = lichessNotice(s.failure, trf("Not sent: {}.", lichess::describe(s.failure)),
+                                                  lichessAccess(lichess::SCOPE_STUDY_WRITE), {});
+                if (const auto* fix = drawNotice(notice, "study_send_error")) {
+                    if (fix->kind == Fix::Kind::LinkLichess) s.after_link = true;
+                    applyFix(*fix);
+                }
+            } else if (!s.error.empty()) {  // the program's own sentence: a study to choose, a name, the quota, a lock
+                drawNotice(Notice{Notice::Level::Warning, s.error, {}, {}}, "study_send_error");
             }
             const bool can =
                 !s.busy && !lichess_link_ && (s.where == 0 ? !s.study.empty() : lichess::studyNameOk(s.name.data()));

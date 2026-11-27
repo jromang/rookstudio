@@ -26,6 +26,7 @@
 #include "app_context.hpp"
 #include "endgames.hpp"
 #include "focus_words.hpp"
+#include "notice.hpp"
 #include "review_queue.hpp"
 #include "training_kind.hpp"
 
@@ -55,6 +56,11 @@ class EndgamesPage final : public TrainingKind {
     // Its --focus words, tried where the Training page has them (training_page.cpp): endgame=ID, endgames-review.
     // `word` is the word `words` was made with.
     void addFocusWords(FocusWords& words, const std::string& word) override;
+
+    // Why the tables' download stopped, as its card says it under "The download stopped at…" (#146): a file that
+    // could not be written or read named in the tooltip, with Open the folder (Go on, under it, asks for the rest);
+    // none while it did not fail. Its fix carried out by the program.
+    [[nodiscard]] std::optional<Notice> tablesDownloadNotice() const;
 
     // The day's review: the endgames missed due today and after, how long one takes; their session, the longest overdue
     // first (false when none is due, or none can be played now); their share of "Review all" (TrainingKind): one step,

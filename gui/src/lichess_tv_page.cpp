@@ -79,9 +79,33 @@ std::string tvName(const std::string& name) {
     return name;
 }
 
-LichessTvPage::LichessTvPage(TvContext& app) : app_(app) {}
+LichessTvPage::LichessTvPage(TvContext& app)
+    : app_(app),
+      retries_([this](const std::string& host) { return app_.pausedFor(host); },
+               [this](Retry what) { askAgain(what); }) {}
 
 LichessTvPage::~LichessTvPage() = default;
+
+std::optional<Notice> LichessTvPage::channelsNotice() const {
+    if (!tv_rows_.failed()) return std::nullopt;
+    // Without a list, why none came; with one, why it is not the latest.
+    auto text = tv_rows_.value ? trf("The list shown was read earlier: {}.", lichess::describe(tv_rows_))
+                               : lichess::gaveNothing(tv_rows_);
+    return lichessNotice(tv_rows_, std::move(text), app_.lichessAccess({}),
+                         retries_.state(Retry::TvChannels, lichess::apiHost()));
+}
+
+void LichessTvPage::repair(const Fix& fix) {
+    if (!retries_.carryOut(fix)) app_.repair(fix);
+}
+
+void LichessTvPage::drawRepair(const Notice& notice, const char* id) {
+    if (const auto* fix = drawNotice(notice, id)) repair(*fix);
+}
+
+void LichessTvPage::askAgain(Retry what) {
+    if (what == Retry::TvChannels) tv_rows_asked_ = {};  // asked at the next poll, the card showing
+}
 
 std::string LichessTvPage::channelShown() const {
     const auto& shown = app_.mosaicShown();
@@ -254,6 +278,7 @@ void LichessTvPage::keepGame(const std::string& folder, const std::string& name)
 
 void LichessTvPage::poll() {
     using namespace std::chrono_literals;
+    retries_.poll();  // a Try again queued through the host's pause, asked once it is over
     const auto now = Clock::now();
     loadKept();
     const auto own = app_.ownLichessIds();
@@ -439,7 +464,11 @@ void LichessTvPage::drawCard() {
     ImGui::TextDisabled("%s", TR("· each channel's featured game"));
     const auto own = app_.ownLichessIds();
     if (!tv_rows_.value) {
-        ImGui::TextDisabled("%s", tv_rows_.failed() ? lichess::gaveNothing(tv_rows_).c_str() : TR("Asking Lichess…"));
+        // Why nothing came, with its repair (#146), as the Lichess page's other cards say it.
+        if (const auto notice = channelsNotice())
+            drawRepair(*notice, "tv_channels");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
     } else {
         const auto ai = [](const lichess::TvPlayer& p) { return trf("Lichess AI, level {}", p.ai); };
         float name_w  = 0;
@@ -505,9 +534,7 @@ void LichessTvPage::drawCard() {
             }
             ImGui::EndTable();
         }
-        if (tv_rows_.failed())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trf("The list shown was read earlier: {}.", lichess::describe(tv_rows_)).c_str());
+        if (const auto notice = channelsNotice()) drawRepair(*notice, "tv_channels");
     }
     ImGui::TextDisabled("%s", TR("The variants' channels (Crazyhouse, Atomic…) are not shown. The list is read again "
                                  "when the card shows, at most once every 30 s."));
@@ -611,8 +638,9 @@ void LichessTvPage::drawBoardCard() {
     else
         then = TR("When it ends, the channel goes on to the next one, by itself.");
     ImGui::TextDisabled("%s", then.c_str());
+    // Why the channel's next game has not come: asked again by itself, a token refused with its repair (#146).
     if (t.error.failed() && ended && !t.stay)
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", lichess::describeAlone(t.error).c_str());
+        drawRepair(lichessNotice(t.error, lichess::describeAlone(t.error), app_.lichessAccess({}), {}), "tv_next");
     if (!g && tv_quota_ == 0)
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                            trf("Lichess lets an address follow {} games at once: the rounds and the players followed "

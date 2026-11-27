@@ -93,6 +93,39 @@ void App::retryNow(Retry what) {
             startFileAdd(std::move(add), database, title, nullptr);
             break;
         }
+        case Retry::Broadcasts:  // asked again at once, the failure said again if it fails again
+            lichess_broadcasts_time_                            = {};
+            static_cast<lichess::Failure&>(lichess_broadcasts_) = {};
+            askBroadcasts();
+            break;
+        case Retry::BroadcastSearch:
+            if (broadcast_found_ && !broadcast_search_job_.valid()) {
+                broadcast_found_.reset();
+                startBroadcastSearch();  // the same words, still in the field
+            }
+            break;
+        case Retry::ReportExplorer:
+            // The explorer's answers that gave nothing forgotten: the report asks for its position again.
+            for (auto it = explorer_answers_.begin(); it != explorer_answers_.end();) {
+                if (it->second.value) {
+                    ++it;
+                    continue;
+                }
+                explorer_failed_.erase(it->first);
+                it = explorer_answers_.erase(it);
+            }
+            if (opening_report_) opening_report_->lichess_failure = {};
+            break;
+        case Retry::ReviewTables:  // those not answered asked again, those answered read from the profile
+            if (!review_tables_job_) {
+                review_tables_started_ = false;
+                review_tables_error_   = {};
+            }
+            break;
+        case Retry::TvChannels:
+        case Retry::ArenaList:
+        case Retry::TeamSwisses:
+            break;  // the modules' own, asked by them (OwnRetries)
     }
 }
 

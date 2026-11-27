@@ -90,6 +90,7 @@ void App::pollLichess() {
                 lichess::saveAccount(storage_.root(), *answer.value);
                 lichess_account_ = *answer.value;
                 lichess_error_   = {};
+                lichess_unwritten_.clear();
                 if (lichess_.player.empty()) lichess_.player = answer.value->username;
                 saveLichessSettings();
                 if (window_) SDL_RaiseWindow(window_);  // back in front of the browser
@@ -108,7 +109,12 @@ void App::pollLichess() {
                 }
                 if (follow) followBroadcast(*follow);
             } catch (const std::exception& e) {
-                lichess_error_ = lichess::Failure::own(e.what());
+                // The file out of the words (#146): in the notice's tooltip and behind Open the folder; the log's.
+                Console::instance().add(trf("Lichess: the account could not be kept: {}", e.what()), true);
+                NetFailure unwritable;
+                unwritable.kind = NetFailure::Kind::Unwritable;
+                lichess_error_ = lichess::Failure::own(trf("The account could not be kept: {}.", describe(unwritable)));
+                lichess_unwritten_ = storage_.root() / lichess::ACCOUNT_FILE;
             }
         } else if (answer.net != lichess::NetError::Cancelled) {
             if (lichess_scope_ask_)
@@ -279,6 +285,7 @@ void App::askBroadcasts() {
 void App::startLichessLink(std::vector<std::string> scopes, std::string username,
                            std::optional<lichess::BroadcastEntry> then_follow) {
     lichess_error_ = {};
+    lichess_unwritten_.clear();
     if (lichess_scope_ask_) lichess_scope_ask_->error = {};
     auto link         = std::make_unique<LichessLink>();
     link->cancel      = std::make_shared<std::atomic<bool>>(false);
@@ -465,7 +472,8 @@ void App::drawLichessAccount() {
         }
         // What went wrong last, and the gesture that mends it (M4, board 2): a notice with Link Lichess again… (#141).
         if (lichess_error_.failed()) {
-            drawRepairNotice(linkNotice(lichess_error_, lichess::linkFailed(lichess_error_)), "lichess_link_failed");
+            drawRepairNotice(linkNotice(lichess_error_, lichess::linkFailed(lichess_error_), lichess_unwritten_),
+                             "lichess_link_failed");
         } else if (ui::iconButton("lichess_link", ui::Icon::External, TR("Link the account…"))) {
             startLichessLink();
         }
@@ -536,12 +544,13 @@ void App::drawLichessGames() {
         }
         if (lichess_sync_report_) {
             const auto& r = *lichess_sync_report_;
-            if (r.failed())
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Stopped: {}. The games received are in the database; Sync goes on from the "
-                                       "next one.",
-                                       lichess::describe(r))
-                                       .c_str());
+            if (r.failed())  // a notice (#146): a token refused with Link Lichess again…; Sync goes on by itself
+                drawRepairNotice(lichessNotice(r,
+                                               trf("Stopped: {}. The games received are in the database; Sync goes on "
+                                                   "from the next one.",
+                                                   lichess::describe(r)),
+                                               lichessAccess(), {}),
+                                 "lichess_sync");
             else
                 ImGui::TextUnformatted(trf("Done: {} new games{}.", ui::exactCount(r.added),
                                            r.cancelled ? std::string(TR(", stopped at your request")) : std::string())
@@ -641,7 +650,13 @@ void App::drawLichessBroadcasts() {
     }
     const auto& b = lichess_broadcasts_;
     if (!b.value && !broadcast_found_ && !broadcast_search_job_.valid()) {
-        ImGui::TextDisabled("%s", b.failed() ? lichess::gaveNothing(b).c_str() : TR("Asking Lichess…"));
+        // A token refused, the host's pause, an outage: each with its repair, as the studies card says them (#146).
+        if (b.failed())
+            drawRepairNotice(lichessNotice(b, lichess::gaveNothing(b), lichessAccess(),
+                                           retryState(Retry::Broadcasts, lichess::apiHost())),
+                             "broadcasts");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
     } else {
         const auto row = [&](const lichess::BroadcastEntry& e, bool live) {
             ImGui::PushID(e.round.id.c_str());
@@ -680,9 +695,11 @@ void App::drawLichessBroadcasts() {
                 return;
             }
             const auto& found = *broadcast_found_;
-            if (!found.value)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                                   trf("Lichess did not search: {}", lichess::describe(found)).c_str());
+            if (!found.value)  // the search needs the account's study:read: a token refused, its permission (#146)
+                drawRepairNotice(lichessNotice(found, trf("Lichess did not search: {}", lichess::describe(found)),
+                                               lichessAccess(lichess::SCOPE_STUDY_READ),
+                                               retryState(Retry::BroadcastSearch, lichess::apiHost())),
+                                 "broadcast_search");
             else if (found.value->empty())
                 ImGui::TextDisabled("%s", trf("No broadcast found for “{}”.", broadcast_searched_).c_str());
             else
@@ -761,14 +778,19 @@ void App::drawLichessFollowed() {
         if (f.follower->streaming())
             ImGui::TextColored(ImVec4(0.82f, 0.29f, 0.23f, 1.0f), "%s", TR("live"));
         else
-            ImGui::TextDisabled(
-                "%s", broke.failed()
-                          ? trf("the stream broke ({}): it opens again by itself", lichess::describe(broke)).c_str()
-                          : TR("connecting…"));
+            ImGui::TextDisabled("%s", TR("connecting…"));
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("The mosaic"))) openBroadcastMosaic(f.key());
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Stop following"))) stop = r;
+        // Why its stream broke, as a notice under it (#146): it opens again by itself, Lichess's pause said in orange;
+        // a token refused with Link Lichess again….
+        if (!f.follower->streaming() && broke.failed())
+            drawRepairNotice(
+                lichessNotice(broke,
+                              trf("The round's stream broke ({}): it opens again by itself.", lichess::describe(broke)),
+                              lichessAccess(f.with_token ? lichess::SCOPE_STUDY_READ : ""), {}),
+                "round_broke");
         // Lichess refuses it, or slows it down, without an account allowed to read broadcasts (#44).
         if (!f.with_token) {
             const bool refused = f.follower->refused();

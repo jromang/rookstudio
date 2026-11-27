@@ -2177,8 +2177,9 @@ class App {
         bool assistant  = false;
         bool after_link = false;  // sent once Lichess gave the permission
         bool busy       = false;
-        std::string error;
-        bool refused = false;                     // the error: the permission refused on Lichess's page
+        std::string error;         // the program's own words: a study to choose, a name, the day's quota, a lock
+        lichess::Failure failure;  // Lichess's, or the link's, as it came (#146): said with its repair
+        bool refused = false;      // the error: the permission refused on Lichess's page
         lichess::SentRecord going;                // what goes, while it goes
         uint64_t serial = 0;                      // the board's game then (board_game_serial_)
         int count       = 0;                      // and its changes

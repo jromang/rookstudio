@@ -981,11 +981,19 @@ void App::drawReportStates() {
     else if (r.players && r.lichess_failure[1])
         unanswered = &*r.lichess_failure[1];
     if (unanswered) {
+        // With its repair under it (#146): a token refused, Link Lichess again…; an outage or the explorer's pause, Try
+        // again, the pause counted down.
+        const auto notice  = lichessNotice(*unanswered, reportUnanswered(*unanswered), lichessAccess(),
+                                           retryState(Retry::ReportExplorer, urlHost(lichess::servers().explorer)));
         const bool offline = unanswered->net == lichess::NetError::Offline;
-        state("report_offline", offline ? ui::Icon::WifiOff : ui::Icon::Alert, offline ? text : ui::WARN,
-              reportUnanswered(*unanswered),
+        state("report_offline", offline ? ui::Icon::WifiOff : ui::Icon::Alert,
+              offline                                ? text
+              : notice.level == Notice::Level::Error ? ui::BAD
+                                                     : ui::WARN,
+              notice.text,
               TR("Your databases and the evaluations kept offline answer; Lichess's sources show their last figures "
                  "for this position, dated, when the report kept them."));
+        if (const auto* fix = drawFixes(notice, "report_lichess")) applyFix(*fix);
         endState();
     }
     // A correspondence game on this position: the lines and figures stay, the evaluations and the summary do not.

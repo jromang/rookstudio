@@ -104,6 +104,18 @@ void App::retryNow(Retry what) {
                 startBroadcastSearch();  // the same words, still in the field
             }
             break;
+        case Retry::ReportExplorer:
+            // The explorer's answers that gave nothing forgotten: the report asks for its position again.
+            for (auto it = explorer_answers_.begin(); it != explorer_answers_.end();) {
+                if (it->second.value) {
+                    ++it;
+                    continue;
+                }
+                explorer_failed_.erase(it->first);
+                it = explorer_answers_.erase(it);
+            }
+            if (opening_report_) opening_report_->lichess_failure = {};
+            break;
         case Retry::TvChannels:
         case Retry::ArenaList:
         case Retry::TeamSwisses:

@@ -266,27 +266,10 @@ const char* noticeTopic(const Notice& notice) {
     return topic;
 }
 
-const Fix* drawNotice(const Notice& notice, const char* id) {
-    const bool ok    = notice.level == Notice::Level::Ok;
-    const bool error = notice.level == Notice::Level::Error;
-    ImGui::PushStyleColor(ImGuiCol_Text, ok ? ui::GOOD : error ? ui::BAD : ui::WARN);
-    ImGui::TextUnformatted(ok ? "✓" : "!");
-    ImGui::PopStyleColor();
-    ImGui::SameLine();
-    const float text_x = ImGui::GetCursorPosX();
-    if (error) ImGui::PushStyleColor(ImGuiCol_Text, ui::BAD);
-    ImGui::TextWrapped("%s", notice.text.c_str());
-    if (error) ImGui::PopStyleColor();
-    if (!notice.detail.empty() && ImGui::BeginItemTooltip()) {
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 36.0f);
-        ImGui::TextUnformatted(notice.detail.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
-    const char* topic = noticeTopic(notice);
-    if (notice.fixes.empty() && !topic) return nullptr;
+namespace {
 
-    // The fixes under the text, from where it starts, then the `?` of the guide's section that explains it.
+// The fixes of `notice` from `text_x` on, then the `?` of the guide's section that explains it; the fix clicked.
+const Fix* drawFixLine(const Notice& notice, const char* id, const char* topic, float text_x) {
     const Fix* clicked = nullptr;
     ImGui::PushID(id);
     ImGui::SetCursorPosX(text_x);
@@ -310,6 +293,37 @@ const Fix* drawNotice(const Notice& notice, const char* id) {
     }
     ImGui::PopID();
     return clicked;
+}
+
+}  // namespace
+
+const Fix* drawNotice(const Notice& notice, const char* id) {
+    const bool ok    = notice.level == Notice::Level::Ok;
+    const bool error = notice.level == Notice::Level::Error;
+    ImGui::PushStyleColor(ImGuiCol_Text, ok ? ui::GOOD : error ? ui::BAD : ui::WARN);
+    ImGui::TextUnformatted(ok ? "✓" : "!");
+    ImGui::PopStyleColor();
+    ImGui::SameLine();
+    const float text_x = ImGui::GetCursorPosX();
+    if (error) ImGui::PushStyleColor(ImGuiCol_Text, ui::BAD);
+    ImGui::TextWrapped("%s", notice.text.c_str());
+    if (error) ImGui::PopStyleColor();
+    if (!notice.detail.empty() && ImGui::BeginItemTooltip()) {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 36.0f);
+        ImGui::TextUnformatted(notice.detail.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+    const char* topic = noticeTopic(notice);
+    if (notice.fixes.empty() && !topic) return nullptr;
+    // The fixes under the text, from where it starts.
+    return drawFixLine(notice, id, topic, text_x);
+}
+
+const Fix* drawFixes(const Notice& notice, const char* id) {
+    const char* topic = noticeTopic(notice);
+    if (notice.fixes.empty() && !topic) return nullptr;
+    return drawFixLine(notice, id, topic, ImGui::GetCursorPosX());
 }
 
 bool drawNotices(const std::vector<Notice>& notices, const char* id, Fix& clicked) {

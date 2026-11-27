@@ -47,28 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Use the main Ubuntu archive
-        # The runners' Azure mirror can stay unresolvable for hours; the main archive does not depend on it.
-        run: |
-          sudo sed -i -e 's#mirror+file:/etc/apt/apt-mirrors.txt#http://archive.ubuntu.com/ubuntu/#' \
-            -e 's#http://azure.archive.ubuntu.com/ubuntu/*#http://archive.ubuntu.com/ubuntu/#' \
-            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
-          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
-          # The runner's resolver can fail on Ubuntu's hosts alone: public resolvers then.
-          if ! getent hosts archive.ubuntu.com > /dev/null; then
-            sudo mkdir -p /etc/systemd/resolved.conf.d
-            printf '[Resolve]\nDNS=1.1.1.1 8.8.8.8\n' | sudo tee /etc/systemd/resolved.conf.d/fallback.conf
-            sudo systemctl restart systemd-resolved
-            getent hosts archive.ubuntu.com || true
-          fi
-
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build ccache g++-15 \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
-            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev \
-            libdrm-dev libgbm-dev libdbus-1-dev libudev-dev libpipewire-0.3-dev libpulse-dev libasound2-dev
+        uses: ./.github/actions/linux-deps
+        with:
+          compiler: g++-15
 
       - name: Vulkan
         # The assistant's GPU backend, for a release and on demand: its shaders take minutes that no cache keeps.
@@ -178,31 +160,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Use the main Ubuntu archive
-        # The runners' Azure mirror can stay unresolvable for hours; the main archive does not depend on it.
-        run: |
-          sudo sed -i -e 's#mirror+file:/etc/apt/apt-mirrors.txt#http://archive.ubuntu.com/ubuntu/#' \
-            -e 's#http://azure.archive.ubuntu.com/ubuntu/*#http://archive.ubuntu.com/ubuntu/#' \
-            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
-          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
-          # The runner's resolver can fail on Ubuntu's hosts alone: public resolvers then.
-          if ! getent hosts archive.ubuntu.com > /dev/null; then
-            sudo mkdir -p /etc/systemd/resolved.conf.d
-            printf '[Resolve]\nDNS=1.1.1.1 8.8.8.8\n' | sudo tee /etc/systemd/resolved.conf.d/fallback.conf
-            sudo systemctl restart systemd-resolved
-            getent hosts archive.ubuntu.com || true
-          fi
-
       - name: Install dependencies
         # clang 23 from LLVM's archive, as for the fuzzers: everything instrumented compiles in a third of gcc's time.
-        run: |
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
-          echo "deb https://apt.llvm.org/resolute/ llvm-toolchain-resolute-23 main" | sudo tee /etc/apt/sources.list.d/llvm-23.list
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build ccache clang-23 libclang-rt-23-dev \
-            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
-            libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl1-mesa-dev libgl1-mesa-dev \
-            libdrm-dev libgbm-dev libdbus-1-dev libudev-dev libpipewire-0.3-dev libpulse-dev libasound2-dev
+        uses: ./.github/actions/linux-deps
+        with:
+          compiler: clang-23
 
       - name: Address space randomisation AddressSanitizer works with
         # The runner's kernel randomises more address bits than the sanitizers' shadow memory allows.
@@ -277,25 +239,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Use the main Ubuntu archive
-        # The runners' Azure mirror can stay unresolvable for hours; the main archive does not depend on it.
-        run: |
-          sudo sed -i -e 's#mirror+file:/etc/apt/apt-mirrors.txt#http://archive.ubuntu.com/ubuntu/#' \
-            -e 's#http://azure.archive.ubuntu.com/ubuntu/*#http://archive.ubuntu.com/ubuntu/#' \
-            /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
-          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
-          # The runner's resolver can fail on Ubuntu's hosts alone: public resolvers then.
-          if ! getent hosts archive.ubuntu.com > /dev/null; then
-            sudo mkdir -p /etc/systemd/resolved.conf.d
-            printf '[Resolve]\nDNS=1.1.1.1 8.8.8.8\n' | sudo tee /etc/systemd/resolved.conf.d/fallback.conf
-            sudo systemctl restart systemd-resolved
-            getent hosts archive.ubuntu.com || true
-          fi
-
       - name: Install mingw-w64
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ninja-build ccache mingw-w64
+        uses: ./.github/actions/linux-deps
+        with:
+          compiler: mingw-w64
+          gui-headers: false
 
       - name: glslc
         # The assistant's GPU backend, for a release and on demand: its shaders, compiled by the host's glslc, take

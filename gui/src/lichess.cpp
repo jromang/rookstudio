@@ -10,6 +10,7 @@
 
 #include "console.hpp"
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -68,6 +69,10 @@ std::string LichessGame::pgn(std::size_t annotate_from) const {
         white = !white;
     }
     return out + result + "\n\n";
+}
+
+LichessTarget readLichessTarget(const std::filesystem::path& dir) {
+    return readProfileEntries<LichessTarget>(dir / "lichess.json");
 }
 
 LichessGame lichessLiveGame(const LiveGame& g, const std::string& event, int white_elo, int black_elo, bool frc) {
@@ -287,13 +292,7 @@ bool LichessRelay::Session::newRound() {
 
 bool LichessRelay::Session::prepare() {
     // A round given by its URL or id; otherwise the one made earlier for this tournament, or a new broadcast.
-    if (auto saved = readJson<nlohmann::json>(settings_.dir / "lichess.json")) {
-        try {
-            target_ = saved->get<LichessTarget>();
-        } catch (...) {
-            target_ = {};
-        }
-    }
+    target_ = readLichessTarget(settings_.dir);
     if (!settings_.round.empty()) {
         const auto id = lichessRoundId(settings_.round);
         if (!id) {

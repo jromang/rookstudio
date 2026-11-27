@@ -26,6 +26,7 @@
 #include "notation_view.hpp"
 #include "portable.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -1024,7 +1025,8 @@ void App::drawBoardTree() {
             ImGui::PushID(static_cast<int>(r));
             // A CTG book's move not to play in a tournament: in the list, greyed (M10, board 3).
             const bool greyed = row.book < 0;
-            if (greyed) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ui::StyleColor greyed_text;
+            if (greyed) greyed_text.push(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
             // The move, the whole row a target: a click plays it, the mouse over it shows it as an arrow.
             ImGui::TableSetColumnIndex(1);
             if (ImGui::Selectable(row.san.c_str(), tree_row_ == static_cast<int>(r),
@@ -1077,7 +1079,6 @@ void App::drawBoardTree() {
                     ImGui::TableSetColumnIndex(columns - 1);
                     drawTreeTheoryCell(row.san);
                 }
-                if (greyed) ImGui::PopStyleColor();
                 continue;
             }
             ImGui::TextUnformatted(ui::exactCount(row.games).c_str());
@@ -1120,7 +1121,6 @@ void App::drawBoardTree() {
                 ImGui::TableNextColumn();
                 drawTreeTheoryCell(row.san);
             }
-            if (greyed) ImGui::PopStyleColor();
         }
         ImGui::EndTable();
     }

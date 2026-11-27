@@ -24,6 +24,7 @@
 #include "i18n.hpp"
 #include "review_bridge.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -230,7 +231,7 @@ void App::drawBoardExplained() {
         live = *explain_job_->made;
     }
     const Explained* e = live ? &*live : explained_ ? &*explained_ : nullptr;
-    ImGui::PushTextWrapPos();
+    const ui::TextWrap wrap;
     const auto review = boardCommentaryReview();
     if (!e) {
         ImGui::TextUnformatted(
@@ -245,7 +246,6 @@ void App::drawBoardExplained() {
                                          "first (Alt+G)."));
         if (!explain_after_review_ && ui::iconButton("explain_every_move", ui::Icon::Comment, TR("Explain every move")))
             explainEveryMove();
-        ImGui::PopTextWrapPos();
         return;
     }
 
@@ -367,7 +367,6 @@ void App::drawBoardExplained() {
     ImGui::EndDisabled();
     ImGui::TextDisabled("%s", TR("Kept with the review, beside the moves; “Write them into the game” makes them the "
                                  "assistant's comments, which Ctrl+Z takes back."));
-    ImGui::PopTextWrapPos();
 }
 
 }  // namespace fcg

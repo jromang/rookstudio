@@ -1266,14 +1266,15 @@ void App::drawReportKeyGames() {
         return;
     }
     const auto& novelties = r.report->novelties.moves;
+    std::optional<std::size_t> opened;  // the game opened, once its card is ended
     for (std::size_t i = 0; i < r.report->key_games.size(); ++i) {
         const auto& k = r.report->key_games[i];
         if (k.game.source >= r.bases.size()) continue;
         const auto& snap = *r.bases[k.game.source].snapshot;
         const auto row   = snap.row(k.game.id);
         const auto ids   = snap.rowIds(k.game.id);
-        ImGui::PushID(static_cast<int>(i));
-        ui::beginCard("report_key");
+        const ui::Id key_id(static_cast<int>(i));
+        const ui::Card card("report_key");
         const char* open = TR("Open");
         const float w    = ImGui::CalcTextSize(open).x + ImGui::GetStyle().FramePadding.x * 2;
         ImGui::BeginGroup();
@@ -1329,15 +1330,12 @@ void App::drawReportKeyGames() {
         ImGui::EndGroup();
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(8), ImGui::GetContentRegionMax().x - w));
         if (ImGui::Button(open)) {
-            ui::endCard();
-            ImGui::PopID();
-            openReportGame(k.game);
-            return;
+            opened = i;
+            break;
         }
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("On the Board page, at this position"));
-        ui::endCard();
-        ImGui::PopID();
     }
+    if (opened) openReportGame(r.report->key_games[*opened].game);
 }
 
 void App::drawReportNovelties() {

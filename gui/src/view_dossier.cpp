@@ -482,22 +482,25 @@ void App::drawDossier() {
             }
             ImGui::OpenPopup("##dossier_in_list");
         }
-        if (ImGui::BeginPopup("##dossier_in_list")) {
+        std::optional<std::size_t> chosen;  // the database whose games go to the list, once the popup is ended
+        if (const ui::Popup popup("##dossier_in_list"); popup) {
             for (std::size_t s = 0; s < r->board.sources.size() && s < d.folders.size(); ++s) {
                 const auto n = r->board.sources[s].games;
                 if (n == 0) continue;
                 if (ImGui::Selectable(fmt::format("{} · {}##in{}", d.folders[s].second,
                                                   trn("{} game", "{} games", n, ui::exactCount(n)), s)
                                           .c_str())) {
-                    std::vector<study::GameId> ids;
-                    for (const auto& g : r->dossier->games)
-                        if (g.source == s) ids.push_back(g.id);
-                    ImGui::EndPopup();
-                    dossierInList(s, std::move(ids), trf("the games of {}", d.subject.name));
-                    return;
+                    chosen = s;
+                    break;
                 }
             }
-            ImGui::EndPopup();
+        }
+        if (chosen) {
+            std::vector<study::GameId> ids;
+            for (const auto& g : r->dossier->games)
+                if (g.source == *chosen) ids.push_back(g.id);
+            dossierInList(*chosen, std::move(ids), trf("the games of {}", d.subject.name));
+            return;
         }
     }
 
@@ -1012,8 +1015,8 @@ void App::drawDossierOpenings() {
 }
 
 void App::drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how) {
-    ui::beginCard("dossier_gaps");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("dossier_gaps");
+    const ui::TextWrap wrap;
     if (repertoires().entries().empty()) {
         ImGui::TextUnformatted(TR("Your repertoires against them"));
         ImGui::TextDisabled("%s", TR("No repertoire yet: the Tree tab's stars make one, measured on the Openings "
@@ -1033,8 +1036,6 @@ void App::drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how) 
             if (!g.gap.move.empty()) line.push_back(g.gap.move);
             if (ImGui::SmallButton(fmt::format("{}##dossier_gap{}", movesText(line), i).c_str())) {
                 openDossierLine(line, !g.white);
-                ImGui::PopTextWrapPos();
-                ui::endCard();
                 return;
             }
             ImGui::SameLine();
@@ -1044,8 +1045,6 @@ void App::drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how) 
         }
     }
     ImGui::TextDisabled("%s", how);
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::drawDossierRating() {

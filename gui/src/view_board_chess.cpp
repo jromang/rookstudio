@@ -19,6 +19,7 @@
 #include "notation_view.hpp"
 #include "piece_letters.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -93,46 +94,47 @@ void App::drawNewMoveQuestion() {
         ImGui::OpenPopup(kId);
         ImGui::SetNextWindowPos(new_move_at_, ImGuiCond_Appearing);
     }
-    if (!ImGui::BeginPopup(kId)) {  // a click elsewhere: the move is not played
-        new_move_.reset();
-        return;
-    }
-    const auto& b    = board_;
-    const auto board = boardAt(b.game, b.chess960, b.ply);
-    const auto san   = localSan(chess::uci::moveToSan(board, *new_move_));
     std::optional<NewMove> as;
-    ImGui::TextDisabled("%s", trf("{}: the game went another way here", san).c_str());
-    struct Choice {
-        NewMove as;
-        const char* label;
-        const char* key;
-        ImGuiKey imgui_key;
-    };
-    static constexpr Choice choices[] = {{NewMove::Variation, N_("A variation"), "V", ImGuiKey_V},
-                                         {NewMove::MainLine, N_("A new main line"), "M", ImGuiKey_M},
-                                         {NewMove::Replace, N_("Replace the moves after"), "R", ImGuiKey_R}};
-    for (const auto& c : choices) {
-        if (ImGui::Selectable(TR(c.label), c.as == NewMove::Variation, 0, ImVec2(px(240), 0))) as = c.as;
-        ImGui::SameLine(px(250));
-        ImGui::TextDisabled("%s", c.key);
-        if (ImGui::IsKeyPressed(c.imgui_key, false)) as = c.as;
+    chess::Move move;
+    {
+        const ui::Popup popup(kId);
+        if (!popup) {  // a click elsewhere: the move is not played
+            new_move_.reset();
+            return;
+        }
+        const auto& b    = board_;
+        const auto board = boardAt(b.game, b.chess960, b.ply);
+        const auto san   = localSan(chess::uci::moveToSan(board, *new_move_));
+        ImGui::TextDisabled("%s", trf("{}: the game went another way here", san).c_str());
+        struct Choice {
+            NewMove as;
+            const char* label;
+            const char* key;
+            ImGuiKey imgui_key;
+        };
+        static constexpr Choice choices[] = {{NewMove::Variation, N_("A variation"), "V", ImGuiKey_V},
+                                             {NewMove::MainLine, N_("A new main line"), "M", ImGuiKey_M},
+                                             {NewMove::Replace, N_("Replace the moves after"), "R", ImGuiKey_R}};
+        for (const auto& c : choices) {
+            if (ImGui::Selectable(TR(c.label), c.as == NewMove::Variation, 0, ImVec2(px(240), 0))) as = c.as;
+            ImGui::SameLine(px(250));
+            ImGui::TextDisabled("%s", c.key);
+            if (ImGui::IsKeyPressed(c.imgui_key, false)) as = c.as;
+        }
+        ImGui::TextDisabled("%s", TR("Enter: a variation · Esc: not played"));
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
+            as = NewMove::Variation;
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            new_move_.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        if (as) {
+            move = *new_move_;
+            new_move_.reset();
+            ImGui::CloseCurrentPopup();
+        }
     }
-    ImGui::TextDisabled("%s", TR("Enter: a variation · Esc: not played"));
-    if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-        as = NewMove::Variation;
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
-        new_move_.reset();
-        ImGui::CloseCurrentPopup();
-    }
-    if (as) {
-        const auto move = *new_move_;
-        new_move_.reset();
-        ImGui::CloseCurrentPopup();
-        ImGui::EndPopup();
-        boardPlayAs(move, *as);
-        return;
-    }
-    ImGui::EndPopup();
+    if (as) boardPlayAs(move, *as);  // once the popup is ended
 }
 
 namespace {

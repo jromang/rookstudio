@@ -533,6 +533,7 @@ class App::ModulesContext final : public AppContext {
     // The user's names.
     std::vector<std::string> userNames() const override { return app_.userNames(); }
     void drawPlayerNames(const char* id) override { app_.drawPlayerNames(id); }
+    void showNamesSettings() override { app_.page_ = Page::Settings; }
 
     // The Board page's analysis.
     const EngineEntry* analysisEngine() override { return app_.analysisEngine(); }
@@ -671,6 +672,41 @@ class App::ModulesContext final : public AppContext {
     void sayOnBoard(const std::string& text) override {
         app_.board_.message       = text;
         app_.board_.message_error = true;
+    }
+
+    // The views and the pages offered once.
+    bool hasViews() const override { return !app_.views_.empty(); }
+    std::string viewName() const override { return app_.views_.empty() ? std::string() : app_.view().name; }
+    bool viewHolds(views::PageId page) const override { return !app_.views_.empty() && app_.view().holds(page); }
+    bool viewsHold(views::PageId page) const override {
+        return std::any_of(app_.views_.begin(), app_.views_.end(), [&](const auto& v) { return v.holds(page); });
+    }
+    void addToView(views::PageId page, const std::vector<views::PageId>& after,
+                   const std::vector<views::PageId>& before) override {
+        if (app_.views_.empty()) return;
+        auto& view  = app_.views_[static_cast<std::size_t>(app_.view_)];
+        auto& pages = view.pages;
+        auto at     = pages.end();
+        for (const auto p : after)
+            if (at == pages.end()) at = std::find(pages.begin(), pages.end(), p);
+        if (at != pages.end()) {
+            ++at;
+        } else {
+            for (const auto p : before)
+                if (at == pages.end()) at = std::find(pages.begin(), pages.end(), p);
+        }
+        pages.insert(at, page);
+        views::tidy(view);
+        app_.saveViews();
+    }
+    std::vector<std::string> pagesOffered() const override { return app_.storage_.pagesOffered(); }
+    void setPagesOffered(const std::vector<std::string>& pages) override { app_.storage_.setPagesOffered(pages); }
+
+    // The Training page among the program's pages.
+    void toTrainingPage() override { app_.page_ = Page::Training; }
+    bool trainingPageShown() const override { return app_.page_ == Page::Training; }
+    bool boardGamePlayed() const override {
+        return (app_.board_.match && app_.board_.match_state.running) || app_.engineGameRunning();
     }
 
    private:

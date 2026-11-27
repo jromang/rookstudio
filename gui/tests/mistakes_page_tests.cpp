@@ -146,6 +146,7 @@ class FakeApp final : public MistakesContext {
     bool liveGameOn() const override { return live_game; }
     std::vector<std::string> userNames() const override { return names; }
     void drawPlayerNames(const char* id) override { names_drawn.emplace_back(id); }
+    void showNamesSettings() override { ++names_settings; }
 
     // The engines: the analysis's, the library's by name; the reviews in the background.
     const EngineEntry* analysisEngine() override { return engines.empty() ? nullptr : &engines.front(); }
@@ -192,7 +193,7 @@ class FakeApp final : public MistakesContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1, review_stopped = 0;
+    int training_part = -1, review_stopped = 0, names_settings = 0;
     bool training_shown = false, enter_puzzles = true, live_game = false;
     std::vector<ReviewKind> reviewed_only;
     std::vector<std::string> names{"Tester"};

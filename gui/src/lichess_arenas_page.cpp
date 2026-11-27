@@ -31,7 +31,6 @@
 #include "databases.hpp"
 #include "guide.hpp"
 #include "home.hpp"
-#include "https.hpp"
 #include "i18n.hpp"
 #include "jobs.hpp"
 #include "lichess_account.hpp"
@@ -62,13 +61,6 @@ std::string lower(std::string_view text) {
 int64_t nowMillis() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
-}
-
-// The host Lichess's requests go to, as the HostGate names it: its pause after a 429.
-std::string apiHost() {
-    std::string_view url = lichess::servers().api;
-    if (const auto scheme = url.find("://"); scheme != std::string_view::npos) url.remove_prefix(scheme + 3);
-    return std::string(url.substr(0, url.find_first_of(":/")));
 }
 
 void tip(const std::string& text) {
@@ -328,36 +320,30 @@ void LichessArenasPage::poll() {
     const auto token    = account ? account->token : std::string();
     const bool linked   = account != nullptr;
     // After a 429: until the host's pause is over.
-    const auto pause = [&](const lichess::Failure& f) {
-        return f.net == lichess::NetError::RateLimited ? now + HostGate::instance().pausedFor(apiHost()) : now;
-    };
+    const auto pause_end = [&] { return now + lichess::apiPause(); };
 
     // The permission to read the user's teams granted: its question goes (#45's card).
     if (app_.scopeAsked() == lichess::SCOPE_TEAM_READ && linked && !app_.lichessLinking() &&
         account->has(lichess::SCOPE_TEAM_READ))
         app_.dropScopeAsk();
-    // The card's list: asked when it shows (or the Play page's part), again after a minute.
-    if (ready(arena_card_.job)) {
-        auto a = arena_card_.job.get();
-        if (a.value || !arena_card_.list.value)
-            arena_card_.list = std::move(a);
-        else  // the list of before stays, the failure said
-            static_cast<lichess::Failure&>(arena_card_.list) = a;
-    }
-    const bool card_shown = frame - arena_card_.drawn < 3;
-    if (card_shown && !arena_card_.job.valid() &&
-        (arena_card_.asked.time_since_epoch().count() == 0 || now - arena_card_.asked >= 60s)) {
-        arena_card_.asked = now;
-        arena_card_.job   = std::async(std::launch::async, [] { return lichess::arenaList(); });
-    }
+    // The card's list: asked when it shows (or the Play page's part), again after a minute; the list of before stays
+    // when a refresh fails, the failure said.
+    arena_card_.list.poll();
+    const bool card_shown = drawnLately(arena_card_.drawn, frame);
+    if (card_shown && arena_card_.list.due())
+        arena_card_.list.ask([](const TaskState<>& state) { return lichess::arenaList(&state.cancel); });
     // The user's teams' Swiss tournaments, with team:read: their teams, then each one's, every five minutes.
     if (ready(arena_card_.swiss_job)) {
         auto [swisses, teams] = arena_card_.swiss_job.get();
         arena_card_.swisses   = std::move(swisses);
         arena_card_.teams     = teams;
     }
-    if (card_shown && linked && account->has(lichess::SCOPE_TEAM_READ) && !arena_card_.swiss_job.valid() &&
-        (arena_card_.swiss_token != token || now - arena_card_.swiss_asked >= 5min)) {
+    if (lichess::teamSwissesDue({.shown     = card_shown,
+                                 .readable  = linked && account->has(lichess::SCOPE_TEAM_READ),
+                                 .new_token = arena_card_.swiss_token != token,
+                                 .asking    = arena_card_.swiss_job.valid(),
+                                 .asked     = arena_card_.swiss_asked},
+                                now)) {
         arena_card_.swiss_asked = now;
         arena_card_.swiss_token = token;
         arena_card_.swiss_job   = std::async(std::launch::async, [token, name = account->username] {
@@ -394,10 +380,10 @@ void LichessArenasPage::poll() {
     if (tour_follow_) {
         auto& f          = *tour_follow_;
         const bool shown = followedShown();
-        const bool drawn = shown && frame - app_.mosaicDrawn() < 3;
+        const bool drawn = shown && drawnLately(app_.mosaicDrawn(), frame);
         if (ready(f.arena_job)) {
             auto a = f.arena_job.get();
-            if (a.net == lichess::NetError::RateLimited) f.waits_until = pause(a);
+            if (a.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
             if (a.value) {
                 f.arena = std::move(a);
                 if (f.name.empty()) f.name = f.arena.value->info.name;
@@ -407,8 +393,8 @@ void LichessArenasPage::poll() {
         }
         if (ready(f.swiss_job)) {
             auto [info, rows] = f.swiss_job.get();
-            if (info.net == lichess::NetError::RateLimited) f.waits_until = pause(info);
-            if (rows.net == lichess::NetError::RateLimited) f.waits_until = pause(rows);
+            if (info.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
+            if (rows.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
             if (info.value) {
                 if (rows.value) {
                     f.swiss_rows = std::move(rows);
@@ -421,15 +407,17 @@ void LichessArenasPage::poll() {
             }
         }
         // Its standing every 15 s while the mosaic shows; a Swiss's every 30 s (its standing after each round).
-        const auto every = f.swiss ? 30s : lichess::STANDING_EVERY;
-        if (drawn && now >= f.waits_until && !f.arena_job.valid() && !f.swiss_job.valid() &&
-            (f.asked.time_since_epoch().count() == 0 || now - f.asked >= every)) {
+        if (lichess::standingDue({.drawn       = drawn,
+                                  .swiss       = f.swiss,
+                                  .asking      = f.arena_job.valid() || f.swiss_job.valid(),
+                                  .asked       = f.asked,
+                                  .waits_until = f.waits_until},
+                                 now)) {
             f.asked = now;
             if (f.swiss) {
-                const bool rows_due = !f.swiss_rows.value || !f.swiss_info.value ||
-                                      f.swiss_info.value->round != f.rows_round ||
-                                      f.swiss_info.value->state == lichess::TourState::Finished;
-                f.swiss_job         = std::async(std::launch::async, [id = f.id, token, rows_due] {
+                const bool rows_due = lichess::swissRowsDue(
+                    f.swiss_rows.value.has_value(), f.swiss_info.value ? &*f.swiss_info.value : nullptr, f.rows_round);
+                f.swiss_job = std::async(std::launch::async, [id = f.id, token, rows_due] {
                     auto info = lichess::swissOf(id, token);
                     lichess::Answer<std::vector<lichess::SwissRow>> rows;
                     if (info.value && rows_due) rows = lichess::swissResults(id);
@@ -454,7 +442,7 @@ void LichessArenasPage::poll() {
                                      : f.arena.value && f.arena.value->info.state == lichess::TourState::Started;
         if (ready(f.status_job)) {
             auto a = f.status_job.get();
-            if (a.net == lichess::NetError::RateLimited) f.waits_until = pause(a);
+            if (a.net == lichess::NetError::RateLimited) f.waits_until = pause_end();
             if (a.value) {
                 f.status_error = {};
                 // Their games, in the standing's order: never one of the user's own.
@@ -482,9 +470,16 @@ void LichessArenasPage::poll() {
         }
         const bool some_over =
             std::any_of(f.places.begin(), f.places.end(), [&](const auto& id) { return f.over.count(id) > 0; });
-        if (shown && playing && !top.empty() && !f.status_job.valid() && now >= f.waits_until &&
-            (top != f.top || f.status_asked.time_since_epoch().count() == 0 ||
-             (now - f.status_asked >= lichess::STANDING_EVERY && (some_over || f.places.size() < top.size())))) {
+        if (lichess::statusesDue({.shown       = shown,
+                                  .playing     = playing,
+                                  .top         = top.size(),
+                                  .top_changed = top != f.top,
+                                  .some_over   = some_over,
+                                  .places      = f.places.size(),
+                                  .asking      = f.status_job.valid(),
+                                  .asked       = f.status_asked,
+                                  .waits_until = f.waits_until},
+                                 now)) {
             f.top          = top;
             f.status_asked = now;
             f.status_job   = std::async(std::launch::async, [top] { return lichess::playerStatuses(top); });
@@ -521,7 +516,7 @@ void LichessArenasPage::poll() {
         auto& a = *arena_play_;
         if (ready(a.job)) {
             auto [state, me] = a.job.get();
-            if (state.net == lichess::NetError::RateLimited) a.waits_until = pause(state);
+            if (state.net == lichess::NetError::RateLimited) a.waits_until = pause_end();
             if (state.value) {
                 const bool fire_before = a.me && a.me->fire;
                 // It starts: joined again at once, Lichess pairing then the players present.
@@ -551,8 +546,12 @@ void LichessArenasPage::poll() {
         // Its page every 15 s while the user is in it or looks at it; their own page when they are not in the first
         // ten.
         const bool looked = app_.playTournamentsShown() || a.seat.in() || app_.homeShown();
-        if (looked && now >= a.waits_until && !a.job.valid() && !a.seat.isOver() &&
-            (a.asked.time_since_epoch().count() == 0 || now - a.asked >= lichess::STANDING_EVERY)) {
+        if (lichess::arenaPageDue({.looked      = looked,
+                                   .over        = a.seat.isOver(),
+                                   .asking      = a.job.valid(),
+                                   .asked       = a.asked,
+                                   .waits_until = a.waits_until},
+                                  now)) {
             a.asked = now;
             a.job =
                 std::async(std::launch::async, [id = a.id, token, name = linked ? account->username : std::string()] {
@@ -578,7 +577,7 @@ void LichessArenasPage::poll() {
                 a.asked = {};  // its page asked again at once: the user's rank
             } else {
                 a.error = r;
-                if (r.net == lichess::NetError::RateLimited) a.waits_until = pause(r);
+                if (r.net == lichess::NetError::RateLimited) a.waits_until = pause_end();
                 if (!a.quiet_join) a.seat.pause();
             }
         }
@@ -616,7 +615,7 @@ void LichessArenasPage::poll() {
             if (lichess::lostAtStart(s, og.white)) a.last_result = "nostart";
             a.asked = {};  // the sheet asked again at once
         }
-        if (a.seat.due(now) && !a.join_job.valid() && linked && now >= a.waits_until) joinArenaHere(true);
+        if (lichess::rejoinDue(a.seat, linked, a.join_job.valid(), a.waits_until, now)) joinArenaHere(true);
         if (a.join_pending && linked && !app_.lichessLinking() && account->has(lichess::SCOPE_TOURNAMENT_WRITE)) {
             a.join_pending = false;
             joinArenaHere();
@@ -646,12 +645,17 @@ void LichessArenasPage::poll() {
             }
         }
         const bool looked = app_.playTournamentsShown() || s.joined;
-        const auto every = s.joined || (s.info.value && s.info.value->state == lichess::TourState::Started) ? 20s : 60s;
-        if (looked && !s.job.valid() && (s.asked.time_since_epoch().count() == 0 || now - s.asked >= every) &&
-            !(s.info.value && s.info.value->state == lichess::TourState::Finished && s.rows.value && s.trf)) {
+        if (lichess::swissPageDue({.looked   = looked,
+                                   .joined   = s.joined,
+                                   .started  = s.info.value && s.info.value->state == lichess::TourState::Started,
+                                   .complete = s.info.value && s.info.value->state == lichess::TourState::Finished &&
+                                               s.rows.value && s.trf,
+                                   .asking   = s.job.valid(),
+                                   .asked    = s.asked},
+                                  now)) {
             s.asked             = now;
-            const bool rows_due = !s.rows.value || !s.info.value || s.info.value->round != s.rows_round ||
-                                  s.info.value->state == lichess::TourState::Finished;
+            const bool rows_due =
+                lichess::swissRowsDue(s.rows.value.has_value(), s.info.value ? &*s.info.value : nullptr, s.rows_round);
             s.job               = std::async(std::launch::async, [id = s.id, token, rows_due] {
                 auto info = lichess::swissOf(id, token);
                 lichess::Answer<std::vector<lichess::SwissRow>> rows;

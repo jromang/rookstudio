@@ -149,8 +149,7 @@ void App::pollLichessPlaying() {
     if (listening || lichess_playing_job_.valid()) return;
     const auto now   = std::chrono::steady_clock::now();
     const auto since = now - lichess_playing_asked_;
-    const bool due   = lichess_playing_asked_.time_since_epoch().count() == 0 ||
-                       (shown && since > std::chrono::seconds(20)) ||
+    const bool due   = never(lichess_playing_asked_) || (shown && since > std::chrono::seconds(20)) ||
                        (liveGameOn() && since > std::chrono::seconds(30)) ||
                        (!lichess_playing_.empty() && since > std::chrono::minutes(10));
     if (!due) return;
@@ -290,7 +289,7 @@ void App::drawFairPlayBanner(bool whole_game) {
 void App::drawPlayingGames() {
     // The Home page just showed: the games looked at again, if that was a while ago.
     const int frame = ImGui::GetFrameCount();
-    if (frame - lichess_playing_home_frame_ > 2) lichess_playing_ask_now_ = true;
+    if (!drawnLately(lichess_playing_home_frame_, frame)) lichess_playing_ask_now_ = true;
     lichess_playing_home_frame_ = frame;
     if (lichess_playing_.empty()) return;
     const ui::TopicRegion topic(guide::topics::FairPlay);
@@ -304,7 +303,7 @@ void App::drawPlayingGames() {
     const auto& style = ImGui::GetStyle();
     for (const auto* p : games) {
         const auto& g = *p;
-        ImGui::PushID(g.id.c_str());
+        const ui::Id id(g.id.c_str());
         chip(g.live()    ? TR("Live game")
              : g.my_turn ? TR("Your turn")
                          : TR("Their turn"),
@@ -339,7 +338,6 @@ void App::drawPlayingGames() {
             else
                 SDL_OpenURL(fmt::format("https://lichess.org/{}", g.full_id).c_str());
         }
-        ImGui::PopID();
     }
     ImGui::Dummy(ImVec2(0, px(4)));
 }

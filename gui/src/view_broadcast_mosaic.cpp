@@ -176,7 +176,7 @@ void App::pollBroadcastBoards() {
             broadcast_selected_ = broadcast_boards_[0].url;
     }
     // Their engines: one each for the games still played, while the mosaic shows (its engine and threads a game).
-    const bool shown        = ImGui::GetFrameCount() - broadcast_drawn_ < 3;
+    const bool shown        = drawnLately(broadcast_drawn_, ImGui::GetFrameCount());
     const EngineEntry* with = nullptr;
     for (const auto& e : engines_)
         if (e.name == lichess_.broadcast_engine) with = &e;
@@ -412,7 +412,7 @@ void App::pollBroadcastStandings() {
     const FollowedRound* round = nullptr;
     for (const auto& f : followed_rounds_)
         if (f.key() == broadcast_round_) round = &f;
-    const bool shown = round && !round->entry.tour.id.empty() && ImGui::GetFrameCount() - broadcast_drawn_ < 3;
+    const bool shown = round && !round->entry.tour.id.empty() && drawnLately(broadcast_drawn_, ImGui::GetFrameCount());
     if (!shown || s.job.valid()) return;
     const auto now = std::chrono::steady_clock::now();
     if (s.tour == round->entry.tour.id && now - s.asked < 2min) return;

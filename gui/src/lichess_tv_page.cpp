@@ -24,6 +24,7 @@
 #include "lichess_players.hpp"
 #include "lichess_settings.hpp"
 #include "pgn_store.hpp"
+#include "refreshing.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -262,9 +263,8 @@ void LichessTvPage::poll() {
             if (!tv_rows_.failed()) tv_rows_.net = lichess::NetError::Offline;  // nothing, and no word why
         }
     }
-    const bool card_shown = app_.frame() - tv_card_drawn_ < 3;
-    if (card_shown && !tv_rows_job_.valid() &&
-        (tv_rows_asked_.time_since_epoch().count() == 0 || now - tv_rows_asked_ >= 30s)) {
+    const bool card_shown = drawnLately(tv_card_drawn_, app_.frame());
+    if (card_shown && !tv_rows_job_.valid() && dueAfter(tv_rows_asked_, 30s, now)) {
         tv_rows_asked_ = now;
         tv_rows_job_   = std::async(std::launch::async, [] { return lichess::tvRows(); });
     }

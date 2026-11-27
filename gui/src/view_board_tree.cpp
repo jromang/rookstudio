@@ -23,6 +23,7 @@
 #include "board_text.hpp"
 #include "console.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "notation_view.hpp"
 #include "portable.hpp"
 #include "ui.hpp"
@@ -446,7 +447,8 @@ void App::drawBoardStrip() {
         return ImGui::CalcTextSize(s, nullptr, true).x + style.FramePadding.x * 2;
     };
     const float gap    = px(10);
-    const float keys_w = px(4) + ImGui::CalcTextSize("Ctrl+Tab").x + px(4) + ImGui::CalcTextSize("Ctrl+S").x;
+    const float keys_w = px(4) + ImGui::CalcTextSize("Ctrl+Tab").x + px(4) +
+                         ImGui::CalcTextSize(keyboard::name(keyboard::SAVE).c_str()).x;
     const float bare =
         button(recent) + gap + (status.empty() ? 0 : ImGui::CalcTextSize(status.c_str()).x + gap) + button(save);
     const float right = ImGui::GetContentRegionMax().x;
@@ -483,7 +485,7 @@ void App::drawBoardStrip() {
                       : TR("Into a database, its PGN file or another: a menu · Ctrl+S"));
     if (show_keys) {
         ImGui::SameLine(0, px(4));
-        ImGui::TextDisabled("Ctrl+S");
+        ImGui::TextDisabled("%s", keyboard::name(keyboard::SAVE).c_str());
     }
     if (ImGui::IsPopupOpen("##recent_popup")) ImGui::SetNextWindowPos(under, ImGuiCond_Appearing, ImVec2(1, 0));
     drawRecentPopup();
@@ -959,16 +961,14 @@ void App::drawBoardTree() {
     // The keys (M3): Up and Down choose a move, Enter plays it, * stars it in the active repertoire.
     std::optional<chess::Move> play, hovered;
     const auto& io  = ImGui::GetIO();
-    const bool keys = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
-                      !io.KeyAlt && !tree_rows_.empty();
+    const bool keys = keyboard::plain() && !tree_rows_.empty();
     if (keys) {
         const int last = static_cast<int>(tree_rows_.size()) - 1;
         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) tree_row_ = std::min(tree_row_ + 1, last), tree_scroll_ = true;
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) tree_row_ = std::max(tree_row_ - 1, -1), tree_scroll_ = true;
         if (tree_row_ > last) tree_row_ = last;
         if (tree_row_ >= 0) {
-            if (!linkCardTakesKeys() &&
-                (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
+            if (!linkCardTakesKeys() && keyboard::enterPressed())
                 play = tree_rows_[static_cast<std::size_t>(tree_row_)].move;
             for (const auto c : io.InputQueueCharacters)
                 if (c == '*' && path) star = tree_rows_[static_cast<std::size_t>(tree_row_)].move;

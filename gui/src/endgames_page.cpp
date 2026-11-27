@@ -33,6 +33,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "jobs.hpp"
+#include "keyboard.hpp"
 #include "lichess_settings.hpp"
 #include "machines.hpp"
 #include "mistakes.hpp"
@@ -78,10 +79,7 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-bool enterPressed() {
-    return !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-           (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
-}
+bool enterPressed() { return keyboard::available() && keyboard::enterPressed(); }
 
 // "win", "mate", "hold the draw": what a task asks.
 const char* goalText(const EndgameTask& t) {
@@ -350,7 +348,7 @@ void EndgamesPage::drawEndgameCatalogue(bool& enter) {
     const auto lock   = endgameLock();
     endgame_selected_ = std::clamp(endgame_selected_, 0, static_cast<int>(all.size()) - 1);
     // The arrows move over the endgames once one was clicked; Enter plays the one chosen.
-    if (endgame_keys_ && !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
+    if (endgame_keys_ && keyboard::available()) {
         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
             endgame_selected_ = std::min(endgame_selected_ + 1, static_cast<int>(all.size()) - 1);
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) endgame_selected_ = std::max(endgame_selected_ - 1, 0);
@@ -1138,14 +1136,13 @@ void EndgamesPage::dropEndgame() {
 void EndgamesPage::endgameKeys() {
     auto& r        = *endgame_;
     const auto& io = ImGui::GetIO();
-    if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+    if (!keyboard::available()) return;
     const auto owner = ImGui::GetID("##endgame_keys");
     for (const auto key : {ImGuiKey_Enter, ImGuiKey_KeypadEnter, ImGuiKey_Escape, ImGuiKey_LeftArrow,
                            ImGuiKey_RightArrow, ImGuiKey_UpArrow, ImGuiKey_DownArrow, ImGuiKey_Home, ImGuiKey_End})
         ImGui::SetKeyOwner(key, owner);
     const bool plain = !io.KeyCtrl && !io.KeyAlt && !io.KeySuper;
-    const bool enter =
-        plain && (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter  = plain && keyboard::enterPressed();
     const bool escape = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
     const bool undo   = ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z);
     switch (r.phase) {

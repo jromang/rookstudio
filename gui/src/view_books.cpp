@@ -245,7 +245,8 @@ void App::drawOpeningSuite() {
                                    .c_str());
     ImGui::BeginDisabled(kept.empty());
     if (ImGui::Button(TR("Make the book…")))
-        dialogs_.saveFile(Dialogs::Purpose::OpeningSuiteBook, {{"EPD", "epd"}}, newBookPath("lichess-openings.epd"));
+        dialogs_.saveFile([this](const std::string& path) { writeOpeningSuiteBook(path); }, {{"EPD", "epd"}},
+                          newBookPath("lichess-openings.epd"));
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Cancel"))) opening_suite_shown_ = false;
@@ -1001,8 +1002,13 @@ void App::drawCtgDetail(const BookEntry& book) {
     ImGui::BeginDisabled(running);
     ui::sameLineOrWrap(TR("For engines: make a Polyglot book…"));
     if (ImGui::Button(TR("For engines: make a Polyglot book…"))) {
-        dialogs_.saveFile(Dialogs::Purpose::CtgPolyglotBook, {{"Polyglot", "bin"}},
-                          (fs::path(path).parent_path() / (fs::path(path).stem().string() + ".bin")).string());
+        dialogs_.saveFile(
+            [this](const std::string& bin) {
+                if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size()) &&
+                    study::isCtg(books_[selected_book_].path))
+                    startCtgJob(CtgJobKind::Polyglot, books_[selected_book_].path, bin);
+            },
+            {{"Polyglot", "bin"}}, (fs::path(path).parent_path() / (fs::path(path).stem().string() + ".bin")).string());
     }
     tip(
         TR("A Polyglot copy (.bin) added to the library, for the setup's Openings and the participants' own books: "

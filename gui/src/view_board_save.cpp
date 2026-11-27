@@ -21,6 +21,7 @@
 #include "app.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "portable.hpp"
 #include "ui.hpp"
 
@@ -213,10 +214,11 @@ void App::drawSaveMenu(ImVec2 under) {
         choices.push_back(std::move(c));
     }
     choices.push_back({TR("Into a PGN file…"), TR("a new file"), [this] { saveBoardPgn(); }, {}});
-    choices.push_back({TR("At the end of a PGN file…"),
-                       TR("the file's games kept, this one after them"),
-                       [this] { dialogs_.openFile(Dialogs::Purpose::AppendBoardPgn, {{"PGN", "pgn"}}); },
-                       {}});
+    choices.push_back(
+        {TR("At the end of a PGN file…"),
+         TR("the file's games kept, this one after them"),
+         [this] { dialogs_.openFile([this](const std::string& path) { appendBoardPgnTo(path); }, {{"PGN", "pgn"}}); },
+         {}});
 
     ImGui::TextDisabled("%s", save_copy_ ? TR("Save a copy of the game") : TR("Save the game"));
     std::function<void()> chosen;
@@ -234,8 +236,7 @@ void App::drawSaveMenu(ImVec2 under) {
         ImGui::TextDisabled("%s", (c.off.empty() ? c.detail : c.off).c_str());
         ImGui::Unindent(px(10));
         if (first && c.off.empty()) {
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-                chosen = c.act;
+            if (keyboard::enterPressed()) chosen = c.act;
             first = false;
         }
         ImGui::PopID();

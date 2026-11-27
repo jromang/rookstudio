@@ -16,6 +16,7 @@
 #include "assistant_service.hpp"
 #include "board_view.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_arenas_page.hpp"
 #include "lichess_bot_page.hpp"
 #include "training_page.hpp"
@@ -45,13 +46,14 @@ void App::drawChessHome() {
     const char* search_label = TR("Find a command, a game, a database");
     const auto& style        = ImGui::GetStyle();
     const float search_w     = style.FramePadding.x * 2 + ImGui::GetFrameHeight() * 0.42f + style.ItemInnerSpacing.x +
-                               ImGui::CalcTextSize(search_label).x + px(6) + ImGui::CalcTextSize("Ctrl+K").x;
+                               ImGui::CalcTextSize(search_label).x + px(6) +
+                               ImGui::CalcTextSize(keyboard::name(keyboard::PALETTE).c_str()).x;
     ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - search_w));
     if (ui::iconButton("chess_search", ui::Icon::Search, search_label)) {
         palette_request_ = true;
     }
     ImGui::SameLine(0, px(6));
-    ImGui::TextDisabled("Ctrl+K");
+    ImGui::TextDisabled("%s", keyboard::name(keyboard::PALETTE).c_str());
     ImGui::Dummy(ImVec2(0, px(4)));
     auto& b = board_;
     // The cards of the view's pages (M6, board 3): the board's, the databases', Lichess', the tournaments'.
@@ -128,19 +130,19 @@ void App::drawChessHome() {
     };
     if (board) {
         if (ui::iconButton("chess_open", ui::Icon::Folder, TR("Open a PGN…"))) openBoardPgnDialog();
-        key("Ctrl+O");
+        key(keyboard::name(keyboard::OPEN_PGN).c_str());
         if (ui::iconButton("chess_paste", ui::Icon::Paste, TR("Paste a game or a FEN"))) {
             page_ = Page::Board;
             pasteOnBoard();
         }
-        key("Ctrl+V");
+        key(keyboard::name(keyboard::PASTE).c_str());
         if (ui::iconButton("chess_new", ui::Icon::Plus, TR("New game"))) newBoardGame();
-        key("Ctrl+N");
+        key(keyboard::name(keyboard::NEW_GAME).c_str());
     }
     if (bases) {
         if (ui::iconButton("chess_import", ui::Icon::Database, TR("Import into a database…"))) {
             page_ = Page::Databases;
-            dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+            openGamesImport({{"PGN", "pgn;zst;gz;zip"}});
         }
         ImGui::SameLine(0, px(14));
     }
@@ -151,7 +153,7 @@ void App::drawChessHome() {
         if (board) ImGui::SameLine(0, px(14));
         if (ui::iconButton("chess_tournament", ui::Icon::Trophy, TR("New tournament"))) page_ = Page::NewMatch;
     }
-    if (board && !ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) {
+    if (board && keyboard::shortcut(keyboard::PASTE)) {
         page_ = Page::Board;
         pasteOnBoard();
     }
@@ -200,7 +202,7 @@ void App::drawChessHome() {
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10), ImGui::GetContentRegionMax().x - import_w));
         if (ImGui::SmallButton(import_label)) {
             page_ = Page::Databases;
-            dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+            openGamesImport({{"PGN", "pgn;zst;gz;zip"}});
         }
         std::size_t linked = 0, shown = 0;
         for (std::size_t i = 0; i < shelf_.entries().size(); ++i) {

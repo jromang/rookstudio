@@ -12,6 +12,7 @@
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "participants.hpp"
 #include "setup_checks.hpp"
 #include "ui.hpp"
@@ -533,8 +534,7 @@ bool App::participantPicker() {
     // The search, focused for a screenshot; Enter in it adds the engines selected, or the first one shown.
     // Ctrl+F on the page, or a screenshot, gives it the keyboard.
     const int open_for_shot = std::exchange(open_picker_, 0);
-    if (open_for_shot == 1 || (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_F) && !ImGui::GetIO().WantTextInput &&
-                               !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))) {
+    if (open_for_shot == 1 || (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_F) && keyboard::available())) {
         ImGui::SetKeyboardFocusHere();
     }
     char buffer[128];
@@ -588,8 +588,7 @@ bool App::participantPicker() {
         return out;
     };
     // Enter, while one of the engines has the keyboard: the selection as it was before this frame's.
-    if (lib.focused && !ImGui::GetIO().WantTextInput &&
-        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))) {
+    if (lib.focused && !ImGui::GetIO().WantTextInput && keyboard::enterPressed()) {
         add = selectedNames(-1);
     }
 

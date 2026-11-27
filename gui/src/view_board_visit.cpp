@@ -25,6 +25,7 @@
 #include "explained.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "live.hpp"
 #include "mistakes_page.hpp"
 #include "review_bridge.hpp"
@@ -354,12 +355,10 @@ void App::drawVisitPage() {
     auto& v = *visit_;
     auto& b = board_;
     ui::pageTitle(TR("Board"), guide::topics::GuidedVisit);
-    if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        !SDL_TextInputActive(window_))
-        SDL_StartTextInput(window_);
+    if (keyboard::available() && !SDL_TextInputActive(window_)) SDL_StartTextInput(window_);
     // The keys: a move typed, Space "I don't know", Enter the next moment, Alt+Q "Why not?", Escape stops.
     const auto& io = ImGui::GetIO();
-    if (!io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
+    if (keyboard::available()) {
         const auto owner = ImGui::GetID("##visit_keys");
         for (const auto key : {ImGuiKey_Enter, ImGuiKey_KeypadEnter, ImGuiKey_Escape, ImGuiKey_Space})
             ImGui::SetKeyOwner(key, owner);
@@ -369,8 +368,7 @@ void App::drawVisitPage() {
         if (v.phase == VisitRun::Phase::Asking) {
             if (plain && ImGui::IsKeyPressed(ImGuiKey_Space, false)) visitDontKnow();
             boardMoveKeys();
-        } else if (plain &&
-                   (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))) {
+        } else if (plain && keyboard::enterPressed()) {
             if (v.phase == VisitRun::Phase::Shown)
                 visitNext();
             else if (v.phase == VisitRun::Phase::End)

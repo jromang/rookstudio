@@ -19,6 +19,7 @@
 
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "training.hpp"
 #include "ui.hpp"
 #include "views.hpp"
@@ -397,8 +398,7 @@ void TrainingPage::drawToday() {
             true);
     ImGui::Dummy(ImVec2(0, px(2)));
     // Enter: the review, or the puzzles once one of their choices was clicked.
-    bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-                 (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    bool enter = keyboard::available() && keyboard::enterPressed();
     if (enter) {
         const auto owner = ImGui::GetID("##training_enter");
         ImGui::SetKeyOwner(ImGuiKey_Enter, owner);

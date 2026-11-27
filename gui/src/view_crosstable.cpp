@@ -25,6 +25,7 @@
 #include "fide_rating_list.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "publish_reports.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -313,12 +314,12 @@ void App::drawTournamentList(std::size_t database) {
 
     // The filter.
     ImGui::SetNextItemWidth(std::min(px(460), ImGui::GetContentRegionAvail().x));
-    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_L)) ImGui::SetKeyboardFocusHere();
+    if (ImGui::IsKeyChordPressed(keyboard::FILTER)) ImGui::SetKeyboardFocusHere();
     ImGui::InputTextWithHint("##tournament_filter", TR("Filter: event, site, year"), tournament_filter_.data(),
                              tournament_filter_.size());
     const bool list_keys = !ImGui::GetIO().WantTextInput || ImGui::IsItemActive();
     ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("Ctrl+L");
+    ImGui::TextDisabled("%s", keyboard::name(keyboard::FILTER).c_str());
 
     // The rows shown: filtered, sorted.
     const auto of = fmt::format("{}|{}|{}|{}|{}", entry.folder.string(), kept->generation, tournament_filter_.data(),
@@ -416,8 +417,7 @@ void App::drawTournamentList(std::size_t database) {
             if (ImGui::IsKeyPressed(ImGuiKey_PageDown))
                 tournament_row_ = std::min(tournament_row_ + 20, rows.size() - 1);
             if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) tournament_row_ = tournament_row_ > 20 ? tournament_row_ - 20 : 0;
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-                open = rows[tournament_row_];
+            if (keyboard::enterPressed()) open = rows[tournament_row_];
         }
         ImGuiListClipper clipper;
         clipper.Begin(static_cast<int>(rows.size()));

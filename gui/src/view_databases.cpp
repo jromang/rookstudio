@@ -26,6 +26,7 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
 
@@ -405,7 +406,7 @@ void App::drawEmptyDatabase(std::size_t index) {
                                  "or:"));
     if (ui::iconButton("db_empty_import", ui::Icon::Folder, TR("Import a file…"))) {
         db_selected_ = static_cast<int>(index);
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+        openGamesImport(gameFiles());
     }
     ImGui::SameLine();
     if (ui::iconButton("db_empty_paste", ui::Icon::Paste, TR("Paste games"))) pasteGamesInto(static_cast<int>(index));
@@ -591,7 +592,7 @@ void App::drawImportOutcome(std::size_t index) {
 void App::drawDatabases() {
     auto& s = shelf();
     // A Lichess link pasted here (#47): its card, its games offered for the database chosen.
-    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V)) {
+    if (keyboard::shortcut(keyboard::PASTE)) {
         char* clip             = SDL_GetClipboardText();
         const std::string text = clip ? clip : "";
         SDL_free(clip);
@@ -617,7 +618,7 @@ void App::drawDatabases() {
         const char* add     = TR("Add a database…");
         float width         = px(36);
         for (const char* label : {make, import, sources, add}) width += ImGui::CalcTextSize(label).x + px(44);
-        width += ImGui::CalcTextSize("Ctrl+I").x + px(8);
+        width += ImGui::CalcTextSize(keyboard::name(keyboard::IMPORT).c_str()).x + px(8);
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(20), ImGui::GetContentRegionMax().x - width));
         if (ui::iconButton("db_new", ui::Icon::Plus, make)) {
             db_naming_ = true;
@@ -626,11 +627,11 @@ void App::drawDatabases() {
         ImGui::SameLine();
         ImGui::BeginDisabled(s.import() != nullptr);
         if (ui::iconButton("db_import", ui::Icon::Folder, import) ||
-            (!s.import() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_I)))
-            dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+            (!s.import() && ImGui::IsKeyChordPressed(keyboard::IMPORT)))
+            openGamesImport(gameFiles());
         ImGui::EndDisabled();
         ImGui::SameLine(0, px(4));
-        ImGui::TextDisabled("Ctrl+I");
+        ImGui::TextDisabled("%s", keyboard::name(keyboard::IMPORT).c_str());
         ImGui::SameLine();
         // The sources of games (#70, mockup M10): each with what it brings, its terms, the database it goes into.
         if (ui::iconButton("db_sources", ui::Icon::Globe, sources) || std::exchange(db_sources_open_, false))
@@ -641,7 +642,15 @@ void App::drawDatabases() {
                                  "broadcasts and monthly files, a chess.com player's games, Lumbra's Gigabase."));
         drawSourcesMenu();
         ImGui::SameLine();
-        if (ui::iconButton("db_add", ui::Icon::Database, add)) dialogs_.openFolder(Dialogs::Purpose::AddDatabase);
+        if (ui::iconButton("db_add", ui::Icon::Database, add)) {
+            dialogs_.openFolder([this](const std::string& path) {
+                try {
+                    db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
+                } catch (const std::exception& e) {
+                    db_message_ = e.what();
+                }
+            });
+        }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", TR("A database folder (Name.fcgdb) made elsewhere: listed here, its files left "
                                        "where they are."));
@@ -909,7 +918,7 @@ void App::drawDatabases() {
         db_search_open_ = true;
     }
     ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("Ctrl+F");
+    ImGui::TextDisabled("%s", keyboard::name(keyboard::SEARCH).c_str());
     ImGui::EndDisabled();
     if (linked) {
         // A tournament's games or a file: shown where they are.
@@ -924,7 +933,7 @@ void App::drawDatabases() {
     ImGui::SameLine();
     ImGui::BeginDisabled(s.import() != nullptr || !facts.error.empty());
     if (ui::iconButton("db_import_here", ui::Icon::Folder, TR("Import into this database…")))
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+        openGamesImport(gameFiles());
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ui::iconButton("db_folder", ui::Icon::FolderClosed, TR("Open the folder"))) ui::openPath(entries[index].folder);
@@ -1104,19 +1113,19 @@ void App::drawGameList() {
 
     // The quick filter.
     ImGui::SetNextItemWidth(std::min(px(460), ImGui::GetContentRegionAvail().x));
-    if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_L)) ImGui::SetKeyboardFocusHere();
+    if (ImGui::IsKeyChordPressed(keyboard::FILTER)) ImGui::SetKeyboardFocusHere();
     ImGui::InputTextWithHint("##db_filter", TR("Quick filter: players, event, year, ECO, result"), db_filter_.data(),
                              db_filter_.size());
     // The list's keys work while the quick filter is typed, not while another field is (the search panel's).
     const bool list_keys = !ImGui::GetIO().WantTextInput || ImGui::IsItemActive();
     ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("Ctrl+L");
+    ImGui::TextDisabled("%s", keyboard::name(keyboard::FILTER).c_str());
     ImGui::SameLine();
     if (ui::iconButton("db_search", ui::Icon::Search, db_search_open_ ? TR("Close the search") : TR("Search")) ||
-        ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_F))
+        ImGui::IsKeyChordPressed(keyboard::SEARCH))
         db_search_open_ = !db_search_open_;
     ImGui::SameLine(0, px(4));
-    ImGui::TextDisabled("Ctrl+F");
+    ImGui::TextDisabled("%s", keyboard::name(keyboard::SEARCH).c_str());
 
     // The view, made again in the background when what it shows changed: narrowed by the searches set (the position
     // added to the filter, a material, a pattern) once they are done.

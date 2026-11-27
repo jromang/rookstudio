@@ -16,6 +16,7 @@
 #include "app.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "notation_view.hpp"
 #include "piece_letters.hpp"
 #include "ui.hpp"
@@ -122,8 +123,7 @@ void App::drawNewMoveQuestion() {
             if (ImGui::IsKeyPressed(c.imgui_key, false)) as = c.as;
         }
         ImGui::TextDisabled("%s", TR("Enter: a variation · Esc: not played"));
-        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false))
-            as = NewMove::Variation;
+        if (keyboard::enterPressed()) as = NewMove::Variation;
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
             new_move_.reset();
             ImGui::CloseCurrentPopup();
@@ -311,8 +311,7 @@ void App::boardEditKeys() {
     if (onlineGameKeys()) return;
     // Enter writes a comment, unless a move of the tree is chosen (Up, Down): it plays it then.
     const bool tree_chosen = board_side_tab_ == 2 && tree_row_ >= 0;
-    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen && !linkCardTakesKeys() &&
-        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
+    if (b.ply > 0 && !io.KeyCtrl && !io.KeyAlt && !tree_chosen && !linkCardTakesKeys() && keyboard::enterPressed())
         boardComment(io.KeyShift);
     if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) boardUndo(false);
     if (chessBoard() && ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_C)) commentBoardMove();  // M5, board 3

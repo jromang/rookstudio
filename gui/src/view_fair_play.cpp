@@ -26,6 +26,7 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_arenas_page.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -517,7 +518,7 @@ void App::drawFinishedBanner(bool home) {
     }
     // On the Board page: Enter reviews it, Escape puts it aside.
     if (finishedCardTakesKeys() && !ImGui::GetIO().WantTextInput) {
-        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)) {
+        if (keyboard::enterPressed()) {
             link_key_frame_ = ImGui::GetFrameCount();
             reviewFinishedGame(f);
             return;

@@ -23,6 +23,7 @@
 #include "app.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "publish_reports.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -703,9 +704,7 @@ void App::drawDossier() {
                         .c_str());
             }
         }
-        const bool enter =
-            !typing && !popup &&
-            (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+        const bool enter = !typing && !popup && keyboard::enterPressed();
         if (ImGui::Button(TR("Keep this one")) || enter) {
             d.undo_subject  = d.subject;
             d.keep_namesake = r->namesakes[static_cast<std::size_t>(d.namesake)];

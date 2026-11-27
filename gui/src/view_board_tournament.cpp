@@ -14,6 +14,7 @@
 #include "app.hpp"
 #include "board_text.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "live.hpp"
 #include "review_bridge.hpp"
 #include "ui.hpp"
@@ -60,7 +61,7 @@ void App::drawEngineTagChips() {
         if (on) ImGui::PopStyleColor(4);
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("· Ctrl+K");
+    ImGui::TextDisabled("· %s", keyboard::name(keyboard::PALETTE).c_str());
 }
 
 void App::drawEngineMoveTip(int ply, const MoveReview& judged) {

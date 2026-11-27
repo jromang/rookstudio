@@ -1278,9 +1278,11 @@ class App {
     void resumeAll();
     void drawNewMatch();
     // The setup of the new tournament page: its engines chosen, its SPRT bounds the wrong way round, an engine of it
-    // being read. Start and Add to the queue follow them.
+    // being read. Start and Add to the queue follow them: ready when chosen without bounds the wrong way round (the
+    // buttons and Ctrl+K).
     [[nodiscard]] bool setupChosen() const;
     [[nodiscard]] bool setupBadSprt() const;
+    [[nodiscard]] bool setupReady() const;
     [[nodiscard]] bool setupProbing() const;
     void drawWorkspace();
     void drawWorkspaceHeader();
@@ -3455,15 +3457,21 @@ class App {
     void drawSubmissionChecklist();  // in the overview of a finished tournament
 
     void handleDialogs();
-    // RookStudio's parts of frame() and handleDialogs(), out of them (app_chess.cpp, #108): the polls of its pages and
-    // jobs; its --focus words, tried before fastchess-gui's (false: the word is not one of them); its dialogs' files.
-    // The servers outside before the first frame: none for scripted screenshots, a test's Lichess when the focus
-    // word names one. RookStudio's modules and their context, made before anything else of the constructor (#107).
+    // RookStudio's parts of frame(), out of it (app_chess.cpp, #108): the polls of its pages and jobs; its --focus
+    // words, tried before fastchess-gui's (false: the word is not one of them). The servers outside before the first
+    // frame: none for scripted screenshots, a test's Lichess when the focus word names one. RookStudio's modules and
+    // their context, made before anything else of the constructor (#107).
     void initChessServers();
     void initChessModules();
     void pollChess();
     [[nodiscard]] bool applyChessFocusWord(const std::string& w);
-    void handleChessDialog(const Dialogs::Answer& answer);
+    // RookStudio's file dialogs opened from more than one place, or whose answer is long (app_chess.cpp): games
+    // imported into the database selected; a GGUF file for the assistant; the Board page's game saved as a PGN file,
+    // or after the games of one.
+    void openGamesImport(const std::vector<std::pair<std::string, std::string>>& filters);
+    void openAssistantModel();
+    void saveBoardPgnAs(const std::string& path);
+    void appendBoardPgnTo(const std::string& path);
     void saveSetupSoon() { setup_dirty_ = true; }
 
     SDL_Window* window_;

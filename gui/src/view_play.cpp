@@ -28,6 +28,7 @@
 #include "game_analysis.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "mistakes_page.hpp"
 #include "training_page.hpp"
 #include "ui.hpp"
@@ -829,8 +830,7 @@ bool App::engineGameKeys() {
     auto& g        = *engine_game_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput) return false;
-    const bool enter = !io.KeyCtrl && !io.KeyAlt && !io.KeyShift &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter = !io.KeyCtrl && !io.KeyAlt && !io.KeyShift && keyboard::enterPressed();
     if (g.over) {
         // Enter reviews it, once; then the Board's keys as for any game.
         if (enter && !g.reviewed && !board_.reviewing() && reviewKey(board_.tree.main) == g.record.key) {
@@ -1233,10 +1233,7 @@ void App::drawPlayEngine() {
         return;
     }
     const auto lock  = playLock();
-    const auto& io   = ImGui::GetIO();
-    const bool enter = lock.empty() && !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-                       !io.KeyCtrl && !io.KeyAlt &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter = lock.empty() && keyboard::plain() && keyboard::enterPressed();
     if (ImGui::BeginTable("##play_columns", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("##choice", ImGuiTableColumnFlags_WidthStretch, 1.15f);
         ImGui::TableSetupColumn("##you", ImGuiTableColumnFlags_WidthStretch, 1.0f);

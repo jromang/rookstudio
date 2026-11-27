@@ -1425,6 +1425,10 @@ std::string App::summaryText() const {
 void App::handleDialogs() {
     while (auto answer = dialogs_.take()) {
         const auto& path = answer->path;
+        if (answer->chosen) {  // RookStudio's dialogs: their callback
+            answer->chosen(path);
+            continue;
+        }
 
         switch (answer->purpose) {
             case Dialogs::Purpose::AddEngine:
@@ -1645,9 +1649,6 @@ void App::handleDialogs() {
                 break;
             case Dialogs::Purpose::MachineEngineBuild:
                 offerEngineCopy(machine_dialog_for_, machine_dialog_engine_, std::filesystem::path(path));
-                break;
-            default:  // RookStudio's (app_chess.cpp)
-                handleChessDialog(*answer);
                 break;
         }
     }

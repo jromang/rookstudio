@@ -33,6 +33,7 @@
 #include "home.hpp"
 #include "i18n.hpp"
 #include "jobs.hpp"
+#include "keyboard.hpp"
 #include "lichess_account.hpp"
 #include "lichess_broadcasts.hpp"
 #include "lichess_settings.hpp"
@@ -1388,10 +1389,7 @@ void LichessArenasPage::drawArenaPart() {
     const auto* state   = a.state.value ? &*a.state.value : nullptr;
     const auto* profile = app_.lichessProfile();
     const auto* account = app_.lichessAccount();
-    const auto& io      = ImGui::GetIO();
-    const bool enter = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
-                       !io.KeyAlt &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter    = keyboard::plain() && keyboard::enterPressed();
     // What it is.
     ui::inlineIcon(ui::Icon::Trophy, ui::ACCENT);
     ImGui::SameLine();
@@ -1738,10 +1736,7 @@ void LichessArenasPage::drawSwissPart() {
     auto& s             = *swiss_play_;
     const auto* info    = s.info.value ? &*s.info.value : nullptr;
     const auto* account = app_.lichessAccount();
-    const auto& io      = ImGui::GetIO();
-    const bool enter = !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl &&
-                       !io.KeyAlt &&
-                       (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
+    const bool enter    = keyboard::plain() && keyboard::enterPressed();
     ui::inlineIcon(ui::Icon::Users, ui::ACCENT);
     ImGui::SameLine();
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.1f);

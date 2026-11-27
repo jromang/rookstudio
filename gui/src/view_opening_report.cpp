@@ -27,6 +27,7 @@
 #include "fide_rating_list.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "publish_reports.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -1019,16 +1020,12 @@ void App::drawReportLines() {
     }
     // The keys, as in the Tree tab: ↑ ↓ choose a move, Enter plays it.
     std::optional<chess::Move> play;
-    const auto& io = ImGui::GetIO();
-    const bool keys =
-        !io.WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) && !io.KeyCtrl && !io.KeyAlt;
+    const bool keys = keyboard::plain();
     if (keys) {
         const int last = static_cast<int>(r.rows.size()) - 1;
         if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) r.row = std::min(r.row + 1, last), r.scroll = true;
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) r.row = std::max(r.row - 1, -1), r.scroll = true;
-        if (r.row >= 0 &&
-            (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)))
-            play = r.rows[static_cast<std::size_t>(r.row)].move;
+        if (r.row >= 0 && keyboard::enterPressed()) play = r.rows[static_cast<std::size_t>(r.row)].move;
     }
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerH;
     if (ImGui::BeginTable("##report_moves", 8, flags)) {

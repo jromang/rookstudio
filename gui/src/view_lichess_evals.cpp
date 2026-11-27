@@ -17,6 +17,7 @@
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "lichess_months.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
@@ -181,8 +182,7 @@ void App::drawLichessOfflineEvals() {
     }
     const ui::Card card("lichess_offline_evals");
     // Enter: when the card is under the mouse, or was brought into view by Ctrl+K.
-    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::GetIO().WantTextInput &&
-                       !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
+    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) && keyboard::available() &&
                        (offline_evals_keys_ || ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows));
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
         offline_evals_keys_ = false;  // a click elsewhere: Enter is another card's
@@ -390,8 +390,13 @@ void App::drawLichessOfflineEvals() {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("Enter"));
     ImGui::SameLine();
-    if (ImGui::Button(TR("A file already downloaded…")))
-        dialogs_.openFile(Dialogs::Purpose::OfflineEvalsFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
+    if (ImGui::Button(TR("A file already downloaded…"))) {
+        dialogs_.openFile(
+            [this](const std::string& path) {
+                startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
+            },
+            {{"zstd", "zst"}, {TR("All files"), "*"}});
+    }
     tip(TR("lichess_db_eval.jsonl.zst, from database.lichess.org: read from the disk, nothing is downloaded."));
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file to database.lichess.org, its size "
                                  "said before. Then nothing."));

@@ -19,6 +19,7 @@
 #include "app.hpp"
 #include "big_screen.hpp"
 #include "i18n.hpp"
+#include "keyboard.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -234,7 +235,7 @@ void App::handleBigScreenKeys() {
     const auto& io = ImGui::GetIO();
     if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0 || ImGui::IsAnyMouseDown()) big_.moved = Clock::now();
     // Not while typing, nor while a popup (the palette, a menu) takes the keys.
-    if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
+    if (!keyboard::available()) return;
 
     // The window a key is for: a detached board shown as a big screen and focused (in the last frame), else the main
     // window.

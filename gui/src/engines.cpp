@@ -20,6 +20,7 @@
 #include <engine/uci_engine.hpp>
 #include <tour/engine_text.hpp>
 #include <tour/game_db.hpp>
+#include <tour/util.hpp>
 
 namespace fcg {
 
@@ -283,11 +284,7 @@ std::string detectProtocol(const EngineEntry& entry) {
         for (const auto& l : lines) {
             if (l.line.rfind("uciok", 0) == 0) protocol = "uci";
             if (l.line.rfind("feature ", 0) == 0) protocol = "xboard";
-            const auto lower = [&] {
-                std::string s = l.line;
-                for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                return s;
-            }();
+            const auto lower = fcg::lower(l.line);
             if (lower.find("illegal") != std::string::npos || lower.find("error") != std::string::npos ||
                 lower.find("unknown") != std::string::npos || lower.find("invalid") != std::string::npos) {
                 complained = true;
@@ -412,10 +409,6 @@ std::string engineSearchText(const EngineEntry& entry) {
 
 bool engineMatches(const EngineEntry& entry, const std::string& needle) {
     if (needle.empty()) return true;
-    auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     const auto n = lower(needle);
     return lower(entry.name).find(n) != std::string::npos || lower(engineSearchText(entry)).find(n) != std::string::npos;
 }
@@ -504,10 +497,6 @@ bool setSeparatePlayer(std::vector<std::string>& separate, const std::string& pl
 
 bool isWinboard(const EngineEntry& entry) {
     if (entry.protocol == "xboard") return true;
-    auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     return lower(entry.cmd + " " + entry.args).find("wb2uci") != std::string::npos;
 }
 

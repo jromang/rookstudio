@@ -448,10 +448,6 @@ void LichessBotPage::finishBotGame(const lichess::BotGame::State& st) {
     if (g.moves.size() < 2 || !bot_account_) return;  // an aborted game stays out
     // Into "Lichess · <bot>", made when missing, as the user's own finished games are (#49).
     const auto name  = "Lichess · " + bot_account_->username;
-    const auto lower = [](std::string text) {
-        for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return text;
-    };
     auto& s = app_.shelf();
     std::optional<std::size_t> index;
     for (std::size_t i = 0; i < s.entries().size(); ++i)
@@ -1002,10 +998,6 @@ void LichessBotPage::drawBotConfirm() {
     const bool enter  = ImGui::InputText("##bot_confirm_name", bot_confirm_.data(), bot_confirm_.size(),
                                          ImGuiInputTextFlags_EnterReturnsTrue);
     std::string typed = bot_confirm_.data();
-    const auto lower  = [](std::string t) {
-        for (auto& c : t) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return t;
-    };
     const bool matches = !typed.empty() && lower(typed) == lower(name);
     const bool busy    = bot_upgrade_.valid();
     if (primaryButton(busy ? TR("Asking Lichess…") : TR("Make it a bot"), matches && !busy, ui::BAD) ||

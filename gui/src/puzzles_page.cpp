@@ -1410,10 +1410,6 @@ void PuzzlesPage::drawChooser(bool& enter) {
         const std::string filter = puzzles_filter_.data();
         const auto matches       = [&](const std::string& name) {
             if (filter.empty()) return true;
-            auto lower = [](std::string s) {
-                for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                return s;
-            };
             return lower(name).find(lower(filter)) != std::string::npos;
         };
         ImGui::BeginChild("##puzzle_theme_list", ImVec2(px(420), px(360)));

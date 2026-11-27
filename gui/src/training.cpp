@@ -144,10 +144,7 @@ int64_t trainingDayEnd(int64_t now) {
 
 study::TrainingDay trainingDay(int64_t now) { return {now, trainingDayEnd(now)}; }
 
-int64_t epochNow() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
+int64_t epochNow() { return nowSeconds(); }
 
 study::fsrs::Scheduler trainingScheduler() {
     study::fsrs::Settings settings;

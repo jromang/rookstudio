@@ -121,12 +121,6 @@ std::string submissionZipName(const std::string& stem) {
 
 std::filesystem::path submissionZipPath(const std::filesystem::path& pgn) {
     const auto name  = submissionZipName(pgn.stem().string());
-    const auto lower = [](std::string s) {
-        for (auto& c : s) {
-            if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-        }
-        return s;
-    };
     if (lower(name) == lower(pgn.filename().string())) return {};
     return pgn.parent_path() / name;
 }

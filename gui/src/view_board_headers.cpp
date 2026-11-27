@@ -11,6 +11,7 @@
 
 #include <commentary/openings.hpp>
 #include <commentary/position.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -44,12 +45,6 @@ bool validDate(std::string_view date) {
         return v >= low && v <= high;
     };
     return part(0, 4, 0, 9999) && part(5, 2, 1, 12) && part(8, 2, 1, 31);
-}
-
-std::string lower(std::string_view s) {
-    std::string out(s);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
 }
 
 }  // namespace

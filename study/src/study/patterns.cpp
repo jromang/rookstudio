@@ -6,6 +6,8 @@
 #include <charconv>
 #include <limits>
 
+#include <tour/util.hpp>
+
 namespace fcg::study {
 
 namespace {
@@ -241,12 +243,6 @@ int distance(std::string_view a, std::string_view b) {
                 d[i][j] = std::min(d[i][j], d[i - 2][j - 2] + 1);
         }
     return d[a.size()][b.size()];
-}
-
-std::string lower(std::string_view w) {
-    std::string out(w);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
 }
 
 // The word of the language a mistyped word looks like: one letter off for a short word, two for a longer one.

@@ -35,11 +35,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
-
 // The position a FEN gives, without its counters: what the tables and the cloud answer about.
 std::string positionOf(const std::string& fen) {
     std::string out;
@@ -52,9 +47,7 @@ std::string positionOf(const std::string& fen) {
 }
 
 std::filesystem::path cacheFile(const std::filesystem::path& root, const char* kind, const std::string& fen) {
-    uint64_t h = 0xcbf29ce484222325ULL;
-    for (const unsigned char c : positionOf(fen)) h = (h ^ c) * 0x100000001b3ULL;
-    return root / "lichess-cache" / kind / fmt::format("{:016x}.json", h);
+    return root / "lichess-cache" / kind / fmt::format("{:016x}.json", fnv1a(positionOf(fen)));
 }
 
 std::optional<nlohmann::json> readCached(const std::filesystem::path& file, const std::string& fen, int64_t lasts) {

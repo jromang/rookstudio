@@ -25,11 +25,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
-
 bool lichessName(std::string_view name) {
     if (name.size() < 2 || name.size() > 30) return false;
     return std::all_of(name.begin(), name.end(),

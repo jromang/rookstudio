@@ -671,11 +671,6 @@ std::vector<std::string> remoteParts(const std::string& path) {
     return parts;
 }
 
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
 }  // namespace
 
 uint64_t EngineCopy::bytes() const {

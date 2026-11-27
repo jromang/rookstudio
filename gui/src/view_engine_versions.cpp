@@ -13,6 +13,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -40,8 +41,6 @@ void tip(const std::string& text) {
 }
 
 using ui::mix;
-
-int64_t nowSeconds() { return static_cast<int64_t>(std::time(nullptr)); }
 
 // A size as the picker writes it: "118 MB".
 std::string megabytes(uint64_t bytes) { return trf("{} MB", (bytes + 500'000) / 1'000'000); }

@@ -30,6 +30,7 @@
 #include <tour/pgn_file.hpp>
 #include <tour/standings.hpp>
 #include <tour/state.hpp>
+#include <tour/util.hpp>
 
 #include "test_support.hpp"
 #include "tour_fixtures.hpp"
@@ -294,9 +295,7 @@ struct Steps {
     std::vector<std::pair<std::string, uint64_t>> hashes;
 
     void mark(const std::string& label, const std::string& text) {
-        uint64_t h = 0xcbf29ce484222325ULL;
-        for (const unsigned char c : text) h = (h ^ c) * 0x100000001b3ULL;
-        hashes.emplace_back(label, h);
+        hashes.emplace_back(label, fcg::fnv1a(text));
         if (const char* dump = std::getenv("FCG_TOUR_BYTES_DUMP")) {
             std::ofstream(fs::path(dump) / fmt::format("{}-{:02}.txt", scenario, hashes.size()), std::ios::binary)
                 << label << "\n"

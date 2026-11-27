@@ -6,6 +6,8 @@
 #include <unordered_set>
 #include <utility>
 
+#include <tour/util.hpp>
+
 #include "game_tree.hpp"
 
 namespace fcg::study {
@@ -164,11 +166,6 @@ MovesAt treeMoves(std::vector<TreeBase> bases) {
 }
 
 MovesAt playerMoves(TreeBase base, std::string_view player, bool white) {
-    const auto lower = [](std::string_view text) {
-        std::string out(text);
-        for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return out;
-    };
     std::vector<uint32_t> ids;  // the player's name in the database's table of names
     if (base.snapshot) {
         const auto wanted = lower(player);

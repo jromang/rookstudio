@@ -168,10 +168,6 @@ std::string polyglotPgnName(const MatchSetup& setup, const std::string& book, in
     named.name = setup.name.empty() ? defaultTournamentName(setup) : setup.name;
     tour::namePgnFiles(named);
     // Letter case aside, as Windows and macOS name files.
-    const auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     const auto taken = [&](const std::string& file) {
         return lower(file) == lower(named.pgnFile()) || lower(file) == lower(named.chessbasePgnFile());
     };

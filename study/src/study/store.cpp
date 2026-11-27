@@ -15,6 +15,7 @@
 
 #include <chess.hpp>
 #include <json.hpp>
+#include <tour/util.hpp>
 
 #include "scan_board.hpp"
 #include "store_detail.hpp"
@@ -403,11 +404,8 @@ void setCommitFaultHook(std::function<void(std::string_view)> hook) { g_fault_ho
 
 uint64_t duplicateKey(const ImportedGame& game) {
     // FNV-1a over the parts, each ended by a byte no text holds.
-    uint64_t h     = 0xcbf29ce484222325ULL;
-    const auto mix = [&](std::string_view bytes) {
-        for (const unsigned char c : bytes) h = (h ^ c) * 0x100000001b3ULL;
-        h = (h ^ 0xFF) * 0x100000001b3ULL;
-    };
+    uint64_t h     = FNV_OFFSET;
+    const auto mix = [&](std::string_view bytes) { h = fnv1a("\xFF", fnv1a(bytes, h)); };
     const auto tag = [&](std::string_view name) -> std::string_view {
         for (const auto& [k, v] : game.tags) {
             if (k == name) return v;
@@ -752,10 +750,9 @@ void Snapshot::settle() {
         return v != replaced_.end() && v->id == id;
     };
     // The tree built before they could no longer be read holds their games: not that of these edits.
-    uint64_t mix = 0xcbf29ce484222325ULL;
-    for (const unsigned char c : std::to_string(edits_generation_)) mix = (mix ^ c) * 0x100000001b3ULL;
+    uint64_t mix = fnv1a(std::to_string(edits_generation_));
     for (const auto& bad : unreadable_segments_) {
-        for (const unsigned char c : bad.name) mix = (mix ^ c) * 0x100000001b3ULL;
+        mix = fnv1a(bad.name, mix);
         if (bad.versions) continue;
         for (GameId id = bad.first; id < bad.first + bad.games; ++id)
             if (!replaced(id)) set(id);

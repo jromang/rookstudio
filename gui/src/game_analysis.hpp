@@ -96,6 +96,8 @@ struct MoveReview {
 
 // The key a game's analysis is kept under: its start position and moves.
 [[nodiscard]] std::string reviewKey(const ReplayGame& game);
+// What its FNV-1a starts from: FNV's offset basis less its last digit, which the keys already kept were made with.
+inline constexpr uint64_t REVIEW_KEY_BASIS = 1469598103934665603ULL;
 
 // The analyses of a game, kept in `dir` (analyses/ in the profile), one file per game, the judging one first; none
 // when there is no file or it is not the game's.

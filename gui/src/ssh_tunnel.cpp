@@ -15,6 +15,7 @@
 #include <libssh2.h>
 #include <mbedtls/platform_util.h>
 #include <psa/crypto.h>
+#include <tour/util.hpp>
 
 // libssh2 as cmake/patch_libssh2.cmake patches it: without its packets merged and its forwarded connections' window,
 // what a viewer makes the tunnel hold is not bounded; without fcg_libssh2_session_end(), a session whose connection
@@ -105,12 +106,6 @@ constexpr int LOCAL_CONNECT_TIMEOUT_MS = 200;
 constexpr int MAX_PASSES = 16;
 
 constexpr uint32_t LOCALHOST = 0x7F000001;
-
-std::string lower(std::string_view s) {
-    std::string out(s);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
-}
 
 std::string hostPort(const std::string& host, int port) { return host + ":" + std::to_string(port); }
 

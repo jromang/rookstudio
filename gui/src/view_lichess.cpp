@@ -36,11 +36,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
-
 // A day as the page says it: "18 November 2026".
 std::string dateText(int64_t seconds) {
     const auto t = static_cast<std::time_t>(seconds);

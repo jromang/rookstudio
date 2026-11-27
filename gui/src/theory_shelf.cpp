@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "assistant_notes.hpp"
 #include "jobs.hpp"
@@ -21,11 +22,6 @@ namespace fs = std::filesystem;
 namespace fcg {
 
 namespace {
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
 
 const char* kindKey(TheorySource::Kind kind) { return kind == TheorySource::Kind::Lichess ? "lichess" : "file"; }
 

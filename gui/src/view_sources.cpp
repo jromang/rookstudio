@@ -15,6 +15,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "chesscom.hpp"
@@ -29,11 +30,6 @@ namespace fcg {
 namespace fs = std::filesystem;
 
 namespace {
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 

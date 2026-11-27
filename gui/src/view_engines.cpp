@@ -94,10 +94,6 @@ std::string nowText() {
 
 bool containsCaseInsensitive(const std::string& text, const std::string& needle) {
     if (needle.empty()) return true;
-    auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     return lower(text).find(lower(needle)) != std::string::npos;
 }
 

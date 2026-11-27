@@ -31,11 +31,6 @@ int64_t intOf(const nlohmann::json& j, const char* key, int64_t otherwise = 0) {
     return it != j.end() && it->is_number_integer() ? it->get<int64_t>() : otherwise;
 }
 
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
-
 void sleepFor(std::chrono::milliseconds wait, const std::atomic<bool>& stop) {
     const auto until = Clock::now() + wait;
     while (!stop && Clock::now() < until) std::this_thread::sleep_for(std::chrono::milliseconds(10));

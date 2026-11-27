@@ -30,12 +30,6 @@ double numberOf(const nlohmann::json& j, const char* key) {
     return it != j.end() && it->is_number() ? it->get<double>() : 0.0;
 }
 
-std::string lower(std::string_view text) {
-    std::string out(text);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
-}
-
 // An answer about a tournament: its 404 says Lichess has no such tournament.
 template <typename T>
 Answer<T> aboutTournament(Answer<T> a) {

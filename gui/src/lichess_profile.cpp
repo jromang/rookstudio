@@ -7,6 +7,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "https.hpp"
 
@@ -40,11 +41,6 @@ int64_t countOf(const nlohmann::json& j, const char* key) {
 const nlohmann::json* objectAt(const nlohmann::json& j, const char* key) {
     const auto it = j.find(key);
     return it != j.end() && it->is_object() ? &*it : nullptr;
-}
-
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
 }
 
 // A JSON answer, whole: the readers below take what they know of it.

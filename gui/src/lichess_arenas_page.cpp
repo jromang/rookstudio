@@ -49,12 +49,6 @@ using Clock = std::chrono::steady_clock;
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-std::string lower(std::string_view text) {
-    std::string out(text);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
-}
-
 int64_t nowMillis() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();

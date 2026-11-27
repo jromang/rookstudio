@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include <json.hpp>
+#include <tour/util.hpp>
 
 #include "engines.hpp"
 #include "i18n.hpp"
@@ -16,11 +17,6 @@ namespace fcg {
 namespace fs = std::filesystem;
 
 namespace {
-
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
 
 std::string trim(const std::string& s) {
     const auto a = s.find_first_not_of(" \t\r\n\"");

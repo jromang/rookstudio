@@ -19,6 +19,7 @@
 
 #include <study/store.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -35,11 +36,6 @@ namespace {
 namespace fs = std::filesystem;
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
 
 const char* visibilityName(std::string_view key) {
     if (key == "private") return TR("private");

@@ -10,6 +10,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -21,11 +22,6 @@ namespace fcg {
 namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
 
 // A Lichess name: 2 to 30 letters, digits, "_" or "-".
 bool lichessName(std::string_view name) {

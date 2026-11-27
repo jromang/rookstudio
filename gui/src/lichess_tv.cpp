@@ -5,6 +5,7 @@
 #include <cctype>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "https.hpp"
 
@@ -14,12 +15,6 @@ namespace {
 
 constexpr std::array<std::string_view, 8> CHANNELS = {"best",      "bullet",      "blitz", "rapid",
                                                       "classical", "ultraBullet", "bot",   "computer"};
-
-std::string lower(std::string_view text) {
-    std::string out(text);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
-}
 
 // A channel's key as /api/tv/channels may write it, lowered and without spaces or dashes: "toprated", "ultrabullet".
 std::string squeezed(std::string_view key) {

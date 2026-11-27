@@ -7,6 +7,7 @@
 #include <fmt/include/fmt/format.h>
 #include <chess.hpp>
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "https.hpp"
 #include "lichess_links.hpp"
@@ -15,11 +16,6 @@
 namespace fcg::lichess {
 
 namespace {
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
 
 // The placement of a FEN: what tells two positions of a game apart here (the stream's FEN may lack the rest).
 std::string_view placementOf(std::string_view fen) { return fen.substr(0, fen.find(' ')); }

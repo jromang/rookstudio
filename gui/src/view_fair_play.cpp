@@ -21,6 +21,7 @@
 #include <imgui.h>
 
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -381,10 +382,6 @@ void App::finishLichessGame(const lichess::PlayingGame& game) {
     lichess_finished_ids_.push_back(game.id);
     // Its database: "Lichess · account", made when missing; the player's sync writing in it brings the game itself.
     const auto name  = "Lichess · " + lichess_account_->username;
-    const auto lower = [](std::string text) {
-        for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return text;
-    };
     auto& s = shelf();
     std::optional<std::size_t> index;
     for (std::size_t i = 0; i < s.entries().size(); ++i)

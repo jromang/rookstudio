@@ -9,6 +9,8 @@
 #include <set>
 #include <tuple>
 
+#include <tour/util.hpp>
+
 #include "parallel.hpp"
 #include "query.hpp"
 
@@ -18,13 +20,6 @@ namespace fcg::study {
 // Who, and where
 
 namespace {
-
-std::string lowerAscii(std::string_view text) {
-    std::string out(text);
-    for (auto& c : out)
-        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-    return out;
-}
 
 // Whether `name`, folded, is `folded`: its ASCII letters compared first, the accents folded only for a name that has
 // some.
@@ -55,9 +50,9 @@ DossierSource findSubject(std::string database, std::shared_ptr<const Snapshot> 
     const auto& snap = *out.snapshot;
     if (online) {
         if (subject.lichess.empty()) return out;
-        const auto account = lowerAscii(subject.lichess);
+        const auto account = lower(subject.lichess);
         for (uint32_t id = 0; id < snap.names(); ++id)
-            if (lowerAscii(snap.name(id)) == account) out.spellings.push_back(id);
+            if (lower(snap.name(id)) == account) out.spellings.push_back(id);
         return out;
     }
     const auto& table = *snap.players();

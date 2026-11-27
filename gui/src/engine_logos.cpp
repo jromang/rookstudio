@@ -21,6 +21,7 @@
 #include <stb_image.h>
 
 #include <core/crc32.hpp>
+#include <tour/util.hpp>
 
 #include "i18n.hpp"
 
@@ -29,12 +30,6 @@ namespace fcg::logos {
 namespace fs = std::filesystem;
 
 namespace {
-
-std::string lower(std::string text) {
-    std::transform(text.begin(), text.end(), text.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return text;
-}
 
 uint32_t checksum(std::string_view bytes) {
     return fastchess::crc::finalize_crc32(

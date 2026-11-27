@@ -19,6 +19,7 @@
 #include <commentary/fact_parts.hpp>
 #include <study/background.hpp>
 #include <study/query.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -35,11 +36,6 @@ namespace {
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 int percent(double share) { return static_cast<int>(std::lround(share * 100)); }
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
 
 // A list said as the interface's language joins its items ("a, b, c").
 std::string listed(const std::vector<std::string>& items) {

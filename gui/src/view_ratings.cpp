@@ -710,10 +710,6 @@ void App::drawPgnPlayers() {
     ImGui::SetNextItemWidth(px(260));
     if (ImGui::InputTextWithHint("##pgn_players_filter", TR("Search"), buffer, sizeof(buffer)))
         pgn_players_filter_ = buffer;
-    const auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     const auto needle = lower(pgn_players_filter_);
     std::vector<int> shown;
     for (int i = 0; i < static_cast<int>(players.size()); ++i) {

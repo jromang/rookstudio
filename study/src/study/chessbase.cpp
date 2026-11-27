@@ -16,6 +16,8 @@
 #include <map>
 #include <stdexcept>
 
+#include <tour/util.hpp>
+
 #include "chessbase_detail.hpp"
 #include "mapped_file.hpp"
 #include "pgn_reader.hpp"
@@ -101,11 +103,6 @@ class MemorySource final : public Source {
     std::string name_;
     std::vector<uint8_t> bytes_;
 };
-
-std::string lower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return s;
-}
 
 class FolderMembers final : public Members {
    public:
@@ -878,7 +875,7 @@ ChessBaseDatabase::ChessBaseDatabase(const fs::path& file, const ChessBaseOption
     : impl_(std::make_unique<Impl>()) {
     std::error_code ec;
     if (!fs::is_regular_file(file, ec)) throw std::runtime_error(file.string() + ": no such file");
-    const auto ext = chessbase::lower(file.extension().string());
+    const auto ext = lower(file.extension().string());
     try {
         if (isChessBaseArchive(file)) {
             auto members       = chessbase::archiveMembers(file, options.password, options.unpack_whole);

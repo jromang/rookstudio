@@ -13,6 +13,7 @@
 #include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -78,11 +79,6 @@ void heading(const char* text) {
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(text);
     ImGui::PopFont();
-}
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
 }
 
 const char* speedName(std::string_view key) {

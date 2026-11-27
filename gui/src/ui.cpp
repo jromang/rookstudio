@@ -1104,10 +1104,6 @@ int searchComboItems(const std::vector<std::string>& names, const std::string& c
     if (ImGui::InputTextWithHint("##combo_search", TR("Search"), buffer, sizeof(buffer))) search = buffer;
     const bool enter = ImGui::IsItemDeactivated() && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
 
-    const auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     const auto needle = lower(search);
     std::vector<int> shown;
     int current_row = -1;

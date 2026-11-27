@@ -594,7 +594,9 @@ class DiskTables {
     [[nodiscard]] virtual SyzygyDownload* tablesDownload()               = 0;
     [[nodiscard]] virtual const SyzygyDownload::State& tablesHeld()      = 0;
     [[nodiscard]] virtual const std::string& tablesDownloadError() const = 0;
-    virtual void startTablesDownload()                                   = 0;
+    // The failure that error says (#141): its kind, the file beside the words.
+    [[nodiscard]] virtual const NetFailure& tablesDownloadFailure() const = 0;
+    virtual void startTablesDownload()                                    = 0;
     virtual void chooseTablesFolder()                                    = 0;
 };
 

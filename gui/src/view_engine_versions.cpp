@@ -216,6 +216,7 @@ void App::pollEngineVersions() {
         version_download_.reset();
         picker_.installed_read = false;
         versions_shown_.reset();
+        version_download_file_ = r.ok || r.cancelled ? std::filesystem::path() : r.net.path;
         if (r.ok) {
             version_download_error_.clear();
             Console::instance().add(trf("{} downloaded again: its hash checked, it answered uci.", label));
@@ -362,6 +363,7 @@ void App::drawEngineVersions(const EngineEntry& e) {
             ImGui::ProgressBar(size ? static_cast<float>(bytes) / static_cast<float>(size) : 0.0f, ImVec2(px(160), 0));
         } else if (v.state == catalogue::VersionState::Asked && !version_download_error_.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", version_download_error_.c_str());
+            ui::pathTooltip(version_download_file_);  // the file, out of the sentence (#141)
         }
         ImGui::PopTextWrapPos();
         ImGui::TableNextColumn();
@@ -421,6 +423,7 @@ void App::drawEngineVersions(const EngineEntry& e) {
                         return catalogue::installEngine(profile, engine, pick, progress.get(), cancel.get());
                     });
                     version_download_error_.clear();
+                    version_download_file_.clear();
                     version_download_ = std::move(d);
                 }
                 ImGui::EndDisabled();

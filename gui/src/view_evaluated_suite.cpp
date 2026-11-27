@@ -53,6 +53,7 @@ void App::openEvaluatedSuite() {
 
 void App::startEvalsReading(std::string source) {
     evals_stopped_.clear();
+    evals_failure_ = {};
     evals_reading_.start(std::move(source), evalsFolderPath());
 }
 
@@ -73,7 +74,10 @@ void App::pollEvalsReading() {
         evaluated_job_ = std::async(std::launch::async, evaluatedPositions, evalsFolderPath());
     } else if (end->failed()) {
         evals_stopped_ = end->error;
-        Console::instance().add(trf("Lichess's evaluations: the reading stopped: {}", end->error), true);
+        evals_failure_ = end->net;
+        Console::instance().add(trf("Lichess's evaluations: the reading stopped: {}", end->error) +
+                                    (end->net.detail.empty() ? std::string() : " (" + end->net.detail + ")"),
+                                true);
     }
 }
 
@@ -116,8 +120,10 @@ void App::drawEvaluatedSuite() {
                     ? trf("The reading stopped at {} of {}.", formatBytes(folder.stopped_at), formatBytes(folder.size))
                           .c_str()
                     : trf("The reading stopped at {}.", formatBytes(folder.stopped_at)).c_str());
-            if (!evals_stopped_.empty())
+            if (!evals_stopped_.empty()) {
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", evals_stopped_.c_str());
+                ui::pathTooltip(evals_failure_.path);  // the file, out of the sentence (#141)
+            }
             if (ImGui::Button(TR("Go on"))) startEvalsReading(folder.source);
             tip(TR("Downloads and reads the rest, from where it stopped."));
             ImGui::SameLine();
@@ -127,6 +133,7 @@ void App::drawEvaluatedSuite() {
                 fs::remove(evalsFolderPath() / "reading.tsv", ec);
                 evals_folder_ = evalsFolder(evalsFolderPath());
                 evals_stopped_.clear();
+                evals_failure_ = {};
                 if (!evals_size_ && !evals_size_job_.valid())
                     evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
             }

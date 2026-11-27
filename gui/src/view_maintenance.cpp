@@ -1135,6 +1135,7 @@ void App::drawFideListCard() {
                                trf("The download stopped at {}.", formatBytes(o.cut)).c_str());
             ImGui::TextDisabled(
                 "%s", o.error.empty() ? TR("What came is kept.") : trf("What came is kept ({}).", o.error).c_str());
+            ui::pathTooltip(o.net.path);  // the file, out of the sentence (#141)
             if (ImGui::SmallButton(TR("Resume (the rest only)"))) startFideList();
         } else if (o.same) {
             ImGui::TextDisabled("%s", trf("FIDE has published no newer list: the list of {} is the latest.",
@@ -1143,6 +1144,7 @@ void App::drawFideListCard() {
         } else if (!o.ok && !o.cancelled && !o.error.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                trf("FIDE's list could not be taken: {}.", o.error).c_str());
+            ui::pathTooltip(o.net.path);
             if (ImGui::SmallButton(TR("Try again"))) startFideList();
         }
     }

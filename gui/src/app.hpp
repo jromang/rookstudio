@@ -528,6 +528,7 @@ class App {
     };
     std::optional<MonthRun> month_run_;
     std::string month_stopped_;  // why the last reading stopped, before its end
+    NetFailure month_failure_;   // the download's or the file's failure it says (#141): its kind, its file beside it
     // "Open the file at this line": a damaged game's text as the file has it, from the line it starts on, read in the
     // background, its move shown.
     struct FileLines {
@@ -957,6 +958,7 @@ class App {
     std::chrono::steady_clock::time_point syzygy_state_at_{};
     uint64_t syzygy_generation_ = 0;
     std::string syzygy_error_;
+    NetFailure syzygy_failure_;  // the failure it says (#141): its kind, the file beside the words
     const SyzygyDownload::State& syzygyState();
     void pollTablesDownload();
     // Endgames against the tablebases and the mates (#82, mockup M12, board 3), a module of its own
@@ -2422,6 +2424,7 @@ class App {
     bool offline_evals_keys_   = false;  // Enter is the card's: it was brought into view, not clicked away from
     float offline_evals_y_     = -1;     // where the card starts on the screen, for the page to scroll there
     std::string offline_evals_error_;    // why the last preparation stopped
+    NetFailure offline_evals_failure_;   // the download's or the file's failure it says (#141), the file beside it
     std::future<EvalsSize> offline_evals_update_;                  // Update: the server's file asked for its date first
     std::string offline_evals_note_;                               // what Update found
     std::chrono::steady_clock::time_point offline_evals_since_{};  // the rate: since when, from how many bytes
@@ -2538,6 +2541,7 @@ class App {
         bool for_board          = false;  // from the first-need card: the analysis engine once installed
         std::string result;               // how its last install ended
         bool result_error = false;
+        std::filesystem::path result_file;  // the file a download that failed was for, out of `result` (#141)
     };
     struct EnginePicker {
         bool open = false;
@@ -2607,6 +2611,7 @@ class App {
     };
     std::optional<VersionDownload> version_download_;
     std::string version_download_error_;
+    std::filesystem::path version_download_file_;  // the file it was for, out of the words (#141)
     bool versions_checked_ = false;  // once at the start
     void checkVersions(std::string ended = {}, std::string replaced = {});
     void pollEngineVersions();
@@ -3275,6 +3280,7 @@ class App {
     std::future<EvalsSize> evals_size_job_;
     std::optional<EvalsSize> evals_size_;
     std::string evals_stopped_;  // why the last reading stopped before its end
+    NetFailure evals_failure_;   // the download's or the file's failure it says (#141), the file beside it
     [[nodiscard]] std::filesystem::path evalsFolderPath() const;
     void openEvaluatedSuite();
     void startEvalsReading(std::string source);

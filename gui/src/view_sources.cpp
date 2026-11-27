@@ -815,7 +815,8 @@ void App::drawChesscomSheet() {
 
 void App::startMonthReading(const std::string& source) {
     if (monthReading() || !shelf_) return;
-    auto& s = shelf();
+    month_failure_ = {};
+    auto& s        = shelf();
     if (s.import() || twic_add_) {
         month_stopped_ = TR("An import runs already: one at a time.");
         return;
@@ -871,6 +872,7 @@ void App::pollMonthReading() {
     if (!end->done()) {
         month_stopped_ =
             end->cancelled() ? std::string(TR("Cancelled: what was read is in the database.")) : end->error;
+        month_failure_ = end->net;
         return;
     }
     TwicDone done;
@@ -987,6 +989,7 @@ void App::drawMonthSheet() {
     } else if (!month_stopped_.empty()) {
         ImGui::PushTextWrapPos();
         ImGui::TextUnformatted(month_stopped_.c_str());
+        ui::pathTooltip(month_failure_.path);  // a file read from the disk, out of the sentence (#141)
         ImGui::PopTextWrapPos();
     }
     if (ImGui::Button(TR("Close##month"))) month_sheet_ = false;

@@ -178,6 +178,7 @@ class FakeApp final : public EndgamesContext {
     SyzygyDownload* tablesDownload() override { return nullptr; }
     const SyzygyDownload::State& tablesHeld() override { return held_; }
     const std::string& tablesDownloadError() const override { return download_error_; }
+    const NetFailure& tablesDownloadFailure() const override { return download_failure_; }
     void startTablesDownload() override { ++downloads; }
     void chooseTablesFolder() override { ++folder_dialogs; }
 
@@ -212,6 +213,7 @@ class FakeApp final : public EndgamesContext {
     TrainingSettings settings_;
     SyzygyDownload::State held_;
     std::string download_error_;
+    NetFailure download_failure_;
 };
 
 // An ImGui context of the test's own, without a window: a frame draws a page of the module, a key pressed before it

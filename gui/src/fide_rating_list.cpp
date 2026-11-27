@@ -196,9 +196,15 @@ std::unique_ptr<Job> start(const fs::path& profile, const fs::path& file) {
                 out.cancelled = true;
                 return out;
             }
-            if (status != 200) {
-                out.error = status ? fmt::format("ratings.fide.com answered {}", status)
-                                   : (answer.error.empty() ? std::string("no answer") : answer.error);
+            if (status != 200) {  // said by its kind, translated (#141)
+                HttpResult asked = answer;
+                asked.status     = status;
+                out.net          = netFailureOf(asked, url);
+                if (status >= 200 && status < 300) {  // an answer of another kind than the list's
+                    out.net.kind   = NetFailure::Kind::Status;
+                    out.net.detail = fmt::format("{} answered {}", url, status);
+                }
+                out.error = describe(out.net);
                 return out;
             }
             day = httpDay(modified);
@@ -215,7 +221,10 @@ std::unique_ptr<Job> start(const fs::path& profile, const fs::path& file) {
                 const auto part = fs::path(zip.string() + ".part");
                 out.cut         = fs::exists(part, ec) ? fs::file_size(part, ec) : 0;
                 out.cancelled   = j->cancel.load();
-                out.error       = out.cancelled ? std::string() : got.error;
+                if (!out.cancelled) {  // without the file's path, kept beside (#141)
+                    out.net   = got.failure;
+                    out.error = describe(got.failure);
+                }
                 return out;
             }
             source = zip;

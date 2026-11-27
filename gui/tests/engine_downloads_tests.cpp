@@ -290,7 +290,10 @@ TEST_CASE("engine downloads: a file whose hash differs is not kept") {
     pick.choices      = {choiceOf(github, name, mover(), std::string(64, '0'))};
     const auto result = installEngine(profile.path, testEngine(name), pick);
     CHECK_FALSE(result.ok);
-    CHECK(result.error.find("SHA-256") != std::string::npos);
+    // Said by its kind, translated, without the file's path, which is kept beside the words (#141).
+    CHECK(result.net.kind == NetFailure::Kind::Unexpected);
+    CHECK(result.net.path == versionFolder(profile.path, "mover", "1.0") / name);
+    CHECK(result.error == "the file that came is not the one expected");
     CHECK_FALSE(fs::exists(versionFolder(profile.path, "mover", "1.0") / name));
     CHECK(loadInstalled(profile.path).empty());
 }

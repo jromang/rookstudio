@@ -14,20 +14,8 @@ id = "CVE-2026-85091"
 reason = "zlib: a heap overflow in gz_write() after a failed write(). Only inflate.c, inftrees.c, inffast.c, adler32.c, crc32.c and zutil.c are compiled in (fcg_zlib): no gz* file function is built, gzwrite.c's least of all. Fixed in zlib 1.4."
 
 [[IgnoredVulns]]
-id = "CVE-2026-118375"
-reason = "llama.cpp: a stack overflow in the RDMA transport of ggml-rpc's server. ggml-rpc is not built (GGML_RPC off), nor any server, tool or example of llama.cpp."
-
-[[IgnoredVulns]]
-id = "CVE-2026-119052"
-reason = "llama.cpp: ggml-rpc's server aborted by an oversized message length. ggml-rpc is not built (GGML_RPC off), nor any server, tool or example of llama.cpp."
-
-[[IgnoredVulns]]
-id = "CVE-2026-116467"
-reason = "llama.cpp: a reachable assertion in the Mirostat sampler. The assistant samples with a grammar, greedily or with a temperature and a seed (assistant/src/assistant/generator.cpp), never with Mirostat."
-
-[[IgnoredVulns]]
-id = "CVE-2026-116096"
-reason = "llama.cpp: an out-of-bounds write in the Pocket-TTS model of tools/mtmd. No tool of llama.cpp is built (LLAMA_BUILD_TOOLS off), mtmd least of all."
+id = "CVE-2026-137567"
+reason = "llama.cpp: an out-of-bounds write through RPC_CMD_COPY_TENSOR in ggml-rpc's server, fixed in b12658. ggml-rpc is not built (GGML_RPC forced off in CMakeLists.txt), nor any server, tool or example of llama.cpp."
 
 [[IgnoredVulns]]
 id = "CVE-2025-55188"

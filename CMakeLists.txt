@@ -364,6 +364,9 @@ if(FCG_ASSISTANT)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
     # ggml's own thread pool: no OpenMP runtime to ship (libgomp on Windows; Apple's clang has none).
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    # No RPC backend: the advisories about ggml-rpc's server do not concern a program that does not build it
+    # (sbom/osv-scanner.toml).
+    set(GGML_RPC OFF CACHE BOOL "" FORCE)
     # The GPU backend: Vulkan alone, on every platform (MoltenVK on macOS), a module loaded where the loader is.
     set(GGML_VULKAN ${FCG_ASSISTANT_VULKAN} CACHE BOOL "" FORCE)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")

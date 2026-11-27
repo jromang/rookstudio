@@ -268,3 +268,95 @@ TEST_CASE("codec: any code of a position played, its move legal or not, leaves a
     }
     MESSAGE(played << " codes played, legal or not");
 }
+
+TEST_CASE("codec: a game's codes read back as written, the game ended at a code that cannot be read (#112)") {
+    // Fifteen queens: White's codes take two bytes, the lone black king's one.
+    ScanBoard board;
+    REQUIRE(board.setFen("7k/8/8/8/8/PPPPPPPP/QQQQQQQQ/QQQQQQQK w - - 0 1", false));
+    const ScanBoard start = board;
+    std::vector<uint8_t> codes;
+    std::vector<int> played;
+    for (const char* san : {"a4", "Kg8", "b4", "Kh8", "c4"}) {
+        CAPTURE(san);
+        const auto move = board.parseSan(san);
+        REQUIRE(move);
+        played.push_back(board.encode(*move));
+        appendCode(codes, board, *move);
+        board.play(*move);
+    }
+    CHECK(codes.size() == 3 * 2 + 2 * 1);
+    {
+        ScanBoard again = start;
+        Cursor cursor(codes, 5);
+        for (const int code : played) {
+            CHECK(cursor.next(again) == code);
+            again.play(again.decode(code));
+        }
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(cursor.ply() == 5);
+        CHECK(cursor.bytes() == codes.size());
+        CHECK(again.key() == board.key());
+    }
+    // Fewer plies than codes: the plies count, the bytes after them are not read (the check counts them).
+    {
+        ScanBoard again = start;
+        Cursor cursor(codes, 2);
+        for (int k = 0; k < 2; ++k) {
+            const int code = cursor.next(again);
+            REQUIRE(code == played[static_cast<std::size_t>(k)]);
+            again.play(again.decode(code));
+        }
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(cursor.ply() == 2);
+        CHECK(cursor.bytes() == 3);
+    }
+    // A two-byte code cut short (a vector of the bytes alone, which ASan watches): the game ends before it, and stays
+    // ended.
+    {
+        const std::vector<uint8_t> cut(codes.begin(), codes.begin() + 1);
+        ScanBoard again = start;
+        Cursor cursor(cut, 5);
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(cursor.ply() == 0);
+    }
+    // A code past the position's (the black king has 11): the game ends there, and nothing after it is read though
+    // its bytes go on.
+    {
+        auto damaged    = codes;
+        damaged[2]      = 200;
+        ScanBoard again = start;
+        Cursor cursor(damaged, 5);
+        const int first = cursor.next(again);
+        REQUIRE(first == played[0]);
+        again.play(again.decode(first));
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(cursor.ply() == 1);
+        CHECK(cursor.bytes() == 3);
+    }
+    // From a later ply of one-byte codes, as the opening tree reads its games on.
+    {
+        ScanBoard standard;
+        REQUIRE(standard.setFen(chess::constants::STARTPOS, false));
+        std::vector<uint8_t> line;
+        std::vector<ScanBoard> positions{standard};
+        for (const char* san : {"e4", "e5", "Nf3", "Nc6"}) {
+            const auto move = positions.back().parseSan(san);
+            REQUIRE(move);
+            appendCode(line, positions.back(), *move);
+            positions.push_back(positions.back());
+            positions.back().play(*move);
+        }
+        REQUIRE(line.size() == 4);
+        ScanBoard again = positions[2];
+        Cursor cursor(line, 4, 2);
+        for (int ply = 2; ply < 4; ++ply) {
+            const int code = cursor.next(again);
+            REQUIRE(code == line[static_cast<std::size_t>(ply)]);
+            again.play(again.decode(code));
+        }
+        CHECK(cursor.next(again) == Cursor::END);
+        CHECK(again.key() == positions[4].key());
+    }
+}

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -209,6 +210,21 @@ TEST_CASE("import: cancelled between batches, and a file that cannot be read") {
     std::ofstream(cut, std::ios::binary).write(bytes.data(), static_cast<std::streamsize>(bytes.size() / 2));
     const auto damaged = importFile(cut, 2);
     CHECK(!damaged.report.error.empty());
+}
+
+TEST_CASE("import: what the caller's side throws reaches it once the reading threads have stopped (#112)") {
+    // The batches go to the caller's sink on its thread: what the sink throws stops the workers and the reader, waited
+    // for, before it goes on (a thread left running ended the program).
+    ImportProgress progress;
+    std::atomic<bool> cancel{false};
+    int batches = 0;
+    CHECK_THROWS_WITH_AS(importGames(data("games.pgn"), ImportOptions{4, 4096}, progress, cancel,
+                                     [&](std::vector<ImportedGame>&&) {
+                                         ++batches;
+                                         throw std::runtime_error("no room for them");
+                                     }),
+                         "no room for them", std::runtime_error);
+    CHECK(batches == 1);
 }
 
 TEST_CASE("import: a file whose bytes are not text is refused, before it makes junk games") {

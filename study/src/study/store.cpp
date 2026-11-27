@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cerrno>
 #include <charconv>
 #include <chrono>
 #include <cstdio>
@@ -12,14 +13,14 @@
 #include <map>
 #include <memory>
 #include <stdexcept>
-#include <thread>
 
 #include <chess.hpp>
 #include <json.hpp>
 
-#include "background.hpp"
 #include "mapped_file.hpp"
+#include "parallel.hpp"
 #include "scan_board.hpp"
+#include "store_error.hpp"
 #include "tree.hpp"
 
 #ifndef _WIN32
@@ -148,15 +149,33 @@ void syncFolder([[maybe_unused]] const fs::path& dir) {
 #endif
 }
 
+// What a write the system refused tells the window: the disk full (errno), or another reason.
+StoreErrc writeErrc(int error) noexcept {
+#ifdef EDQUOT
+    if (error == EDQUOT) return StoreErrc::DiskFull;  // the user's quota: full as far as they are concerned
+#endif
+    return error == ENOSPC ? StoreErrc::DiskFull : StoreErrc::Other;
+}
+StoreErrc writeErrc(const std::error_code& ec) noexcept {
+    return ec == std::errc::no_space_on_device ? StoreErrc::DiskFull : StoreErrc::Other;
+}
+
+// A change refused: another program writes to the database (it holds the folder's lock).
+StoreError readOnlyError(const fs::path& dir) {
+    return StoreError(StoreErrc::ReadOnly, dir.string() + ": read-only, another program writes to it");
+}
+
 void writeFile(const fs::path& file, std::string_view bytes) {
     step("write " + file.filename().string());
     // Closed however this ends: Windows removes no folder whose files are open.
     const std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(tour::openFile(file, "wb"), &std::fclose);
-    if (!f) throw std::runtime_error("cannot write " + file.string());
-    const bool written = bytes.empty() || std::fwrite(bytes.data(), 1, bytes.size(), f.get()) == bytes.size();
+    if (!f) throw StoreError(writeErrc(errno), "cannot write " + file.string());
+    const bool written    = bytes.empty() || std::fwrite(bytes.data(), 1, bytes.size(), f.get()) == bytes.size();
+    const int write_error = written ? 0 : errno;
     step("sync " + file.filename().string());
     if (!written || !tour::syncFile(f.get()))
-        throw std::runtime_error("cannot write " + file.string() + " (is the disk full?)");
+        throw StoreError(writeErrc(written ? errno : write_error),
+                         "cannot write " + file.string() + " (is the disk full?)");
 }
 
 constexpr std::array<char, 8> EDITS_MAGIC{'F', 'C', 'G', 'E', 'D', 'I', 'T', '1'};
@@ -418,8 +437,9 @@ DatabaseImport importInto(Database& db, const std::filesystem::path& file, const
             out.damaged += appended.damaged;
             ++out.commits;
         } catch (const std::exception& e) {
-            out.error = e.what();
-            cancel    = true;  // the rest of the file would have nowhere to go
+            out.error      = e.what();
+            out.error_code = errorCode(e);
+            cancel         = true;  // the rest of the file would have nowhere to go
         }
         pending.clear();
     };
@@ -882,7 +902,8 @@ std::shared_ptr<Database> Database::create(const fs::path& dir) {
 
 std::shared_ptr<Database> Database::open(const fs::path& dir) {
     std::error_code ec;
-    if (!fs::is_regular_file(dir / MANIFEST, ec)) throw std::runtime_error(dir.string() + " is not a database");
+    if (!fs::is_regular_file(dir / MANIFEST, ec))
+        throw StoreError(StoreErrc::NotADatabase, dir.string() + " is not a database");
     auto db = std::make_shared<Database>(dir);
     db->load();
     return db;
@@ -890,7 +911,8 @@ std::shared_ptr<Database> Database::open(const fs::path& dir) {
 
 std::shared_ptr<Database> Database::openReadOnly(const fs::path& dir) {
     std::error_code ec;
-    if (!fs::is_regular_file(dir / MANIFEST, ec)) throw std::runtime_error(dir.string() + " is not a database");
+    if (!fs::is_regular_file(dir / MANIFEST, ec))
+        throw StoreError(StoreErrc::NotADatabase, dir.string() + " is not a database");
     auto db = std::make_shared<Database>(dir, true);
     db->load();
     return db;
@@ -921,12 +943,12 @@ void Database::load(bool clean, int tries) {
         std::ifstream in(dir_ / MANIFEST, std::ios::binary);
         manifest = nlohmann::json::parse(in);
     } catch (const std::exception& e) {
-        throw std::runtime_error((dir_ / MANIFEST).string() + ": " + e.what());
+        throw StoreError(StoreErrc::Damaged, (dir_ / MANIFEST).string() + ": " + e.what());
     }
     if (manifest.value("format", "") != "rookstudio-database")
-        throw std::runtime_error(dir_.string() + " is not a database");
+        throw StoreError(StoreErrc::NotADatabase, dir_.string() + " is not a database");
     if (manifest.value("version", 0u) > VERSION)
-        throw std::runtime_error(dir_.string() + ": a database of a newer program");
+        throw StoreError(StoreErrc::NewerFormat, dir_.string() + ": a database of a newer program");
 
     auto snap         = std::make_shared<Snapshot>();
     snap->generation_ = manifest.value("generation", uint64_t{0});
@@ -946,7 +968,7 @@ void Database::load(bool clean, int tries) {
         const auto names      = s.at("names").get<uint32_t>();
         // No commit writes more: seven names a game at most (a segment that cannot be read would make room for each).
         if (games > SEGMENT_GAMES || names > 7 * SEGMENT_GAMES + 1 || snap->names_ > UINT32_MAX - names)
-            throw std::runtime_error(dir_.string() + ": damaged manifest");
+            throw StoreError(StoreErrc::Damaged, dir_.string() + ": damaged manifest");
         const bool versions   = s.value("versions", false);
         const bool names_lost = s.value("unknown_names", false);  // written as "?" by keepReadable()
         std::shared_ptr<const Segment> segment;
@@ -986,7 +1008,8 @@ void Database::load(bool clean, int tries) {
     }
     // Every game names its players, if only with the empty name: games without any name are a manifest made up, whose
     // games' name ids could not read as no name (rowIds()).
-    if (snap->games_ > 0 && snap->names_ == 0) throw std::runtime_error(dir_.string() + ": damaged manifest");
+    if (snap->games_ > 0 && snap->names_ == 0)
+        throw StoreError(StoreErrc::Damaged, dir_.string() + ": damaged manifest");
     // Read-only, a segment that the other program removed as it committed (a compaction's, an undoing's) is no damage:
     // read again once its manifest has settled.
     if (!lock_ && !unread.empty() && tries > 0) {
@@ -1004,7 +1027,7 @@ void Database::load(bool clean, int tries) {
     if (!edits.empty()) {
         std::ifstream in(dir_ / edits, std::ios::binary);
         const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        const auto bad = [&] { return std::runtime_error((dir_ / edits).string() + ": damaged edits"); };
+        const auto bad = [&] { return StoreError(StoreErrc::Damaged, (dir_ / edits).string() + ": damaged edits"); };
         if (bytes.size() < 32 || std::memcmp(bytes.data(), EDITS_MAGIC.data(), EDITS_MAGIC.size()) != 0) throw bad();
         const auto at = [&](std::size_t o, auto v) {
             std::memcpy(&v, bytes.data() + o, sizeof v);
@@ -1036,7 +1059,7 @@ void Database::load(bool clean, int tries) {
     const auto players = manifest.value("players", std::string());
     if (!players.empty()) {
         std::ifstream in(dir_ / players, std::ios::binary);
-        if (!in) throw std::runtime_error((dir_ / players).string() + ": missing");
+        if (!in) throw StoreError(StoreErrc::Damaged, (dir_ / players).string() + ": missing");
         const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         snap->players_ =
             std::make_shared<const PlayerTable>(spellingsWithin(PlayerTable::fromBytes(text), snap->names_));
@@ -1246,7 +1269,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             std::error_code ec;
             fs::remove_all(tmp, ec);
             fs::create_directories(tmp, ec);
-            if (ec) throw std::runtime_error("cannot create " + tmp.string());
+            if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
             made.push_back(name);
             writeFile(tmp / "cols.bin", cols);
             writeFile(tmp / "moves.bin", moves);
@@ -1351,7 +1374,7 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
 
 Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_duplicates, const std::string& source,
                                     const std::vector<uint64_t>& forget) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     Appended appended;
     std::lock_guard writing(write_mutex_);
     // Each game's key, made once: for the duplicates, the key column and the keys known after.
@@ -1409,7 +1432,7 @@ Database::Appended Database::append(std::vector<ImportedGame> games, bool keep_d
 }
 
 void Database::replace(GameId id, ImportedGame game) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
     if (id >= current_->games_) throw std::out_of_range("no game " + std::to_string(id) + " to replace");
     const uint64_t old_key = current_->key(id);
@@ -1435,7 +1458,7 @@ void Database::replace(GameId id, ImportedGame game) {
 }
 
 void Database::setDeleted(std::span<const GameId> ids, bool deleted) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
     auto bits = current_->deleted_;
     for (const auto id : ids) {
@@ -1475,7 +1498,7 @@ void trim(std::vector<uint64_t>& bits) {
 }  // namespace
 
 std::vector<GameState> Database::merge(std::vector<Merge> merges) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
     std::vector<GameState> before;
     for (const auto& m : merges) {
@@ -1513,7 +1536,7 @@ std::vector<GameState> Database::merge(std::vector<Merge> merges) {
 }
 
 void Database::restore(std::span<const GameState> states) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
     std::map<GameId, Snapshot::Version> versions;
     for (const auto& v : current_->replaced_) versions[v.id] = v;
@@ -1547,7 +1570,7 @@ void Database::restore(std::span<const GameState> states) {
 }
 
 void Database::setPlayers(PlayerTable table) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
     table = spellingsWithin(std::move(table), current_->names_);
     std::vector<ImportedGame> none;
@@ -1555,7 +1578,7 @@ void Database::setPlayers(PlayerTable table) {
 }
 
 void Database::clear() {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
     const auto before = snapshot();
     nlohmann::json manifest;
@@ -1638,23 +1661,16 @@ bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
             if (!(flags & GAME_DAMAGED) || game.plies != 0 || !game.moves.empty()) return false;
         } else {
             SignatureMaker signature(board);
-            const auto& codes = game.moves;
-            std::size_t at    = 0;
-            for (uint32_t ply = 0; ply < game.plies; ++ply) {
-                const int count = board.codeCount();
-                if (at >= codes.size()) return false;
-                int code = codes[at++];
-                if (count > 256) {
-                    if (at >= codes.size()) return false;
-                    code = code << 8 | codes[at++];
-                }
-                if (code >= count) return false;
+            Cursor cursor(game.moves, game.plies);
+            for (uint32_t ply = 0;; ++ply) {
+                const int code = cursor.next(board);
+                if (code == Cursor::END) break;
                 const auto move = board.decode(code);
-                if (move.from >= 64 || move.to >= 64) return false;
                 signature.before(board, move, ply);
                 board.play(move);
             }
-            if (at != codes.size()) return false;
+            // Every ply read, and nothing after them.
+            if (cursor.ply() < game.plies || cursor.bytes() != game.moves.size()) return false;
             if (const auto* stored = segment.signatureBytes(i); stored && (stored[21] & SIG_KNOWN)) {
                 const auto again = signature.finish(board);
                 if (std::memcmp(stored, again.home.data(), 16) != 0) return false;
@@ -1687,7 +1703,7 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
     for (const auto& info : infos) total += info.games;
     progress.total = total;
     progress.done  = 0;
-    if (threads <= 0) threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    threads        = threadCount(threads);
     // The game a record is the current version of, if any.
     std::map<std::pair<uint32_t, uint32_t>, GameId> current_version;
     for (const auto& v : snap->replaced_) current_version[{v.segment, v.local}] = v.id;
@@ -1699,7 +1715,6 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
     std::vector<GameId> damaged;
     std::mutex found;
     std::atomic<uint64_t> checked{0};
-    const Inherited inherited;
     for (std::size_t s = 0; s < infos.size() && !cancel; ++s) {
         const auto& info = infos[s];
         // The game record i is, when it is one as the database reads it; none for an old version.
@@ -1731,28 +1746,24 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
         }
         if (segment->version() < 2 && info.games > 0) report.signatures = false;
         std::atomic<std::size_t> next{0};
-        std::vector<std::thread> pool;
         const auto parts = std::min<std::size_t>(static_cast<std::size_t>(threads), info.games / 4096 + 1);
-        for (std::size_t t = 0; t < parts; ++t)
-            pool.emplace_back([&] {
-                inherited.apply();
-                std::vector<GameId> mine;
-                for (;;) {
-                    const auto from = next.fetch_add(4096);
-                    if (from >= info.games || cancel.load(std::memory_order_relaxed)) break;
-                    const auto to = std::min<std::size_t>(from + 4096, info.games);
-                    for (std::size_t i = from; i < to; ++i) {
-                        const auto id = gameOf(i);
-                        if (!id || snap->deleted(*id)) continue;  // an old version, or a game no one reads
-                        ++checked;
-                        if (!recordSound(*snap, *segment, i)) mine.push_back(*id);
-                    }
-                    progress.done += to - from;
+        onThreads(static_cast<int>(parts), [&](int) {
+            std::vector<GameId> mine;
+            for (;;) {
+                const auto from = next.fetch_add(4096);
+                if (from >= info.games || cancel.load(std::memory_order_relaxed)) break;
+                const auto to = std::min<std::size_t>(from + 4096, info.games);
+                for (std::size_t i = from; i < to; ++i) {
+                    const auto id = gameOf(i);
+                    if (!id || snap->deleted(*id)) continue;  // an old version, or a game no one reads
+                    ++checked;
+                    if (!recordSound(*snap, *segment, i)) mine.push_back(*id);
                 }
-                std::lock_guard lock(found);
-                damaged.insert(damaged.end(), mine.begin(), mine.end());
-            });
-        for (auto& t : pool) t.join();
+                progress.done += to - from;
+            }
+            std::lock_guard lock(found);
+            damaged.insert(damaged.end(), mine.begin(), mine.end());
+        });
     }
     report.games     = checked.load();
     report.cancelled = cancel.load();
@@ -1851,7 +1862,8 @@ void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records,
     put32(12, static_cast<uint32_t>(n));
     put32(16, name_count);
     for (std::size_t k = 0; k < n; ++k) {
-        if ((k & 0xFFF) == 0 && cancel.load(std::memory_order_relaxed)) throw std::runtime_error("cancelled");
+        if ((k & 0xFFF) == 0 && cancel.load(std::memory_order_relaxed))
+            throw StoreError(StoreErrc::Cancelled, "cancelled");
         const auto& r = records[k];
         if (!r.segment) {  // set aside: nothing kept of it but its number
             for (int c = 0; c < NAME_COLUMNS; ++c) put(static_cast<Column>(c), k, blank_name);
@@ -1913,7 +1925,7 @@ void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records,
     std::error_code ec;
     fs::remove_all(tmp, ec);
     fs::create_directories(tmp, ec);
-    if (ec) throw std::runtime_error("cannot create " + tmp.string());
+    if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
     writeFile(tmp / "cols.bin", cols);
     writeFile(tmp / "moves.bin", moves);
     writeFile(tmp / "annex.bin", annex);
@@ -1927,7 +1939,8 @@ void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records,
 Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& cancel, bool one_at_a_time) {
     Compacted out;
     if (!lock_) {
-        out.error = dir_.string() + ": read-only, another program writes to it";
+        out.error      = readOnlyError(dir_).what();
+        out.error_code = StoreErrc::ReadOnly;
         return out;
     }
     // One compaction at a time. The segments are written without the writers' lock, from the snapshot of when it
@@ -1935,7 +1948,8 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
     std::lock_guard compacting(compact_mutex_);
     auto snap = snapshot();
     if (!snap->unreadable().empty()) {
-        out.error = "a segment cannot be read: keep what can be read first";
+        out.error      = "a segment cannot be read: keep what can be read first";
+        out.error_code = StoreErrc::Damaged;
         return out;
     }
     const auto infos = snap->segmentInfos();
@@ -1949,7 +1963,8 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
         std::error_code ec;
         const auto space = fs::space(dir_, ec);
         if (!ec && space.available < plan.needed + (uint64_t{64} << 20)) {
-            out.error = "disk full";
+            out.error      = "disk full";
+            out.error_code = StoreErrc::DiskFull;
             return out;
         }
     }
@@ -2023,12 +2038,13 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
                 written.emplace_back(s, name);
             }
             syncFolder(dir_);
-            if (cancel) throw std::runtime_error("cancelled");
+            if (cancel) throw StoreError(StoreErrc::Cancelled, "cancelled");
         } catch (const std::exception& e) {
             // Nothing of this step committed: its files go. Those of the steps before stay committed.
             clean();
-            out.cancelled = cancel.load();
-            out.error     = out.cancelled ? std::string() : std::string(e.what());
+            out.cancelled  = cancel.load();
+            out.error      = out.cancelled ? std::string() : std::string(e.what());
+            out.error_code = out.cancelled ? StoreErrc::Other : errorCode(e);
             return out;
         }
         {
@@ -2069,7 +2085,8 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
                 manifest_after = next.dump(1);
             } catch (const std::exception& e) {
                 clean();
-                out.error = e.what();
+                out.error      = e.what();
+                out.error_code = errorCode(e);
                 return out;
             }
             // Committed: read again, the old files kept for now.
@@ -2164,7 +2181,7 @@ bool Database::undoCompaction() {
 // The segments that cannot be read, written again (#97).
 
 uint64_t Database::keepReadable(std::span<const GameId> damaged) {
-    if (!lock_) throw std::runtime_error(dir_.string() + ": read-only, another program writes to it");
+    if (!lock_) throw readOnlyError(dir_);
     std::lock_guard compacting(compact_mutex_);
     std::lock_guard writing(write_mutex_);
     const auto snap = snapshot();

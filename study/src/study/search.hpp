@@ -10,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <map>
 #include <memory>
@@ -131,9 +132,13 @@ class Search {
     Search& operator=(const Search&) = delete;
 
     void cancel() noexcept;  // the threads stop within a twentieth of a second
+    // Waits for its threads; what one of them threw is in error(), never thrown here (the destructor waits too).
     void wait();
     [[nodiscard]] bool done() const noexcept { return finished_ == threads_.size(); }
     [[nodiscard]] bool cancelled() const noexcept { return cancel_; }
+    // The first exception one of its threads threw, none if none did: the search stopped then, every thread of it,
+    // the parts searched whole kept as a cancelled search keeps them. Read once done().
+    [[nodiscard]] std::exception_ptr error() const;
     [[nodiscard]] uint64_t searched() const noexcept { return searched_; }  // games looked at, in parts searched whole
     [[nodiscard]] uint64_t total() const noexcept { return snapshot_->games(); }
     // How long it took, from its start to its last thread's end, once done (not counting a wait for its result).
@@ -149,11 +154,13 @@ class Search {
     [[nodiscard]] const std::shared_ptr<const Snapshot>& snapshot() const noexcept { return snapshot_; }
 
    private:
+    void run() noexcept;  // a thread's: work(), what it throws kept
     void work();
 
     std::shared_ptr<const Snapshot> snapshot_;
     SearchQuery query_;
     std::atomic<bool> cancel_{false};
+    std::atomic<bool> failed_{false};  // a thread threw: the others stop as when cancelled
     std::atomic<uint64_t> next_{0};  // the next part of the games to take
     std::atomic<uint64_t> searched_{0};
     std::atomic<std::size_t> finished_{0};
@@ -164,10 +171,11 @@ class Search {
     std::vector<std::vector<SearchHit>> parts_;  // each part's hits, once searched
     std::vector<SearchStats> stats_;             // each part's, once searched
     std::vector<uint8_t> done_;                  // the parts searched whole
+    std::exception_ptr error_;                   // under mutex_
     std::vector<std::thread> threads_;
 };
 
-// A whole search, waited for: for the tests and the benchmark.
+// A whole search, waited for: for the tests and the benchmark. What a thread of it threw is thrown again.
 [[nodiscard]] std::vector<SearchHit> searchAll(std::shared_ptr<const Snapshot> snapshot, const SearchQuery& query,
                                                int threads = 0);
 

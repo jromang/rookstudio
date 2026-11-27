@@ -10,15 +10,14 @@
 #include <mutex>
 #include <numeric>
 #include <set>
-#include <thread>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "background.hpp"
 #include "dossier.hpp"
 #include "duplicates.hpp"
 #include "fide_list.hpp"
+#include "parallel.hpp"
 #include "players.hpp"
 #include "query.hpp"
 
@@ -1268,23 +1267,6 @@ std::vector<std::vector<uint32_t>> dedupGroups(std::vector<DedupGame> games) {
     return out;
 }
 
-// Runs `work(thread)` on `threads` threads, the background of the caller kept.
-template <typename Work>
-void onThreads(int threads, Work&& work) {
-    if (threads <= 1) {
-        work(0);
-        return;
-    }
-    const Inherited background;
-    std::vector<std::thread> pool;
-    for (int t = 0; t < threads; ++t)
-        pool.emplace_back([&, t] {
-            background.apply();
-            work(t);
-        });
-    for (auto& th : pool) th.join();
-}
-
 constexpr uint32_t NONE         = UINT32_MAX;
 constexpr uint32_t TABLE_PLAYER = 0x80000000u;
 
@@ -1320,7 +1302,7 @@ TournamentList listTournaments(const std::shared_ptr<const Snapshot>& snapshot, 
     progress.total       = 3 * total + 1;
     progress.done        = 0;
     const auto stopped   = [&] { return cancel.load(std::memory_order_relaxed); };
-    const int workers    = threads > 0 ? threads : std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    const int workers       = threadCount(threads);
     constexpr uint64_t PART = 65536;
 
     // The events written (a bit a name), on the machine's threads.

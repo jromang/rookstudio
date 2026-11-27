@@ -9,12 +9,15 @@
 // a capture towards the a-file or the h-file, and 12 on its last rank but one: those three moves each with its 4
 // promotions). A move's code is the sum of the codes of the pieces before it plus its own move's; the code after
 // the last is the null move. A full army has 142 codes and one byte holds them; with more queens than that, two bytes
-// (codeCount() says which, the reader and the writer alike). Decoding walks the pieces once, no move generated.
+// (codeCount() says which, the reader and the writer alike: Cursor and appendCode()). Decoding walks the pieces once,
+// no move generated.
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <chess.hpp>
 
@@ -96,5 +99,57 @@ class ScanBoard {
 
 // The legal move of `board` that a code of the same position (`scan`, set to it) names; none when no move does.
 [[nodiscard]] std::optional<chess::Move> moveOfCode(const chess::Board& board, const ScanBoard& scan, int code);
+
+// A game's codes read one after the other on the board the game reaches, the one decoder of the databases' moves: a
+// byte a code, two where the position has more than 256 (the high one first). The game ends at its last ply, or at a
+// code that cannot be read, cut short or beyond the position's codes (a damaged record's): nothing is read past its
+// codes, and nothing after such a code.
+class Cursor {
+   public:
+    // The reading of a game of `plies` plies from ply `from`, every position before it of one-byte codes (the opening
+    // tree follows no game past a position of more than 256).
+    Cursor(std::span<const uint8_t> codes, uint32_t plies, uint32_t from = 0) noexcept
+        : codes_(codes), plies_(plies), at_(from), ply_(from) {}
+
+    static constexpr int END = -1;  // no move: the game's end, or a code that cannot be read (as TreeMove::END)
+
+    // The next move's code on `board`, the position the game reached; END at the game's end, or for a code that
+    // cannot be read, which ends it there. (An int, not an optional: the replays' speed.)
+    [[nodiscard]] int next(const ScanBoard& board) noexcept {
+        if (ply_ >= plies_ || at_ >= codes_.size()) [[unlikely]]
+            return END;
+        const int count = board.codeCount();
+        int code        = codes_[at_++];
+        if (count > 256) [[unlikely]] {
+            if (at_ >= codes_.size()) return stop();
+            code = (code << 8) | codes_[at_++];
+        }
+        if (code >= count) [[unlikely]]
+            return stop();
+        ++ply_;
+        return code;
+    }
+    // The moves read, and the bytes read: a game read whole has all its plies (an end before them is a code that
+    // could not be read), and all its bytes once its plies are read.
+    [[nodiscard]] uint32_t ply() const noexcept { return ply_; }
+    [[nodiscard]] std::size_t bytes() const noexcept { return at_; }
+
+   private:
+    int stop() noexcept {
+        plies_ = ply_;
+        return END;
+    }
+    std::span<const uint8_t> codes_;
+    uint32_t plies_ = 0;
+    std::size_t at_ = 0;
+    uint32_t ply_   = 0;
+};
+
+// Appends the code of `move` on `board`, the position it is played from, to a game's codes, as Cursor reads it back.
+inline void appendCode(std::vector<uint8_t>& codes, const ScanBoard& board, const CodedMove& move) {
+    const int code = board.encode(move);
+    if (board.codeCount() > 256) codes.push_back(static_cast<uint8_t>(code >> 8));
+    codes.push_back(static_cast<uint8_t>(code & 0xFF));
+}
 
 }  // namespace fcg::study

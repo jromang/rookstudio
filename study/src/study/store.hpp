@@ -32,6 +32,7 @@
 #include "import.hpp"
 #include "players.hpp"
 #include "scan_board.hpp"
+#include "store_error.hpp"
 
 namespace fcg::study {
 
@@ -294,14 +295,16 @@ struct Compacted {
     bool done      = false;
     bool cancelled = false;
     std::string error;
-    uint64_t bytes = 0;      // given back once the old files go
+    StoreErrc error_code = StoreErrc::Other;  // what `error` is, for the window
+    uint64_t bytes       = 0;                 // given back once the old files go
     bool undoable  = false;  // the old files kept: undoCompaction() until the database is closed
 };
 
 class Database {
    public:
     // A new database in an empty or missing folder. Throws std::runtime_error when the folder holds something else,
-    // tour::FolderBusy when another program writes to it.
+    // tour::FolderBusy when another program writes to it. The store's errors are StoreErrors (store_error.hpp), their
+    // code with their text.
     static std::shared_ptr<Database> create(const std::filesystem::path& dir);
     // An existing database, the leftovers of a commit cut short removed. Throws std::runtime_error when it is none.
     static std::shared_ptr<Database> open(const std::filesystem::path& dir);
@@ -449,6 +452,7 @@ struct DatabaseImport {
     uint64_t damaged    = 0;  // of the games added, those damaged (read.damaged counts the duplicates too)
     uint64_t commits    = 0;
     std::string error;  // why the disk refused; the games committed before stay
+    StoreErrc error_code = StoreErrc::Other;  // what `error` is, for the window
     // The first damaged games read, 64 at most: their duplicateKey(), which Snapshot::key() gives back, and the line
     // of the file their text starts on.
     std::vector<std::pair<uint64_t, uint64_t>> damaged_lines;

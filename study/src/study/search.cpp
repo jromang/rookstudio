@@ -5,7 +5,7 @@
 
 #include <chess.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "signature.hpp"
 
 namespace fcg::study {
@@ -18,17 +18,12 @@ constexpr uint64_t PART = 4096;
 // Calls at(ply, board) for the start and after each move, up to ply `last`, until it returns true: true then.
 template <typename At>
 bool replay(std::span<const uint8_t> codes, uint32_t plies, uint32_t last, ScanBoard& board, At&& at) {
-    std::size_t p = 0;
+    Cursor cursor(codes, plies);
     for (uint32_t ply = 0;; ++ply) {
         if (at(ply, static_cast<const ScanBoard&>(board))) return true;
-        if (ply >= last || ply >= plies || p >= codes.size()) return false;
-        const int count = board.codeCount();
-        int code        = codes[p++];
-        if (count > 256) {
-            if (p >= codes.size()) return false;
-            code = (code << 8) | codes[p++];
-        }
-        if (code >= count) return false;
+        if (ply >= last) return false;
+        const int code = cursor.next(board);
+        if (code == Cursor::END) return false;
         board.play(board.decode(code));
     }
 }
@@ -282,21 +277,16 @@ std::optional<uint32_t> findRelation(const Snapshot& snap, GameId id, const Patt
     thread_local std::vector<Candidate> candidates;
     moves.clear();
     candidates.clear();
-    std::size_t p = 0;
+    Cursor cursor(g.codes, g.plies);
     for (uint32_t ply = 0;; ++ply) {
         if (ply >= from && ply <= to)
             m.first(board, ply == g.plies, [&](const Binding& b) {
                 candidates.push_back({ply, board, b});
                 return false;  // every binding
             });
-        if (ply >= last || ply >= g.plies || p >= g.codes.size()) break;
-        const int count = board.codeCount();
-        int code        = g.codes[p++];
-        if (count > 256) {
-            if (p >= g.codes.size()) break;
-            code = (code << 8) | g.codes[p++];
-        }
-        if (code >= count) break;
+        if (ply >= last) break;
+        const int code = cursor.next(board);
+        if (code == Cursor::END) break;
         const auto move = board.decode(code);
         moves.push_back(move);
         board.play(move);
@@ -358,16 +348,11 @@ Found findManoeuvre(const Snapshot& snap, GameId id, const ManoeuvreQuery& q, bo
     };
     std::vector<Attempt> attempts;
     std::vector<std::vector<uint8_t>> parted;
-    int done_on   = -1;  // the route done: the square of its man, whose next move is looked for
-    std::size_t p = 0;
-    for (uint32_t ply = 0; ply < g.plies && p < g.codes.size(); ++ply) {
-        const int count = board.codeCount();
-        int code        = g.codes[p++];
-        if (count > 256) {
-            if (p >= g.codes.size()) break;
-            code = (code << 8) | g.codes[p++];
-        }
-        if (code >= count) break;
+    int done_on = -1;  // the route done: the square of its man, whose next move is looked for
+    Cursor cursor(g.codes, g.plies);
+    for (uint32_t ply = 0;; ++ply) {
+        const int code = cursor.next(board);
+        if (code == Cursor::END) break;
         const auto move = board.decode(code);
         if (ply >= start) {
             const bool ours = board.sideToMove() == q.side;
@@ -642,16 +627,22 @@ Search::Search(std::shared_ptr<const Snapshot> snapshot, SearchQuery query, int 
         }
         searched_ = kept;
     }
-    const int machine = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
-    const auto count  = std::min<std::size_t>(static_cast<std::size_t>(threads > 0 ? threads : machine), parts_.size());
-    planned_          = count;
+    const auto count = std::min<std::size_t>(static_cast<std::size_t>(threadCount(threads)), parts_.size());
+    planned_         = count;
     threads_.reserve(count);
     const Inherited inherited;
-    for (std::size_t t = 0; t < count; ++t)
-        threads_.emplace_back([this, inherited] {
-            inherited.apply();
-            work();
-        });
+    try {
+        for (std::size_t t = 0; t < count; ++t)
+            threads_.emplace_back([this, inherited] {
+                inherited.apply();
+                run();
+            });
+    } catch (...) {
+        // A thread that cannot be started: those started stopped and waited for before it goes on.
+        cancel();
+        wait();
+        throw;
+    }
 }
 
 Search::~Search() {
@@ -666,6 +657,26 @@ void Search::wait() {
         if (t.joinable()) t.join();
 }
 
+std::exception_ptr Search::error() const {
+    std::lock_guard lock(mutex_);
+    return error_;
+}
+
+void Search::run() noexcept {
+    try {
+        work();
+    } catch (...) {
+        {
+            std::lock_guard lock(mutex_);
+            if (!error_) error_ = std::current_exception();
+        }
+        failed_ = true;
+    }
+    if (++finished_ == planned_)
+        elapsed_us_ =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started_).count();
+}
+
 void Search::work() {
     const uint64_t n = snapshot_->games();
     // What a route or a structure tells besides its games.
@@ -673,13 +684,13 @@ void Search::work() {
     const bool structure = std::holds_alternative<StructureQuery>(query_);
     for (;;) {
         const uint64_t part = next_++;
-        if (cancel_ || part >= parts_.size()) break;
+        if (cancel_ || failed_ || part >= parts_.size()) break;
         if (done_[part]) continue;  // kept from the search resumed
         std::vector<SearchHit> found;
         SearchStats stats;
         const uint64_t from = part * PART, to = std::min(n, from + PART);
         uint64_t looked = 0;
-        for (GameId id = from; id < to && !cancel_; ++id, ++looked) {
+        for (GameId id = from; id < to && !cancel_ && !failed_; ++id, ++looked) {
             if (snapshot_->deleted(id)) continue;
             auto f = find(*snapshot_, id, query_, true, route || structure);
             if (route) {
@@ -701,16 +712,13 @@ void Search::work() {
                 if (f.variant != UINT32_MAX) ++stats.variants[f.variant][result];
             }
         }
-        if (cancel_ && looked < to - from) break;  // a part cut short: searched again when resumed
+        if (looked < to - from) break;  // a part cut short (cancelled, failed): searched again when resumed
         searched_ += looked;
         std::lock_guard lock(mutex_);
         parts_[part] = std::move(found);
         stats_[part] = std::move(stats);
         done_[part]  = 1;
     }
-    if (++finished_ == planned_)
-        elapsed_us_ =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started_).count();
 }
 
 std::vector<SearchHit> Search::hits() const {
@@ -736,6 +744,7 @@ SearchStats Search::stats() const {
 std::vector<SearchHit> searchAll(std::shared_ptr<const Snapshot> snapshot, const SearchQuery& query, int threads) {
     Search search(std::move(snapshot), query, threads);
     search.wait();
+    if (const auto error = search.error()) std::rethrow_exception(error);
     return search.hits();
 }
 

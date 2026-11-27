@@ -12,6 +12,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include <study/import.hpp>
@@ -353,6 +354,72 @@ TEST_CASE("store: a file imported into a database, committed as it goes; cancell
     CHECK(refused->snapshot()->games() == got.added);
     CHECK(got.added >= 50);
     CHECK(got.added < 120);
+}
+
+TEST_CASE("store: its errors carry a code for the window to say, with their text (#112)") {
+    const auto games  = fixtureGames();
+    const auto codeOf = [](const std::function<void()>& f) {
+        try {
+            f();
+        } catch (const std::exception& e) {
+            CHECK(std::string(e.what()) != "");  // the text kept, for the log and the errors no code names
+            return errorCode(e);
+        }
+        FAIL("nothing thrown");
+        return StoreErrc::Other;
+    };
+    // No database there, a manifest that does not read, another program's manifest, a newer program's.
+    const ScratchDir nothing("store-codes-nothing.fcgdb");
+    CHECK(codeOf([&] { (void)Database::open(nothing); }) == StoreErrc::NotADatabase);
+    CHECK(codeOf([&] { (void)Database::openReadOnly(nothing); }) == StoreErrc::NotADatabase);
+    const ScratchDir broken("store-codes-broken.fcgdb");
+    fs::create_directories(broken);
+    std::ofstream(broken / "manifest.json") << "{ not json";
+    CHECK(codeOf([&] { (void)Database::open(broken); }) == StoreErrc::Damaged);
+    const ScratchDir other("store-codes-other.fcgdb");
+    fs::create_directories(other);
+    std::ofstream(other / "manifest.json") << R"({"format": "something-else", "version": 1})";
+    CHECK(codeOf([&] { (void)Database::open(other); }) == StoreErrc::NotADatabase);
+    const ScratchDir newer("store-codes-newer.fcgdb");
+    fs::create_directories(newer);
+    std::ofstream(newer / "manifest.json")
+        << R"({"format": "rookstudio-database", "version": 99, "generation": 0, "segments": []})";
+    CHECK(codeOf([&] { (void)Database::open(newer); }) == StoreErrc::NewerFormat);
+
+    // A database another program writes: a change refused, a compaction too.
+    const ScratchDir dir("store-codes.fcgdb");
+    auto writer = Database::create(dir);
+    writer->append(std::vector<ImportedGame>(games.begin(), games.begin() + 10));
+    auto reader = Database::openReadOnly(dir);
+    CHECK(codeOf([&] { reader->append(std::vector<ImportedGame>(games.begin() + 10, games.begin() + 11)); }) ==
+          StoreErrc::ReadOnly);
+    const std::vector<GameId> first{0};
+    CHECK(codeOf([&] { reader->setDeleted(first, true); }) == StoreErrc::ReadOnly);
+    CompactProgress compacting;
+    const std::atomic<bool> go_on{false};
+    const auto refused = reader->compact(compacting, go_on);
+    CHECK_FALSE(refused.error.empty());
+    CHECK(refused.error_code == StoreErrc::ReadOnly);
+    // Another program holds the folder.
+    CHECK(errorCode(fcg::tour::FolderBusy("held")) == StoreErrc::Busy);
+
+    // The disk without room in the middle of an import: the import stops, the code with its text.
+    setCommitFaultHook([](std::string_view step) {
+        if (step == "write moves.bin")
+            throw fs::filesystem_error("cannot write moves.bin", std::make_error_code(std::errc::no_space_on_device));
+    });
+    std::atomic<bool> cancel{false};
+    ImportProgress progress;
+    const auto full = importInto(*writer, data("games.pgn"), ImportOptions{2, 4096}, progress, cancel, false, 50);
+    setCommitFaultHook({});
+    CHECK_FALSE(full.error.empty());
+    CHECK(full.error_code == StoreErrc::DiskFull);
+    CHECK(writer->snapshot()->games() == 10);
+
+    // Any other error: its text alone.
+    CHECK(errorCode(std::runtime_error("something else")) == StoreErrc::Other);
+    CHECK(errorCode(std::exception_ptr()) == StoreErrc::Other);
+    CHECK(errorCode(std::make_exception_ptr(StoreError(StoreErrc::Cancelled, "cancelled"))) == StoreErrc::Cancelled);
 }
 
 TEST_CASE("store: a database another program writes, read as it commits, nothing written") {

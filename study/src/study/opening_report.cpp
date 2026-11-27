@@ -12,7 +12,7 @@
 
 #include <chess.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "search.hpp"
 
 namespace fcg::study {
@@ -31,58 +31,17 @@ constexpr uint32_t NOVELTY_MARGIN = 12;
 constexpr std::size_t NAMED_SAMPLE = 64;
 constexpr uint8_t NO_SQUARE        = 64;
 
-// Runs `work(thread)` on `threads` threads, the background of the caller kept.
-template <typename Work>
-void onThreads(int threads, Work&& work) {
-    if (threads <= 1) {
-        work(0);
-        return;
-    }
-    const Inherited background;
-    std::vector<std::thread> pool;
-    for (int t = 0; t < threads; ++t)
-        pool.emplace_back([&, t] {
-            background.apply();
-            work(t);
-        });
-    for (auto& th : pool) th.join();
-}
-
-// A game's moves read one after the other on the board they are played on.
-class Cursor {
-   public:
-    explicit Cursor(const GameMoves& m) : codes_(m.codes), plies_(m.plies) {}
-    // The next move's code on `board`; none at the game's end, or for a code that cannot be read.
-    std::optional<int> next(const ScanBoard& board) {
-        if (ply_ >= plies_ || p_ >= codes_.size()) return std::nullopt;
-        const int count = board.codeCount();
-        int code        = codes_[p_++];
-        if (count > 256) {
-            if (p_ >= codes_.size()) return std::nullopt;
-            code = (code << 8) | codes_[p_++];
-        }
-        if (code >= count) return std::nullopt;
-        ++ply_;
-        return code;
-    }
-    [[nodiscard]] uint32_t ply() const noexcept { return ply_; }
-
-   private:
-    std::span<const uint8_t> codes_;
-    uint32_t plies_ = 0;
-    std::size_t p_  = 0;
-    uint32_t ply_   = 0;
-};
+static_assert(Cursor::END == TreeMove::END);  // a game's next move read where the trees' moves are counted
 
 // The game replayed up to the ply it reaches the report's position at: the board there, and its cursor.
 bool replayTo(const Snapshot& snap, const ReportGame& g, ScanBoard& board, std::optional<Cursor>& cursor) {
     const auto moves = snap.gameMoves(g.id);
     if (!startOf(snap, g.id, moves.flags, board)) return false;
-    cursor.emplace(moves);
+    cursor.emplace(moves.codes, moves.plies);
     while (cursor->ply() < g.ply) {
-        const auto code = cursor->next(board);
-        if (!code) return false;
-        board.play(board.decode(*code));
+        const int code = cursor->next(board);
+        if (code == Cursor::END) return false;
+        board.play(board.decode(code));
     }
     return true;
 }
@@ -120,7 +79,8 @@ std::optional<TreeAnswer> treesAt(std::span<const ReportSource> sources, uint64_
     return out;
 }
 
-// The games of a snapshot at a position, by a search of every game; none when cancelled.
+// The games of a snapshot at a position, by a search of every game; none when cancelled. What a thread of the search
+// threw is thrown again.
 std::optional<std::vector<SearchHit>> searchPosition(const std::shared_ptr<const Snapshot>& snapshot,
                                                      const ScanBoard& position, int threads,
                                                      const std::atomic<bool>& cancel) {
@@ -134,6 +94,7 @@ std::optional<std::vector<SearchHit>> searchPosition(const std::shared_ptr<const
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     search.wait();
+    if (const auto error = search.error()) std::rethrow_exception(error);
     return search.hits();
 }
 
@@ -203,9 +164,9 @@ bool replayGame(const Snapshot& snap, const ReportGame& g, uint32_t plan_plies, 
             }
         }
         if (step == end) break;
-        const auto code = cursor->next(board);
-        if (!code) break;
-        const auto move = board.decode(*code);
+        const int code = cursor->next(board);
+        if (code == Cursor::END) break;
+        const auto move = board.decode(code);
         if (step < plan_plies && !(move.flags & MOVE_NULL)) {
             const int side     = board.sideToMove();
             const auto mover   = board.on(move.from);
@@ -370,9 +331,9 @@ int namedPlan(std::span<const ReportSource> sources, const ReportPlan& plan, con
         std::size_t found = 0;
         int name          = 0;
         while (found < plan.squares.size()) {
-            const auto code = cursor->next(board);
-            if (!code) break;
-            const auto move   = board.decode(*code);
+            const int code = cursor->next(board);
+            if (code == Cursor::END) break;
+            const auto move   = board.decode(code);
             const auto mover  = board.on(move.from);
             const bool pushes = mover && (mover - 1) % 6 == PAWN && (mover - 1) / 6 == plan.side &&
                                 !board.on(move.to) && !(move.flags & MOVE_EN_PASSANT);
@@ -431,7 +392,7 @@ ReportMoves movesAt(std::span<const ReportSource> sources, const ScanBoard& posi
             std::optional<Cursor> cursor;
             const ReportGame g{static_cast<uint32_t>(s), hit.id, hit.ply};
             if (position.codeCount() <= 256 && replayTo(*src.snapshot, g, board, cursor))
-                code = cursor->next(board).value_or(TreeMove::END);
+                code = cursor->next(board);  // END after its last move, and for a code that cannot be read
             by_code[code].add(numbers);
             auto& each = per_move[code];
             each.resize(sources.size(), 0);
@@ -490,8 +451,7 @@ OpeningReport makeOpeningReport(std::span<const ReportSource> sources, const Sca
                                 const std::function<void(const OpeningReport&)>& section) {
     const auto started = std::chrono::steady_clock::now();
     const auto stopped = [&] { return cancel.load(std::memory_order_relaxed); };
-    const int threads =
-        options.threads > 0 ? options.threads : std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    const int threads  = threadCount(options.threads);
     OpeningReport out;
     const auto finish = [&](ReportSection made) {
         out.made    = made;
@@ -776,11 +736,11 @@ OpeningReport makeOpeningReport(std::span<const ReportSource> sources, const Sca
         std::optional<ReportNovelty> left;
         for (uint32_t step = 0; step < options.plan_plies; ++step) {
             const uint32_t ply = u.game.ply + step;
-            const auto code    = cursor->next(board);
-            if (!code) break;
+            const int code     = cursor->next(board);
+            if (code == Cursor::END) break;
             ScanBoard after = board;
-            after.play(after.decode(*code));
-            codes.push_back(*code);
+            after.play(after.decode(code));
+            codes.push_back(code);
             // The game counted in its own database's tree where the tree keeps the position (another game of the
             // database reaches it too), within its plies.
             const auto own = [&](const ScanBoard& b, uint32_t at_ply) -> uint64_t {

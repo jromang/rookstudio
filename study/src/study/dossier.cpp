@@ -7,12 +7,11 @@
 #include <map>
 #include <mutex>
 #include <set>
-#include <thread>
 #include <tuple>
 
 #include <chess.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "query.hpp"
 
 namespace fcg::study {
@@ -250,23 +249,6 @@ constexpr uint32_t STRUCTURE_PLY  = 40;
 constexpr uint64_t SCAN_PART      = 16384;
 constexpr std::size_t REPLAY_PART = 64;
 
-// Runs `work(thread)` on `threads` threads, the background of the caller kept.
-template <typename Work>
-void onThreads(int threads, Work&& work) {
-    if (threads <= 1) {
-        work(0);
-        return;
-    }
-    const Inherited background;
-    std::vector<std::thread> pool;
-    for (int t = 0; t < threads; ++t)
-        pool.emplace_back([&, t] {
-            background.apply();
-            work(t);
-        });
-    for (auto& th : pool) th.join();
-}
-
 struct Found {
     uint32_t source = 0;
     GameId id       = 0;
@@ -282,8 +264,7 @@ Dossier makeDossier(std::vector<DossierSource> sources, const DossierSubject& su
     Dossier out;
     out.sources  = std::move(sources);
     out.openings = options.openings;
-    const int threads =
-        options.threads > 0 ? options.threads : std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    const int threads = threadCount(options.threads);
     uint64_t total = 0;
     for (const auto& s : out.sources)
         if (s.snapshot) total += s.snapshot->games();
@@ -386,7 +367,7 @@ Dossier makeDossier(std::vector<DossierSource> sources, const DossierSubject& su
                     const bool standard = !(moves.flags & (GAME_FEN | GAME_CHESS960));
                     auto& tree          = mine[f.white ? 0 : 1];
                     seen.clear();
-                    std::size_t p = 0;
+                    Cursor cursor(moves.codes, moves.plies);
                     for (uint32_t ply = 0;; ++ply) {
                         const uint64_t key = board.key();
                         if (ply == STRUCTURE_PLY) {  // reached: the game went on to it
@@ -395,25 +376,10 @@ Dossier makeDossier(std::vector<DossierSource> sources, const DossierSubject& su
                         }
                         if (standard && options.openings && ply > 0 && ply <= OPENING_PLIES)
                             if (const auto named = options.openings->at(key)) g.opening = static_cast<int>(*named);
-                        // The next move: none at the game's end; a code that cannot be read ends it too.
-                        int code     = TreeMove::END;
-                        bool damaged = false;
-                        if (ply < moves.plies) {
-                            const int count = board.codeCount();
-                            if (p < moves.codes.size()) {
-                                code = moves.codes[p++];
-                                if (count > 256) {
-                                    if (p < moves.codes.size())
-                                        code = (code << 8) | moves.codes[p++];
-                                    else
-                                        damaged = true;
-                                }
-                                damaged = damaged || code >= count;
-                            } else {
-                                damaged = true;
-                            }
-                        }
-                        if (damaged) break;
+                        // The next move: none at the game's end; a code that cannot be read ends it there too, its
+                        // position kept as the end's is.
+                        static_assert(Cursor::END == TreeMove::END);
+                        const int code = cursor.next(board);
                         if (ply == 0 && code != TreeMove::END) g.first_move = code;
                         // The tree: the positions of its first plies, each where the game first reaches it, with the
                         // move it played there (none at its end); a position of more than 256 codes is not followed.

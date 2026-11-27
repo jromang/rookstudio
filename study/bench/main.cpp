@@ -78,6 +78,7 @@
 #include <study/mapped_file.hpp>
 #include <study/names.hpp>
 #include <study/opening_report.hpp>
+#include <study/parallel.hpp>
 #include <study/patterns.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/puzzles.hpp>
@@ -238,8 +239,7 @@ int runImport(const Args& a) {
     std::fprintf(stderr, "\n");
     const auto snap = db->snapshot();
     std::printf("import %s\n", file.string().c_str());
-    std::printf("  threads           %d\n",
-                options.threads ? options.threads : static_cast<int>(std::thread::hardware_concurrency()));
+    std::printf("  threads           %d\n", threadCount(options.threads));
     std::printf("  time              %.1f s\n", t);
     std::printf("  file              %.1f MB, %.1f MB/s\n", progress.total_bytes / 1e6, progress.total_bytes / 1e6 / t);
     std::printf("  games read        %llu (%.0f games/s), damaged %llu\n",
@@ -352,20 +352,9 @@ long long replay(const Snapshot& snap, GameId id, const ScanBoard& start) {
     } else if (chess960 && !board.setFen(chess::constants::STARTPOS, true)) {
         return -1;
     }
-    const auto* p   = game.codes.data();
-    const auto* end = p + game.codes.size();
-    for (uint32_t ply = 0; ply < game.plies; ++ply) {
-        const int count = board.codeCount();
-        if (p == end) return -1;
-        int code = *p++;
-        if (count > 256) {
-            if (p == end) return -1;
-            code = (code << 8) | *p++;
-        }
-        if (code >= count) return -1;
-        board.play(board.decode(code));
-    }
-    return p == end ? game.plies : -1;
+    Cursor cursor(game.codes, game.plies);
+    for (int code; (code = cursor.next(board)) != Cursor::END;) board.play(board.decode(code));
+    return cursor.ply() == game.plies && cursor.bytes() == game.codes.size() ? game.plies : -1;
 }
 
 // Every game replayed on `threads` threads: the plies and the games that failed.
@@ -859,7 +848,7 @@ int runDecode(const Args& a) {
     if (a.words.size() != 2) return 2;
     auto db          = Database::open(a.words[1]);
     const auto snap  = db->snapshot();
-    const int all    = a.threads ? a.threads : static_cast<int>(std::thread::hardware_concurrency());
+    const int all    = threadCount(a.threads);
     const auto t0    = Clock::now();
     const auto one   = replayAll(*snap, 1);
     const double t1s = seconds(t0);
@@ -1097,7 +1086,7 @@ int runSearch(const Args& a) {
     if (a.words.size() != 2) return 2;
     auto db           = Database::open(a.words[1]);
     const auto snap   = db->snapshot();
-    const int threads = a.threads > 0 ? a.threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    const int threads = threadCount(a.threads);
     std::printf("search %s: %llu games, %d threads\n", a.words[1].c_str(),
                 static_cast<unsigned long long>(snap->games()), threads);
     ScanBoard start_board;
@@ -1204,7 +1193,7 @@ int runAdvanced(const Args& a) {
     if (a.words.size() != 2) return 2;
     auto db           = Database::openReadOnly(a.words[1]);
     const auto snap   = db->snapshot();
-    const int threads = a.threads > 0 ? a.threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    const int threads = threadCount(a.threads);
     bool signatures   = snap->games() > 0 && snap->signature(0).has_value();
     std::printf("advanced %s: %llu games, %d threads, %s\n", a.words[1].c_str(),
                 static_cast<unsigned long long>(snap->games()), threads,
@@ -2145,8 +2134,7 @@ int runDossier(const Args& a) {
             if ((pawns & d) && !(pawns & (c | e))) out.emplace_back(1, side);
         }
     };
-    const int threads_list[] = {a.threads > 0 ? a.threads : static_cast<int>(std::thread::hardware_concurrency()), 4,
-                                1};
+    const int threads_list[] = {threadCount(a.threads), 4, 1};
     for (const std::size_t rank : {std::size_t{1}, std::size_t{10}, std::size_t{100}, std::size_t{1000}}) {
         if (rank > order.size() || anonymousName(snap->name(order[rank - 1]))) continue;
         DossierSubject subject;
@@ -2195,7 +2183,7 @@ int runCrosstables(const Args& a) {
     std::printf("crosstables %s: %llu games, %u names; %.1f MB held\n", a.words[1].c_str(),
                 static_cast<unsigned long long>(snap->games()), snap->names(), heldMb().first);
     TournamentList list;
-    const int machine = a.threads > 0 ? a.threads : static_cast<int>(std::thread::hardware_concurrency());
+    const int machine = threadCount(a.threads);
     for (const int threads : {machine, 4, 1}) {
         TournamentProgress progress;
         std::atomic<bool> cancel{false};
@@ -2295,7 +2283,7 @@ int runOpeningReport(const Args& a) {
          "d4 d5 c4 e6 Nc3 Nf6 cxd5 exd5 Bg5 c6 e3 Be7 Bd3 Nbd7 Qc2 O-O Nf3 Re8 O-O Nf8"},
         {"a rare line", "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3 e5 Nb3 Be6 f3 Be7 Qd2 O-O O-O-O Nbd7 g4 b5 g5 b4"},
     };
-    const int machine = a.threads > 0 ? a.threads : static_cast<int>(std::thread::hardware_concurrency());
+    const int machine = threadCount(a.threads);
     // What confirms the user's game that left the databases: a search of the position in every game.
     {
         chess::Board board;

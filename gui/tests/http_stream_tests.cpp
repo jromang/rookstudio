@@ -431,7 +431,7 @@ TEST_CASE("HTTP: one request at a time to a host, and a pause after it answered 
     CHECK(gate.pausedFor("paused.invalid") > 59s);
 }
 
-TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bounds; the minute without one") {
+TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bounds, lengthens the pause, never less") {
     using namespace std::chrono;
     // "Wed, 21 Oct 2015 07:28:00 GMT".
     const system_clock::time_point now{sys_days{std::chrono::year{2015} / 10 / 21} + 7h + 28min};
@@ -456,9 +456,10 @@ TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bound
         CHECK_FALSE(retryAfter(value, now));
     }
 
-    // A request's, a stream's and a download's 429 pause their host as long as its Retry-After asks, not a minute.
+    // A request's, a stream's and a download's 429 pause their host as long as its Retry-After asks when that is longer
+    // than the pause (a minute; the tests make it shorter), never less: Lichess asks for a full minute.
     auto& gate = HostGate::instance();
-    gate.setPause(60s);
+    gate.setPause(50ms);
     const auto port = fcg::test::freePort();
     ScriptedServer server(port, [&](const std::string& head, net::TcpConnection& c) {
         if (requestPath(head) == "/later")
@@ -469,20 +470,22 @@ TEST_CASE("HTTP: a 429's Retry-After, in seconds or as a date, read within bound
     REQUIRE(server.ok());
     const auto later = fmt::format("http://127.0.0.1:{}/later", port);
     CHECK(politeRequest(get(later)).status == 429);
-    CHECK(gate.pausedFor("127.0.0.1") > 0ms);
-    CHECK(gate.pausedFor("127.0.0.1") <= 1001ms);
-    CHECK(gate.waitPause("127.0.0.1"));  // its second
-    HttpStream stream;
-    CHECK(politeStream(get(later), stream).status == 429);
-    CHECK(gate.pausedFor("127.0.0.1") > 0ms);
+    CHECK(gate.pausedFor("127.0.0.1") > 100ms);  // its second, longer than the pause
     CHECK(gate.pausedFor("127.0.0.1") <= 1001ms);
     CHECK(gate.waitPause("127.0.0.1"));
+    HttpStream stream;
+    CHECK(politeStream(get(later), stream).status == 429);
+    CHECK(gate.pausedFor("127.0.0.1") > 100ms);
+    CHECK(gate.pausedFor("127.0.0.1") <= 1001ms);
+    CHECK(gate.waitPause("127.0.0.1"));
+    // A Retry-After shorter than the pause leaves the pause.
+    gate.setPause(1500ms);
     const auto file = fs::temp_directory_path() / "retry-after-download";
     const auto got  = politeDownload(later, file);
     CHECK(got.status == 429);
     CHECK(got.retry_after == 1s);
-    CHECK(gate.pausedFor("127.0.0.1") > 0ms);
-    CHECK(gate.pausedFor("127.0.0.1") <= 1001ms);
+    CHECK(gate.pausedFor("127.0.0.1") > 1001ms);
+    CHECK(gate.pausedFor("127.0.0.1") <= 1501ms);
     CHECK(gate.waitPause("127.0.0.1"));
     CHECK(politeRequest(get(fmt::format("http://127.0.0.1:{}/now", port))).status == 200);
 }

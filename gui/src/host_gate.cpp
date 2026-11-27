@@ -118,8 +118,9 @@ bool HostGate::waitPause(const std::string& name, const std::atomic<bool>* cance
 void HostGate::tooMany(const std::string& name, std::optional<std::chrono::seconds> asked) {
     auto& h = host(name);
     std::lock_guard lock(mutex_);
+    // Never shorter than the pause: Lichess asks for a full minute after a 429, whatever a Retry-After says.
     h.until = std::chrono::steady_clock::now() +
-              (asked ? std::chrono::duration_cast<std::chrono::milliseconds>(*asked) : pause_);
+              (asked ? std::max(pause_, std::chrono::duration_cast<std::chrono::milliseconds>(*asked)) : pause_);
 }
 
 std::chrono::milliseconds HostGate::pausedFor(const std::string& name) const {

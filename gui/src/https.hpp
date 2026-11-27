@@ -184,8 +184,8 @@ inline constexpr std::chrono::seconds RETRY_AFTER_MOST{15 * 60};
     std::string_view value, std::chrono::system_clock::time_point now = std::chrono::system_clock::now());
 
 // What Lichess asks of its API's clients: one request at a time to a host, and a pause of a full minute after it
-// answered 429 (Too Many Requests), or as long as its Retry-After asks. A process's own: a tournament process's (its
-// broadcast relay) is not the window's.
+// answered 429 (Too Many Requests), or longer when its Retry-After asks for more. A process's own: a tournament
+// process's (its broadcast relay) is not the window's.
 class HostGate {
    public:
     static HostGate& instance();
@@ -195,7 +195,8 @@ class HostGate {
                                                           const std::atomic<bool>* cancel = nullptr);
     // Waits for `host`'s pause to end (true), or for `cancel` (false).
     bool waitPause(const std::string& host, const std::atomic<bool>* cancel = nullptr);
-    // The host answered 429: paused for `asked` (its Retry-After, retryAfter()), else for the pause, a minute.
+    // The host answered 429: paused for the pause, a minute, or for `asked` (its Retry-After, retryAfter()) when that
+    // is longer.
     void tooMany(const std::string& host, std::optional<std::chrono::seconds> asked = std::nullopt);
     [[nodiscard]] std::chrono::milliseconds pausedFor(const std::string& host) const;
     void setPause(std::chrono::milliseconds pause);  // a minute; the tests make it shorter

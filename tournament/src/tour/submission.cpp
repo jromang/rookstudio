@@ -9,6 +9,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include "pgn_file.hpp"
+#include "util.hpp"
 
 namespace fcg::tour {
 
@@ -134,12 +135,7 @@ std::string submissionEvent(const std::string& seed, int64_t first_game_ms) {
     static constexpr const char* MONTHS[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     const auto t                          = static_cast<std::time_t>(first_game_ms / 1000);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm                         = localTime(t);
     return fmt::format("{} - {} {}", seed, MONTHS[std::clamp(tm.tm_mon, 0, 11)], tm.tm_mday);
 }
 

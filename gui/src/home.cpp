@@ -4,6 +4,8 @@
 #include <cmath>
 #include <ctime>
 
+#include <tour/util.hpp>
+
 #include "i18n.hpp"
 #include "memory.hpp"
 #include "run.hpp"
@@ -73,14 +75,8 @@ std::string statusLabel(const tour::Summary& s, bool running) {
 std::string endTime(double seconds) {
     const auto now = std::time(nullptr);
     const auto end = now + static_cast<std::time_t>(seconds);
-    std::tm today{}, then{};
-#ifdef _WIN32
-    localtime_s(&today, &now);
-    localtime_s(&then, &end);
-#else
-    localtime_r(&now, &today);
-    localtime_r(&end, &then);
-#endif
+    const auto today = localTime(now);
+    const auto then  = localTime(end);
     char text[32];
     const bool same_day = today.tm_year == then.tm_year && today.tm_yday == then.tm_yday;
     std::strftime(text, sizeof(text), same_day ? "%H:%M" : "%Y-%m-%d %H:%M", &then);

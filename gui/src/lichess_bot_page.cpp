@@ -20,6 +20,7 @@
 #include <imgui.h>
 #include <engine/uci_engine.hpp>
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "board_page.hpp"
 #include "board_view.hpp"
@@ -128,12 +129,7 @@ std::string declineText(std::string_view key) {
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
+    const auto local = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &local);
     return text;
@@ -1042,12 +1038,7 @@ void LichessBotPage::drawBotRules(const EngineEntry& e, bool enter_below) {
     std::string since;
     if (s.upgraded_at > 0) {
         const auto t = static_cast<std::time_t>(s.upgraded_at);
-        std::tm local{};
-#ifdef _WIN32
-        localtime_s(&local, &t);
-#else
-        localtime_r(&t, &local);
-#endif
+        const auto local = localTime(t);
         // The time today, else the date: "a bot since on Monday" did not read.
         char time_text[16], date_text[16];
         std::strftime(time_text, sizeof(time_text), "%H:%M", &local);

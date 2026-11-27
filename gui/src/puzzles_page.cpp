@@ -29,6 +29,7 @@
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "board_text.hpp"
 #include "board_view.hpp"
@@ -1559,12 +1560,7 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
         const auto when = [](int64_t t) {
             char text[16] = "";
             const auto tt = static_cast<std::time_t>(t);
-            std::tm tm{};
-#ifdef _WIN32
-            localtime_s(&tm, &tt);
-#else
-            localtime_r(&tt, &tm);
-#endif
+            const auto tm = localTime(tt);
             std::strftime(text, sizeof text, "%H:%M", &tm);
             return std::string(text);
         };
@@ -1661,12 +1657,7 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
     }
     if (batch && batch->sent_at > 0) {
         const auto tt = static_cast<std::time_t>(batch->sent_at);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &tt);
-#else
-        localtime_r(&tt, &tm);
-#endif
+        const auto tm = localTime(tt);
         char text[32];
         std::strftime(text, sizeof text, "%H:%M", &tm);
         ImGui::TextDisabled("%s", (batch->sent_status == "accepted"

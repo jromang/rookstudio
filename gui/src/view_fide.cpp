@@ -11,6 +11,7 @@
 #include <imgui.h>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -143,13 +144,7 @@ void App::drawFideAsk(FideAsk& a) {
         if (a.shown->asked > 0) {
             char day[32]           = "";
             const std::time_t when = static_cast<std::time_t>(a.shown->asked);
-            std::tm tm{};  // localtime() shares one buffer between the threads
-#ifdef _WIN32
-            const bool local = localtime_s(&tm, &when) == 0;
-#else
-            const bool local = localtime_r(&when, &tm) != nullptr;
-#endif
-            if (local) std::strftime(day, sizeof day, "%Y-%m-%d", &tm);
+            if (const auto tm = localTimeOf(when)) std::strftime(day, sizeof day, "%Y-%m-%d", &*tm);
             ImGui::TextDisabled(
                 "%s", trf("From Lichess, which keeps FIDE's list; asked on {}, kept in your profile.", day).c_str());
         }

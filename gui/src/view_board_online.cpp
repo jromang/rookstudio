@@ -16,6 +16,7 @@
 #include <json.hpp>
 
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_tables.hpp"
@@ -160,12 +161,7 @@ lichess::CloudEval cloudFrom(const nlohmann::json& j) {
 
 std::string clockText(int64_t seconds) {
     const auto t = static_cast<std::time_t>(seconds);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char text[16];
     std::strftime(text, sizeof(text), "%H:%M", &tm);
     return text;

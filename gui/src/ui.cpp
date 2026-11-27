@@ -18,6 +18,7 @@
 #include <implot.h>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "i18n.hpp"
 #include "renderer.hpp"
@@ -211,14 +212,8 @@ std::string formatCount(uint64_t n) {
 
 std::string dayText(std::time_t when) {
     const auto now = std::time(nullptr);
-    std::tm today{}, then{};
-#ifdef _WIN32
-    localtime_s(&today, &now);
-    localtime_s(&then, &when);
-#else
-    localtime_r(&now, &today);
-    localtime_r(&when, &then);
-#endif
+    const auto today = localTime(now);
+    const auto then  = localTime(when);
     // Days between them, counted from the calendar days, not 24-hour spans.
     std::tm a = today, b = then;
     a.tm_hour = b.tm_hour = 12;

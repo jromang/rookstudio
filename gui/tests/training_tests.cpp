@@ -13,6 +13,7 @@
 #include <fmt/include/fmt/format.h>
 #include <chess.hpp>
 #include <json.hpp>
+#include <tour/util.hpp>
 
 #include "console.hpp"
 #include "repertoires.hpp"
@@ -169,12 +170,7 @@ TEST_CASE("training: a card whose move changed in the repertoire starts again, t
 TEST_CASE("training: the training day ends at 4 in the morning, local time") {
     const auto at = [](int days, int hour, int minute) {
         const auto now = std::time(nullptr);
-        std::tm local{};
-#ifdef _WIN32
-        localtime_s(&local, &now);
-#else
-        localtime_r(&now, &local);
-#endif
+        auto local     = localTime(now);
         local.tm_mday += days;
         local.tm_hour  = hour;
         local.tm_min   = minute;

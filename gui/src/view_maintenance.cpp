@@ -17,6 +17,7 @@
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/background.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -1488,12 +1489,7 @@ void App::drawCareChecks(std::size_t index) {
     if (c.check) {
         const auto& r = *c.check;
         char when[16] = {};
-        std::tm t{};
-#ifdef _WIN32
-        localtime_s(&t, &c.checked);
-#else
-        localtime_r(&c.checked, &t);
-#endif
+        const auto t  = localTime(c.checked);
         std::strftime(when, sizeof when, "%H:%M", &t);
         if (r.damaged.empty() && r.segments.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GOOD), "%s", TR("Sound"));

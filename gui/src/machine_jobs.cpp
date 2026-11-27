@@ -4,6 +4,8 @@
 #include <ctime>
 #include <set>
 
+#include <tour/util.hpp>
+
 #include "i18n.hpp"
 #include "machine_run.hpp"
 #include "memory.hpp"
@@ -21,12 +23,7 @@ using namespace std::chrono_literals;
 
 std::string nowText() {
     const auto t = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char buffer[32];
     std::strftime(buffer, sizeof buffer, "%Y-%m-%d %H:%M", &tm);
     return buffer;

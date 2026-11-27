@@ -6,6 +6,7 @@
 #include <engine/uci_engine.hpp>
 #include <tour/by_opening.hpp>
 #include <tour/ratinglist.hpp>
+#include <tour/util.hpp>
 
 #include <fmt/include/fmt/format.h>
 
@@ -496,12 +497,7 @@ void Broadcaster::publish(const Job& job, const BroadcastSettings& settings) {
         const auto dir   = settings.dir.empty() ? job.input.dir / "live" : settings.dir;
         const auto error = writeBroadcastFiles(snapshot, dir);
         const auto t     = std::time(nullptr);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &t);
-#else
-        localtime_r(&t, &tm);
-#endif
+        const auto tm    = localTime(t);
         char when[16];
         std::strftime(when, sizeof(when), "%H:%M:%S", &tm);
         std::lock_guard<std::mutex> lock(mutex_);

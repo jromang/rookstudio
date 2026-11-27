@@ -20,6 +20,7 @@
 #include <study/dossier.hpp>
 #include <study/import.hpp>
 #include <study/scan_board.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "assistant_service.hpp"
@@ -279,12 +280,7 @@ std::string explorerKey(const lichess::ExplorerQuery& q, int source) {
 
 std::string dateOf(int64_t seconds) {
     const auto t = static_cast<std::time_t>(seconds);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &tm);
     return text;

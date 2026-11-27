@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 #include <engine/uci_engine.hpp>
 #include <tour/polyglot.hpp>
+#include <tour/util.hpp>
 
 #include "board_game.hpp"
 #include "engine_play.hpp"
@@ -50,12 +51,7 @@ bool whiteToMove(const BoardState& s) {
 
 std::string dayOf(int64_t seconds) {
     const auto t = static_cast<std::time_t>(seconds);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &t);
-#else
-    localtime_r(&t, &local);
-#endif
+    const auto local = localTime(t);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &local);
     return text;

@@ -12,6 +12,7 @@
 #include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -48,12 +49,7 @@ std::string lower(std::string text) {
 // A day as the page says it: "18 November 2026".
 std::string dateText(int64_t seconds) {
     const auto t = static_cast<std::time_t>(seconds);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char text[32];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &tm);
     return text;

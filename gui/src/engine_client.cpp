@@ -11,6 +11,7 @@
 #include <engine/uci_engine.hpp>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "engines.hpp"
 #include "proc_tree.hpp"
@@ -207,12 +208,7 @@ void CoreClaim::set(int threads) {
 std::string clockTime(std::chrono::system_clock::time_point when) {
     const auto t  = std::chrono::system_clock::to_time_t(when);
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(when.time_since_epoch()).count() % 1000;
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &t);
-#else
-    localtime_r(&t, &local);
-#endif
+    const auto local = localTime(t);
     return fmt::format("{:02}:{:02}:{:02}.{:03}", local.tm_hour, local.tm_min, local.tm_sec, ms);
 }
 

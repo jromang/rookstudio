@@ -26,6 +26,7 @@
 #include <imgui.h>
 
 #include <study/crosstable.hpp>
+#include <tour/util.hpp>
 
 #include "crosstables.hpp"
 #include "databases.hpp"
@@ -137,12 +138,7 @@ std::string whenText(const lichess::ArenaInfo& a) {
 std::string startText(int64_t ms) {
     if (ms <= 0) return {};
     const auto t = static_cast<std::time_t>(ms / 1000);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm                   = localTime(t);
     static const char* const DAYS[] = {N_("Sunday"),   N_("Monday"), N_("Tuesday"), N_("Wednesday"),
                                        N_("Thursday"), N_("Friday"), N_("Saturday")};
     if (ms - nowMillis() > int64_t{7} * 86400000)
@@ -1928,12 +1924,7 @@ void LichessArenasPage::drawSwissPart() {
             ImGui::PushTextWrapPos();
             if (info->next_round_at > 0) {
                 const auto t = static_cast<std::time_t>(info->next_round_at / 1000);
-                std::tm tm{};
-#ifdef _WIN32
-                localtime_s(&tm, &t);
-#else
-                localtime_r(&t, &tm);
-#endif
+                const auto tm = localTime(t);
                 ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
                 ImGui::TextUnformatted(trf("Round {} at {:02}:{:02}", info->round + 1, tm.tm_hour, tm.tm_min).c_str());
                 ImGui::PopFont();
@@ -2123,12 +2114,7 @@ void LichessArenasPage::drawHome() {
         const auto& info = *s.info.value;
         if (info.state == lichess::TourState::Created && info.next_round_at > 0) {
             const auto t = static_cast<std::time_t>(info.next_round_at / 1000);
-            std::tm tm{};
-#ifdef _WIN32
-            localtime_s(&tm, &t);
-#else
-            localtime_r(&t, &tm);
-#endif
+            const auto tm = localTime(t);
             ImGui::TextUnformatted(
                 trf("In the Swiss: {} · its first round at {:02}:{:02}", s.name, tm.tm_hour, tm.tm_min).c_str());
         } else {

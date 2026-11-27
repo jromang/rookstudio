@@ -8,6 +8,7 @@
 #include <engine/uci_engine.hpp>
 
 #include <tour/engine_text.hpp>
+#include <tour/util.hpp>
 
 #include <fmt/include/fmt/format.h>
 
@@ -47,12 +48,7 @@ std::string csvField(const std::string& s) {
 
 std::string now(const char* format) {
     const auto t = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char buffer[32];
     std::strftime(buffer, sizeof(buffer), format, &tm);
     return buffer;

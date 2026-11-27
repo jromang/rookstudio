@@ -12,6 +12,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -102,13 +103,7 @@ void App::pollPrep() {
         const auto facts = shelf().facts(p.index);
         if (facts.games > 0 && facts.changed > 0) {
             char day[32]  = "";
-            std::tm tm{};  // localtime() shares one buffer between the threads
-#ifdef _WIN32
-            const bool local = localtime_s(&tm, &facts.changed) == 0;
-#else
-            const bool local = localtime_r(&facts.changed, &tm) != nullptr;
-#endif
-            if (local) std::strftime(day, sizeof day, "%Y-%m-%d", &tm);
+            if (const auto tm = localTimeOf(facts.changed)) std::strftime(day, sizeof day, "%Y-%m-%d", &*tm);
             p.last_sync = day;
         }
     }

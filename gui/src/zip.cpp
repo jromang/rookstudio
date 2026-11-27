@@ -6,6 +6,7 @@
 #include <fstream>
 
 #include <core/crc32.hpp>
+#include <tour/util.hpp>
 
 // The zlib compressor of stb_image_write (compiled in screenshot.cpp), which its header does not declare.
 extern "C" unsigned char* stbi_zlib_compress(unsigned char* data, int data_len, int* out_len, int quality);
@@ -146,12 +147,7 @@ std::string zipArchive(const std::string& name, const std::string& data, uint16_
 
 bool writeZip(const std::filesystem::path& zip, const std::string& name, const std::string& data, std::string* error) {
     const auto now = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &now);
-#else
-    localtime_r(&now, &tm);
-#endif
+    const auto tm   = localTime(now);
     const auto time = static_cast<uint16_t>((tm.tm_hour << 11) | (tm.tm_min << 5) | (tm.tm_sec / 2));
     const auto date = static_cast<uint16_t>((std::max(0, tm.tm_year - 80) << 9) | ((tm.tm_mon + 1) << 5) | tm.tm_mday);
 

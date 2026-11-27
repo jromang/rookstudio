@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -37,12 +38,7 @@ bool editText(const char* id, std::string& value, float width = -FLT_MIN) {
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &now);
-#else
-    localtime_r(&now, &tm);
-#endif
+    const auto tm  = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &tm);
     return text;

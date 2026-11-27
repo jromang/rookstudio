@@ -8,6 +8,7 @@
 #include <set>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "https.hpp"
 #include "lichess_games.hpp"
@@ -733,12 +734,7 @@ double trfPoints(char code) {
 
 std::string swissStartText(int64_t ms) {
     const auto t = static_cast<std::time_t>(ms / 1000);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     return fmt::format("{:02}:{:02} on {} {} {}", tm.tm_hour, tm.tm_min, tm.tm_mday, MONTHS[tm.tm_mon % 12],
                        tm.tm_year + 1900);
 }

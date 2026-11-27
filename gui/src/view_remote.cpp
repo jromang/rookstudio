@@ -13,6 +13,7 @@
 #include <mbedtls/platform_util.h>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -58,12 +59,7 @@ std::string untilde(const std::string& path, const std::string& home) {
 std::string dayOf(int64_t time) {
     if (time <= 0) return {};
     const auto t = static_cast<std::time_t>(time);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char text[16];
     std::strftime(text, sizeof text, "%Y-%m-%d", &tm);
     return text;

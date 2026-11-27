@@ -18,6 +18,7 @@
 #include <imgui.h>
 #include <chess.hpp>
 #include <tour/budget.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_view.hpp"
@@ -112,12 +113,7 @@ void keyHint(const char* key) {
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
+    const auto local = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &local);
     return text;

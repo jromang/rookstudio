@@ -15,6 +15,7 @@
 #include <implot.h>
 
 #include <tour/budget.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -1096,12 +1097,7 @@ void App::drawRemoteMachinesLine() {
             text += " · " + trn("{} engine playing", "{} engines playing", m.engines, m.engines);
         } else if (!m.error.empty() && m.since > 0) {
             const auto t = static_cast<std::time_t>(m.since);
-            std::tm tm{};
-#ifdef _WIN32
-            localtime_s(&tm, &t);
-#else
-            localtime_r(&t, &tm);
-#endif
+            const auto tm = localTime(t);
             char hhmm[8];
             std::strftime(hhmm, sizeof hhmm, "%H:%M", &tm);
             text += " · " + trf("not answering since {}", hhmm);

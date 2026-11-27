@@ -28,6 +28,7 @@
 #include <study/background.hpp>
 #include <study/game_tree.hpp>
 #include <study/import.hpp>
+#include <tour/util.hpp>
 
 #include "board_page.hpp"
 #include "board_text.hpp"
@@ -1249,12 +1250,7 @@ void MistakesPage::drawMistakeColumn() {
     const auto review_date = [&] {
         if (e.reviewed <= 0) return std::string();
         const auto t = static_cast<std::time_t>(e.reviewed);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &t);
-#else
-        localtime_r(&t, &tm);
-#endif
+        const auto tm = localTime(t);
         char text[16];
         std::strftime(text, sizeof text, "%Y-%m-%d", &tm);
         return std::string(text);

@@ -8,6 +8,7 @@
 #include <json.hpp>
 
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "profile_entries.hpp"
 #include "storage.hpp"
@@ -129,12 +130,7 @@ void writeTrainingSettings(const fs::path& profile, const TrainingSettings& sett
 
 int64_t trainingDayEnd(int64_t now) {
     const auto t = static_cast<std::time_t>(now);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &t);
-#else
-    localtime_r(&t, &local);
-#endif
+    const auto local = localTime(t);
     // 4 a.m. of this day, or of the next one once past it.
     std::tm end  = local;
     end.tm_hour  = 4;

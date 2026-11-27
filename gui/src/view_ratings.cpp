@@ -17,6 +17,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include <tour/summary.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -33,12 +34,7 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 std::string date(int64_t ms) {
     if (ms <= 0) return "?";
     const auto t = static_cast<std::time_t>(ms / 1000);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     return fmt::format("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 

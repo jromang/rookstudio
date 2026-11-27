@@ -4,6 +4,7 @@
 #include <set>
 
 #include <tour/pgn_file.hpp>
+#include <tour/util.hpp>
 
 #include <fmt/include/fmt/format.h>
 
@@ -44,12 +45,7 @@ constexpr std::string_view START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR 
 
 std::string now() {
     const auto t = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char buffer[16];
     std::strftime(buffer, sizeof(buffer), "%H:%M:%S", &tm);
     return buffer;

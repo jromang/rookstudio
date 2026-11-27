@@ -11,6 +11,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include <tour/rating_import.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "program_format.hpp"
@@ -86,12 +87,7 @@ struct InFlight {
 std::string nowText() {
     char when[32];
     const auto now = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &now);
-#else
-    localtime_r(&now, &tm);
-#endif
+    const auto tm  = localTime(now);
     std::strftime(when, sizeof(when), "%Y-%m-%d %H:%M", &tm);
     return when;
 }

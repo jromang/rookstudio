@@ -15,6 +15,7 @@
 #include <json.hpp>
 #include <study/import.hpp>
 #include <study/query.hpp>
+#include <tour/util.hpp>
 
 #include "board_text.hpp"
 #include "console.hpp"
@@ -341,12 +342,7 @@ std::string_view mistakeKindTheme(std::string_view key) {
 
 uint32_t packedDaysBefore(int64_t now, int days) {
     const auto t = static_cast<std::time_t>(now - static_cast<int64_t>(days) * study::fsrs::DAY);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     return static_cast<uint32_t>(tm.tm_year + 1900) << 9 | static_cast<uint32_t>(tm.tm_mon + 1) << 5 |
            static_cast<uint32_t>(tm.tm_mday);
 }

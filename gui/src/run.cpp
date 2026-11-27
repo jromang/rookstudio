@@ -21,6 +21,7 @@
 #include <tour/polyglot.hpp>
 #include <tour/runner.hpp>
 #include <tour/sprt_rules.hpp>
+#include <tour/util.hpp>
 
 #include "console.hpp"
 #include "engines.hpp"
@@ -153,12 +154,7 @@ fastchess::EngineConfiguration toConfig(const EngineEntry& entry, const MatchSet
 
 std::string timestamp() {
     const auto now = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &now);
-#else
-    localtime_r(&now, &tm);
-#endif
+    const auto tm  = localTime(now);
     char stamp[32];
     std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &tm);
     return stamp;

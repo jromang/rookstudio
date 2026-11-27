@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <future>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -28,6 +29,25 @@ template <typename Future>
 [[nodiscard]] bool isReady(const Future& future) {
     return future.valid() && future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
 }
+
+// How a task that may stop before its end ended (#117): at its end, cancelled (its job's cancel(), its group's
+// cancelAll()), or stopped by a failure, said in words. Its owner tells a cancel from a failure by the kind, never by
+// the words.
+struct TaskEnd {
+    enum class Kind { Done, Cancelled, Failed };
+    Kind kind = Kind::Done;
+    std::string error;  // why it failed, shown as it is
+
+    [[nodiscard]] static TaskEnd cancel() { return {Kind::Cancelled, {}}; }
+    // At its end when `why` is empty (a reading's word for its end), else failed for it.
+    [[nodiscard]] static TaskEnd of(std::string why) {
+        return why.empty() ? TaskEnd{} : TaskEnd{Kind::Failed, std::move(why)};
+    }
+    [[nodiscard]] bool done() const noexcept { return kind == Kind::Done; }
+    [[nodiscard]] bool cancelled() const noexcept { return kind == Kind::Cancelled; }
+    [[nodiscard]] bool failed() const noexcept { return kind == Kind::Failed; }
+    bool operator==(const TaskEnd&) const = default;
+};
 
 // What a task that tells nothing as it goes tells.
 struct NoProgress {};

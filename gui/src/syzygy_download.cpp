@@ -146,12 +146,12 @@ const char* syzygy345Url() { return "https://tablebase.lichess.ovh/tables/standa
 
 namespace {
 
-// The files of `files` missing in `folder` downloaded from `base_url`, one after the other: empty when every file is
-// there, else why it stopped ("cancelled" for Cancel). On the download's thread, holding all it uses.
-std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, const std::vector<SyzygyFile>& files,
-                           std::atomic<uint64_t>& generation, TaskState<SyzygyDownload::Progress>& job) {
+// The files of `files` missing in `folder` downloaded from `base_url`, one after the other: done when every file is
+// there, else cancelled or failed, with why it stopped. On the download's thread, holding all it uses.
+TaskEnd downloadSyzygy(const fs::path& folder, const std::string& base_url, const std::vector<SyzygyFile>& files,
+                       std::atomic<uint64_t>& generation, TaskState<SyzygyDownload::Progress>& job) {
     auto& progress = static_cast<SyzygyDownload::Progress&>(job);
-    std::string why;
+    TaskEnd end;
     uint64_t done     = 0;
     std::size_t count = 0;
     // What is there already counts, checked.
@@ -176,7 +176,7 @@ std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, 
     progress.ready = readyBefore(0);
     for (std::size_t i = 0; i < todo.size(); ++i) {
         if (job.cancel) {
-            why = "cancelled";
+            end = TaskEnd::cancel();
             break;
         }
         const auto& f          = *todo[i];
@@ -185,14 +185,15 @@ std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, 
         // After the host's pause, taking no turn: a file may take minutes, which the online tables' questions to the
         // same host do not wait for.
         const auto got = politeDownload(base_url + f.name, folder / f.name, &progress.current, &job.cancel);
-        if (!got.ok) {
-            why = got.error.empty() ? std::string("the download stopped") : got.error;
+        if (!got.ok) {  // its cancel stopped it, or it failed
+            end = job.cancel ? TaskEnd::cancel()
+                             : TaskEnd::of(got.error.empty() ? std::string("the download stopped") : got.error);
             break;
         }
         if (!syzygyFileValid(folder / f.name)) {
             std::error_code ec;
             fs::remove(folder / f.name, ec);
-            why = std::string(f.name) + ": not a Syzygy table";
+            end = TaskEnd::of(std::string(f.name) + ": not a Syzygy table");
             break;
         }
         std::error_code ec;
@@ -206,7 +207,7 @@ std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, 
             ++generation;
         }
     }
-    return why;
+    return end;
 }
 
 }  // namespace
@@ -241,7 +242,7 @@ void SyzygyDownload::start() {
                    TaskState<Progress>& job) { return downloadSyzygy(folder, base_url, files, *generation, job); });
 }
 
-std::optional<std::string> SyzygyDownload::finished() {
+std::optional<TaskEnd> SyzygyDownload::finished() {
     if (!job_.ready()) return std::nullopt;
     return job_.take();
 }

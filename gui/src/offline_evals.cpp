@@ -240,7 +240,7 @@ void OfflineEvals::start(std::string source, int min_men) {
     o.on_saved         = on_saved_;
     // The task holds what it reads, what it tells and what it publishes: it may outlive this object, parked.
     job_.start([source = std::move(source), folder = folder_, options, o,
-                published = published_](TaskState<Progress>& job) -> std::string {
+                published = published_](TaskState<Progress>& job) -> TaskEnd {
         try {
             const auto build = folder / "build";
             std::error_code ec;
@@ -252,24 +252,24 @@ void OfflineEvals::start(std::string source, int min_men) {
                 }
                 ++published->version;
             });
-            auto why = readZstd(source, build / "reading.json", consumer, job, job.cancel, o);
-            if (why.empty()) fs::remove_all(build, ec);  // the index made: its runs and logs are gone, its state too
-            return why;
+            auto end = readZstd(source, build / "reading.json", consumer, job, job.cancel, o);
+            if (end.done()) fs::remove_all(build, ec);  // the index made: its runs and logs are gone, its state too
+            return end;
         } catch (const std::exception& e) {
             const std::string why = e.what();
-            return why.empty() ? std::string("stopped") : why;
+            return TaskEnd::of(why.empty() ? std::string("stopped") : why);
         }
     });
 }
 
-std::optional<std::string> OfflineEvals::finished() {
+std::optional<TaskEnd> OfflineEvals::finished() {
     if (!job_.ready()) return std::nullopt;
     auto out = job_.take();
     if (std::exchange(remove_when_ended_, false)) {
         removeNow();
         return std::nullopt;  // cancelled by the removal
     }
-    if (out.empty()) study::tidyEvalsFolder(folder_);  // the index it replaced
+    if (out.done()) study::tidyEvalsFolder(folder_);  // the index it replaced
     reload();
     runs_seen_ = published_->version;
     return out;

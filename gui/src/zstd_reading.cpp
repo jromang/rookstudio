@@ -52,8 +52,8 @@ std::optional<nlohmann::json> readJsonFile(const fs::path& file) {
 
 }  // namespace
 
-std::string readZstd(const std::string& source, const fs::path& state_file, ZstdConsumer& consumer,
-                     ZstdProgress& progress, const std::atomic<bool>& cancel, const ZstdReadingOptions& options) {
+TaskEnd readZstd(const std::string& source, const fs::path& state_file, ZstdConsumer& consumer, ZstdProgress& progress,
+                 const std::atomic<bool>& cancel, const ZstdReadingOptions& options) {
     std::error_code ec;
     fs::create_directories(state_file.parent_path(), ec);
     const bool remote = source.rfind("http://", 0) == 0 || source.rfind("https://", 0) == 0;
@@ -123,22 +123,22 @@ std::string readZstd(const std::string& source, const fs::path& state_file, Zstd
         at = offset;
     };
     // At a stop: what was found made safe, the place of the last frame's end kept, unless nothing was read.
-    const auto stop = [&](std::string why) {
+    const auto stop = [&](TaskEnd end) {
         consumer.commit();
         if (offset > 0) saveState();
-        return why;
+        return end;
     };
     const auto done = [&] {
-        if (!consumer.error().empty()) return consumer.error();
+        if (!consumer.error().empty()) return TaskEnd::of(consumer.error());
         auto why = consumer.finish(date);
         if (why.empty()) fs::remove(state_file, ec);
-        return why;
+        return TaskEnd::of(std::move(why));
     };
 
     if (!remote) {
         progress.size = size;
         std::ifstream in(source, std::ios::binary);
-        if (!in) return "cannot open " + source;
+        if (!in) return TaskEnd::of("cannot open " + source);
         fromPlace();
         in.seekg(static_cast<std::streamoff>(offset));
         std::vector<char> buffer(1 << 20);
@@ -149,9 +149,9 @@ std::string readZstd(const std::string& source, const fs::path& state_file, Zstd
             if (n == 0) break;
             more = feed(std::string_view(buffer.data(), n));
         }
-        if (cancel) return stop("cancelled");
-        if (!consumer.error().empty()) return stop(consumer.error());
-        if (!zstd.betweenFrames()) return stop(source + " is cut short");
+        if (cancel) return stop(TaskEnd::cancel());
+        if (!consumer.error().empty()) return stop(TaskEnd::of(consumer.error()));
+        if (!zstd.betweenFrames()) return stop(TaskEnd::of(source + " is cut short"));
         return done();
     }
 
@@ -209,15 +209,15 @@ std::string readZstd(const std::string& source, const fs::path& state_file, Zstd
         };
         stream.on_data    = feed;
         const auto result = politeStream(request, stream);
-        if (cancel) return stop("cancelled");
-        if (!consumer.error().empty()) return stop(consumer.error());
+        if (cancel) return stop(TaskEnd::cancel());
+        if (!consumer.error().empty()) return stop(TaskEnd::of(consumer.error()));
         if (!refused.empty()) {
             if (offset > 0 && attempt == 0) {  // read again from the start
                 startAgain();
                 saveState();
                 continue;
             }
-            return refused;
+            return TaskEnd::of(refused);
         }
         if (result.error.empty() && result.status != 0 && zstd.betweenFrames() && (size == 0 || at == size))
             return done();
@@ -225,10 +225,10 @@ std::string readZstd(const std::string& source, const fs::path& state_file, Zstd
         consumer.commit();
         if (offset > 0) saveState();
         if (attempt >= options.retries)
-            return result.error.empty() ? std::string("the download was cut short") : result.error;
+            return TaskEnd::of(result.error.empty() ? std::string("the download was cut short") : result.error);
         const auto wait = std::chrono::steady_clock::now() + options.retry_wait * (1 << attempt);
         while (std::chrono::steady_clock::now() < wait) {
-            if (cancel) return "cancelled";
+            if (cancel) return TaskEnd::cancel();
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }

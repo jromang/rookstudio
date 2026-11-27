@@ -486,12 +486,12 @@ void EvalsReading::start(std::string source, fs::path folder) {
             return readZstd(source, folder / "reading.json", consumer, job, job.cancel, options);
         } catch (const std::exception& e) {
             const std::string why = e.what();
-            return why.empty() ? std::string("stopped") : why;
+            return TaskEnd::of(why.empty() ? std::string("stopped") : why);
         }
     });
 }
 
-std::optional<std::string> EvalsReading::finished() {
+std::optional<TaskEnd> EvalsReading::finished() {
     if (!job_.ready()) return std::nullopt;
     return job_.take();
 }

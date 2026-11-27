@@ -179,23 +179,23 @@ void OfflinePuzzles::start(std::string source) {
     o.retry_wait       = retry_wait_;
     o.on_saved         = on_saved_;
     // The task holds what it reads and what it tells: it may outlive this object, parked.
-    job_.start([source = std::move(source), folder = folder_, o](TaskState<Progress>& job) -> std::string {
+    job_.start([source = std::move(source), folder = folder_, o](TaskState<Progress>& job) -> TaskEnd {
         try {
             const auto build = folder / "build";
             std::error_code ec;
             fs::create_directories(build, ec);
             StoreConsumer consumer(folder, job);
-            auto why = readZstd(source, build / "reading.json", consumer, job, job.cancel, o);
-            if (why.empty()) fs::remove_all(build, ec);  // the store made: its files and its state are gone
-            return why;
+            auto end = readZstd(source, build / "reading.json", consumer, job, job.cancel, o);
+            if (end.done()) fs::remove_all(build, ec);  // the store made: its files and its state are gone
+            return end;
         } catch (const std::exception& e) {
             const std::string why = e.what();
-            return why.empty() ? std::string("stopped") : why;
+            return TaskEnd::of(why.empty() ? std::string("stopped") : why);
         }
     });
 }
 
-std::optional<std::string> OfflinePuzzles::finished() {
+std::optional<TaskEnd> OfflinePuzzles::finished() {
     if (!job_.ready()) return std::nullopt;
     auto out = job_.take();
     if (std::exchange(remove_when_ended_, false)) {
@@ -204,9 +204,9 @@ std::optional<std::string> OfflinePuzzles::finished() {
     }
     {
         std::lock_guard lock(mutex_);
-        if (out.empty()) store_.reset();  // the store it replaced, closed before it is removed
+        if (out.done()) store_.reset();  // the store it replaced, closed before it is removed
     }
-    if (out.empty()) study::tidyPuzzleFolder(folder_);
+    if (out.done()) study::tidyPuzzleFolder(folder_);
     reload();
     return out;
 }

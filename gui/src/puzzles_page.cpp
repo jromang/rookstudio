@@ -279,14 +279,15 @@ void PuzzlesPage::poll() {
             else
                 startOffline(lichess::puzzlesUrl());
         }
-        if (const auto why = offline_puzzles_->finished()) {
+        if (const auto end = offline_puzzles_->finished()) {
             const auto state = offline_puzzles_->state();
-            if (why->empty()) {
+            if (end->done()) {
                 Console::instance().add(trf("Lichess's puzzles kept offline: {} puzzles, {}",
                                             ui::exactCount(state.puzzles), formatBytes(state.bytes)));
-            } else if (*why != "cancelled") {
-                offline_puzzles_error_ = *why;
-                Console::instance().add(trf("Lichess's puzzles offline: the preparation stopped: {}", *why), true);
+            } else if (end->failed()) {
+                offline_puzzles_error_ = end->error;
+                Console::instance().add(trf("Lichess's puzzles offline: the preparation stopped: {}", end->error),
+                                        true);
             }
         }
     }

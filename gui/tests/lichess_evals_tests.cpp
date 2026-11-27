@@ -337,7 +337,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         reading.setRetryWait(std::chrono::milliseconds(1));
         reading.start(url, folder);
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
-        CHECK(reading.finished() == std::string());
+        CHECK(reading.finished() == TaskEnd{});
         CHECK(reading.progress().lines == static_cast<uint64_t>(lines_v1));
         CHECK(reading.progress().bytes == contents[0].size());
     }
@@ -377,7 +377,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         REQUIRE(waitUntil([&] { return reading.progress().bytes >= contents[0].size() * 3 / 4; }));
         reading.cancel();
         REQUIRE(waitUntil([&] { return !reading.busy(); }));
-        CHECK(reading.finished() == std::string("cancelled"));
+        CHECK(reading.finished() == TaskEnd::cancel());
     }
     released     = true;
     folder_state = evalsFolder(folder);
@@ -390,7 +390,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         EvalsReading reading(jobs);
         reading.start(url, folder);
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
-        CHECK(reading.finished() == std::string());
+        CHECK(reading.finished() == TaskEnd{});
         CHECK(reading.progress().resumed);
         CHECK(reading.progress().lines == static_cast<uint64_t>(lines_v1));
     }
@@ -408,7 +408,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         REQUIRE(waitUntil([&] { return reading.progress().bytes >= contents[0].size() / 3; }));
         version = 2;
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
-        CHECK(reading.finished() == std::string());
+        CHECK(reading.finished() == TaskEnd{});
         CHECK_FALSE(reading.progress().resumed);
         CHECK(reading.progress().lines == static_cast<uint64_t>(lines_v2));
     }
@@ -426,7 +426,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         EvalsReading reading(jobs);
         reading.start(file.string(), folder);
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
-        CHECK(reading.finished() == std::string());
+        CHECK(reading.finished() == TaskEnd{});
         CHECK(reading.progress().lines == static_cast<uint64_t>(lines_v1));
     }
     CHECK(evaluatedPositions(folder).size() == 3);
@@ -441,7 +441,7 @@ TEST_CASE("evaluations: read while it downloads, cut short and resumed at a fram
         REQUIRE(waitUntil([&] { return !reading.busy(); }, std::chrono::seconds(60)));
         const auto why = reading.finished();
         REQUIRE(why);
-        CHECK(why->find("cut short") != std::string::npos);
+        CHECK(why->error.find("cut short") != std::string::npos);
     }
     CHECK(evalsFolder(folder).stopped_at > 0);
 }

@@ -450,7 +450,7 @@ class App {
         std::filesystem::path folder;
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<DownloadProgress> progress;
-        std::future<std::vector<std::pair<std::filesystem::path, std::string>>> downloads;  // each file, or why not
+        std::future<std::vector<std::pair<std::filesystem::path, TaskEnd>>> downloads;  // each file, and how it ended
         std::vector<std::filesystem::path> files;
         std::size_t next = 0;  // the next file to import
         bool downloaded  = false;

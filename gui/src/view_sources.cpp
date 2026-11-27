@@ -118,14 +118,16 @@ void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, i
     if (const auto db = s.open(add.index)) add.from = static_cast<study::GameId>(db->snapshot()->games());
     add.downloads = std::async(std::launch::async,
                                [urls = add.urls, wanted = add.wanted, cancel = add.cancel, progress = add.progress] {
-                                   std::vector<std::pair<fs::path, std::string>> out;
+                                   std::vector<std::pair<fs::path, TaskEnd>> out;
                                    for (std::size_t i = 0; i < urls.size() && i < wanted.size(); ++i) {
                                        if (cancel->load()) break;
                                        progress->bytes = 0;
                                        progress->size  = 0;
                                        const auto got =
                                            politeDownload(urls[i], wanted[i], progress.get(), cancel.get());
-                                       out.emplace_back(wanted[i], got.ok ? std::string() : got.error);
+                                       out.emplace_back(wanted[i], got.ok           ? TaskEnd{}
+                                                                   : cancel->load() ? TaskEnd::cancel()
+                                                                                    : TaskEnd::of(got.error));
                                        if (!got.ok) break;
                                    }
                                    return out;
@@ -206,10 +208,10 @@ void App::pollTwic() {
     if (!add.downloaded) {
         if (!isReady(add.downloads)) return;
         add.downloaded = true;
-        for (const auto& [file, error] : add.downloads.get()) {
-            if (!error.empty()) {
+        for (const auto& [file, end] : add.downloads.get()) {
+            if (!end.done()) {
                 twic_done_        = TwicDone{};
-                twic_done_->error = error == "cancelled" ? std::string(TR("Cancelled.")) : error;
+                twic_done_->error = end.cancelled() ? std::string(TR("Cancelled.")) : end.error;
                 twic_add_.reset();
                 return;
             }
@@ -884,12 +886,13 @@ void App::startMonthReading(const std::string& source) {
 
 void App::pollMonthReading() {
     if (!month_reading_ || month_reading_->busy() || !month_run_) return;
-    const auto why = month_reading_->finished();
-    if (!why) return;
+    const auto end = month_reading_->finished();
+    if (!end) return;
     const auto& run = *month_run_;
     if (run.index < shelf().entries().size()) shelf().rebuildTree(run.index);  // its opening tree, for what came
-    if (!why->empty()) {
-        month_stopped_ = *why == "cancelled" ? std::string(TR("Cancelled: what was read is in the database.")) : *why;
+    if (!end->done()) {
+        month_stopped_ =
+            end->cancelled() ? std::string(TR("Cancelled: what was read is in the database.")) : end->error;
         return;
     }
     TwicDone done;

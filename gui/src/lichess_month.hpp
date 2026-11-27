@@ -46,14 +46,14 @@ class MonthReading {
     [[nodiscard]] bool busy() const noexcept { return job_.running(); }
     void cancel() noexcept { job_.cancel(); }
     [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
-    // Once stopped: empty when it went to its end, else why ("cancelled" for Cancel).
-    [[nodiscard]] std::optional<std::string> finished();
+    // Once stopped: how it ended, done when it went to its end.
+    [[nodiscard]] std::optional<TaskEnd> finished();
     void setOptions(ZstdReadingOptions options) { options_ = options; }  // the tests' shorter waits
     static constexpr std::size_t BATCH = 20000;                          // games committed together, at most
 
    private:
     ZstdReadingOptions options_;
-    Job<std::string, Progress> job_;
+    Job<TaskEnd, Progress> job_;
 };
 
 }  // namespace fcg::lichess

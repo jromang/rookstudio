@@ -173,8 +173,6 @@ struct SegmentBytes {
     void header(std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, sizeof v); }
 };
 
-void syncFolder(const std::filesystem::path& dir);
-
 // What a write the system refused tells the window: the disk full (errno), or another reason.
 StoreErrc writeErrc(int error) noexcept;
 StoreErrc writeErrc(const std::error_code& ec) noexcept;

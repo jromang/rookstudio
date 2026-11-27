@@ -19,9 +19,13 @@ namespace fcg::tour {
 // Flushes `file` and asks the system to put its data on the disk. False when that fails.
 [[nodiscard]] bool syncFile(std::FILE* file);
 
-// Whether syncFile() and replaceFile() wait for the disk; on unless turned off. The tests turn it off: their files
-// need not survive a power loss, and on Windows thousands of syncs at once take minutes.
+// Whether syncFile(), syncFolder() and replaceFile() wait for the disk; on unless turned off. The tests turn it off:
+// their files need not survive a power loss, and on Windows thousands of syncs at once take minutes.
 void setSyncToDisk(bool on);
+
+// Asks the system to put a folder's entries on the disk, a file renamed or made there being on it once its folder is
+// (POSIX; nothing on Windows, where a rename is written through).
+void syncFolder(const std::filesystem::path& dir);
 
 // Replaces `file` with `text`: written to a temporary file next to it, synced, then renamed over it, and the
 // rename synced. After a crash the file is the old one or the new one, never a mix or empty. The new file keeps

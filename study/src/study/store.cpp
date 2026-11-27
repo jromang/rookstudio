@@ -15,16 +15,12 @@
 
 #include <chess.hpp>
 #include <json.hpp>
+#include <tour/files.hpp>
 #include <tour/util.hpp>
 
 #include "scan_board.hpp"
 #include "store_detail.hpp"
 #include "store_error.hpp"
-
-#ifndef _WIN32
-#    include <fcntl.h>
-#    include <unistd.h>
-#endif
 
 namespace fcg::study {
 
@@ -175,16 +171,6 @@ void step(std::string_view name) {
     if (g_fault_hook) g_fault_hook(name);
 }
 
-void syncFolder([[maybe_unused]] const fs::path& dir) {
-#ifndef _WIN32
-    const int fd = ::open(dir.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd >= 0) {
-        ::fsync(fd);
-        ::close(fd);
-    }
-#endif
-}
-
 StoreErrc writeErrc(int error) noexcept {
 #ifdef EDQUOT
     if (error == EDQUOT) return StoreErrc::DiskFull;  // the user's quota: full as far as they are concerned
@@ -261,14 +247,14 @@ std::string SegmentWriter::write(const SegmentBytes& segment) {
     writeFile(tmp / "annex.bin", segment.annex);
     writeFile(tmp / "names.bin", segment.names);
     writeFile(tmp / "sig.bin", segment.sig);
-    syncFolder(tmp);
+    tour::syncFolder(tmp);
     step("rename segment");
     fs::rename(tmp, dir_ / name, ec);
     if (ec) throw std::runtime_error("cannot rename " + tmp.string() + ": " + ec.message());
     under_way_.clear();
     written_.push_back(name);
     step("sync folder");
-    syncFolder(dir_);
+    tour::syncFolder(dir_);
     return name;
 }
 

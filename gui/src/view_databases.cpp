@@ -1633,6 +1633,13 @@ void App::pollSearches(const std::shared_ptr<const study::Snapshot>& snapshot, c
         job.search->hitsFrom(job.next_part, *job.hits);
         for (std::size_t i = before; i < job.hits->size(); ++i) job.ids.push_back((*job.hits)[i].id);
         job.stats = job.search->stats();
+        if (done && job.search->error()) {
+            // A search that failed stops as a cancelled one does, what it found kept for "Resume"; why, in the log.
+            Console::instance().add(trf("The search stopped: {}", storeErrorText(job.search->error())), true);
+            job.searched  = job.search->searched();
+            job.cancelled = std::move(job.search);
+            return;
+        }
         if (done && !job.search->cancelled()) {
             job.ms    = job.search->elapsedMs();
             job.ready = true;

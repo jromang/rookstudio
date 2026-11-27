@@ -1262,6 +1262,13 @@ void App::drawTreeNovelty(std::size_t index) {
     auto& n = tree_novelty_;
     if (!n.ply || *n.ply > path->size()) return;
     if (n.search && n.search->done()) {
+        if (const auto error = n.search->error()) {
+            // A search that failed confirms nothing: no novelty said; why, in the log.
+            Console::instance().add(trf("The search stopped: {}", storeErrorText(error)), true);
+            n.search.reset();
+            n.ply.reset();
+            return;
+        }
         const auto hits = n.search->hits();
         n.found         = hits.size();
         n.confirmed     = hits.empty();

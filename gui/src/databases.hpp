@@ -73,6 +73,7 @@ struct DamageSummary {
 // with its details) for an error no code names. In lower case without a final stop, for a sentence ("Not done: {}.").
 [[nodiscard]] std::string storeErrorText(study::StoreErrc code, const std::string& text);
 [[nodiscard]] std::string storeErrorText(const std::exception& e);
+[[nodiscard]] std::string storeErrorText(const std::exception_ptr& e);  // a thread's, kept (study::Search::error())
 
 // The quick filter of a game list, its words typed freely: a year (2024), an ECO code or its start (B90, B9, B), a
 // result (1-0, 0-1, 1/2 or ½) are told apart, the other words are looked for in the players, the event and the site.

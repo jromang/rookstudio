@@ -113,6 +113,16 @@ std::string storeErrorText(study::StoreErrc code, const std::string& text) {
 
 std::string storeErrorText(const std::exception& e) { return storeErrorText(study::errorCode(e), e.what()); }
 
+std::string storeErrorText(const std::exception_ptr& e) {
+    try {
+        if (e) std::rethrow_exception(e);
+    } catch (const std::exception& thrown) {
+        return storeErrorText(thrown);
+    } catch (...) {
+    }
+    return TR("an unknown error");
+}
+
 DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot) {
     DamageSummary out;
     for (const auto& bad : report.segments) {

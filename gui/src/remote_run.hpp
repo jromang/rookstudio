@@ -48,7 +48,8 @@ class RemoteRun final : public Run {
     std::string endGame(int slot, uint64_t number, const std::string& result, const std::string& why) override;
 
     void setPaused(bool paused) override;
-    [[nodiscard]] bool paused() const override { return status_.paused; }
+    // The pause or the resume asked, shown at once; status() says it once the process does (#142).
+    [[nodiscard]] bool paused() const override { return pause_asked_.value_or(status_.paused); }
     bool tryEngineAgain(int participant) override;
     // The machines its engines run on, as its process's engine hub sees them.
     [[nodiscard]] const std::vector<control::Status::Machine>& machines() const { return status_.machines; }
@@ -119,6 +120,8 @@ class RemoteRun final : public Run {
     std::unique_ptr<GuiObserver> observer_;
     RunInfo info_;
     control::Status status_;
+    // setPaused()'s, until the process's state says it: status_ stays the process's word, with its games running then.
+    std::optional<bool> pause_asked_;
     control::End end_;
     tour::Allowance allowance_;
     bool allowance_sent_ = false;

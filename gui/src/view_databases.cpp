@@ -364,9 +364,8 @@ void App::drawFileLines() {
     bool close = ImGui::SmallButton((std::string(TR("Close")) + "##file_lines").c_str());
     if (!v.ready) {
         ImGui::TextDisabled("%s", TR("Reading the file…"));
-    } else if (!v.error.empty()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           trf("The file cannot be read: {}.", v.error).c_str());
+    } else if (!v.error.empty()) {  // a notice without a button: the file is mended out of RookStudio (#141)
+        drawNotice(Notice{Notice::Level::Error, trf("The file cannot be read: {}.", v.error), {}, {}}, "file_lines");
     } else if (v.lines.empty()) {
         ImGui::TextDisabled("%s", TR("The file no longer has this line: it has changed since the import."));
     } else {
@@ -445,9 +444,10 @@ void App::drawImportOutcome(std::size_t index) {
         ImGui::SameLine();
         if (ImGui::Button(TR("Open the database's folder"))) ui::openPath(o.folder);
     } else if (!o.report.read.error.empty()) {
-        // The file could not be read on: what was read before it stays.
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           trf("Import of {} stopped: {}.", file, o.report.read.error).c_str());
+        // The file could not be read on: what was read before it stays. A PGN that does not read is mended out of
+        // RookStudio: a notice without a button (#141).
+        drawNotice(Notice{Notice::Level::Error, trf("Import of {} stopped: {}.", file, o.report.read.error), {}, {}},
+                   "import_read");
         if (o.report.added > 0)
             ImGui::TextDisabled("%s", trn("The {} game read before it stays in the database.",
                                           "The {} games read before it stay in the database.", o.report.added, added)

@@ -1040,6 +1040,9 @@ void App::drawBoardPage() {
     if (!b.message.empty() && b.message == board_message_fix_for_) {
         // No engine to analyse: the Board's engine picker, a click away (#141).
         drawRepairNotice(Notice{Notice::Level::Warning, b.message, {}, {chooseEngineFix()}}, "board_message");
+    } else if (!b.message.empty() && b.message == TR("Locked while one of your games is played on Lichess.")) {
+        // A fair-play lock: a notice without a button, nothing gets round it (#141, R17).
+        drawNotice(Notice{Notice::Level::Warning, b.message, {}, {}}, "board_lock");
     } else if (!b.message.empty()) {
         ImGui::PushStyleColor(ImGuiCol_Text, b.message_error ? ui::BAD : ui::MUTED);
         ImGui::TextWrapped("%s", b.message.c_str());

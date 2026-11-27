@@ -1,7 +1,8 @@
 // The files of the profile that fell back to their defaults in silence on a value of another type, the next save then
-// writing the defaults over what the user had (#143): each read entry by entry, the readable entries kept, those of
-// another type set aside and said in the console, the file as it was copied beside it (.unreadable); a file cut short
-// copied aside and said. A file read again as it is says nothing more.
+// writing the defaults over what the user had (#143, and #144 for a tournament's lichess.json and a Lichess player
+// database's sync state): each read entry by entry, the readable entries kept, those of another type set aside and
+// said in the console, the file as it was copied beside it (.unreadable); a file cut short copied aside and said. A
+// file read again as it is says nothing more.
 
 #include <doctest/doctest.hpp>
 
@@ -18,8 +19,10 @@
 #include "console.hpp"
 #include "engine_downloads.hpp"
 #include "engine_play.hpp"
+#include "lichess.hpp"
 #include "lichess_board.hpp"
 #include "lichess_bot.hpp"
+#include "lichess_games.hpp"
 #include "lichess_profile.hpp"
 #include "lichess_settings.hpp"
 #include "machines.hpp"
@@ -198,6 +201,58 @@ TEST_CASE("profile types: the online game's settings, one of another type keeps 
             CHECK(back.seek_rated == lichess::OnlinePlaySettings{}.seek_rated);
         },
         [&] { CHECK(back.opponent.empty()); });
+}
+
+TEST_CASE(
+    "profile types: a tournament's lichess.json, an entry of another type keeps its default, the others read (#144)") {
+    // The broadcast a tournament's games go to, read by its relay as it starts: one entry of another type made a new
+    // broadcast in silence, the games pushed before left on the other.
+    const test::ScratchDir dir("broadcast-types");
+    LichessTarget t;
+    t.tour_id                      = "TOUR0001";
+    t.round_id                     = "ROUND002";
+    t.url                          = "https://lichess.org/broadcast/-/-/ROUND002";
+    t.round_index                  = 2;
+    t.rounds                       = {{"1|Alpha|Beta", "ROUND001"}, {"33|Alpha|Beta", "ROUND002"}};
+    t.finished                     = {"1|Alpha|Beta"};
+    t.annotated                    = {{"1|Alpha|Beta", 40}};
+    auto j                         = nlohmann::json(t);
+    j["round_index"]               = "two";
+    j["annotated"]["1|Alpha|Beta"] = "all";
+    LichessTarget back;
+    checkReader(
+        dir / "lichess.json", j.dump(), "annotated, round_index", [&] { back = readLichessTarget(dir); },
+        [&] {
+            CHECK(back.tour_id == "TOUR0001");
+            CHECK(back.round_id == "ROUND002");
+            CHECK(back.url == t.url);
+            CHECK(back.rounds == t.rounds);
+            CHECK(back.finished == t.finished);
+            CHECK(back.round_index == LichessTarget{}.round_index);
+            CHECK(back.annotated.empty());
+        },
+        [&] {
+            CHECK(back.tour_id.empty());
+            CHECK(back.round_id.empty());
+        });
+}
+
+TEST_CASE("profile types: a Lichess player database's sync state, a value of another type set aside and said (#144)") {
+    // Read by each sync and each count of the new games: a sync state that did not read made the next sync ask Lichess
+    // for every game again, in silence.
+    const test::ScratchDir database("sync-types");
+    lichess::saveSyncState(database, {"claire", 1'790'000'000'000});
+    auto j     = nlohmann::json::parse(test::readFile(database / "lichess.json"));
+    j["since"] = "yesterday";
+    std::optional<lichess::SyncState> back;
+    checkReader(
+        database / "lichess.json", j.dump(), "since", [&] { back = lichess::loadSyncState(database); },
+        [&] {
+            REQUIRE(back);
+            CHECK(back->username == "claire");
+            CHECK(back->since == 0);
+        },
+        [&] { CHECK_FALSE(back); });
 }
 
 TEST_CASE(

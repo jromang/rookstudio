@@ -3,11 +3,19 @@
 
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <chrono>
+#include <condition_variable>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
+#include <mutex>
+#include <string>
 #include <thread>
+
+#include <json.hpp>
 
 #include "child_process.hpp"
 #include "console.hpp"
@@ -17,6 +25,7 @@
 #include "run.hpp"
 #include "self_path.hpp"
 #include "storage.hpp"
+#include "test_support.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -135,6 +144,99 @@ struct Harness {
     }
 };
 
+// A file's last `most` bytes: the end of what a process wrote, told when a test case fails.
+std::string endOf(const fs::path& file, std::size_t most = 4000) {
+    std::ifstream in(file, std::ios::binary);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return text.size() > most ? "..." + text.substr(text.size() - most) : text;
+}
+
+// How the window's run ended, as its process said in its "end" event (none: it said nothing).
+std::string endSaid(const RemoteRun& run) {
+    const auto& e = run.end();
+    return "the window's run: state " + std::to_string(static_cast<int>(run.state())) + ", error '" + run.error() +
+           "'; the process's end: exit code " + std::to_string(e.exit_code) + ", error '" + e.error + "', abnormal " +
+           std::to_string(e.abnormal) + ", stopped by the user " + std::to_string(e.stopped_by_user) + ", finished " +
+           std::to_string(e.finished) + ", stalled " + std::to_string(e.stalled) +
+           (e.failed_engine.empty() ? std::string() : ", " + e.failed_engine + " failed: " + e.failed_reason);
+}
+
+// What the process said last of its games, as status() has it.
+std::string statusSaid(const RemoteRun& run) {
+    const auto& st = run.status();
+    std::string playing;
+    for (const auto n : st.running) playing += (playing.empty() ? "" : ", ") + std::to_string(n);
+    return "the process's state: paused " + std::to_string(st.paused) + ", running games " +
+           std::to_string(st.running_games) + " (" + playing + "), open pairs " + std::to_string(st.open_pairs) +
+           "; the window's pause " + std::to_string(run.paused());
+}
+
+// What a wait on game `number` ran out on: what the window's copy holds of the game, the journal's lines of it, how
+// the run and its process stand, and the end of the process's log.
+std::string gameSaid(const Harness& h, const fs::path& dir, uint64_t number) {
+    std::string out    = "game " + std::to_string(number) + " in the window's copy: ";
+    const auto* copy   = h.run.tournament();
+    const auto result  = copy ? copy->resultOf(number) : std::nullopt;
+    const auto running = h.run.status().running;
+    if (result) {
+        out += result->result + " (" + result->reason + "), " +
+               (result->set ? "set by the operator (" + result->set->why + ")" : "not set by the operator");
+    } else {
+        out += "no result";
+    }
+    out += std::find(running.begin(), running.end(), number) != running.end() ? ", playing" : ", not playing";
+    if (copy) {
+        out += "; its results " + std::to_string(copy->results().size()) + ", its journal " +
+               std::to_string(copy->journalSize()) + " bytes";
+    }
+    out += "\nthe journal's lines of the game:";
+    std::ifstream journal(dir / "journal.jsonl", std::ios::binary);
+    for (std::string line; std::getline(journal, line);) {
+        const auto j = nlohmann::json::parse(line, nullptr, false);
+        if (j.is_object() && j.value("encounter", int64_t{-1}) == static_cast<int64_t>(number / 2) &&
+            j.value("game", int64_t{-1}) == static_cast<int64_t>(number % 2))
+            out += "\n" + line;
+    }
+    return out + "\n" + endSaid(h.run) + "\nthe process's log ends with:\n" + endOf(dir / "rookstudio.log");
+}
+
+// The tournament process's side of a connection, played by the test: what it says is what the window reads.
+struct ProcessSide {
+    std::mutex mutex;
+    std::condition_variable said;
+    std::string pending;  // not read yet
+    bool closed = false;
+
+    void say(const nlohmann::json& message) {
+        const std::lock_guard<std::mutex> lock(mutex);
+        pending += message.dump() + "\n";
+        said.notify_all();
+    }
+};
+
+class ScriptedLink final : public Link {
+   public:
+    explicit ScriptedLink(std::shared_ptr<ProcessSide> side) : side_(std::move(side)) {}
+    long read(char* buffer, std::size_t size) override {
+        std::unique_lock<std::mutex> lock(side_->mutex);
+        side_->said.wait(lock, [&] { return side_->closed || !side_->pending.empty(); });
+        if (side_->pending.empty()) return 0;
+        const auto n = std::min(size, side_->pending.size());
+        std::memcpy(buffer, side_->pending.data(), n);
+        side_->pending.erase(0, n);
+        return static_cast<long>(n);
+    }
+    bool write(const std::string&) override { return true; }
+    void close() override {
+        const std::lock_guard<std::mutex> lock(side_->mutex);
+        side_->closed = true;
+        side_->said.notify_all();
+    }
+
+   private:
+    std::shared_ptr<ProcessSide> side_;
+};
+
 }  // namespace
 
 TEST_CASE("remote: a tournament in a process of its own; its copy follows; pause, edits, allowance, stop when idle") {
@@ -164,15 +266,18 @@ TEST_CASE("remote: a tournament in a process of its own; its copy follows; pause
     CHECK(h.run.tournament()->results().size() >= 3);
     CHECK(h.run.pid() > 0);
 
-    // Paused: the running games end, and none starts.
+    // Paused: the running games end, and none starts. The window shows the pause at once; its status says what the
+    // process said, the games it was playing with it (#142).
     h.run.setPaused(true);
     CHECK(h.run.paused());
     REQUIRE(h.waitFor(
         [&] { return h.run.status().paused && h.run.runningGames() == 0 && h.run.status().open_pairs == 0; }));
     const auto at_pause = h.run.tournament()->results().size();
+    const auto paused   = statusSaid(h.run);
     std::this_thread::sleep_for(600ms);
     h.pump();
-    CHECK(h.run.tournament()->results().size() == at_pause);
+    CHECK_MESSAGE(h.run.tournament()->results().size() == at_pause, "at the pause, ", paused, "; now ",
+                  statusSaid(h.run));
 
     // A change while paused: the copy has it when applyEdit() returns; it can be undone until a game starts.
     tour::Edit cycles;
@@ -211,12 +316,15 @@ TEST_CASE("remote: a tournament in a process of its own; its copy follows; pause
     // Stopped once the running games are over: nothing is lost.
     h.run.stopWhenIdle();
     CHECK(h.run.stoppingWhenIdle());
-    REQUIRE(h.waitFor([&] { return h.run.state() == Run::State::Finished; }));
-    CHECK(h.run.takeFinishedEvent());
-    CHECK(h.run.stoppedByUser());
-    CHECK(h.run.error().empty());
-    CHECK(h.run.end().exit_code == 3);
-    CHECK_FALSE(h.run.end().finished);
+    {
+        INFO(endSaid(h.run), "\nthe process's log ends with:\n", endOf(dir / "rookstudio.log"));
+        REQUIRE(h.waitFor([&] { return h.run.state() == Run::State::Finished; }));
+        CHECK(h.run.takeFinishedEvent());
+        CHECK(h.run.stoppedByUser());
+        CHECK(h.run.error().empty());
+        CHECK(h.run.end().exit_code == 3);
+        CHECK_FALSE(h.run.end().finished);
+    }
 
     // The copy holds what the files hold, and the window's lists every game.
     const auto fresh = tour::TournamentState::open(dir, true);
@@ -251,6 +359,53 @@ TEST_CASE("remote: a tournament in a process of its own; its copy follows; pause
     CHECK_FALSE(h.run.tournament()->readOnly());
     CHECK(h.run.undoEdit().empty());
     CHECK(h.run.tournament()->totalGames() == 30);
+}
+
+TEST_CASE("remote: the pause asked shown at once, the process's state saying it once the process does (#142)") {
+    // The window wrote the pause it asked for in the process's state: a state sent before the process read it, between
+    // two pairs (no game running, no pair open), then said a pause that had not begun, and the process's games
+    // started meanwhile were played during it.
+    const auto dir  = makeTournament(fs::temp_directory_path() / "fcg-remote-tests-pause", roundRobin(3, 1), 3);
+    const auto side = std::make_shared<ProcessSide>();
+    RemoteRun run;
+    REQUIRE(run.attach(dir, std::make_unique<ScriptedLink>(side)).empty());
+    int sent        = 0;
+    const auto said = [&](bool paused, int running, int open) {
+        control::Status st;
+        st.paused            = paused;
+        st.running_games     = running;
+        st.open_pairs        = open;
+        st.allowance.threads = ++sent;  // tells this state from the one before
+        auto j               = control::statusJson(st);
+        j["e"]               = "state";
+        side->say(j);
+        return fcg::test::waitUntil([&] {
+            run.update();
+            return run.status().allowance.threads == sent;
+        });
+    };
+
+    REQUIRE(said(false, 2, 1));
+    run.setPaused(true);
+    CHECK(run.paused());
+    CHECK_FALSE(run.status().paused);
+    // Sent before the process read the pause: the window still shows it, the state says what the process does.
+    REQUIRE(said(false, 0, 0));
+    CHECK(run.paused());
+    CHECK_FALSE(run.status().paused);
+    REQUIRE(said(true, 1, 0));
+    CHECK(run.paused());
+    CHECK(run.status().paused);
+    CHECK(run.runningGames() == 1);
+
+    run.setPaused(false);
+    CHECK_FALSE(run.paused());
+    CHECK(run.status().paused);
+    REQUIRE(said(true, 0, 0));  // before it read the resume
+    CHECK_FALSE(run.paused());
+    REQUIRE(said(false, 2, 1));
+    CHECK_FALSE(run.paused());
+    CHECK_FALSE(run.status().paused);
 }
 
 TEST_CASE("remote: a game ended by the operator, then the window going away stops the tournament, resumable") {
@@ -295,6 +450,7 @@ TEST_CASE("remote: a game ended by the operator, then the window going away stop
         }));
         const auto number = slot.game_id - 1;
         CHECK(h.run.endGame(playing, number, "1/2-1/2", "a test").empty());
+        INFO(gameSaid(h, dir, number));
         REQUIRE(h.waitFor([&] {
             const auto r = h.run.tournament()->resultOf(number);
             return r && r->set;

@@ -1264,6 +1264,38 @@ TEST_CASE("a process tree is ended only from a child of ours not reaped yet, nev
     }
     CHECK(ended);
 }
+
+TEST_CASE(
+    "an engine stopped by the operator ends its game's wait though another process keeps its output open (#142)") {
+    // An engine another game started at the moment this one's pipes were made keeps their ends (fastchess makes them
+    // close-on-exec only after): the end of the stopped engine's output never comes, and a read without a time limit
+    // (a game in nodes) waited for ever. Here a process the engine leaves behind, out of its tree, keeps it open.
+    const test::ScratchDir dir("engine-output-kept");
+    const auto script = dir / "engine.sh";
+    const auto left   = dir / "left.pid";
+    std::ofstream(script) << "#!/bin/sh\n(sleep 60 & echo $! > \"$1\")\nexec sleep 60\n";
+    fs::permissions(script, fs::perms::owner_all);
+    fastchess::engine::process::Process engine;
+    REQUIRE(engine.init(dir.string(), script.string(), left.string(), "kept"));
+    int behind = 0;
+    REQUIRE(test::waitUntil([&] { return (std::ifstream(left) >> behind) && behind > 0; }));
+
+    std::promise<fastchess::engine::process::Result> read;
+    auto ended = read.get_future();
+    std::thread game([&] {
+        std::vector<fastchess::engine::process::Line> lines;
+        read.set_value(engine.readOutput(lines, "bestmove", 0ms));  // no time limit
+    });
+    stopEngineProcess(engine.pid());
+    const bool woken = ended.wait_for(20s) == std::future_status::ready;
+    CHECK(woken);
+    // Ended before the game is woken: fastchess, which asks next whether it runs, finds it gone.
+    CHECK_FALSE(engine.alive());
+    ::kill(behind, SIGKILL);  // what kept the output open: the read ends now in any case
+    game.join();
+    if (woken) CHECK(ended.get().code == fastchess::engine::process::Status::ERR);
+    engine.terminate();
+}
 #endif
 
 TEST_CASE("EPD suite runs: every engine on every position, the totals, CSV and saved runs") {

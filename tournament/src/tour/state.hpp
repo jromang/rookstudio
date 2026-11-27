@@ -210,6 +210,10 @@ class TournamentState {
     bool requestEnd(uint64_t number, const std::string& result, const std::string& why);
     // The request for game `number`, taken: (result, why), nullopt when there is none.
     std::optional<std::pair<std::string, std::string>> takeEnd(uint64_t number);
+    // The same, by the runner as fastchess ends the game: a request asked from then on is refused, as the game is over,
+    // rather than accepted and dropped with the game recorded without it (#142); until takeEnd() once the game is
+    // recorded or let go of, which may play it again.
+    std::optional<std::pair<std::string, std::string>> takeEndAsItEnds(uint64_t number);
 
     // Is the claimed game still to be played as it was claimed: not dropped, nor its encounter changed by an edit?
     [[nodiscard]] bool wanted(const GameTask& task) const;
@@ -407,6 +411,7 @@ class TournamentState {
 
     StartFailures start_failures_;
     std::map<uint64_t, std::pair<std::string, std::string>> end_requests_;  // requestEnd(): number -> (result, why)
+    std::set<uint64_t> ending_;  // the games fastchess ended, not recorded or let go of yet (takeEndAsItEnds())
 
     // version(): bumped when a change is over, the mutex released (declared before the lock_guard).
     std::atomic<uint64_t> version_{0};

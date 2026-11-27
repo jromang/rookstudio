@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <fstream>
 #include <vector>
 
 #include <json.hpp>
@@ -14,6 +13,7 @@
 
 #include "https.hpp"
 #include "lichess_api.hpp"
+#include "profile_entries.hpp"
 
 namespace fcg::lichess {
 
@@ -46,18 +46,21 @@ std::optional<int64_t> startOf(std::string_view utc_date, std::string_view utc_t
 }
 
 std::optional<SyncState> loadSyncState(const std::filesystem::path& database) {
-    std::ifstream in(database / SYNC_FILE, std::ios::binary);
-    if (!in) return std::nullopt;
-    try {
-        const auto j = nlohmann::json::parse(in);
-        if (j.value("format", "") != "rookstudio-lichess-sync") return std::nullopt;
-        SyncState s;
-        s.username = j.at("username").get<std::string>();
-        s.since    = j.value("since", int64_t{0});
-        return s;
-    } catch (const std::exception&) {
+    // With its types checked (#144, profile_entries.hpp): a value of another type is set aside and said, the file as it
+    // was kept beside it, the other value kept; a file cut short is kept aside and said. The next sync, which then asks
+    // for the games from the first one (or takes the account it is asked for), no longer does so in silence.
+    const auto file = database / SYNC_FILE;
+    const auto j    = readProfileJson(file);
+    if (!j) return std::nullopt;
+    if (const auto format = j->find("format");
+        format == j->end() || !format->is_string() || *format != "rookstudio-lichess-sync")
         return std::nullopt;
-    }
+    ProfileEntries entries(file);
+    SyncState s;
+    entries.entry("username", [&] { s.username = j->at("username").get<std::string>(); });
+    entries.entry("since", [&] { s.since = j->value("since", int64_t{0}); });
+    entries.sayUnread();
+    return s;
 }
 
 void saveSyncState(const std::filesystem::path& database, const SyncState& state) {
@@ -101,11 +104,13 @@ SyncReport syncGames(study::Database& db, const std::string& username, const std
     SyncReport report;
     const auto folder = db.folder();
     const auto before = loadSyncState(folder);
-    if (before && lower(before->username) != lower(username)) {
+    // An account that could not be read (said as it was read) is taken as the one asked for.
+    const bool named = before && !before->username.empty();
+    if (named && lower(before->username) != lower(username)) {
         report.error = fmt::format("this database holds {}'s games", before->username);
         return report;
     }
-    SyncState state{before ? before->username : username, before ? before->since : 0};  // the name as first written
+    SyncState state{named ? before->username : username, before ? before->since : 0};  // the name as first written
 
     auto asked      = request("GET", exportUrl(username, filters, askedSince(state, filters), true), token,
                               "application/x-chess-pgn");

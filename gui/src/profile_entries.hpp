@@ -11,8 +11,9 @@
 // the FIDE cards' cache (fide_cards.hpp) and the Suites page's setup are read so; and (#143) play.json and the games
 // played (engine_play.hpp), assistant.json, lichess.json, machines.json, the bot's settings (lichess_bot.hpp), the
 // online game's (lichess_board.hpp), the engines installed and their releases kept (engine_downloads.hpp), the
-// account's cache (lichess_profile.hpp) and the explorer's (opening_report.hpp). A file read again and again while it
-// stays as it is is said and copied aside once.
+// account's cache (lichess_profile.hpp) and the explorer's (opening_report.hpp); and (#144) a tournament's
+// lichess.json, the broadcast it goes to (lichess.hpp), and a Lichess player database's, its sync state
+// (lichess_games.hpp). A file read again and again while it stays as it is is said and copied aside once.
 
 #include <exception>
 #include <filesystem>

@@ -40,6 +40,11 @@ struct LichessTarget {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(LichessTarget, tour_id, round_id, url, round_index, rounds, finished,
                                                 annotated)
 
+// The tournament's lichess.json in `dir`, read with its types checked (#144, profile_entries.hpp): an entry of another
+// type keeps its default and is said, the file as it was kept beside it; the defaults when there is none, or when it
+// is cut short, which is said and kept aside too, rather than a new broadcast made in silence.
+[[nodiscard]] LichessTarget readLichessTarget(const std::filesystem::path& dir);
+
 // A lichess round holds this many games; the next ones go to a new round of the same broadcast.
 constexpr std::size_t LICHESS_ROUND_GAMES = 64;
 

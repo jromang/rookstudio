@@ -197,6 +197,7 @@ void RemoteRun::apply(const nlohmann::json& m) {
             }
         } else if (kind == "state") {
             status_ = control::statusFromJson(m);
+            if (pause_asked_ == status_.paused) pause_asked_.reset();
             if (replica_) {
                 tour::TournamentState::ReplicaStatus rs;
                 rs.running       = std::set<uint64_t>(status_.running.begin(), status_.running.end());
@@ -374,7 +375,7 @@ std::string RemoteRun::endGame(int slot, uint64_t number, const std::string& res
 
 void RemoteRun::setPaused(bool paused) {
     if (state_ != State::Running) return;
-    if (process_.send(control::command(paused ? "pause" : "resume", 0))) status_.paused = paused;
+    if (process_.send(control::command(paused ? "pause" : "resume", 0))) pause_asked_ = paused;
 }
 
 bool RemoteRun::tryEngineAgain(int participant) {

@@ -6,6 +6,7 @@
 #include <cctype>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <random>
 #include <string>
@@ -176,6 +177,18 @@ TEST_CASE("Lichess games: an account's games brought in, then those played since
     const auto other = syncGames(*db, "SomeoneElse", "", progress, cancel);
     CHECK(other.error == "this database holds Me's games");
     CHECK(other.read == 0);
+
+    // Its account written as another type, set aside and said as it is read (#144): taken as the account asked for,
+    // rather than "this database holds 's games" refusing every sync; the moment kept.
+    std::ofstream(db->folder() / "lichess.json", std::ios::binary | std::ios::trunc) << fmt::format(
+        R"({{"format": "rookstudio-lichess-sync", "username": 7, "since": {}}})", lichess.games.back().start);
+    const auto third = syncGames(*db, "Me", "", progress, cancel, 50);
+    CHECK_MESSAGE(!third.failed(), describe(third));
+    CHECK(lichess.lastPath() ==
+          fmt::format("/api/games/user/Me?clocks=true&evals=true&opening=true&sort=dateAsc&since={}",
+                      lichess.games.back().start - 60000));
+    CHECK(third.added == 0);
+    CHECK(loadSyncState(db->folder())->username == "Me");
 }
 
 TEST_CASE("Lichess games: a cancel keeps what was committed, and the next sync brings the rest") {

@@ -1389,18 +1389,35 @@ std::vector<GameResult> TournamentState::results() const {
 
 bool TournamentState::requestEnd(uint64_t number, const std::string& result, const std::string& why) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (read_only_ || !running_.count(number) || !validResult(result)) return false;
+    if (read_only_ || !running_.count(number) || ending_.count(number) || !validResult(result)) return false;
     end_requests_[number] = {result, why};
     return true;
 }
 
+namespace {
+
+// The request for game `number` taken out of `requests`, if there is one.
+std::optional<std::pair<std::string, std::string>> takeOut(
+    std::map<uint64_t, std::pair<std::string, std::string>>& requests, uint64_t number) {
+    const auto it = requests.find(number);
+    if (it == requests.end()) return std::nullopt;
+    auto request = std::move(it->second);
+    requests.erase(it);
+    return request;
+}
+
+}  // namespace
+
 std::optional<std::pair<std::string, std::string>> TournamentState::takeEnd(uint64_t number) {
     std::lock_guard<std::mutex> lock(mutex_);
-    const auto it = end_requests_.find(number);
-    if (it == end_requests_.end()) return std::nullopt;
-    auto request = std::move(it->second);
-    end_requests_.erase(it);
-    return request;
+    ending_.erase(number);
+    return takeOut(end_requests_, number);
+}
+
+std::optional<std::pair<std::string, std::string>> TournamentState::takeEndAsItEnds(uint64_t number) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    ending_.insert(number);
+    return takeOut(end_requests_, number);
 }
 
 std::optional<GameResult> TournamentState::resultOf(uint64_t number) const {

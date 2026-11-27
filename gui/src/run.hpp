@@ -87,7 +87,8 @@ void configureFastchess(const tour::TournamentSpec& spec);
                                          const std::function<void(tour::Runner*)>& on_runner = {});
 
 // Ends the engine process `pid` of a game being played, with what it started (the engine behind a WinBoard adapter
-// or a book adapter), as interruptEngineProcesses() ends them all.
+// or a book adapter), as interruptEngineProcesses() ends them all, and its game's wait for what it says: the game
+// ends as the engine's disconnection, even when another process keeps the engine's output open (#142).
 void stopEngineProcess(int64_t pid);
 
 // The most recent match in `runs_root`, if it is not finished (stopped, or interrupted by a crash).

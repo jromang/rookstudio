@@ -126,6 +126,18 @@ class Child {
 
 }  // namespace
 
+bool waitChildEnded(int pid, std::chrono::milliseconds most) {
+    if (pid <= 0) return true;
+    const Child child(pid);
+    const auto until = std::chrono::steady_clock::now() + most;
+    for (;;) {
+        bool ended = false;
+        if (!child.ours(ended) || ended) return true;
+        if (std::chrono::steady_clock::now() >= until) return false;
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
+    }
+}
+
 std::vector<int> childProcesses(int pid) {
     std::vector<int> children;
 #    ifdef __linux__

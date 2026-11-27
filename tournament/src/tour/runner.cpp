@@ -424,14 +424,17 @@ void Runner::onMove(int slot, chess::Color mover, const fastchess::MoveData& mov
 void Runner::onGameEnd(int slot, std::size_t game_id, std::size_t round_id, const fastchess::MatchData& played,
                        bool counted) {
     // Ended by the operator: recorded with their result, whatever ended it. Not when the tournament is stopping (the
-    // game is played again): the request is dropped then.
+    // game is played again): the request is dropped then. A request asked from now on is refused, the game being over
+    // (#142): accepted, its engine stopped, it would have been dropped, the game recorded without it.
     std::optional<fastchess::MatchData> ended;
     std::optional<ResultSet> set;
-    if (counted && t_task && t_started) {
-        if (const auto end = state_.takeEnd(t_task->number())) {
-            t_ended = true;
-            ended   = endedByOperator(played, end->first);
-            set     = ResultSet{end->second, "*", fastchess::MatchTermination::INTERRUPT, ""};
+    if (t_task) {
+        if (const auto end = state_.takeEndAsItEnds(t_task->number())) {
+            t_ended = true;  // its engine on move may have been stopped: both start anew (play())
+            if (counted && t_started) {
+                ended = endedByOperator(played, end->first);
+                set   = ResultSet{end->second, "*", fastchess::MatchTermination::INTERRUPT, ""};
+            }
         }
     }
     const auto& data = ended ? *ended : played;

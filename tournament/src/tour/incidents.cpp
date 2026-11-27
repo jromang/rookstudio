@@ -6,9 +6,9 @@
 
 #include <json.hpp>
 
+#include "game_result.hpp"
 #include "journal.hpp"
 #include "journal_events.hpp"
-#include "state.hpp"
 #include "summary.hpp"
 
 namespace fcg::tour {

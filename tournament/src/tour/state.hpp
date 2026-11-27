@@ -56,6 +56,8 @@
 
 namespace fcg::tour {
 
+struct JournalReader;  // journal_events.hpp
+
 // One game handed to the runner.
 struct GameTask {
     Encounter encounter;
@@ -354,6 +356,10 @@ class TournamentState {
     TournamentState(std::filesystem::path dir, TournamentSpec spec);
 
     void load();  // replays the journal
+    // What load() and follow() do with the journal's events, as they were journaled: openings, edits, rounds and the
+    // end applied to the state. Its handlers hold `this`: called under mutex_, or by load() before another thread has
+    // the state.
+    [[nodiscard]] JournalReader applying();
     [[nodiscard]] Impact previewLocked(const Edit& edit) const;  // preview(), mutex_ held
     // Returns true when the result completes its encounter.
     bool apply(const GameResult& result);

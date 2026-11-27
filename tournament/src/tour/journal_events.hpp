@@ -1,8 +1,11 @@
 #pragma once
 
 // The files of a tournament's folder, and the events of its journal (journal.jsonl, see journal.hpp): each line one
-// JSON object whose "t" names its type. Their names are written here only.
+// JSON object whose "t" names its type. Their names are written here only, and readEvent() hands an event to the
+// handler of its type: the readers of the journal (TournamentState's load(), follow() and replay()) say what they do
+// with each type, not how a type is told.
 
+#include <functional>
 #include <string_view>
 
 #include <json.hpp>
@@ -54,5 +57,22 @@ enum class EventType {
 
 // The edits: those editEvent() makes.
 [[nodiscard]] bool isEditEvent(EventType type) noexcept;
+
+// What a reader of the journal does with the events of each type. A handler left empty passes over its events.
+struct JournalReader {
+    std::function<void(const nlohmann::json&)> encounter_started;
+    std::function<void(const nlohmann::json&)> game_finished;
+    std::function<void(const nlohmann::json&)> edit;  // the edits, isEditEvent()
+    std::function<void(const nlohmann::json&)> edit_undone;
+    std::function<void(const nlohmann::json&)> round;  // round_paired, tiebreak_added
+    std::function<void(const nlohmann::json&)> finished;
+    std::function<void(const nlohmann::json&)> pgn_out;
+    // An event without a "t", or of a type this version does not know, is an error ("unknown event"); not strict, it
+    // is passed over (a summary reads a journal a newer version may be writing).
+    bool strict = true;
+};
+
+// Hands `event` to the handler of its type in `reader`.
+void readEvent(const nlohmann::json& event, const JournalReader& reader);
 
 }  // namespace fcg::tour

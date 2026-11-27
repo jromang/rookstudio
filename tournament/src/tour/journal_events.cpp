@@ -1,5 +1,6 @@
 #include "journal_events.hpp"
 
+#include <stdexcept>
 #include <string>
 
 namespace fcg::tour {
@@ -59,9 +60,55 @@ bool isEditEvent(EventType type) noexcept {
         case EventType::GamesVoided:
         case EventType::ResultSet:
             return true;
-        default:
+        case EventType::Unknown:
+        case EventType::EncounterStarted:
+        case EventType::GameFinished:
+        case EventType::EditUndone:
+        case EventType::RoundPaired:
+        case EventType::TiebreakAdded:
+        case EventType::Finished:
+        case EventType::PgnOut:
             return false;
     }
+    return false;
+}
+
+void readEvent(const nlohmann::json& event, const JournalReader& reader) {
+    const auto name = reader.strict ? event.at("t").get<std::string>() : event.value("t", std::string{});
+    const std::function<void(const nlohmann::json&)>* handler = nullptr;
+    switch (eventType(name)) {
+        case EventType::EncounterStarted:
+            handler = &reader.encounter_started;
+            break;
+        case EventType::GameFinished:
+            handler = &reader.game_finished;
+            break;
+        case EventType::ParticipantAdded:
+        case EventType::ParticipantReplaced:
+        case EventType::ParticipantWithdrawn:
+        case EventType::CyclesChanged:
+        case EventType::GamesVoided:
+        case EventType::ResultSet:
+            handler = &reader.edit;
+            break;
+        case EventType::EditUndone:
+            handler = &reader.edit_undone;
+            break;
+        case EventType::RoundPaired:
+        case EventType::TiebreakAdded:
+            handler = &reader.round;
+            break;
+        case EventType::Finished:
+            handler = &reader.finished;
+            break;
+        case EventType::PgnOut:
+            handler = &reader.pgn_out;
+            break;
+        case EventType::Unknown:
+            if (reader.strict) throw std::runtime_error("unknown event \"" + name + "\"");
+            return;
+    }
+    if (*handler) (*handler)(event);
 }
 
 }  // namespace fcg::tour

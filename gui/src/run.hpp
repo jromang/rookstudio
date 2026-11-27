@@ -81,7 +81,9 @@ void configureFastchess(const tour::TournamentSpec& spec);
 
 // Plays `tournament` on this thread until it is finished or fastchess::atomic::stop is set; configureFastchess()
 // first. Returns an error message, empty on success. `on_runner`, when given, is told the runner once it exists (to
-// set its allowance, read what it plays), and nullptr before it goes away.
+// set its allowance, read what it plays), and nullptr before it goes away. Its engines are watched meanwhile
+// (EngineWatchdog): a game whose engine ends on its own ends, even when another process keeps the engine's output
+// open (#145).
 [[nodiscard]] std::string playTournament(tour::TournamentState& tournament, fastchess::observer::GameObserver* observer,
                                          tour::RecordListener* listener,
                                          const std::function<void(tour::Runner*)>& on_runner = {});

@@ -28,6 +28,7 @@
 #include <tour/util.hpp>
 
 #include "console.hpp"
+#include "engine_watchdog.hpp"
 #include "engines.hpp"
 #include "i18n.hpp"
 #include "participants.hpp"
@@ -1136,6 +1137,10 @@ std::string playTournament(tour::TournamentState& tournament, fastchess::observe
                 throw fastchess_exception(TR("Cannot load the Syzygy tablebases from ") + tb.syzygy_dirs);
             }
         }
+
+        // A game whose engine ends on its own ends though another engine keeps the engine's output open (#145).
+        // Made before the runner, so that it watches until the runner has joined its games.
+        const EngineWatchdog watchdog(EngineWatchdog::PERIOD);
 
         // The runner is fastchess' observer while it plays, and forwards everything to ours.
         tour::Runner runner(tournament, observer, listener);

@@ -138,6 +138,12 @@ bool waitChildEnded(int pid, std::chrono::milliseconds most) {
     }
 }
 
+bool childEnded(int pid) {
+    if (pid <= 0) return false;
+    bool ended = false;
+    return Child(pid).ours(ended) && ended;
+}
+
 std::vector<int> childProcesses(int pid) {
     std::vector<int> children;
 #    ifdef __linux__

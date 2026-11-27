@@ -21,6 +21,10 @@ bool killProcessTree(int pid);
 // it still runs after `most`.
 bool waitChildEnded(int pid, std::chrono::milliseconds most);
 
+// The process `pid` is a child of this program that has ended and was not reaped yet (a zombie), as waitid's WNOWAIT
+// tells without reaping it. False while it runs, and once it was reaped: its pid may be another process's by then.
+[[nodiscard]] bool childEnded(int pid);
+
 // The processes `pid` started that have not ended (Linux and macOS; none elsewhere).
 [[nodiscard]] std::vector<int> childProcesses(int pid);
 

@@ -157,12 +157,17 @@ struct FakeLichess {
             Answer a;
             a.id = path.substr(std::string("/engine/api/external-engine/work/").size());
             readChunks(head, c, a);
-            if (a.whole) c.sendAll(reply(200, "", "text/plain"));
-            std::lock_guard lock(mutex);
-            answers.push_back(std::move(a));
+            const bool whole = a.whole;
+            {
+                // Kept before the answer: the service, which ends once answered, finds it there.
+                std::lock_guard lock(mutex);
+                answers.push_back(std::move(a));
+            }
+            if (whole) c.sendAll(reply(200, "", "text/plain"));
             return;
         }
-        // The registrations.
+        // The registrations, their body read whole before any answer, a refusal's too (Windows: scripted_server.hpp).
+        const auto body = bodyOf(head, c);
         std::lock_guard lock(mutex);
         requests.push_back(line);
         if (auth != std::string("Bearer ") + TOKEN) {
@@ -170,7 +175,7 @@ struct FakeLichess {
             return;
         }
         if (line.rfind("POST /api/external-engine ", 0) == 0) {
-            registrations.push_back(bodyOf(head, c));
+            registrations.push_back(body);
             auto j = nlohmann::json::parse(registrations.back());
             c.sendAll(reply(200, nlohmann::json{{"id", "eei_Sample000001"},
                                                 {"name", j["name"]},

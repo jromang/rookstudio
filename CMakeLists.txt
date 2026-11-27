@@ -242,23 +242,22 @@ endif()
 # What the study layer's imports decompress: zstd (decompression only) and zlib (inflate only)
 # ---------------------------------------------------------------------------
 
+# Each dependency is pinned by a commit, or by its archive's SHA-256: the release's own archive where the project
+# publishes one, else GitHub's archive of the commit the version's tag names (the version said above it).
 include(FetchContent)
 FetchContent_Declare(zstd
-    GIT_REPOSITORY https://github.com/facebook/zstd.git
-    GIT_TAG v1.5.7
-    SOURCE_SUBDIR fcg-no-cmake
-    GIT_SHALLOW TRUE)
+    URL https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+    URL_HASH SHA256=eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3
+    SOURCE_SUBDIR fcg-no-cmake)
 FetchContent_Declare(zlib
-    GIT_REPOSITORY https://github.com/madler/zlib.git
-    GIT_TAG v1.3.2
-    SOURCE_SUBDIR fcg-no-cmake
-    GIT_SHALLOW TRUE)
+    URL https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz
+    URL_HASH SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
+    SOURCE_SUBDIR fcg-no-cmake)
 # The LZMA SDK's decoders and 7z reader (public domain), from 7-Zip's sources: .7z archives, Lumbra's Gigabase.
 FetchContent_Declare(lzma
-    GIT_REPOSITORY https://github.com/ip7z/7zip.git
-    GIT_TAG 24.09
-    SOURCE_SUBDIR fcg-no-cmake
-    GIT_SHALLOW TRUE)
+    URL https://github.com/ip7z/7zip/releases/download/24.09/7z2409-src.tar.xz
+    URL_HASH SHA256=49c05169f49572c1128453579af1632a952409ced028259381dac30726b6133a
+    SOURCE_SUBDIR fcg-no-cmake)
 FetchContent_MakeAvailable(zstd zlib lzma)
 
 # The decoder alone, in C, without its assembly (one source set on every system) or threads.
@@ -357,11 +356,10 @@ if(FCG_ASSISTANT)
     # missing. The CPU backend in every variant x86-64 processors need, the best one chosen at run time.
     # b12604: the first build with the fixes of a crafted model's out-of-bounds write (CVE-2026-133710: hrm_text's
     # loader, which any GGUF the user chooses could reach) and of a grammar's repetition whose maximum is below its
-    # minimum (CVE-2026-137057); back to a version tag once one has them (v1.0.0 has not).
+    # minimum (CVE-2026-137057); back to a version tag once one has them (v1.0.0 has not). Its commit's archive.
     FetchContent_Declare(llama
-        GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
-        GIT_TAG b12604
-        GIT_SHALLOW TRUE)
+        URL https://github.com/ggml-org/llama.cpp/archive/46eb1742db6d2caec1bfa848c5702b1bdcc815e5.tar.gz
+        URL_HASH SHA256=770e1927f3fc66b834bb1f45e2f6e2a482dc151fda21a1ad0acabbe96a494502)
     set(FCG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS ON)
     set(GGML_BACKEND_DL ON CACHE BOOL "" FORCE)
@@ -380,16 +378,15 @@ if(FCG_ASSISTANT)
     if(FCG_ASSISTANT_VULKAN AND CMAKE_CROSSCOMPILING AND MINGW)
         # Cross-built for Windows, the Vulkan SDK's parts for the target are made here: its headers and SPIRV-Headers,
         # fetched; an import library for vulkan-1.dll, the loader every GPU driver installs, made from the headers'
-        # prototypes (only the functions ggml calls become imports); and the host's glslc.
+        # prototypes (only the functions ggml calls become imports); and the host's glslc. Both at vulkan-sdk-1.4.363.0,
+        # their commits' archives.
         FetchContent_Declare(vulkan_headers
-            GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
-            GIT_TAG vulkan-sdk-1.4.363.0
-            GIT_SHALLOW TRUE
+            URL https://github.com/KhronosGroup/Vulkan-Headers/archive/6802bb4733b63ed5efd3adb308a6c885ef180ea1.tar.gz
+            URL_HASH SHA256=9044fbb356160e43201dc2094acb44c8a906722a63a35f48fc0f051579db9bb6
             SOURCE_SUBDIR fcg-no-cmake)
         FetchContent_Declare(SPIRV-Headers
-            GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
-            GIT_TAG vulkan-sdk-1.4.363.0
-            GIT_SHALLOW TRUE
+            URL https://github.com/KhronosGroup/SPIRV-Headers/archive/496543121ce6419f23d6fa5d7194ba66c36212d2.tar.gz
+            URL_HASH SHA256=a9bb9c48713245eacf97cc539b6f1d45405a92d8813f8b82e635f0a085ee9898
             OVERRIDE_FIND_PACKAGE)
         FetchContent_MakeAvailable(vulkan_headers SPIRV-Headers)
         file(STRINGS ${vulkan_headers_SOURCE_DIR}/include/vulkan/vulkan_core.h prototypes
@@ -414,7 +411,13 @@ if(FCG_ASSISTANT)
         set(Vulkan_GLSLC_EXECUTABLE ${FCG_GLSLC} CACHE FILEPATH "" FORCE)
     endif()
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+    # llama.cpp and ggml ask git for the commit they are built from (their version headers): their archive has none,
+    # and git would answer with the repository the build folder is in. They say "unknown" instead, the same at every
+    # commit of ours (git says twice, in the configuration's output, that it found no repository).
+    set(FCG_GIT_CEILING "$ENV{GIT_CEILING_DIRECTORIES}")
+    set(ENV{GIT_CEILING_DIRECTORIES} "${FETCHCONTENT_BASE_DIR}")
     FetchContent_MakeAvailable(llama)
+    set(ENV{GIT_CEILING_DIRECTORIES} "${FCG_GIT_CEILING}")
     set(BUILD_SHARED_LIBS ${FCG_BUILD_SHARED_LIBS})
     # Its libraries beside the programs (llama.cpp puts them in bin/): where ggml looks for its backends, and where
     # Windows finds a program's DLLs; elsewhere the programs' run path ($ORIGIN) does.
@@ -558,20 +561,20 @@ if(FCG_BUILD_GUI)
     set(SDL_RENDER ON CACHE BOOL "" FORCE)
     set(SDL_AUDIO ON CACHE BOOL "" FORCE)
 
+    # SDL's source release names its revision (REVISION.txt, SDL_GetRevision()'s): SDL does not ask git, which would
+    # answer with the repository the build folder is in.
     FetchContent_Declare(sdl3
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-3.4.18
-        GIT_SHALLOW TRUE)
+        URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+        URL_HASH SHA256=9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3)
+    # v1.92.9-docking, its commit's archive.
     FetchContent_Declare(imgui
-        GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.92.9-docking
-        SOURCE_SUBDIR fcg-no-cmake
-        GIT_SHALLOW TRUE)
+        URL https://github.com/ocornut/imgui/archive/9b4eb24cee2071e61dc1f9ef3e5228097cdde720.tar.gz
+        URL_HASH SHA256=7af17518117f40103be7c2b68312a496e7dc3e1de6d3ce985df36c612fb05506
+        SOURCE_SUBDIR fcg-no-cmake)
     FetchContent_Declare(implot
-        GIT_REPOSITORY https://github.com/epezent/implot.git
-        GIT_TAG v1.0
-        SOURCE_SUBDIR fcg-no-cmake
-        GIT_SHALLOW TRUE)
+        URL https://github.com/epezent/implot/releases/download/v1.0/implot-v1.0.tar.gz
+        URL_HASH SHA256=20ca14d5a46f36a650746096c74eba8bea99c9432cd3c877343b96b17a6ae566
+        SOURCE_SUBDIR fcg-no-cmake)
     FetchContent_Declare(nanosvg
         GIT_REPOSITORY https://github.com/memononen/nanosvg.git
         GIT_TAG 239e102ec2c691f2902e20ace2ed36ee4a35cfe6

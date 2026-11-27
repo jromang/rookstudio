@@ -12,6 +12,7 @@
 #include <tour/state.hpp>
 
 #include "import.hpp"
+#include "import_into.hpp"
 
 namespace fcg::study {
 

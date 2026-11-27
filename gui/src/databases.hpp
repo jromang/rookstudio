@@ -20,6 +20,7 @@
 
 #include <study/duplicates.hpp>
 #include <study/import.hpp>
+#include <study/import_into.hpp>
 #include <study/linked.hpp>
 #include <study/query.hpp>
 #include <study/store.hpp>

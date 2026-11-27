@@ -553,6 +553,7 @@ class App {
     // the merges and the names brought together; "Undo the compaction" puts its old files back until RookStudio closes.
     enum class CarePart { Duplicates, Names, Checks };
     void openCare(int database, CarePart part);
+    void drawCareItems(int database);  // the items that open it, in a database's context menu and its ⋯
     void drawCare();
     void drawCareDuplicates(std::size_t index);
     void drawCarePair(std::size_t index);

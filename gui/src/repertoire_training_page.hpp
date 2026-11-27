@@ -98,6 +98,7 @@ class RepertoireTrainingPage final : public BoardSession {
         int new_per_day = -1;  // the limit it was counted with
     };
     [[nodiscard]] const Summary& summary(std::size_t index);
+    void keep(const TrainingRun& t);  // its memories as the session wrote them, counted again
     // The cards ordered by what the databases play (the walk, the games of each), made in the background, one
     // repertoire at a time: nullptr until they are ready.
     [[nodiscard]] const std::vector<study::TrainingCard>* plannedCards(std::size_t index);

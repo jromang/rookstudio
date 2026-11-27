@@ -191,12 +191,15 @@ std::optional<std::size_t> RepertoireTrainingPage::repertoireOf(const std::files
 }
 
 const RepertoireTrainingPage::Summary& RepertoireTrainingPage::summary(std::size_t index) {
-    const auto& e = app_.repertoires().entries().at(index);
-    auto& s       = summaries_[e.file];
+    const auto& e     = app_.repertoires().entries().at(index);
+    auto [it, unread] = summaries_.try_emplace(e.file);
+    auto& s           = it->second;
+    // Its memories read once, then kept up to date by the sessions (keep()): what could not be read in its file is said
+    // once (#136), not again at each change of the repertoire.
+    if (unread) s.kept = readTrainingFile(e.file);
     if (s.revision != e.revision) {
         s.revision = e.revision;
         s.cards    = study::trainingCards(e.lines, e.side);
-        s.kept     = readTrainingFile(e.file);
         s.counted  = 0;
     }
     const auto now  = epochNow();
@@ -524,6 +527,10 @@ void RepertoireTrainingPage::trainingGrade(bool right) {
                                 trainingFileOf(t.file).string()));
         appendReview(t.file, key, now, t.rating, ms, t.played);
     }
+    keep(t);
+}
+
+void RepertoireTrainingPage::keep(const TrainingRun& t) {
     if (const auto it = summaries_.find(t.file); it != summaries_.end()) {
         it->second.kept    = t.kept;
         it->second.counted = 0;
@@ -580,6 +587,7 @@ void RepertoireTrainingPage::trainingAdd() {
     if (const auto it = t.session->memories().find(card.key); it != t.session->memories().end())
         t.kept.memories[card.key] = it->second;
     if (!app_.scripted()) (void)writeTrainingFile(t.file, t.kept);
+    keep(t);
     t.added = std::move(added);
 }
 
@@ -592,6 +600,7 @@ void RepertoireTrainingPage::trainingTakeBack() {
     if (const auto it = t.session->memories().find(key); it != t.session->memories().end())
         t.kept.memories[key] = it->second;
     if (!app_.scripted()) (void)writeTrainingFile(t.file, t.kept);
+    keep(t);
     t.added.reset();
 }
 

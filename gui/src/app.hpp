@@ -1278,9 +1278,11 @@ class App {
     void resumeAll();
     void drawNewMatch();
     // The setup of the new tournament page: its engines chosen, its SPRT bounds the wrong way round, an engine of it
-    // being read. Start and Add to the queue follow them.
+    // being read. Start and Add to the queue follow them: ready when chosen without bounds the wrong way round (the
+    // buttons and Ctrl+K).
     [[nodiscard]] bool setupChosen() const;
     [[nodiscard]] bool setupBadSprt() const;
+    [[nodiscard]] bool setupReady() const;
     [[nodiscard]] bool setupProbing() const;
     void drawWorkspace();
     void drawWorkspaceHeader();

@@ -365,6 +365,8 @@ bool App::setupChosen() const {
                                                     : setup_.participants.size() >= 2;
 }
 
+bool App::setupReady() const { return setupChosen() && !setupBadSprt(); }
+
 // SPRT bounds the wrong way round, said beside them, rather than fastchess' message once started.
 bool App::setupBadSprt() const {
     return setup_.format == TournamentFormat::Match && setup_.mode == MatchMode::Sprt &&
@@ -384,7 +386,7 @@ void App::drawNewMatch() {
 
     const bool chosen   = setupChosen();
     const bool bad_sprt = setupBadSprt();
-    const bool ready    = chosen && !bad_sprt;
+    const bool ready    = setupReady();
     const bool probing  = setupProbing();
     // While an engine of the setup is read, Start waits for it (and says so), see startAfterReads.
     if (!drawStartWaiting("start", "start")) {
@@ -542,12 +544,9 @@ void App::drawWorkspaceHeader() {
     if (run_->running()) {
         const bool paused = run_->paused();
         if (paused) {
-            if (ui::iconButton("resume", ui::Icon::Play, TR("Resume"),
-                               !run_->stopping() && !run_->stoppingWhenIdle())) {
-                setRunPaused(false);
-            }
+            if (ui::iconButton("resume", ui::Icon::Play, TR("Resume"), run_->canResume())) setRunPaused(false);
         } else {
-            if (ui::iconButton("pause", ui::Icon::Pause, TR("Pause"), !run_->stopping())) setRunPaused(true);
+            if (ui::iconButton("pause", ui::Icon::Pause, TR("Pause"), run_->canPause())) setRunPaused(true);
         }
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", TR("Pause: no new pair starts. Running games, and the second game of their "
@@ -555,7 +554,7 @@ void App::drawWorkspaceHeader() {
         }
 
         ImGui::SameLine();
-        if (ui::iconButton("stop", ui::Icon::Stop, TR("Stop"), !run_->stopping())) ImGui::OpenPopup("stop_menu");
+        if (ui::iconButton("stop", ui::Icon::Stop, TR("Stop"), run_->canStop())) ImGui::OpenPopup("stop_menu");
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", TR("Finishes the running games first, or stops now; either way the tournament can "
                                        "be resumed where it stopped."));
@@ -729,7 +728,7 @@ bool App::drawStartFailures(const char* title) {
             return hit;
         };
         if (running) {
-            ImGui::BeginDisabled(e.trying || run_->stopping());
+            ImGui::BeginDisabled(e.trying || !run_->canTryEngineAgain());
             const char* try_tip =
                 TR("Try to start it now, rather than at its next try: its games come back if it starts.");
             if (button(TR("Try again"), try_tip)) {

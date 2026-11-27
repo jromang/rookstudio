@@ -228,24 +228,21 @@ void App::drawGettingStarted() {
 // Pause all
 
 bool App::canPauseAll() const {
-    const bool tournament = std::any_of(runs_.begin(), runs_.end(), [](const OpenRun& r) {
-        return r.run->running() && !r.run->paused() && !r.run->stopping();
-    });
+    const bool tournament = std::any_of(runs_.begin(), runs_.end(), [](const OpenRun& r) { return r.run->pausable(); });
     return tournament || (!queue_.empty() && !queue_held_);
 }
 
 bool App::allPaused() const {
     // A tournament stopping is paused too, but not to be resumed.
-    const bool tournament = std::any_of(runs_.begin(), runs_.end(), [](const OpenRun& r) {
-        return r.run->running() && r.run->paused() && !r.run->stopping() && !r.run->stoppingWhenIdle();
-    });
+    const bool tournament =
+        std::any_of(runs_.begin(), runs_.end(), [](const OpenRun& r) { return r.run->resumable(); });
     return !canPauseAll() && (tournament || queue_held_);
 }
 
 void App::pauseAll() {
     for (std::size_t i = 0; i < runs_.size(); ++i) {
         auto& r = *runs_[i].run;
-        if (!r.running() || r.paused() || r.stopping()) continue;
+        if (!r.pausable()) continue;
         if (i == shown_run_) {
             setRunPaused(true);
         } else {
@@ -260,7 +257,7 @@ void App::resumeAll() {
     queue_held_ = false;
     for (std::size_t i = 0; i < runs_.size(); ++i) {
         auto& r = *runs_[i].run;
-        if (!r.running() || !r.paused() || r.stopping() || r.stoppingWhenIdle()) continue;
+        if (!r.resumable()) continue;
         if (i == shown_run_) {
             setRunPaused(false);
         } else {
@@ -426,6 +423,22 @@ std::optional<double> App::runSecondsLeft() const {
     return played >= total ? 0.0 : static_cast<double>(total - played) / games_per_hour_ * 3600.0;
 }
 
+namespace {
+
+// What a card shows of a tournament playing and offers to do with it, the shown one's as another's.
+void runCardState(home::RunCard& c, const Run& r) {
+    c.paused     = r.paused();
+    c.can_pause  = r.canPause();
+    c.can_resume = r.canResume();
+    c.warn_state = r.paused() || r.stopping();
+    c.state      = r.stopping()           ? TR("Stopping…")
+                   : r.stoppingWhenIdle() ? TR("Stopping after the running games")
+                   : r.paused()           ? TR("Paused")
+                                          : TR("Running");
+}
+
+}  // namespace
+
 home::RunCard App::runCard() {
     const auto* t    = run_->tournament();
     const auto& info = run_->info();
@@ -441,14 +454,7 @@ home::RunCard App::runCard() {
     c.total   = info.total_games;
     c.playing = run_->runningGames();
 
-    c.paused     = run_->paused();
-    c.can_pause  = !run_->stopping();
-    c.can_resume = !run_->stopping() && !run_->stoppingWhenIdle();
-    c.warn_state = run_->paused() || run_->stopping();
-    c.state      = run_->stopping()           ? TR("Stopping…")
-                   : run_->stoppingWhenIdle() ? TR("Stopping after the running games")
-                   : run_->paused()           ? TR("Paused")
-                                              : TR("Running");
+    runCardState(c, *run_);
     if (const auto left = runSecondsLeft()) {
         c.end = trf("Ends about {} (in {})", endTime(*left), ui::formatDuration(*left));
     } else if (info.total_games == 0) {
@@ -534,15 +540,8 @@ home::RunCard App::runCardOf(std::size_t index) {
     }
     c.total      = info.total_games;
     c.playing    = r.runningGames();
-    c.paused     = r.paused();
-    c.can_pause  = !r.stopping();
-    c.can_resume = !r.stopping() && !r.stoppingWhenIdle();
-    c.warn_state = r.paused() || r.stopping();
-    c.state      = r.stopping()           ? TR("Stopping…")
-                   : r.stoppingWhenIdle() ? TR("Stopping after the running games")
-                   : r.paused()           ? TR("Paused")
-                                          : TR("Running");
-    c.end        = TR("Open it for its end");
+    runCardState(c, r);
+    c.end = TR("Open it for its end");
 
     // Who leads, from its copy of the journal, computed again when games came.
     if (!t) return c;

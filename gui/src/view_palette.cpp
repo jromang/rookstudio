@@ -139,12 +139,11 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
     // Actions, as their buttons allow them.
     if (run_->running()) {
         if (run_->paused()) {
-            if (!run_->stopping() && !run_->stoppingWhenIdle())
-                add(TR("Resume"), name, [this] { setRunPaused(false); });
-        } else if (!run_->stopping()) {
+            if (run_->canResume()) add(TR("Resume"), name, [this] { setRunPaused(false); });
+        } else if (run_->canPause()) {
             add(TR("Pause"), name, [this] { setRunPaused(true); });
         }
-        if (!run_->stopping()) {
+        if (run_->canStop()) {
             add(TR("Finish the running games, then stop"), name, [this] { stopRun(false); });
             add(TR("Stop now (running games are lost)"), name, [this] { stopRun(true); });
         }
@@ -193,7 +192,7 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
         for (const auto& e : t->startFailures().engines()) {
             const auto* p = t->spec().participant(e.participant);
             if (!p || !p->active) continue;
-            if (run_->running() && !run_->stopping() && !e.trying) {
+            if (run_->canTryEngineAgain() && !e.trying) {
                 add(trf("Try again to start {}", e.name), name,
                     [this, id = e.participant] { run_->tryEngineAgain(id); });
             }
@@ -224,7 +223,7 @@ std::vector<App::PaletteEntry> App::paletteEntries() {
             }
         }
     }
-    const bool ready = setupChosen() && !setupBadSprt();
+    const bool ready = setupReady();
     if (ready && !startPending("start")) add(TR("Start"), TR("New tournament"), [this] { startRun(); });
     if (ready) add(TR("Add to the queue"), TR("New tournament"), [this] { enqueue(); });
     // The fixes the setup summary offers (Lower Threads, Lower to N pieces, Locate…), named after their engine. The

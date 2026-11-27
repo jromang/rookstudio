@@ -228,6 +228,16 @@ class Run {
     [[nodiscard]] virtual bool stoppingWhenIdle() const = 0;
     [[nodiscard]] virtual bool stopping() const         = 0;
 
+    // What its buttons, Ctrl+K and the home page's cards offer, each rule written here once. Pause, Stop and Try again
+    // wait for no stop asked; Resume for neither stop, now or once the running games are over (which pauses it).
+    [[nodiscard]] bool canPause() const { return !stopping(); }
+    [[nodiscard]] bool canStop() const { return !stopping(); }
+    [[nodiscard]] bool canResume() const { return !stopping() && !stoppingWhenIdle(); }
+    [[nodiscard]] bool canTryEngineAgain() const { return running() && !stopping(); }
+    // Playing, and Pause (Pause all) or Resume (Resume all) would act on it.
+    [[nodiscard]] bool pausable() const { return running() && !paused() && canPause(); }
+    [[nodiscard]] bool resumable() const { return running() && paused() && canResume(); }
+
     // Call once per frame.
     virtual void update() = 0;
 

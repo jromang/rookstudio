@@ -25,6 +25,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -954,10 +955,9 @@ std::string App::foundMove(const std::shared_ptr<const study::Snapshot>& snapsho
 // The state of a search
 
 void App::drawSearchState(SearchJob& job, const char* nothing, const char* how) {
-    ImGui::PushTextWrapPos();
+    const ui::TextWrap wrap;
     if (job.of.empty()) {
         ImGui::TextDisabled("%s", nothing);
-        ImGui::PopTextWrapPos();
         return;
     }
     const auto count = [](std::size_t n) {
@@ -1041,7 +1041,6 @@ void App::drawSearchState(SearchJob& job, const char* nothing, const char* how) 
             }
         }
     }
-    ImGui::PopTextWrapPos();
 }
 
 void App::drawFoundGame(const SearchJob& job, float size) {

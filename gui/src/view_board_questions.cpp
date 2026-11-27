@@ -29,6 +29,7 @@
 #include "review_tables.hpp"
 #include "tablebases.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -51,11 +52,9 @@ void drawComparison(const commentary::Position& from, const commentary::Answered
                     const std::optional<commentary::References>& refs, const std::string& engine,
                     const std::vector<commentary::ReferenceBase>& bases, commentary::PieceLetters letters) {
     const std::string base = bases.size() == 1 ? bases.front().name : std::string(TR("Your databases"));
-    ImGui::PushTextWrapPos(-1.0f);  // the card wraps its text: not the table's cells, sized by what they hold
-    if (!ImGui::BeginTable("##compare", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerH)) {
-        ImGui::PopTextWrapPos();
-        return;
-    }
+    const ui::TextWrap wrap(-1.0f);  // the card wraps its text: not the table's cells, sized by what they hold
+    const ui::Table table("##compare", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerH);
+    if (!table) return;
     ImGui::TableSetupColumn(TR("Move"));
     ImGui::TableSetupColumn(engine.empty() ? TR("Engine") : engine.c_str());
     ImGui::TableSetupColumn(base.c_str());
@@ -92,8 +91,6 @@ void drawComparison(const commentary::Position& from, const commentary::Answered
         ImGui::TableNextColumn();
         ImGui::TextUnformatted(commentary::lineText(after, ans.lines[i].moves, 4, letters).c_str());
     }
-    ImGui::EndTable();
-    ImGui::PopTextWrapPos();
 }
 
 // A move with its number, as the notation writes it: "14.Nd5", "14…Bxd5"; in the interface's letters, or as `san` is.

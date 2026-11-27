@@ -26,6 +26,7 @@
 #include "live.hpp"
 #include "online_cache.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -337,37 +338,36 @@ void App::drawBoardOnline() {
 void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
     auto& b       = board_;
     const auto& a = online_tb_->answer;
-    ui::beginCard("online_tb");
-    ImGui::PushTextWrapPos();
-    ImGui::TextUnformatted(TR("Endgame tables"));
-    ImGui::SameLine();
-    ImGui::TextDisabled(
-        "%s",
-        trf("· {} pieces · Lichess · asked at {}, kept in your profile", pieces, clockText(online_tb_->when)).c_str());
-    if (!a.value) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a, "tablebase.lichess.ovh").c_str());
-        if (ImGui::SmallButton(TR("Try again"))) online_tb_.reset();
-        ImGui::PopTextWrapPos();
-        ui::endCard();
-        return;
+    {
+        const ui::Card card("online_tb");
+        const ui::TextWrap wrap;
+        ImGui::TextUnformatted(TR("Endgame tables"));
+        ImGui::SameLine();
+        ImGui::TextDisabled(
+            "%s", trf("· {} pieces · Lichess · asked at {}, kept in your profile", pieces, clockText(online_tb_->when))
+                      .c_str());
+        if (!a.value) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                               trouble(a, "tablebase.lichess.ovh").c_str());
+            if (ImGui::SmallButton(TR("Try again"))) online_tb_.reset();
+            return;
+        }
+        // The verdict and how far, in the Endgames tab's words (#42).
+        const auto& t = *a.value;
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.15f);
+        ImGui::TextUnformatted(t.checkmate   ? TR("Checkmate")
+                               : t.stalemate ? TR("Stalemate")
+                                             : outcomeVerdict(t.outcome, board.sideToMove()).c_str());
+        ImGui::PopFont();
+        if (const auto distance = tablesDistance(t.dtm, t.dtz, t.dtc); !distance.empty()) {
+            ImGui::TextDisabled("%s", distance.c_str());
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tablesMetric(t.dtm, t.dtz, t.dtc));
+        }
+        // The moves, each by its outcome, its distance and why a move spoils the result: the Endgames tab's (#42, R1).
+        if (ImGui::SmallButton(TR("Each move by its outcome: the Endgames tab"))) board_side_tab_ = 5;
+        ImGui::SameLine();
+        ImGui::TextDisabled("Alt+6");
     }
-    // The verdict and how far, in the Endgames tab's words (#42).
-    const auto& t = *a.value;
-    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.15f);
-    ImGui::TextUnformatted(t.checkmate   ? TR("Checkmate")
-                           : t.stalemate ? TR("Stalemate")
-                                         : outcomeVerdict(t.outcome, board.sideToMove()).c_str());
-    ImGui::PopFont();
-    if (const auto distance = tablesDistance(t.dtm, t.dtz, t.dtc); !distance.empty()) {
-        ImGui::TextDisabled("%s", distance.c_str());
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tablesMetric(t.dtm, t.dtz, t.dtc));
-    }
-    // The moves, each by its outcome, its distance and why a move spoils the result: the Endgames tab's (#42, R1).
-    if (ImGui::SmallButton(TR("Each move by its outcome: the Endgames tab"))) board_side_tab_ = 5;
-    ImGui::SameLine();
-    ImGui::TextDisabled("Alt+6");
-    ImGui::PopTextWrapPos();
-    ui::endCard();
     ImGui::Dummy(ImVec2(0, px(4)));
     (void)b;
 }
@@ -375,41 +375,40 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
 void App::drawOnlineCloud(const chess::Board& board) {
     const auto& a = online_cloud_->answer;
     if (!a.value && !a.failed()) return;  // a position the cloud has not computed says nothing
-    ui::beginCard("online_cloud");
-    ImGui::PushTextWrapPos();
-    if (!a.value) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a, "lichess.org").c_str());
-        if (ImGui::SmallButton(TR("Try again"))) online_cloud_.reset();
-        ImGui::PopTextWrapPos();
-        ui::endCard();
-        return;
-    }
-    const auto& c = *a.value;
-    ImGui::TextUnformatted(TR("In Lichess's cloud"));
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", trf("· depth {} · already computed by its servers", c.depth).c_str());
-    for (std::size_t i = 0; i < c.lines.size(); ++i) {
-        const auto& l    = c.lines[i];
-        const auto score = l.mate ? fmt::format("#{}", *l.mate)
-                           : l.cp ? fmt::format("{:+.2f}", static_cast<double>(*l.cp) / 100.0)
-                                  : std::string("?");
-        const auto line  = localLine(pvToSan(board, l.moves, 12));
-        const auto label = fmt::format("{}  {}##cloud_{}", score, line, i);
-        if (ImGui::Selectable(label.c_str())) {
-            BoardPreview preview;
-            preview.ply    = board_.ply;
-            preview.at     = board_.ply;
-            preview.moves  = l.moves;
-            preview.label  = TR("Lichess's cloud");
-            board_.preview = std::move(preview);
+    {
+        const ui::Card card("online_cloud");
+        const ui::TextWrap wrap;
+        if (!a.value) {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a, "lichess.org").c_str());
+            if (ImGui::SmallButton(TR("Try again"))) online_cloud_.reset();
+            return;
         }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", TR("A click shows the line on the board. Scores are White's."));
+        const auto& c = *a.value;
+        ImGui::TextUnformatted(TR("In Lichess's cloud"));
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", trf("· depth {} · already computed by its servers", c.depth).c_str());
+        for (std::size_t i = 0; i < c.lines.size(); ++i) {
+            const auto& l    = c.lines[i];
+            const auto score = l.mate ? fmt::format("#{}", *l.mate)
+                               : l.cp ? fmt::format("{:+.2f}", static_cast<double>(*l.cp) / 100.0)
+                                      : std::string("?");
+            const auto line  = localLine(pvToSan(board, l.moves, 12));
+            const auto label = fmt::format("{}  {}##cloud_{}", score, line, i);
+            if (ImGui::Selectable(label.c_str())) {
+                BoardPreview preview;
+                preview.ply    = board_.ply;
+                preview.at     = board_.ply;
+                preview.moves  = l.moves;
+                preview.label  = TR("Lichess's cloud");
+                board_.preview = std::move(preview);
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", TR("A click shows the line on the board. Scores are White's."));
+        }
+        ImGui::TextDisabled("%s",
+                            TR("Sent: the position's FEN, without an account. A position Lichess has not computed "
+                               "says nothing here: your engine alone answers."));
     }
-    ImGui::TextDisabled("%s", TR("Sent: the position's FEN, without an account. A position Lichess has not computed "
-                                 "says nothing here: your engine alone answers."));
-    ImGui::PopTextWrapPos();
-    ui::endCard();
     ImGui::Dummy(ImVec2(0, px(4)));
 }
 

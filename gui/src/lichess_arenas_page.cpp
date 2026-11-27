@@ -38,6 +38,7 @@
 #include "lichess_broadcasts.hpp"
 #include "lichess_settings.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -79,25 +80,14 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
+using ui::endTinted;
+using ui::mix;
+using ui::primaryButton;
+using ui::wrapped;
 
-void beginTinted(const char* id, ImU32 tone) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, tone, 0.08f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BD, tone, 0.55f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(14), px(10)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
+// The arenas' tinted boxes are a little tighter than the training's.
+constexpr ui::Tint TINT{.padding = ImVec2(14, 10)};
+void beginTinted(const char* id, ImU32 tone) { ui::beginTinted(id, tone, TINT); }
 
 void heading(const std::string& text) {
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
@@ -105,28 +95,10 @@ void heading(const std::string& text) {
     ImGui::PopFont();
 }
 
-void wrapped(const std::string& text, bool grey = false) {
-    if (grey) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text.c_str());
-    if (grey) ImGui::PopStyleColor();
-}
-
 void coloured(const std::string& text, ImU32 tone) {
     ImGui::PushStyleColor(ImGuiCol_Text, tone);
     ImGui::TextWrapped("%s", text.c_str());
     ImGui::PopStyleColor();
-}
-
-bool primaryButton(const char* label, bool enabled = true) {
-    ImGui::BeginDisabled(!enabled);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32_WHITE, 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_WHITE);
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(3);
-    ImGui::EndDisabled();
-    return clicked;
 }
 
 // A chip: a speed of the card; filled when chosen.
@@ -1730,8 +1702,8 @@ void LichessArenasPage::drawArenaOver(bool home) {
         if (ImGui::SmallButton(TR("See it##arena_over"))) chooseArena(a.id, a.name);
         return;
     }
-    beginTinted("##arena_over", ui::GOOD);
-    ImGui::PushTextWrapPos();
+    const ui::Tinted tinted("##arena_over", ui::GOOD, TINT);
+    const ui::TextWrap wrap;
     ui::inlineIcon(ui::Icon::Trophy, ui::GOOD);
     ImGui::SameLine();
     coloured(title, ui::GOOD);
@@ -1754,12 +1726,8 @@ void LichessArenasPage::drawArenaOver(bool home) {
     if (ImGui::Button(TR("Close##arena_over"))) {
         app_.letGoHeld(a.id);
         dropArena();
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
-    ImGui::PopTextWrapPos();
-    endTinted();
 }
 
 void LichessArenasPage::drawSwissPart() {

@@ -26,6 +26,7 @@
 #include "i18n.hpp"
 #include "lichess_studies.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -77,24 +78,12 @@ std::string fitted(std::string text, float width) {
 // A day as the card says it, from seconds since the epoch.
 std::string dayOf(int64_t seconds) { return seconds > 0 ? ui::dayText(static_cast<std::time_t>(seconds)) : ""; }
 
-// A card tinted with `tone`, as the broadcast's banner is.
-void beginTinted(const char* id, ImU32 tone) {
-    const auto bg  = ImGui::ColorConvertU32ToFloat4(ui::CARD_BG);
-    const auto t   = ImGui::ColorConvertU32ToFloat4(tone);
-    const auto mix = [&](float k) {
-        return ImVec4(bg.x + (t.x - bg.x) * k, bg.y + (t.y - bg.y) * k, bg.z + (t.z - bg.z) * k, 1.0f);
-    };
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, mix(0.08f));
-    ImGui::PushStyleColor(ImGuiCol_Border, mix(0.45f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(12), px(8)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
+using ui::endTinted;
 
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
+// A card tinted with `tone`, as the broadcast's banner is: its border drawn from the background, softer than the
+// training's.
+void beginTinted(const char* id, ImU32 tone) {
+    ui::beginTinted(id, tone, {.edge = 0.45f, .soft_edge = true, .padding = ImVec2(12, 8)});
 }
 
 // Whether a study read before changed on Lichess since: the last HEAD's Last-Modified against the reading's, or the
@@ -497,7 +486,7 @@ void App::openStudyChapter(const std::string& id, std::size_t index) {
 
 void App::drawLichessStudies() {
     loadStudiesState();
-    ui::beginCard("lichess_studies");
+    const ui::Card card("lichess_studies");
     ImGui::PushTextWrapPos();
     // The card folds; its first opening asks for the permission to read the private studies.
     bool open = studies_.shown;
@@ -560,7 +549,6 @@ void App::drawLichessStudies() {
             ImGui::PopID();
         }
         ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     if (!lichess_account_) {
@@ -569,7 +557,6 @@ void App::drawLichessStudies() {
         if (!lichess_link_ && ui::iconButton("studies_link", ui::Icon::External, TR("Link the account…")))
             startLichessLink({lichess::SCOPE_STUDY_READ});
         ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // The permission to read the private and unlisted studies: asked here, once.
@@ -696,7 +683,6 @@ void App::drawLichessStudies() {
                                  "changed?), nothing downloaded. Your token goes with them once RookStudio may read "
                                  "your studies."));
     ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::drawStudyDetail(const lichess::StudyInfo& study) {

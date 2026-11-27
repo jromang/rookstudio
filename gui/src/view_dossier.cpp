@@ -25,6 +25,7 @@
 #include "i18n.hpp"
 #include "publish_reports.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -82,44 +83,7 @@ void cellText(const std::string& text, bool muted = false) {
         ImGui::SetTooltip("%s", text.c_str());
 }
 
-// A source of the dossier as a chip: filled when it is in, outlined in dashes when it can be added. True when clicked.
-bool chip(const char* id, const std::string& text, bool on) {
-    const ImVec2 pad(px(10), px(3));
-    const ImVec2 label = ImGui::CalcTextSize(text.c_str());
-    const ImVec2 size(label.x + pad.x * 2, label.y + pad.y * 2);
-    const ImVec2 pos     = ImGui::GetCursorScreenPos();
-    const bool clicked   = ImGui::InvisibleButton(id, size);
-    const bool hovered   = ImGui::IsItemHovered();
-    auto* dl             = ImGui::GetWindowDrawList();
-    const ImVec2 end     = ImVec2(pos.x + size.x, pos.y + size.y);
-    const float rounding = size.y * 0.5f;
-    if (on) {
-        dl->AddRectFilled(pos, end, (ui::ACCENT & 0x00ffffff) | (hovered ? 0x55000000 : 0x33000000), rounding);
-        dl->AddRect(pos, end, ui::ACCENT, rounding);
-    } else {
-        if (hovered) dl->AddRectFilled(pos, end, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), rounding);
-        const ImU32 col  = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-        const float dash = px(4), gap = px(3);
-        const auto line = [&](ImVec2 a, ImVec2 b) {
-            const float length = std::hypot(b.x - a.x, b.y - a.y);
-            for (float t = 0; t < length; t += dash + gap) {
-                const float u = std::min(t + dash, length);
-                dl->AddLine(ImVec2(a.x + (b.x - a.x) * t / length, a.y + (b.y - a.y) * t / length),
-                            ImVec2(a.x + (b.x - a.x) * u / length, a.y + (b.y - a.y) * u / length), col);
-            }
-        };
-        line(ImVec2(pos.x + rounding, pos.y), ImVec2(end.x - rounding, pos.y));
-        line(ImVec2(pos.x + rounding, end.y - 1), ImVec2(end.x - rounding, end.y - 1));
-        constexpr float pi = 3.14159265f;
-        dl->PathArcTo(ImVec2(pos.x + rounding, pos.y + rounding), rounding - 0.5f, pi * 0.5f, pi * 1.5f, 10);
-        dl->PathStroke(col, 0);
-        dl->PathArcTo(ImVec2(end.x - rounding, pos.y + rounding), rounding - 0.5f, -pi * 0.5f, pi * 0.5f, 10);
-        dl->PathStroke(col, 0);
-    }
-    dl->AddText(ImVec2(pos.x + pad.x, pos.y + pad.y), on ? ui::ACCENT : ImGui::GetColorU32(ImGuiCol_Text),
-                text.c_str());
-    return clicked;
-}
+using ui::dashedChip;
 
 // A text that wraps, its percentages ("44 %") kept whole on a line: the space before "%" one that does not break.
 std::string percentsKept(std::string text) {
@@ -518,22 +482,25 @@ void App::drawDossier() {
             }
             ImGui::OpenPopup("##dossier_in_list");
         }
-        if (ImGui::BeginPopup("##dossier_in_list")) {
+        std::optional<std::size_t> chosen;  // the database whose games go to the list, once the popup is ended
+        if (const ui::Popup popup("##dossier_in_list"); popup) {
             for (std::size_t s = 0; s < r->board.sources.size() && s < d.folders.size(); ++s) {
                 const auto n = r->board.sources[s].games;
                 if (n == 0) continue;
                 if (ImGui::Selectable(fmt::format("{} · {}##in{}", d.folders[s].second,
                                                   trn("{} game", "{} games", n, ui::exactCount(n)), s)
                                           .c_str())) {
-                    std::vector<study::GameId> ids;
-                    for (const auto& g : r->dossier->games)
-                        if (g.source == s) ids.push_back(g.id);
-                    ImGui::EndPopup();
-                    dossierInList(s, std::move(ids), trf("the games of {}", d.subject.name));
-                    return;
+                    chosen = s;
+                    break;
                 }
             }
-            ImGui::EndPopup();
+        }
+        if (chosen) {
+            std::vector<study::GameId> ids;
+            for (const auto& g : r->dossier->games)
+                if (g.source == *chosen) ids.push_back(g.id);
+            dossierInList(*chosen, std::move(ids), trf("the games of {}", d.subject.name));
+            return;
         }
     }
 
@@ -561,7 +528,7 @@ void App::drawDossier() {
             text             = trf("Your databases · {} · {}", games,
                                    years(static_cast<int>(r->board.first >> 9), static_cast<int>(r->board.last >> 9)));
         }
-        chip("##dossier_bases", text, !r || r->board.games > 0);
+        dashedChip("##dossier_bases", text, !r || r->board.games > 0);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", TR("Their games in your databases, all their spellings together (the tables of "
                                        "names): nothing leaves the machine."));
@@ -595,7 +562,7 @@ void App::drawDossier() {
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TR("Enter · kept in the tables of names"));
     } else if (d.subject.lichess.empty()) {
-        if (chip("##dossier_add_lichess", TR("+ Lichess…"), false)) {
+        if (dashedChip("##dossier_add_lichess", TR("+ Lichess…"), false)) {
             d.lichess_typing = true;
             d.lichess_focus  = true;
         }
@@ -618,7 +585,7 @@ void App::drawDossier() {
             text         = trf("Lichess · {} · {}", d.subject.lichess,
                                trn("{} game of the last year", "{} games of the last year", n, ui::exactCount(n)));
         }
-        if (chip("##dossier_lichess_chip", text, d.lichess)) {
+        if (dashedChip("##dossier_lichess_chip", text, d.lichess)) {
             d.lichess = !d.lichess;
             if (d.lichess && (!prep_ || lower(prep_->opponent) != lower(d.subject.lichess)))
                 startPrep(d.subject.lichess);
@@ -1048,8 +1015,8 @@ void App::drawDossierOpenings() {
 }
 
 void App::drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how) {
-    ui::beginCard("dossier_gaps");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("dossier_gaps");
+    const ui::TextWrap wrap;
     if (repertoires().entries().empty()) {
         ImGui::TextUnformatted(TR("Your repertoires against them"));
         ImGui::TextDisabled("%s", TR("No repertoire yet: the Tree tab's stars make one, measured on the Openings "
@@ -1069,8 +1036,6 @@ void App::drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how) 
             if (!g.gap.move.empty()) line.push_back(g.gap.move);
             if (ImGui::SmallButton(fmt::format("{}##dossier_gap{}", movesText(line), i).c_str())) {
                 openDossierLine(line, !g.white);
-                ImGui::PopTextWrapPos();
-                ui::endCard();
                 return;
             }
             ImGui::SameLine();
@@ -1080,8 +1045,6 @@ void App::drawDossierGaps(const std::vector<DossierGap>& gaps, const char* how) 
         }
     }
     ImGui::TextDisabled("%s", how);
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::drawDossierRating() {

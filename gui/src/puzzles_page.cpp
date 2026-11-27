@@ -42,6 +42,7 @@
 #include "mistakes.hpp"
 #include "training.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -60,8 +61,8 @@ double since(Clock::time_point t) { return std::chrono::duration<double>(Clock::
 constexpr double REPLY_SECONDS = 0.5;
 
 // How much of its tone a tinted card takes: the answer's on the Board page, a card of the Training page.
-constexpr float SERIES_TINT = 0.10f;
-constexpr float PAGE_TINT   = 0.08f;
+constexpr ui::Tint SERIES_TINT{.fill = 0.10f};
+constexpr ui::Tint PAGE_TINT{.fill = 0.08f};
 
 // A tooltip for the item just drawn, also when it is disabled, its lines wrapped.
 void tip(const std::string& text) {
@@ -73,41 +74,13 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
-
-// A card tinted: the answer's tone, the accent, a warning's.
-void beginTinted(const char* id, ImU32 tone, float tint) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, tone, tint)));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BD, tone, 0.55f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(16), px(14)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
-
-// The button of the main gesture, filled with the accent.
-bool primaryButton(const char* label, bool enabled = true) {
-    ImGui::BeginDisabled(!enabled);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(255, 255, 255, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(0, 0, 0, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(4);
-    ImGui::EndDisabled();
-    return clicked;
-}
+using ui::beginTinted;
+using ui::chip;
+using ui::endTinted;
+using ui::mix;
+using ui::numbered;
+using ui::primaryButton;
+using ui::wrapped;
 
 // A count in large figures over what it counts.
 void bigCount(const std::string& n, const std::string& what) {
@@ -119,42 +92,11 @@ void bigCount(const std::string& n, const std::string& what) {
     ImGui::EndGroup();
 }
 
-void wrapped(const std::string& text, bool grey = false) {
-    if (grey) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text.c_str());
-    if (grey) ImGui::PopStyleColor();
-}
-
-// A chip: a theme, a difficulty; filled when chosen.
-bool chip(const char* label, bool chosen, const char* id = nullptr) {
-    const auto& style = ImGui::GetStyle();
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, px(12));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(10), style.FramePadding.y * 0.8f));
-    if (chosen) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, ui::ACCENT, 0.30f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::CARD_BG));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::CARD_BD));
-    }
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-    const bool clicked = ImGui::Button(id ? fmt::format("{}##{}", label, id).c_str() : label);
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
-    return clicked;
-}
-
 // The space the profile's disk has left; 0 when it cannot be said.
 uint64_t freeSpace(const fs::path& folder) {
     std::error_code ec;
     const auto info = fs::space(fs::exists(folder, ec) ? folder : folder.parent_path(), ec);
     return ec ? 0 : info.available;
-}
-
-// A move with its number as the interface writes it: "24.Nc7+", "23…Qxd4".
-std::string numbered(const chess::Board& before, chess::Move move) {
-    return fmt::format("{}{}{}", before.fullMoveNumber(), before.sideToMove() == chess::Color::WHITE ? "." : "…",
-                       localSan(chess::uci::moveToSan(before, move)));
 }
 
 // The game the board shows for a puzzle: from its position, the opponent's move, then `played` moves of the solution.
@@ -1771,8 +1713,8 @@ void PuzzlesPage::drawPuzzleStoreCard() {
     const ui::TopicRegion topic(guide::topics::Puzzles);
     auto& puzzles    = *offline_puzzles_;
     const auto state = puzzles.state();
-    ui::beginCard("##puzzle_store");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("##puzzle_store");
+    const ui::TextWrap wrap;
     ui::inlineIcon(ui::Icon::Download, ImGui::GetColorU32(ImGuiCol_Text));
     ImGui::SameLine();
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
@@ -1821,8 +1763,6 @@ void PuzzlesPage::drawPuzzleStoreCard() {
                             TR("Read while it downloads. Cut short (Cancel, the network, the program closed), the "
                                "download goes on from where it stopped."));
         if (ImGui::Button(TR("Cancel##offline_puzzles"))) puzzles.cancel();
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // Ready: what is kept, Update, Remove them.
@@ -1877,8 +1817,6 @@ void PuzzlesPage::drawPuzzleStoreCard() {
             if (offline_puzzles_update_.valid()) ImGui::TextDisabled("%s", TR("Asking database.lichess.org…"));
             if (!offline_puzzles_note_.empty()) ImGui::TextDisabled("%s", offline_puzzles_note_.c_str());
         }
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // A preparation cut short.
@@ -1898,8 +1836,6 @@ void PuzzlesPage::drawPuzzleStoreCard() {
             puzzles.forgetStopped();
             offline_puzzles_error_.clear();
         }
-        ImGui::PopTextWrapPos();
-        ui::endCard();
         return;
     }
     // Before: the file, its size, the disk.
@@ -1931,19 +1867,16 @@ void PuzzlesPage::drawPuzzleStoreCard() {
     tip(TR("lichess_db_puzzle.csv.zst, from database.lichess.org: read from the disk, nothing is downloaded."));
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file to database.lichess.org, its size "
                                  "said before. Then nothing."));
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void PuzzlesPage::drawPuzzleThemes() {
     const auto& r = puzzleRecord();
-    ui::beginCard("##puzzle_results");
+    const ui::Card card("##puzzle_results");
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(TR("Your results by theme"));
     ImGui::PopFont();
     if (r.themes.empty()) {
         ImGui::TextDisabled("%s", TR("None yet: each puzzle answered counts for its themes."));
-        ui::endCard();
         return;
     }
     std::vector<std::pair<std::string, ThemeResults>> rows(r.themes.begin(), r.themes.end());
@@ -1965,7 +1898,6 @@ void PuzzlesPage::drawPuzzleThemes() {
         }
         ImGui::EndTable();
     }
-    ui::endCard();
 }
 
 }  // namespace fcg

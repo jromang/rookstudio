@@ -23,6 +23,7 @@
 #include "lichess_arenas_page.hpp"
 #include "sound.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -47,69 +48,17 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
-
-void beginTinted(const char* id, ImU32 tone) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, tone, 0.08f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BD, tone, 0.55f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(16), px(14)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
-
-bool primaryButton(const char* label, bool enabled = true) {
-    ImGui::BeginDisabled(!enabled);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(255, 255, 255, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(0, 0, 0, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(4);
-    ImGui::EndDisabled();
-    return clicked;
-}
-
-void wrapped(const std::string& text, bool grey = false) {
-    if (grey) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text.c_str());
-    if (grey) ImGui::PopStyleColor();
-}
+using ui::beginTinted;
+using ui::chip;
+using ui::endTinted;
+using ui::mix;
+using ui::primaryButton;
+using ui::wrapped;
 
 void coloured(const std::string& text, ImU32 tone) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(tone));
     ImGui::TextWrapped("%s", text.c_str());
     ImGui::PopStyleColor();
-}
-
-// A chip: a clock, a colour; filled when chosen.
-bool chip(const char* label, bool chosen, const char* id) {
-    const auto& style = ImGui::GetStyle();
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, px(12));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(10), style.FramePadding.y * 0.8f));
-    if (chosen) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, ui::ACCENT, 0.30f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::CARD_BG));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::CARD_BD));
-    }
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-    const bool clicked = ImGui::Button(fmt::format("{}##{}", label, id).c_str());
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
-    return clicked;
 }
 
 // A short label on a coloured ground, on the line of the text around it.
@@ -1699,8 +1648,8 @@ void App::drawOnlineGameEnd() {
     const ui::TopicRegion topic(guide::topics::LichessGame);
     // Its stream stopped before its end: Lichess does not know the game any more, or refused the token.
     if (!s.over()) {
-        beginTinted("##online_lost", ui::WARN);
-        ImGui::PushTextWrapPos();
+        const ui::Tinted tinted("##online_lost", ui::WARN);
+        const ui::TextWrap wrap;
         coloured(trf("Lichess no longer answers for your game against {}: {}.", onlineOpponent(),
                      lichess::describe(s.failure)),
                  ui::WARN);
@@ -1709,12 +1658,8 @@ void App::drawOnlineGameEnd() {
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Close##online_lost"))) {
             online_game_.reset();
-            ImGui::PopTextWrapPos();
-            endTinted();
             return;
         }
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     const auto& them = og.white ? s.black : s.white;
@@ -1760,8 +1705,8 @@ void App::drawOnlineGameEnd() {
         title = TR("Draw");
     else
         title = won ? TR("You won") : lost ? TR("You lost") : TR("Game over");
-    beginTinted("##online_end", ui::ACCENT);
-    ImGui::PushTextWrapPos();
+    const ui::Tinted tinted("##online_end", ui::ACCENT);
+    const ui::TextWrap wrap;
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase * 1.25f);
     wrapped(title);
     ImGui::PopFont();
@@ -1774,8 +1719,6 @@ void App::drawOnlineGameEnd() {
     if (lichess::tournamentGame(s)) {
         if (primaryButton(TR("Back to the tournament##online_end"))) {
             if (!arenas_->backToTournament(s.swiss)) page_ = Page::Play;
-            ImGui::PopTextWrapPos();
-            endTinted();
             return;
         }
         ImGui::SameLine();
@@ -1787,8 +1730,6 @@ void App::drawOnlineGameEnd() {
             play_part_          = 1;
             page_               = Page::Play;
             startSeek();
-            ImGui::PopTextWrapPos();
-            endTinted();
             return;
         }
         ImGui::SameLine();
@@ -1800,13 +1741,9 @@ void App::drawOnlineGameEnd() {
     ImGui::SameLine();
     if (ImGui::Button(TR("Close##online_end"))) {
         closeOnlineGame();
-        ImGui::PopTextWrapPos();
-        endTinted();
         return;
     }
     tip(TR("The game stays on the board as any game; it comes into your Lichess database as your finished games do."));
-    ImGui::PopTextWrapPos();
-    endTinted();
 }
 
 // ---------------------------------------------------------------------------

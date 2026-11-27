@@ -26,6 +26,7 @@
 #include "publish_reports.hpp"
 #include "renderer.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -876,15 +877,8 @@ void endProblemCard() {
     ui::endCard();
 }
 
-bool primaryButton(const char* label) {
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4((ui::ACCENT & 0x00ffffff) | 0xdd000000));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(3);
-    return clicked;
-}
+// The sheet's primary buttons keep a translucent hover until a mockup settles it (#110).
+bool primaryButton(const char* label) { return ui::primaryButton(label, true, 0, ui::PrimaryHover::Translucent); }
 
 }  // namespace
 

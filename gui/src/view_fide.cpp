@@ -15,6 +15,7 @@
 #include "app.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -89,15 +90,14 @@ void App::drawFidePopup() {
     if (std::exchange(fide_popup_, false)) ImGui::OpenPopup("##fide_card");
     ImGui::SetNextWindowSizeConstraints(ImVec2(ImGui::GetFontSize() * 18, 0),
                                         ImVec2(ImGui::GetFontSize() * 30, FLT_MAX));
-    if (!ImGui::BeginPopup("##fide_card")) return;
+    const ui::Popup popup("##fide_card");
+    if (!popup) return;
     if (!fide_ask_) {
         ImGui::CloseCurrentPopup();
-        ImGui::EndPopup();
         return;
     }
     auto& a = *fide_ask_;
     drawFideAsk(a);
-    ImGui::EndPopup();
 }
 
 void App::drawFideAsk(FideAsk& a) {

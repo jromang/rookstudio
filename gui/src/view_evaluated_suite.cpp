@@ -17,6 +17,7 @@
 #include "lichess_months.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -82,7 +83,7 @@ void App::drawEvaluatedSuite() {
     if (!evals_folder_) evals_folder_ = evalsFolder(evalsFolderPath());
     const auto& folder = *evals_folder_;
     auto& o            = evaluated_suite_;
-    ImGui::PushTextWrapPos(0);
+    const ui::TextWrap wrap(0);
     ImGui::PushFont(ui::titleFont(), ImGui::GetFontSize() * 1.1f);
     ImGui::TextUnformatted(TR("A book from Lichess's evaluated positions"));
     ImGui::PopFont();
@@ -105,7 +106,6 @@ void App::drawEvaluatedSuite() {
             trf("{} positions read · {} kept", ui::exactCount(p.lines), ui::exactCount(p.kept)).c_str());
         ImGui::TextDisabled("%s", TR("Cancel keeps what was read: the reading goes on from there later, even after "
                                      "the program was closed."));
-        ImGui::PopTextWrapPos();
         return;
     }
 
@@ -163,7 +163,6 @@ void App::drawEvaluatedSuite() {
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(TR("Cancel##evals_form"))) evaluated_suite_shown_ = false;
-        ImGui::PopTextWrapPos();
         return;
     }
 
@@ -181,7 +180,6 @@ void App::drawEvaluatedSuite() {
         evals_folder_ = evalsFolder(evalsFolderPath());
         if (!evals_size_ && !evals_size_job_.valid())
             evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
-        ImGui::PopTextWrapPos();
         return;
     }
     tip(TR("Reads Lichess's evaluations database again, for its newer evaluations."));
@@ -237,7 +235,6 @@ void App::drawEvaluatedSuite() {
     ImGui::Spacing();
     if (!evaluated_positions_) {
         ImGui::TextDisabled("%s", TR("Reading the positions kept…"));
-        ImGui::PopTextWrapPos();
         return;
     }
     // What it would hold, worked out again when the choices change.
@@ -267,7 +264,6 @@ void App::drawEvaluatedSuite() {
            "(ce, acd) and its opening (c0), added to the library."));
     ImGui::SameLine();
     if (ImGui::SmallButton(TR("Cancel##evals_book"))) evaluated_suite_shown_ = false;
-    ImGui::PopTextWrapPos();
 }
 
 void App::writeEvaluatedSuiteBook(std::string path) {

@@ -27,6 +27,7 @@
 #include "lichess_tv_page.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -326,8 +327,8 @@ void App::startLichessLink(std::vector<std::string> scopes, std::string username
 void App::drawLichessScopeAsk() {
     if (!lichess_scope_ask_ || !lichess_account_) return;
     auto& ask = *lichess_scope_ask_;
-    ui::beginCard("lichess_scope");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("lichess_scope");
+    const ui::TextWrap wrap;
     ImGui::TextUnformatted(TR("Lichess asks for one more permission"));
     if (ask.follow)
         ImGui::TextDisabled("%s", trf("to follow “{} · {}”", ask.follow->tour.name, ask.follow->round.name).c_str());
@@ -382,8 +383,6 @@ void App::drawLichessScopeAsk() {
                 saveLichessSettings();
                 lichess_scope_ask_.reset();
                 openPlayersMosaic(true);
-                ImGui::PopTextWrapPos();
-                ui::endCard();
                 return;
             }
         }
@@ -393,8 +392,6 @@ void App::drawLichessScopeAsk() {
                 const auto entry = *ask.follow;
                 lichess_scope_ask_.reset();
                 followBroadcast(entry, true);
-                ImGui::PopTextWrapPos();
-                ui::endCard();
                 return;
             }
         }
@@ -406,13 +403,9 @@ void App::drawLichessScopeAsk() {
                 saveLichessSettings();
             }
             lichess_scope_ask_.reset();
-            ImGui::PopTextWrapPos();
-            ui::endCard();
             return;
         }
     }
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::drawLichessAccount() {
@@ -657,8 +650,8 @@ void App::startBroadcastSearch() {
 
 void App::drawLichessBroadcasts() {
     askBroadcasts();
-    ui::beginCard("lichess_broadcasts");
-    ImGui::PushTextWrapPos();
+    const ui::Card card("lichess_broadcasts");
+    const ui::TextWrap wrap;
     ImGui::TextUnformatted(TR("Official broadcasts"));
     // A search among the recent ones (#55): the words, and an account allowed to read broadcasts.
     ImGui::BeginDisabled(!lichess_account_);
@@ -716,8 +709,6 @@ void App::drawLichessBroadcasts() {
         if (broadcast_search_job_.valid() || broadcast_found_) {
             if (broadcast_search_job_.valid() || !broadcast_found_) {
                 ImGui::TextDisabled("%s", TR("Searching…"));
-                ImGui::PopTextWrapPos();
-                ui::endCard();
                 return;
             }
             const auto& found = *broadcast_found_;
@@ -730,8 +721,6 @@ void App::drawLichessBroadcasts() {
                 ImGui::TextDisabled("%s", trf("Found for “{}”:", broadcast_searched_).c_str());
             if (found.value)
                 for (const auto& e : *found.value) row(e, e.round.ongoing);
-            ImGui::PopTextWrapPos();
-            ui::endCard();
             return;
         }
         // The best known events first (Lichess's tier), six of them unless all are asked for; the next ones after.
@@ -754,8 +743,6 @@ void App::drawLichessBroadcasts() {
         "%s", TR("Follow opens the round in a mosaic on this page, each game analysed by your engine, on your "
                  "machine. Lichess limits the rounds followed at once: 4 without an account, 8 with "
                  "one."));
-    ImGui::PopTextWrapPos();
-    ui::endCard();
 }
 
 void App::followBroadcast(const lichess::BroadcastEntry& entry, bool without_account) {

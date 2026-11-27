@@ -81,10 +81,22 @@ std::string tvName(const std::string& name) {
 
 LichessTvPage::LichessTvPage(TvContext& app)
     : app_(app),
+      stop_(app.jobs().cancelFlag()),
       retries_([this](const std::string& host) { return app_.pausedFor(host); },
                [this](Retry what) { askAgain(what); }) {}
 
-LichessTvPage::~LichessTvPage() = default;
+LichessTvPage::~LichessTvPage() {
+    // Its requests end at once, the host's pause not waited for: the futures below wait for their tasks as they go.
+    *stop_ = true;
+    dropBoardTv();
+}
+
+void LichessTvPage::dropBoardTv() {
+    if (!board_tv_) return;
+    if (board_tv_->next_cancel) *board_tv_->next_cancel = true;
+    if (board_tv_->next.valid()) app_.jobs().park(std::move(board_tv_->next));
+    board_tv_.reset();
+}
 
 std::optional<Notice> LichessTvPage::channelsNotice() const {
     if (!tv_rows_.failed()) return std::nullopt;
@@ -147,6 +159,7 @@ void LichessTvPage::followOnBoard(const std::string& channel, const std::string&
                 }
     }
     app_.followOnBoard(std::move(replay), title, std::string(lichess::TV_MOSAIC) + channel, url, version, in_place);
+    dropBoardTv();  // the game it followed before, its next one's request with it
     BoardTv tv;
     tv.channel  = channel;
     tv.game     = game;
@@ -288,7 +301,7 @@ void LichessTvPage::poll() {
         auto a = tv_rows_job_.get();
         if (a.value) {
             tv_rows_ = std::move(a);
-        } else {  // the rows of before stay, the failure said
+        } else if (a.net != lichess::NetError::Cancelled) {  // the rows of before stay, the failure said
             static_cast<lichess::Failure&>(tv_rows_) = a;
             if (!tv_rows_.failed()) tv_rows_.net = lichess::NetError::Offline;  // nothing, and no word why
         }
@@ -296,7 +309,7 @@ void LichessTvPage::poll() {
     const bool card_shown = drawnLately(tv_card_drawn_, app_.frame());
     if (card_shown && !tv_rows_job_.valid() && dueAfter(tv_rows_asked_, 30s, now)) {
         tv_rows_asked_ = now;
-        tv_rows_job_   = std::async(std::launch::async, [] { return lichess::tvRows(); });
+        tv_rows_job_   = std::async(std::launch::async, [stop = stop_] { return lichess::tvRows(stop.get()); });
     }
 
     // What the follower knows: the games over (ended, or not read), and the Board's.
@@ -311,7 +324,7 @@ void LichessTvPage::poll() {
     };
 
     // The Board's game left for another one, or changed by the user: it is no longer followed.
-    if (board_tv_ && app_.boardFollows() != gameUrl(board_tv_->game)) board_tv_.reset();
+    if (board_tv_ && app_.boardFollows() != gameUrl(board_tv_->game)) dropBoardTv();
 
     // The games kept: into their database once they end; one that could not be read is asked again, as is the Board's.
     for (std::size_t i = 0; i < tv_kept_.size();) {
@@ -356,8 +369,10 @@ void LichessTvPage::poll() {
         // Lichess chooses the channel's next featured game within seconds: asked again every 3 s, another of the
         // channel's games taken after four tries, given up after a minute.
         if (ended(t.game) && !t.stay && !t.next.valid() && t.tries < 20 && now >= t.next_at) {
-            t.next = std::async(std::launch::async, [channel = t.channel, game = t.game, own, others = t.tries >= 4] {
-                return lichess::askTvNext(channel, game, own, others);
+            t.next_cancel = app_.jobs().cancelFlag();
+            t.next = std::async(std::launch::async, [channel = t.channel, game = t.game, own, others = t.tries >= 4,
+                                                     cancel = t.next_cancel] {
+                return lichess::askTvNext(channel, game, own, others, cancel.get());
             });
         }
     }
@@ -371,7 +386,7 @@ void LichessTvPage::poll() {
             tv_listed_     = std::move(*a.value);
             tv_listed_of_  = of;
             tv_list_error_ = {};
-        } else {
+        } else if (a.net != lichess::NetError::Cancelled) {
             tv_list_error_ = a;
         }
     }
@@ -417,8 +432,9 @@ void LichessTvPage::poll() {
         if (!tv_list_job_.valid() && (fresh || (some_over && since >= 10s) || (going < tv_room_ && since >= 30s))) {
             tv_list_asked_of_ = channel;
             tv_list_asked_at_ = now;
-            tv_list_job_ =
-                std::async(std::launch::async, [channel] { return std::make_pair(channel, lichess::tvList(channel)); });
+            tv_list_job_      = std::async(std::launch::async, [channel, stop = stop_] {
+                return std::make_pair(channel, lichess::tvList(channel, lichess::TV_MOST_GAMES, stop.get()));
+            });
         }
         // A game that ended keeps its tile 5 s, its result shown, before another takes it.
         std::set<std::string> resting;

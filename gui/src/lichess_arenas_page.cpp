@@ -204,10 +204,18 @@ std::string figureOf(const lichess::TourCondition& c, std::string_view perf, con
 
 LichessArenasPage::LichessArenasPage(ArenasContext& app)
     : app_(app),
+      stop_(app.jobs().cancelFlag()),
       retries_([this](const std::string& host) { return app_.pausedFor(host); },
                [this](Retry what) { askAgain(what); }) {}
 
-LichessArenasPage::~LichessArenasPage() = default;
+LichessArenasPage::~LichessArenasPage() {
+    // Its readings end at once, the host's pause not waited for (#148): the futures below wait for their tasks as they
+    // go; those of the tournaments followed and chosen are parked.
+    *stop_ = true;
+    dropTour();
+    dropArena();
+    dropSwiss();
+}
 
 std::optional<Notice> LichessArenasPage::listNotice() const {
     const auto& list = arena_card_.list;
@@ -308,6 +316,7 @@ bool LichessArenasPage::berserkable() const {
 // destroyed.
 void LichessArenasPage::dropTour() {
     if (!tour_follow_) return;
+    if (tour_follow_->cancel) *tour_follow_->cancel = true;  // its readings: the host's pause not waited for (#148)
     app_.jobs().park(std::move(tour_follow_->arena_job));
     app_.jobs().park(std::move(tour_follow_->swiss_job));
     app_.jobs().park(std::move(tour_follow_->status_job));
@@ -316,6 +325,7 @@ void LichessArenasPage::dropTour() {
 
 void LichessArenasPage::dropArena() {
     if (!arena_play_) return;
+    if (arena_play_->cancel) *arena_play_->cancel = true;  // its reading; a join or a pause is sent all the same
     app_.jobs().park(std::move(arena_play_->job));
     app_.jobs().park(std::move(arena_play_->join_job));
     app_.jobs().park(std::move(arena_play_->pause_job));
@@ -324,6 +334,7 @@ void LichessArenasPage::dropArena() {
 
 void LichessArenasPage::dropSwiss() {
     if (!swiss_play_) return;
+    if (swiss_play_->cancel) *swiss_play_->cancel = true;  // its readings; a join or a withdrawal is sent all the same
     app_.jobs().park(std::move(swiss_play_->job));
     app_.jobs().park(std::move(swiss_play_->join_job));
     app_.jobs().park(std::move(swiss_play_->pause_job));
@@ -369,15 +380,15 @@ void LichessArenasPage::poll() {
                                 now)) {
         arena_card_.swiss_asked = now;
         arena_card_.swiss_token = token;
-        arena_card_.swiss_job   = std::async(std::launch::async, [token, name = account->username] {
-            auto teams = lichess::teamsOf(name, token);
+        arena_card_.swiss_job   = std::async(std::launch::async, [token, name = account->username, stop = stop_] {
+            auto teams = lichess::teamsOf(name, token, stop.get());
             auto out   = lichess::failedWith<std::vector<lichess::SwissInfo>>(teams);
             if (!teams.value) return std::make_pair(std::move(out), std::size_t{0});
             std::vector<lichess::SwissInfo> all;
             const auto week = nowMillis() - int64_t{7} * 86400000;
             for (std::size_t i = 0; i < teams.value->size() && i < 8; ++i) {
                 const auto& team = (*teams.value)[i];
-                auto list        = lichess::teamSwisses(team.id, token, 5);
+                auto list        = lichess::teamSwisses(team.id, token, 5, stop.get());
                 if (!list.value) {  // the others are listed all the same, this failure said
                     static_cast<lichess::Failure&>(out) = list;
                     continue;
@@ -440,15 +451,16 @@ void LichessArenasPage::poll() {
             if (f.swiss) {
                 const bool rows_due = lichess::swissRowsDue(
                     f.swiss_rows.value.has_value(), f.swiss_info.value ? &*f.swiss_info.value : nullptr, f.rows_round);
-                f.swiss_job = std::async(std::launch::async, [id = f.id, token, rows_due] {
-                    auto info = lichess::swissOf(id, token);
+                f.swiss_job = std::async(std::launch::async, [id = f.id, token, rows_due, cancel = f.cancel] {
+                    auto info = lichess::swissOf(id, token, cancel.get());
                     lichess::Answer<std::vector<lichess::SwissRow>> rows;
-                    if (info.value && rows_due) rows = lichess::swissResults(id);
+                    if (info.value && rows_due) rows = lichess::swissResults(id, 0, cancel.get());
                     return std::make_pair(std::move(info), std::move(rows));
                 });
             } else {
-                f.arena_job =
-                    std::async(std::launch::async, [id = f.id, token] { return lichess::arenaOf(id, 1, token); });
+                f.arena_job = std::async(std::launch::async, [id = f.id, token, cancel = f.cancel] {
+                    return lichess::arenaOf(id, 1, token, cancel.get());
+                });
             }
         }
         // The first eight's names, as the standing gives them; their games found by player.
@@ -505,7 +517,8 @@ void LichessArenasPage::poll() {
                                  now)) {
             f.top          = top;
             f.status_asked = now;
-            f.status_job   = std::async(std::launch::async, [top] { return lichess::playerStatuses(top); });
+            f.status_job = std::async(std::launch::async,
+                                      [top, cancel = f.cancel] { return lichess::playerStatuses(top, cancel.get()); });
         }
         // The places: a finished game keeps its tile 5 s, its result shown, then gives it to the next one.
         const auto over = f.follower ? f.follower->over() : std::set<std::string>{};
@@ -576,21 +589,22 @@ void LichessArenasPage::poll() {
                                    .waits_until = a.waits_until},
                                   now)) {
             a.asked = now;
-            a.job =
-                std::async(std::launch::async, [id = a.id, token, name = linked ? account->username : std::string()] {
-                    auto state = lichess::arenaOf(id, 1, token);
-                    std::optional<lichess::ArenaPlayer> me;
-                    if (state.value && !name.empty()) {
-                        if (const auto* row = lichess::standingOf(*state.value, name)) {
-                            me = *row;
-                        } else if (state.value->me && state.value->me->rank > 10) {
-                            const auto page = lichess::arenaOf(id, lichess::standingPage(state.value->me->rank), token);
-                            if (page.value)
-                                if (const auto* mine = lichess::standingOf(*page.value, name)) me = *mine;
-                        }
+            a.job = std::async(std::launch::async, [id = a.id, token, name = linked ? account->username : std::string(),
+                                                    cancel = a.cancel] {
+                auto state = lichess::arenaOf(id, 1, token, cancel.get());
+                std::optional<lichess::ArenaPlayer> me;
+                if (state.value && !name.empty()) {
+                    if (const auto* row = lichess::standingOf(*state.value, name)) {
+                        me = *row;
+                    } else if (state.value->me && state.value->me->rank > 10) {
+                        const auto page =
+                            lichess::arenaOf(id, lichess::standingPage(state.value->me->rank), token, cancel.get());
+                        if (page.value)
+                            if (const auto* mine = lichess::standingOf(*page.value, name)) me = *mine;
                     }
-                    return std::make_pair(std::move(state), std::move(me));
-                });
+                }
+                return std::make_pair(std::move(state), std::move(me));
+            });
         }
         if (isReady(a.join_job)) {
             const auto r = a.join_job.get();
@@ -679,14 +693,15 @@ void LichessArenasPage::poll() {
             s.asked             = now;
             const bool rows_due =
                 lichess::swissRowsDue(s.rows.value.has_value(), s.info.value ? &*s.info.value : nullptr, s.rows_round);
-            s.job               = std::async(std::launch::async, [id = s.id, token, rows_due] {
-                auto info = lichess::swissOf(id, token);
+            s.job = std::async(std::launch::async, [id = s.id, token, rows_due, cancel = s.cancel] {
+                auto info = lichess::swissOf(id, token, cancel.get());
                 lichess::Answer<std::vector<lichess::SwissRow>> rows;
                 std::optional<lichess::Trf> trf_read;
                 if (info.value && rows_due) {
-                    rows = lichess::swissResults(id);
+                    rows = lichess::swissResults(id, 0, cancel.get());
                     if (info.value->round > 0)
-                        if (const auto t = lichess::swissTrf(id); t.value) trf_read = lichess::readTrf(*t.value);
+                        if (const auto t = lichess::swissTrf(id, cancel.get()); t.value)
+                            trf_read = lichess::readTrf(*t.value);
                 }
                 return std::make_tuple(std::move(info), std::move(rows), std::move(trf_read));
             });
@@ -974,10 +989,11 @@ void LichessArenasPage::followTournament(const std::string& id, const std::strin
     const auto key = std::string(swiss ? lichess::SWISS_MOSAIC : lichess::ARENA_MOSAIC) + id;
     if (!tour_follow_ || tour_follow_->key != key) {
         TourFollow f;
-        f.key   = key;
-        f.id    = id;
-        f.name  = name;
-        f.swiss = swiss;
+        f.key    = key;
+        f.id     = id;
+        f.name   = name;
+        f.swiss  = swiss;
+        f.cancel = app_.jobs().cancelFlag();
         dropTour();  // the one before: its streams closed
         tour_follow_ = std::move(f);
     }
@@ -1218,8 +1234,9 @@ void LichessArenasPage::chooseArena(const std::string& id, const std::string& na
         if (arena_play_ && (arena_play_->seat.in() || arena_play_->seat.paused()))
             pauseArena();  // in another one: paused there first
         ArenaPlay a;
-        a.id   = id;
-        a.name = name;
+        a.id     = id;
+        a.name   = name;
+        a.cancel = app_.jobs().cancelFlag();
         dropArena();
         arena_play_ = std::move(a);
     }
@@ -1231,6 +1248,7 @@ void LichessArenasPage::chooseArena(const std::string& id, const std::string& na
 void LichessArenasPage::chooseSwiss(const lichess::SwissInfo& swiss) {
     if (!swiss_play_ || swiss_play_->id != swiss.id) {
         SwissPlay s;
+        s.cancel     = app_.jobs().cancelFlag();
         s.id         = swiss.id;
         s.name       = swiss.name;
         s.team_id    = swiss.team_id;
@@ -2031,15 +2049,16 @@ void LichessArenasPage::keepSwiss(const std::string& folder, const std::string& 
     const auto token     = account ? account->token : std::string();
     const int64_t starts = s.info.value ? s.info.value->starts_at : 0;
     // Its games and its TRF asked, read and kept; the rounds without a game go to its crosstable's settings once back.
-    s.keep_job   = std::async(std::launch::async, [db, base, index, id = s.id, name = s.name, token, starts] {
+    s.keep_job   = std::async(std::launch::async, [db, base, index, id = s.id, name = s.name, token, starts,
+                                                   cancel = s.cancel] {
         SwissKept out;
         out.index        = index;
-        const auto games = lichess::swissGames(id, token);
+        const auto games = lichess::swissGames(id, token, cancel.get());
         if (!games.value) {
             out.failure = games;
             return out;
         }
-        const auto trf_text = lichess::swissTrf(id);
+        const auto trf_text = lichess::swissTrf(id, cancel.get());
         if (!trf_text.value) {
             out.failure = trf_text;
             return out;

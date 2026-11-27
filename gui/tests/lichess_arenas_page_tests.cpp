@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -804,4 +805,40 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     }
     CHECK(listAsked() == asked + 1);
     CHECK(app.repairs.size() == 1);
+}
+
+TEST_CASE(
+    "Lichess arenas' module without App: its readings in the host's pause end at once as the program quits "
+    "(#148)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    lichess.refuse   = 429;  // Lichess answers 429 to everything
+    auto& gate       = HostGate::instance();
+    const auto host  = lichess::apiHost();
+    const auto pause = [&](std::chrono::milliseconds length) {
+        gate.setPause(length);
+        gate.tooMany(host);
+    };
+    pause(60s);  // its minute of pause after a 429
+    const ScratchDir profile("arenas-quit");
+    FakeApp app(profile);
+    app.account = sampleAccount({lichess::SCOPE_TEAM_READ});  // its teams' Swiss tournaments read too
+    Frames frames;
+    auto arenas = std::make_unique<LichessArenasPage>(app);
+    // The card drawn: the arenas and the user's teams asked, both waiting for the pause, as is a tournament followed.
+    CHECK(applied(*arenas, "arena-mosaic=rap1d100"));
+    frames.draw(app, [&] { arenas->drawCard(); });
+    arenas->poll();
+    std::this_thread::sleep_for(200ms);  // into their waits; shorter, they are cancelled before, which ends them too
+    // The program quits: the flags set first, as App's quit does, then the module goes, its tasks parked waited for.
+    app.jobs().cancelAll();
+    const auto start = std::chrono::steady_clock::now();
+    arenas.reset();
+    app.jobs().wait();
+    CHECK(std::chrono::steady_clock::now() - start < 5s);
+    CHECK(lichess.seen("/api/tournament").empty());  // nothing sent during the pause
+    CHECK(lichess.seen("/api/team/of/RS_Sample").empty());
+    CHECK(gate.pausedFor(host) > 50s);
+    pause(50ms);  // over for what follows in this process
 }

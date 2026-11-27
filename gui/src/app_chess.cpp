@@ -323,6 +323,7 @@ class App::ModulesContext final : public AppContext {
     // The Board taken by a training session.
     std::string sessionLock() const override { return app_.training_->lock(); }
     BoardTaken takeBoard(const std::string& title, bool tree) override {
+        app_.stopVisit();  // a guided visit under way ends: the Board is the session's now (#137)
         app_.training_->closeSessionForAnother();  // the session that holds it closed, the day's review going on (#80)
         auto& b = app_.board_;
         BoardTaken taken;
@@ -740,8 +741,7 @@ BoardSession* App::boardSession() const { return training_->boardSession(); }
 
 bool App::drawBoardSession() {
     auto* session = boardSession();
-    // A guided visit (#94) started during an endgame or a vision exercise shows over their page, as it always did.
-    if (!session || (visit_ && (endgames_->onBoard() || vision_->onBoard()))) return false;
+    if (!session) return false;
     session->drawSessionPage();
     return true;
 }

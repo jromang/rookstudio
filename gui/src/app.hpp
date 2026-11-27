@@ -966,10 +966,10 @@ class App {
     // game guessed, an endgame, a vision exercise), which takes the Board through context::SessionBoard
     // (app_context.hpp); the Training page knows which holds it.
     [[nodiscard]] BoardSession* boardSession() const;  // the session that holds the Board; none when none does
-    // Its hooks: the Board page drawn by it (false when no session holds the Board, or a guided visit, #94, shows over
-    // an endgame or a vision exercise, as before); a move played or typed, its answer (false when no session took it);
-    // another game on the Board, the session left there; the guide's section of its page (none when no session holds
-    // the Board); a question asked: the tree, the engines, the notes hidden.
+    // Its hooks: the Board page drawn by it (false when no session holds the Board); a move played or typed, its answer
+    // (false when no session took it); another game on the Board, the session left there; the guide's section of its
+    // page (none when no session holds the Board); a question asked: the tree, the engines, the notes hidden. A guided
+    // visit (#94) ends when a session takes the Board, and does not start while one holds it (#137).
     bool drawBoardSession();
     bool boardSessionMove(chess::Move move);
     void leaveBoardSession();

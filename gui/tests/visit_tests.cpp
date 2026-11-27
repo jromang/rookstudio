@@ -1,10 +1,11 @@
 // The guided visit and "Why not?" (#94, mockup M13, board 7, point 16): the moments in the game's order, nothing shown
 // before the answer, the answer judged as Guess the moves judges a guess, a wrong one a card of the day's queue that
-// the scans of the user's games keep; "Why not?" asked as the Questions' Compare, its two lines the engine's after each
-// move.
+// the scans of the user's games keep; nothing read of the Board once a training session took it (#137); "Why not?"
+// asked as the Questions' Compare, its two lines the engine's after each move.
 
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <deque>
 #include <filesystem>
 #include <string>
@@ -15,6 +16,7 @@
 
 #include <study/game_tree.hpp>
 
+#include "endgames.hpp"
 #include "mistakes.hpp"
 #include "pgn_store.hpp"
 #include "review_bridge.hpp"
@@ -171,6 +173,42 @@ TEST_CASE("guided visit: a wrong answer, a card of the day's queue that the scan
     CHECK(scan.record.exercises.begin()->second.visit);
     CHECK(scan.record.kept.empty());
     fs::remove_all(dir);
+}
+
+TEST_CASE("guided visit: a training session that takes the Board leaves the visit nothing of it to read (#137)") {
+    // A visit under way on the Board's game, the serial of the Board's game 7 when it started: each moment's move is
+    // the game's (5.Nxf7?? at ply 9).
+    const auto game = parseReplay(GAME);
+    REQUIRE(game);
+    const auto review = commentaryReview(*game, false, reviewOf(*game));
+    REQUIRE(review);
+    const auto moments = visitMoments(review->report);
+    REQUIRE(!moments.empty());
+    const uint64_t made_for = 7;
+    for (const auto ply : moments) CHECK(visitReadsMoment(*game, ply, made_for, made_for));
+    REQUIRE(std::find(moments.begin(), moments.end(), 9) != moments.end());
+    CHECK(game->moves[8].san == "Nxf7");
+
+    // An endgame of the catalogue takes the Board, as every session takes it (context::SessionBoard::takeBoard()): an
+    // empty game from the endgame's position on the Board, the serial of the Board's game one further. Every moment of
+    // the visit lies past its moves, which the visit's column read before (#137): nothing is read now.
+    const auto* queen = endgameEntry("queen");
+    REQUIRE(queen);
+    ReplayGame session;
+    session.start_fen = queen->fen;
+    for (const auto ply : moments) CHECK_FALSE(visitReadsMoment(session, ply, made_for, made_for + 1));
+    // The endgame played on: its moves are the session's, however many there are.
+    session.moves.resize(moments.back() + 2);
+    for (const auto ply : moments) CHECK_FALSE(visitReadsMoment(session, ply, made_for, made_for + 1));
+
+    // Both tell: another game on the Board, even of the same moves; the Board's game cut short before a moment; the
+    // start, which no move leads to.
+    CHECK_FALSE(visitReadsMoment(*game, moments.front(), made_for, made_for + 1));
+    auto cut = *game;
+    cut.moves.resize(moments.back() - 1);
+    CHECK_FALSE(visitReadsMoment(cut, moments.back(), made_for, made_for));
+    CHECK(visitReadsMoment(cut, moments.back() - 1, made_for, made_for));
+    CHECK_FALSE(visitReadsMoment(*game, 0, made_for, made_for));
 }
 
 TEST_CASE("why not: the question the Questions read as Compare, its figures the engine's after each move") {

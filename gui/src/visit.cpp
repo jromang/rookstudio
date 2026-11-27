@@ -29,6 +29,10 @@ std::vector<std::size_t> visitMoments(const commentary::GameReport& report) {
     return out;
 }
 
+bool visitReadsMoment(const ReplayGame& game, std::size_t ply, uint64_t made_for, uint64_t shown) {
+    return made_for == shown && ply >= 1 && ply <= game.moves.size();
+}
+
 VisitVerdict judgeVisitAnswer(bool engine_move, double best_pawns, double answer_pawns, bool dont_know) {
     VisitVerdict v;
     if (dont_know) return v;

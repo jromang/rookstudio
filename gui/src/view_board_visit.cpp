@@ -154,6 +154,10 @@ void App::startVisit() {
         boardToast(TR("Hidden until the end of your game: Show them first, and the game is marked “with aids”"));
         return;
     }
+    if (boardSession()) {  // a training session holds the Board, its own position on it (#137)
+        boardToast(TR("Once the exercise on the Board is over."));
+        return;
+    }
     auto& b           = board_;
     const auto review = boardCommentaryReview();
     if (!review || !review->report.complete || b.reviews.empty()) {
@@ -337,7 +341,8 @@ void App::pollVisit() {
 void App::visitWhyNot() {
     auto& v = *visit_;
     if (v.phase != VisitRun::Phase::Shown) return;  // nothing shown before the answer
-    const auto ply   = v.moments[v.current];
+    const auto ply = v.moments[v.current];
+    if (!visitReadsMoment(board_.game, ply, v.game, board_game_serial_)) return;  // another game on the Board (#137)
     const auto game  = chess::uci::moveToUci(board_.game.moves[ply - 1].move, board_.chess960);
     const auto mine  = v.answered ? chess::uci::moveToUci(v.answer, board_.chess960) : std::string();
     const auto asked = !mine.empty() && mine != v.best ? mine : game;
@@ -388,7 +393,8 @@ void App::drawVisitPage() {
     const bool asking = v.phase == VisitRun::Phase::Asking && b.line < 0 && v.current < v.moments.size() &&
                         b.ply == static_cast<int>(v.moments[v.current]) - 1;
     const auto shows  = visitShows(v.phase);
-    if (shows.notation && v.phase == VisitRun::Phase::Shown && v.current < v.moments.size()) {
+    if (shows.notation && v.phase == VisitRun::Phase::Shown && v.current < v.moments.size() &&
+        visitReadsMoment(b.game, v.moments[v.current], v.game, board_game_serial_)) {
         const auto ply  = v.moments[v.current];
         const auto game = b.game.moves[ply - 1].move;
         decor.arrows.push_back({game, IM_COL32(226, 116, 31, 200)});
@@ -491,7 +497,13 @@ void App::drawVisitColumn() {
         ImGui::PopTextWrapPos();
         return;
     }
-    const auto ply    = v.moments[v.current];
+    const auto ply = v.moments[v.current];
+    // The Board no longer shows the game the visit was made for (another game came on it, a training session took it):
+    // nothing of it is read, and the visit is over (#137).
+    if (!visitReadsMoment(b.game, ply, v.game, board_game_serial_)) {
+        ImGui::PopTextWrapPos();
+        return stopVisit();
+    }
     const auto before = boardAt(b.game, b.chess960, static_cast<int>(ply) - 1);
     const auto game   = chess::uci::moveToUci(b.game.moves[ply - 1].move, b.chess960);
     ui::beginCard("visit_question");

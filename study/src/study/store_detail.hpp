@@ -18,6 +18,8 @@
 #include <system_error>
 #include <vector>
 
+#include <json.hpp>
+
 #include "import.hpp"
 #include "mapped_file.hpp"
 #include "signature.hpp"
@@ -139,6 +141,38 @@ std::string editsName(uint64_t generation);
 std::string editsBytes(const std::vector<Snapshot::Version>& replaced, const std::vector<uint64_t>& deleted);
 
 std::string segmentName(uint64_t number);
+
+// manifest.json, the only file a commit replaces (by a rename: tour::replaceFile()): the segments in their order, the
+// edits and the table of names it names, its generation. Read and written here alone. A manifest this program wrote
+// reads back to the same bytes; the keys it does not know (a newer program's) are kept as they are.
+struct Manifest {
+    struct Entry {  // a segment
+        std::string name;
+        uint32_t games = 0;             // none for a segment of versions a compaction emptied: its names only
+        uint32_t names = 0;             // the names it adds, their ids counting on from those of the segments before
+        bool versions  = false;         // its games are versions of games before (Database::replace())
+        std::string source;             // the file its games were imported from; empty when not known
+        bool unknown_names    = false;  // its names written as "?" in place of names lost (Database::keepReadable())
+        nlohmann::json others = nlohmann::json::object();  // its keys not known here
+    };
+    uint32_t version    = VERSION;  // of the format it was made in
+    uint64_t generation = 0;        // of its commit
+    std::vector<Entry> segments;
+    std::string edits;  // the edits file (editsName()), empty when none
+    // The generation of the last commit that replaced or deleted games (Snapshot::editsGeneration()): none until one.
+    std::optional<uint64_t> edits_generation;
+    std::string players;                               // the table of names' file, empty when none
+    nlohmann::json others = nlohmann::json::object();  // its keys not known here
+
+    // The manifest of the database in `dir`, `text` its file's. Throws StoreError: Damaged when it does not read (no
+    // JSON, or numbers no commit writes), NotADatabase for another program's file, NewerFormat for a newer one's.
+    [[nodiscard]] static Manifest read(const std::filesystem::path& dir);
+    [[nodiscard]] static Manifest parse(std::string_view text, const std::filesystem::path& dir);
+    // As it is written: the keys in their order, a space of indent.
+    [[nodiscard]] std::string text() const;
+    // In place of the one in `dir`, at once (tour::replaceFile()): the commit.
+    void write(const std::filesystem::path& dir) const;
+};
 
 class Segment {
    public:

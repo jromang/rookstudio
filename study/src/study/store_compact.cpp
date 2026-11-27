@@ -6,8 +6,6 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
-#include <fstream>
-#include <iterator>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -15,7 +13,6 @@
 #include <vector>
 
 #include <chess.hpp>
-#include <json.hpp>
 
 #include "scan_board.hpp"
 #include "signature.hpp"
@@ -212,12 +209,7 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
             return out;
         }
     }
-    std::string manifest_text;
-    {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest_text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    }
-    const auto old_edits = nlohmann::json::parse(manifest_text).value("edits", std::string());
+    const auto manifest_before = Manifest::read(dir_);  // what undoCompaction() puts back
     // The steps: all the segments at once; or each logical segment, then the segments of versions.
     std::vector<std::size_t> logical_stale, versions;
     for (std::size_t s = 0; s < infos.size(); ++s) {
@@ -241,8 +233,7 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
     auto replaced     = snap->replaced_;  // what stays replaced, the segments folded so far taken out
     std::vector<std::string> old_files, new_files;
     uint64_t old_bytes    = 0;
-    std::string edits_now = old_edits;  // the edits file the manifest names
-    std::string manifest_after;
+    std::string edits_now = manifest_before.edits;  // the edits file the manifest names
     for (const auto& batch : steps) {
         std::vector<std::pair<std::size_t, std::string>> written;  // a segment's index, its new folder
         std::string edits_written;
@@ -299,34 +290,29 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
             try {
                 if (snapshot()->editsGeneration() != snap->editsGeneration())
                     throw std::runtime_error("a game was replaced or deleted meanwhile");
-                nlohmann::json next;
-                {
-                    std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-                    next = nlohmann::json::parse(in);
-                }
+                auto next = Manifest::read(dir_);
                 for (const auto& [s, name] : written) {
-                    auto& entry   = next["segments"][s];
-                    entry["name"] = name;
+                    auto& entry = next.segments.at(s);
+                    entry.name  = name;
                     if (infos[s].versions) {
-                        entry["games"] = 0;
+                        entry.games = 0;
                     } else {
                         const auto first = infos[s].first, last = first + infos[s].games;
                         std::erase_if(replaced,
                                       [&](const Snapshot::Version& v) { return v.id >= first && v.id < last; });
                     }
                 }
-                const auto generation = next.value("generation", uint64_t{0}) + 1;
+                const auto generation = next.generation + 1;
                 if (!replaced.empty() || !snap->deleted_.empty()) {
                     edits_written = editsName(generation);
                     writeFile(dir_ / edits_written, editsBytes(replaced, snap->deleted_));
-                    next["edits"] = edits_written;
+                    next.edits = edits_written;
                 } else {
-                    next.erase("edits");
+                    next.edits.clear();
                 }
-                next["generation"] = generation;
+                next.generation = generation;
                 step("write manifest");
-                tour::replaceFile(dir_ / MANIFEST, next.dump(1));
-                manifest_after = next.dump(1);
+                next.write(dir_);
             } catch (const std::exception& e) {
                 clean();
                 out.error      = e.what();
@@ -378,7 +364,7 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
     // Undoing it puts the manifest before back, unless something was committed since: the segments added meanwhile
     // would go with it.
     Leftovers left;
-    left.manifest   = now->generation() == snap->generation() + 1 ? manifest_text : std::string();
+    left.manifest   = now->generation() == snap->generation() + 1 ? manifest_before.text() : std::string();
     left.generation = now->generation();
     left.files      = old_files;
     left.new_files  = new_files;
@@ -396,15 +382,15 @@ bool Database::compactionUndoable() const {
 bool Database::undoCompaction() {
     std::lock_guard compacting(compact_mutex_);
     std::lock_guard writing(write_mutex_);
-    nlohmann::json manifest;
+    Manifest manifest;
     {
         std::lock_guard lock(mutex_);
         if (!leftovers_ || leftovers_->manifest.empty() || current_->generation_ != leftovers_->generation)
             return false;
-        manifest               = nlohmann::json::parse(leftovers_->manifest);
-        manifest["generation"] = current_->generation_ + 1;  // readers see a commit
+        manifest            = Manifest::parse(leftovers_->manifest, dir_);
+        manifest.generation = current_->generation_ + 1;  // readers see a commit
     }
-    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    manifest.write(dir_);
     std::vector<std::string> made;
     {
         std::lock_guard lock(mutex_);
@@ -442,14 +428,10 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
     for (const auto id : damaged) aside(id);
     if (snap->unreadable_segments_.empty() && set_aside == 0) return 0;
 
-    std::string manifest_text;
-    {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest_text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    }
-    auto manifest             = nlohmann::json::parse(manifest_text);
-    const auto old_edits      = manifest.value("edits", std::string());
-    const uint64_t generation = snap->generation_ + 1;
+    const auto manifest_before = Manifest::read(dir_);  // what undoKeepReadable() puts back
+    auto manifest              = manifest_before;
+    const auto old_edits       = manifest.edits;
+    const uint64_t generation  = snap->generation_ + 1;
     const auto blank          = snap->blankName();
     const uint32_t blank_name = blank.value_or(snap->names_);  // none: a name "" added after the others
     std::vector<std::string> written, old_files;
@@ -484,22 +466,26 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
                 names.reserve(std::size_t{segment.nameCount()} * 2);
                 for (uint32_t k = 0; k < segment.nameCount(); ++k) names += "?\n";
             }
-            auto& entry = manifest["segments"][s];
-            old_files.push_back(entry.at("name").get<std::string>());
-            entry["name"] = made(std::vector<RecordSource>(segment.games()), names, segment.nameCount());
-            if (!segment.namesKnown() && segment.nameCount() > 0) entry["unknown_names"] = true;
+            auto& entry = manifest.segments.at(s);
+            old_files.push_back(entry.name);
+            entry.name = made(std::vector<RecordSource>(segment.games()), names, segment.nameCount());
+            if (!segment.namesKnown() && segment.nameCount() > 0) entry.unknown_names = true;
         }
-        if (!blank && !snap->unreadable_segments_.empty())  // a segment of names only, as a compaction leaves them
-            manifest["segments"].push_back(
-                {{"name", made({}, "\n", 1)}, {"games", 0}, {"names", 1}, {"versions", true}});
+        if (!blank && !snap->unreadable_segments_.empty()) {  // a segment of names only, as a compaction leaves them
+            Manifest::Entry entry;
+            entry.name     = made({}, "\n", 1);
+            entry.names    = 1;
+            entry.versions = true;
+            manifest.segments.push_back(std::move(entry));
+        }
         syncFolder(dir_);
         edits_written = editsName(generation);
         writeFile(dir_ / edits_written, editsBytes(snap->replaced_, deleted));
-        manifest["edits"]            = edits_written;
-        manifest["edits_generation"] = generation;
-        manifest["generation"]       = generation;
+        manifest.edits            = edits_written;
+        manifest.edits_generation = generation;
+        manifest.generation       = generation;
         step("write manifest");
-        tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+        manifest.write(dir_);
     } catch (const std::exception&) {
         // Nothing committed: what it wrote goes, the database as before.
         std::error_code ec;
@@ -516,7 +502,7 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
     name_ids_.clear();
     if (!old_edits.empty() && old_edits != edits_written) old_files.push_back(old_edits);
     Leftovers left;
-    left.manifest   = manifest_text;
+    left.manifest   = manifest_before.text();
     left.generation = generation;
     left.files      = std::move(old_files);
     left.new_files  = std::move(written);
@@ -536,15 +522,15 @@ bool Database::keepReadableUndoable() const {
 bool Database::undoKeepReadable() {
     std::lock_guard compacting(compact_mutex_);
     std::lock_guard writing(write_mutex_);
-    nlohmann::json manifest;
+    Manifest manifest;
     std::vector<std::string> made;
     {
         std::lock_guard lock(mutex_);
         if (!kept_ || kept_->manifest.empty() || current_->generation_ != kept_->generation) return false;
-        manifest               = nlohmann::json::parse(kept_->manifest);
-        manifest["generation"] = current_->generation_ + 1;  // readers see a commit
+        manifest            = Manifest::parse(kept_->manifest, dir_);
+        manifest.generation = current_->generation_ + 1;  // readers see a commit
     }
-    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    manifest.write(dir_);
     {
         std::lock_guard lock(mutex_);
         made = kept_->new_files;

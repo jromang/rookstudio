@@ -145,6 +145,88 @@ std::string segmentName(uint64_t number) {
     return name;
 }
 
+Manifest Manifest::read(const fs::path& dir) {
+    std::string text;
+    {
+        // Closed before the manifest is replaced: Windows does not rename over an open file.
+        std::ifstream in(dir / MANIFEST, std::ios::binary);
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    return parse(text, dir);
+}
+
+Manifest Manifest::parse(std::string_view text, const fs::path& dir) {
+    nlohmann::json j;
+    try {
+        j = nlohmann::json::parse(text);
+    } catch (const std::exception& e) {
+        throw StoreError(StoreErrc::Damaged, (dir / MANIFEST).string() + ": " + e.what());
+    }
+    if (j.value("format", "") != "rookstudio-database")
+        throw StoreError(StoreErrc::NotADatabase, dir.string() + " is not a database");
+    if (j.value("version", 0u) > VERSION)
+        throw StoreError(StoreErrc::NewerFormat, dir.string() + ": a database of a newer program");
+    const auto damaged = [&] { return StoreError(StoreErrc::Damaged, dir.string() + ": damaged manifest"); };
+    Manifest m;
+    m.version      = j.value("version", 0u);
+    m.generation   = j.value("generation", uint64_t{0});
+    uint64_t games = 0, names = 0;  // of the segments before
+    for (const auto& s : j.at("segments")) {
+        Entry e;
+        e.name  = s.at("name").get<std::string>();
+        e.games = s.at("games").get<uint32_t>();
+        e.names = s.at("names").get<uint32_t>();
+        // No commit writes more: seven names a game at most (a segment that cannot be read would make room for each).
+        if (e.games > SEGMENT_GAMES || e.names > 7 * SEGMENT_GAMES + 1 || names > UINT32_MAX - e.names) throw damaged();
+        e.versions      = s.value("versions", false);
+        e.unknown_names = s.value("unknown_names", false);
+        e.source        = s.value("source", std::string());
+        for (const auto& [key, value] : s.items())
+            if (key != "name" && key != "games" && key != "names" && key != "versions" && key != "unknown_names" &&
+                key != "source")
+                e.others[key] = value;
+        if (!e.versions) games += e.games;
+        names += e.names;
+        m.segments.push_back(std::move(e));
+    }
+    // Every game names its players, if only with the empty name: games without any name are a manifest made up, whose
+    // games' name ids could not read as no name (Snapshot::rowIds()).
+    if (games > 0 && names == 0) throw damaged();
+    m.edits = j.value("edits", std::string());
+    if (j.contains("edits_generation")) m.edits_generation = j.at("edits_generation").get<uint64_t>();
+    m.players = j.value("players", std::string());
+    for (const auto& [key, value] : j.items())
+        if (key != "format" && key != "version" && key != "generation" && key != "segments" && key != "edits" &&
+            key != "edits_generation" && key != "players")
+            m.others[key] = value;
+    return m;
+}
+
+std::string Manifest::text() const {
+    nlohmann::json j = others;
+    j["format"]      = "rookstudio-database";
+    j["version"]     = version;
+    j["generation"]  = generation;
+    auto list        = nlohmann::json::array();
+    for (const auto& s : segments) {
+        nlohmann::json e = s.others;
+        e["name"]        = s.name;
+        e["games"]       = s.games;
+        e["names"]       = s.names;
+        if (s.versions) e["versions"] = true;
+        if (!s.source.empty()) e["source"] = s.source;
+        if (s.unknown_names) e["unknown_names"] = true;
+        list.push_back(std::move(e));
+    }
+    j["segments"] = std::move(list);
+    if (!edits.empty()) j["edits"] = edits;
+    if (edits_generation) j["edits_generation"] = *edits_generation;
+    if (!players.empty()) j["players"] = players;
+    return j.dump(1);
+}
+
+void Manifest::write(const fs::path& dir) const { tour::replaceFile(dir / MANIFEST, text()); }
+
 }  // namespace store
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -644,11 +726,7 @@ std::shared_ptr<Database> Database::create(const fs::path& dir) {
     fs::create_directories(dir, ec);
     if (ec) throw std::runtime_error("cannot create the folder " + dir.string());
     auto db = std::make_shared<Database>(dir);
-    nlohmann::json manifest{{"format", "rookstudio-database"},
-                            {"version", VERSION},
-                            {"generation", 0},
-                            {"segments", nlohmann::json::array()}};
-    tour::replaceFile(dir / MANIFEST, manifest.dump(1));
+    Manifest().write(dir);  // no segment, generation 0
     db->load();
     return db;
 }
@@ -676,8 +754,7 @@ bool Database::refresh() {
     std::lock_guard writing(write_mutex_);  // current_ changes under it, as for a change
     uint64_t generation = 0;
     try {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        generation = nlohmann::json::parse(in).value("generation", uint64_t{0});
+        generation = Manifest::read(dir_).generation;
     } catch (const std::exception&) {
         return false;  // being replaced as it was read: read again next time
     }
@@ -691,20 +768,9 @@ bool Database::refresh() {
 }
 
 void Database::load(bool clean, int tries) {
-    nlohmann::json manifest;
-    try {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest = nlohmann::json::parse(in);
-    } catch (const std::exception& e) {
-        throw StoreError(StoreErrc::Damaged, (dir_ / MANIFEST).string() + ": " + e.what());
-    }
-    if (manifest.value("format", "") != "rookstudio-database")
-        throw StoreError(StoreErrc::NotADatabase, dir_.string() + " is not a database");
-    if (manifest.value("version", 0u) > VERSION)
-        throw StoreError(StoreErrc::NewerFormat, dir_.string() + ": a database of a newer program");
-
-    auto snap         = std::make_shared<Snapshot>();
-    snap->generation_ = manifest.value("generation", uint64_t{0});
+    const auto manifest = Manifest::read(dir_);
+    auto snap           = std::make_shared<Snapshot>();
+    snap->generation_   = manifest.generation;
     std::vector<std::string> named;
     uint64_t next_segment = 1;  // the numbers the segments there take, and the next one
     // A segment that cannot be read (a file of it cut short, missing, or not a segment's: damaged while the database
@@ -715,23 +781,20 @@ void Database::load(bool clean, int tries) {
         bool names_known = true;
     };
     std::vector<Unread> unread;
-    for (const auto& s : manifest.at("segments")) {
-        const auto name       = s.at("name").get<std::string>();
-        const auto games      = s.at("games").get<uint32_t>();
-        const auto names      = s.at("names").get<uint32_t>();
-        // No commit writes more: seven names a game at most (a segment that cannot be read would make room for each).
-        if (games > SEGMENT_GAMES || names > 7 * SEGMENT_GAMES + 1 || snap->names_ > UINT32_MAX - names)
-            throw StoreError(StoreErrc::Damaged, dir_.string() + ": damaged manifest");
-        const bool versions   = s.value("versions", false);
-        const bool names_lost = s.value("unknown_names", false);  // written as "?" by keepReadable()
+    for (const auto& s : manifest.segments) {
+        const auto& name      = s.name;
+        const auto games      = s.games;
+        const auto names      = s.names;
+        const bool versions   = s.versions;
+        const bool names_lost = s.unknown_names;  // written as "?" by keepReadable()
         std::shared_ptr<const Segment> segment;
         try {
             segment = std::make_shared<const Segment>(dir_ / name, games, names, !names_lost);
         } catch (const std::exception& e) {
             segment = std::make_shared<const Segment>(Segment::Unreadable{}, dir_ / name, games, names, 0, !names_lost);
             unread.push_back({snap->segments_.size(),
-                              {name, versions ? GameId{0} : snap->games_, games, versions, e.what(),
-                               s.value("source", std::string()), names == 0 || segment->namesKnown()},
+                              {name, versions ? GameId{0} : snap->games_, games, versions, e.what(), s.source,
+                               names == 0 || segment->namesKnown()},
                               !names_lost});
             // A file missing, or one changed: said apart (sig.bin only where its format has one, as the error says).
             const std::string why = e.what();
@@ -752,31 +815,26 @@ void Database::load(bool clean, int tries) {
         snap->names_ += names;
         snap->segments_.push_back(std::move(segment));
         snap->segment_names_.push_back(name);
-        snap->sources_.push_back(s.value("source", std::string()));
+        snap->sources_.push_back(s.source);
         snap->versions_.push_back(versions);
         named.push_back(name);
         unsigned long long number = 0;
         std::sscanf(name.c_str(), "seg-%llu", &number);
         next_segment = std::max<uint64_t>(next_segment, number + 1);
     }
-    // Every game names its players, if only with the empty name: games without any name are a manifest made up, whose
-    // games' name ids could not read as no name (rowIds()).
-    if (snap->games_ > 0 && snap->names_ == 0)
-        throw StoreError(StoreErrc::Damaged, dir_.string() + ": damaged manifest");
     // Read-only, a segment that the other program removed as it committed (a compaction's, an undoing's) is no damage:
     // read again once its manifest has settled.
     if (!lock_ && !unread.empty() && tries > 0) {
         uint64_t now = snap->generation_ + 1;  // a manifest being replaced as it is read has changed too
         try {
-            std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-            now = nlohmann::json::parse(in).value("generation", uint64_t{0});
+            now = Manifest::read(dir_).generation;
         } catch (const std::exception&) {
         }
         if (now != snap->generation_) return load(clean, tries - 1);
     }
     // The edits it names: the games replaced and those deleted.
-    const auto edits        = manifest.value("edits", std::string());
-    snap->edits_generation_ = manifest.value("edits_generation", uint64_t{0});
+    const auto& edits       = manifest.edits;
+    snap->edits_generation_ = manifest.edits_generation.value_or(0);
     if (!edits.empty()) {
         std::ifstream in(dir_ / edits, std::ios::binary);
         const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -809,7 +867,7 @@ void Database::load(bool clean, int tries) {
         for (const auto w : snap->deleted_) snap->deleted_count_ += static_cast<uint64_t>(std::popcount(w));
     }
     // The table of names it names.
-    const auto players = manifest.value("players", std::string());
+    const auto& players = manifest.players;
     if (!players.empty()) {
         std::ifstream in(dir_ / players, std::ios::binary);
         if (!in) throw StoreError(StoreErrc::Damaged, (dir_ / players).string() + ": missing");
@@ -822,10 +880,9 @@ void Database::load(bool clean, int tries) {
     if (!unread.empty()) {
         const auto blank = snap->blankName().value_or(0);
         for (auto& u : unread) {
-            const auto& entry        = manifest.at("segments")[u.index];
             snap->segments_[u.index] = std::make_shared<const Segment>(
                 Segment::Unreadable{}, dir_ / u.bad.name, static_cast<uint32_t>(u.bad.games),
-                entry.at("names").get<uint32_t>(), blank, u.names_known);
+                manifest.segments[u.index].names, blank, u.names_known);
             snap->unreadable_segments_.push_back(std::move(u.bad));
         }
     }
@@ -881,14 +938,9 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
     std::vector<std::string> added;                     // the names this append adds, all segments
     std::vector<std::string> made;                      // the segments it wrote
     std::vector<std::pair<uint32_t, uint32_t>> counts;  // their games and names
-    nlohmann::json manifest;
-    {
-        // Closed before the manifest is replaced: Windows does not rename over an open file.
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest = nlohmann::json::parse(in);
-    }
-    const auto edits_before   = manifest.value("edits", std::string());
-    const auto players_before = manifest.value("players", std::string());
+    auto manifest             = Manifest::read(dir_);
+    const auto edits_before   = manifest.edits;
+    const auto players_before = manifest.players;
     std::string edits_written, players_written;
     bool committed = false;
     try {
@@ -1038,26 +1090,29 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             counts.emplace_back(static_cast<uint32_t>(n), new_names);
         }
         for (std::size_t s = 0; s < made.size(); ++s) {
-            nlohmann::json entry{{"name", made[s]}, {"games", counts[s].first}, {"names", counts[s].second}};
-            if (versions) entry["versions"] = true;
-            if (!source.empty()) entry["source"] = source;
-            manifest["segments"].push_back(std::move(entry));
+            Manifest::Entry entry;
+            entry.name     = made[s];
+            entry.games    = counts[s].first;
+            entry.names    = counts[s].second;
+            entry.versions = versions;
+            entry.source   = source;
+            manifest.segments.push_back(std::move(entry));
         }
         if (players) {
             players_written = playersName(current_->generation_ + 1);
             writeFile(dir_ / players_written, players->bytes());
-            manifest["players"] = players_written;
+            manifest.players = players_written;
         }
         if (replaced || deleted) {
             edits_written = editsName(current_->generation_ + 1);
             writeFile(dir_ / edits_written,
                       editsBytes(replaced ? *replaced : current_->replaced_, deleted ? *deleted : current_->deleted_));
-            manifest["edits"]            = edits_written;
-            manifest["edits_generation"] = current_->generation_ + 1;
+            manifest.edits            = edits_written;
+            manifest.edits_generation = current_->generation_ + 1;
         }
-        manifest["generation"] = current_->generation_ + 1;
+        manifest.generation = current_->generation_ + 1;
         step("write manifest");
-        tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+        manifest.write(dir_);
         committed = true;
         step("manifest written");
     } catch (const std::exception&) {
@@ -1314,25 +1369,21 @@ void Database::setPlayers(PlayerTable table) {
 void Database::clear() {
     if (!lock_) throw readOnlyError(dir_);
     std::lock_guard writing(write_mutex_);
-    const auto before = snapshot();
-    nlohmann::json manifest;
-    {
-        std::ifstream in(dir_ / MANIFEST, std::ios::binary);
-        manifest = nlohmann::json::parse(in);
-    }
-    const auto edits_before   = manifest.value("edits", std::string());
-    const auto players_before = manifest.value("players", std::string());
+    const auto before         = snapshot();
+    auto manifest             = Manifest::read(dir_);
+    const auto edits_before   = manifest.edits;
+    const auto players_before = manifest.players;
     // As a database just made, its generation going on; every game taken out, as edits do: what was built from the
     // games before (an opening tree) no longer holds, nor what the window keeps by generation. A compaction under way
     // stops before its commit for it.
-    const uint64_t generation    = before->generation_ + 1;
-    manifest["segments"]         = nlohmann::json::array();
-    manifest["edits_generation"] = generation;
-    manifest["generation"]       = generation;
-    manifest.erase("edits");
-    manifest.erase("players");
+    const uint64_t generation = before->generation_ + 1;
+    manifest.segments.clear();
+    manifest.edits_generation = generation;
+    manifest.generation       = generation;
+    manifest.edits.clear();
+    manifest.players.clear();
     step("write manifest");
-    tour::replaceFile(dir_ / MANIFEST, manifest.dump(1));
+    manifest.write(dir_);
     step("manifest written");
     auto snap               = std::make_shared<Snapshot>();
     snap->generation_       = generation;

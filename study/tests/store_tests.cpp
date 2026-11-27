@@ -15,6 +15,7 @@
 #include <system_error>
 #include <vector>
 
+#include <json.hpp>
 #include <study/import.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
@@ -823,4 +824,46 @@ TEST_CASE("store: every change a database commits writes the same bytes as befor
         CHECK(now[i].first == before[i].first);
         CHECK(now[i].second == before[i].second);
     }
+}
+
+TEST_CASE("store: the manifest's keys a newer program wrote are kept through every change (#112)") {
+    const ScratchDir dir("store-newer-keys.fcgdb");
+    const auto games = fcg::test::randomGames(40, 5, 6);
+    {
+        auto db = Database::create(dir);
+        db->append({games.begin(), games.begin() + 20}, true, "/x/first.pgn");
+        db->append({games.begin() + 20, games.end()}, true, "/x/second.pgn");
+    }
+    // Keys of its own at the top and in a segment's entry: this program reads past them and writes them back.
+    auto manifest                       = nlohmann::json::parse(fcg::test::readFile(dir / "manifest.json"));
+    manifest["newer"]                   = {{"index", "index-000002.bin"}, {"level", 3}};
+    manifest["segments"][1]["checksum"] = "c0ffee";
+    std::ofstream(dir / "manifest.json", std::ios::binary | std::ios::trunc) << manifest.dump(1);
+    const auto kept = [&](bool entry) {
+        const auto now = nlohmann::json::parse(fcg::test::readFile(dir / "manifest.json"));
+        CHECK(now.value("newer", nlohmann::json()) == manifest["newer"]);
+        if (entry) CHECK(now["segments"][1].value("checksum", "") == "c0ffee");
+    };
+    auto db = Database::open(dir);
+    CHECK(db->snapshot()->games() == 40);
+    db->append(fcg::test::randomGames(5, 6, 6), true);
+    kept(true);
+    db->replace(3, games[4]);
+    db->setDeleted(std::vector<GameId>{7}, true);
+    kept(true);
+    db->setPlayers(PlayerTable(std::vector<Player>{}, {{1, 2}}));
+    kept(true);
+    CompactProgress progress;
+    std::atomic<bool> cancel{false};
+    REQUIRE(db->compact(progress, cancel).done);
+    kept(true);
+    REQUIRE(db->undoCompaction());
+    kept(true);
+    REQUIRE(db->compact(progress, cancel, true).done);
+    kept(true);
+    db->clear();  // its segments gone, their keys with them
+    kept(false);
+    CHECK(nlohmann::json::parse(fcg::test::readFile(dir / "manifest.json"))["segments"].empty());
+    db.reset();
+    CHECK(Database::open(dir)->snapshot()->games() == 0);
 }

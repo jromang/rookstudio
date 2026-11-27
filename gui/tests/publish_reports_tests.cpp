@@ -6,7 +6,9 @@
 
 #include <doctest/doctest.hpp>
 
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <random>
 #include <sstream>
 #include <string>
@@ -19,6 +21,7 @@
 #include <study/pgn_reader.hpp>
 #include <study/store.hpp>
 #include <study/tree.hpp>
+#include <tour/files.hpp>
 
 #include "dossier.hpp"
 #include "opening_report.hpp"
@@ -69,9 +72,12 @@ DocumentLook look() {
     return l;
 }
 
-// The PDF of pages: its page objects counted, its fonts embedded.
+// The PDF of pages: its page objects counted, its fonts embedded. With FCG_PUBLISH_DUMP set to a folder, written there
+// as <title>.pdf, to be compared whole.
 void checkPdf(const std::vector<Page>& pages, const std::string& title) {
     const auto pdf = pdfBytes(pages, look().pieces.get(), {title, "en", ""});
+    if (const char* dir = std::getenv("FCG_PUBLISH_DUMP"))
+        std::ofstream(std::filesystem::path(dir) / (tour::fileNameOf(title) + ".pdf"), std::ios::binary) << pdf;
     CHECK(pdf.rfind("%PDF-1.7", 0) == 0);
     CHECK(count(pdf, "/Type /Page ") == pages.size());
     CHECK(count(pdf, "/FontFile2") + count(pdf, "/FontFile3") >= 1);

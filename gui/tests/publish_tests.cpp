@@ -11,6 +11,7 @@
 #include <fstream>
 #include <map>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -487,6 +488,32 @@ TEST_CASE("publish: a PDF parsed: its pages, its text through its fonts' maps, i
         }
     }
     CHECK(embedded >= 2);
+}
+
+TEST_CASE("publish: a PDF of pieces drawn with gradients and transparency: their shadings, shared") {
+    static const auto celtic = PieceShapes::make(appearance::builtInPieces("celtic"));
+    Document doc;
+    doc.title  = "Celtic";
+    doc.pieces = celtic;
+    for (const bool flipped : {false, true}) {
+        Block diagram;
+        diagram.kind    = Block::Kind::Diagram;
+        diagram.diagram = diagramAt(game().main, flipped, 24, nullptr, appearance::BoardColours{});
+        doc.blocks.push_back(diagram);
+    }
+    const auto pdf = pdfBytes(layOut(doc), celtic.get(), {doc.title, "en", "D:20261127120000Z"});
+    dump("celtic.pdf", pdf);
+    CHECK(pdf.find("/ShadingType") != std::string::npos);
+    // A shading made once, however many pieces paint with it.
+    const auto objects = readPdf(pdf);
+    std::set<std::string> shadings;
+    int count = 0;
+    for (const auto& [n, o] : objects)
+        if (o.dict.find("/ShadingType") != std::string::npos) {
+            shadings.insert(o.dict);
+            ++count;
+        }
+    CHECK(count == static_cast<int>(shadings.size()));
 }
 
 TEST_CASE("publish: a replayable HTML page read back: one file, its moves, variations, comments and marks") {

@@ -174,21 +174,22 @@ void App::readStudy(const std::string& id, std::optional<std::size_t> base, bool
     }
     study_said_.clear();
     study_said_of_ = id;
-    job.done       = std::async(std::launch::async, [id, token = studyToken(false), db, before,
-                                                     cache = lichess::studyCache(storage_.root(), id)] {
-        StudyRead out;
-        out.text = lichess::studyText(id, token);
-        if (!out.text.value) return out;
-        out.chapters = lichess::parseStudyPgn(out.text.value->pgn);
-        try {  // kept for the next time, shown offline too
-            std::error_code ec;
-            fs::create_directories(cache.parent_path(), ec);
-            tour::replaceFile(cache, out.text.value->pgn);
-        } catch (const std::exception&) {
-        }
-        if (db) out.import = lichess::importStudy(*db, out.chapters, before);
-        return out;
-    });
+    job.done =
+        std::async(std::launch::async, [id, token = studyToken(false), db, before,
+                                        cache = lichess::studyCache(storage_.root(), id), stop = jobs_.cancelFlag()] {
+            StudyRead out;
+            out.text = lichess::studyText(id, token, true, stop.get());
+            if (!out.text.value) return out;
+            out.chapters = lichess::parseStudyPgn(out.text.value->pgn);
+            try {  // kept for the next time, shown offline too
+                std::error_code ec;
+                fs::create_directories(cache.parent_path(), ec);
+                tour::replaceFile(cache, out.text.value->pgn);
+            } catch (const std::exception&) {
+            }
+            if (db) out.import = lichess::importStudy(*db, out.chapters, before);
+            return out;
+        });
     study_job_     = std::move(job);
 }
 
@@ -199,9 +200,9 @@ void App::checkFollowedStudies() {
         if (r.followed && r.read_at > 0) ids.push_back(r.id);
     if (ids.empty()) return;
     study_checked_    = std::chrono::steady_clock::now();
-    study_checks_job_ = std::async(std::launch::async, [ids, token = studyToken(false)] {
+    study_checks_job_ = std::async(std::launch::async, [ids, token = studyToken(false), stop = jobs_.cancelFlag()] {
         std::vector<std::pair<std::string, lichess::Answer<std::string>>> out;
-        for (const auto& id : ids) out.emplace_back(id, lichess::studyModified(id, token));
+        for (const auto& id : ids) out.emplace_back(id, lichess::studyModified(id, token, stop.get()));
         return out;
     });
 }
@@ -498,8 +499,10 @@ void App::drawLichessStudies() {
     const auto key = user + (may_read ? "+read" : "");
     if (open && !user.empty() && !studies_list_job_.valid() && studies_list_of_ != key && !lichess_link_) {
         studies_list_of_  = key;
-        studies_list_job_ = std::async(std::launch::async,
-                                       [user, token = studyToken(false)] { return lichess::userStudies(user, token); });
+        studies_list_job_ =
+            std::async(std::launch::async, [user, token = studyToken(false), stop = jobs_.cancelFlag()] {
+                return lichess::userStudies(user, token, stop.get());
+            });
     }
     if (studies_list_) {
         ImGui::SameLine();
@@ -897,8 +900,10 @@ void App::openStudySend() {
     const auto key         = user + (studyToken(false).empty() ? "" : "+read");
     if (!user.empty() && !studies_list_job_.valid() && studies_list_of_ != key && !lichess_link_) {
         studies_list_of_  = key;
-        studies_list_job_ = std::async(std::launch::async,
-                                       [user, token = studyToken(false)] { return lichess::userStudies(user, token); });
+        studies_list_job_ =
+            std::async(std::launch::async, [user, token = studyToken(false), stop = jobs_.cancelFlag()] {
+                return lichess::userStudies(user, token, stop.get());
+            });
     }
 }
 

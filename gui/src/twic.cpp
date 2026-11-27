@@ -198,12 +198,12 @@ std::optional<Issue> newIssue(const State& state, const std::string& database) {
 
 bool lookDue(const State& state, int64_t now) { return state.weekly && now - state.checked >= 6 * 3600; }
 
-std::pair<std::vector<Issue>, NetFailure> fetchIndex() {
+std::pair<std::vector<Issue>, NetFailure> fetchIndex(const std::atomic<bool>* cancel) {
     HttpRequest request;
     request.url    = indexUrl();
     request.method = "GET";
     std::pair<std::vector<Issue>, NetFailure> out;
-    const auto answer = politeRequest(request);
+    const auto answer = politeRequest(request, cancel);
     out.second        = netFailureOf(answer, request.url);
     if (out.second.kind != NetFailure::Kind::None) return out;
     out.first = parseIndex(answer.body);

@@ -171,9 +171,10 @@ void App::drawLichessAccountPanel() {
     const auto& chosen = p.speeds[static_cast<std::size_t>(std::clamp(lichess_speed_, 0, count - 1))];
     const auto figures = lichess_figures_.find(chosen.key);
     if (figures == lichess_figures_.end() && !lichess_figures_job_.valid() && chosen.games > 0) {
-        lichess_figures_job_ =
-            std::async(std::launch::async, [user = p.username, key = chosen.key, token = lichess_account_->token] {
-                return std::pair{key, lichess::perfFigures(user, key, token)};
+        lichess_figures_job_ = std::async(
+            std::launch::async,
+            [user = p.username, key = chosen.key, token = lichess_account_->token, stop = jobs_.cancelFlag()] {
+                return std::pair{key, lichess::perfFigures(user, key, token, stop.get())};
             });
     }
     const float half = (ImGui::GetContentRegionAvail().x - px(14)) * 0.5f;

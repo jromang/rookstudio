@@ -403,7 +403,8 @@ void App::askReportLichess(int source) {
         if (!explorer_job_.valid()) {
             explorer_asked_     = key;
             explorer_job_since_ = ImGui::GetTime();
-            explorer_job_       = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+            explorer_job_ = std::async(std::launch::async,
+                                       [q, stop = jobs_.cancelFlag()] { return lichess::explorer(q, stop.get()); });
         }
         return;
     }

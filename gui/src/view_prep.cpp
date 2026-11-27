@@ -70,7 +70,9 @@ void App::startPrep(const std::string& opponent) {
                 return lichess::syncGames(*db, opponent, token, *progress, *cancel, 500, filters);
             });
     }
-    p.profile_job = std::async(std::launch::async, [opponent] { return lichess::publicProfile(opponent); });
+    p.profile_job = std::async(std::launch::async, [opponent, stop = jobs_.cancelFlag()] {
+        return lichess::publicProfile(opponent, stop.get());
+    });
     prep_         = std::move(p);
 }
 

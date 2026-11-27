@@ -279,7 +279,8 @@ void App::askBroadcasts() {
         now - lichess_broadcasts_time_ < std::chrono::minutes(1))
         return;
     lichess_broadcasts_time_ = now;
-    lichess_broadcasts_job_  = std::async(std::launch::async, [] { return lichess::topBroadcasts(); });
+    lichess_broadcasts_job_ =
+        std::async(std::launch::async, [stop = jobs_.cancelFlag()] { return lichess::topBroadcasts(stop.get()); });
 }
 
 void App::startLichessLink(std::vector<std::string> scopes, std::string username,
@@ -620,9 +621,10 @@ void App::startBroadcastSearch() {
         return;
     }
     broadcast_searched_   = words;
-    broadcast_search_job_ = std::async(std::launch::async, [words, token = lichess_account_->token] {
-        return lichess::searchBroadcasts(words, token);
-    });
+    broadcast_search_job_ =
+        std::async(std::launch::async, [words, token = lichess_account_->token, stop = jobs_.cancelFlag()] {
+            return lichess::searchBroadcasts(words, token, stop.get());
+        });
 }
 
 void App::drawLichessBroadcasts() {
@@ -1050,7 +1052,8 @@ bool App::lichessTreeRows(int source, const std::string& fen) {
         if (now - explorer_since_ > 0.4 && !explorer_job_.valid()) {
             explorer_asked_     = key;
             explorer_job_since_ = now;
-            explorer_job_       = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+            explorer_job_ = std::async(std::launch::async,
+                                       [q, stop = jobs_.cancelFlag()] { return lichess::explorer(q, stop.get()); });
         }
         tree_rows_.clear();
         tree_rows_of_.clear();
@@ -1168,7 +1171,8 @@ void App::pollExplorerMonths() {
         q.moves               = 1;
         q.top_games           = 0;
         explorer_month_asked_ = row.months;
-        explorer_month_job_   = std::async(std::launch::async, [q] { return lichess::explorer(q); });
+        explorer_month_job_ =
+            std::async(std::launch::async, [q, stop = jobs_.cancelFlag()] { return lichess::explorer(q, stop.get()); });
         return;
     }
 }
@@ -1210,10 +1214,11 @@ void App::drawTreeGames() {
             explorer_game_title_ = title;
             explorer_game_fen_   = boardFen();
             explorer_game_error_ = {};
-            explorer_game_job_ = std::async(
-                std::launch::async, [id = g.id, token = lichess_account_->token, masters = tree_games_source_ == 0] {
-                    return masters ? lichess::mastersGame(id, token) : lichess::gamePgn(id, token);
-                });
+            explorer_game_job_   = std::async(std::launch::async, [id = g.id, token = lichess_account_->token,
+                                                                   masters = tree_games_source_ == 0,
+                                                                   stop    = jobs_.cancelFlag()] {
+                return masters ? lichess::mastersGame(id, token, stop.get()) : lichess::gamePgn(id, token, stop.get());
+            });
         }
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))

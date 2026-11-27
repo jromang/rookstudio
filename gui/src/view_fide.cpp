@@ -39,9 +39,12 @@ void App::askFideCard(std::string name, int64_t id) {
         return;
     }
     if (id > 0)
-        a.card = std::async(std::launch::async, [id] { return lichess::fidePlayer(id); });
+        a.card = std::async(std::launch::async,
+                            [id, stop = jobs_.cancelFlag()] { return lichess::fidePlayer(id, stop.get()); });
     else
-        a.search = std::async(std::launch::async, [name = a.name] { return lichess::fideSearch(name); });
+        a.search = std::async(std::launch::async, [name = a.name, stop = jobs_.cancelFlag()] {
+            return lichess::fideSearch(name, stop.get());
+        });
 }
 
 void App::pollFideCards() {

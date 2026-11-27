@@ -273,7 +273,9 @@ void LichessBotPage::checkBotToken(std::string token) {
     if (token.empty()) return;
     bot_error_      = {};
     bot_unanswered_ = false;
-    bot_check_      = std::async(std::launch::async, [token] { return lichess::checkBotToken(token); });
+    bot_check_      = std::async(std::launch::async, [token, stop = app_.jobs().cancelFlag()] {
+        return lichess::checkBotToken(token, stop.get());
+    });
 }
 
 void LichessBotPage::keepBotAccount(const lichess::Account& account) {
@@ -455,10 +457,11 @@ void LichessBotPage::finishBotGame(const lichess::BotGame::State& st) {
     try {
         if (!index) index = s.create(name);
         auto db = s.open(*index);
-        bot_arrivals_.push_back(
-            {g.id, *index, std::async(std::launch::async, [id = g.id, token = bot_account_->token, db] {
-                 return lichess::bringGame(id, token, db.get());
-             })});
+        bot_arrivals_.push_back({g.id, *index,
+                                 std::async(std::launch::async, [id = g.id, token = bot_account_->token, db,
+                                                                 stop = app_.jobs().cancelFlag()] {
+                                     return lichess::bringGame(id, token, db.get(), stop.get());
+                                 })});
     } catch (const std::exception& e) {
         Console::instance().add(trf("Lichess bot: “{}” could not be made: {}", name, e.what()), true);
     }
@@ -520,8 +523,10 @@ void LichessBotPage::poll() {
             bot_step_       = BotStep::Account;
             // Refused: the account looked at again, what Lichess saw in it then said.
             if (r.status != 0 && bot_account_ && !bot_check_.valid())
-                bot_check_ = std::async(std::launch::async,
-                                        [token = bot_account_->token] { return lichess::checkBotToken(token); });
+                bot_check_ =
+                    std::async(std::launch::async, [token = bot_account_->token, stop = app_.jobs().cancelFlag()] {
+                        return lichess::checkBotToken(token, stop.get());
+                    });
         }
     }
     if (isReady(bot_unlink_)) {

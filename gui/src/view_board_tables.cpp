@@ -69,9 +69,9 @@ const std::vector<std::string>* App::boardTablesLine(const lichess::TablebaseMov
     // Lichess's: kept in the profile, else asked, one at a time.
     if (ask && !t.line_job.valid()) {
         t.line_job_fen = fen;
-        t.line_job     = std::async(std::launch::async, [root = storage_.root(), fen] {
+        t.line_job     = std::async(std::launch::async, [root = storage_.root(), fen, stop = jobs_.cancelFlag()] {
             bool asked = false;
-            return keptOrAskedLine(root, fen, asked);
+            return keptOrAskedLine(root, fen, asked, stop.get());
         });
     }
     return nullptr;
@@ -170,9 +170,9 @@ void App::drawBoardEndgames() {
             t.online = true;
         } else if (settled) {
             t.asking_fen = fen;
-            t.asking     = std::async(std::launch::async, [root = storage_.root(), fen] {
+            t.asking     = std::async(std::launch::async, [root = storage_.root(), fen, stop = jobs_.cancelFlag()] {
                 bool asked = false;
-                return keptOrAskedTables(root, fen, asked);
+                return keptOrAskedTables(root, fen, asked, stop.get());
             });
         }
     }

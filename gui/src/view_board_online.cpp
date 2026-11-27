@@ -264,7 +264,9 @@ void App::drawBoardOnline() {
                     online_tb_   = OnlineTablebase{fen, std::move(answer), cached->value("when", int64_t{0})};
                 } else if (settled && !online_tb_job_.valid()) {
                     online_tb_asked_ = fen;
-                    online_tb_job_   = std::async(std::launch::async, [fen] { return lichess::tablebase(fen); });
+                    online_tb_job_   = std::async(std::launch::async, [fen, stop = jobs_.cancelFlag()] {
+                        return lichess::tablebase(fen, stop.get());
+                    });
                 }
             }
             if (online_tb_ && positionOf(online_tb_->fen) == positionOf(fen)) {
@@ -304,7 +306,9 @@ void App::drawBoardOnline() {
                     online_cloud_ = OnlineCloud{fen, std::move(answer), cached->value("when", int64_t{0})};
                 } else if (settled && !online_cloud_job_.valid()) {
                     online_cloud_asked_ = fen;
-                    online_cloud_job_   = std::async(std::launch::async, [fen] { return lichess::cloudEval(fen, 3); });
+                    online_cloud_job_   = std::async(std::launch::async, [fen, stop = jobs_.cancelFlag()] {
+                        return lichess::cloudEval(fen, 3, stop.get());
+                    });
                 }
             }
             if (online_cloud_ && positionOf(online_cloud_->fen) == positionOf(fen)) drawOnlineCloud(board);

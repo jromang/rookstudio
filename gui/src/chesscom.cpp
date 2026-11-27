@@ -103,13 +103,14 @@ std::vector<std::string> monthsToAsk(const std::vector<std::string>& listed, con
     return out;
 }
 
-std::pair<std::vector<std::string>, NetFailure> fetchMonths(const std::string& player) {
+std::pair<std::vector<std::string>, NetFailure> fetchMonths(const std::string& player,
+                                                            const std::atomic<bool>* cancel) {
     HttpRequest request;
     request.url    = archivesUrl(player);
     request.method = "GET";
     request.headers.emplace_back("Accept", "application/json");
     std::pair<std::vector<std::string>, NetFailure> out;
-    const auto answer = politeRequest(request);
+    const auto answer = politeRequest(request, cancel);
     out.second        = netFailureOf(answer, request.url);
     if (out.second.kind == NetFailure::Kind::None) out.first = parseArchives(answer.body);
     return out;

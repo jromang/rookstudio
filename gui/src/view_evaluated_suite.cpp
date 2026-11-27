@@ -48,7 +48,8 @@ void App::openEvaluatedSuite() {
         evaluated_job_ = std::async(std::launch::async, evaluatedPositions, evalsFolderPath());
     // Its size, said before anything is downloaded: asked of the server by the file's first byte.
     if (!evals_folder_->done && !evals_size_ && !evals_size_job_.valid())
-        evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
+        evals_size_job_ = std::async(
+            std::launch::async, [stop = jobs_.cancelFlag()] { return evalsSize(lichess::evalsUrl(), stop.get()); });
 }
 
 void App::startEvalsReading(std::string source) {
@@ -134,7 +135,9 @@ void App::drawEvaluatedSuite() {
                 evals_stopped_.clear();
                 evals_failure_ = {};
                 if (!evals_size_ && !evals_size_job_.valid())
-                    evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
+                    evals_size_job_ = std::async(std::launch::async, [stop = jobs_.cancelFlag()] {
+                        return evalsSize(lichess::evalsUrl(), stop.get());
+                    });
             }
         } else {
             if (evals_size_ && !evals_size_->failed()) {
@@ -185,7 +188,8 @@ void App::drawEvaluatedSuite() {
         fs::remove(evalsFolderPath() / "evaluations.json", ec);
         evals_folder_ = evalsFolder(evalsFolderPath());
         if (!evals_size_ && !evals_size_job_.valid())
-            evals_size_job_ = std::async(std::launch::async, [] { return evalsSize(lichess::evalsUrl()); });
+            evals_size_job_ = std::async(
+                std::launch::async, [stop = jobs_.cancelFlag()] { return evalsSize(lichess::evalsUrl(), stop.get()); });
         return;
     }
     tip(TR("Reads Lichess's evaluations database again, for its newer evaluations."));

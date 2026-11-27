@@ -155,8 +155,9 @@ void App::pollLichessPlaying() {
                        (!lichess_playing_.empty() && since > std::chrono::minutes(10));
     if (!due) return;
     lichess_playing_asked_ = now;
-    lichess_playing_job_ =
-        std::async(std::launch::async, [token = lichess_account_->token] { return lichess::playingGames(token); });
+    lichess_playing_job_ = std::async(std::launch::async, [token = lichess_account_->token, stop = jobs_.cancelFlag()] {
+        return lichess::playingGames(token, stop.get());
+    });
 }
 
 const lichess::PlayingGame* App::liveGameOn() const {
@@ -402,9 +403,10 @@ void App::finishLichessGame(const lichess::PlayingGame& game) {
     } catch (const std::exception& e) {
         Console::instance().add(trf("Lichess: “{}” could not be made: {}", name, e.what()), true);
     }
-    f.arrival = std::async(std::launch::async, [id = game.id, token = lichess_account_->token, db] {
-        return lichess::bringGame(id, token, db.get());
-    });
+    f.arrival =
+        std::async(std::launch::async, [id = game.id, token = lichess_account_->token, db, stop = jobs_.cancelFlag()] {
+            return lichess::bringGame(id, token, db.get(), stop.get());
+        });
     lichess_finished_.push_back(std::move(f));
 }
 
@@ -445,9 +447,10 @@ void App::reviewFinishedGame(FinishedGame& f) {
         return;
     }
     // Asked again: Lichess's analysis may have been asked for on lichess.org since the game ended.
-    f.again = std::async(std::launch::async, [id = f.game.id, token = lichess_account_->token] {
-        return lichess::bringGame(id, token, nullptr);
-    });
+    f.again =
+        std::async(std::launch::async, [id = f.game.id, token = lichess_account_->token, stop = jobs_.cancelFlag()] {
+            return lichess::bringGame(id, token, nullptr, stop.get());
+        });
 }
 
 void App::openFinishedGame(FinishedGame& f, const std::string& pgn) {

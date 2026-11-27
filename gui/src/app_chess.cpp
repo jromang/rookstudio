@@ -489,8 +489,8 @@ class App::ModulesContext final : public AppContext {
 
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return app_.trainingSettings(); }
-    void setGuessTheory(bool on) override {
-        app_.trainingSettings().guess_theory = on;
+    void setTrainingSettings(const TrainingSettings& settings) override {
+        app_.trainingSettings() = settings;
         app_.saveTrainingSettings();
     }
     void showTrainingPage(int part) override {
@@ -643,6 +643,39 @@ class App::ModulesContext final : public AppContext {
         return [book](const chess::Board& board) { return book->move(board); };
     }
     void showPlayPage() override { app_.page_ = Page::Play; }
+
+    // The Openings page and its repertoires.
+    RepertoireShelf& repertoires() override { return app_.repertoires(); }
+    bool measuredOn(const std::filesystem::path& folder) const override {
+        return !app_.coverage_left_.contains(folder);
+    }
+    void showOpeningsPage() override { app_.page_ = Page::Openings; }
+
+    // The user's correspondence games on Lichess.
+    bool playingOnLichess() const override { return !app_.lichess_playing_.empty(); }
+    int correspondencePly(const ReplayGame& line) const override {
+        return app_.correspondencePly(line, false, INT32_MAX);
+    }
+
+    // The Board as the repertoires' training asks on it.
+    void askAgainAt(int ply) override {
+        auto& b = app_.board_;
+        if (b.game.moves.size() > static_cast<std::size_t>(ply)) {
+            b.game.moves.resize(static_cast<std::size_t>(ply));
+            b.tree = GameTree{b.game, {}};
+        }
+        b.line = -1;
+        b.ply  = ply;
+        b.selected.reset();
+    }
+    void showTreeAt(int ply) override {
+        if (app_.board_.ply > ply) app_.board_.ply = ply;
+        app_.board_side_tab_ = 2;
+    }
+    void sayOnBoard(const std::string& text) override {
+        app_.board_.message       = text;
+        app_.board_.message_error = true;
+    }
 
    private:
     // The user's games of a tournament kept with their review held until its end (#95), in the order they ended.

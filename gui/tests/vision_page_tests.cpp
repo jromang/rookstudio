@@ -116,7 +116,7 @@ class FakeApp final : public VisionContext {
 
     // The Training page.
     const TrainingSettings& trainingSettings() override { return settings_; }
-    void setGuessTheory(bool) override {}
+    void setTrainingSettings(const TrainingSettings&) override {}
     void showTrainingPage(int part) override { training_part = part; }
     bool trainingShown() const override { return false; }
     void setEnterStartsPuzzles(bool) override {}

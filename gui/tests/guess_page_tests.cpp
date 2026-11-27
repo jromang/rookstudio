@@ -126,7 +126,7 @@ class FakeApp final : public GuessContext {
 
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
-    void setGuessTheory(bool on) override { settings_.guess_theory = on; }
+    void setTrainingSettings(const TrainingSettings& settings) override { settings_ = settings; }
     void showTrainingPage(int part) override { training_part = part; }
     bool trainingShown() const override { return training_part >= 0; }
     void setEnterStartsPuzzles(bool) override {}

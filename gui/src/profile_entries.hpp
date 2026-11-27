@@ -5,8 +5,8 @@
 // stopping the program at launch. What was set aside is said in the console with the entries' names, and the file as it
 // was is copied beside it (<file>.unreadable, then .unreadable2…), since the next save writes it without them. A file
 // there but unreadable as a whole (cut short) is copied aside and said the same way, rather than replaced in silence by
-// the next save. The user's mistakes (mistakes.hpp), the endgames' record (endgames.hpp) and board vision's
-// (vision.hpp) are read so.
+// the next save. The user's mistakes (mistakes.hpp), the endgames' record (endgames.hpp), board vision's (vision.hpp),
+// the training's settings and each repertoire's training (training.hpp) are read so.
 
 #include <exception>
 #include <filesystem>

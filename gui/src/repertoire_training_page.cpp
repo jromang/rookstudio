@@ -1,34 +1,35 @@
-// The repertoires' training (#76, mockup M11, board 1; training.hpp): the training card of the Openings page, a
-// session on the Board page whose column becomes the training's, the end of a session, the Home page's line.
+// The repertoires' training (#76, mockup M11, board 1), a module of its own out of App (#107; training.hpp is its
+// data): the training card of the Openings page, a session on the Board page whose column becomes the training's, the
+// end of a session, the day's review of the positions due, the Home page's line.
 //
 // The keys of a question: a move played on the board, or typed (its letters open the move field, as everywhere on the
 // study Board); Alt+H a hint (H begins the h-pawn's moves), Space "I don't know", Escape stops. After the answer,
 // Enter goes on (or tries again after a wrong one), Ctrl+Z takes back a move added to the repertoire.
+
+#include "repertoire_training_page.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
-#include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/game_tree.hpp>
 
-#include "app.hpp"
-#include "board_session.hpp"
+#include "board_page.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
-#include "endgames_page.hpp"
-#include "guess_page.hpp"
+#include "databases.hpp"
+#include "guide.hpp"
 #include "i18n.hpp"
-#include "mistakes_page.hpp"
+#include "repertoires.hpp"
 #include "ui.hpp"
-#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -168,37 +169,41 @@ void wrapped(const std::string& text, bool grey = false) {
 
 }  // namespace
 
+RepertoireTrainingPage::RepertoireTrainingPage(RepertoireTrainingContext& app) : app_(app) {}
+
+RepertoireTrainingPage::~RepertoireTrainingPage() = default;
+
+bool RepertoireTrainingPage::hidesAids() const {
+    // A question, or its cards being prepared.
+    return training_ && (training_->phase == Ask::Asking || training_->phase == Ask::Preparing);
+}
+
+const char* RepertoireTrainingPage::guideTopic() const { return guide::topics::Training; }
+
 // ---------------------------------------------------------------------------
 // Kept and counted
 
-TrainingSettings& App::trainingSettings() {
-    if (!training_settings_) training_settings_ = readTrainingSettings(storage_.root());
-    return *training_settings_;
-}
-
-void App::saveTrainingSettings() {
-    if (options_.scripted) return;  // a run for screenshots leaves the profile as it was
-    writeTrainingSettings(storage_.root(), trainingSettings());
-}
-
-std::optional<std::size_t> App::repertoireOf(const std::filesystem::path& file) {
-    const auto& entries = repertoires().entries();
+std::optional<std::size_t> RepertoireTrainingPage::repertoireOf(const std::filesystem::path& file) {
+    const auto& entries = app_.repertoires().entries();
     for (std::size_t i = 0; i < entries.size(); ++i)
         if (entries[i].file == file) return i;
     return std::nullopt;
 }
 
-const App::TrainingSummary& App::trainingSummary(std::size_t index) {
-    const auto& e = repertoires().entries().at(index);
-    auto& s       = training_summaries_[e.file];
+const RepertoireTrainingPage::Summary& RepertoireTrainingPage::summary(std::size_t index) {
+    const auto& e     = app_.repertoires().entries().at(index);
+    auto [it, unread] = summaries_.try_emplace(e.file);
+    auto& s           = it->second;
+    // Its memories read once, then kept up to date by the sessions (keep()): what could not be read in its file is said
+    // once (#136), not again at each change of the repertoire.
+    if (unread) s.kept = readTrainingFile(e.file);
     if (s.revision != e.revision) {
         s.revision = e.revision;
         s.cards    = study::trainingCards(e.lines, e.side);
-        s.kept     = readTrainingFile(e.file);
         s.counted  = 0;
     }
     const auto now  = epochNow();
-    const int limit = trainingSettings().new_per_day;
+    const int limit = app_.trainingSettings().new_per_day;
     if (s.counted / 60 != now / 60 || s.new_per_day != limit) {
         s.counts      = study::trainingCounts(s.cards, s.kept.memories, trainingDay(now),
                                               static_cast<std::size_t>(std::max(0, limit)));
@@ -208,12 +213,12 @@ const App::TrainingSummary& App::trainingSummary(std::size_t index) {
     return s;
 }
 
-std::vector<study::TreeBase> App::trainingBases(std::string* key, std::vector<std::string>* names) {
-    auto& s = shelf();
+std::vector<study::TreeBase> RepertoireTrainingPage::trainingBases(std::string* key, std::vector<std::string>* names) {
+    auto& s = app_.shelf();
     std::vector<study::TreeBase> bases;
     for (std::size_t i = 0; i < s.entries().size(); ++i) {
         const auto& e = s.entries()[i];
-        if (e.source || coverage_left_.count(e.folder)) continue;
+        if (e.source || !app_.measuredOn(e.folder)) continue;
         const auto source = s.treeSource(i);
         if (!source || !source->tree) continue;
         bases.push_back({source->snapshot, source->tree});
@@ -223,61 +228,57 @@ std::vector<study::TreeBase> App::trainingBases(std::string* key, std::vector<st
     return bases;
 }
 
-const std::vector<study::TrainingCard>* App::plannedCards(std::size_t index) {
-    const auto& e = repertoires().entries().at(index);
+const std::vector<study::TrainingCard>* RepertoireTrainingPage::plannedCards(std::size_t index) {
+    const auto& e = app_.repertoires().entries().at(index);
     std::string bases_key;
     auto bases    = trainingBases(&bases_key, nullptr);
     const auto of = fmt::format("{}|{}|{}", e.file.string(), e.revision, bases_key);
-    if (training_planning_ &&
-        training_planning_->cards.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        training_planned_[training_planning_->file] = {training_planning_->of, training_planning_->cards.get()};
-        training_planning_.reset();
+    if (planning_ && planning_->cards.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        planned_[planning_->file] = {planning_->of, planning_->cards.get()};
+        planning_.reset();
     }
-    if (const auto it = training_planned_.find(e.file); it != training_planned_.end() && it->second.of == of)
-        return &it->second.cards;
+    if (const auto it = planned_.find(e.file); it != planned_.end() && it->second.of == of) return &it->second.cards;
     // One at a time: the next once the one being made is done.
-    if (!training_planning_) {
-        TrainingPlanning job;
-        job.file           = e.file;
-        job.of             = of;
-        job.cards          = std::async(std::launch::async, [lines = e.lines, side = e.side, bases = std::move(bases)] {
+    if (!planning_) {
+        Planning job;
+        job.file  = e.file;
+        job.of    = of;
+        job.cards = std::async(std::launch::async, [lines = e.lines, side = e.side, bases = std::move(bases)] {
             const study::Repertoire repertoire(lines, side);
             return study::trainingCards(lines, side, study::trainingPlan(repertoire, study::treeMoves(bases)));
         });
-        training_planning_ = std::move(job);
+        planning_ = std::move(job);
     }
     return nullptr;
 }
 
-std::string App::trainingLock() const {
-    if (liveGameOn()) return TR("Locked while one of your games is played on Lichess.");
-    if ((board_.match && board_.match_state.running) || engineGameRunning())
-        return TR("Once the game played on the board is over.");
-    return {};
-}
-
-bool App::trainingHidesAids() const {
-    // The question of the training session that holds the Board, whatever its kind (#76, #80–#82).
-    const auto* session = boardSession();
-    return session && session->hidesAids();
-}
-
-std::string App::trainingListLine(std::size_t index) {
-    const auto& c = trainingSummary(index).counts;
+std::string RepertoireTrainingPage::listLine(std::size_t index) {
+    const auto& c = summary(index).counts;
     if (c.cards == 0) return TR("nothing to train yet");
     if (c.due > 0) return trn("{} to review", "{} to review", c.due, ui::exactCount(c.due));
     return TR("nothing to review");
 }
 
+std::size_t RepertoireTrainingPage::cardCount(std::size_t index) { return summary(index).counts.cards; }
+
+std::array<std::unordered_set<uint64_t>, 2> RepertoireTrainingPage::repertoirePositions() {
+    std::array<std::unordered_set<uint64_t>, 2> keys;
+    for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i) {
+        auto& set = keys[app_.repertoires().entries()[i].side == chess::Color::WHITE ? 0 : 1];
+        for (const auto& c : summary(i).cards) set.insert(c.key);
+    }
+    return keys;
+}
+
 // ---------------------------------------------------------------------------
 // The Openings page
 
-void App::drawTrainingCard(std::size_t index) {
-    const auto& e   = repertoires().entries()[index];
-    const auto& s   = trainingSummary(index);
-    const auto& c   = s.counts;
-    auto& settings  = trainingSettings();
-    const auto lock = trainingLock();
+void RepertoireTrainingPage::drawCard(std::size_t index) {
+    const auto& e        = app_.repertoires().entries()[index];
+    const auto& s        = summary(index);
+    const auto& c        = s.counts;
+    const auto& settings = app_.trainingSettings();
+    const auto lock      = app_.sessionLock();
     beginTinted("##training_card", ui::ACCENT);
     {
         const ui::TopicRegion topic(guide::topics::Training);
@@ -307,7 +308,7 @@ void App::drawTrainingCard(std::size_t index) {
             const auto session = c.due + c.today;
             bool start         = false;
             if (here) {
-                if (primaryButton(TR("Back to the session"))) page_ = Page::Board;
+                if (primaryButton(TR("Back to the session"))) app_.showSession();
             } else {
                 const auto label = trn("Start · {} position", "Start · {} positions", session, ui::exactCount(session));
                 start            = primaryButton(label.c_str(), session > 0 && lock.empty());
@@ -341,7 +342,7 @@ void App::drawTrainingCard(std::size_t index) {
             }
             ImGui::SameLine(0, px(8));
             if (ImGui::SmallButton(trf("{} a day##training_limit", settings.new_per_day).c_str()) ||
-                std::exchange(training_limit_menu_, false))
+                std::exchange(limit_menu_, false))
                 ImGui::OpenPopup("##training_limit_menu");
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", TR("New positions a day at most"));
             if (ImGui::BeginPopup("##training_limit_menu")) {
@@ -349,8 +350,9 @@ void App::drawTrainingCard(std::size_t index) {
                 for (const int n : {5, 10, 20, 30, 50, 100}) {
                     if (ImGui::MenuItem(ui::exactCount(static_cast<uint64_t>(n)).c_str(), nullptr,
                                         settings.new_per_day == n)) {
-                        settings.new_per_day = n;
-                        saveTrainingSettings();
+                        auto changed        = settings;
+                        changed.new_per_day = n;
+                        app_.setTrainingSettings(changed);
                     }
                 }
                 ImGui::EndPopup();
@@ -411,35 +413,32 @@ void App::drawTrainingCard(std::size_t index) {
 // ---------------------------------------------------------------------------
 // A session
 
-void App::startTraining(std::size_t index, TrainingRun::Kind kind) {
-    if (!trainingLock().empty() || index >= repertoires().entries().size()) return;
-    closeBoardSession();  // the session that holds the Board left where it is, its answers kept (#80–#82)
-    const auto& e  = repertoires().entries()[index];
-    auto run       = std::make_unique<TrainingRun>();
-    run->kind      = kind;
-    run->file      = e.file;
-    run->name      = e.name;
-    run->side      = e.side;
-    run->start_fen = e.lines.main.start_fen;
-    run->kept      = trainingSummary(index).kept;
-    run->settings  = trainingSettings();
-    run->flip      = board_.flip;
-    run->tab       = board_side_tab_;
-    // The game on the board goes among the recent games (Ctrl+Tab), given back after the session.
-    const auto& b = board_;
-    run->aside    = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
-    toStudyBoard();
-    openOnBoard(gameOf(run->start_fen, {}), 0, false, trf("Training · {}", e.name), false);
-    board_.flip = e.side == chess::Color::BLACK;
-    board_back_.reset();
-    // With the answer, the tree rather than the notation's editing: the moves of the session are not a game.
-    if (board_side_tab_ == 0) board_side_tab_ = 2;
+void RepertoireTrainingPage::startTraining(std::size_t index, TrainingRun::Kind kind) {
+    if (!app_.sessionLock().empty() || index >= app_.repertoires().entries().size()) return;
+    // The Board taken, the session that holds it closed first, left where it is, its answers kept (#80–#82): the game
+    // on the board goes among the recent games (Ctrl+Tab), given back after the session; with the answer, the tree
+    // rather than the notation's editing, the moves of the session being no game.
+    const auto taken = app_.takeBoard(trf("Training · {}", app_.repertoires().entries()[index].name), true);
+    const auto& e    = app_.repertoires().entries()[index];
+    auto run         = std::make_unique<TrainingRun>();
+    run->kind        = kind;
+    run->file        = e.file;
+    run->name        = e.name;
+    run->side        = e.side;
+    run->start_fen   = e.lines.main.start_fen;
+    run->kept        = summary(index).kept;
+    run->settings    = app_.trainingSettings();
+    run->flip        = taken.flip;
+    run->tab         = taken.tab;
+    run->aside       = taken.aside;
+    app_.showSessionGame(gameOf(run->start_fen, {}));  // the repertoire's start, until its cards are ready
+    app_.setFlip(e.side == chess::Color::BLACK);
     run->started = Clock::now();
     training_    = std::move(run);
-    pollTraining();  // the first question at once when the cards are ready
+    poll();  // the first question at once when the cards are ready
 }
 
-void App::pollTraining() {
+void RepertoireTrainingPage::poll() {
     if (!training_ || training_->phase != Ask::Preparing) return;
     auto& t          = *training_;
     const auto index = repertoireOf(t.file);
@@ -455,9 +454,9 @@ void App::pollTraining() {
     // Fair play (#48): a position on the line of one of the user's correspondence games on Lichess is not asked while
     // the game lasts: the repertoire would tell its next move.
     std::unordered_set<uint64_t> left_out;
-    if (!lichess_playing_.empty()) {
+    if (app_.playingOnLichess()) {
         for (const auto& card : *cards)
-            if (correspondencePly(gameOf(t.start_fen, card.line), false, INT32_MAX) >= 0) left_out.insert(card.key);
+            if (app_.correspondencePly(gameOf(t.start_fen, card.line)) >= 0) left_out.insert(card.key);
     }
     t.left_out = left_out.size();
     auto order = study::sessionOrder(*cards, t.kept.memories, day, fresh,
@@ -468,29 +467,11 @@ void App::pollTraining() {
     askTrainingCard();
 }
 
-void App::showTrainingCard(const study::TrainingCard& card) {
-    auto& b    = board_;
-    b.game     = gameOf(training_->start_fen, card.line);
-    b.tree     = GameTree{b.game, {}};
-    b.line     = -1;
-    b.ply      = static_cast<int>(b.game.moves.size());
-    b.chess960 = false;
-    b.selected.reset();
-    b.promotion.reset();
-    b.preview.reset();
-    b.drag.reset();
-    b.drag_over.reset();
-    b.move_typed.reset();
-    b.move_error.clear();
-    b.comment_edit.reset();
-    b.undo.clear();
-    b.redo.clear();
-    b.changes     = {};
-    b.start_notes = {};
-    b.new_game    = true;
+void RepertoireTrainingPage::showTrainingCard(const study::TrainingCard& card) {
+    app_.showSessionGame(gameOf(training_->start_fen, card.line));
 }
 
-void App::askTrainingCard() {
+void RepertoireTrainingPage::askTrainingCard() {
     auto& t      = *training_;
     const auto i = t.session ? t.session->current() : std::nullopt;
     if (!i) return finishTraining(false);
@@ -507,13 +488,13 @@ void App::askTrainingCard() {
     t.asked = Clock::now();
 }
 
-void App::trainingAnswer(chess::Move move) {
+void RepertoireTrainingPage::trainingAnswer(chess::Move move) {
     auto& t = *training_;
-    if (t.phase != Ask::Asking || !t.session || !t.session->current() || liveGameOn()) return;
-    auto& b          = board_;
+    if (t.phase != Ask::Asking || !t.session || !t.session->current() || app_.liveGameOn()) return;
     const auto& card = t.session->cards()[*t.session->current()];
-    if (b.ply != static_cast<int>(card.line.size())) return;  // the question's position only
-    const auto board = boardAt(b.game, b.chess960, b.ply);
+    const int ply    = app_.sessionPly();
+    if (ply != static_cast<int>(card.line.size())) return;  // the question's position only
+    const auto board = boardAt(app_.sessionGame(), false, ply);
     t.played         = chess::uci::moveToSan(board, move);
     t.played_move    = move;
     t.shown          = false;
@@ -521,14 +502,13 @@ void App::trainingAnswer(chess::Move move) {
     const bool right = t.session->right(t.played);
     if (!t.retry) trainingGrade(right);
     // The move on the board, after the opponent's.
-    b.ply  = playOnGame(b.game, b.chess960, b.ply, move);
-    b.tree = GameTree{b.game, {}};
-    b.selected.reset();
-    b.move_typed.reset();
+    app_.playSessionMove(move);
+    app_.dropPick();
+    app_.dropTypedMove();
     t.phase = right ? Ask::Right : Ask::Wrong;
 }
 
-void App::trainingGrade(bool right) {
+void RepertoireTrainingPage::trainingGrade(bool right) {
     auto& t              = *training_;
     const auto i         = *t.session->current();
     const auto key       = t.session->cards()[i].key;
@@ -541,43 +521,37 @@ void App::trainingGrade(bool right) {
     // How long an answer takes, for the time a session is foreseen to take: a long pause counts as a minute.
     const auto ms    = static_cast<int64_t>(std::min(t.seconds, 60.0) * 1000);
     t.kept.answer_ms = t.kept.answer_ms > 0 ? (t.kept.answer_ms * 4 + ms) / 5 : ms;
-    if (!options_.scripted) {
-        if (!writeTrainingFile(t.file, t.kept)) {
-            board_.message       = trf("The answer could not be kept in {}: is the profile's folder writable?",
-                                       trainingFileOf(t.file).string());
-            board_.message_error = true;
-        }
+    if (!app_.scripted()) {
+        if (!writeTrainingFile(t.file, t.kept))
+            app_.sayOnBoard(trf("The answer could not be kept in {}: is the profile's folder writable?",
+                                trainingFileOf(t.file).string()));
         appendReview(t.file, key, now, t.rating, ms, t.played);
     }
-    if (const auto it = training_summaries_.find(t.file); it != training_summaries_.end()) {
+    keep(t);
+}
+
+void RepertoireTrainingPage::keep(const TrainingRun& t) {
+    if (const auto it = summaries_.find(t.file); it != summaries_.end()) {
         it->second.kept    = t.kept;
         it->second.counted = 0;
     }
 }
 
-void App::trainingDontKnow() {
+void RepertoireTrainingPage::trainingDontKnow() {
     auto& t = *training_;
-    if (t.phase != Ask::Asking || liveGameOn()) return;
+    if (t.phase != Ask::Asking || app_.liveGameOn()) return;
     t.played.clear();
     t.shown    = true;
     t.answered = Clock::now();
     if (!t.retry) trainingGrade(false);
-    board_.move_typed.reset();
+    app_.dropTypedMove();
     t.phase = Ask::Wrong;
 }
 
-void App::trainingRetry() {
+void RepertoireTrainingPage::trainingRetry() {
     auto& t = *training_;
     if (t.phase != Ask::Wrong || !t.session || !t.session->current()) return;
-    auto& b      = board_;
-    const auto q = t.session->cards()[*t.session->current()].line.size();
-    if (b.game.moves.size() > q) {
-        b.game.moves.resize(q);
-        b.tree = GameTree{b.game, {}};
-    }
-    b.line = -1;
-    b.ply  = static_cast<int>(q);
-    b.selected.reset();
+    app_.askAgainAt(static_cast<int>(t.session->cards()[*t.session->current()].line.size()));
     t.phase = Ask::Asking;
     t.retry = true;
     t.shown = false;
@@ -587,7 +561,7 @@ void App::trainingRetry() {
     t.asked = Clock::now();
 }
 
-void App::trainingNext() {
+void RepertoireTrainingPage::trainingNext() {
     auto& t = *training_;
     if (!t.session) return;
     t.session->next();
@@ -595,7 +569,7 @@ void App::trainingNext() {
     askTrainingCard();
 }
 
-void App::trainingAdd() {
+void RepertoireTrainingPage::trainingAdd() {
     auto& t = *training_;
     if (t.phase != Ask::Wrong || t.shown || t.played.empty() || t.added || !t.session || !t.session->current()) return;
     const auto index = repertoireOf(t.file);
@@ -605,40 +579,42 @@ void App::trainingAdd() {
     std::vector<chess::Move> path;
     auto board = startBoard(t.start_fen);
     if (!play(board, card.line, &path)) return;
-    auto& r = repertoires();
+    auto& r = app_.repertoires();
     if (r.has(*index, path, t.played_move)) return;
     TrainingRun::Added added{*index, r.entries()[*index].lines, i, t.played};
     if (!r.toggle(*index, path, t.played_move)) return;
     t.session->addMove(i, t.played);
     if (const auto it = t.session->memories().find(card.key); it != t.session->memories().end())
         t.kept.memories[card.key] = it->second;
-    if (!options_.scripted) (void)writeTrainingFile(t.file, t.kept);
+    if (!app_.scripted()) (void)writeTrainingFile(t.file, t.kept);
+    keep(t);
     t.added = std::move(added);
 }
 
-void App::trainingTakeBack() {
+void RepertoireTrainingPage::trainingTakeBack() {
     auto& t = *training_;
     if (!t.added || !t.session) return;
-    repertoires().restore(t.added->repertoire, t.added->lines);
+    app_.repertoires().restore(t.added->repertoire, t.added->lines);
     t.session->takeBack(t.added->card, t.added->san);
     const auto key = t.session->cards()[t.added->card].key;
     if (const auto it = t.session->memories().find(key); it != t.session->memories().end())
         t.kept.memories[key] = it->second;
-    if (!options_.scripted) (void)writeTrainingFile(t.file, t.kept);
+    if (!app_.scripted()) (void)writeTrainingFile(t.file, t.kept);
+    keep(t);
     t.added.reset();
 }
 
-void App::finishTraining(bool stopped) {
+void RepertoireTrainingPage::finishTraining(bool stopped) {
     auto& t        = *training_;
     t.phase        = Ask::End;
     t.stopped      = stopped;
     t.took         = since(t.started);
     t.missed_shown = -1;
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
 }
 
-void App::reviewMissed() {
+void RepertoireTrainingPage::reviewMissed() {
     auto& t = *training_;
     if (!t.session) return;
     std::vector<std::size_t> order;
@@ -654,39 +630,33 @@ void App::reviewMissed() {
     askTrainingCard();
 }
 
-void App::closeTraining(bool to_openings) {
+void RepertoireTrainingPage::closeTraining(bool to_openings) {
     if (!training_) return;
     // Left during the day's review (#80): back to the Training page, what the review had left forgotten.
-    const bool to_training = to_openings && review_running_;
-    if (to_openings) {
-        review_running_ = false;
-        review_chain_.clear();
-    }
-    const bool aside = training_->aside, flip = training_->flip;
-    board_side_tab_ = training_->tab;
+    const bool to_training = to_openings && app_.reviewRunning();
+    if (to_openings) app_.stopReview();
+    BoardTaken taken;
+    taken.aside = training_->aside;
+    taken.flip  = training_->flip;
+    taken.tab   = training_->tab;
     training_.reset();
-    forget_board_game_ = true;  // the session's position is no game to remember
-    if (aside && !recent_games_.empty())
-        restoreRecentGame(0);
-    else
-        newBoardGame();
-    forget_board_game_ = false;
-    board_.flip        = flip;
-    board_back_.reset();
-    page_ = to_training ? Page::Training : to_openings ? Page::Openings : Page::Board;
+    app_.giveBoardBack(taken, to_training);  // the session's position is no game to remember
+    if (to_openings && !to_training) app_.showOpeningsPage();
 }
 
-void App::dropTraining() {
-    board_.flip     = training_->flip;
-    board_side_tab_ = training_->tab;
+void RepertoireTrainingPage::dropTraining() {
+    BoardTaken taken;
+    taken.aside = training_->aside;
+    taken.flip  = training_->flip;
+    taken.tab   = training_->tab;
     training_.reset();
-    forget_board_game_ = true;  // the game that comes takes the board; the one put aside stays among the recent ones
+    app_.leaveBoard(taken);  // the game that comes takes the board; the one put aside stays among the recent ones
 }
 
 // ---------------------------------------------------------------------------
 // The Board page during a session
 
-void App::trainingKeys() {
+void RepertoireTrainingPage::trainingKeys() {
     auto& t        = *training_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
@@ -707,12 +677,12 @@ void App::trainingKeys() {
         case Ask::Asking:
             if (escape) {
                 finishTraining(true);
-            } else if (!liveGameOn()) {
+            } else if (!app_.liveGameOn()) {
                 if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_H)) t.hint = true;
                 if (plain && ImGui::IsKeyPressed(ImGuiKey_Space, false))
                     trainingDontKnow();
                 else
-                    boardMoveKeys();
+                    app_.moveKeys();
             }
             break;
         case Ask::Right:
@@ -726,17 +696,17 @@ void App::trainingKeys() {
                     trainingRetry();
             } else if (t.phase == Ask::Wrong && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
                 trainingTakeBack();
-            } else if (boardKey()) {
-                setBoardAnalysis(!board_.analysing);  // Alt+A: the engine, now that the answer is given
+            } else {
+                (void)app_.analysisKey();  // Alt+A: the engine, now that the answer is given
             }
             break;
         case Ask::End: {
             const bool missed = t.session && std::any_of(t.session->outcomes().begin(), t.session->outcomes().end(),
                                                          [](const auto& o) { return o.rating == Rating::Again; });
-            if (review_running_) {  // the day's review (#80): Enter goes on, Escape back to the Training page
+            if (app_.reviewRunning()) {  // the day's review (#80): Enter goes on, Escape back to the Training page
                 if (escape)
                     closeTraining(true);
-                else if (enter && !nextReview())
+                else if (enter && !app_.nextReview())
                     closeTraining(true);
             } else if (escape) {
                 closeTraining(true);
@@ -748,12 +718,9 @@ void App::trainingKeys() {
     }
 }
 
-void App::drawTrainingPage() {
-    ui::pageTitle(TR("Board"), guideSection());
-    // The letters typed reach the move field whatever the keyboard's layout (see drawBoardPage).
-    if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        !SDL_TextInputActive(window_))
-        SDL_StartTextInput(window_);
+void RepertoireTrainingPage::drawTrainingPage() {
+    // The page's title, the letters typed reaching the move field whatever the keyboard's layout.
+    app_.beginSessionPage();
     trainingKeys();
     if (!training_) return;  // left by a key
     auto& t = *training_;
@@ -763,11 +730,7 @@ void App::drawTrainingPage() {
         trainingNext();
         if (!training_) return;
     }
-    if (!board_.message.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, board_.message_error ? ui::BAD : ui::MUTED);
-        ImGui::TextWrapped("%s", board_.message.c_str());
-        ImGui::PopStyleColor();
-    }
+    app_.drawBoardMessage();
     const ImVec2 avail = ImGui::GetContentRegionAvail();
     const float side   = std::clamp(avail.x * 0.42f, px(340), px(620));
     const float under  = ImGui::GetTextLineHeightWithSpacing() * 4;
@@ -806,14 +769,15 @@ void App::drawTrainingPage() {
     ImGui::EndChild();
 }
 
-void App::drawTrainingBoard(float size) {
-    auto& b          = board_;
+void RepertoireTrainingPage::drawTrainingBoard(float size) {
     auto& t          = *training_;
-    const auto board = boardAt(b.game, b.chess960, b.ply);
+    const auto& game = app_.sessionGame();
+    const int ply    = app_.sessionPly();
+    const auto board = boardAt(game, false, ply);
+    // The session's marks over the board, which draws the position shown, its last move and the side below.
     BoardDecor decor;
-    decor.flipped    = b.flip;
-    decor.eval_white = -1.0f;  // no bar: no engine's word on the position
-    if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
+    std::optional<chess::Move> last_move;
+    if (ply > 0) last_move = game.moves[static_cast<std::size_t>(ply - 1)].move;
     const study::TrainingCard* card = nullptr;
     if (t.session && t.session->current() && t.phase != Ask::End) card = &t.session->cards()[*t.session->current()];
     if (t.phase == Ask::End && t.session && t.missed_shown >= 0 &&
@@ -836,7 +800,7 @@ void App::drawTrainingBoard(float size) {
             if (arrows) decor.arrows.push_back({m, markColour('G', false)});
         }
     };
-    const bool question = card && b.ply == static_cast<int>(card->line.size());
+    const bool question = card && ply == static_cast<int>(card->line.size());
     switch (t.phase) {
         case Ask::Asking:
             // The hint: the piece to play, in blue.
@@ -848,22 +812,22 @@ void App::drawTrainingBoard(float size) {
             }
             break;
         case Ask::Right:
-            if (decor.last_move) {
-                decor.tints.push_back({decor.last_move->from(), green});
-                decor.tints.push_back({shownTarget(*decor.last_move), green});
+            if (last_move) {
+                decor.tints.push_back({last_move->from(), green});
+                decor.tints.push_back({shownTarget(*last_move), green});
             }
             break;
         case Ask::Wrong:
             if (t.added) {  // the move played is the repertoire's now
-                if (decor.last_move && !question) {
-                    decor.tints.push_back({decor.last_move->from(), green});
-                    decor.tints.push_back({shownTarget(*decor.last_move), green});
+                if (last_move && !question) {
+                    decor.tints.push_back({last_move->from(), green});
+                    decor.tints.push_back({shownTarget(*last_move), green});
                 }
                 break;
             }
-            if (!t.shown && !question && decor.last_move) {  // the move played, in orange
-                decor.tints.push_back({decor.last_move->from(), orange});
-                decor.tints.push_back({shownTarget(*decor.last_move), orange});
+            if (!t.shown && !question && last_move) {  // the move played, in orange
+                decor.tints.push_back({last_move->from(), orange});
+                decor.tints.push_back({shownTarget(*last_move), orange});
             }
             if (!t.shown && question) decor.arrows.push_back({t.played_move, orange});
             repertoireMoves(true);
@@ -881,40 +845,16 @@ void App::drawTrainingBoard(float size) {
         case Ask::Preparing:
             break;
     }
-    const bool moves = t.phase == Ask::Asking && question && !liveGameOn();
-    decor.selected   = moves ? b.selected : std::nullopt;
-    if (decor.selected)
-        for (const auto& m : movesFrom(board, *decor.selected)) decor.targets.push_back(shownTarget(m));
-    const bool dragging = moves && b.drag && b.drag->moved && b.selected == b.drag->from;
-    if (dragging) {
-        decor.lifted = b.drag->from;
-        if (b.drag_over && std::find(decor.targets.begin(), decor.targets.end(), *b.drag_over) != decor.targets.end())
-            decor.drop = b.drag_over;
-    }
-    const ImVec2 top = ImGui::GetCursorScreenPos();
-    if (appearance::current().board3d.on && board3d_.available()) {
-        board3d_.setMarks(Board3d::Marks::Off);
-        const auto input = board3d_.draw(board, size, decor);
-        if (moves) boardPointer(board, input.clicked, input.hovered, input.right_click);
-    } else {
-        if (!appearance::current().board3d.on) board3d_.release();
-        drawBoard(atlas_, board, size, decor);
-        const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
-        if (moves) {
-            const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
-                       right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
-            boardPointer(board, left ? hover : std::nullopt, hover, right);
-            if (dragging && b.drag) drawDraggedPiece(atlas_, board.at(b.drag->from), size);
-        }
-    }
-    drawPromotionPopup(board);
+    // The user's moves taken on the board only at the question's position, while no live game holds the aids.
+    const bool moves = t.phase == Ask::Asking && question && !app_.liveGameOn();
+    app_.drawSessionBoard(size, decor, moves);
 }
 
-void App::drawTrainingColumn() {
+void RepertoireTrainingPage::drawTrainingColumn() {
     auto& t = *training_;
     const ui::TopicRegion topic(guide::topics::Training);
-    if (liveGameOn()) {  // fair play (#48): a live game on Lichess stops the training where it is
-        drawFairPlayBanner();
+    if (app_.liveGameOn()) {  // fair play (#48): a live game on Lichess stops the training where it is
+        app_.drawFairPlayBanner();
         if (ImGui::Button(TR("Stop · Esc"))) finishTraining(true);
         return;
     }
@@ -958,7 +898,7 @@ void App::drawTrainingColumn() {
             wrapped(TR("Play it on the board, or type it and press Enter. The tree, the engine and your notes are "
                        "hidden during the question; they come back with the answer."),
                     true);
-            drawMoveField();
+            app_.drawMoveField();
             if (ImGui::Button(TR("A hint · Alt+H"))) t.hint = true;
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", TR("H alone begins a move of the h-pawn: the hint is under Alt."));
@@ -1014,9 +954,10 @@ void App::drawTrainingColumn() {
                         const auto label =
                             ms > 0 ? trf("On its own after {} s", ms / 1000) : std::string(TR("On Enter only"));
                         if (ImGui::MenuItem(label.c_str(), nullptr, s.advance_ms == ms)) {
-                            t.settings.advance_ms         = ms;
-                            trainingSettings().advance_ms = ms;
-                            saveTrainingSettings();
+                            t.settings.advance_ms = ms;
+                            auto changed          = app_.trainingSettings();
+                            changed.advance_ms    = ms;
+                            app_.setTrainingSettings(changed);
                         }
                     }
                     ImGui::EndPopup();
@@ -1059,11 +1000,7 @@ void App::drawTrainingColumn() {
             }
             if (t.phase == Ask::Wrong) {
                 ImGui::SameLine();
-                if (ImGui::Button(TR("See the tree here"))) {
-                    if (board_.ply > static_cast<int>(card.line.size()))
-                        board_.ply = static_cast<int>(card.line.size());
-                    board_side_tab_ = 2;
-                }
+                if (ImGui::Button(TR("See the tree here"))) app_.showTreeAt(static_cast<int>(card.line.size()));
                 if (ImGui::IsItemHovered())
                     ImGui::SetTooltip("%s", TR("The position of the question, the Tree tab beside it."));
                 if (!t.shown && !t.added) {
@@ -1102,11 +1039,11 @@ void App::drawTrainingColumn() {
     // With the answer, the tree, the engine and the notes come back.
     if (t.phase == Ask::Right || t.phase == Ask::Wrong) {
         ImGui::Separator();
-        drawChessTabs();
+        app_.drawBoardTabs();
     }
 }
 
-void App::drawTrainingEnd() {
+void RepertoireTrainingPage::drawTrainingEnd() {
     auto& t = *training_;
     if (!t.session) return;
     const auto& outcomes = t.session->outcomes();
@@ -1187,8 +1124,8 @@ void App::drawTrainingEnd() {
         ui::endCard();
     }
     ImGui::Dummy(ImVec2(0, px(6)));
-    if (review_running_) {  // the day's review (#80): the next kind, or back to the Training page
-        drawReviewNext(false);
+    if (app_.reviewRunning()) {  // the day's review (#80): the next kind, or back to the Training page
+        app_.drawReviewNext(false);
         if (!training_) return;
         if (!missed.empty()) {
             ImGui::SameLine();
@@ -1207,7 +1144,7 @@ void App::drawTrainingEnd() {
     } else if (primaryButton(TR("Back to the Openings"))) {
         return closeTraining(true);
     }
-    if (!review_running_) {
+    if (!app_.reviewRunning()) {
         ImGui::SameLine(0, px(8));
         ImGui::TextDisabled("%s", missed.empty() ? TR("Enter") : TR("Enter: review them · Esc: back"));
     }
@@ -1216,31 +1153,92 @@ void App::drawTrainingEnd() {
 }
 
 // ---------------------------------------------------------------------------
-// The Home page
+// The day's review, the Home page, the palette, the focus words
 
-bool App::trainingDue() {
-    if (boardSession()) return true;  // a training session holds the Board (#76, #80–#82)
-    return reviewDay().due() > 0;  // the day's review, every kind (#80)
+ReviewCount RepertoireTrainingPage::reviewCount() {
+    ReviewCount out;
+    out.kind       = ReviewKind::Repertoire;
+    int64_t ms     = 0;
+    int64_t weight = 0;
+    for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i) {
+        const auto& s = summary(i);
+        out.due += s.counts.due;
+        out.tomorrow += s.counts.tomorrow;
+        out.three_days += s.counts.three_days;
+        if (s.kept.answer_ms > 0) {
+            ms += s.kept.answer_ms * static_cast<int64_t>(std::max<std::size_t>(1, s.counts.due));
+            weight += static_cast<int64_t>(std::max<std::size_t>(1, s.counts.due));
+        }
+    }
+    out.answer_ms = weight > 0 ? ms / weight : 0;
+    return out;
 }
 
-void App::drawTrainingHome() {
-    if (training_) {
-        const auto& t    = *training_;
-        const auto label = t.session && t.phase != Ask::End && t.phase != Ask::Preparing
-                               ? trf("Training “{}”: position {} of {}", t.name, t.position, t.session->total())
-                               : trf("Training “{}”", t.name);
-        ImGui::TextUnformatted(label.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Back to the session"))) page_ = Page::Board;
+std::vector<std::size_t> RepertoireTrainingPage::dueRepertoires() {
+    std::vector<std::size_t> out;
+    for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i)
+        if (summary(i).counts.due > 0) out.push_back(i);
+    return out;
+}
+
+bool RepertoireTrainingPage::startReview(std::size_t repertoire) {
+    if (repertoire >= app_.repertoires().entries().size() || summary(repertoire).counts.due == 0) return false;
+    startTraining(repertoire, TrainingRun::Kind::Review);
+    return training_ != nullptr;
+}
+
+std::string RepertoireTrainingPage::reviewNextLabel(std::size_t repertoire) {
+    if (repertoire >= app_.repertoires().entries().size()) return {};
+    const auto n = summary(repertoire).counts.due;
+    return trn("Next: {} position of “{}”", "Next: {} positions of “{}”", n, ui::exactCount(n),
+               app_.repertoires().entries()[repertoire].name);
+}
+
+void RepertoireTrainingPage::drawHomeLine() {
+    if (!training_) return;
+    const auto& t    = *training_;
+    const auto label = t.session && t.phase != Ask::End && t.phase != Ask::Preparing
+                           ? trf("Training “{}”: position {} of {}", t.name, t.position, t.session->total())
+                           : trf("Training “{}”", t.name);
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Back to the session"))) app_.showSession();
+}
+
+void RepertoireTrainingPage::addCommands(const PaletteAdd& add) {
+    for (std::size_t i = 0; i < app_.repertoires().entries().size(); ++i) {
+        const auto& counts = summary(i).counts;
+        if (counts.cards == 0) continue;
+        const auto& name = app_.repertoires().entries()[i].name;
+        add(trf("Train the repertoire “{}”", name),
+            counts.due > 0
+                ? trn("{} position to review", "{} positions to review", counts.due, ui::exactCount(counts.due))
+                : std::string(TR("Openings")),
+            [this, i] { startTraining(i, TrainingRun::Kind::Due); });
+        if (counts.fresh > 0)
+            add(trf("Train only the new positions of “{}”", name), TR("Openings"),
+                [this, i] { startTraining(i, TrainingRun::Kind::New); });
     }
-    // A session of exercises, a game guessed (#81): their modules' (#107).
-    mistakes_->drawHomeLine();
-    guessing_->drawHomeLine();
-    // An endgame against the tables, a vision exercise (#82): their modules' (#107).
-    endgames_->drawHomeLine();
-    vision_->drawHomeLine();
-    // The day's review (#80): one count for every kind, a click reviewing them all.
-    drawReviewHome();
+    add(app_.trainingSettings().advance_ms > 0 ? TR("Training: the next position on Enter only")
+                                               : TR("Training: the next position on its own after a right answer"),
+        TR("Openings"), [this] {
+            auto s       = app_.trainingSettings();
+            s.advance_ms = s.advance_ms > 0 ? 0 : 1000;
+            if (training_) training_->settings.advance_ms = s.advance_ms;
+            app_.setTrainingSettings(s);
+        });
+    add(TR("Training: new positions a day…"), TR("Openings"), [this] {
+        app_.showOpeningsPage();
+        limit_menu_ = true;
+    });
+}
+
+void RepertoireTrainingPage::addFocusWords(FocusWords& words, const std::string& word) {
+    words.on({"training", "training-new"}, [&] {  // a session of the active repertoire's training (#76)
+        if (app_.repertoires().active() >= 0)
+            startTraining(static_cast<std::size_t>(app_.repertoires().active()),
+                          word == "training" ? TrainingRun::Kind::Due : TrainingRun::Kind::New);
+    });
 }
 
 }  // namespace fcg

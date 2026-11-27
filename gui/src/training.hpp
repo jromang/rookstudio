@@ -5,7 +5,8 @@
 // <name>.reviews.jsonl one line per answer. The profile's training.json holds the training's settings. Nothing leaves
 // the machine.
 //
-// A session runs on the Board page (view_training.cpp), whose column becomes the training's: TrainingRun is its state.
+// A session runs on the Board page, whose column becomes the training's: TrainingRun is its state, kept by the
+// repertoires' training module (repertoire_training_page.hpp, #107).
 
 #include <chrono>
 #include <cstdint>
@@ -29,7 +30,9 @@ struct TrainingFile {
 // Beside a repertoire's PGN (Najdorf.pgn): Najdorf.training.json, Najdorf.reviews.jsonl.
 [[nodiscard]] std::filesystem::path trainingFileOf(const std::filesystem::path& repertoire);
 [[nodiscard]] std::filesystem::path reviewsFileOf(const std::filesystem::path& repertoire);
-// Empty when the file is missing or cannot be read.
+// Empty when the file is missing. Read with its types checked (#136, profile_entries.hpp): an entry of another type
+// than the one written (the average answer time, a card) is set aside and the readable ones kept, a file unreadable as
+// a whole read as empty; either is said in the console, the file as it was kept beside it.
 [[nodiscard]] TrainingFile readTrainingFile(const std::filesystem::path& repertoire);
 bool writeTrainingFile(const std::filesystem::path& repertoire, const TrainingFile& file);
 // An answer, at the end of the reviews: the position, when, its grade, how long it took, the move played ("" for
@@ -42,6 +45,8 @@ struct TrainingSettings {
     int new_per_day = 20;    // new positions a day at most
     bool guess_theory = true;  // guessing the moves (#81): the moves of theory pass by themselves
 };
+// The defaults when the file is missing; a setting of another type than the one written keeps its default, said as
+// readTrainingFile() says it (#136).
 [[nodiscard]] TrainingSettings readTrainingSettings(const std::filesystem::path& profile);
 void writeTrainingSettings(const std::filesystem::path& profile, const TrainingSettings& settings);
 

@@ -1,14 +1,20 @@
+// The repertoires' training kept in the profile (#76): the cards' memories beside the repertoire, a card started again
+// when its moves change, the training day, the settings; the files read with their types checked (#136).
+
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
 
+#include <fmt/include/fmt/format.h>
 #include <chess.hpp>
 #include <json.hpp>
 
+#include "console.hpp"
 #include "repertoires.hpp"
 #include "test_support.hpp"
 #include "training.hpp"
@@ -186,4 +192,106 @@ TEST_CASE("training: the training day ends at 4 in the morning, local time") {
     CHECK(scheduler.settings().learning_steps == std::vector<int64_t>{600});
     CHECK(scheduler.settings().relearning_steps == std::vector<int64_t>{600});
     CHECK(scheduler.settings().retention == doctest::Approx(0.9));
+}
+
+TEST_CASE("training: a repertoire's training of the wrong types keeps its readable cards, the rest said (#136)") {
+    const test::ScratchDir profile("training-types");
+    RepertoireShelf shelf(profile);
+    const auto index  = najdorf(shelf);
+    const auto& entry = shelf.entries()[index];
+    const auto cards  = study::trainingCards(entry.lines, entry.side);
+    REQUIRE(cards.size() == 3);
+    study::TrainingSession session(cards, {0, 1, 2}, {}, trainingScheduler());
+    const int64_t now = 1'700'000'000;
+    for (const auto& card : cards) {
+        (void)session.grade(Rating::Good, card.moves.front(), now);
+        session.next();
+    }
+    TrainingFile kept;
+    kept.memories  = session.memories();
+    kept.answer_ms = 4200;
+    REQUIRE(writeTrainingFile(entry.file, kept));
+    const auto file = trainingFileOf(entry.file);
+    // Values of another type than the one written: a text for a time, a text for a date, a number for the moves, a card
+    // whose key is no position's (an older or newer version, a hand edit). Each used to stop the program as soon as the
+    // Openings page, the Home page or the Training page counted the repertoire's positions.
+    const auto hex                         = [](uint64_t key) { return fmt::format("{:016x}", key); };
+    auto j                                 = nlohmann::json::parse(test::readFile(file));
+    j["answer_ms"]                         = "slow";
+    j["cards"][hex(cards[1].key)]["due"]   = "tomorrow";
+    j["cards"][hex(cards[2].key)]["moves"] = 7;
+    j["cards"]["no-key"]                   = j["cards"][hex(cards[0].key)];
+    const auto written                     = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    TrainingFile back;
+    REQUIRE_NOTHROW(back = readTrainingFile(entry.file));
+    // The readable card kept; the others set aside, said in the file's order, the file kept as it was.
+    REQUIRE(back.memories.size() == 1);
+    CHECK(back.memories.at(cards[0].key) == kept.memories.at(cards[0].key));
+    CHECK(back.answer_ms == 0);
+    auto bad = std::vector<std::string>{hex(cards[1].key), hex(cards[2].key)};
+    std::sort(bad.begin(), bad.end());
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("4 entries could not be read and were set aside") != std::string::npos);
+    CHECK(said[0].find(fmt::format("(answer_ms, cards/{}, cards/{}, cards/no-key)", bad[0], bad[1])) !=
+          std::string::npos);
+    CHECK(said[0].find("Najdorf.training.json.unreadable") != std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // Written again, as the next answer writes it: the file reads whole, nothing said.
+    REQUIRE(writeTrainingFile(entry.file, back));
+    const auto quiet = Console::instance().added();
+    CHECK(readTrainingFile(entry.file).memories == back.memories);
+    CHECK(Console::instance().since(quiet).empty());
+    // A file cut short: kept aside, said, rather than replaced in silence by the next answer.
+    std::ofstream(file, std::ios::binary) << "{\"version\": 1, \"cards\": {";
+    const auto cut = Console::instance().added();
+    CHECK(readTrainingFile(entry.file).memories.empty());
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
+    // A repertoire never trained has no file: nothing to say.
+    fs::remove(file);
+    const auto none = Console::instance().added();
+    CHECK(readTrainingFile(entry.file).memories.empty());
+    CHECK(Console::instance().since(none).empty());
+}
+
+TEST_CASE("training: settings of the wrong type keep their defaults, the others read, what was set aside said (#136)") {
+    const test::ScratchDir profile("training-settings-types");
+    writeTrainingSettings(profile, {3000, 35, false});
+    const auto file = profile / "training.json";
+    // A text where milliseconds are, a number where a yes or no is: each used to stop the program at the first page
+    // that read the training's settings.
+    auto j             = nlohmann::json::parse(test::readFile(file));
+    j["advance_ms"]    = "slow";
+    j["guess_theory"]  = 1;
+    const auto written = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    TrainingSettings back;
+    REQUIRE_NOTHROW(back = readTrainingSettings(profile));
+    CHECK(back.advance_ms == TrainingSettings{}.advance_ms);
+    CHECK(back.new_per_day == 35);
+    CHECK(back.guess_theory == TrainingSettings{}.guess_theory);
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("2 entries could not be read and were set aside (advance_ms, guess_theory)") !=
+          std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // Saved again, as a change of a setting saves them: they read whole, nothing said.
+    writeTrainingSettings(profile, back);
+    const auto quiet = Console::instance().added();
+    CHECK(readTrainingSettings(profile).new_per_day == 35);
+    CHECK(Console::instance().since(quiet).empty());
+    // A file cut short: the defaults, the file kept aside and said.
+    std::ofstream(file, std::ios::binary) << "{\"advance_ms\": 20";
+    const auto cut = Console::instance().added();
+    CHECK(readTrainingSettings(profile).new_per_day == TrainingSettings{}.new_per_day);
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

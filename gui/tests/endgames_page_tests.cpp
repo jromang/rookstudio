@@ -132,7 +132,7 @@ class FakeApp final : public EndgamesContext {
 
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
-    void setGuessTheory(bool) override {}
+    void setTrainingSettings(const TrainingSettings&) override {}
     void showTrainingPage(int part) override { training_part = part; }
     bool trainingShown() const override { return false; }
     void setEnterStartsPuzzles(bool puzzles) override { enter_puzzles = puzzles; }

@@ -281,7 +281,11 @@ void GuessPage::drawPart() {
         if (chip(TR("Black"), guess_side_ == 1, "guess_black")) guess_side_ = 1;
         ImGui::SameLine(0, px(16));
         bool theory = app_.trainingSettings().guess_theory;
-        if (ImGui::Checkbox(TR("The moves of theory pass by themselves"), &theory)) app_.setGuessTheory(theory);
+        if (ImGui::Checkbox(TR("The moves of theory pass by themselves"), &theory)) {
+            auto settings         = app_.trainingSettings();
+            settings.guess_theory = theory;
+            app_.setTrainingSettings(settings);
+        }
         tip(
             TR("The moves played by many games of your databases (their opening tree): the guessing starts where the "
                "game leaves them."));

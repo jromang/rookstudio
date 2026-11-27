@@ -23,6 +23,7 @@
 #include "lichess_tv_page.hpp"
 #include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
+#include "repertoire_training_page.hpp"
 #include "ui.hpp"
 #include "vision_page.hpp"
 
@@ -162,32 +163,8 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
                     toStudyBoard();
                     board_side_tab_ = 2;
                 });
-    // The repertoires' training (#76): a session of each, its new positions alone, its settings.
-    for (std::size_t i = 0; i < repertoires().entries().size(); ++i) {
-        const auto& counts = trainingSummary(i).counts;
-        if (counts.cards == 0) continue;
-        const auto& name = repertoires().entries()[i].name;
-        add(trf("Train the repertoire “{}”", name),
-            counts.due > 0
-                ? trn("{} position to review", "{} positions to review", counts.due, ui::exactCount(counts.due))
-                : std::string(TR("Openings")),
-            [this, i] { startTraining(i, TrainingRun::Kind::Due); });
-        if (counts.fresh > 0)
-            add(trf("Train only the new positions of “{}”", name), TR("Openings"),
-                [this, i] { startTraining(i, TrainingRun::Kind::New); });
-    }
-    add(trainingSettings().advance_ms > 0 ? TR("Training: the next position on Enter only")
-                                          : TR("Training: the next position on its own after a right answer"),
-        TR("Openings"), [this] {
-            auto& s      = trainingSettings();
-            s.advance_ms = s.advance_ms > 0 ? 0 : 1000;
-            if (training_) training_->settings.advance_ms = s.advance_ms;
-            saveTrainingSettings();
-        });
-    add(TR("Training: new positions a day…"), TR("Openings"), [this] {
-        page_                = Page::Openings;
-        training_limit_menu_ = true;
-    });
+    // The repertoires' training (#76), its module's (#107): a session of each, its new positions alone, its settings.
+    rep_training_->addCommands(add);
     // Playing against an engine (#83): the Play page; a game's commands while it lasts, a rematch after it.
     add(TR("Play against an engine"), where(Page::Play), page(Page::Play));
     if (engine_game_ && !engine_game_->over && !engine_game_->waiting && board_.match && board_.match_state.running) {

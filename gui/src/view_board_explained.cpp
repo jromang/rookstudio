@@ -83,21 +83,20 @@ void App::startExplaining(bool rest) {
     } else {
         // The games of the user's databases at a position: those their opening trees count.
         auto& sh = shelf();
-        std::vector<std::pair<std::shared_ptr<const study::Tree>, std::shared_ptr<const study::Snapshot>>> trees;
+        std::vector<DatabaseShelf::TreeSource> trees;
         for (std::size_t i = 0; i < sh.entries().size(); ++i)
             if (!sh.entries()[i].source)
-                if (auto source = sh.treeSource(i); source && source->tree)
-                    trees.emplace_back(source->tree, source->snapshot);
+                if (auto source = sh.treeSource(i); source && source->tree) trees.push_back(std::move(*source));
+        std::string unread;  // a tree that could not be read (#139), left out of `trees`: said once
         const auto games = [&](const commentary::Position& pos) {
             study::ScanBoard scan;
             if (!scan.setFen(pos.fen(), false)) return uint64_t{0};
-            uint64_t n = 0;
-            for (const auto& [tree, snapshot] : trees)
-                if (!tree->stale(*snapshot))
-                    if (const auto at = tree->at(*snapshot, scan.key())) n += at->total.games;
-            return n;
+            auto read = treesAt(trees, scan.key());
+            if (unread.empty()) unread = std::move(read.error);
+            return read.answer ? read.answer->total.games : uint64_t{0};
         };
         e.lines = explainPlan(review->line, review->report, lang, games);
+        if (!unread.empty()) boardToast(unread);  // the theory's games counted without it; also in the log
     }
     const auto* engine = analysisEngine();
     if (!engine)

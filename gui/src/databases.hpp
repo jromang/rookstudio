@@ -222,4 +222,18 @@ class DatabaseShelf {
     std::optional<std::size_t> tree_again_;  // a build asked for while another ran, or during an import
 };
 
+// The databases' opening trees at a position (its Polyglot key), as the window's thread reads them (the Board's Tree
+// tab, its explanations): their games added move by move, the most played first and those that end there last, and
+// each move's games by database. A tree that does not read (#139: its records damaged) adds nothing and is taken out
+// of `sources`, so that a caller that keeps them says it once; `error` says why (the page's sentence, also in the log),
+// and the other trees answer all the same.
+struct TreesAnswer {
+    // None when no tree has two games there.
+    std::optional<study::TreeAnswer> answer;
+    // By move code: each database's name and games.
+    std::map<int, std::vector<std::pair<std::string, uint64_t>>> by_database;
+    std::string error;
+};
+[[nodiscard]] TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t key);
+
 }  // namespace fcg

@@ -750,6 +750,7 @@ void App::drawBoardTree() {
             fmt::format("dossier{}|{}|{}", static_cast<const void*>(dossier), dossier->games.size(), dossier_->lichess);
     const auto of = fmt::format("{}|{}|{}", fen, tree_source_, book ? std::string() : counts);
     if (!online && of != tree_rows_of_) {
+        tree_unread_  = false;
         tree_rows_of_ = of;
         tree_rows_.clear();
         tree_summary_.clear();
@@ -765,29 +766,27 @@ void App::drawBoardTree() {
             // One database's answer, or those of all, added move by move (a move's code is the position's own).
             std::optional<study::TreeAnswer> answer;
             std::map<int, std::string> shares;
-            if (dossier_source)  // their games alone, from their side: the board's and, ticked, Lichess's
+            std::string unread;    // a tree that could not be read (#139): said on the summary's line
+            if (dossier_source) {  // their games alone, from their side: the board's and, ticked, Lichess's
                 answer = dossier->at(scan.key(), tree_source_ == dossier_at,
                                      dossier_->lichess ? study::DossierParts::Both : study::DossierParts::Board);
-            for (const auto& [name, i] : databases) {
-                if (dossier_source) break;
-                if (!combined && static_cast<int>(i) != tree_db_) continue;
-                if (combined && tree_left_.count(s.entries()[i].folder)) continue;
-                const auto source = s.treeSource(i);
-                const auto one =
-                    source && source->tree ? source->tree->at(*source->snapshot, scan.key()) : std::nullopt;
-                if (!one) continue;
-                if (!answer) answer.emplace();
-                answer->total.add(one->total);
-                for (const auto& m : one->moves) {
-                    auto at = std::find_if(answer->moves.begin(), answer->moves.end(),
-                                           [&](const study::TreeMove& t) { return t.code == m.code; });
-                    if (at == answer->moves.end()) at = answer->moves.insert(answer->moves.end(), {m.code, {}});
-                    at->stats.add(m.stats);
-                    if (combined) {
-                        auto& text = shares[m.code];
-                        text += (text.empty() ? "" : "\n") + fmt::format("{}: {}", name, ui::exactCount(m.stats.games));
-                    }
+            } else {
+                std::vector<DatabaseShelf::TreeSource> trees;
+                for (const auto& [name, i] : databases) {
+                    if (!combined && static_cast<int>(i) != tree_db_) continue;
+                    if (combined && tree_left_.count(s.entries()[i].folder)) continue;
+                    if (auto source = s.treeSource(i); source && source->tree) trees.push_back(std::move(*source));
                 }
+                auto read    = treesAt(trees, scan.key());
+                answer       = std::move(read.answer);
+                unread       = std::move(read.error);
+                tree_unread_ = !unread.empty();
+                if (combined)
+                    for (const auto& [code, games] : read.by_database)
+                        for (const auto& [name, n] : games) {
+                            auto& text = shares[code];
+                            text += (text.empty() ? "" : "\n") + fmt::format("{}: {}", name, ui::exactCount(n));
+                        }
             }
             if (answer)
                 std::stable_sort(answer->moves.begin(), answer->moves.end(),
@@ -805,6 +804,7 @@ void App::drawBoardTree() {
                     tree_summary_ +=
                         trf(" · White {} % · draws {} % · Black {} %", std::lround(100.0 * t.white / decided),
                             std::lround(100.0 * t.draws / decided), std::lround(100.0 * t.black / decided));
+                if (!unread.empty()) tree_summary_ += "\n" + unread;  // the other databases' games counted
                 for (const auto& m : answer->moves) {
                     if (m.code == study::TreeMove::END) continue;
                     const auto move = study::moveOfCode(board, scan, m.code);
@@ -835,9 +835,10 @@ void App::drawBoardTree() {
                     tree_rows_.push_back(std::move(row));
                 }
             } else {
-                tree_summary_ = dossier_source ? TR("None of their games reaches this position.")
-                                : combined     ? TR("No two games of these databases reach this position.")
-                                               : TR("No two games of this database reach this position.");
+                tree_summary_ = !unread.empty()  ? unread
+                                : dossier_source ? TR("None of their games reaches this position.")
+                                : combined       ? TR("No two games of these databases reach this position.")
+                                                 : TR("No two games of this database reach this position.");
             }
         } else if (tree_ctg_) {
             // A CTG book (#68, mockup M10, board 3): the games behind each move, its colour and its symbol; green
@@ -936,7 +937,7 @@ void App::drawBoardTree() {
         ImGui::TextUnformatted(tree_summary_.c_str());
         ImGui::PopTextWrapPos();
     }
-    if (tree_db_ >= 0) drawTreeNovelty(static_cast<std::size_t>(tree_db_));
+    if (tree_db_ >= 0 && !tree_unread_) drawTreeNovelty(static_cast<std::size_t>(tree_db_));  // a damaged tree: none
     // Lichess's players: each move's games month by month, when asked for (#56).
     const bool lichess_players = online && tree_source_ - lichess_at == 1;
     if (lichess_players) {
@@ -1247,7 +1248,14 @@ void App::drawTreeNovelty(std::size_t index) {
             scan.play(*move);
             board.makeMove<false>(m);
         }
-        tree_novelty_.ply = src->tree->novelty(*src->snapshot, start, codes);
+        try {
+            tree_novelty_.ply = src->tree->novelty(*src->snapshot, start, codes);
+        } catch (const std::exception& e) {
+            // A tree that does not read (#139: its records damaged): no novelty said, why on its line and in the log;
+            // read again at another position.
+            tree_novelty_.error = loggedStoreError(
+                trf("Where the game's line leaves “{}” could not be read: {}.", src->name, storeErrorText(e)), e);
+        }
         if (tree_novelty_.ply && *tree_novelty_.ply <= path->size()) {
             // The position after it: no game of the database reaches it, unless a single one by other moves.
             study::ScanBoard after;
@@ -1260,6 +1268,11 @@ void App::drawTreeNovelty(std::size_t index) {
         }
     }
     auto& n = tree_novelty_;
+    if (!n.error.empty()) {
+        const ui::TextWrap wrap;
+        ImGui::TextUnformatted(n.error.c_str());
+        return;
+    }
     if (!n.ply || *n.ply > path->size()) return;
     if (n.search && n.search->done()) {
         if (const auto error = n.search->error()) {

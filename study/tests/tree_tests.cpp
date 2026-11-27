@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <random>
 #include <set>
 #include <sstream>
@@ -380,4 +382,124 @@ TEST_CASE("tree: the games that played a move from a position, as a recount give
     }
     CHECK(wrong == 0);
     CHECK(checked > 1000);
+}
+
+namespace {
+
+// A tree's files copied to a folder of their own, `file` written over with `bytes`: the tree that opens there. The tree
+// before must be let go first (its files are removed, and Windows keeps a mapped file).
+std::shared_ptr<const Tree> damagedCopy(const fs::path& database, const std::string& name, const std::string& file,
+                                        const std::string& bytes) {
+    const auto dir = fs::temp_directory_path() / "tree-damaged-copy";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    fs::copy_file(database / "tree.json", dir / "tree.json");
+    fs::copy(database / name, dir / name, fs::copy_options::recursive);
+    std::ofstream(dir / name / file, std::ios::binary | std::ios::trunc) << bytes;
+    return Tree::open(dir);
+}
+
+void putU64(std::string& bytes, std::size_t at, uint64_t v) { std::memcpy(bytes.data() + at, &v, 8); }
+
+}  // namespace
+
+TEST_CASE("tree: a damaged tree throws a store error where it is read, never reads outside its files (#139)") {
+    auto db = database("tree-damaged", randomGames(1200, 139, 8));
+    build(*db);
+    const auto snap = db->snapshot();
+    std::string name;
+    std::vector<uint64_t> keys;
+    {
+        const auto sound = Tree::open(db->folder());
+        REQUIRE(sound);
+        name = sound->folderName();
+        for (uint64_t i = 0; i < sound->positions(); ++i) keys.push_back(sound->keyAt(i));
+    }
+    REQUIRE(keys.size() > 200);
+    const auto dir = db->folder() / name;
+    const std::map<std::string, std::string> sound{{"order.bin", readFile(dir / "order.bin")},
+                                                   {"index.bin", readFile(dir / "index.bin")},
+                                                   {"records.bin", readFile(dir / "records.bin")}};
+    // Lines from the start, to look for where they leave the database: the first plies of the games.
+    ScanBoard start;
+    REQUIRE(start.setFen(chess::constants::STARTPOS, false));
+    std::vector<std::vector<int>> lines;
+    for (GameId id = 0; id < snap->games(); id += 37) {
+        const auto m = snap->gameMoves(id);
+        lines.emplace_back(m.codes.begin(), m.codes.begin() + std::min<std::size_t>(m.codes.size(), 20));
+    }
+
+    // Everything asked of a tree at every kept position and along the lines: an answer, or a store error saying the
+    // tree is damaged, and naming its folder; never another exception, nor a read outside its files (the sanitizers').
+    // How many questions it refused.
+    const auto ask = [&](const Tree& tree) {
+        std::size_t refused = 0;
+        const auto one      = [&](auto&& question) {
+            try {
+                question();
+            } catch (const StoreError& e) {
+                CHECK(e.code() == StoreErrc::Damaged);
+                CHECK(std::string(e.what()).find(name + ": a damaged tree") != std::string::npos);
+                ++refused;
+            }
+        };
+        for (const auto key : keys) {
+            one([&] {
+                if (const auto answer = tree.at(*snap, key))
+                    for (const auto& m : answer->moves) CHECK((m.code >= TreeMove::END && m.code <= 65535));
+            });
+            one([&] {
+                for (const auto& g : tree.gamesAt(*snap, key)) CHECK(g.id < snap->games());
+            });
+            one([&] { (void)tree.visitAt(*snap, key, [&](GameId id, uint32_t) { CHECK(id < snap->games()); }); });
+            one([&] { (void)tree.gamesWith(*snap, key, 0); });
+        }
+        for (const auto& line : lines) one([&] { (void)tree.novelty(*snap, start, line); });
+        return refused;
+    };
+    const std::size_t questions = 4 * keys.size() + lines.size();
+    {
+        const auto copy = damagedCopy(db->folder(), name, "records.bin", sound.at("records.bin"));
+        REQUIRE(copy);
+        CHECK(ask(*copy) == 0);  // the copy reads as the tree does
+    }
+
+    SUBCASE("its records' bytes overwritten, their header left: every position read is refused") {
+        auto records = sound.at("records.bin");
+        std::fill(records.begin() + 32, records.end(), '\xff');
+        const auto copy = damagedCopy(db->folder(), name, "records.bin", records);
+        REQUIRE(copy);  // it opens: only its records are changed
+        CHECK(ask(*copy) == questions);
+    }
+
+    SUBCASE("its index's places past its records, and its games' ids past the database's games") {
+        auto index = sound.at("index.bin");
+        for (std::size_t at = 32; at + 8 <= index.size(); at += 8)
+            putU64(index, at, at % 16 == 0 ? ~uint64_t{0} : sound.at("records.bin").size());
+        {
+            const auto copy = damagedCopy(db->folder(), name, "index.bin", index);
+            REQUIRE(copy);
+            CHECK(ask(*copy) == questions);
+        }
+        auto order = sound.at("order.bin");
+        std::fill(order.begin() + 32, order.end(), '\xff');
+        const auto copy = damagedCopy(db->folder(), name, "order.bin", order);
+        REQUIRE(copy);
+        CHECK(ask(*copy) > 0);  // the popular positions keep their numbers: those answer without the games
+    }
+
+    SUBCASE("its records, index and order changed at random, thirty times") {
+        std::mt19937 random(139);
+        const char* files[] = {"records.bin", "records.bin", "index.bin", "order.bin"};
+        for (int round = 0; round < 30; ++round) {
+            CAPTURE(round);
+            const std::string file = files[random() % 4];
+            auto bytes             = sound.at(file);
+            for (int k = 0; k < 16; ++k)
+                bytes[32 + random() % (bytes.size() - 32)] ^= static_cast<char>(1 + random() % 255);
+            const auto copy = damagedCopy(db->folder(), name, file, bytes);
+            REQUIRE(copy);
+            (void)ask(*copy);
+        }
+    }
 }

@@ -668,7 +668,11 @@ TEST_CASE("repertoire training page: a database whose tree cannot be read: the s
     CHECK(page.session()->session->total() == 3);
     CHECK(page.cardCount(index) == 3);
     REQUIRE(app.toasts.size() == 1);
-    CHECK(app.toasts[0] == "The new positions come in the repertoire's order: a damaged tree.");
+    CHECK(app.toasts[0] == "The new positions come in the repertoire's order: a file of the database is damaged.");
+    // The log says it with the store's own words, which name the tree (#139).
     const auto lines = Console::instance().since(logged);
-    CHECK(std::find(lines.begin(), lines.end(), app.toasts[0]) != lines.end());
+    CHECK(std::any_of(lines.begin(), lines.end(), [&](const std::string& line) {
+        return line.rfind(app.toasts[0], 0) == 0 && line.find(": a damaged tree)") != std::string::npos &&
+               line.find(records.parent_path().filename().string()) != std::string::npos;
+    }));
 }

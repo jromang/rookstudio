@@ -45,6 +45,28 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 constexpr double RESIGN_SECONDS = 4.0;  // "Resign…" waits so long for Enter or a second click
 
+// The moves the databases' games give the engine at a position, asked on the game's thread: none when a tree does not
+// read (#139: its records damaged), the engine then playing from there; why, in the log.
+std::vector<OpeningChoice> treeChoices(const study::MovesAt& moves, const chess::Board& board) {
+    std::vector<OpeningChoice> out;
+    study::ScanBoard scan;
+    if (!scan.setFen(board.getFen(), board.chess960())) return out;
+    std::optional<study::TreeAnswer> answer;
+    try {
+        answer = moves(scan);
+    } catch (const std::exception& e) {
+        (void)loggedStoreError(
+            trf("The engine's openings could not be read: {}; it plays from here.", storeErrorText(e)), e);
+        return out;
+    }
+    if (!answer) return out;
+    for (const auto& m : answer->moves) {
+        if (m.code == study::TreeMove::END) continue;
+        if (const auto move = study::moveOfCode(board, scan, m.code)) out.push_back({*move, m.stats.games, false});
+    }
+    return out;
+}
+
 // A tooltip for the item just drawn, also when it is disabled, its lines wrapped.
 void tip(const std::string& text) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) return;
@@ -173,19 +195,8 @@ OpeningBook::Source App::openingSource(const PlaySettings& s, chess::Color engin
             tag  = s.database.empty() ? std::string("databases") : "database " + name;
             least = OPENING_LEAST;
             if (!build) return {};
-            auto moves = study::treeMoves(std::move(bases));
-            return [moves](const chess::Board& board) {
-                std::vector<OpeningChoice> out;
-                study::ScanBoard scan;
-                if (!scan.setFen(board.getFen(), board.chess960())) return out;
-                const auto answer = moves(scan);
-                if (!answer) return out;
-                for (const auto& m : answer->moves) {
-                    if (m.code == study::TreeMove::END) continue;
-                    if (const auto move = study::moveOfCode(board, scan, m.code))
-                        out.push_back({*move, m.stats.games, false});
-                }
-                return out;
+            return [moves = study::treeMoves(std::move(bases))](const chess::Board& board) {
+                return treeChoices(moves, board);
             };
         }
         case Openings::Player: {
@@ -200,19 +211,7 @@ OpeningBook::Source App::openingSource(const PlaySettings& s, chess::Color engin
                 least             = OPENING_LEAST;
                 if (!build) return {};
                 auto moves = study::playerMoves({src->snapshot, src->tree}, player, engine_side == chess::Color::WHITE);
-                return [moves](const chess::Board& board) {
-                    std::vector<OpeningChoice> out;
-                    study::ScanBoard scan;
-                    if (!scan.setFen(board.getFen(), board.chess960())) return out;
-                    const auto answer = moves(scan);
-                    if (!answer) return out;
-                    for (const auto& m : answer->moves) {
-                        if (m.code == study::TreeMove::END) continue;
-                        if (const auto move = study::moveOfCode(board, scan, m.code))
-                            out.push_back({*move, m.stats.games, false});
-                    }
-                    return out;
-                };
+                return [moves](const chess::Board& board) { return treeChoices(moves, board); };
             }
             note = TR("The player's games are no longer there: the engine plays from the first move.");
             return {};

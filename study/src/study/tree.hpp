@@ -77,10 +77,12 @@ struct TreeGame {
     bool operator==(const TreeGame&) const = default;
 };
 
+// A tree whose files are damaged throws a StoreError (StoreErrc::Damaged) where it reads them: its files' headers and
+// sizes when it is opened, a position's record or a game's id when it is asked (#139). Whatever its bytes, it never
+// reads outside its files.
 class Tree {
    public:
-    // The tree written in a database's folder: none when it has none, or one of a newer program. Throws
-    // std::runtime_error when its files are damaged.
+    // The tree written in a database's folder: none when it has none, or one of a newer program.
     static std::shared_ptr<const Tree> open(const std::filesystem::path& folder);
 
     [[nodiscard]] uint64_t games() const noexcept { return games_; }  // it covers the database's first games()
@@ -131,8 +133,12 @@ class Tree {
         std::optional<TreeAnswer> numbers;  // popular positions'
     };
     [[nodiscard]] std::optional<Record> record(uint64_t key) const;
+    // The id order.bin keeps at `j`: one of the games the tree covers, else the tree is damaged.
+    [[nodiscard]] GameId idAt(uint64_t j) const;
+    [[noreturn]] void damaged() const;
 
     MappedFile order_, keys_, index_, records_;
+    std::filesystem::path dir_;  // its folder, which its errors name
     uint64_t ordered_   = 0;  // the games order.bin holds
     uint64_t games_     = 0;
     uint64_t edits_     = 0;  // the database's edits generation it was built at

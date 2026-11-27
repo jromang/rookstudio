@@ -10,9 +10,12 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <study/chessbase.hpp>
+#include <study/scan_board.hpp>
 
+#include "console.hpp"
 #include "databases.hpp"
 #include "test_support.hpp"
 
@@ -471,4 +474,77 @@ TEST_CASE("databases: a database whose segment no longer reads opens with the ot
     CHECK_FALSE(mixed.segments[1].names_lost);
     CHECK(mixed.in_segments == 1);
     CHECK(mixed.elsewhere == 1);
+}
+
+TEST_CASE("databases: a damaged opening tree read at a position is said, the other databases' trees answer (#139)") {
+    const ScratchDir profile("shelf-damaged-tree");
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
+    const auto ours    = shelf.create("Ours");
+    const auto damaged = shelf.create("Damaged");
+    for (const auto index : {ours, damaged}) {
+        REQUIRE(shelf.startImport(index, pgnFile(profile, 16)));
+        const auto report = imported(shelf);
+        REQUIRE(report);
+        REQUIRE(report->added == 16);
+        REQUIRE(shelf.facts(index).tree);
+    }
+    // The second's records overwritten, their header left: its tree opens, a position read in it is a damaged one.
+    fs::path records;
+    for (const auto& entry : fs::directory_iterator(shelf.entries()[damaged].folder))
+        if (entry.is_directory() && entry.path().filename().string().rfind("tree-", 0) == 0)
+            records = entry.path() / "records.bin";
+    REQUIRE(fs::exists(records));
+    {
+        const auto size = fs::file_size(records);
+        REQUIRE(size > 32);
+        std::fstream bytes(records, std::ios::in | std::ios::out | std::ios::binary);
+        bytes.seekp(32);
+        const std::string junk(static_cast<std::size_t>(size - 32), '\xff');
+        bytes.write(junk.data(), static_cast<std::streamsize>(junk.size()));
+    }
+    std::vector<DatabaseShelf::TreeSource> sources;
+    for (const auto index : {ours, damaged}) {
+        auto source = shelf.treeSource(index);
+        REQUIRE(source);
+        REQUIRE(source->tree);
+        sources.push_back(std::move(*source));
+    }
+    study::ScanBoard after_e4;
+    REQUIRE(after_e4.setFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", false));
+    after_e4.play(*after_e4.parseSan("e4"));
+
+    // Read as the Tree tab reads it: the games of the first, the second said on the tab's line and in the log, with
+    // the store's own words that name its tree; it is taken out of the sources.
+    const auto logged = Console::instance().added();
+    auto read         = treesAt(sources, after_e4.key());
+    REQUIRE(read.answer);
+    CHECK(read.answer->total.games == 16);
+    CHECK(read.answer->moves.size() == 8);  // each game's reply
+    for (const auto& [code, games] : read.by_database) {
+        REQUIRE(games.size() == 1);
+        CHECK(games[0].first == "Ours");
+    }
+    CHECK(read.error == "The opening tree of “Damaged” could not be read: a file of the database is damaged.");
+    REQUIRE(sources.size() == 1);
+    CHECK(sources[0].name == "Ours");
+    const auto lines = Console::instance().since(logged);
+    CHECK(std::count_if(lines.begin(), lines.end(), [&](const std::string& line) {
+              return line.rfind(read.error, 0) == 0 &&
+                     line.find(records.parent_path().filename().string()) != std::string::npos;
+          }) == 1);
+
+    // Asked again with the sources kept: said once.
+    const auto again = treesAt(sources, after_e4.key());
+    CHECK(again.error.empty());
+    REQUIRE(again.answer);
+    CHECK(again.answer->total.games == 16);
+    CHECK(Console::instance().since(logged).size() == lines.size());
+
+    // The damaged tree alone: no answer, why in its place.
+    std::vector<DatabaseShelf::TreeSource> alone{*shelf.treeSource(damaged)};
+    const auto none = treesAt(alone, after_e4.key());
+    CHECK_FALSE(none.answer);
+    CHECK(none.error == read.error);
+    CHECK(alone.empty());
 }

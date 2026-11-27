@@ -132,6 +132,43 @@ std::string loggedStoreError(std::string said, const std::exception& e) {
     return said;
 }
 
+TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t key) {
+    TreesAnswer out;
+    for (auto source = sources.begin(); source != sources.end();) {
+        std::optional<study::TreeAnswer> one;
+        try {
+            if (source->tree && source->snapshot) one = source->tree->at(*source->snapshot, key);
+        } catch (const std::exception& e) {
+            const auto said = loggedStoreError(
+                trf("The opening tree of “{}” could not be read: {}.", source->name, storeErrorText(e)), e);
+            if (out.error.empty()) out.error = said;
+            source = sources.erase(source);
+            continue;
+        }
+        if (one) {
+            if (!out.answer) out.answer.emplace();
+            out.answer->total.add(one->total);
+            for (const auto& m : one->moves) {
+                auto& moves = out.answer->moves;
+                auto at     = std::find_if(moves.begin(), moves.end(),
+                                           [&](const study::TreeMove& t) { return t.code == m.code; });
+                if (at == moves.end()) at = moves.insert(moves.end(), {m.code, {}});
+                at->stats.add(m.stats);
+                out.by_database[m.code].push_back({source->name, m.stats.games});
+            }
+        }
+        ++source;
+    }
+    if (out.answer)
+        std::stable_sort(out.answer->moves.begin(), out.answer->moves.end(),
+                         [](const study::TreeMove& x, const study::TreeMove& y) {
+                             if ((x.code == study::TreeMove::END) != (y.code == study::TreeMove::END))
+                                 return y.code == study::TreeMove::END;
+                             return x.stats.games > y.stats.games;
+                         });
+    return out;
+}
+
 DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot) {
     DamageSummary out;
     for (const auto& bad : report.segments) {

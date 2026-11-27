@@ -2898,9 +2898,11 @@ class App {
         std::unique_ptr<study::Search> search;  // the games through the position after it
         bool confirmed = false;                 // none found
         uint64_t found = 0;
+        std::string error;  // why the tree could not tell it (#139: a damaged tree), said in its place
     };
     NoveltyJob tree_novelty_;
     std::string tree_summary_;
+    bool tree_unread_ = false;  // a tree of the rows could not be read: the summary says it, no novelty is looked for
     bool tree_book_  = false;  // the rows are a book's weights
     int tree_source_ = 0;      // the databases with a tree, the library's Polyglot books, then Lichess's explorer
     // Lichess's explorer in the Tree tab (M3, board 2; M4): its answers this session, by position and source.

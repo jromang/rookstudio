@@ -17,6 +17,7 @@
 
 #include "parallel.hpp"
 #include "scan_board.hpp"
+#include "store_error.hpp"
 
 namespace fcg::study {
 
@@ -52,15 +53,18 @@ void putVarint(std::string& out, uint64_t v) {
     out.push_back(static_cast<char>(v));
 }
 
+// What reading a record that is not as it was written throws: Tree::record() says it again with the tree's folder.
+[[noreturn]] void damagedRecord() { throw StoreError(StoreErrc::Damaged, "a damaged tree"); }
+
 uint64_t getVarint(const uint8_t*& p, const uint8_t* end) {
     uint64_t v = 0;
     for (int shift = 0; shift < 64; shift += 7) {
-        if (p >= end) throw std::runtime_error("a damaged tree");
+        if (p >= end) damagedRecord();
         const uint8_t b = *p++;
         v |= static_cast<uint64_t>(b & 0x7F) << shift;
         if (!(b & 0x80)) return v;
     }
-    throw std::runtime_error("a damaged tree");
+    damagedRecord();
 }
 
 std::string header(FileKind kind, uint64_t count) {
@@ -77,8 +81,9 @@ std::string header(FileKind kind, uint64_t count) {
 uint64_t checkHeader(const MappedFile& file, FileKind kind, const fs::path& path) {
     if (file.size() < HEADER || std::memcmp(file.data(), MAGIC, sizeof MAGIC) != 0 ||
         load<uint32_t>(file.data() + 8) != kind)
-        throw std::runtime_error(path.string() + ": not a tree file");
-    if (load<uint32_t>(file.data() + 12) != VERSION) throw std::runtime_error(path.string() + ": another version");
+        throw StoreError(StoreErrc::Damaged, path.string() + ": not a tree file");
+    if (load<uint32_t>(file.data() + 12) != VERSION)
+        throw StoreError(StoreErrc::Damaged, path.string() + ": another version");
     return load<uint64_t>(file.data() + 16);
 }
 
@@ -784,7 +789,7 @@ std::shared_ptr<const Tree> Tree::open(const fs::path& folder) {
         try {
             j = nlohmann::json::parse(in);
         } catch (const std::exception& e) {
-            throw std::runtime_error((folder / TREE_JSON).string() + ": " + e.what());
+            throw StoreError(StoreErrc::Damaged, (folder / TREE_JSON).string() + ": " + e.what());
         }
     }
     if (j.value("format", "") != "rookstudio-tree" || j.value("version", 0u) > VERSION) return nullptr;
@@ -794,6 +799,7 @@ std::shared_ptr<const Tree> Tree::open(const fs::path& folder) {
     tree->edits_     = j.value("edits", uint64_t{0});
     tree->plies_     = j.value("plies", 0u);
     const auto dir   = folder / tree->name_;
+    tree->dir_       = dir;
     tree->order_     = MappedFile(dir / "order.bin");
     tree->keys_      = MappedFile(dir / "keys.bin");
     tree->index_     = MappedFile(dir / "index.bin");
@@ -802,14 +808,26 @@ std::shared_ptr<const Tree> Tree::open(const fs::path& folder) {
     tree->positions_                  = checkHeader(tree->keys_, KEYS, dir / "keys.bin");
     const auto marks                  = checkHeader(tree->index_, INDEX, dir / "index.bin");
     const auto bytes                  = checkHeader(tree->records_, RECORDS, dir / "records.bin");
-    if (tree->order_.size() != HEADER + games * 4 || tree->keys_.size() != HEADER + tree->positions_ * 8 ||
-        marks != (tree->positions_ + INDEX_EVERY - 1) / INDEX_EVERY || tree->index_.size() != HEADER + marks * 8 ||
-        tree->records_.size() != HEADER + bytes || games > tree->games_)
-        throw std::runtime_error(dir.string() + ": a damaged tree");
+    // Each file as long as its header's count says, by a division: a count made up would overflow a product.
+    const auto holds = [](const MappedFile& file, uint64_t count, uint64_t each) {
+        return (file.size() - HEADER) % each == 0 && (file.size() - HEADER) / each == count;
+    };
+    if (!holds(tree->order_, games, 4) || !holds(tree->keys_, tree->positions_, 8) ||
+        marks != (tree->positions_ + INDEX_EVERY - 1) / INDEX_EVERY || !holds(tree->index_, marks, 8) ||
+        !holds(tree->records_, bytes, 1) || games > tree->games_)
+        tree->damaged();
     return tree;
 }
 
+void Tree::damaged() const { throw StoreError(StoreErrc::Damaged, dir_.string() + ": a damaged tree"); }
+
 uint64_t Tree::keyAt(uint64_t i) const noexcept { return load<uint64_t>(keys_.data() + HEADER + i * 8); }
+
+GameId Tree::idAt(uint64_t j) const {
+    const GameId id = load<uint32_t>(order_.data() + HEADER + j * 4);
+    if (id >= games_) damaged();  // past the games it covers: the snapshot has no such game
+    return id;
+}
 
 std::optional<Tree::Record> Tree::record(uint64_t key) const {
     uint64_t lo = 0, hi = positions_;
@@ -821,46 +839,57 @@ std::optional<Tree::Record> Tree::record(uint64_t key) const {
             hi = mid;
     }
     if (lo == positions_ || keyAt(lo) != key) return std::nullopt;
-    const uint8_t* base = records_.data() + HEADER;
-    const uint8_t* end  = records_.data() + records_.size();
-    const uint8_t* p    = base + load<uint64_t>(index_.data() + HEADER + (lo / INDEX_EVERY) * 8);
-    for (uint64_t skip = lo % INDEX_EVERY; skip > 0; --skip) {
-        const uint64_t length = getVarint(p, end);
-        p += length;
-    }
-    const uint64_t length = getVarint(p, end);
-    if (length > static_cast<uint64_t>(end - p)) throw std::runtime_error("a damaged tree");
-    end = p + length;
-    Record r;
-    const uint8_t flags = *p++;
-    r.wide              = (flags & RECORD_WIDE) != 0;
-    r.games             = getVarint(p, end);
-    const uint64_t runs = getVarint(p, end);
-    uint64_t start      = 0;
-    for (uint64_t i = 0; i < runs; ++i) {
-        Run run;
-        start += getVarint(p, end);
-        run.start = start;
-        run.count = getVarint(p, end) + 1;
-        if (p >= end) throw std::runtime_error("a damaged tree");
-        run.depth = *p++;
-        if (run.start >= ordered_ || run.count > ordered_ - run.start || run.depth > plies_)
-            throw std::runtime_error("a damaged tree");
-        r.runs.push_back(run);
-    }
-    if (flags & RECORD_POPULAR) {
-        TreeAnswer a;
-        const uint64_t moves = getVarint(p, end);
-        for (uint64_t i = 0; i < moves; ++i) {
-            TreeMove m;
-            m.code  = static_cast<int>(getVarint(p, end)) - 1;
-            m.stats = getStats(p, end);
-            a.total.add(m.stats);
-            a.moves.push_back(m);
+    // Every place and length read from the files bounded by records.bin's bytes: a damaged or crafted record throws,
+    // it never takes the reading outside the file.
+    try {
+        const uint8_t* base = records_.data() + HEADER;
+        const uint8_t* end  = records_.data() + records_.size();
+        const uint64_t at   = load<uint64_t>(index_.data() + HEADER + (lo / INDEX_EVERY) * 8);
+        if (at > static_cast<uint64_t>(end - base)) damagedRecord();
+        const uint8_t* p = base + at;
+        for (uint64_t skip = lo % INDEX_EVERY; skip > 0; --skip) {
+            const uint64_t length = getVarint(p, end);
+            if (length > static_cast<uint64_t>(end - p)) damagedRecord();
+            p += length;
         }
-        r.numbers = std::move(a);
+        const uint64_t length = getVarint(p, end);
+        if (length == 0 || length > static_cast<uint64_t>(end - p)) damagedRecord();  // its flags at least
+        end = p + length;
+        Record r;
+        const uint8_t flags = *p++;
+        r.wide              = (flags & RECORD_WIDE) != 0;
+        r.games             = getVarint(p, end);
+        const uint64_t runs = getVarint(p, end);
+        uint64_t start      = 0;
+        for (uint64_t i = 0; i < runs; ++i) {
+            Run run;
+            start += getVarint(p, end);
+            run.start = start;
+            run.count = getVarint(p, end) + 1;
+            if (p >= end) damagedRecord();
+            run.depth = *p++;
+            if (run.start >= ordered_ || run.count > ordered_ - run.start || run.depth > plies_) damagedRecord();
+            r.runs.push_back(run);
+        }
+        if (flags & RECORD_POPULAR) {
+            TreeAnswer a;
+            const uint64_t moves = getVarint(p, end);
+            for (uint64_t i = 0; i < moves; ++i) {
+                TreeMove m;
+                // A code of one byte or two, END written as 0: the callers decode it on a board.
+                const uint64_t code = getVarint(p, end);
+                if (code > 65536) damagedRecord();
+                m.code  = static_cast<int>(code) - 1;
+                m.stats = getStats(p, end);
+                a.total.add(m.stats);
+                a.moves.push_back(m);
+            }
+            r.numbers = std::move(a);
+        }
+        return r;
+    } catch (const StoreError&) {
+        damaged();
     }
-    return r;
 }
 
 std::optional<TreeAnswer> Tree::at(const Snapshot& snapshot, uint64_t key) const {
@@ -870,7 +899,7 @@ std::optional<TreeAnswer> Tree::at(const Snapshot& snapshot, uint64_t key) const
     std::map<int, TreeStats> by;
     for (const auto& run : r->runs) {
         for (uint64_t j = run.start; j < run.start + run.count; ++j) {
-            const GameId id = load<uint32_t>(order_.data() + HEADER + j * 4);
+            const GameId id = idAt(j);
             const auto n    = snapshot.numbers(id);
             by[codeAt(snapshot.moves(id), n.plies, run.depth, r->wide)].add(n);
         }
@@ -884,7 +913,7 @@ std::vector<TreeGame> Tree::gamesAt(const Snapshot& snapshot, uint64_t key) cons
     if (!r || stale(snapshot)) return out;
     for (const auto& run : r->runs) {
         for (uint64_t j = run.start; j < run.start + run.count; ++j) {
-            const GameId id = load<uint32_t>(order_.data() + HEADER + j * 4);
+            const GameId id = idAt(j);
             const auto m    = snapshot.gameMoves(id);
             out.push_back({id, run.depth, codeAt(m.codes, m.plies, run.depth, r->wide)});
         }
@@ -897,8 +926,7 @@ bool Tree::visitAt(const Snapshot& snapshot, uint64_t key,
     const auto r = record(key);
     if (!r || stale(snapshot)) return false;
     for (const auto& run : r->runs)
-        for (uint64_t j = run.start; j < run.start + run.count; ++j)
-            visit(load<uint32_t>(order_.data() + HEADER + j * 4), run.depth);
+        for (uint64_t j = run.start; j < run.start + run.count; ++j) visit(idAt(j), run.depth);
     return true;
 }
 
@@ -906,7 +934,6 @@ std::vector<TreeGame> Tree::gamesWith(const Snapshot& snapshot, uint64_t key, in
     std::vector<TreeGame> out;
     const auto r = record(key);
     if (!r || stale(snapshot)) return out;
-    const auto idAt   = [&](uint64_t j) -> GameId { return load<uint32_t>(order_.data() + HEADER + j * 4); };
     const auto codeOf = [&](uint64_t j, uint32_t depth) {
         const auto m = snapshot.gameMoves(idAt(j));
         return codeAt(m.codes, m.plies, depth, r->wide);

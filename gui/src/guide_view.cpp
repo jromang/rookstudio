@@ -246,6 +246,7 @@ void GuideView::draw(float width, float height) {
     const bool focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows);
     const bool hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows);
     hovered_           = hovered;
+    focused_           = focused;
     auto* dl           = ImGui::GetWindowDrawList();
     dl->AddLine(origin, ImVec2(origin.x, origin.y + height), ui::CARD_BD, std::max(1.0f, em() * 0.06f));
 

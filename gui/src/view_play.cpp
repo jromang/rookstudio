@@ -21,6 +21,7 @@
 #include <study/scan_board.hpp>
 #include <tour/pgn_file.hpp>
 #include <tour/polyglot.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -82,11 +83,6 @@ void heading(const char* text) {
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(text);
     ImGui::PopFont();
-}
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
 }
 
 // The PGN tag of a game, set or replaced.

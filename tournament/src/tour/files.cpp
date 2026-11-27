@@ -47,17 +47,6 @@ std::string lastError() {
 
 std::atomic_bool sync_to_disk{true};
 
-#ifndef _WIN32
-// The rename of a file is on the disk once its folder is.
-void syncFolder(const fs::path& dir) {
-    if (!sync_to_disk) return;
-    const int fd = ::open(dir.empty() ? "." : dir.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd < 0) return;
-    ::fsync(fd);
-    ::close(fd);
-}
-#endif
-
 std::string readAll(const fs::path& file) {
     std::ifstream in(file, std::ios::binary);
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
@@ -92,6 +81,16 @@ std::FILE* openFile(const fs::path& file, const char* mode) {
 }
 
 void setSyncToDisk(bool on) { sync_to_disk = on; }
+
+void syncFolder([[maybe_unused]] const fs::path& dir) {
+#ifndef _WIN32
+    if (!sync_to_disk) return;
+    const int fd = ::open(dir.empty() ? "." : dir.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return;
+    ::fsync(fd);
+    ::close(fd);
+#endif
+}
 
 bool syncFile(std::FILE* file) {
     if (std::fflush(file) != 0) return false;

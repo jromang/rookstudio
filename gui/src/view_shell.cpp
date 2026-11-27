@@ -105,7 +105,7 @@ void App::handleZoomKeys() {
 
 void App::refreshTournaments() {
     if (tournaments_job_.valid()) {
-        if (tournaments_job_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(tournaments_job_)) return;
         auto list         = tournaments_job_.get();
         tournaments_      = std::move(list.summaries);
         legacy_runs_      = list.legacy_runs;

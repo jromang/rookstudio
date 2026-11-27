@@ -86,8 +86,6 @@ struct ExternalEngine {
 // registrationProblem's words (Failure::error).
 [[nodiscard]] Answer<ExternalEngine> registerEngine(const std::string& token, const EngineRegistration& r,
                                                     const std::atomic<bool>* cancel = nullptr);
-[[nodiscard]] Answer<std::vector<ExternalEngine>> listEngines(const std::string& token,
-                                                              const std::atomic<bool>* cancel = nullptr);
 // The registration `id`: no value and no failure when Lichess has it no more (404: withdrawn on lichess.org).
 [[nodiscard]] Answer<ExternalEngine> engineRegistration(const std::string& token, const std::string& id,
                                                         const std::atomic<bool>* cancel = nullptr);

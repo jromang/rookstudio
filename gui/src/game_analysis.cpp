@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "storage.hpp"
 
@@ -74,13 +75,8 @@ std::array<std::array<int, 3>, 2> judgementCounts(const ReplayGame& game, const 
 
 std::string reviewKey(const ReplayGame& game) {
     // FNV-1a over the start position and the moves.
-    uint64_t hash   = 1469598103934665603ULL;
-    const auto feed = [&](std::string_view text) {
-        for (const char c : text) {
-            hash ^= static_cast<unsigned char>(c);
-            hash *= 1099511628211ULL;
-        }
-    };
+    uint64_t hash   = REVIEW_KEY_BASIS;
+    const auto feed = [&](std::string_view text) { hash = fnv1a(text, hash); };
     feed(game.start_fen.empty() ? std::string(chess::constants::STARTPOS) : game.start_fen);
     for (const auto& m : game.moves) {
         feed(" ");

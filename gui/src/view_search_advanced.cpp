@@ -720,7 +720,7 @@ class Builder {
 // ---------------------------------------------------------------------------------------------------------------
 // The pattern as the fields hold it
 
-study::Pattern App::fullPattern(const SearchFields& f) {
+study::Pattern fullPattern(const SearchFields& f) {
     study::Pattern p = f.language;
     std::vector<study::Condition> men;
     for (int sq = 0; sq < 64; ++sq) {
@@ -744,7 +744,7 @@ study::Pattern App::fullPattern(const SearchFields& f) {
     return p;
 }
 
-void App::setPattern(SearchFields& f, const study::Pattern& p) {
+void setPattern(SearchFields& f, const study::Pattern& p) {
     f.pattern.fill(-1);
     f.only_pawns = {};
     f.language   = p;

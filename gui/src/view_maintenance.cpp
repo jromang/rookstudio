@@ -17,6 +17,8 @@
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/background.hpp>
+#include <study/result_char.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -42,8 +44,6 @@ std::string sourceOf(const study::Snapshot& snap, study::GameId id) {
     if (label.empty()) label = study::sourceLabel({}, snap.game(id));
     return label.empty() ? std::string("—") : label;
 }
-
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "½-½" : "*"; }
 
 // How long a task took: milliseconds under a second.
 std::string tookText(double seconds) {
@@ -206,7 +206,7 @@ void App::startFideList(const fs::path& file) {
 }
 
 void App::pollFideList() {
-    if (!fide_job_ || fide_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!fide_job_ || !isReady(fide_job_->done)) return;
     auto outcome = fide_job_->done.get();
     fide_job_.reset();
     if (outcome.ok) {
@@ -377,7 +377,7 @@ void App::startCareKeep(std::size_t index, std::vector<study::GameId> damaged) {
 
 void App::pollCare() {
     pollFideList();
-    if (!care_job_ || care_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!care_job_ || !isReady(care_job_->done)) return;
     auto job         = std::move(care_job_);
     const auto index = indexOf(shelf(), job->folder);
     const bool here  = care_ && care_->folder == job->folder;
@@ -862,7 +862,7 @@ void App::drawCareDuplicates(std::size_t index) {
                 ImGui::SameLine();
                 std::string where_game(first.event);
                 if (!first.round.empty()) where_game += (where_game.empty() ? "" : ", ") + trf("r. {}", first.round);
-                where_game += " · " + resultText(first.result);
+                where_game += " · " + study::shownResult(first.result);
                 ImGui::TextDisabled("· %s", where_game.c_str());
                 ImGui::TableNextColumn();
                 std::string sources;
@@ -880,9 +880,9 @@ void App::drawCareDuplicates(std::size_t index) {
                 if (group.kind == study::DuplicateKind::Results) {
                     std::string results, said;
                     for (const auto id : group.games) {
-                        results += (results.empty() ? "" : " / ") + resultText(snap->numbers(id).result);
+                        results += (results.empty() ? "" : " / ") + study::shownResult(snap->numbers(id).result);
                         said += (said.empty() ? "" : "\n") +
-                                trf("{} in {}", resultText(snap->numbers(id).result), sourceOf(*snap, id));
+                                trf("{} in {}", study::shownResult(snap->numbers(id).result), sourceOf(*snap, id));
                     }
                     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
                                        trf("results {}: to see", results).c_str());
@@ -924,7 +924,7 @@ void App::drawCarePair(std::size_t index) {
     std::string title = fmt::format("{} – {}", snap->shownName(ids.white), snap->shownName(ids.black));
     if (!first.event.empty()) title += " · " + std::string(first.event);
     if (!first.round.empty()) title += " · " + trf("round {}", first.round);
-    title += " · " + resultText(merged.result);
+    title += " · " + study::shownResult(merged.result);
     ImGui::TextUnformatted(title.c_str());
     ImGui::PopFont();
     ImGui::SameLine();
@@ -1488,12 +1488,7 @@ void App::drawCareChecks(std::size_t index) {
     if (c.check) {
         const auto& r = *c.check;
         char when[16] = {};
-        std::tm t{};
-#ifdef _WIN32
-        localtime_s(&t, &c.checked);
-#else
-        localtime_r(&c.checked, &t);
-#endif
+        const auto t  = localTime(c.checked);
         std::strftime(when, sizeof when, "%H:%M", &t);
         if (r.damaged.empty() && r.segments.empty()) {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::GOOD), "%s", TR("Sound"));
@@ -1656,7 +1651,7 @@ void App::drawCareChecks(std::size_t index) {
     ImGui::SameLine();
     ImGui::TextUnformatted(TR("Compact"));
     // What it gives back, made in the background once for each snapshot (it reads every game's place).
-    if (c.plan_job && c.plan_job->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (c.plan_job && isReady(*c.plan_job)) {
         try {
             c.plan = c.plan_job->get();
         } catch (const std::exception& e) {

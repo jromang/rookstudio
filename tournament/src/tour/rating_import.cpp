@@ -9,6 +9,7 @@
 #include <set>
 
 #include "game_db.hpp"
+#include "util.hpp"
 
 namespace fcg::tour {
 
@@ -26,13 +27,6 @@ std::string trim(std::string_view s) {
     while (!s.empty() && isSpace(s.front())) s.remove_prefix(1);
     while (!s.empty() && isSpace(s.back())) s.remove_suffix(1);
     return std::string(s);
-}
-
-std::string lower(std::string s) {
-    for (auto& c : s) {
-        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-    }
-    return s;
 }
 
 bool hasLetter(std::string_view s) {

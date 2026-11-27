@@ -69,7 +69,7 @@ Download httpDownload(const std::string& url, const std::filesystem::path& file,
         }
         bool other_file = false;
         out             = Download{};
-        std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(nullptr, &std::fclose);
+        tour::File f;
         HttpStream stream;
         stream.cancel  = cancel;
         stream.on_head = [&](int status, std::string_view head) {

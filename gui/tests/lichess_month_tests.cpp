@@ -102,7 +102,7 @@ TEST_CASE("Lichess month: its games read from a file, those kept added; cut shor
     REQUIRE(waitIdle(reading));
     const auto why = reading.finished();
     REQUIRE(why);
-    CHECK(why->find("cut short") != std::string::npos);
+    CHECK(why->error.find("cut short") != std::string::npos);
     CHECK(fs::exists(dir / "reading.json"));
     const auto first = db->snapshot()->games();
     CHECK(first > 0);
@@ -111,7 +111,7 @@ TEST_CASE("Lichess month: its games read from a file, those kept added; cut shor
     std::ofstream(file, std::ios::binary | std::ios::trunc) << whole;
     reading.start(file.string(), db, {}, dir / "reading.json");
     REQUIRE(waitIdle(reading));
-    CHECK(reading.finished() == std::string());
+    CHECK(reading.finished() == TaskEnd{});
     CHECK(reading.progress().games == 300);
     CHECK(reading.progress().kept == static_cast<uint64_t>(kept));
     CHECK(db->snapshot()->games() == static_cast<uint64_t>(kept));

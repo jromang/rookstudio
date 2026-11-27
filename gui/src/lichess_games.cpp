@@ -10,6 +10,7 @@
 #include <fmt/include/fmt/format.h>
 #include <study/import.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -28,12 +29,6 @@ int64_t daysFromCivil(int64_t y, unsigned m, unsigned d) {
     const unsigned doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
     const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     return era * 146097 + static_cast<int64_t>(doe) - 719468;
-}
-
-std::string lower(std::string s) {
-    for (auto& c : s)
-        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-    return s;
 }
 
 }  // namespace

@@ -83,9 +83,9 @@ bool App::diskTablesLocked() const {
 void App::pollTablesDownload() {
     // The download: its end, and the tables loaded again as each piece count's files are all there.
     if (!syzygy_download_) return;
-    if (const auto why = syzygy_download_->finished()) {
+    if (const auto end = syzygy_download_->finished()) {
         syzygy_state_.reset();
-        if (why->empty()) {
+        if (end->done()) {
             // The set is whole: offered to the tournaments, the setup's folders taking it in.
             const auto own  = syzygy_download_->folder().string();
             const auto dirs = splitTablebasePath(setup_.tb_paths);
@@ -94,9 +94,9 @@ void App::pollTablesDownload() {
                 saveSetupSoon();
             }
             Console::instance().add(trf("The Syzygy tables of 3 to 5 pieces are on the disk: {}", own));
-        } else if (*why != "cancelled") {
-            syzygy_error_ = *why;
-            Console::instance().add(trf("The Syzygy tables' download stopped: {}", *why), true);
+        } else if (end->failed()) {
+            syzygy_error_ = end->error;
+            Console::instance().add(trf("The Syzygy tables' download stopped: {}", end->error), true);
         }
     }
     if (syzygy_download_->generation() != syzygy_generation_ && !diskTablesLocked()) {

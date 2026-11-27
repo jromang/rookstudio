@@ -10,6 +10,7 @@
 #include <tour/files.hpp>
 #include <tour/pgn_file.hpp>
 #include <tour/state.hpp>
+#include <tour/util.hpp>
 
 #include "import.hpp"
 #include "import_into.hpp"
@@ -23,14 +24,6 @@ namespace {
 constexpr std::size_t HEAD_BYTES = 65536;  // a file's first bytes, and the last ones read, tell it was not rewritten
 constexpr std::size_t TAIL_BYTES = 4096;
 constexpr std::size_t BATCH      = 4096;
-
-uint64_t fnv1a(std::string_view s, uint64_t h = 14695981039346656037ull) {
-    for (const unsigned char c : s) {
-        h ^= c;
-        h *= 1099511628211ull;
-    }
-    return h;
-}
 
 // A path's text in UTF-8 (C++20 gives it as char8_t).
 std::string utf8(const fs::path& p) {

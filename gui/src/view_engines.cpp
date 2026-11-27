@@ -11,6 +11,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include <tour/rating_import.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "program_format.hpp"
@@ -86,22 +87,13 @@ struct InFlight {
 std::string nowText() {
     char when[32];
     const auto now = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &now);
-#else
-    localtime_r(&now, &tm);
-#endif
+    const auto tm  = localTime(now);
     std::strftime(when, sizeof(when), "%Y-%m-%d %H:%M", &tm);
     return when;
 }
 
 bool containsCaseInsensitive(const std::string& text, const std::string& needle) {
     if (needle.empty()) return true;
-    auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     return lower(text).find(lower(needle)) != std::string::npos;
 }
 
@@ -251,7 +243,7 @@ void App::refreshPrograms() {
 }
 
 void App::pollFingerprints() {
-    if (!fingerprints_.valid() || fingerprints_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!isReady(fingerprints_)) return;
     bool save = false;
     for (const auto& [program, fingerprint] : fingerprints_.get()) {
         for (auto& e : engines_) {
@@ -364,8 +356,8 @@ bool App::startAfterReads(const std::string& key, std::vector<std::string> needs
 
 bool App::advanceStart() {
     // What ended meanwhile first: a read it needs is applied, and what ended is not interrupted for nothing.
-    if (probe_.valid() && probe_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) applyProbe();
-    if (check_.valid() && check_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) pollCheck();
+    if (isReady(probe_)) applyProbe();
+    if (isReady(check_)) pollCheck();
     if (!pending_start_) return false;  // a read it needed failed: it does not start
 
     auto& pending     = *pending_start_;
@@ -511,7 +503,7 @@ void App::pollProbe() {
         }
     }
 
-    if (probe_.valid() && probe_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) applyProbe();
+    if (isReady(probe_)) applyProbe();
 }
 
 void App::applyProbe() {
@@ -1822,7 +1814,7 @@ void App::pollCheck() {
         if (it != engines_.end()) startCheck(static_cast<int>(it - engines_.begin()));
     }
 
-    if (!check_.valid() || check_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!isReady(check_)) return;
     CheckResult result;
     try {
         result = check_.get();

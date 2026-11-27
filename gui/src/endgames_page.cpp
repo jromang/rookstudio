@@ -177,14 +177,11 @@ void EndgamesPage::startSyzygyDownload() {
 }
 
 void EndgamesPage::poll() {
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // Fair play (#48): the tables are an aid; the endgame waits for a live game's end, where it is.
     if (!endgame_ || app_.liveGameOn()) return;
     auto& r = *endgame_;
     // Lichess's answer.
-    if (ready(r.asking)) {
+    if (isReady(r.asking)) {
         auto answer = r.asking.get();
         if (answer.value && answer.value->outcome != lichess::Outcome::Unknown) {
             keepTablebase(app_.profileDir(), r.asking_fen, *answer.value);
@@ -210,7 +207,7 @@ void EndgamesPage::poll() {
         if (!r.answer && r.waiting.empty() && r.missing.empty() && r.phase != EgPhase::Done && r.phase != EgPhase::End)
             askEndgameTables();
     }
-    if (ready(r.win_line_job)) {
+    if (isReady(r.win_line_job)) {
         const auto line = r.win_line_job.get();
         if (line.value) r.win_line = *line.value;
     }
@@ -640,7 +637,7 @@ void EndgamesPage::drawMatesCard() {
     const auto lock  = app_.sessionLock();
     const auto play  = [&](std::string_view key) {
         // Neither the database nor the account: the Puzzles part says how to have them.
-        if (!app_.startPuzzleTheme(std::string(key))) app_.showTrainingPage(1);
+        if (!app_.startPuzzleTheme(std::string(key))) app_.showTrainingPage(TrainingPart::Puzzles);
     };
     ImGui::BeginDisabled(!lock.empty());
     static constexpr std::string_view MATES[]    = {"mateIn1", "mateIn2", "mateIn3", "mateIn4", "mateIn5"};
@@ -1098,7 +1095,8 @@ void EndgamesPage::closeEndgame(bool to_training) {
     if (!endgame_) return;
     if (to_training) {
         // Back where it was started: the Endgames part, or Today for the day's review.
-        if (!app_.reviewRunning() && endgame_->source != EndgameRun::Source::Review) app_.showTrainingPage(4);
+        if (!app_.reviewRunning() && endgame_->source != EndgameRun::Source::Review)
+            app_.showTrainingPage(TrainingPart::Endgames);
         app_.stopReview();
         app_.setEnterStartsPuzzles(false);  // back on the page, Enter reviews again
     }
@@ -1658,7 +1656,9 @@ std::size_t EndgamesPage::doneCount() {
     return done;
 }
 
-TrainingKind::Part EndgamesPage::part() const { return {4, TR("Endgames"), "endgames", guide::topics::Endgames}; }
+TrainingKind::Part EndgamesPage::part() const {
+    return {TrainingPart::Endgames, TR("Endgames"), "endgames", guide::topics::Endgames};
+}
 
 void EndgamesPage::drawTodayCards(TodayCards& cards) {
     // The endgames against the tables; the mates, a card of their own that leads to the part's mates.
@@ -1686,16 +1686,16 @@ void EndgamesPage::drawHomeLine() {
 }
 
 void EndgamesPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
-    add(TR("Endgames"), training_view, [this] { app_.showTrainingPage(4); });
+    add(TR("Endgames"), training_view, [this] { app_.showTrainingPage(TrainingPart::Endgames); });
     add(TR("Mates"), training_view, [this] {
-        app_.showTrainingPage(4);
+        app_.showTrainingPage(TrainingPart::Endgames);
         endgame_scroll_mates_ = true;
     });
     if (endgameLock().empty()) {
         for (const auto& e : endgameCatalogue())
             add(trf("Endgame: {}", TR(e.name)), TR("Training"), [this, &e] {
                 if (endgameNeed(e.fen).empty() && startEndgame(e)) return;
-                app_.showTrainingPage(4);
+                app_.showTrainingPage(TrainingPart::Endgames);
                 endgame_need_ = e.id;
             });
         if (const auto n = reviewCount().due; n > 0)
@@ -1712,7 +1712,7 @@ void EndgamesPage::addCommands(const PaletteAdd& add, const std::string& trainin
         else if (!app_.tablesHeld().complete)
             add(trf("Download the Syzygy tables of 3 to 5 pieces · {}", formatBytes(syzygy345Bytes())), TR("Training"),
                 [this] {
-                    app_.showTrainingPage(4);
+                    app_.showTrainingPage(TrainingPart::Endgames);
                     startSyzygyDownload();
                 });
     }
@@ -1722,13 +1722,13 @@ void EndgamesPage::addFocusWords(FocusWords& words, const std::string& word) {
     words.on({"endgame=*"}, [&] {  // endgame=ID: that endgame of the catalogue against the tables
         if (const auto* e = endgameEntry(word.substr(8))) {
             if (!endgameNeed(e->fen).empty() || !startEndgame(*e)) {
-                app_.showTrainingPage(4);
+                app_.showTrainingPage(TrainingPart::Endgames);
                 endgame_need_ = e->id;
             }
         }
     });
     words.on({"endgames-review"}, [&] {  // the endgames missed, due today (#82)
-        if (!startReview()) app_.showTrainingPage(4);
+        if (!startReview()) app_.showTrainingPage(TrainingPart::Endgames);
     });
 }
 

@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "background.hpp"
 #include "mapped_file.hpp"
 #include "scan_board.hpp"
 #include "store.hpp"
@@ -146,10 +147,7 @@ struct TreeOptions {
     std::size_t memory = std::size_t{2} << 30;  // about the most the build holds at once: more makes it take longer
 };
 
-struct TreeProgress {
-    std::atomic<uint64_t> done{0};
-    std::atomic<uint64_t> total{0};
-};
+using TreeProgress = JobProgress;
 
 struct TreeBuilt {
     uint64_t games     = 0;

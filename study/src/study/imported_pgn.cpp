@@ -1,6 +1,7 @@
 #include <string>
 
 #include <chess.hpp>
+#include <tour/pgn_file.hpp>
 
 #include "import.hpp"
 #include "scan_board.hpp"
@@ -8,15 +9,6 @@
 namespace fcg::study {
 
 namespace {
-
-std::string tagValue(const std::string& value) {
-    std::string out;
-    for (const char c : value) {
-        if (c == '\\' || c == '"') out += '\\';
-        out += c;
-    }
-    return out;
-}
 
 // The legal move of `board` that the fast board's move names.
 chess::Move chessMove(const chess::Board& board, const CodedMove& wanted) {
@@ -38,7 +30,7 @@ chess::Move chessMove(const chess::Board& board, const CodedMove& wanted) {
 std::string importedPgn(const ImportedGame& game) {
     if (!game.text.empty()) return game.text;
     std::string out;
-    for (const auto& [key, value] : game.tags) out += "[" + key + " \"" + tagValue(value) + "\"]\n";
+    for (const auto& [key, value] : game.tags) out += tour::pgnTagPair(key, value);
     out += "\n";
     const std::string fen = game.start_fen.empty() ? std::string(chess::constants::STARTPOS) : game.start_fen;
     chess::Board board;

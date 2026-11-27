@@ -148,7 +148,7 @@ TEST_CASE("puzzles offline: prepared from a file downloaded before") {
     offline.setCheckpointEvery(0);
     offline.start(file.string());
     REQUIRE(waitUntil([&] { return !offline.busy(); }, 60s));
-    CHECK(offline.finished() == std::string());
+    CHECK(offline.finished() == TaskEnd{});
     const auto st = offline.state();
     REQUIRE(st.ready);
     CHECK(st.puzzles == all.size());
@@ -219,7 +219,7 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
         offline.setRetryWait(1ms);
         offline.start(url);
         REQUIRE(waitUntil([&] { return !offline.busy(); }, 60s));
-        CHECK(offline.finished() == std::string());
+        CHECK(offline.finished() == TaskEnd{});
         const auto st = offline.state();
         REQUIRE(st.ready);
         CHECK(st.puzzles == versions[0].size());
@@ -248,7 +248,7 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
         REQUIRE(waitUntil([&] { return offline.progress().bytes >= contents[0].size() * 3 / 4; }));
         offline.cancel();
         REQUIRE(waitUntil([&] { return !offline.busy(); }));
-        CHECK(offline.finished() == std::string("cancelled"));
+        CHECK(offline.finished() == TaskEnd::cancel());
         const auto st = offline.state();
         CHECK(st.stopped);
         CHECK_FALSE(st.ready);
@@ -265,7 +265,7 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
         CHECK(st.stopped);
         offline.start(st.source);
         REQUIRE(waitUntil([&] { return !offline.busy(); }, 60s));
-        CHECK(offline.finished() == std::string());
+        CHECK(offline.finished() == TaskEnd{});
         CHECK(offline.progress().resumed);
         st = offline.state();
         REQUIRE(st.ready);
@@ -283,7 +283,7 @@ TEST_CASE("puzzles offline: downloaded, cut short and gone on with, updated whil
         CHECK(offline.state().puzzles == versions[0].size());  // the old store answers meanwhile
         released = true;
         REQUIRE(waitUntil([&] { return !offline.busy(); }, 60s));
-        CHECK(offline.finished() == std::string());
+        CHECK(offline.finished() == TaskEnd{});
         st = offline.state();
         CHECK(st.puzzles == versions[1].size());
         CHECK(st.date == "2026-12-01");

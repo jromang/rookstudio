@@ -19,6 +19,7 @@
 #include <commentary/fact_parts.hpp>
 #include <study/background.hpp>
 #include <study/query.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -35,11 +36,6 @@ namespace {
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
 int percent(double share) { return static_cast<int>(std::lround(share * 100)); }
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
 
 // A list said as the interface's language joins its items ("a, b, c").
 std::string listed(const std::vector<std::string>& items) {
@@ -225,7 +221,7 @@ void App::pollDossier() {
     auto& d = *dossier_;
     // Another page shown (the rail, a command): the dossier steps aside.
     if (d.shown && page_ != d.over) d.shown = false;
-    if (d.job.valid() && d.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(d.job)) {
         DossierReport report;
         try {
             report = d.job.get();
@@ -334,7 +330,7 @@ void App::lookForDossierNames(const std::string& query) {
     }
     if (letters < 3) words.clear();
     auto& job = dossier_names_job_;
-    if (job && job->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (job && isReady(job->done)) {
         try {
             auto found = job->done.get();
             if (!*job->cancel && job->of == words) {

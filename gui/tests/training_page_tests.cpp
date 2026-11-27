@@ -138,7 +138,7 @@ class FakeKind final : public TrainingKind {
     }
     Part part() const override {
         if (place_ == 0) return {};
-        return {place_, name_.c_str(), word_.c_str(), topic_.c_str()};
+        return {static_cast<TrainingPart>(place_), name_.c_str(), word_.c_str(), topic_.c_str()};
     }
     void drawPart() override { ++parts_drawn; }
     void drawTodayCards(TodayCards& cards) override {
@@ -464,11 +464,11 @@ TEST_CASE("training page: the settings changed and kept; the page offered once; 
     CHECK(kinds.drills.parts_drawn >= 1);
     CHECK(std::string_view(page.guideTopic()) == "the-part-of-drills");
     // context::Training's parts by their places (0 Today); the page shown.
-    page.showTrainingPage(5);
+    page.showTrainingPage(TrainingPart::Vision);
     frames.draw(app, [&] { page.draw(); });
     CHECK(kinds.sight.parts_drawn == 1);
     CHECK(page.trainingShown());
-    page.showTrainingPage(0);
+    page.showTrainingPage(TrainingPart::Today);
     CHECK(std::string_view(page.guideTopic()) == guide::topics::TrainingPage);
 
     // Ctrl+K: the page, "Review all", then each kind's with its part, in the parts' order (the repertoires' training
@@ -481,7 +481,7 @@ TEST_CASE("training page: the settings changed and kept; the page offered once; 
     CHECK(list[2].first == "Drills");
     CHECK(list[3].first == "Exercises");
     CHECK(list[4].first == "Sight");
-    page.showTrainingPage(2);
+    page.showTrainingPage(TrainingPart::Mistakes);
     app.shown = false;
     runs["Training"]();
     CHECK(app.shown);

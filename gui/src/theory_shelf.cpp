@@ -10,8 +10,10 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "assistant_notes.hpp"
+#include "jobs.hpp"
 #include "lichess_studies.hpp"
 #include "portable.hpp"
 
@@ -20,11 +22,6 @@ namespace fs = std::filesystem;
 namespace fcg {
 
 namespace {
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
 
 const char* kindKey(TheorySource::Kind kind) { return kind == TheorySource::Kind::Lichess ? "lichess" : "file"; }
 
@@ -271,7 +268,7 @@ void TheoryShelf::syncRepertoires(const std::vector<std::pair<std::string, fs::p
 bool TheoryShelf::poll(std::chrono::steady_clock::time_point now, std::chrono::milliseconds every) {
     bool changed    = false;
     const auto take = [&](TheorySource& s) {
-        if (!s.job.valid() || s.job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(s.job)) return;
         try {
             auto notes = s.job.get();
             s.notes    = std::make_shared<const study::TheoryNotes>(std::move(notes));

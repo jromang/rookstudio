@@ -128,7 +128,9 @@ void VisionPage::saveVisionRecord() {
                                 true);
 }
 
-TrainingKind::Part VisionPage::part() const { return {5, TR("Vision"), "vision", guide::topics::Vision}; }
+TrainingKind::Part VisionPage::part() const {
+    return {TrainingPart::Vision, TR("Vision"), "vision", guide::topics::Vision};
+}
 
 void VisionPage::drawTodayCards(TodayCards& cards) {
     int best = 0;
@@ -453,7 +455,7 @@ void VisionPage::finishVision(bool stopped) {
 void VisionPage::closeVision(bool to_training) {
     if (!vision_) return;
     if (vision_->match) vision_->match->stop();
-    if (to_training) app_.showTrainingPage(5);  // back to the Vision part
+    if (to_training) app_.showTrainingPage(TrainingPart::Vision);  // back to the Vision part
     BoardTaken taken;
     taken.aside = vision_->aside;
     taken.flip  = vision_->flip;
@@ -953,7 +955,7 @@ void VisionPage::drawHomeLine() {
 }
 
 void VisionPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
-    add(TR("Vision"), training_view, [this] { app_.showTrainingPage(5); });
+    add(TR("Vision"), training_view, [this] { app_.showTrainingPage(TrainingPart::Vision); });
     if (app_.sessionLock().empty()) {
         add(TR("Coordinates: find the square"), TR("Training"), [this] {
             vision_mode_ = CoordMode::Find;

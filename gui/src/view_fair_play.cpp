@@ -21,6 +21,7 @@
 #include <imgui.h>
 
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -135,8 +136,7 @@ void App::pollLichessPlaying() {
     const bool listening = lichess_events_ && !lichess_events_->refused();
     // Else asked: once at the start, when the Home page shows, every half-minute while a live game lasts (its end gives
     // the aids back), every ten minutes while a game by correspondence does; never twice in twenty seconds.
-    if (lichess_playing_job_.valid() &&
-        lichess_playing_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(lichess_playing_job_)) {
         auto answer = lichess_playing_job_.get();
         if (answer.value) {
             // Those no longer listed ended (#49).
@@ -382,10 +382,6 @@ void App::finishLichessGame(const lichess::PlayingGame& game) {
     lichess_finished_ids_.push_back(game.id);
     // Its database: "Lichess · account", made when missing; the player's sync writing in it brings the game itself.
     const auto name  = "Lichess · " + lichess_account_->username;
-    const auto lower = [](std::string text) {
-        for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return text;
-    };
     auto& s = shelf();
     std::optional<std::size_t> index;
     for (std::size_t i = 0; i < s.entries().size(); ++i)
@@ -413,11 +409,8 @@ void App::finishLichessGame(const lichess::PlayingGame& game) {
 }
 
 void App::pollLichessFinished() {
-    const auto ready = [](auto& job) {
-        return job.valid() && job.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     for (auto& f : lichess_finished_) {
-        if (ready(f.arrival)) {
+        if (isReady(f.arrival)) {
             f.got = f.arrival.get();
             if (f.got->added && f.index < shelf().entries().size()) shelf().rebuildTree(f.index);
             if (f.got->failure.failed())
@@ -432,7 +425,7 @@ void App::pollLichessFinished() {
                 reviewFinishedGame(f);
             }
         }
-        if (ready(f.again)) {
+        if (isReady(f.again)) {
             auto again = f.again.get();
             openFinishedGame(f, again.pgn.empty() ? f.got->pgn : again.pgn);
         }

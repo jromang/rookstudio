@@ -3,21 +3,14 @@
 #include <utility>
 #include <vector>
 
+#include <tour/pgn_file.hpp>
+
 #include "import.hpp"
 #include "players.hpp"
 
 namespace fcg::study {
 
 namespace {
-
-std::string escaped(const std::string& value) {
-    std::string out;
-    for (const char c : value) {
-        if (c == '"' || c == '\\') out += '\\';
-        out += c;
-    }
-    return out;
-}
 
 }  // namespace
 
@@ -83,7 +76,7 @@ std::string pgnWithNames(std::string_view pgn, const std::optional<WrittenName>&
         if (!n.title.empty()) set(std::string(side) + "Title", n.title);
     }
     std::string out;
-    for (const auto& [k, v] : tags) out += "[" + k + " \"" + escaped(v) + "\"]\n";
+    for (const auto& [k, v] : tags) out += tour::pgnTagPair(k, v);
     if (at < pgn.size()) out += pgn.substr(at);
     return out;
 }

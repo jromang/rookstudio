@@ -1,5 +1,6 @@
 #include "assistant_service.hpp"
 
+#include "jobs.hpp"
 #include "storage.hpp"
 
 #ifdef FCG_ASSISTANT
@@ -174,7 +175,7 @@ void AssistantService::unload() {
 
 void AssistantService::poll() {
     const auto now = std::chrono::steady_clock::now();
-    if (download_.valid() && download_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(download_)) {
         const auto done = download_.get();
         download_error_ = done.ok || done.error == "cancelled" ? std::string() : done.error;
     }

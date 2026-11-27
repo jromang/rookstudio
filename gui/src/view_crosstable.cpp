@@ -20,6 +20,7 @@
 #include <study/import.hpp>
 #include <study/players.hpp>
 #include <study/query.hpp>
+#include <study/result_char.hpp>
 
 #include "app.hpp"
 #include "fide_rating_list.hpp"
@@ -122,8 +123,6 @@ std::string listed(const std::vector<std::string>& items) {
 }
 
 bool resultKnown(char r) { return r == '1' || r == '0' || r == '='; }
-
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "½-½" : "*"; }
 
 // A line of what is wrong with the data: an icon, a title in its tone, its explanation.
 void issueLine(ui::Icon icon, ImU32 tone, const std::string& title, const std::string& text) {
@@ -604,7 +603,7 @@ void App::startCrosstable() {
 void App::pollCrosstable() {
     if (!crosstable_) return;
     auto& c = *crosstable_;
-    if (c.job.valid() && c.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(c.job)) {
         try {
             auto input = c.job.get();
             if (!*c.cancel) {
@@ -625,7 +624,7 @@ void App::pollCrosstable() {
             if (s.entries()[i].folder == c.folder)
                 if (const auto db = s.open(i); db && db->snapshot()->generation() != c.generation) startCrosstable();
     }
-    if (c.looking.valid() && c.looking.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(c.looking)) {
         try {
             auto found = c.looking.get();
             if (!*c.look_cancel) c.found = std::move(found);
@@ -1252,9 +1251,10 @@ void App::drawStudyCrosstable() {
             for (std::size_t k = 0; k < c.found->size(); ++k) {
                 const auto& f = (*c.found)[k];
                 ImGui::PushID(static_cast<int>(k));
-                ImGui::TextDisabled("%s", trf("In “{}”: {} – {}, round {}, {}", f.database, f.white, f.black,
-                                              f.round.empty() ? std::string("?") : f.round, resultText(f.result))
-                                              .c_str());
+                ImGui::TextDisabled("%s",
+                                    trf("In “{}”: {} – {}, round {}, {}", f.database, f.white, f.black,
+                                        f.round.empty() ? std::string("?") : f.round, study::shownResult(f.result))
+                                        .c_str());
                 ImGui::SameLine();
                 ImGui::BeginDisabled(!writable);
                 if (ImGui::SmallButton(TR("Copy it into this tournament")) && f.asked < c.asked.size()) {
@@ -1321,7 +1321,7 @@ void App::drawStudyCrosstable() {
                                             .c_str());
                     for (const char r : {'1', '=', '0'}) {
                         ImGui::SameLine();
-                        if (ImGui::SmallButton(resultText(r).c_str())) {
+                        if (ImGui::SmallButton(study::shownResult(r).c_str())) {
                             study::HandResult h;
                             h.white  = name(m.white);
                             h.black  = name(m.black);

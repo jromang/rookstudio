@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "https.hpp"
+#include "jobs.hpp"
 
 namespace fcg::update {
 
@@ -111,7 +112,7 @@ void Checker::start() {
 }
 
 std::optional<Checker::Answer> Checker::poll() {
-    if (!future_.valid() || future_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return std::nullopt;
+    if (!isReady(future_)) return std::nullopt;
     return future_.get();
 }
 

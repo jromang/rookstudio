@@ -13,6 +13,7 @@
 #include <fmt/include/fmt/format.h>
 #include <tour/chess_text.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #ifdef _WIN64
 #    include <engine/process/process_win.hpp>
@@ -603,11 +604,7 @@ void Adapter::fromEngine(const std::string& raw, Clock::time_point now) {
     if (line.empty() || line[0] == '#') return;
     const auto tokens = split(line);
     const auto& cmd   = tokens[0];
-    const auto lower  = [&] {
-        std::string s = line;
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    }();
+    const auto lower  = fcg::lower(line);
 
     if (cmd == "feature") {
         onFeatures(line.substr(7));

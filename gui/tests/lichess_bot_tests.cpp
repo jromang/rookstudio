@@ -16,6 +16,7 @@
 #include <fmt/include/fmt/format.h>
 #include <chess.hpp>
 #include <json.hpp>
+#include <tour/util.hpp>
 
 #include "free_ports.hpp"
 #include "https.hpp"
@@ -77,12 +78,7 @@ Challenge challenge(std::string speed, ChallengeClock clock, bool rated = false,
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
+    const auto local = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &local);
     return text;

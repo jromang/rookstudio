@@ -21,6 +21,7 @@
 #include <tour/polyglot.hpp>
 #include <tour/runner.hpp>
 #include <tour/sprt_rules.hpp>
+#include <tour/util.hpp>
 
 #include "console.hpp"
 #include "engines.hpp"
@@ -153,12 +154,7 @@ fastchess::EngineConfiguration toConfig(const EngineEntry& entry, const MatchSet
 
 std::string timestamp() {
     const auto now = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &now);
-#else
-    localtime_r(&now, &tm);
-#endif
+    const auto tm  = localTime(now);
     char stamp[32];
     std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &tm);
     return stamp;
@@ -172,10 +168,6 @@ std::string polyglotPgnName(const MatchSetup& setup, const std::string& book, in
     named.name = setup.name.empty() ? defaultTournamentName(setup) : setup.name;
     tour::namePgnFiles(named);
     // Letter case aside, as Windows and macOS name files.
-    const auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     const auto taken = [&](const std::string& file) {
         return lower(file) == lower(named.pgnFile()) || lower(file) == lower(named.chessbasePgnFile());
     };

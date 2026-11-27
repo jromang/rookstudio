@@ -22,6 +22,7 @@
 #include <study/crosstable_detail.hpp>
 #include <study/fide_list.hpp>
 #include <study/players.hpp>
+#include <study/result_char.hpp>
 #include <study/store.hpp>
 
 #include "test_games.hpp"
@@ -44,7 +45,6 @@ std::string dance(int plies) {
     return out;
 }
 
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "1/2-1/2" : "*"; }
 
 struct G {
     std::string white, black, round;

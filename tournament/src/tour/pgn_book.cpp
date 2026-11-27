@@ -13,6 +13,7 @@
 #include "chess_text.hpp"
 #include "files.hpp"
 #include "polyglot.hpp"
+#include "util.hpp"
 
 #ifdef _WIN32
 #    include <windows.h>
@@ -25,11 +26,6 @@ namespace fcg::tour {
 namespace fs = std::filesystem;
 
 namespace {
-
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
 
 long processId() {
 #ifdef _WIN32
@@ -210,13 +206,6 @@ fs::path cacheDir() {
     return ec ? dir : absolute.lexically_normal();
 }
 
-// FNV-1a, 64 bits.
-uint64_t fnv(const void* data, std::size_t size, uint64_t h = 0xcbf29ce484222325ULL) {
-    const auto* p = static_cast<const unsigned char*>(data);
-    for (std::size_t i = 0; i < size; ++i) h = (h ^ p[i]) * 0x100000001b3ULL;
-    return h;
-}
-
 // The sidecar of a cached book: what it was made from and what the conversion found.
 fs::path sidecar(const fs::path& bin) { return fs::path(bin).replace_extension(".json"); }
 
@@ -359,10 +348,10 @@ fs::path pgnBookCacheFile(const std::string& pgn, int depth, bool chess960) {
     // The name: a few letters of the file's, to tell the books apart, and a hash of all it is made from (the
     // conversion's version, should it change).
     const auto& native = file.native();
-    auto h             = fnv(native.data(), native.size() * sizeof(native[0]));
+    auto h = fnv1a(std::string_view(reinterpret_cast<const char*>(native.data()), native.size() * sizeof(native[0])));
     const auto rest =
         fmt::format("|{}|{}|{}|{}|v1", size, time.time_since_epoch().count(), pgnBookPlies(depth), chess960 ? 1 : 0);
-    h = fnv(rest.data(), rest.size(), h);
+    h = fnv1a(rest, h);
     std::string stem;
     for (const auto c : file.stem().u8string()) {
         if (stem.size() >= 32) break;

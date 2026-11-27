@@ -6,8 +6,11 @@
 #include <map>
 #include <numeric>
 
+#include <tour/pgn_file.hpp>
+
 #include "pgn_lexer.hpp"
 #include "players.hpp"
+#include "result_char.hpp"
 
 namespace fcg::study {
 
@@ -305,16 +308,6 @@ std::size_t known(const std::vector<int16_t>& evals) {
         std::count_if(evals.begin(), evals.end(), [](int16_t e) { return e != ImportedGame::NO_EVAL; }));
 }
 
-const char* resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "1/2-1/2" : "*"; }
-
-std::string escaped(std::string_view v) {
-    std::string out;
-    for (const char c : v) {
-        if (c == '\\' || c == '"') out += '\\';
-        out += c;
-    }
-    return out;
-}
 
 // An annotated game's text with these tags and this result: its moves and comments as they were.
 std::string withTags(std::string_view text, const std::vector<std::pair<std::string, std::string>>& tags,
@@ -337,7 +330,7 @@ std::string withTags(std::string_view text, const std::vector<std::pair<std::str
         }
     }
     std::string out;
-    for (const auto& [k, v] : tags) out += "[" + k + " \"" + escaped(v) + "\"]\n";
+    for (const auto& [k, v] : tags) out += tour::pgnTagPair(k, v);
     out += "\n";
     if (result_at != std::string_view::npos) {
         out += text.substr(moves_at, result_at - moves_at);

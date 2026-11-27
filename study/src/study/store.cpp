@@ -15,15 +15,12 @@
 
 #include <chess.hpp>
 #include <json.hpp>
+#include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "scan_board.hpp"
 #include "store_detail.hpp"
 #include "store_error.hpp"
-
-#ifndef _WIN32
-#    include <fcntl.h>
-#    include <unistd.h>
-#endif
 
 namespace fcg::study {
 
@@ -174,16 +171,6 @@ void step(std::string_view name) {
     if (g_fault_hook) g_fault_hook(name);
 }
 
-void syncFolder([[maybe_unused]] const fs::path& dir) {
-#ifndef _WIN32
-    const int fd = ::open(dir.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd >= 0) {
-        ::fsync(fd);
-        ::close(fd);
-    }
-#endif
-}
-
 StoreErrc writeErrc(int error) noexcept {
 #ifdef EDQUOT
     if (error == EDQUOT) return StoreErrc::DiskFull;  // the user's quota: full as far as they are concerned
@@ -201,7 +188,7 @@ StoreError readOnlyError(const fs::path& dir) {
 void writeFile(const fs::path& file, std::string_view bytes) {
     step("write " + file.filename().string());
     // Closed however this ends: Windows removes no folder whose files are open.
-    const std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(tour::openFile(file, "wb"), &std::fclose);
+    const tour::File f(tour::openFile(file, "wb"));
     if (!f) throw StoreError(writeErrc(errno), "cannot write " + file.string());
     const bool written    = bytes.empty() || std::fwrite(bytes.data(), 1, bytes.size(), f.get()) == bytes.size();
     const int write_error = written ? 0 : errno;
@@ -260,14 +247,14 @@ std::string SegmentWriter::write(const SegmentBytes& segment) {
     writeFile(tmp / "annex.bin", segment.annex);
     writeFile(tmp / "names.bin", segment.names);
     writeFile(tmp / "sig.bin", segment.sig);
-    syncFolder(tmp);
+    tour::syncFolder(tmp);
     step("rename segment");
     fs::rename(tmp, dir_ / name, ec);
     if (ec) throw std::runtime_error("cannot rename " + tmp.string() + ": " + ec.message());
     under_way_.clear();
     written_.push_back(name);
     step("sync folder");
-    syncFolder(dir_);
+    tour::syncFolder(dir_);
     return name;
 }
 
@@ -403,11 +390,8 @@ void setCommitFaultHook(std::function<void(std::string_view)> hook) { g_fault_ho
 
 uint64_t duplicateKey(const ImportedGame& game) {
     // FNV-1a over the parts, each ended by a byte no text holds.
-    uint64_t h     = 0xcbf29ce484222325ULL;
-    const auto mix = [&](std::string_view bytes) {
-        for (const unsigned char c : bytes) h = (h ^ c) * 0x100000001b3ULL;
-        h = (h ^ 0xFF) * 0x100000001b3ULL;
-    };
+    uint64_t h     = FNV_OFFSET;
+    const auto mix = [&](std::string_view bytes) { h = fnv1a("\xFF", fnv1a(bytes, h)); };
     const auto tag = [&](std::string_view name) -> std::string_view {
         for (const auto& [k, v] : game.tags) {
             if (k == name) return v;
@@ -752,10 +736,9 @@ void Snapshot::settle() {
         return v != replaced_.end() && v->id == id;
     };
     // The tree built before they could no longer be read holds their games: not that of these edits.
-    uint64_t mix = 0xcbf29ce484222325ULL;
-    for (const unsigned char c : std::to_string(edits_generation_)) mix = (mix ^ c) * 0x100000001b3ULL;
+    uint64_t mix = fnv1a(std::to_string(edits_generation_));
     for (const auto& bad : unreadable_segments_) {
-        for (const unsigned char c : bad.name) mix = (mix ^ c) * 0x100000001b3ULL;
+        mix = fnv1a(bad.name, mix);
         if (bad.versions) continue;
         for (GameId id = bad.first; id < bad.first + bad.games; ++id)
             if (!replaced(id)) set(id);

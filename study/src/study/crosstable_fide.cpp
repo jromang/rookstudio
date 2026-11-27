@@ -97,10 +97,6 @@ std::optional<Tiebreak> tiebreakFromCode(std::string_view code) {
     return std::nullopt;
 }
 
-bool ratingTiebreak(Tiebreak t) {
-    return t == Tiebreak::AverageRating || t == Tiebreak::AverageRatingCut1 || t == Tiebreak::Performance;
-}
-
 std::vector<Tiebreak> fideTiebreaks(TournamentSystem system, bool all_rated) {
     switch (system) {
         case TournamentSystem::RoundRobin:

@@ -115,8 +115,7 @@ void App::pollOfflineEvals() {
     if (!offline_evals_) return;
     if (page_ != Page::Lichess) offline_evals_keys_ = false;  // Enter is the card's only while it is shown
     offline_evals_->poll();
-    if (offline_evals_update_.valid() &&
-        offline_evals_update_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(offline_evals_update_)) {
         const auto size  = offline_evals_update_.get();
         const auto state = offline_evals_->state();
         if (size.failed()) {
@@ -127,19 +126,19 @@ void App::pollOfflineEvals() {
             startOfflineEvals(lichess::evalsUrl(), state.min_men);
         }
     }
-    const auto why = offline_evals_->finished();
+    const auto end = offline_evals_->finished();
     if (offline_evals_->generation() != offline_evals_generation_) {  // what answers changed
         offline_evals_generation_ = offline_evals_->generation();
         offline_evals_seen_.clear();
     }
-    if (!why) return;
+    if (!end) return;
     const auto state = offline_evals_->state();
-    if (why->empty()) {
+    if (end->done()) {
         Console::instance().add(trf("Lichess's evaluations kept offline: {} positions, {}",
                                     ui::exactCount(state.positions), formatBytes(state.bytes)));
-    } else if (*why != "cancelled") {
-        offline_evals_error_ = *why;
-        Console::instance().add(trf("Lichess's evaluations offline: the preparation stopped: {}", *why), true);
+    } else if (end->failed()) {
+        offline_evals_error_ = end->error;
+        Console::instance().add(trf("Lichess's evaluations offline: the preparation stopped: {}", end->error), true);
     }
 }
 

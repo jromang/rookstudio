@@ -142,12 +142,12 @@ void MonthReading::start(std::string source, std::shared_ptr<study::Database> db
             MonthConsumer consumer(db, filter, job);
             return readZstd(source, state_file, consumer, job, job.cancel, options);
         } catch (const std::exception& e) {
-            return std::string(e.what());
+            return TaskEnd::of(e.what());
         }
     });
 }
 
-std::optional<std::string> MonthReading::finished() {
+std::optional<TaskEnd> MonthReading::finished() {
     if (!job_.ready()) return std::nullopt;
     return job_.take();
 }

@@ -162,7 +162,7 @@ void App::pollExplained() {
     if (explain_after_review_ && !explain_job_ && !b.reviewing() && !b.review_key.empty()) {
         if (const auto review = boardCommentaryReview(); review && review->report.complete) startExplaining(false);
     }
-    if (!explain_job_ || explain_job_->finished.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!explain_job_ || !isReady(explain_job_->finished)) return;
     explain_job_->finished.get();
     Explained made;
     {

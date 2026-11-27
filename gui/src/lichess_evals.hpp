@@ -138,8 +138,8 @@ class EvalsReading {
     [[nodiscard]] bool busy() const noexcept { return job_.running(); }
     void cancel() noexcept { job_.cancel(); }
     [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
-    // Once a reading has stopped: empty when it went to its end, else why it stopped ("cancelled" for Cancel).
-    [[nodiscard]] std::optional<std::string> finished();
+    // Once a reading has stopped: how it ended, done when it went to its end.
+    [[nodiscard]] std::optional<TaskEnd> finished();
     // Seconds between checkpoints; the tests make it 0.
     void setCheckpointEvery(double seconds) noexcept { checkpoint_every_ = seconds; }
     // The wait before going on after the download was cut short, doubled each time; the tests make it shorter.
@@ -148,7 +148,7 @@ class EvalsReading {
    private:
     double checkpoint_every_ = 5;
     std::chrono::milliseconds retry_wait_{2000};
-    Job<std::string, Progress> job_;
+    Job<TaskEnd, Progress> job_;
 };
 
 }  // namespace fcg

@@ -58,23 +58,22 @@ void App::startEvalsReading(std::string source) {
 
 void App::pollEvalsReading() {
     using namespace std::chrono_literals;
-    if (evals_size_job_.valid() && evals_size_job_.wait_for(0s) == std::future_status::ready)
-        evals_size_ = evals_size_job_.get();
-    if (evaluated_job_.valid() && evaluated_job_.wait_for(0s) == std::future_status::ready) {
+    if (isReady(evals_size_job_)) evals_size_ = evals_size_job_.get();
+    if (isReady(evaluated_job_)) {
         evaluated_positions_ = evaluated_job_.get();
         evaluated_suite_preview_.reset();
     }
-    const auto why = evals_reading_.finished();
-    if (!why) return;
+    const auto end = evals_reading_.finished();
+    if (!end) return;
     evals_folder_ = evalsFolder(evalsFolderPath());
-    if (why->empty()) {
+    if (end->done()) {
         Console::instance().add(trf("Lichess's evaluations read: {} positions kept of {}",
                                     ui::exactCount(evals_folder_->kept), ui::exactCount(evals_folder_->lines)));
         evaluated_positions_.reset();
         evaluated_job_ = std::async(std::launch::async, evaluatedPositions, evalsFolderPath());
-    } else if (*why != "cancelled") {
-        evals_stopped_ = *why;
-        Console::instance().add(trf("Lichess's evaluations: the reading stopped: {}", *why), true);
+    } else if (end->failed()) {
+        evals_stopped_ = end->error;
+        Console::instance().add(trf("Lichess's evaluations: the reading stopped: {}", end->error), true);
     }
 }
 

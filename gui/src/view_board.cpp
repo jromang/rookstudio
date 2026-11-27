@@ -1112,7 +1112,7 @@ void App::openBoardPgn(const std::filesystem::path& file) {
 
 void App::pollBoardPgn() {
     auto& b = board_;
-    if (!b.reading || b.reading->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!b.reading || !isReady(b.reading->result)) return;
     auto index        = b.reading->result.get();
     const auto file   = b.reading->file;
     const bool cancel = *b.reading->cancel;
@@ -3460,37 +3460,6 @@ std::string App::judgementTip(int ply, const MoveReview& judged) const {
         }
     }
     return tip;
-}
-
-void App::drawGameReview() {
-    auto& b = board_;
-    // What the analysis found, by side.
-    if (b.reviews.empty() || !b.reviews.front().complete(b.tree.main.moves.size())) return;
-    const auto& review = b.reviews.front();
-    const auto counts  = judgementCounts(b.tree.main, b.judged);
-    const auto side    = [&](int colour) {
-        const auto& c = counts[static_cast<std::size_t>(colour)];
-        std::string parts;
-        const auto add = [&](std::string part) { parts += (parts.empty() ? "" : ", ") + part; };
-        if (c[2]) add(trn("{} blunder", "{} blunders", c[2], c[2]));
-        if (c[1]) add(trn("{} mistake", "{} mistakes", c[1], c[1]));
-        if (c[0]) add(trn("{} inaccuracy", "{} inaccuracies", c[0], c[0]));
-        if (parts.empty()) parts = TR("no mistake");
-        auto name = b.tree.main.header(colour == 0 ? "White" : "Black");
-        if (name.empty() || name == "?") name = colour == 0 ? TR("White") : TR("Black");
-        return fmt::format("{}: {}", name, parts);
-    };
-    ImGui::TextWrapped("%s", trf("Analysis: {} · {}", side(0), side(1)).c_str());
-    if (ImGui::IsItemHovered()) {
-        const auto how = review.nodes > 0   ? reviewNodesText(review.nodes)
-                         : review.depth > 0 ? trf("depth {}", review.depth)
-                                            : trf("{:g} s per move", static_cast<double>(review.movetime_ms) / 1000.0);
-        ImGui::SetTooltip("%s", trf("By {}, {}. Losses of 10, 20 and 30 % of the winning chances are an "
-                                    "inaccuracy (?!), a mistake (?) and a blunder (?\?).",
-                                    review.engine, how)
-                                    .c_str());
-    }
-    ui::topic(guide::topics::GameAnalysis);
 }
 
 std::vector<const GameReview*> App::shownReviews() const {

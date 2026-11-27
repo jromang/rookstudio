@@ -64,8 +64,8 @@ class SyzygyDownload {
     [[nodiscard]] bool busy() const noexcept { return job_.running(); }
     void cancel() noexcept { job_.cancel(); }
     [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
-    // Once stopped: empty when every file is there, else why ("cancelled" for Cancel).
-    [[nodiscard]] std::optional<std::string> finished();
+    // Once stopped: how it ended, done when every file is there.
+    [[nodiscard]] std::optional<TaskEnd> finished();
     // Changes when a piece count's files are all there: the tables to be loaded again.
     [[nodiscard]] uint64_t generation() const noexcept { return *generation_; }
 
@@ -74,7 +74,7 @@ class SyzygyDownload {
     std::string base_url_;
     std::vector<SyzygyFile> files_;
     std::shared_ptr<std::atomic<uint64_t>> generation_ = std::make_shared<std::atomic<uint64_t>>(0);  // the task's too
-    Job<std::string, Progress> job_;
+    Job<TaskEnd, Progress> job_;
 };
 
 }  // namespace fcg

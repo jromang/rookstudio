@@ -9,6 +9,7 @@
 #include <imgui_internal.h>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -27,11 +28,6 @@ bool lessCaseInsensitive(const std::string& a, const std::string& b) {
     return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(), [](char x, char y) {
         return std::tolower(static_cast<unsigned char>(x)) < std::tolower(static_cast<unsigned char>(y));
     });
-}
-
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
 }
 
 // A tooltip at the cursor for the item just drawn, wrapped.

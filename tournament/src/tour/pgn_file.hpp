@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include "files.hpp"
+
 namespace fcg::tour {
 
 // A byte range inside a PGN file.
@@ -32,8 +34,6 @@ class PgnFile {
     // place of journaled ones; missing() tells how much was lost. Without `between`, text between them stays.
     explicit PgnFile(std::filesystem::path path, std::optional<std::vector<PgnSpan>> kept = std::nullopt,
                      bool between = true);
-    ~PgnFile();
-
     PgnFile(const PgnFile&)            = delete;
     PgnFile& operator=(const PgnFile&) = delete;
 
@@ -50,7 +50,7 @@ class PgnFile {
 
    private:
     std::filesystem::path path_;
-    std::FILE* file_  = nullptr;
+    File file_;
     uint64_t size_    = 0;
     uint64_t missing_ = 0;
     std::string error_;  // why the file takes no more games
@@ -80,6 +80,8 @@ inline std::function<std::size_t(std::size_t size)> appendSharedCut;
 
 // A tag value as PGN writes it between the quotes: its quotes and backslashes escaped.
 [[nodiscard]] std::string pgnTagValue(std::string_view value);
+// A tag pair as PGN writes it, with its line end: [Name "value"], the value escaped (pgnTagValue()).
+[[nodiscard]] std::string pgnTagPair(std::string_view name, std::string_view value);
 
 // The line of a tag in the tags of one game's PGN text: [begin, end) without its line ending; npos when it has none.
 [[nodiscard]] std::pair<std::size_t, std::size_t> pgnTagLine(std::string_view game, std::string_view tag);

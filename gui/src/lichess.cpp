@@ -4,6 +4,7 @@
 #include <set>
 
 #include <tour/pgn_file.hpp>
+#include <tour/util.hpp>
 
 #include <fmt/include/fmt/format.h>
 
@@ -19,9 +20,7 @@ constexpr auto PUSH_EVERY = std::chrono::seconds(8);
 
 std::string headers(const std::string& event, uint32_t round, const std::string& white, const std::string& black,
                     int white_elo, int black_elo, const std::string& result, const std::string& fen, bool frc) {
-    const auto tag = [](const char* name, const std::string& value) {
-        return fmt::format("[{} \"{}\"]\n", name, tour::pgnTagValue(value));
-    };
+    const auto tag  = tour::pgnTagPair;
     std::string out = tag("Event", event) + tag("Site", "RookStudio") + tag("Round", std::to_string(round)) +
                       tag("White", white) + tag("Black", black) + tag("Result", result);
     if (white_elo > 0) out += tag("WhiteElo", std::to_string(white_elo));
@@ -44,12 +43,7 @@ constexpr std::string_view START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR 
 
 std::string now() {
     const auto t = std::time(nullptr);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char buffer[16];
     std::strftime(buffer, sizeof(buffer), "%H:%M:%S", &tm);
     return buffer;

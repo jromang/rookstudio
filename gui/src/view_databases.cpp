@@ -332,7 +332,7 @@ int markedLine(const std::vector<std::string>& lines, std::string_view move) {
 
 void App::drawFileLines() {
     auto& v = *db_lines_;
-    if (!v.ready && v.reading.valid() && v.reading.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (!v.ready && isReady(v.reading)) {
         try {
             v.lines = v.reading.get();
         } catch (const std::exception& e) {
@@ -753,10 +753,7 @@ void App::drawDatabases() {
         if (ImGui::Selectable("##db", on, 0, ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 2.2f)))
             db_selected_ = static_cast<int>(i);
         if (!entries[i].source && ImGui::BeginPopupContextItem("##db_menu")) {
-            ImGui::TextDisabled("%s", TR("Maintenance"));
-            if (ImGui::MenuItem(TR("Duplicate games"))) openCare(static_cast<int>(i), CarePart::Duplicates);
-            if (ImGui::MenuItem(TR("Players' names"))) openCare(static_cast<int>(i), CarePart::Names);
-            if (ImGui::MenuItem(TR("Check and compact"))) openCare(static_cast<int>(i), CarePart::Checks);
+            drawCareItems(static_cast<int>(i));
             ImGui::EndPopup();
         }
         ImGui::SetCursorPos(ImVec2(start.x + px(6), start.y + px(3)));
@@ -951,13 +948,17 @@ void App::drawDatabases() {
     if (ui::iconOnlyButton("##db_more", ui::Icon::More, TR("More: the database's maintenance")))
         ImGui::OpenPopup("##db_more_menu");
     if (ImGui::BeginPopup("##db_more_menu")) {
-        ImGui::TextDisabled("%s", TR("Maintenance"));
-        if (ImGui::MenuItem(TR("Duplicate games"))) openCare(static_cast<int>(index), CarePart::Duplicates);
-        if (ImGui::MenuItem(TR("Players' names"))) openCare(static_cast<int>(index), CarePart::Names);
-        if (ImGui::MenuItem(TR("Check and compact"))) openCare(static_cast<int>(index), CarePart::Checks);
+        drawCareItems(static_cast<int>(index));
         ImGui::EndPopup();
     }
     ImGui::EndChild();
+}
+
+void App::drawCareItems(int database) {
+    ImGui::TextDisabled("%s", TR("Maintenance"));
+    if (ImGui::MenuItem(TR("Duplicate games"))) openCare(database, CarePart::Duplicates);
+    if (ImGui::MenuItem(TR("Players' names"))) openCare(database, CarePart::Names);
+    if (ImGui::MenuItem(TR("Check and compact"))) openCare(database, CarePart::Checks);
 }
 
 void App::openListedGame(std::size_t row) {
@@ -1184,7 +1185,7 @@ void App::drawGameList() {
         });
         db_view_job_ = std::move(job);
     }
-    if (db_view_job_ && db_view_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (db_view_job_ && isReady(db_view_job_->done)) {
         study::View view;
         try {
             view = db_view_job_->done.get();

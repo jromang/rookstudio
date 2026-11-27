@@ -471,7 +471,7 @@ void App::startBookScan(int index) {
 }
 
 void App::pollBookScan() {
-    if (!book_reading_ || book_reading_->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!book_reading_ || !isReady(book_reading_->result)) return;
 
     auto reading = std::move(*book_reading_);
     book_reading_.reset();
@@ -885,7 +885,7 @@ void App::startCtgJob(CtgJobKind kind, const std::string& path, const std::strin
 }
 
 void App::pollCtgJob() {
-    if (!ctg_job_ || ctg_job_->done.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!ctg_job_ || !isReady(ctg_job_->done)) return;
     auto job = std::move(*ctg_job_);
     ctg_job_.reset();
     const auto done = job.done.get();

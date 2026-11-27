@@ -10,6 +10,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -21,11 +22,6 @@ namespace fcg {
 namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
 
 // A Lichess name: 2 to 30 letters, digits, "_" or "-".
 bool lichessName(std::string_view name) {
@@ -50,11 +46,8 @@ std::vector<std::string> App::followedPlayers() const {
 }
 
 void App::pollFollowedPlayers() {
-    const auto ready = [](auto& job) {
-        return job.valid() && job.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // Whom the account follows: read once a session with a token allowed to, again when the token changes.
-    if (ready(lichess_following_job_)) {
+    if (isReady(lichess_following_job_)) {
         auto answer = lichess_following_job_.get();
         if (answer.value)
             lichess_following_ = std::move(*answer.value);
@@ -81,7 +74,7 @@ void App::pollFollowedPlayers() {
     const bool mosaic = broadcast_round_ == lichess::PLAYERS_MOSAIC;
     const int frame   = ImGui::GetFrameCount();
     const bool shown  = drawnLately(lichess_players_drawn_, frame) || (mosaic && drawnLately(broadcast_drawn_, frame));
-    if (ready(lichess_status_job_)) {
+    if (isReady(lichess_status_job_)) {
         auto answer = lichess_status_job_.get();
         if (answer.value) {
             lichess_statuses_     = std::move(*answer.value);

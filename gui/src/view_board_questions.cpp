@@ -311,8 +311,7 @@ void App::pollQuestions() {
     pollVisit();      // the guided visit (#94)
     pollStory();
     for (auto& q : questions_)
-        if (q.answer.valid() && q.answer.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-            q.done = q.answer.get();
+        if (isReady(q.answer)) q.done = q.answer.get();
 }
 
 void App::leaveQuestions() {

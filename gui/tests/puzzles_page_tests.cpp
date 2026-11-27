@@ -113,8 +113,8 @@ class FakeApp final : public PuzzlesContext {
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
     void setTrainingSettings(const TrainingSettings&) override {}
-    void showTrainingPage(int part) override { training_part = part; }
-    bool trainingShown() const override { return training_part >= 0; }
+    void showTrainingPage(TrainingPart part) override { training_part = part; }
+    bool trainingShown() const override { return training_part.has_value(); }
     void setEnterStartsPuzzles(bool puzzles) override { enter_puzzles = puzzles; }
     void reviewOnly(ReviewKind) override {}
     bool reviewRunning() const override { return false; }
@@ -151,7 +151,8 @@ class FakeApp final : public PuzzlesContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1, review_stopped = 0, file_dialogs = 0;
+    std::optional<TrainingPart> training_part;
+    int review_stopped = 0, file_dialogs = 0;
     bool enter_puzzles = false;
     std::vector<std::vector<std::string>> links;
     std::optional<lichess::Account> own;
@@ -465,7 +466,7 @@ void solveBatch(FakeApp& app, PuzzlesPage& page, Frames& frames) {
     FocusWords words("puzzles-online");
     page.addFocusWords(words, "puzzles-online");
     REQUIRE(words.applied());
-    CHECK(app.training_part == 1);
+    CHECK(app.training_part == TrainingPart::Puzzles);
     frames.draw(app, [&] { page.drawPart(); }, ImGuiKey_Enter);
     REQUIRE(waitUntil([&] {
         page.poll();

@@ -146,7 +146,7 @@ void GuessPage::addCommands(const PaletteAdd& add, const std::string& training_v
             startGuessBoard();
             return;
         }
-        app_.showTrainingPage(3);
+        app_.showTrainingPage(TrainingPart::GuessMoves);
     });
     if (app_.sessionLock().empty())
         add(TR("Guess the moves: a random game"), TR("Training"), [this] { (void)startGuessRandom(); });
@@ -165,7 +165,9 @@ void GuessPage::addFocusWords(FocusWords& words, const std::string& w) {
 // ---------------------------------------------------------------------------
 // The Training page's part
 
-TrainingKind::Part GuessPage::part() const { return {3, TR("Guess the moves"), "guess", guide::topics::GuessMoves}; }
+TrainingKind::Part GuessPage::part() const {
+    return {TrainingPart::GuessMoves, TR("Guess the moves"), "guess", guide::topics::GuessMoves};
+}
 
 void GuessPage::drawTodayCards(TodayCards& cards) {
     const auto& last = lastRecord();
@@ -295,7 +297,7 @@ void GuessPage::drawPart() {
 
 void GuessPage::poll() {
     // A game drawn at random for guessing.
-    if (guess_pick_.valid() && guess_pick_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(guess_pick_)) {
         auto pick = guess_pick_.get();
         if (pick.game)
             startGuess(std::move(*pick.game), pick.chess960, std::move(pick.title), guess_pick_side_, 0,
@@ -489,7 +491,7 @@ void GuessPage::pollGuess() {
     auto& g = *guess_;
     g.engine.poll();
     if (g.phase == GuessPhase::Preparing) {
-        if (g.theory.valid() && g.theory.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (isReady(g.theory)) {
             try {
                 g.book = g.theory.get();
             } catch (const std::exception& e) {

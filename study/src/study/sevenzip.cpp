@@ -61,7 +61,7 @@ SRes fileSeek(ISeekInStreamPtr p, Int64* pos, ESzSeek origin) {
 
 class SevenZipSource final : public ByteSource {
    public:
-    explicit SevenZipSource(const std::filesystem::path& file) : file_(tour::openFile(file, "rb"), &std::fclose) {
+    explicit SevenZipSource(const std::filesystem::path& file) : file_(tour::openFile(file, "rb")) {
         static const bool crc_table = (CrcGenerateTable(), true);
         (void)crc_table;
         name_ = file.filename().string();
@@ -234,7 +234,7 @@ class SevenZipSource final : public ByteSource {
         return true;
     }
 
-    std::unique_ptr<std::FILE, int (*)(std::FILE*)> file_;
+    tour::File file_;
     FileStream stream_;
     CLookToRead2 look_{};
     std::vector<Byte> look_buf_;

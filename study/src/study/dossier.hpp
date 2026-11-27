@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "background.hpp"
 #include "opening_names.hpp"
 #include "players.hpp"
 #include "repertoire.hpp"
@@ -113,10 +114,7 @@ struct DossierOptions {
     int threads         = 0;           // 0: the machine's
 };
 
-struct DossierProgress {
-    std::atomic<uint64_t> done{0};
-    std::atomic<uint64_t> total{0};
-};
+using DossierProgress = JobProgress;
 
 class Dossier {
    public:

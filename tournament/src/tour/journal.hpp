@@ -13,6 +13,8 @@
 
 #include <json.hpp>
 
+#include "files.hpp"
+
 namespace fcg::tour {
 
 class Journal {
@@ -28,7 +30,6 @@ class Journal {
     // Opens the file for appending, creating it if needed. Throws when it cannot. A last line left without its
     // newline gets one, so that the next line is not glued to it.
     explicit Journal(const std::filesystem::path& file);
-    ~Journal();
 
     Journal(const Journal&)            = delete;
     Journal& operator=(const Journal&) = delete;
@@ -51,9 +52,9 @@ class Journal {
     static uint64_t readFrom(const std::filesystem::path& file, uint64_t from, const Listener& line);
 
    private:
-    std::FILE* file_ = nullptr;
-    bool failed_     = false;
-    uint64_t size_   = 0;  // where the next line goes
+    File file_;
+    bool failed_   = false;
+    uint64_t size_ = 0;  // where the next line goes
     Listener listener_;
     std::mutex mutex_;
 };

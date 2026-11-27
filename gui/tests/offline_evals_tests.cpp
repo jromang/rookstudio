@@ -175,7 +175,7 @@ TEST_CASE("offline evaluations: prepared from a file downloaded before, then ans
     evals.setCheckpointEvery(0);
     evals.start(file.string(), 0);
     REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
-    CHECK(evals.finished() == std::string());
+    CHECK(evals.finished() == TaskEnd{});
     const auto st = evals.state();
     REQUIRE(st.ready);
     CHECK(st.positions == all.size());
@@ -230,7 +230,7 @@ TEST_CASE("offline evaluations: prepared from a file downloaded before, then ans
     openings.setRunEntries(250);
     openings.start(file.string(), study::EVALS_OPENING_MEN);
     REQUIRE(waitUntil([&] { return !openings.busy(); }, 60s));
-    CHECK(openings.finished() == std::string());
+    CHECK(openings.finished() == TaskEnd{});
     CHECK(openings.state().min_men == study::EVALS_OPENING_MEN);
     std::size_t kept = 0;
     for (const auto& p : all) {
@@ -298,7 +298,7 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
         evals.setRetryWait(1ms);
         evals.start(url, 0);
         REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
-        CHECK(evals.finished() == std::string());
+        CHECK(evals.finished() == TaskEnd{});
         CHECK(evals.progress().bytes == contents[0].size());
         const auto st = evals.state();
         REQUIRE(st.ready);
@@ -338,7 +338,7 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
         checkFound(evals, versions[0][10]);
         evals.cancel();
         REQUIRE(waitUntil([&] { return !evals.busy(); }));
-        CHECK(evals.finished() == std::string("cancelled"));
+        CHECK(evals.finished() == TaskEnd::cancel());
         const auto st = evals.state();
         CHECK(st.stopped);
         CHECK(st.stopped_at > 0);
@@ -361,7 +361,7 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
         evals.setRunEntries(300);
         evals.start(st.source, st.stopped_min_men);
         REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
-        CHECK(evals.finished() == std::string());
+        CHECK(evals.finished() == TaskEnd{});
         CHECK(evals.progress().resumed);
         st = evals.state();
         REQUIRE(st.ready);
@@ -381,7 +381,7 @@ TEST_CASE("offline evaluations: downloaded, cut short and gone on with, the posi
         checkFound(evals, versions[0][20]);
         released = true;
         REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
-        CHECK(evals.finished() == std::string());
+        CHECK(evals.finished() == TaskEnd{});
         st = evals.state();
         CHECK(st.date == "2026-12-01");
         for (const auto& p : versions[1]) checkFound(evals, p);
@@ -445,7 +445,7 @@ TEST_CASE("offline evaluations: the program killed at a place saved, then gone o
         });
         evals.start(file.string(), 0);
         REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
-        CHECK(evals.finished() == std::string());
+        CHECK(evals.finished() == TaskEnd{});
     }
     REQUIRE(saves > 3);
     REQUIRE(fs::exists(killed / "build" / "reading.json"));
@@ -459,7 +459,7 @@ TEST_CASE("offline evaluations: the program killed at a place saved, then gone o
         evals.setRunEntries(200);
         evals.start(file.string(), 0);
         REQUIRE(waitUntil([&] { return !evals.busy(); }, 60s));
-        CHECK(evals.finished() == std::string());
+        CHECK(evals.finished() == TaskEnd{});
         CHECK(evals.progress().resumed);
         CHECK(evals.state().positions == all.size());
         for (const auto& p : all) checkFound(evals, p);

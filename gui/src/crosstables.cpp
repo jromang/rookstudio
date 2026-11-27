@@ -11,6 +11,7 @@
 #include <study/import.hpp>
 #include <study/players.hpp>
 #include <study/query.hpp>
+#include <study/result_char.hpp>
 
 #include "i18n.hpp"
 #include "storage.hpp"
@@ -91,7 +92,7 @@ CrosstableSettings settingsFrom(const nlohmann::json& j) {
                 h.white           = item.value("white", std::string());
                 h.black           = item.value("black", std::string());
                 const auto result = item.value("result", std::string());
-                h.result          = result == "1-0" ? '1' : result == "0-1" ? '0' : result == "1/2-1/2" ? '=' : '*';
+                h.result          = study::resultChar(result);
                 if (h.black.empty() || h.result == '*') continue;
             }
             if (h.white.empty()) continue;
@@ -359,7 +360,7 @@ LiveCrosstable liveCrosstableInput(const std::vector<lichess::BroadcastGame>& fo
         c.round       = study::readRound(g.round.empty() && read ? std::string() : g.round);
         c.plies       = read ? game.plies : 0;
         const auto& r = g.result;
-        c.result      = r == "1-0" ? '1' : r == "0-1" ? '0' : (r == "1/2-1/2" || r == "½-½") ? '=' : '*';
+        c.result      = r == "½-½" ? '=' : study::resultChar(r);
         c.live        = c.result == '*';
         c.source      = 1;
         c.ref         = out.urls.size();

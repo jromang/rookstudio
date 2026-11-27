@@ -9,6 +9,7 @@
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include <commentary/position.hpp>
 #include <study/background.hpp>
@@ -363,9 +364,7 @@ commentary::SummaryFigures summaryFigures(const ReportView& view, commentary::La
 namespace {
 
 std::filesystem::path explorerFile(const std::filesystem::path& profile, const std::string& key) {
-    uint64_t h = 0xcbf29ce484222325ULL;
-    for (const unsigned char c : key) h = (h ^ c) * 0x100000001b3ULL;
-    return profile / "lichess-cache" / "explorer" / fmt::format("{:016x}.json", h);
+    return profile / "lichess-cache" / "explorer" / fmt::format("{:016x}.json", fnv1a(key));
 }
 
 }  // namespace

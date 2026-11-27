@@ -177,7 +177,7 @@ std::shared_ptr<const CommentaryReview> App::boardCommentaryReview() {
             }
         }
     }
-    if (theory_job_ && theory_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (theory_job_ && isReady(theory_job_->done)) {
         try {
             board_theory_ = theory_job_->done.get();
         } catch (const std::exception& e) {
@@ -242,8 +242,7 @@ void App::updateReviewTables() {
         }
     }
     // Its end: the review made again, held to what they said (an earlier game's asking just ends).
-    if (review_tables_job_ &&
-        review_tables_job_->finished.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (review_tables_job_ && isReady(review_tables_job_->finished)) {
         auto error      = review_tables_job_->finished.get();
         const bool ours = review_tables_job_->of == review_tables_of_;
         const int done  = *review_tables_job_->done;
@@ -481,9 +480,7 @@ void App::commentKeyMoments() {
 }
 
 void App::pollBoardComments() {
-    if (!comment_job_ || !comment_job_->texts.valid() ||
-        comment_job_->texts.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-        return;
+    if (!comment_job_ || !isReady(comment_job_->texts)) return;
     auto job = std::move(*comment_job_);
     comment_job_.reset();
     const auto texts = job.texts.get();
@@ -738,9 +735,7 @@ void App::writeStory(bool again) {
 }
 
 void App::pollStory() {
-    if (!story_job_ || !story_job_->story.valid() ||
-        story_job_->story.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-        return;
+    if (!story_job_ || !isReady(story_job_->story)) return;
     auto job = std::move(*story_job_);
     story_job_.reset();
     auto [told, why] = job.story.get();

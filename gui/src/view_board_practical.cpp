@@ -26,11 +26,6 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-template <typename T>
-bool ready(const std::future<T>& f) {
-    return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-}
-
 // A move numbered from the position before it, in the interface's letters: "4.Ng5", "4…d5".
 std::string numberedMove(const chess::Board& before, const std::string& uci) {
     const auto m = chess::uci::uciToMove(before, uci);
@@ -135,7 +130,7 @@ void App::drawPractical() {
     auto& p = practical_;
     auto& s = b.settings;
     // The answers that came, whatever the position shown now.
-    if (ready(p.explorer_job)) {
+    if (isReady(p.explorer_job)) {
         auto a = p.explorer_job.get();
         if (a.value) {
             p.level[p.job_key] = levelMoves(*a.value);
@@ -144,7 +139,7 @@ void App::drawPractical() {
             p.error = lichess::describe(a);
         }
     }
-    if (ready(p.db_job)) {
+    if (isReady(p.db_job)) {
         try {
             p.level[p.job_key] = p.db_job.get();
         } catch (const std::exception& e) {

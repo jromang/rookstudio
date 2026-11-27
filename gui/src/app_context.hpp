@@ -79,6 +79,9 @@ enum class PageId;
 // An entry of the command palette (Ctrl+K), as App::paletteEntries() makes them: add(label, where, run).
 using PaletteAdd = std::function<void(std::string, std::string, std::function<void()>)>;
 
+// The parts of the Training page, in their order (#117): Today, then the part of each kind of training that has one.
+enum class TrainingPart { Today, Puzzles, Mistakes, GuessMoves, Endgames, Vision };
+
 namespace context {
 
 // The program around a module: the frame and its time, the keys, the profile and its databases, a toast, the jobs.
@@ -427,9 +430,8 @@ class Training {
     // (not by a run for screenshots).
     [[nodiscard]] virtual const TrainingSettings& trainingSettings()   = 0;
     virtual void setTrainingSettings(const TrainingSettings& settings) = 0;
-    // The Training page shown, at its part `part` (0 Today, 1 Puzzles, 2 My mistakes, 3 Guess the moves…); whether it
-    // is the page shown.
-    virtual void showTrainingPage(int part)          = 0;
+    // The Training page shown, at its part `part`; whether it is the page shown.
+    virtual void showTrainingPage(TrainingPart part) = 0;
     [[nodiscard]] virtual bool trainingShown() const = 0;
     // What Enter starts on the Training page: the puzzles, once one of their choices was clicked, else the day's
     // review.

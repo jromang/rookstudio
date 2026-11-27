@@ -63,36 +63,32 @@ PgnFile::PgnFile(fs::path path, std::optional<std::vector<PgnSpan>> kept, bool b
     // no reason to stop, and the next opening tries again.
     if (between && kept && !kept->empty() && fs::exists(path_, ec)) {
         const auto size = fs::file_size(path_, ec);
-        if (std::FILE* file = ec ? nullptr : openFile(path_, "r+b")) {
+        if (const File file{ec ? nullptr : openFile(path_, "r+b")}) {
             bool wrote    = false;
             uint64_t from = 0;
             for (const auto& span : *kept) {
                 if (from >= size) break;
-                if (span.offset > from && !blankRange(file, from, std::min<uint64_t>(span.offset, size), wrote)) break;
+                if (span.offset > from && !blankRange(file.get(), from, std::min<uint64_t>(span.offset, size), wrote))
+                    break;
                 from = std::max(from, span.end());
             }
-            if (wrote) (void)syncFile(file);
-            std::fclose(file);
+            if (wrote) (void)syncFile(file.get());
         }
     }
 
-    file_ = openFile(path_, "ab");
+    file_.reset(openFile(path_, "ab"));
     if (!file_) error_ = "cannot write " + path_.string();
     size_ = fs::exists(path_, ec) ? fs::file_size(path_, ec) : 0;
 
     if (file_ && keep && size_ < *keep) {
         missing_ = *keep - size_;
         const std::string blank(missing_, '\n');
-        if (std::fwrite(blank.data(), 1, blank.size(), file_) == blank.size() && syncFile(file_)) {
+        if (std::fwrite(blank.data(), 1, blank.size(), file_.get()) == blank.size() && syncFile(file_.get())) {
             size_ = *keep;
         } else {
             error_ = "cannot write " + path_.string();
         }
     }
-}
-
-PgnFile::~PgnFile() {
-    if (file_) std::fclose(file_);
 }
 
 PgnSpan PgnFile::append(const std::string& pgn) {
@@ -101,7 +97,7 @@ PgnSpan PgnFile::append(const std::string& pgn) {
 
     // On the disk before the journal points to it: after a power cut, no journaled game lies past the end.
     PgnSpan span{size_, static_cast<uint32_t>(pgn.size())};
-    if (std::fwrite(pgn.data(), 1, pgn.size(), file_) != pgn.size() || !syncFile(file_)) {
+    if (std::fwrite(pgn.data(), 1, pgn.size(), file_.get()) != pgn.size() || !syncFile(file_.get())) {
         error_ = "cannot write " + path_.string() + " (is the disk full?)";
         throw std::runtime_error(error_);
     }
@@ -192,6 +188,10 @@ std::string pgnTagValue(std::string_view value) {
         out += c;
     }
     return out;
+}
+
+std::string pgnTagPair(std::string_view name, std::string_view value) {
+    return std::string("[").append(name).append(" \"").append(pgnTagValue(value)).append("\"]\n");
 }
 
 std::pair<std::size_t, std::size_t> pgnTagLine(std::string_view game, std::string_view tag) {

@@ -17,6 +17,7 @@
 #include <study/names.hpp>
 #include <study/query.hpp>
 #include <study/scan_board.hpp>
+#include <tour/util.hpp>
 
 #include "board_text.hpp"
 #include "game_analysis.hpp"
@@ -55,13 +56,8 @@ namespace {
 std::optional<std::string> reviewKeyOf(const study::Snapshot& snap, study::GameId id) {
     const auto moves = snap.gameMoves(id);
     if (moves.flags & (study::GAME_FEN | study::GAME_CHESS960)) return std::nullopt;
-    uint64_t hash   = 1469598103934665603ULL;
-    const auto feed = [&](std::string_view text) {
-        for (const char c : text) {
-            hash ^= static_cast<unsigned char>(c);
-            hash *= 1099511628211ULL;
-        }
-    };
+    uint64_t hash   = REVIEW_KEY_BASIS;
+    const auto feed = [&](std::string_view text) { hash = fnv1a(text, hash); };
     feed(chess::constants::STARTPOS);
     chess::Board board;
     study::ScanBoard scan;
@@ -162,12 +158,6 @@ DossierNamesake namesakeOf(const study::FidePlayer& p, const std::string& month)
     n.blitz      = p.blitz;
     n.list       = month;
     return n;
-}
-
-std::string lowerAscii(std::string text) {
-    for (auto& c : text)
-        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-    return text;
 }
 
 // The spellings written as `name` that no player with a FIDE id holds: those a choice of namesake brings together.
@@ -310,18 +300,18 @@ DossierReport makeDossierReport(DossierAsk ask, study::DossierProgress& progress
     // Who they are: a player of the tables of their name (or of their Lichess account) and their FIDE identity.
     std::vector<std::shared_ptr<const study::Snapshot>> snapshots;
     for (const auto& base : ask.bases) snapshots.push_back(base.db ? base.db->snapshot() : nullptr);
-    const auto from_lichess = !subject.lichess.empty() && lowerAscii(subject.name) == lowerAscii(subject.lichess);
+    const auto from_lichess = !subject.lichess.empty() && lower(subject.name) == lower(subject.lichess);
     if (from_lichess) {
         for (const auto& snap : snapshots) {
             if (!snap) continue;
             for (const auto& p : snap->players()->players())
-                if (!p.lichess.empty() && lowerAscii(p.lichess) == lowerAscii(subject.lichess)) {
+                if (!p.lichess.empty() && lower(p.lichess) == lower(subject.lichess)) {
                     subject.name = p.name;
                     if (p.fide) subject.fide = p.fide;
                     if (p.born) subject.born = p.born;
                     break;
                 }
-            if (lowerAscii(subject.name) != lowerAscii(subject.lichess)) break;
+            if (lower(subject.name) != lower(subject.lichess)) break;
         }
     }
     std::map<int64_t, study::Player> fide_players;  // the tables' players of that name with a FIDE id

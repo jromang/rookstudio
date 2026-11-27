@@ -32,7 +32,8 @@ struct Engine {
     // (version, licence): the licence from that version on, the versions in increasing order.
     std::vector<std::pair<std::string, std::string>> licence_from;
     std::string tag;  // a regular expression of its releases' tags, {ver} the version they give
-    // By platform (platformNames()), the fastest file first.
+    // By platform ("linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "macos-x64", "macos-arm64"), the
+    // fastest file first.
     std::map<std::string, std::vector<BuildFile>, std::less<>> files;
 
     // The licence of `version`.
@@ -58,9 +59,6 @@ inline constexpr int CATALOGUE_FORMAT = 1;
 // A pattern of the catalogue as an ECMAScript regular expression: {ver} standing for a version.
 [[nodiscard]] std::string regexOf(std::string_view pattern);
 
-// The platforms of the catalogue: "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "macos-x64",
-// "macos-arm64".
-[[nodiscard]] std::span<const std::string_view> platformNames();
 // The platforms whose files run on this system and processor, the best first: "windows-arm64" then "windows-x64"
 // (by emulation) on an ARM PC.
 [[nodiscard]] std::vector<std::string> enginePlatforms(const CpuFeatures& cpu);

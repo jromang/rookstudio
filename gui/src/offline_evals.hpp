@@ -91,8 +91,8 @@ class OfflineEvals {
     [[nodiscard]] bool busy() const noexcept { return job_.running(); }
     void cancel() noexcept { job_.cancel(); }
     [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
-    // Once a preparation has stopped: empty when it went to its end, else why it stopped ("cancelled" for Cancel).
-    [[nodiscard]] std::optional<std::string> finished();
+    // Once a preparation has stopped: how it ended, done when it went to its end.
+    [[nodiscard]] std::optional<TaskEnd> finished();
     // At each frame: the runs a preparation wrote opened, the index it made taken.
     void poll();
     // Everything removed, a preparation under way cancelled first: nothing answers at once; the files go once it
@@ -132,7 +132,7 @@ class OfflineEvals {
     std::chrono::milliseconds retry_wait_{2000};
     std::size_t run_entries_ = std::size_t{1} << 23;
     std::function<void()> on_saved_;
-    Job<std::string, Progress> job_;
+    Job<TaskEnd, Progress> job_;
 };
 
 }  // namespace fcg

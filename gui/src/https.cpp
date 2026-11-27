@@ -15,6 +15,7 @@
 #include <psa/crypto.h>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "console.hpp"
 #include "net.hpp"
@@ -56,11 +57,6 @@ constexpr const char* USER_AGENT = "RookStudio/" FCG_VERSION " (+https://github.
 
 // A server that answers at all connects in far less.
 constexpr int CONNECT_TIMEOUT_MS = 10000;
-
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
 
 std::string base64(std::string_view data) {
     static constexpr char DIGITS[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

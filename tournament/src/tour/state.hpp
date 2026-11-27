@@ -302,6 +302,7 @@ class TournamentState {
     // the state.
     [[nodiscard]] JournalReader applying();
     [[nodiscard]] Impact previewLocked(const Edit& edit) const;  // preview(), mutex_ held
+    [[nodiscard]] int nextParticipantId() const;  // the id a participant added takes, one past the highest; mutex_ held
     // Returns true when the result completes its encounter.
     bool apply(const GameResult& result);
     bool count(std::size_t index);                 // adds results_[index] to the statistics

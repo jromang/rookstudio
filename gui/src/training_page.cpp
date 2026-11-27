@@ -134,7 +134,7 @@ TrainingKind* TrainingPage::kindOf(ReviewKind kind) const {
 std::vector<TrainingKind*> TrainingPage::parts() const {
     std::vector<TrainingKind*> out;
     for (auto* k : kinds_)
-        if (k->part().place > 0) out.push_back(k);
+        if (k->part().place != TrainingPart::Today) out.push_back(k);
     std::stable_sort(out.begin(), out.end(), [](auto* a, auto* b) { return a->part().place < b->part().place; });
     return out;
 }
@@ -179,10 +179,10 @@ void TrainingPage::saveSettings() {
 // ---------------------------------------------------------------------------
 // The part shown
 
-void TrainingPage::showTrainingPage(int part) {
+void TrainingPage::showTrainingPage(TrainingPart part) {
     shown_ = nullptr;
     for (auto* k : kinds_)
-        if (part > 0 && k->part().place == part) shown_ = k;
+        if (part != TrainingPart::Today && k->part().place == part) shown_ = k;
     app_.toTrainingPage();
 }
 
@@ -345,7 +345,7 @@ void TrainingPage::drawOffer() {
 
 void TrainingPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
     // The page, the day's review, then each kind's with its part's, in the parts' order (#80–#82).
-    add(TR("Training"), training_view, [this] { showTrainingPage(0); });
+    add(TR("Training"), training_view, [this] { showTrainingPage(TrainingPart::Today); });
     if (const auto day = reviewDay(); day.due() > 0 && lock().empty())
         add(trn("Review all · {} to review today", "Review all · {} to review today", day.due(),
                 ui::exactCount(day.due())),
@@ -358,7 +358,7 @@ void TrainingPage::addFocusWords(FocusWords& words, const std::string& word) {
         startReview();
     });
     // The page at its Today part, or at a kind's part: training-puzzles, training-mistakes, training-guess…
-    words.on({"training-page"}, [&] { showTrainingPage(0); });
+    words.on({"training-page"}, [&] { showTrainingPage(TrainingPart::Today); });
     for (auto* k : parts()) {
         const auto part    = k->part();
         const auto pattern = std::string("training-") + part.word;

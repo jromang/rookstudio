@@ -13,6 +13,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -40,8 +41,6 @@ void tip(const std::string& text) {
 }
 
 using ui::mix;
-
-int64_t nowSeconds() { return static_cast<int64_t>(std::time(nullptr)); }
 
 // A size as the picker writes it: "118 MB".
 std::string megabytes(uint64_t bytes) { return trf("{} MB", (bytes + 500'000) / 1'000'000); }
@@ -168,7 +167,7 @@ void App::pollEngineVersions() {
                         [](const catalogue::Installed& i) { return i.retired > 0 && i.deleted == 0; }))
             checkVersions();
     }
-    if (version_check_ && version_check_->result.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (version_check_ && isReady(version_check_->result)) {
         const auto deleted = version_check_->result.get();
         const auto ended   = version_check_->ended;
         const auto brought = version_check_->replaced;
@@ -209,7 +208,7 @@ void App::pollEngineVersions() {
         }
     }
     // A version downloaded again for a tournament that asks for it.
-    if (version_download_ && version_download_->result.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (version_download_ && isReady(version_download_->result)) {
         auto r             = version_download_->result.get();
         const auto* engine = picker_.catalogue.find(version_download_->id);
         const auto label =

@@ -277,30 +277,26 @@ class Writer {
     explicit Writer(const fs::path& file) : file_(file), out_(tour::openFile(file, "wb")) {
         if (!out_) error_ = "cannot write " + file.string();
     }
-    ~Writer() {
-        if (out_) std::fclose(out_);
-    }
     Writer(const Writer&)            = delete;
     Writer& operator=(const Writer&) = delete;
 
     void put(const void* data, std::size_t size) {
         if (!out_ || !error_.empty()) return;
-        if (std::fwrite(data, 1, size, out_) != size)
+        if (std::fwrite(data, 1, size, out_.get()) != size)
             error_ = "cannot write " + file_.string() + " (is the disk full?)";
         written_ += size;
     }
     void put(const std::vector<uint8_t>& bytes) { put(bytes.data(), bytes.size()); }
     // Back to its start, for the header written last.
     void rewind() {
-        if (out_ && std::fseek(out_, 0, SEEK_SET) != 0) error_ = "cannot write " + file_.string();
+        if (out_ && std::fseek(out_.get(), 0, SEEK_SET) != 0) error_ = "cannot write " + file_.string();
     }
     // Synced and closed: empty, or why not.
     std::string close() {
         if (out_) {
-            if (error_.empty() && !tour::syncFile(out_))
+            if (error_.empty() && !tour::syncFile(out_.get()))
                 error_ = "cannot write " + file_.string() + " (is the disk full?)";
-            std::fclose(out_);
-            out_ = nullptr;
+            out_.reset();
         }
         return error_;
     }
@@ -309,7 +305,7 @@ class Writer {
 
    private:
     fs::path file_;
-    std::FILE* out_   = nullptr;
+    tour::File out_;
     uint64_t written_ = 0;
     std::string error_;
 };
@@ -647,10 +643,7 @@ PuzzleBuilder::~PuzzleBuilder() { closeFiles(); }
 fs::path PuzzleBuilder::bucketFile(int bucket) const { return build_ / ("bucket-" + std::to_string(bucket) + ".bin"); }
 
 void PuzzleBuilder::closeFiles() {
-    for (auto& f : files_) {
-        if (f) std::fclose(f);
-        f = nullptr;
-    }
+    for (auto& f : files_) f.reset();
 }
 
 void PuzzleBuilder::fail(std::string why) {
@@ -791,10 +784,10 @@ void PuzzleBuilder::line(std::string_view text) {
     const int bucket = std::min(std::clamp(puzzle.rating, 0, RATINGS - 1) / BUCKET_POINTS, BUCKETS - 1);
     auto& file       = files_[bucket];
     if (!file) {
-        file = tour::openFile(bucketFile(bucket), "ab");
+        file.reset(tour::openFile(bucketFile(bucket), "ab"));
         if (!file) return fail("cannot write " + bucketFile(bucket).string());
     }
-    if (std::fwrite(scratch_.data(), 1, scratch_.size(), file) != scratch_.size())
+    if (std::fwrite(scratch_.data(), 1, scratch_.size(), file.get()) != scratch_.size())
         return fail("cannot write " + bucketFile(bucket).string() + " (is the disk full?)");
     lengths_[bucket] += scratch_.size();
     ++kept_;
@@ -809,7 +802,7 @@ nlohmann::json PuzzleBuilder::mark() const {
 void PuzzleBuilder::commit() {
     if (!error_.empty()) return;
     for (int b = 0; b < BUCKETS; ++b) {
-        if (files_[b] && !tour::syncFile(files_[b])) return fail("cannot write " + bucketFile(b).string());
+        if (files_[b] && !tour::syncFile(files_[b].get())) return fail("cannot write " + bucketFile(b).string());
     }
 }
 
@@ -887,10 +880,9 @@ std::string PuzzleBuilder::finish(const fs::path& store, const std::string& date
         if (lengths_[b] == 0) continue;
         std::vector<uint8_t> data(lengths_[b]);
         {
-            std::FILE* in = tour::openFile(bucketFile(b), "rb");
+            const tour::File in{tour::openFile(bucketFile(b), "rb")};
             if (!in) return "cannot read " + bucketFile(b).string();
-            const auto got = std::fread(data.data(), 1, data.size(), in);
-            std::fclose(in);
+            const auto got = std::fread(data.data(), 1, data.size(), in.get());
             if (got != data.size()) return bucketFile(b).string() + " is shorter than its state";
         }
         std::vector<uint32_t> at;  // where each record starts

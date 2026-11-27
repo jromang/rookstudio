@@ -9,6 +9,7 @@
 #include <engine/uci_engine.hpp>
 #include <tour/engine_text.hpp>
 #include <tour/pgn_file.hpp>
+#include <tour/util.hpp>
 
 #include <fmt/include/fmt/format.h>
 
@@ -86,12 +87,7 @@ ReplayGame withoutEvaluations(ReplayGame game) {
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
+    const auto local = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y.%m.%d", &local);
     return text;

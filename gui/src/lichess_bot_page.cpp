@@ -20,6 +20,7 @@
 #include <imgui.h>
 #include <engine/uci_engine.hpp>
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "board_page.hpp"
 #include "board_view.hpp"
@@ -128,12 +129,7 @@ std::string declineText(std::string_view key) {
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
+    const auto local = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &local);
     return text;
@@ -452,10 +448,6 @@ void LichessBotPage::finishBotGame(const lichess::BotGame::State& st) {
     if (g.moves.size() < 2 || !bot_account_) return;  // an aborted game stays out
     // Into "Lichess · <bot>", made when missing, as the user's own finished games are (#49).
     const auto name  = "Lichess · " + bot_account_->username;
-    const auto lower = [](std::string text) {
-        for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return text;
-    };
     auto& s = app_.shelf();
     std::optional<std::size_t> index;
     for (std::size_t i = 0; i < s.entries().size(); ++i)
@@ -474,9 +466,6 @@ void LichessBotPage::finishBotGame(const lichess::BotGame::State& st) {
 
 void LichessBotPage::poll() {
     loadBot();
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // An account linked or a token pasted: checked before it is kept, and before anything changes it.
     const auto take = [&](lichess::BotTokenCheck c) {
         if (!c.account || !c.facts) {
@@ -508,14 +497,14 @@ void LichessBotPage::poll() {
         saveBotSettings();
         app_.raiseWindow();  // back in front of the browser
     };
-    if (bot_link_ && ready(bot_link_->result)) {
+    if (bot_link_ && isReady(bot_link_->result)) {
         auto c = bot_link_->result.get();
         bot_link_.reset();
         take(std::move(c));
     }
-    if (ready(bot_check_)) take(bot_check_.get());
+    if (isReady(bot_check_)) take(bot_check_.get());
     // The upgrade: done, refused with Lichess's words, or unanswered (nothing changed).
-    if (ready(bot_upgrade_)) {
+    if (isReady(bot_upgrade_)) {
         const auto r = bot_upgrade_.get();
         if (r.ok && bot_facts_) {
             bot_facts_->title         = "BOT";
@@ -535,14 +524,14 @@ void LichessBotPage::poll() {
                                         [token = bot_account_->token] { return lichess::checkBotToken(token); });
         }
     }
-    if (ready(bot_unlink_)) {
+    if (isReady(bot_unlink_)) {
         if (const auto failure = bot_unlink_.get(); failure.failed())
             Console::instance().add(
                 trf("Lichess: the bot's token could not be revoked: {}", lichess::describe(failure)), true);
     }
     // Its answers to the challenges: what failed is said on its card.
     for (auto& c : bot_calls_) {
-        if (!ready(c.reply)) continue;
+        if (!isReady(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
         bot_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
@@ -551,7 +540,7 @@ void LichessBotPage::poll() {
     std::erase_if(bot_calls_, [](const auto& c) { return !c.reply.valid(); });
     // Its finished games brought in.
     for (auto& a : bot_arrivals_) {
-        if (!ready(a.arrival)) continue;
+        if (!isReady(a.arrival)) continue;
         const auto got = a.arrival.get();
         if (got.added && a.index < app_.shelf().entries().size()) app_.shelf().rebuildTree(a.index);
         if (got.failure.failed())
@@ -1009,10 +998,6 @@ void LichessBotPage::drawBotConfirm() {
     const bool enter  = ImGui::InputText("##bot_confirm_name", bot_confirm_.data(), bot_confirm_.size(),
                                          ImGuiInputTextFlags_EnterReturnsTrue);
     std::string typed = bot_confirm_.data();
-    const auto lower  = [](std::string t) {
-        for (auto& c : t) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return t;
-    };
     const bool matches = !typed.empty() && lower(typed) == lower(name);
     const bool busy    = bot_upgrade_.valid();
     if (primaryButton(busy ? TR("Asking Lichess…") : TR("Make it a bot"), matches && !busy, ui::BAD) ||
@@ -1042,12 +1027,7 @@ void LichessBotPage::drawBotRules(const EngineEntry& e, bool enter_below) {
     std::string since;
     if (s.upgraded_at > 0) {
         const auto t = static_cast<std::time_t>(s.upgraded_at);
-        std::tm local{};
-#ifdef _WIN32
-        localtime_s(&local, &t);
-#else
-        localtime_r(&t, &local);
-#endif
+        const auto local = localTime(t);
         // The time today, else the date: "a bot since on Monday" did not read.
         char time_text[16], date_text[16];
         std::strftime(time_text, sizeof(time_text), "%H:%M", &local);

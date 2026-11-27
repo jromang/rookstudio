@@ -17,6 +17,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include <tour/summary.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "i18n.hpp"
@@ -33,12 +34,7 @@ float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 std::string date(int64_t ms) {
     if (ms <= 0) return "?";
     const auto t = static_cast<std::time_t>(ms / 1000);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     return fmt::format("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 
@@ -119,7 +115,7 @@ bool reviewPgnPlayers(const std::vector<tour::GameDb::Player>& players, const st
 
 void App::refreshRatings() {
     if (ratings_job_.valid()) {
-        if (ratings_job_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(ratings_job_)) return;
         auto r              = ratings_job_.get();
         game_db_            = std::move(r.db);
         rating_list_        = std::move(r.list);
@@ -714,10 +710,6 @@ void App::drawPgnPlayers() {
     ImGui::SetNextItemWidth(px(260));
     if (ImGui::InputTextWithHint("##pgn_players_filter", TR("Search"), buffer, sizeof(buffer)))
         pgn_players_filter_ = buffer;
-    const auto lower = [](std::string s) {
-        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        return s;
-    };
     const auto needle = lower(pgn_players_filter_);
     std::vector<int> shown;
     for (int i = 0; i < static_cast<int>(players.size()); ++i) {

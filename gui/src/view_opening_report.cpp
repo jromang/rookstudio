@@ -19,7 +19,9 @@
 #include <commentary/fact_parts.hpp>
 #include <study/dossier.hpp>
 #include <study/import.hpp>
+#include <study/result_char.hpp>
 #include <study/scan_board.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "assistant_service.hpp"
@@ -265,8 +267,6 @@ std::string evalText(const ReportEval& e) {
     return e.cp ? fmt::format("{:+.2f}", *e.cp / 100.0) : std::string();
 }
 
-std::string resultText(char r) { return r == '1' ? "1-0" : r == '0' ? "0-1" : r == '=' ? "½-½" : "*"; }
-
 // The explorer's key of a question, as the Tree tab makes it: the same answer serves both.
 std::string explorerKey(const lichess::ExplorerQuery& q, int source) {
     std::string key = fmt::format("{}|{}", source, q.fen);
@@ -279,12 +279,7 @@ std::string explorerKey(const lichess::ExplorerQuery& q, int source) {
 
 std::string dateOf(int64_t seconds) {
     const auto t = static_cast<std::time_t>(seconds);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &tm);
     return text;
@@ -387,7 +382,7 @@ void App::askReportLichess(int source) {
     auto& r = *opening_report_;
     if (!lichess_account_ || !lichess_.explorer || aidsLocked()) return;
     // The answers that came, for the Tree tab and the report alike.
-    if (explorer_job_.valid() && explorer_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(explorer_job_)) {
         if (explorer_answers_.size() > 2000) explorer_answers_.clear();
         auto answer = explorer_job_.get();
         if (!answer.value) explorer_failed_[explorer_asked_] = ImGui::GetTime();
@@ -452,7 +447,7 @@ void App::pollOpeningReport() {
         return;
     }
     if (r.locked) {
-        if (r.job.valid() && r.job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (r.job.valid() && !isReady(r.job)) return;
         startOpeningReport();
         return;
     }
@@ -469,7 +464,7 @@ void App::pollOpeningReport() {
             }
         }
     }
-    if (r.job.valid() && r.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(r.job)) {
         try {
             r.job.get();
         } catch (const std::exception& e) {
@@ -519,7 +514,7 @@ void App::pollOpeningReport() {
     if (r.report && !correspondence && !r.rows.empty()) {
         std::string of;
         for (const auto& row : r.rows) of += chess::uci::moveToUci(row.move) + " ";
-        if (r.evals_job.valid() && r.evals_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (isReady(r.evals_job)) {
             r.evals = r.evals_job.get();
             r.evals_offline =
                 std::any_of(r.evals.begin(), r.evals.end(), [](const auto& e) { return e && !e->engine; });
@@ -549,7 +544,7 @@ void App::pollOpeningReport() {
         }
     }
     // The summary, once the report, its evaluations and Lichess's sources ticked are in.
-    if (r.summary_job.valid() && r.summary_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(r.summary_job)) {
         auto written = r.summary_job.get();
         if (!written.cancelled) r.summary = std::move(written);
     }
@@ -1292,7 +1287,7 @@ void App::drawReportKeyGames() {
         std::vector<std::string> where;
         if (!row.event.empty() && row.event != "?") where.emplace_back(row.event);
         if (row.date >> 9) where.push_back(std::to_string(row.date >> 9));
-        where.push_back(resultText(row.result));
+        where.push_back(study::shownResult(row.result));
         where.push_back(trn("{} move", "{} moves", static_cast<int>((row.plies + 1) / 2), (row.plies + 1) / 2));
         std::string w_text;
         for (const auto& part : where) w_text += (w_text.empty() ? "" : " · ") + part;
@@ -1731,7 +1726,7 @@ publish::Document openingReportDocument(const ReportView& view, const std::vecto
             const std::string event(row.event);
             t.table.rows.push_back({{fmt::format("{} – {}", snap.shownName(ids.white), snap.shownName(ids.black))},
                                     {event == "?" ? std::string() : event},
-                                    {resultText(row.result)},
+                                    {study::shownResult(row.result)},
                                     {why, publish::FontId::Regular, publish::MUTED_COLOUR}});
         }
         d.blocks.push_back(std::move(t));

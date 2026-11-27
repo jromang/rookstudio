@@ -16,6 +16,8 @@
 
 #include <json.hpp>
 
+#include "jobs.hpp"
+
 namespace fcg {
 
 class ZstdConsumer {
@@ -51,9 +53,9 @@ struct ZstdReadingOptions {
 };
 
 // Reads `source` (an http:// or https:// URL, else a file) through `consumer`, its place kept in `state_file`, on the
-// calling thread. Returns "" at the end, "cancelled" for a cancel, else why it stopped.
-[[nodiscard]] std::string readZstd(const std::string& source, const std::filesystem::path& state_file,
-                                   ZstdConsumer& consumer, ZstdProgress& progress, const std::atomic<bool>& cancel,
-                                   const ZstdReadingOptions& options = {});
+// calling thread: at its end, cancelled by `cancel`, or failed, with why it stopped.
+[[nodiscard]] TaskEnd readZstd(const std::string& source, const std::filesystem::path& state_file,
+                               ZstdConsumer& consumer, ZstdProgress& progress, const std::atomic<bool>& cancel,
+                               const ZstdReadingOptions& options = {});
 
 }  // namespace fcg

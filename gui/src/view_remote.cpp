@@ -13,6 +13,7 @@
 #include <mbedtls/platform_util.h>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -58,12 +59,7 @@ std::string untilde(const std::string& path, const std::string& home) {
 std::string dayOf(int64_t time) {
     if (time <= 0) return {};
     const auto t = static_cast<std::time_t>(time);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     char text[16];
     std::strftime(text, sizeof text, "%Y-%m-%d", &tm);
     return text;
@@ -372,7 +368,7 @@ void App::hashRemotePrograms(std::vector<std::string> names) {
 }
 
 void App::pollRemoteHashes() {
-    if (!remote_hashes_.valid() || remote_hashes_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    if (!isReady(remote_hashes_)) return;
     const auto hashes = remote_hashes_.get();
     bool save = false, machines = false;
     for (const auto& h : hashes) {
@@ -560,7 +556,7 @@ void App::drawRemotePicker() {
         ImGui::OpenPopup("##remote_picker");
         p.shown = true;
     }
-    if (p.listing.valid() && p.listing.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(p.listing)) {
         auto listing = p.listing.get();
         if (!listing.file.empty()) {
             chooseRemote(listing.file);

@@ -12,6 +12,7 @@
 
 #include <study/sources.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "i18n.hpp"
 
@@ -35,12 +36,7 @@ fs::path keptFile(const fs::path& profile) { return folder(profile) / "list.json
 
 std::optional<Day> today() {
     const auto now = std::time(nullptr);
-    std::tm t{};
-#ifdef _WIN32
-    localtime_s(&t, &now);
-#else
-    localtime_r(&now, &t);
-#endif
+    const auto t   = localTime(now);
     return Day{t.tm_year + 1900, t.tm_mon + 1, t.tm_mday};
 }
 
@@ -165,12 +161,7 @@ void removeKept(const fs::path& profile) {
 }
 
 std::string monthDue(const Kept& kept, std::time_t now) {
-    std::tm t{};
-#ifdef _WIN32
-    localtime_s(&t, &now);
-#else
-    localtime_r(&now, &t);
-#endif
+    const auto t       = localTime(now);
     const auto current = fmt::format("{:04}-{:02}", t.tm_year + 1900, t.tm_mon + 1);
     if (current <= kept.month || current <= kept.offered) return {};
     return current;
@@ -237,12 +228,7 @@ std::unique_ptr<Job> start(const fs::path& profile, const fs::path& file) {
                     const auto when = std::chrono::system_clock::to_time_t(
                         std::chrono::time_point_cast<std::chrono::system_clock::duration>(
                             std::chrono::file_clock::to_sys(written)));
-                    std::tm t{};
-#ifdef _WIN32
-                    localtime_s(&t, &when);
-#else
-                    localtime_r(&when, &t);
-#endif
+                    const auto t = localTime(when);
                     day = Day{t.tm_year + 1900, t.tm_mon + 1, t.tm_mday};
                 } else {
                     day = today();

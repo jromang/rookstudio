@@ -110,7 +110,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     REQUIRE(waitUntil([&] { return !download.busy(); }));
     auto why = download.finished();
     REQUIRE(why);
-    CHECK_FALSE(why->empty());
+    CHECK_FALSE(why->done());
     CHECK(download.state().files == 4);
     CHECK(download.state().ready == 0);
     CHECK(fs::file_size(fs::path(folder / "KPvK.rtbw").concat(".part")) == 3000);
@@ -121,7 +121,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     REQUIRE(waitUntil([&] { return !download.busy(); }));
     why = download.finished();
     REQUIRE(why);
-    CHECK(why->empty());
+    CHECK(why->done());
     const auto state = download.state();
     CHECK(state.files == 10);
     CHECK(state.complete);
@@ -142,7 +142,7 @@ TEST_CASE("Syzygy download: each file in turn, cut short and resumed, the tables
     REQUIRE(waitUntil([&] { return !download.busy(); }));
     why = download.finished();
     REQUIRE(why);
-    CHECK(why->find("KRvK.rtbz") != std::string::npos);
+    CHECK(why->error.find("KRvK.rtbz") != std::string::npos);
     CHECK_FALSE(fs::exists(folder / "KRvK.rtbz"));
     CHECK(download.state().files == 9);
     fs::remove_all(folder);

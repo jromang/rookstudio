@@ -1101,7 +1101,7 @@ const TableVerdict* App::liveVerdict(const chess::Board& board) {
     if (run_->running() && !run_->remote()) return nullptr;
 
     auto& lt = live_tables_;
-    if (lt.job.valid() && lt.job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(lt.job)) {
         auto verdict = lt.job.get();
         if (lt.known.size() > 50'000) lt.known.clear();
         lt.known[lt.job_fen] = verdict;

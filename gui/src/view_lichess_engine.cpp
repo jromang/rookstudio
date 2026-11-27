@@ -18,6 +18,7 @@
 #include <imgui.h>
 #include <chess.hpp>
 #include <tour/budget.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_view.hpp"
@@ -112,12 +113,7 @@ void keyHint(const char* key) {
 
 std::string today() {
     const auto now = std::time(nullptr);
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &now);
-#else
-    localtime_r(&now, &local);
-#endif
+    const auto local = localTime(now);
     char text[16];
     std::strftime(text, sizeof(text), "%Y-%m-%d", &local);
     return text;
@@ -411,7 +407,7 @@ void App::pollLichessEngines() {
     for (auto it = offer_calls_.begin(); it != offer_calls_.end();) {
         auto& c = *it;
         if (c.kind == OfferCall::Kind::Withdraw) {
-            if (c.withdrawn.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            if (!isReady(c.withdrawn)) {
                 ++it;
                 continue;
             }
@@ -424,7 +420,7 @@ void App::pollLichessEngines() {
             it = offer_calls_.erase(it);
             continue;
         }
-        if (c.result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        if (!isReady(c.result)) {
             ++it;
             continue;
         }

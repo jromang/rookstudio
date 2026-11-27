@@ -17,6 +17,7 @@
 #include <fmt/include/fmt/format.h>
 #include <study/sources.hpp>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "console.hpp"
 #include "i18n.hpp"
@@ -119,7 +120,7 @@ std::optional<std::string> programName(std::string_view path) {
 std::string writeStream(study::ByteSource& in, uint64_t size, const fs::path& file) {
     std::error_code ec;
     const auto part = fs::path(file).concat(".part");
-    std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(tour::openFile(part, "wb"), &std::fclose);
+    tour::File f(tour::openFile(part, "wb"));
     if (!f) return "cannot write " + part.string();
     std::vector<char> buffer(1 << 16);
     std::string error;
@@ -190,11 +191,6 @@ Extracted fromTar(study::ByteSource& in, const std::regex& inside, const fs::pat
         }
     }
     return {{}, "the program is not in the archive"};
-}
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
 }
 
 }  // namespace
@@ -390,7 +386,7 @@ Extracted extractProgram(const fs::path& archive, std::string_view inside, const
     try {
         std::array<unsigned char, 4> magic{};
         {
-            std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(tour::openFile(archive, "rb"), &std::fclose);
+            tour::File f(tour::openFile(archive, "rb"));
             if (!f || std::fread(magic.data(), 1, magic.size(), f.get()) != magic.size())
                 return {{}, "cannot read " + archive.string()};
         }

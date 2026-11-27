@@ -29,6 +29,7 @@
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/game_tree.hpp>
+#include <tour/util.hpp>
 
 #include "board_text.hpp"
 #include "board_view.hpp"
@@ -268,8 +269,7 @@ void PuzzlesPage::sendOnlineResults() {
 
 void PuzzlesPage::poll() {
     if (offline_puzzles_) {
-        if (offline_puzzles_update_.valid() &&
-            offline_puzzles_update_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (isReady(offline_puzzles_update_)) {
             const auto size  = offline_puzzles_update_.get();
             const auto state = offline_puzzles_->state();
             if (size.failed())
@@ -279,22 +279,20 @@ void PuzzlesPage::poll() {
             else
                 startOffline(lichess::puzzlesUrl());
         }
-        if (const auto why = offline_puzzles_->finished()) {
+        if (const auto end = offline_puzzles_->finished()) {
             const auto state = offline_puzzles_->state();
-            if (why->empty()) {
+            if (end->done()) {
                 Console::instance().add(trf("Lichess's puzzles kept offline: {} puzzles, {}",
                                             ui::exactCount(state.puzzles), formatBytes(state.bytes)));
-            } else if (*why != "cancelled") {
-                offline_puzzles_error_ = *why;
-                Console::instance().add(trf("Lichess's puzzles offline: the preparation stopped: {}", *why), true);
+            } else if (end->failed()) {
+                offline_puzzles_error_ = end->error;
+                Console::instance().add(trf("Lichess's puzzles offline: the preparation stopped: {}", end->error),
+                                        true);
             }
         }
     }
     // Online: a batch asked for, results sent.
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
-    if (ready(online_ask_)) {
+    if (isReady(online_ask_)) {
         auto answer    = online_ask_.get();
         online_status_ = answer.status;
         if (answer.value && !answer.value->puzzles.empty()) {
@@ -321,7 +319,7 @@ void PuzzlesPage::poll() {
                                                : lichess::describe(answer);
         }
     }
-    if (ready(online_send_)) {
+    if (isReady(online_send_)) {
         auto answer    = online_send_.get();
         online_status_ = answer.status;
         auto* batch    = onlineBatch();
@@ -419,7 +417,7 @@ bool PuzzlesPage::startTheme(const std::string& theme) {
 }
 
 void PuzzlesPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
-    add(TR("Puzzles"), training_view, [this] { app_.showTrainingPage(1); });
+    add(TR("Puzzles"), training_view, [this] { app_.showTrainingPage(TrainingPart::Puzzles); });
     if (offline_puzzles_) {
         const auto store = offline_puzzles_->store();
         if (store && puzzleLock().empty()) {
@@ -441,35 +439,35 @@ void PuzzlesPage::addCommands(const PaletteAdd& add, const std::string& training
             add(TR("Cancel the download of Lichess's puzzles"), TR("Training"), [this] { offline_puzzles_->cancel(); });
         } else if (store) {
             add(TR("Update Lichess's puzzles"), TR("Training"), [this] {
-                app_.showTrainingPage(1);
+                app_.showTrainingPage(TrainingPart::Puzzles);
                 offline_puzzles_note_.clear();
                 offline_puzzles_update_ =
                     std::async(std::launch::async, [] { return evalsSize(lichess::puzzlesUrl()); });
             });
             add(TR("Remove Lichess's puzzles…"), TR("Training"), [this] {
-                app_.showTrainingPage(1);
+                app_.showTrainingPage(TrainingPart::Puzzles);
                 offline_puzzles_remove_ = true;
             });
         } else {
             add(TR("Download Lichess's puzzles"), TR("Training"), [this] {
-                app_.showTrainingPage(1);
+                app_.showTrainingPage(TrainingPart::Puzzles);
                 startOffline(lichess::puzzlesUrl());
             });
         }
     }
     add(TR("Puzzles online, from my Lichess account"), "Lichess", [this] {
-        app_.showTrainingPage(1);
+        app_.showTrainingPage(TrainingPart::Puzzles);
         puzzles_online_ = true;
     });
 }
 
 void PuzzlesPage::addFocusWords(FocusWords& words, const std::string& w) {
     words.on({"puzzles-online"}, [&] {  // the Training page's Puzzles part (#80), the puzzles online chosen
-        app_.showTrainingPage(1);
+        app_.showTrainingPage(TrainingPart::Puzzles);
         puzzles_online_ = true;
     });
     words.on({"puzzles-file=*"}, [&] {  // puzzles-file=FILE: Lichess's puzzle database read from it
-        app_.showTrainingPage(1);
+        app_.showTrainingPage(TrainingPart::Puzzles);
         startOffline(w.substr(13));
     });
     words.on({"puzzles-series", "puzzles-series=*"}, [&] {
@@ -1277,7 +1275,9 @@ void PuzzlesPage::drawPuzzleEnd() {
 // ---------------------------------------------------------------------------
 // The Training page
 
-TrainingKind::Part PuzzlesPage::part() const { return {1, TR("Puzzles"), "puzzles", guide::topics::Puzzles}; }
+TrainingKind::Part PuzzlesPage::part() const {
+    return {TrainingPart::Puzzles, TR("Puzzles"), "puzzles", guide::topics::Puzzles};
+}
 
 void PuzzlesPage::drawTodayCards(TodayCards& cards) {
     const auto state = storeState();
@@ -1413,10 +1413,6 @@ void PuzzlesPage::drawChooser(bool& enter) {
         const std::string filter = puzzles_filter_.data();
         const auto matches       = [&](const std::string& name) {
             if (filter.empty()) return true;
-            auto lower = [](std::string s) {
-                for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-                return s;
-            };
             return lower(name).find(lower(filter)) != std::string::npos;
         };
         ImGui::BeginChild("##puzzle_theme_list", ImVec2(px(420), px(360)));
@@ -1559,12 +1555,7 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
         const auto when = [](int64_t t) {
             char text[16] = "";
             const auto tt = static_cast<std::time_t>(t);
-            std::tm tm{};
-#ifdef _WIN32
-            localtime_s(&tm, &tt);
-#else
-            localtime_r(&tt, &tm);
-#endif
+            const auto tm = localTime(tt);
             std::strftime(text, sizeof text, "%H:%M", &tm);
             return std::string(text);
         };
@@ -1632,8 +1623,7 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
         online_dashboard_job_ =
             std::async(std::launch::async, [token = account->token] { return lichess::puzzleDashboard(token, 30); });
     }
-    if (online_dashboard_job_.valid() &&
-        online_dashboard_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (isReady(online_dashboard_job_)) {
         if (auto answer = online_dashboard_job_.get(); answer.value) online_dashboard_ = std::move(*answer.value);
     }
     if (online_dashboard_ && online_dashboard_->nb > 0) {
@@ -1661,12 +1651,7 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
     }
     if (batch && batch->sent_at > 0) {
         const auto tt = static_cast<std::time_t>(batch->sent_at);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &tt);
-#else
-        localtime_r(&tt, &tm);
-#endif
+        const auto tm = localTime(tt);
         char text[32];
         std::strftime(text, sizeof text, "%H:%M", &tm);
         ImGui::TextDisabled("%s", (batch->sent_status == "accepted"

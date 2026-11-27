@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include "background.hpp"
 #include "store.hpp"
 
 namespace fcg::study {
@@ -30,10 +31,7 @@ struct DuplicateGroup {
     DuplicateKind kind = DuplicateKind::SameMoves;
 };
 
-struct DuplicateProgress {
-    std::atomic<uint64_t> done{0};
-    std::atomic<uint64_t> total{0};
-};
+using DuplicateProgress = JobProgress;
 
 struct Duplicates {
     std::vector<DuplicateGroup> groups;  // by kind, then by their first game

@@ -16,6 +16,7 @@
 
 #include <study/import.hpp>
 #include <study/theory_notes.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -33,11 +34,6 @@ namespace {
 namespace fs = std::filesystem;
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
 
 // A move as the notation writes it, in the interface's letters: "7…Qb6", "7.f4".
 std::string moveLabel(int number, bool black, const std::string& san) {

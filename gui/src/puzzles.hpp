@@ -78,8 +78,8 @@ class OfflinePuzzles {
     [[nodiscard]] bool busy() const noexcept { return job_.running(); }
     void cancel() noexcept { job_.cancel(); }
     [[nodiscard]] const Progress& progress() const noexcept { return job_.state(); }
-    // Once a preparation has stopped: empty when it went to its end, else why it stopped ("cancelled" for Cancel).
-    [[nodiscard]] std::optional<std::string> finished();
+    // Once a preparation has stopped: how it ended, done when it went to its end.
+    [[nodiscard]] std::optional<TaskEnd> finished();
     // The store removed, a preparation under way cancelled first: no store at once; the files go once it ended, at the
     // finished() that sees its end (it writes in the folder until then), and it is not said. The user's own puzzles
     // stay (another folder).
@@ -106,7 +106,7 @@ class OfflinePuzzles {
     double checkpoint_every_ = 5;
     std::chrono::milliseconds retry_wait_{2000};
     std::function<void()> on_saved_;
-    Job<std::string, Progress> job_;
+    Job<TaskEnd, Progress> job_;
 };
 
 // ---------------------------------------------------------------------------

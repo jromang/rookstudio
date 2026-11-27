@@ -8,6 +8,7 @@
 #include <set>
 
 #include <fmt/include/fmt/format.h>
+#include <tour/util.hpp>
 
 #include "https.hpp"
 #include "lichess_games.hpp"
@@ -27,12 +28,6 @@ int64_t intOf(const nlohmann::json& j, const char* key, int64_t otherwise = 0) {
 double numberOf(const nlohmann::json& j, const char* key) {
     const auto it = j.find(key);
     return it != j.end() && it->is_number() ? it->get<double>() : 0.0;
-}
-
-std::string lower(std::string_view text) {
-    std::string out(text);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
 }
 
 // An answer about a tournament: its 404 says Lichess has no such tournament.
@@ -733,12 +728,7 @@ double trfPoints(char code) {
 
 std::string swissStartText(int64_t ms) {
     const auto t = static_cast<std::time_t>(ms / 1000);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     return fmt::format("{:02}:{:02} on {} {} {}", tm.tm_hour, tm.tm_min, tm.tm_mday, MONTHS[tm.tm_mon % 12],
                        tm.tm_year + 1900);
 }

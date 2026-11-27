@@ -12,17 +12,13 @@
 
 #include "chess_text.hpp"
 #include "polyglot.hpp"
+#include "util.hpp"
 
 namespace fcg::tour {
 
 namespace fs = std::filesystem;
 
 namespace {
-
-std::string lower(std::string s) {
-    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
 
 // The first four fields of an EPD line (placement, side, castling, en passant): its position.
 std::string epdPosition(std::string_view line) {

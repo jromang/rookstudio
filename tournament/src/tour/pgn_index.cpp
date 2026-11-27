@@ -1,4 +1,5 @@
 #include "pgn_index.hpp"
+#include "util.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -7,12 +8,6 @@
 namespace fcg::tour {
 
 namespace {
-
-std::string lower(std::string_view s) {
-    std::string out(s);
-    for (auto& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
-}
 
 // A tag line, `[Name "value"]`: its name and value (unescaped), false for anything else (a comment's [%eval 0.3]).
 bool tagOf(std::string_view line, std::string_view& name, std::string& value) {

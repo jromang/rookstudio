@@ -627,6 +627,12 @@ Impact TournamentState::preview(const Edit& edit) const {
     return previewLocked(edit);
 }
 
+int TournamentState::nextParticipantId() const {
+    int id = 0;
+    for (const auto& p : spec_.participants) id = std::max(id, p.id + 1);
+    return id;
+}
+
 Impact TournamentState::previewLocked(const Edit& edit) const {
     Impact impact;
     impact.games_before = totalLocked();
@@ -661,8 +667,7 @@ Impact TournamentState::previewLocked(const Edit& edit) const {
         }
     }
 
-    int new_id = 0;
-    for (const auto& p : spec_.participants) new_id = std::max(new_id, p.id + 1);
+    const int new_id = nextParticipantId();
 
     auto spec     = spec_;
     auto schedule = schedule_;
@@ -700,8 +705,7 @@ void TournamentState::applyEdit(const Edit& edit) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (const auto impact = previewLocked(edit); !impact.error.empty()) throw std::runtime_error(impact.error);
 
-    int new_id = 0;
-    for (const auto& p : spec_.participants) new_id = std::max(new_id, p.id + 1);
+    const int new_id = nextParticipantId();
 
     auto event = editEvent(edit, next_encounter_, new_id, spec_);
     // The newcomer's program is read here rather than in editEvent(), which every preview calls.

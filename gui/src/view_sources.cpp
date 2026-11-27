@@ -15,6 +15,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <tour/files.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "chesscom.hpp"
@@ -29,11 +30,6 @@ namespace fcg {
 namespace fs = std::filesystem;
 
 namespace {
-
-int64_t nowSeconds() {
-    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-        .count();
-}
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
@@ -122,14 +118,16 @@ void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, i
     if (const auto db = s.open(add.index)) add.from = static_cast<study::GameId>(db->snapshot()->games());
     add.downloads = std::async(std::launch::async,
                                [urls = add.urls, wanted = add.wanted, cancel = add.cancel, progress = add.progress] {
-                                   std::vector<std::pair<fs::path, std::string>> out;
+                                   std::vector<std::pair<fs::path, TaskEnd>> out;
                                    for (std::size_t i = 0; i < urls.size() && i < wanted.size(); ++i) {
                                        if (cancel->load()) break;
                                        progress->bytes = 0;
                                        progress->size  = 0;
                                        const auto got =
                                            politeDownload(urls[i], wanted[i], progress.get(), cancel.get());
-                                       out.emplace_back(wanted[i], got.ok ? std::string() : got.error);
+                                       out.emplace_back(wanted[i], got.ok           ? TaskEnd{}
+                                                                   : cancel->load() ? TaskEnd::cancel()
+                                                                                    : TaskEnd::of(got.error));
                                        if (!got.ok) break;
                                    }
                                    return out;
@@ -175,7 +173,7 @@ void App::pollTwic() {
     const auto now = nowSeconds();
     // The weekly look, when ticked: the page of issues, at most four times a day.
     if (!twic_index_job_ && twic::lookDue(twic_, now)) startTwicIndex(true);
-    if (twic_index_job_ && twic_index_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (twic_index_job_ && isReady(twic_index_job_->done)) {
         auto [issues, error] = twic_index_job_->done.get();
         const bool weekly    = twic_index_job_->weekly;
         twic_index_job_.reset();
@@ -191,7 +189,7 @@ void App::pollTwic() {
         saveTwic();
     }
     // Lichess's page of monthly files, asked for by a sheet.
-    if (lichess_months_job_ && lichess_months_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (lichess_months_job_ && isReady(*lichess_months_job_)) {
         auto page = lichess_months_job_->get();
         lichess_months_job_.reset();
         if (!page.value) {
@@ -208,12 +206,12 @@ void App::pollTwic() {
     auto& add = *twic_add_;
     // The downloads, then the imports one after the other.
     if (!add.downloaded) {
-        if (add.downloads.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+        if (!isReady(add.downloads)) return;
         add.downloaded = true;
-        for (const auto& [file, error] : add.downloads.get()) {
-            if (!error.empty()) {
+        for (const auto& [file, end] : add.downloads.get()) {
+            if (!end.done()) {
                 twic_done_        = TwicDone{};
-                twic_done_->error = error == "cancelled" ? std::string(TR("Cancelled.")) : error;
+                twic_done_->error = end.cancelled() ? std::string(TR("Cancelled.")) : end.error;
                 twic_add_.reset();
                 return;
             }
@@ -732,7 +730,7 @@ void App::drawChesscomSheet() {
         loadChesscom();
         chesscom_loaded_ = true;
     }
-    if (chesscom_job_ && chesscom_job_->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (chesscom_job_ && isReady(*chesscom_job_)) {
         auto [months, error] = chesscom_job_->get();
         chesscom_job_.reset();
         chesscom_months_ = months;
@@ -888,12 +886,13 @@ void App::startMonthReading(const std::string& source) {
 
 void App::pollMonthReading() {
     if (!month_reading_ || month_reading_->busy() || !month_run_) return;
-    const auto why = month_reading_->finished();
-    if (!why) return;
+    const auto end = month_reading_->finished();
+    if (!end) return;
     const auto& run = *month_run_;
     if (run.index < shelf().entries().size()) shelf().rebuildTree(run.index);  // its opening tree, for what came
-    if (!why->empty()) {
-        month_stopped_ = *why == "cancelled" ? std::string(TR("Cancelled: what was read is in the database.")) : *why;
+    if (!end->done()) {
+        month_stopped_ =
+            end->cancelled() ? std::string(TR("Cancelled: what was read is in the database.")) : end->error;
         return;
     }
     TwicDone done;

@@ -13,6 +13,7 @@
 #include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "board_text.hpp"
@@ -78,11 +79,6 @@ void heading(const char* text) {
     ImGui::PushFont(ui::titleFont(), ImGui::GetStyle().FontSizeBase);
     ImGui::TextUnformatted(text);
     ImGui::PopFont();
-}
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
 }
 
 const char* speedName(std::string_view key) {
@@ -294,12 +290,9 @@ void App::onlineEvent(const lichess::GameEvent& e) {
 }
 
 void App::pollOnlinePlay() {
-    const auto ready = [](auto& f) {
-        return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
     // The requests under way: what failed is said where the user plays.
     for (auto& c : online_calls_) {
-        if (!ready(c.reply)) continue;
+        if (!isReady(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
         play_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
@@ -434,7 +427,7 @@ void App::pollOnlinePlay() {
         }
     }
     // The move's answer: refused, or cut, it is taken back.
-    if (ready(og.move_job)) {
+    if (isReady(og.move_job)) {
         const auto r = og.move_job.get();
         if (!r.ok) {
             og.sent.reset();

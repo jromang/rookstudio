@@ -27,6 +27,7 @@
 #include <utility>
 #include <vector>
 
+#include "background.hpp"
 #include "dossier.hpp"
 #include "scan_board.hpp"
 #include "store.hpp"
@@ -160,10 +161,8 @@ struct ReportOptions {
 
 enum class ReportSection : uint8_t { Moves, Shapes, KeyGames, Novelties, Done };
 
-struct ReportProgress {
+struct ReportProgress : JobProgress {
     std::atomic<int> section{0};  // ReportSection
-    std::atomic<uint64_t> done{0};
-    std::atomic<uint64_t> total{0};
 };
 
 struct OpeningReport {

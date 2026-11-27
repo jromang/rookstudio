@@ -15,6 +15,7 @@
 #include <implot.h>
 
 #include <tour/budget.hpp>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "console.hpp"
@@ -735,8 +736,7 @@ void App::drawInterrupted(bool error) {
 
 void App::pollDiskSpace() {
     // The drives the tournaments are written to, asked every minute on a worker thread: a network drive can be slow.
-    if (disk_job_.valid() && disk_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-        disks_ = disk_job_.get();
+    if (isReady(disk_job_)) disks_ = disk_job_.get();
     const auto now = std::chrono::steady_clock::now();
     if (disk_job_.valid() || (disk_asked_ != decltype(disk_asked_){} && now - disk_asked_ < std::chrono::minutes(1)))
         return;
@@ -919,8 +919,7 @@ void App::drawLastFinished() {
 void App::drawHealth() {
     // The journals of the last 24 hours, read again every 30 seconds on a worker thread: only what they gained.
     const auto now = std::chrono::steady_clock::now();
-    if (incidents_job_.valid() && incidents_job_.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-        incidents_ = incidents_job_.get();
+    if (isReady(incidents_job_)) incidents_ = incidents_job_.get();
     if (!incidents_job_.valid() && now - incidents_asked_ > std::chrono::seconds(30)) {
         incidents_asked_ = now;
         const auto since = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -1096,12 +1095,7 @@ void App::drawRemoteMachinesLine() {
             text += " · " + trn("{} engine playing", "{} engines playing", m.engines, m.engines);
         } else if (!m.error.empty() && m.since > 0) {
             const auto t = static_cast<std::time_t>(m.since);
-            std::tm tm{};
-#ifdef _WIN32
-            localtime_s(&tm, &t);
-#else
-            localtime_r(&t, &tm);
-#endif
+            const auto tm = localTime(t);
             char hhmm[8];
             std::strftime(hhmm, sizeof hhmm, "%H:%M", &tm);
             text += " · " + trf("not answering since {}", hhmm);

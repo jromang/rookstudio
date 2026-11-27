@@ -26,6 +26,7 @@
 #include <stdexcept>
 
 #include <zlib.h>
+#include <tour/util.hpp>
 
 #include "chessbase_detail.hpp"
 #include "mapped_file.hpp"
@@ -609,11 +610,6 @@ class MemberSource final : public Source {
     std::vector<uint8_t> scratch_;
     Huffman huffman_;
 };
-
-std::string lower(std::string s) {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return s;
-}
 
 class ArchiveMembers final : public Members {
    public:

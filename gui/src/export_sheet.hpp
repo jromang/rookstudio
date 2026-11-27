@@ -50,10 +50,6 @@ void saveExportSettings(const std::filesystem::path& profile, const ExportSettin
 // Whether files can be written in a folder: one made there and removed.
 [[nodiscard]] bool folderWritable(const std::filesystem::path& folder);
 
-// A path free in a folder: `stem` and `extension`, a number added when it is taken ("game-2.pdf").
-[[nodiscard]] std::filesystem::path freePath(const std::filesystem::path& folder, const std::string& stem,
-                                             const std::string& extension);
-
 // Whether the system has a reader for PDF files: on Linux, the one xdg-mime names; elsewhere, true (Windows and macOS
 // have one, and opening the file says when not).
 [[nodiscard]] bool systemHasPdfReader();

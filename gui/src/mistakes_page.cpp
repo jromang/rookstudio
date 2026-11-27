@@ -28,6 +28,7 @@
 #include <study/background.hpp>
 #include <study/game_tree.hpp>
 #include <study/import.hpp>
+#include <tour/util.hpp>
 
 #include "board_page.hpp"
 #include "board_text.hpp"
@@ -285,7 +286,7 @@ void MistakesPage::drawHomeLine() {
 }
 
 void MistakesPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
-    add(TR("My mistakes"), training_view, [this] { app_.showTrainingPage(2); });
+    add(TR("My mistakes"), training_view, [this] { app_.showTrainingPage(TrainingPart::Mistakes); });
     if (mistakeLock().empty()) {
         const auto c = mistakeDayCounts();
         if (c.due > 0)
@@ -311,7 +312,7 @@ void MistakesPage::addCommands(const PaletteAdd& add, const std::string& trainin
 void MistakesPage::addFocusWords(FocusWords& words, const std::string& w) {
     words.on({"mistakes-session", "mistakes-review"}, [&] {
         // A session of the exercises of the user's mistakes: today's, or the day's review of them alone (#81).
-        if (!startMistakes(w == "mistakes-review")) app_.showTrainingPage(2);
+        if (!startMistakes(w == "mistakes-review")) app_.showTrainingPage(TrainingPart::Mistakes);
     });
 }
 
@@ -344,7 +345,7 @@ void MistakesPage::poll() {
             mistake_scan_job_ = std::move(job);
         }
     }
-    if (mistake_scan_job_ && mistake_scan_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (mistake_scan_job_ && isReady(mistake_scan_job_->done)) {
         MistakeScan scan;
         try {
             scan = mistake_scan_job_->done.get();
@@ -580,7 +581,9 @@ void MistakesPage::drawMistakeReviewsCard() {
 // ---------------------------------------------------------------------------
 // The Training page's part
 
-TrainingKind::Part MistakesPage::part() const { return {2, TR("My mistakes"), "mistakes", guide::topics::Mistakes}; }
+TrainingKind::Part MistakesPage::part() const {
+    return {TrainingPart::Mistakes, TR("My mistakes"), "mistakes", guide::topics::Mistakes};
+}
 
 void MistakesPage::drawTodayCards(TodayCards& cards) {
     const auto all = mistakeExercises();
@@ -1249,12 +1252,7 @@ void MistakesPage::drawMistakeColumn() {
     const auto review_date = [&] {
         if (e.reviewed <= 0) return std::string();
         const auto t = static_cast<std::time_t>(e.reviewed);
-        std::tm tm{};
-#ifdef _WIN32
-        localtime_s(&tm, &t);
-#else
-        localtime_r(&t, &tm);
-#endif
+        const auto tm = localTime(t);
         char text[16];
         std::strftime(text, sizeof text, "%Y-%m-%d", &tm);
         return std::string(text);

@@ -1327,7 +1327,7 @@ void App::drawBoardReferences() {
         });
         references_job_ = std::move(job);
     }
-    if (references_job_ && references_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (references_job_ && isReady(references_job_->done)) {
         try {
             references_ = references_job_->done.get();
         } catch (const std::exception& e) {

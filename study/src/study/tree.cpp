@@ -18,11 +18,6 @@
 #include "parallel.hpp"
 #include "scan_board.hpp"
 
-#ifndef _WIN32
-#    include <fcntl.h>
-#    include <unistd.h>
-#endif
-
 namespace fcg::study {
 
 namespace fs = std::filesystem;
@@ -87,21 +82,10 @@ uint64_t checkHeader(const MappedFile& file, FileKind kind, const fs::path& path
     return load<uint64_t>(file.data() + 16);
 }
 
-void syncFolder([[maybe_unused]] const fs::path& dir) {
-#ifndef _WIN32
-    const int fd = ::open(dir.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd >= 0) {
-        ::fsync(fd);
-        ::close(fd);
-    }
-#endif
-}
-
 // A file written from the start, its header written again at the end with what it holds.
 class Writer {
    public:
-    Writer(const fs::path& file, FileKind kind)
-        : path_(file), kind_(kind), file_(tour::openFile(file, "wb"), &std::fclose) {
+    Writer(const fs::path& file, FileKind kind) : path_(file), kind_(kind), file_(tour::openFile(file, "wb")) {
         if (!file_) throw std::runtime_error("cannot write " + file.string());
         put(header(kind, 0));
     }
@@ -132,7 +116,7 @@ class Writer {
     }
     fs::path path_;
     FileKind kind_;
-    std::unique_ptr<std::FILE, int (*)(std::FILE*)> file_;
+    tour::File file_;
     std::string buffer_;
     uint64_t written_ = 0;
 };
@@ -1022,9 +1006,9 @@ TreeBuilt buildTree(const Database& db, const Snapshot& snapshot, const TreeOpti
             out.cancelled = true;
             return out;
         }
-        syncFolder(tmp);
+        tour::syncFolder(tmp);
         fs::rename(tmp, dir / name);
-        syncFolder(dir);
+        tour::syncFolder(dir);
         const nlohmann::json j{{"format", "rookstudio-tree"},
                                {"version", VERSION},
                                {"folder", name},

@@ -127,7 +127,7 @@ class FakeApp final : public RepertoireTrainingContext {
         settings_ = s;
         ++settings_saved;
     }
-    void showTrainingPage(int part) override { training_part = part; }
+    void showTrainingPage(TrainingPart part) override { training_part = part; }
     bool trainingShown() const override { return false; }
     void setEnterStartsPuzzles(bool) override {}
     void reviewOnly(ReviewKind) override {}
@@ -160,7 +160,8 @@ class FakeApp final : public RepertoireTrainingContext {
     int frame_ = 0;
     BoardTaken before{true, false, 0};  // the Board before a session: a game put aside, White below, the notation
     int taken = 0, board_page = 0, picks_dropped = 0, typed_dropped = 0, move_fields = 0, tabs = 0, asked_again = 0;
-    int fair_play_banners = 0, settings_saved = 0, openings_page = 0, review_next = 0, training_part = -1;
+    int fair_play_banners = 0, settings_saved = 0, openings_page = 0, review_next = 0;
+    std::optional<TrainingPart> training_part;
     std::string board_title, message;
     std::vector<std::string> toasts;
     bool board_tree = false, flip = false, board_moves = false, tree_tab = false;

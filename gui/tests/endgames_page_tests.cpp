@@ -133,7 +133,7 @@ class FakeApp final : public EndgamesContext {
     // The Training page and its day's review.
     const TrainingSettings& trainingSettings() override { return settings_; }
     void setTrainingSettings(const TrainingSettings&) override {}
-    void showTrainingPage(int part) override { training_part = part; }
+    void showTrainingPage(TrainingPart part) override { training_part = part; }
     bool trainingShown() const override { return false; }
     void setEnterStartsPuzzles(bool puzzles) override { enter_puzzles = puzzles; }
     void reviewOnly(ReviewKind kind) override { reviewed_only.push_back(kind); }
@@ -191,7 +191,8 @@ class FakeApp final : public EndgamesContext {
     int ply = 0;
     std::vector<std::pair<BoardTaken, bool>> given_back;
     std::vector<BoardTaken> left;
-    int training_part = -1, review_stopped = 0, lichess_saved = 0, downloads = 0, folder_dialogs = 0;
+    std::optional<TrainingPart> training_part;
+    int review_stopped = 0, lichess_saved = 0, downloads = 0, folder_dialogs = 0;
     bool enter_puzzles = true, live_game = false, locked = false, puzzles_on_disk = false;
     std::vector<ReviewKind> reviewed_only;
     LichessSettings lichess;
@@ -472,7 +473,7 @@ TEST_CASE("endgames page: an endgame of the catalogue against the disk's tables,
     CHECK(app.given_back[0].first.flip);
     CHECK(app.given_back[0].first.tab == 3);
     CHECK(app.given_back[0].second);
-    CHECK(app.training_part == 4);
+    CHECK(app.training_part == TrainingPart::Endgames);
     CHECK_FALSE(app.enter_puzzles);
 
     // The palette: each endgame of the catalogue; the position missed only once it is due, tomorrow.
@@ -550,7 +551,7 @@ TEST_CASE("endgames page: a position of the user's games against Lichess's table
     frames.draw(app, boardPage(page), ImGuiKey_Escape);
     CHECK_FALSE(page.onBoard());
     REQUIRE(app.given_back.size() == 1);
-    CHECK(app.training_part == 4);
+    CHECK(app.training_part == TrainingPart::Endgames);
     // Stopped after a fault: a try that counts for no endgame of the catalogue; the card stays.
     CHECK(readEndgameRecord(profile / "endgames").results.empty());
 }
@@ -569,7 +570,7 @@ TEST_CASE(
     page.addFocusWords(words, "endgame=lucena");
     REQUIRE(words.applied());
     CHECK_FALSE(page.onBoard());
-    CHECK(app.training_part == 4);
+    CHECK(app.training_part == TrainingPart::Endgames);
     CHECK(app.taken == 0);
     frames.draw(app, [&] { page.drawPart(); });
     // The user's games' endgames: none can be played, said on the part.
@@ -580,11 +581,11 @@ TEST_CASE(
     CHECK(tables.requests() == 0);
     // The day's review has nothing to play.
     FocusWords review("endgames-review");
-    app.training_part = -1;
+    app.training_part.reset();
     page.addFocusWords(review, "endgames-review");
     REQUIRE(review.applied());
     CHECK_FALSE(page.onBoard());
-    CHECK(app.training_part == 4);
+    CHECK(app.training_part == TrainingPart::Endgames);
 
     // A game of the user's played live on Lichess: no endgame starts, the palette offers none.
     app.live_game = true;

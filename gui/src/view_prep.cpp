@@ -12,6 +12,7 @@
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
+#include <tour/util.hpp>
 
 #include "app.hpp"
 #include "guide.hpp"
@@ -23,11 +24,6 @@ namespace fcg {
 namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
-
-std::string lower(std::string text) {
-    for (auto& c : text) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return text;
-}
 
 bool lichessName(std::string_view name) {
     if (name.size() < 2 || name.size() > 30) return false;
@@ -81,17 +77,14 @@ void App::startPrep(const std::string& opponent) {
 void App::pollPrep() {
     if (!prep_) return;
     auto& p          = *prep_;
-    const auto ready = [](auto& job) {
-        return job.valid() && job.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    };
-    if (ready(p.profile_job)) {
+    if (isReady(p.profile_job)) {
         auto answer = p.profile_job.get();
         if (answer.value)
             p.profile = std::move(*answer.value);
         else
             p.profile_error = answer;
     }
-    if (ready(p.sync)) {
+    if (isReady(p.sync)) {
         const auto report = p.sync.get();
         if (report.failed() && !report.cancelled) p.error = report;
         if (report.added > 0 && p.index < shelf().entries().size()) shelf().rebuildTree(p.index);
@@ -102,13 +95,7 @@ void App::pollPrep() {
         const auto facts = shelf().facts(p.index);
         if (facts.games > 0 && facts.changed > 0) {
             char day[32]  = "";
-            std::tm tm{};  // localtime() shares one buffer between the threads
-#ifdef _WIN32
-            const bool local = localtime_s(&tm, &facts.changed) == 0;
-#else
-            const bool local = localtime_r(&facts.changed, &tm) != nullptr;
-#endif
-            if (local) std::strftime(day, sizeof day, "%Y-%m-%d", &tm);
+            if (const auto tm = localTimeOf(facts.changed)) std::strftime(day, sizeof day, "%Y-%m-%d", &*tm);
             p.last_sync = day;
         }
     }

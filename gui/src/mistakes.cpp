@@ -13,8 +13,10 @@
 #include <commentary/story.hpp>
 #include <commentary/writing.hpp>
 #include <json.hpp>
+#include <study/fsrs_json.hpp>
 #include <study/import.hpp>
 #include <study/query.hpp>
+#include <tour/util.hpp>
 
 #include "board_text.hpp"
 #include "console.hpp"
@@ -66,34 +68,6 @@ std::optional<std::array<int64_t, 3>> wdlOf(const nlohmann::json& j) {
     }
 }
 
-nlohmann::json cardJson(const study::fsrs::Card& c) {
-    return {{"state", static_cast<int>(c.state)},
-            {"step", c.step},
-            {"stability", c.stability},
-            {"difficulty", c.difficulty},
-            {"due", c.due},
-            {"last", c.last},
-            {"reps", c.reps},
-            {"lapses", c.lapses}};
-}
-
-study::fsrs::Card cardOf(const nlohmann::json& j) {
-    study::fsrs::Card c;
-    if (!j.is_object()) return c;
-    const int state = j.value("state", 1);
-    c.state         = state == 2   ? study::fsrs::State::Review
-                      : state == 3 ? study::fsrs::State::Relearning
-                                   : study::fsrs::State::Learning;
-    c.step          = j.value("step", 0);
-    c.stability     = j.value("stability", 0.0);
-    c.difficulty    = j.value("difficulty", 0.0);
-    c.due           = j.value("due", int64_t{0});
-    c.last          = j.value("last", int64_t{0});
-    c.reps          = j.value("reps", 0);
-    c.lapses        = j.value("lapses", 0);
-    return c;
-}
-
 nlohmann::json exerciseJson(const MistakeExercise& e) {
     nlohmann::json j = {{"start", e.start_fen},
                         {"moves", e.moves},
@@ -120,7 +94,7 @@ nlohmann::json exerciseJson(const MistakeExercise& e) {
                         {"reply", e.reply},
                         {"comment", e.comment},
                         {"comment_lang", e.comment_lang},
-                        {"card", cardJson(e.card)},
+                        {"card", e.card},
                         {"since", e.since}};
     if (e.visit) j["visit"] = true;
     if (e.score) j["score"] = scoreJson(*e.score);
@@ -166,7 +140,7 @@ std::optional<MistakeExercise> exerciseOf(uint64_t key, const nlohmann::json& j)
     if (const auto it = j.find("wdl"); it != j.end()) e.wdl = wdlOf(*it);
     if (const auto it = j.find("after"); it != j.end()) e.after = scoreOf(*it);
     if (const auto it = j.find("after_wdl"); it != j.end()) e.after_wdl = wdlOf(*it);
-    if (const auto it = j.find("card"); it != j.end()) e.card = cardOf(*it);
+    if (const auto it = j.find("card"); it != j.end()) e.card = it->get<study::fsrs::Card>();
     e.since = j.value("since", int64_t{0});
     e.visit = j.value("visit", false);
     // An exercise must play: its position and its best move.
@@ -341,12 +315,7 @@ std::string_view mistakeKindTheme(std::string_view key) {
 
 uint32_t packedDaysBefore(int64_t now, int days) {
     const auto t = static_cast<std::time_t>(now - static_cast<int64_t>(days) * study::fsrs::DAY);
-    std::tm tm{};
-#ifdef _WIN32
-    localtime_s(&tm, &t);
-#else
-    localtime_r(&t, &tm);
-#endif
+    const auto tm = localTime(t);
     return static_cast<uint32_t>(tm.tm_year + 1900) << 9 | static_cast<uint32_t>(tm.tm_mon + 1) << 5 |
            static_cast<uint32_t>(tm.tm_mday);
 }
@@ -527,7 +496,7 @@ MistakeRecord readMistakeRecord(const fs::path& folder) {
         for (const auto& [hex, j] : it->items())
             entry("kept/" + hex, [&] {
                 if (const auto key = keyOfHex(hex); key && j.is_object()) {
-                    const KeptCard kept{cardOf(j.value("card", nlohmann::json::object())),
+                    const KeptCard kept{j.value("card", nlohmann::json::object()).get<study::fsrs::Card>(),
                                         j.value("since", int64_t{0})};
                     out.kept[*key] = kept;  // read whole first: nothing kept of an entry set aside
                 }
@@ -548,7 +517,7 @@ bool writeMistakeRecord(const fs::path& folder, const MistakeRecord& record) {
         games[game] = {{"review", g.review}, {"keys", std::move(keys)}};
     }
     nlohmann::json kept = nlohmann::json::object();
-    for (const auto& [key, k] : record.kept) kept[hexKey(key)] = {{"card", cardJson(k.card)}, {"since", k.since}};
+    for (const auto& [key, k] : record.kept) kept[hexKey(key)] = {{"card", k.card}, {"since", k.since}};
     return writeJson(folder / "exercises.json", {{"version", 1},
                                                  {"answer_ms", record.answer_ms},
                                                  {"exercises", std::move(exercises)},
@@ -562,8 +531,7 @@ void appendMistakeAnswer(const fs::path& folder, uint64_t key, int64_t at, study
     fs::create_directories(folder, ec);
     const nlohmann::json line = {
         {"key", hexKey(key)}, {"at", at}, {"rating", static_cast<int>(rating)}, {"ms", ms}, {"played", played}};
-    std::ofstream out(folder / "answers.jsonl", std::ios::binary | std::ios::app);
-    out << line.dump() << '\n';
+    (void)appendJsonLine(folder / "answers.jsonl", line);
 }
 
 MistakeCounts mistakeCounts(const std::vector<const MistakeExercise*>& exercises, const study::TrainingDay& day,
@@ -813,18 +781,14 @@ void appendGuessRecord(const fs::path& folder, const GuessRecord& r) {
     fs::create_directories(folder, ec);
     const nlohmann::json line = {{"at", r.at},   {"title", r.title}, {"white", r.white}, {"points", r.points},
                                  {"max", r.max}, {"same", r.same},   {"moves", r.moves}, {"loss", r.loss}};
-    std::ofstream out(folder / "games.jsonl", std::ios::binary | std::ios::app);
-    out << line.dump() << '\n';
+    (void)appendJsonLine(folder / "games.jsonl", line);
 }
 
 std::optional<GuessRecord> lastGuessRecord(const fs::path& folder) {
     const auto file = folder / "games.jsonl";
-    std::ifstream in(file, std::ios::binary);
     std::optional<GuessRecord> out;
     std::size_t unread = 0;  // lines of another type than expected (#136): left out, said in the console
-    for (std::string line; std::getline(in, line);) {
-        const auto j = nlohmann::json::parse(line, nullptr, false);
-        if (j.is_discarded() || !j.is_object()) continue;
+    forEachJsonLine(file, [&](const nlohmann::json& j) {
         try {
             GuessRecord r;
             r.at     = j.value("at", int64_t{0});
@@ -839,7 +803,7 @@ std::optional<GuessRecord> lastGuessRecord(const fs::path& folder) {
         } catch (const std::exception&) {
             ++unread;
         }
-    }
+    });
     if (unread > 0)
         Console::instance().add(trn("{}: {} line could not be read and was left out",
                                     "{}: {} lines could not be read and were left out", unread, file.string(), unread),

@@ -50,6 +50,35 @@ function(fcg_drop_isa_note target)
     endif()
 endfunction()
 
+# The warnings our sources compile with, linked by each of our libraries (first, so that the options stay where they
+# were) and by the programs that ask for them; not the dependencies', nor the vendored fastchess' command line tool.
+add_library(fcg_warnings INTERFACE)
+target_compile_options(fcg_warnings INTERFACE -Wall -Wextra)
+
+# A program: add_executable's arguments (WIN32, MACOSX_BUNDLE, the sources), then the libraries it links after
+# LIBRARIES; WARNINGS links fcg_warnings. On Windows, libgcc and libstdc++ are linked in: a program needs no MinGW DLL
+# beside it.
+function(fcg_add_program target)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "WARNINGS" "" "LIBRARIES")
+    add_executable(${target} ${arg_UNPARSED_ARGUMENTS})
+    if(arg_WARNINGS)
+        target_link_libraries(${target} PRIVATE fcg_warnings)
+    endif()
+    if(arg_LIBRARIES)
+        target_link_libraries(${target} PRIVATE ${arg_LIBRARIES})
+    endif()
+    if(WIN32)
+        target_link_options(${target} PRIVATE -static -static-libgcc -static-libstdc++)
+    endif()
+endfunction()
+
+# A test program: a program that links, after the libraries it tests, what the test programs share (fcg_test_support).
+# Its name goes in FCG_TEST_PROGRAMS too (at the end), for the tests target and test_programs.txt.
+function(fcg_add_test_program target)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "LIBRARIES")
+    fcg_add_program(${target} ${arg_UNPARSED_ARGUMENTS} LIBRARIES ${arg_LIBRARIES} fcg_test_support)
+endfunction()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ccache, when installed: a file compiled once with the same flags, in this build folder or another, is not compiled
@@ -142,7 +171,7 @@ target_include_directories(fastchess_core PUBLIC
     ${FC_APP}/third_party
     ${FC_APP}/third_party/fmt/include
 )
-target_compile_options(fastchess_core PRIVATE -Wall -Wextra)
+target_link_libraries(fastchess_core PRIVATE fcg_warnings)
 
 find_package(Threads REQUIRED)
 target_link_libraries(fastchess_core PUBLIC Threads::Threads)
@@ -179,13 +208,9 @@ if(GIT_FOUND)
 endif()
 
 # The upstream command line tool, built from the same core library.
-add_executable(fastchess ${FC_APP}/src/main.cpp)
-target_link_libraries(fastchess PRIVATE fastchess_core)
+fcg_add_program(fastchess ${FC_APP}/src/main.cpp LIBRARIES fastchess_core)
 set_target_properties(fastchess PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 fcg_drop_isa_note(fastchess)
-if(WIN32)
-    target_link_options(fastchess PRIVATE -static -static-libgcc -static-libstdc++)
-endif()
 
 # ---------------------------------------------------------------------------
 # Tournament layer: schedules, journal, results, runner (no UI)
@@ -195,7 +220,7 @@ file(GLOB FCG_TOURNAMENT_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/t
 add_library(fcg_tournament STATIC ${FCG_TOURNAMENT_SOURCES})
 target_compile_features(fcg_tournament PUBLIC cxx_std_20)
 target_include_directories(fcg_tournament PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tournament/src)
-target_compile_options(fcg_tournament PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_tournament PRIVATE fcg_warnings)
 target_link_libraries(fcg_tournament PUBLIC fastchess_core)
 # The program's name where the tournament layer writes it (engine logs, a rating list's header, the book adapter's
 # messages), set by each repository: tournament/src stays the same in fastchess-gui's.
@@ -220,22 +245,15 @@ if(FCG_BUILD_TESTS)
     target_link_libraries(fcg_test_support INTERFACE fcg_tournament)
 
     # fastchess' own mock engine, so the integration tests play real (random) games.
-    add_executable(fcg_random_mover ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/mock/random_mover.cpp)
+    fcg_add_program(fcg_random_mover ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/mock/random_mover.cpp)
     target_include_directories(fcg_random_mover PRIVATE ${FC_APP}/third_party)
     set_target_properties(fcg_random_mover PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-    if(WIN32)
-        target_link_options(fcg_random_mover PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
 
     file(GLOB FCG_TOURNAMENT_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tournament/tests/*.cpp)
-    add_executable(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES})
-    target_link_libraries(fcg-tournament-tests PRIVATE fcg_tournament fcg_test_support)
+    fcg_add_test_program(fcg-tournament-tests ${FCG_TOURNAMENT_TEST_SOURCES} LIBRARIES fcg_tournament)
     add_dependencies(fcg-tournament-tests fcg_random_mover)
     target_compile_definitions(fcg-tournament-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
                                                               FCG_PRODUCT_NAME="${FCG_PRODUCT_NAME}")
-    if(WIN32)
-        target_link_options(fcg-tournament-tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
 endif()
 
 # ---------------------------------------------------------------------------
@@ -292,22 +310,16 @@ file(GLOB FCG_STUDY_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/
 add_library(fcg_study STATIC ${FCG_STUDY_SOURCES})
 target_compile_features(fcg_study PUBLIC cxx_std_20)
 target_include_directories(fcg_study PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/study/src)
-target_compile_options(fcg_study PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_study PRIVATE fcg_warnings)
 target_link_libraries(fcg_study PUBLIC fcg_tournament PRIVATE fcg_zstd fcg_zlib fcg_lzma)
 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_STUDY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/study/tests/*.cpp)
-    add_executable(fcg-study-tests ${FCG_STUDY_TEST_SOURCES})
-    target_link_libraries(fcg-study-tests PRIVATE fcg_study fcg_test_support)
-    if(WIN32)
-        target_link_options(fcg-study-tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
+    fcg_add_test_program(fcg-study-tests ${FCG_STUDY_TEST_SOURCES} LIBRARIES fcg_study)
 endif()
 
 if(FCG_STUDY_BENCH)
-    add_executable(fcg-study-bench ${CMAKE_CURRENT_SOURCE_DIR}/study/bench/main.cpp)
-    target_link_libraries(fcg-study-bench PRIVATE fcg_study)
-    target_compile_options(fcg-study-bench PRIVATE -Wall -Wextra)
+    fcg_add_program(fcg-study-bench WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/study/bench/main.cpp LIBRARIES fcg_study)
 endif()
 
 if(FCG_FUZZ)
@@ -340,7 +352,7 @@ add_custom_command(
 add_library(fcg_commentary STATIC ${FCG_COMMENTARY_SOURCES} ${FCG_OPENINGS_CPP})
 target_compile_features(fcg_commentary PUBLIC cxx_std_20)
 target_include_directories(fcg_commentary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/commentary/src)
-target_compile_options(fcg_commentary PRIVATE -Wall -Wextra)
+target_link_libraries(fcg_commentary PRIVATE fcg_warnings)
 target_link_libraries(fcg_commentary PUBLIC fcg_tournament fcg_study)
 
 # ---------------------------------------------------------------------------
@@ -507,7 +519,7 @@ if(FCG_ASSISTANT)
     add_library(fcg_assistant STATIC ${FCG_ASSISTANT_SOURCES})
     target_compile_features(fcg_assistant PUBLIC cxx_std_20)
     target_include_directories(fcg_assistant PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/assistant/src)
-    target_compile_options(fcg_assistant PRIVATE -Wall -Wextra)
+    target_link_libraries(fcg_assistant PRIVATE fcg_warnings)
     target_link_libraries(fcg_assistant PUBLIC fcg_commentary PRIVATE llama fcg_jinja)
     target_compile_definitions(fcg_assistant PUBLIC FCG_ASSISTANT=1)
     if(FCG_ASSISTANT_VULKAN)
@@ -518,23 +530,15 @@ if(FCG_ASSISTANT)
     endif()
 
     if(FCG_ASSISTANT_EVAL)
-        add_executable(fcg-assistant-eval ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp)
-        target_link_libraries(fcg-assistant-eval PRIVATE fcg_assistant fcg_study)
-        target_compile_options(fcg-assistant-eval PRIVATE -Wall -Wextra)
-        if(WIN32)
-            target_link_options(fcg-assistant-eval PRIVATE -static -static-libgcc -static-libstdc++)
-        endif()
+        fcg_add_program(fcg-assistant-eval WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/assistant/tools/eval.cpp
+                        LIBRARIES fcg_assistant fcg_study)
     endif()
 endif()
 
 if(FCG_BUILD_TESTS)
     file(GLOB FCG_COMMENTARY_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/commentary/tests/*.cpp)
-    add_executable(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES})
     # fcg_study reads the compressed reference files.
-    target_link_libraries(fcg-commentary-tests PRIVATE fcg_commentary fcg_study fcg_test_support)
-    if(WIN32)
-        target_link_options(fcg-commentary-tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
+    fcg_add_test_program(fcg-commentary-tests ${FCG_COMMENTARY_TEST_SOURCES} LIBRARIES fcg_commentary fcg_study)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -702,13 +706,12 @@ if(FCG_BUILD_GUI)
     file(GLOB FCG_BOARD3D_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/board3d/*.cpp)
     option(FCG_BOARD3D_VIEWER "Build fcg-board3d, the 3D board's viewer" OFF)
     if(FCG_BOARD3D_VIEWER)
-        add_executable(fcg-board3d ${CMAKE_CURRENT_SOURCE_DIR}/tools/board3d/viewer.cpp ${FCG_BOARD3D_SOURCES})
+        fcg_add_program(fcg-board3d WARNINGS ${CMAKE_CURRENT_SOURCE_DIR}/tools/board3d/viewer.cpp ${FCG_BOARD3D_SOURCES}
+                        LIBRARIES imgui_lib)
         target_compile_features(fcg-board3d PRIVATE cxx_std_20)
         target_include_directories(fcg-board3d PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src)
         target_include_directories(fcg-board3d SYSTEM PRIVATE ${stb_SOURCE_DIR})
-        target_link_libraries(fcg-board3d PRIVATE imgui_lib)
         target_compile_definitions(fcg-board3d PRIVATE FCG_BOARD3D_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-        target_compile_options(fcg-board3d PRIVATE -Wall -Wextra)
     endif()
 
     add_library(fcg_md4c STATIC ${md4c_SOURCE_DIR}/src/md4c.c)
@@ -731,7 +734,7 @@ if(FCG_BUILD_GUI)
     target_compile_definitions(fcg_libssh2 PRIVATE HAVE_CONFIG_H LIBSSH2_MBEDTLS LIBSSH2_MBEDTLS_H LIBSSH2DEBUG)
     set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa/mbedtls_psa.c
                                 ${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa/ed25519.c PROPERTIES
-                                COMPILE_OPTIONS "-Wall;-Wextra")
+                                COMPILE_OPTIONS "$<TARGET_PROPERTY:fcg_warnings,INTERFACE_COMPILE_OPTIONS>")
     target_link_libraries(fcg_libssh2 PRIVATE tfpsacrypto)
     if(WIN32)
         target_link_libraries(fcg_libssh2 PUBLIC ws2_32)
@@ -860,7 +863,7 @@ if(FCG_BUILD_GUI)
         ${stb_SOURCE_DIR}
         ${qrcodegen_SOURCE_DIR}/cpp
     )
-    target_compile_options(fcg_lib PRIVATE -Wall -Wextra)
+    target_link_libraries(fcg_lib PRIVATE fcg_warnings)
     target_compile_definitions(fcg_lib PUBLIC FCG_VERSION="${PROJECT_VERSION}${FCG_VERSION_SUFFIX}")
     # The commentary library too, without the assistant's runtime: the Board page's reference games read it.
     target_link_libraries(fcg_lib PUBLIC fcg_study fcg_commentary fcg_tournament imgui_lib PRIVATE mbedtls fcg_libssh2
@@ -885,18 +888,14 @@ if(FCG_BUILD_GUI)
 
     # The program, rookstudio (RookStudio.app on macOS); its target keeps fastchess-gui's name, for its releases to
     # merge.
-    add_executable(fastchess-gui WIN32 MACOSX_BUNDLE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/main.cpp
-                   ${FCG_PLATFORM_SOURCES})
+    fcg_add_program(fastchess-gui WIN32 MACOSX_BUNDLE ${CMAKE_CURRENT_SOURCE_DIR}/gui/src/main.cpp
+                    ${FCG_PLATFORM_SOURCES} LIBRARIES fcg_lib)
     if(APPLE)
         set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME RookStudio)
     else()
         set_target_properties(fastchess-gui PROPERTIES OUTPUT_NAME rookstudio)
     endif()
-    target_link_libraries(fastchess-gui PRIVATE fcg_lib)
     fcg_drop_isa_note(fastchess-gui)
-    if(WIN32)
-        target_link_options(fastchess-gui PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
     if(APPLE)
         set_target_properties(fastchess-gui PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/mac/Info.plist.in
@@ -909,26 +908,19 @@ if(FCG_BUILD_GUI)
 
     if(FCG_BUILD_TESTS)
         file(GLOB FCG_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/*.cpp)
-        add_executable(fastchess-gui-tests ${FCG_TEST_SOURCES})
         # Mbed TLS too: the SSH tests play the server's part with its cryptography. And the libssh2 backend's
         # functions, which they call directly.
-        target_link_libraries(fastchess-gui-tests PRIVATE fcg_lib mbedtls fcg_libssh2 fcg_test_support)
+        fcg_add_test_program(fastchess-gui-tests ${FCG_TEST_SOURCES} LIBRARIES fcg_lib mbedtls fcg_libssh2)
         target_include_directories(fastchess-gui-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/gui/libssh2-psa)
         target_include_directories(fastchess-gui-tests SYSTEM PRIVATE ${libssh2_SOURCE_DIR}/src)
         # A WinBoard engine for the tests of the adapter.
-        add_executable(fcg_wb_mover ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/wb_mover.cpp)
+        fcg_add_program(fcg_wb_mover ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/wb_mover.cpp)
         set_target_properties(fcg_wb_mover PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-        if(WIN32)
-            target_link_options(fcg_wb_mover PRIVATE -static -static-libgcc -static-libstdc++)
-        endif()
 
         if(FCG_ASSISTANT)
             # A language model that answers at once, for the tests of the assistant's process.
-            add_executable(fcg_mock_assistant ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/assistant.cpp)
-            target_link_libraries(fcg_mock_assistant PRIVATE fcg_assistant)
-            if(WIN32)
-                target_link_options(fcg_mock_assistant PRIVATE -static -static-libgcc -static-libstdc++)
-            endif()
+            fcg_add_program(fcg_mock_assistant ${CMAKE_CURRENT_SOURCE_DIR}/gui/tests/mock/assistant.cpp
+                            LIBRARIES fcg_assistant)
             add_dependencies(fastchess-gui-tests fcg_mock_assistant)
             target_compile_definitions(fastchess-gui-tests
                                        PRIVATE FCG_MOCK_ASSISTANT="$<TARGET_FILE_NAME:fcg_mock_assistant>")
@@ -938,9 +930,6 @@ if(FCG_BUILD_GUI)
         target_compile_definitions(fastchess-gui-tests PRIVATE FCG_RANDOM_MOVER="$<TARGET_FILE_NAME:fcg_random_mover>"
                                                               FCG_WB_MOVER="$<TARGET_FILE_NAME:fcg_wb_mover>"
                                                               FCG_GUI_PROGRAM="$<TARGET_FILE:fastchess-gui>")
-        if(WIN32)
-            target_link_options(fastchess-gui-tests PRIVATE -static -static-libgcc -static-libstdc++)
-        endif()
     endif()
 
     if(FCG_FUZZ)

@@ -12,7 +12,7 @@
 
 #include <chess.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "search.hpp"
 
 namespace fcg::study {
@@ -30,23 +30,6 @@ constexpr uint32_t NOVELTY_MARGIN = 12;
 // The games of a pawn plan whose pushes the caller names: an even sample.
 constexpr std::size_t NAMED_SAMPLE = 64;
 constexpr uint8_t NO_SQUARE        = 64;
-
-// Runs `work(thread)` on `threads` threads, the background of the caller kept.
-template <typename Work>
-void onThreads(int threads, Work&& work) {
-    if (threads <= 1) {
-        work(0);
-        return;
-    }
-    const Inherited background;
-    std::vector<std::thread> pool;
-    for (int t = 0; t < threads; ++t)
-        pool.emplace_back([&, t] {
-            background.apply();
-            work(t);
-        });
-    for (auto& th : pool) th.join();
-}
 
 // A game's moves read one after the other on the board they are played on.
 class Cursor {
@@ -120,7 +103,8 @@ std::optional<TreeAnswer> treesAt(std::span<const ReportSource> sources, uint64_
     return out;
 }
 
-// The games of a snapshot at a position, by a search of every game; none when cancelled.
+// The games of a snapshot at a position, by a search of every game; none when cancelled. What a thread of the search
+// threw is thrown again.
 std::optional<std::vector<SearchHit>> searchPosition(const std::shared_ptr<const Snapshot>& snapshot,
                                                      const ScanBoard& position, int threads,
                                                      const std::atomic<bool>& cancel) {
@@ -134,6 +118,7 @@ std::optional<std::vector<SearchHit>> searchPosition(const std::shared_ptr<const
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     search.wait();
+    if (const auto error = search.error()) std::rethrow_exception(error);
     return search.hits();
 }
 
@@ -490,8 +475,7 @@ OpeningReport makeOpeningReport(std::span<const ReportSource> sources, const Sca
                                 const std::function<void(const OpeningReport&)>& section) {
     const auto started = std::chrono::steady_clock::now();
     const auto stopped = [&] { return cancel.load(std::memory_order_relaxed); };
-    const int threads =
-        options.threads > 0 ? options.threads : std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    const int threads  = threadCount(options.threads);
     OpeningReport out;
     const auto finish = [&](ReportSection made) {
         out.made    = made;

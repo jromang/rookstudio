@@ -1,12 +1,11 @@
 #include "query.hpp"
 
-#include "background.hpp"
+#include "parallel.hpp"
 
 #include <algorithm>
 #include <map>
 #include <mutex>
 #include <numeric>
-#include <thread>
 
 namespace fcg::study {
 
@@ -31,27 +30,10 @@ std::vector<std::string> words(std::string_view text) {
     return out;
 }
 
-int threadsFor(int threads) {
-    return threads > 0 ? threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
-}
-
-// Runs f(from, to) on ranges of [0, n) on `threads` threads.
+// Runs f(from, to, part) on parts of [0, n) on `threads` threads at most: a part for every 65536 games.
 template <typename F>
 void parallel(std::size_t n, int threads, F&& f) {
-    const auto parts = static_cast<std::size_t>(
-        std::min<std::size_t>(static_cast<std::size_t>(threads), std::max<std::size_t>(1, n / 65536)));
-    if (parts <= 1) {
-        f(std::size_t{0}, n, std::size_t{0});
-        return;
-    }
-    std::vector<std::thread> pool;
-    const Inherited inherited;
-    for (std::size_t p = 0; p < parts; ++p)
-        pool.emplace_back([&, p, inherited] {
-            inherited.apply();
-            f(n * p / parts, n * (p + 1) / parts, p);
-        });
-    for (auto& t : pool) t.join();
+    forEachPart(n, std::min<std::size_t>(static_cast<std::size_t>(threads), std::max<std::size_t>(1, n / 65536)), f);
 }
 
 // The names of a snapshot folded and ranked in alphabetical order, kept while the names and the table of names do not
@@ -168,7 +150,7 @@ View makeView(const std::shared_ptr<const Snapshot>& snapshot, const Filter& fil
               int threads, const std::atomic<bool>* cancel) {
     View view;
     view.snapshot  = snapshot;
-    threads        = threadsFor(threads);
+    threads        = threadCount(threads);
     const auto n   = static_cast<std::size_t>(snapshot->games());
     const auto all = words(filter.words), white = words(filter.white), black = words(filter.black),
                player       = words(filter.player);

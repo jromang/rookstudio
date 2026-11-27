@@ -12,13 +12,12 @@
 #include <map>
 #include <memory>
 #include <stdexcept>
-#include <thread>
 
 #include <chess.hpp>
 #include <json.hpp>
 
-#include "background.hpp"
 #include "mapped_file.hpp"
+#include "parallel.hpp"
 #include "scan_board.hpp"
 #include "tree.hpp"
 
@@ -1687,7 +1686,7 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
     for (const auto& info : infos) total += info.games;
     progress.total = total;
     progress.done  = 0;
-    if (threads <= 0) threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    threads        = threadCount(threads);
     // The game a record is the current version of, if any.
     std::map<std::pair<uint32_t, uint32_t>, GameId> current_version;
     for (const auto& v : snap->replaced_) current_version[{v.segment, v.local}] = v.id;
@@ -1699,7 +1698,6 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
     std::vector<GameId> damaged;
     std::mutex found;
     std::atomic<uint64_t> checked{0};
-    const Inherited inherited;
     for (std::size_t s = 0; s < infos.size() && !cancel; ++s) {
         const auto& info = infos[s];
         // The game record i is, when it is one as the database reads it; none for an old version.
@@ -1731,28 +1729,24 @@ CheckReport Database::check(CheckProgress& progress, const std::atomic<bool>& ca
         }
         if (segment->version() < 2 && info.games > 0) report.signatures = false;
         std::atomic<std::size_t> next{0};
-        std::vector<std::thread> pool;
         const auto parts = std::min<std::size_t>(static_cast<std::size_t>(threads), info.games / 4096 + 1);
-        for (std::size_t t = 0; t < parts; ++t)
-            pool.emplace_back([&] {
-                inherited.apply();
-                std::vector<GameId> mine;
-                for (;;) {
-                    const auto from = next.fetch_add(4096);
-                    if (from >= info.games || cancel.load(std::memory_order_relaxed)) break;
-                    const auto to = std::min<std::size_t>(from + 4096, info.games);
-                    for (std::size_t i = from; i < to; ++i) {
-                        const auto id = gameOf(i);
-                        if (!id || snap->deleted(*id)) continue;  // an old version, or a game no one reads
-                        ++checked;
-                        if (!recordSound(*snap, *segment, i)) mine.push_back(*id);
-                    }
-                    progress.done += to - from;
+        onThreads(static_cast<int>(parts), [&](int) {
+            std::vector<GameId> mine;
+            for (;;) {
+                const auto from = next.fetch_add(4096);
+                if (from >= info.games || cancel.load(std::memory_order_relaxed)) break;
+                const auto to = std::min<std::size_t>(from + 4096, info.games);
+                for (std::size_t i = from; i < to; ++i) {
+                    const auto id = gameOf(i);
+                    if (!id || snap->deleted(*id)) continue;  // an old version, or a game no one reads
+                    ++checked;
+                    if (!recordSound(*snap, *segment, i)) mine.push_back(*id);
                 }
-                std::lock_guard lock(found);
-                damaged.insert(damaged.end(), mine.begin(), mine.end());
-            });
-        for (auto& t : pool) t.join();
+                progress.done += to - from;
+            }
+            std::lock_guard lock(found);
+            damaged.insert(damaged.end(), mine.begin(), mine.end());
+        });
     }
     report.games     = checked.load();
     report.cancelled = cancel.load();

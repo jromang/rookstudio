@@ -1,6 +1,6 @@
 #include "import.hpp"
 
-#include "background.hpp"
+#include "parallel.hpp"
 
 #include <algorithm>
 #include <condition_variable>
@@ -325,8 +325,7 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
     }
     std::error_code ec;
     progress.total_bytes = fs::file_size(file, ec);
-    const int threads =
-        options.threads > 0 ? options.threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+    const int threads       = threadCount(options.threads);
     const std::size_t piece = std::max<std::size_t>(options.piece_bytes, 4096);
 
     std::mutex mutex;
@@ -343,8 +342,26 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
     bool read_all   = false;
     bool stop       = false;
     std::string error;
+    // What a thread threw, the first the import's error. A worker's stops the import (the piece it lost would never
+    // come); the reader's leaves the pieces it gave to be read and given.
+    const auto failed = [&](std::exception_ptr thrown, bool stop_import) {
+        std::string what = "an unknown error";
+        try {
+            std::rethrow_exception(thrown);
+        } catch (const std::exception& e) {
+            what = e.what();
+        } catch (...) {
+        }
+        {
+            std::lock_guard lock(mutex);
+            if (error.empty()) error = std::move(what);
+            stop = stop || stop_import;
+        }
+        work.notify_all();
+        ready.notify_all();
+    };
 
-    const auto worker = [&] {
+    const auto read_pieces = [&] {
         for (;;) {
             Piece job;
             {
@@ -375,6 +392,13 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
                 --working;
             }
             ready.notify_all();
+        }
+    };
+    const auto worker = [&] {
+        try {
+            read_pieces();
+        } catch (...) {
+            failed(std::current_exception(), true);
         }
     };
     const auto reader = [&] {
@@ -434,9 +458,8 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
                     if (stop) break;
                 }
             }
-        } catch (const std::exception& e) {
-            std::lock_guard lock(mutex);
-            error = e.what();
+        } catch (...) {
+            failed(std::current_exception(), false);
         }
         {
             std::lock_guard lock(mutex);
@@ -447,53 +470,65 @@ ImportReport importGames(const fs::path& file, const ImportOptions& options, Imp
     };
 
     std::vector<std::thread> pool;
-    pool.reserve(static_cast<std::size_t>(threads));
-    const Inherited inherited;
-    for (int i = 0; i < threads; ++i)
-        pool.emplace_back([&worker, inherited] {
-            inherited.apply();
-            worker();
-        });
-    std::thread reading([&reader, inherited] {
-        inherited.apply();
-        reader();
-    });
-
-    // The batches given in the file's order.
-    for (uint64_t next = 0;;) {
-        std::vector<ImportedGame> batch;
+    std::thread reading;
+    // Every thread told to stop, then waited for: at the end, and before what the caller's side throws (the sink, a
+    // thread that cannot be started) goes on.
+    const auto end_threads = [&] {
         {
-            std::unique_lock lock(mutex);
-            ready.wait_for(lock, std::chrono::milliseconds(100),
-                           [&] { return done.count(next) > 0 || (read_all && next >= pieces) || stop; });
-            if (cancel.load(std::memory_order_relaxed)) {
-                stop = true;
-                work.notify_all();
-                break;
-            }
-            if (const auto it = done.find(next); it != done.end()) {
-                batch = std::move(it->second);
-                done.erase(it);
-                ++next;
-            } else if ((read_all && next >= pieces) || stop) {
-                break;
-            } else {
-                continue;
-            }
+            std::lock_guard lock(mutex);
+            stop = true;
         }
-        work.notify_all();  // room for the reader
-        for (const auto& game : batch) report.damaged += game.damaged;
-        report.games += batch.size();
-        progress.games.store(report.games, std::memory_order_relaxed);
-        if (!batch.empty()) sink(std::move(batch));
+        work.notify_all();
+        ready.notify_all();
+        if (reading.joinable()) reading.join();
+        for (auto& t : pool) t.join();
+    };
+    try {
+        pool.reserve(static_cast<std::size_t>(threads));
+        const Inherited inherited;
+        for (int i = 0; i < threads; ++i)
+            pool.emplace_back([&worker, inherited] {
+                inherited.apply();
+                worker();
+            });
+        reading = std::thread([&reader, inherited] {
+            inherited.apply();
+            reader();
+        });
+
+        // The batches given in the file's order.
+        for (uint64_t next = 0;;) {
+            std::vector<ImportedGame> batch;
+            {
+                std::unique_lock lock(mutex);
+                ready.wait_for(lock, std::chrono::milliseconds(100),
+                               [&] { return done.count(next) > 0 || (read_all && next >= pieces) || stop; });
+                if (cancel.load(std::memory_order_relaxed)) {
+                    stop = true;
+                    work.notify_all();
+                    break;
+                }
+                if (const auto it = done.find(next); it != done.end()) {
+                    batch = std::move(it->second);
+                    done.erase(it);
+                    ++next;
+                } else if ((read_all && next >= pieces) || stop) {
+                    break;
+                } else {
+                    continue;
+                }
+            }
+            work.notify_all();  // room for the reader
+            for (const auto& game : batch) report.damaged += game.damaged;
+            report.games += batch.size();
+            progress.games.store(report.games, std::memory_order_relaxed);
+            if (!batch.empty()) sink(std::move(batch));
+        }
+    } catch (...) {
+        end_threads();
+        throw;
     }
-    {
-        std::lock_guard lock(mutex);
-        stop = true;
-    }
-    work.notify_all();
-    reading.join();
-    for (auto& t : pool) t.join();
+    end_threads();
     report.cancelled = cancel.load();
     report.error     = error;
     return report;

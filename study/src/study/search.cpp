@@ -5,7 +5,7 @@
 
 #include <chess.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "signature.hpp"
 
 namespace fcg::study {
@@ -642,16 +642,22 @@ Search::Search(std::shared_ptr<const Snapshot> snapshot, SearchQuery query, int 
         }
         searched_ = kept;
     }
-    const int machine = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
-    const auto count  = std::min<std::size_t>(static_cast<std::size_t>(threads > 0 ? threads : machine), parts_.size());
-    planned_          = count;
+    const auto count = std::min<std::size_t>(static_cast<std::size_t>(threadCount(threads)), parts_.size());
+    planned_         = count;
     threads_.reserve(count);
     const Inherited inherited;
-    for (std::size_t t = 0; t < count; ++t)
-        threads_.emplace_back([this, inherited] {
-            inherited.apply();
-            work();
-        });
+    try {
+        for (std::size_t t = 0; t < count; ++t)
+            threads_.emplace_back([this, inherited] {
+                inherited.apply();
+                run();
+            });
+    } catch (...) {
+        // A thread that cannot be started: those started stopped and waited for before it goes on.
+        cancel();
+        wait();
+        throw;
+    }
 }
 
 Search::~Search() {
@@ -666,6 +672,26 @@ void Search::wait() {
         if (t.joinable()) t.join();
 }
 
+std::exception_ptr Search::error() const {
+    std::lock_guard lock(mutex_);
+    return error_;
+}
+
+void Search::run() noexcept {
+    try {
+        work();
+    } catch (...) {
+        {
+            std::lock_guard lock(mutex_);
+            if (!error_) error_ = std::current_exception();
+        }
+        failed_ = true;
+    }
+    if (++finished_ == planned_)
+        elapsed_us_ =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started_).count();
+}
+
 void Search::work() {
     const uint64_t n = snapshot_->games();
     // What a route or a structure tells besides its games.
@@ -673,13 +699,13 @@ void Search::work() {
     const bool structure = std::holds_alternative<StructureQuery>(query_);
     for (;;) {
         const uint64_t part = next_++;
-        if (cancel_ || part >= parts_.size()) break;
+        if (cancel_ || failed_ || part >= parts_.size()) break;
         if (done_[part]) continue;  // kept from the search resumed
         std::vector<SearchHit> found;
         SearchStats stats;
         const uint64_t from = part * PART, to = std::min(n, from + PART);
         uint64_t looked = 0;
-        for (GameId id = from; id < to && !cancel_; ++id, ++looked) {
+        for (GameId id = from; id < to && !cancel_ && !failed_; ++id, ++looked) {
             if (snapshot_->deleted(id)) continue;
             auto f = find(*snapshot_, id, query_, true, route || structure);
             if (route) {
@@ -701,16 +727,13 @@ void Search::work() {
                 if (f.variant != UINT32_MAX) ++stats.variants[f.variant][result];
             }
         }
-        if (cancel_ && looked < to - from) break;  // a part cut short: searched again when resumed
+        if (looked < to - from) break;  // a part cut short (cancelled, failed): searched again when resumed
         searched_ += looked;
         std::lock_guard lock(mutex_);
         parts_[part] = std::move(found);
         stats_[part] = std::move(stats);
         done_[part]  = 1;
     }
-    if (++finished_ == planned_)
-        elapsed_us_ =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started_).count();
 }
 
 std::vector<SearchHit> Search::hits() const {
@@ -736,6 +759,7 @@ SearchStats Search::stats() const {
 std::vector<SearchHit> searchAll(std::shared_ptr<const Snapshot> snapshot, const SearchQuery& query, int threads) {
     Search search(std::move(snapshot), query, threads);
     search.wait();
+    if (const auto error = search.error()) std::rethrow_exception(error);
     return search.hits();
 }
 

@@ -7,12 +7,11 @@
 #include <map>
 #include <mutex>
 #include <set>
-#include <thread>
 #include <tuple>
 
 #include <chess.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "query.hpp"
 
 namespace fcg::study {
@@ -250,23 +249,6 @@ constexpr uint32_t STRUCTURE_PLY  = 40;
 constexpr uint64_t SCAN_PART      = 16384;
 constexpr std::size_t REPLAY_PART = 64;
 
-// Runs `work(thread)` on `threads` threads, the background of the caller kept.
-template <typename Work>
-void onThreads(int threads, Work&& work) {
-    if (threads <= 1) {
-        work(0);
-        return;
-    }
-    const Inherited background;
-    std::vector<std::thread> pool;
-    for (int t = 0; t < threads; ++t)
-        pool.emplace_back([&, t] {
-            background.apply();
-            work(t);
-        });
-    for (auto& th : pool) th.join();
-}
-
 struct Found {
     uint32_t source = 0;
     GameId id       = 0;
@@ -282,8 +264,7 @@ Dossier makeDossier(std::vector<DossierSource> sources, const DossierSubject& su
     Dossier out;
     out.sources  = std::move(sources);
     out.openings = options.openings;
-    const int threads =
-        options.threads > 0 ? options.threads : std::max(1, static_cast<int>(std::thread::hardware_concurrency()));
+    const int threads = threadCount(options.threads);
     uint64_t total = 0;
     for (const auto& s : out.sources)
         if (s.snapshot) total += s.snapshot->games();

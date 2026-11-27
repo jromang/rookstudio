@@ -10,13 +10,12 @@
 #include <map>
 #include <mutex>
 #include <stdexcept>
-#include <thread>
 
 #include <chess.hpp>
 #include <json.hpp>
 #include <tour/files.hpp>
 
-#include "background.hpp"
+#include "parallel.hpp"
 #include "scan_board.hpp"
 
 #ifndef _WIN32
@@ -138,28 +137,6 @@ class Writer {
     uint64_t written_ = 0;
 };
 
-int threadCount(int threads) {
-    return threads > 0 ? threads : static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
-}
-
-// Runs f(from, to) over parts of [0, n), each on a thread of its own.
-template <typename F>
-void forParts(std::size_t n, std::size_t parts, F&& f) {
-    parts = std::max<std::size_t>(1, std::min(parts, n));
-    if (parts == 1) {
-        f(std::size_t{0}, n, std::size_t{0});
-        return;
-    }
-    std::vector<std::thread> pool;
-    const Inherited inherited;
-    for (std::size_t p = 0; p < parts; ++p)
-        pool.emplace_back([&, p, inherited] {
-            inherited.apply();
-            f(n * p / parts, n * (p + 1) / parts, p);
-        });
-    for (auto& t : pool) t.join();
-}
-
 // Sorts on several threads: parts sorted apart, then merged two by two.
 template <typename T, typename Less>
 void parallelSort(std::vector<T>& v, int threads, Less less) {
@@ -172,7 +149,7 @@ void parallelSort(std::vector<T>& v, int threads, Less less) {
     }
     std::vector<std::size_t> at(parts + 1);
     for (std::size_t p = 0; p <= parts; ++p) at[p] = n * p / parts;
-    forParts(parts, parts, [&](std::size_t from, std::size_t, std::size_t) {
+    forEachPart(parts, parts, [&](std::size_t from, std::size_t, std::size_t) {
         std::sort(v.begin() + static_cast<std::ptrdiff_t>(at[from]),
                   v.begin() + static_cast<std::ptrdiff_t>(at[from + 1]), less);
     });
@@ -180,15 +157,13 @@ void parallelSort(std::vector<T>& v, int threads, Less less) {
     T* src = v.data();
     T* dst = other.data();
     for (std::size_t width = 1; width < parts; width *= 2) {
-        std::vector<std::thread> pool;
-        for (std::size_t p = 0; p < parts; p += 2 * width) {
+        // The parts merged two by two, each pair on a thread of its own.
+        const std::size_t pairs = (parts + 2 * width - 1) / (2 * width);
+        onThreads(static_cast<int>(pairs), [&](int pair) {
+            const std::size_t p = static_cast<std::size_t>(pair) * 2 * width;
             const auto a = at[p], b = at[std::min(parts, p + width)], c = at[std::min(parts, p + 2 * width)];
-            pool.emplace_back([=, inherited = Inherited()] {
-                inherited.apply();
-                std::merge(src + a, src + b, src + b, src + c, dst + a, less);
-            });
-        }
-        for (auto& t : pool) t.join();
+            std::merge(src + a, src + b, src + b, src + c, dst + a, less);
+        });
         std::swap(src, dst);
     }
     if (src != v.data()) v.swap(other);
@@ -219,10 +194,9 @@ void sortByKey(T* v, std::size_t n, int shift, int threads) {
         }
     }
     std::atomic<int> taken{0};
-    forParts(static_cast<std::size_t>(threads), static_cast<std::size_t>(threads),
-             [&](std::size_t, std::size_t, std::size_t) {
-                 for (int b; (b = taken++) < 256;) std::sort(v + start[b], v + start[b + 1], less);
-             });
+    onThreads(threads, [&](int) {
+        for (int b; (b = taken++) < 256;) std::sort(v + start[b], v + start[b + 1], less);
+    });
 }
 
 void addGame(TreeStats& s, char result, uint16_t white_elo, uint16_t black_elo, uint32_t date) noexcept {
@@ -444,7 +418,7 @@ class Builder {
         std::vector<BuildGame> all(n);
         std::vector<uint8_t> kept(n, 0);
         const uint64_t standard = standard_.key();
-        forParts(n, static_cast<std::size_t>(threads_), [&](std::size_t from, std::size_t to, std::size_t) {
+        forEachPart(n, static_cast<std::size_t>(threads_), [&](std::size_t from, std::size_t to, std::size_t) {
             for (std::size_t id = from; id < to; ++id) {
                 if (snap_.deleted(id)) continue;  // left out of the tree
                 const auto m = snap_.gameMoves(id);
@@ -483,19 +457,20 @@ class Builder {
     // The games' numbers, in the order of their moves.
     void numbers() {
         numbers_.resize(games_.size());
-        forParts(games_.size(), static_cast<std::size_t>(threads_), [&](std::size_t from, std::size_t to, std::size_t) {
-            for (std::size_t j = from; j < to; ++j) {
-                const auto n = snap_.numbers(games_[j].id);
-                numbers_[j]  = {n.date, n.white_elo, n.black_elo, n.result};
-            }
-        });
+        forEachPart(games_.size(), static_cast<std::size_t>(threads_),
+                    [&](std::size_t from, std::size_t to, std::size_t) {
+                        for (std::size_t j = from; j < to; ++j) {
+                            const auto n = snap_.numbers(games_[j].id);
+                            numbers_[j]  = {n.date, n.white_elo, n.black_elo, n.result};
+                        }
+                    });
     }
 
     // How deep each game shares its moves with the game before it (-1: another start), and with either neighbour.
     void shared() {
         const std::size_t n = games_.size();
         lcp_.assign(n + 1, -1);
-        forParts(n, static_cast<std::size_t>(threads_), [&](std::size_t from, std::size_t to, std::size_t) {
+        forEachPart(n, static_cast<std::size_t>(threads_), [&](std::size_t from, std::size_t to, std::size_t) {
             for (std::size_t i = std::max<std::size_t>(from, 1); i < to; ++i) {
                 const auto& a = games_[i - 1];
                 const auto& b = games_[i];
@@ -541,7 +516,7 @@ class Builder {
     // game reaches by moves of its own whose keys are in the pass's part.
     void replay(uint32_t pass, bool with_nodes, std::vector<std::size_t>& made, TailArray& tails) {
         const std::size_t parts = chunks_.size() - 1;
-        forParts(parts, parts, [&](std::size_t p, std::size_t, std::size_t) {
+        forEachPart(parts, parts, [&](std::size_t p, std::size_t, std::size_t) {
             const std::size_t from = chunks_[p], to = chunks_[p + 1];
             Node* my_nodes      = nodes_.data() + node_at_[p];
             std::size_t my_made = 0;

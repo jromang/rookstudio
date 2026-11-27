@@ -170,7 +170,7 @@ struct Download {
 [[nodiscard]] std::string sha256File(const std::filesystem::path& file);
 
 // What Lichess asks of its API's clients: one request at a time to a host, and a pause of a full minute after it
-// answered 429 (Too Many Requests).
+// answered 429 (Too Many Requests). A process's own: a tournament process's (its broadcast relay) is not the window's.
 class HostGate {
    public:
     static HostGate& instance();

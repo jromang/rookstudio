@@ -434,12 +434,14 @@ class App {
     std::set<int> twic_ticked_;
     int twic_target_ = -2;  // the database chosen in the sheet: the shelf's index, -1 a new one, -2 not chosen yet
     struct TwicIndexJob {
-        std::future<std::pair<std::vector<twic::Issue>, std::string>> done;
+        std::future<std::pair<std::vector<twic::Issue>, NetFailure>> done;
         bool weekly = false;
     };
     std::optional<TwicIndexJob> twic_index_job_;
     std::vector<twic::Issue> twic_issues_;  // the index's, this session
-    std::string twic_error_;
+    // Why the page of issues gave none (#141): its kind (an outage, a status, the host's pause after a 429, a page the
+    // program cannot read), worded where the sheet says it.
+    NetFailure twic_error_;
     struct TwicAdd {
         std::string title;                          // what is added, said by the report: "TWIC 1671", "…broadcasts of…"
         std::vector<twic::Issue> issues;            // TWIC's; empty for another source
@@ -451,7 +453,8 @@ class App {
         std::filesystem::path folder;
         std::shared_ptr<std::atomic<bool>> cancel;
         std::shared_ptr<DownloadProgress> progress;
-        std::future<std::vector<std::pair<std::filesystem::path, TaskEnd>>> downloads;  // each file, and how it ended
+        std::future<std::vector<std::pair<std::filesystem::path, NetFailure>>>
+            downloads;  // each file, and why it stopped
         std::vector<std::filesystem::path> files;
         std::size_t next = 0;  // the next file to import
         bool downloaded  = false;
@@ -468,9 +471,11 @@ class App {
         std::string database;
         uint64_t added = 0, duplicates = 0;
         twic::Report report;
-        std::string error;
+        StoreFailure error;   // the database's (made, its import) with the store's code, or "Cancelled."
+        NetFailure download;  // a download's (#141): its kind, the file beside its words
         std::vector<study::DuplicateGroup> others;  // the games already there from another source
         study::GameId from = 0;
+        [[nodiscard]] bool failed() const noexcept { return !error.empty() || download.failed(); }
     };
     std::optional<TwicDone> twic_done_;
     // A month of Lichess's broadcasts (#73): its page of files asked for once, read for both kinds of months.
@@ -495,8 +500,9 @@ class App {
     std::array<char, 64> chesscom_name_{};
     std::string chesscom_player_;  // the name looked up
     std::vector<std::string> chesscom_months_;
-    std::optional<std::future<std::pair<std::vector<std::string>, std::string>>> chesscom_job_;
-    std::string chesscom_error_;
+    std::optional<std::future<std::pair<std::vector<std::string>, NetFailure>>> chesscom_job_;
+    NetFailure chesscom_error_;     // why the player's months could not be had (#141): an outage, a status, a pause
+    bool chesscom_none_   = false;  // they could: the player has none
     int chesscom_target_  = -2;
     bool chesscom_follow_ = true;
     bool chesscom_loaded_ = false;

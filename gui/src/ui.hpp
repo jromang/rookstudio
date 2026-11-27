@@ -241,6 +241,9 @@ CopyAs copyButton(const char* id, bool small = false, bool gauntlet = false, boo
 // to the clipboard and drawOpenPathError(), called once a frame, says so.
 void openPath(const std::filesystem::path& path);
 void drawOpenPathError();
+// A file's path in the tooltip of the item just drawn, when there is one: a download's error keeps it beside its words
+// (#141).
+void pathTooltip(const std::filesystem::path& path);
 
 // file:///... with every byte outside [A-Za-z0-9/-._~:] percent-encoded.
 [[nodiscard]] std::string fileUrl(const std::filesystem::path& path);

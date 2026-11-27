@@ -180,7 +180,11 @@ Download politeDownload(const std::string& url, const std::filesystem::path& fil
     auto& gate = HostGate::instance();
     if (!gate.waitPause(host, cancel)) {
         Download out;
-        out.error = "cancelled";
+        out.error          = "cancelled";
+        out.failure.kind   = NetFailure::Kind::Cancelled;
+        out.failure.host   = host;
+        out.failure.path   = file;
+        out.failure.detail = out.error;
         return out;
     }
     auto out = httpDownload(url, file, progress, cancel, sha256);

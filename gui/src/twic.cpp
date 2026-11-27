@@ -6,7 +6,11 @@
 #include <cstdio>
 #include <unordered_map>
 
+#include <fmt/include/fmt/format.h>
 #include <json.hpp>
+
+#include "https.hpp"
+#include "i18n.hpp"
 
 namespace fcg::twic {
 
@@ -193,5 +197,29 @@ std::optional<Issue> newIssue(const State& state, const std::string& database) {
 }
 
 bool lookDue(const State& state, int64_t now) { return state.weekly && now - state.checked >= 6 * 3600; }
+
+std::pair<std::vector<Issue>, NetFailure> fetchIndex() {
+    HttpRequest request;
+    request.url    = indexUrl();
+    request.method = "GET";
+    std::pair<std::vector<Issue>, NetFailure> out;
+    const auto answer = politeRequest(request);
+    out.second        = netFailureOf(answer, request.url);
+    if (out.second.kind != NetFailure::Kind::None) return out;
+    out.first = parseIndex(answer.body);
+    if (out.first.empty()) {
+        out.second.kind   = NetFailure::Kind::Unexpected;
+        out.second.detail = "the page of issues lists none the program can read";
+    }
+    return out;
+}
+
+std::string indexSaid(const NetFailure& failure) {
+    if (auto own = siteSentence(failure, "theweekinchess.com"); !own.empty()) return own;
+    return trf("theweekinchess.com did not answer: {}",
+               failure.kind == NetFailure::Kind::Unexpected
+                   ? std::string(TR("The page of issues lists none the program can read."))
+                   : fmt::format("HTTP {}", failure.status));
+}
 
 }  // namespace fcg::twic

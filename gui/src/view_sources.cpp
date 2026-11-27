@@ -64,23 +64,10 @@ void App::saveTwic() {
 
 void App::startTwicIndex(bool weekly) {
     if (twic_index_job_) return;
-    if (!weekly) twic_error_.clear();
+    if (!weekly) twic_error_ = {};
     TwicIndexJob job;
     job.weekly      = weekly;
-    job.done        = std::async(std::launch::async, [] {
-        HttpRequest request;
-        request.url       = twic::indexUrl();
-        request.method    = "GET";
-        const auto answer = politeRequest(request);
-        std::pair<std::vector<twic::Issue>, std::string> out;
-        if (answer.status != 200) {
-            out.second = answer.error.empty() ? fmt::format("HTTP {}", answer.status) : answer.error;
-            return out;
-        }
-        out.first = twic::parseIndex(answer.body);
-        if (out.first.empty()) out.second = N_("The page of issues lists none the program can read.");
-        return out;
-    });
+    job.done        = std::async(std::launch::async, [] { return twic::fetchIndex(); });
     twic_index_job_ = std::move(job);
 }
 
@@ -107,7 +94,7 @@ void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, i
             if (target) *target = database;  // the sheet shows the new database from now on
         } catch (const std::exception& e) {
             twic_done_        = TwicDone{};
-            twic_done_->error = e.what();
+            twic_done_->error = {e.what(), study::errorCode(e)};
             return;
         }
     }
@@ -118,16 +105,14 @@ void App::startFileAdd(TwicAdd add, int database, const std::string& new_name, i
     if (const auto db = s.open(add.index)) add.from = static_cast<study::GameId>(db->snapshot()->games());
     add.downloads = std::async(std::launch::async,
                                [urls = add.urls, wanted = add.wanted, cancel = add.cancel, progress = add.progress] {
-                                   std::vector<std::pair<fs::path, TaskEnd>> out;
+                                   std::vector<std::pair<fs::path, NetFailure>> out;
                                    for (std::size_t i = 0; i < urls.size() && i < wanted.size(); ++i) {
                                        if (cancel->load()) break;
                                        progress->bytes = 0;
                                        progress->size  = 0;
-                                       const auto got =
-                                           politeDownload(urls[i], wanted[i], progress.get(), cancel.get());
-                                       out.emplace_back(wanted[i], got.ok           ? TaskEnd{}
-                                                                   : cancel->load() ? TaskEnd::cancel()
-                                                                                    : TaskEnd::of(got.error));
+                                       auto got = politeDownload(urls[i], wanted[i], progress.get(), cancel.get());
+                                       if (!got.ok && cancel->load()) got.failure.kind = NetFailure::Kind::Cancelled;
+                                       out.emplace_back(wanted[i], std::move(got.failure));
                                        if (!got.ok) break;
                                    }
                                    return out;
@@ -157,7 +142,8 @@ bool App::twicImportEnded(const fs::path& file, const study::DatabaseImport& rep
     } else {
         add.cancel->store(true);
         twic_done_        = TwicDone{};
-        twic_done_->error = report.error.empty() ? std::string(TR("Cancelled.")) : report.error;
+        twic_done_->error =
+            report.error.empty() ? StoreFailure{TR("Cancelled.")} : StoreFailure{report.error, report.error_code};
     }
     add.importing = false;
     ++add.next;
@@ -178,8 +164,8 @@ void App::pollTwic() {
         const bool weekly    = twic_index_job_->weekly;
         twic_index_job_.reset();
         twic_.checked = now;
-        if (!error.empty()) {
-            if (!weekly) twic_error_ = TR(error.c_str());
+        if (error.kind != NetFailure::Kind::None) {
+            if (!weekly) twic_error_ = std::move(error);
         } else {
             twic_issues_       = issues;
             twic_.newest       = issues.front().number;
@@ -208,10 +194,13 @@ void App::pollTwic() {
     if (!add.downloaded) {
         if (!isReady(add.downloads)) return;
         add.downloaded = true;
-        for (const auto& [file, end] : add.downloads.get()) {
-            if (!end.done()) {
-                twic_done_        = TwicDone{};
-                twic_done_->error = end.cancelled() ? std::string(TR("Cancelled.")) : end.error;
+        for (auto& [file, failure] : add.downloads.get()) {
+            if (failure.kind != NetFailure::Kind::None) {
+                twic_done_ = TwicDone{};
+                if (failure.cancelled())
+                    twic_done_->error = {TR("Cancelled.")};
+                else
+                    twic_done_->download = std::move(failure);
                 twic_add_.reset();
                 return;
             }
@@ -228,7 +217,7 @@ void App::pollTwic() {
         return;
     }
     // All of them in: the report.
-    if (!twic_done_ || twic_done_->error.empty()) {
+    if (!twic_done_ || !twic_done_->failed()) {
         TwicDone done;
         done.title      = add.title;
         done.index      = add.index;
@@ -315,13 +304,12 @@ void App::drawTwicSheet() {
     const auto added = [&](int n) { return there != twic_.added.end() && there->second.count(n) > 0; };
 
     if (twic_issues_.empty()) {
-        if (!twic_index_job_ && twic_error_.empty()) startTwicIndex(false);
+        if (!twic_index_job_ && twic_error_.kind == NetFailure::Kind::None) startTwicIndex(false);
         if (twic_index_job_) {
             ImGui::TextDisabled("%s", TR("Asking theweekinchess.com for its issues…"));
         } else {
             ImGui::PushTextWrapPos();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                               trf("theweekinchess.com did not answer: {}", twic_error_).c_str());
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", twic::indexSaid(twic_error_).c_str());
             ImGui::PopTextWrapPos();
             if (ImGui::Button(TR("Try again"))) startTwicIndex(false);
         }
@@ -422,10 +410,12 @@ void App::drawTwicReport() {
     if (!twic_done_) return;
     const auto& d = *twic_done_;
     ui::beginCard("twic_report");
-    if (!d.error.empty()) {
+    if (d.failed()) {
         ImGui::PushTextWrapPos();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                           trf("The games could not be added: {}", d.error).c_str());
+        ImGui::TextColored(
+            ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+            trf("The games could not be added: {}", d.download.failed() ? describe(d.download) : d.error.said).c_str());
+        ui::pathTooltip(d.download.path);  // the file, out of the sentence (#141)
         ImGui::PopTextWrapPos();
     } else {
         ui::inlineIcon(ui::Icon::Check, ui::GOOD);
@@ -702,26 +692,11 @@ void App::saveChesscom() {
 
 void App::startChesscomLookup(const std::string& player) {
     if (chesscom_job_ || player.empty()) return;
-    chesscom_error_.clear();
+    chesscom_error_ = {};
+    chesscom_none_  = false;
     chesscom_months_.clear();
     chesscom_player_ = player;
-    chesscom_job_    = std::async(std::launch::async, [player] {
-        HttpRequest request;
-        request.url    = chesscom::archivesUrl(player);
-        request.method = "GET";
-        request.headers.emplace_back("Accept", "application/json");
-        const auto answer = politeRequest(request);
-        std::pair<std::vector<std::string>, std::string> out;
-        if (answer.status == 404) {
-            out.second = N_("chess.com knows no player of that name.");
-        } else if (answer.status != 200) {
-            out.second = answer.error.empty() ? fmt::format("HTTP {}", answer.status) : answer.error;
-        } else {
-            out.first = chesscom::parseArchives(answer.body);
-            if (out.first.empty()) out.second = N_("This player has no game on chess.com.");
-        }
-        return out;
-    });
+    chesscom_job_    = std::async(std::launch::async, [player] { return chesscom::fetchMonths(player); });
 }
 
 void App::drawChesscomSheet() {
@@ -734,7 +709,8 @@ void App::drawChesscomSheet() {
         auto [months, error] = chesscom_job_->get();
         chesscom_job_.reset();
         chesscom_months_ = months;
-        chesscom_error_  = error.empty() ? std::string() : std::string(TR(error.c_str()));
+        chesscom_none_   = !error.failed() && months.empty();
+        chesscom_error_  = std::move(error);
     }
     ui::beginCard("chesscom_sheet");
     ImGui::TextUnformatted("chess.com");
@@ -752,8 +728,10 @@ void App::drawChesscomSheet() {
     ImGui::EndDisabled();
     if (chesscom_job_) {
         ImGui::TextDisabled("%s", TR("Asking chess.com for the player's months…"));
-    } else if (!chesscom_error_.empty()) {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s", chesscom_error_.c_str());
+    } else if (chesscom_error_.failed() || chesscom_none_) {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+                           chesscom_none_ ? TR("This player has no game on chess.com.")
+                                          : chesscom::monthsSaid(chesscom_error_).c_str());
     } else if (!chesscom_months_.empty()) {
         const auto followed = std::find_if(chesscom_followed_.begin(), chesscom_followed_.end(),
                                            [&](const auto& f) { return f.name == chesscom_player_; });

@@ -10,9 +10,12 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <study/store.hpp>
+
+#include "net_failure.hpp"
 
 namespace fcg::twic {
 
@@ -30,6 +33,14 @@ struct Issue {
 
 // The issues the index page lists, the newest first; empty when it lists none (the page changed).
 [[nodiscard]] std::vector<Issue> parseIndex(std::string_view html);
+
+// The index page asked of the site (politeRequest) and read: its issues, or none and why (#141), the network's kind
+// (an outage, a status, the host's pause after a 429), Unexpected for a page that lists none the program can read.
+// Blocks: call it from a thread of its own.
+[[nodiscard]] std::pair<std::vector<Issue>, NetFailure> fetchIndex();
+// Why the index gave none, as the sheet says it: an outage and the host's pause in their words, a status and a page
+// that cannot be read after "theweekinchess.com did not answer".
+[[nodiscard]] std::string indexSaid(const NetFailure& failure);
 
 // The zip of an issue's PGN, and its name.
 [[nodiscard]] std::string pgnUrl(int number);

@@ -1027,6 +1027,12 @@ namespace {
 std::string open_error;
 }
 
+void pathTooltip(const std::filesystem::path& path) {
+    if (path.empty()) return;
+    const auto u8 = path.u8string();
+    ImGui::SetItemTooltip("%s", std::string(u8.begin(), u8.end()).c_str());
+}
+
 void openPath(const std::filesystem::path& path) {
     const auto u8 = path.u8string();
     const std::string text(u8.begin(), u8.end());

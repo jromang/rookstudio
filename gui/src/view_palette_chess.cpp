@@ -14,6 +14,7 @@
 
 #include "app.hpp"
 #include "assistant_service.hpp"
+#include "endgames_page.hpp"
 #include "guess_page.hpp"
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
@@ -23,6 +24,7 @@
 #include "mistakes_page.hpp"
 #include "puzzles_page.hpp"
 #include "ui.hpp"
+#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -299,57 +301,11 @@ void App::addChessCommands(const PaletteAdd& add, const PalettePage& page) {
     mistakes_->addCommands(add, where(Page::Training));
     add(TR("Your names…"), TR("Settings"), page(Page::Settings));
     guessing_->addCommands(add, where(Page::Training));
-    // The endgames against the tables, the mates, board vision (#82).
-    add(TR("Endgames"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_ = 4;
-    });
-    add(TR("Mates"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_         = 4;
-        endgame_scroll_mates_ = true;
-    });
-    if (endgameLock().empty()) {
-        for (const auto& e : endgameCatalogue())
-            add(trf("Endgame: {}", TR(e.name)), TR("Training"), [this, &e, go = page(Page::Training)] {
-                if (endgameNeed(e.fen).empty() && startEndgame(e)) return;
-                go();
-                training_tab_ = 4;
-                endgame_need_ = e.id;
-            });
-        if (const auto n = reviewCount(ReviewKind::Endgames).due; n > 0)
-            add(trn("Review the missed endgames · {} due", "Review the missed endgames · {} due", n, ui::exactCount(n)),
-                TR("Training"), [this] { startReview(ReviewKind::Endgames); });
-        if (!gameEndgames().empty())
-            add(TR("Endgames of my games"), TR("Training"), [this] { (void)startGameEndgames(); });
-    }
-    if (syzygy_download_) {
-        if (syzygy_download_->busy())
-            add(TR("Cancel the download of the Syzygy tables"), TR("Training"), [this] { syzygy_download_->cancel(); });
-        else if (!syzygyState().complete)
-            add(trf("Download the Syzygy tables of 3 to 5 pieces · {}", formatBytes(syzygy345Bytes())), TR("Training"),
-                [this, go = page(Page::Training)] {
-                    go();
-                    training_tab_ = 4;
-                    startSyzygyDownload();
-                });
-    }
-    add(TR("Vision"), where(Page::Training), [this, go = page(Page::Training)] {
-        go();
-        training_tab_ = 5;
-    });
-    if (trainingLock().empty()) {
-        add(TR("Coordinates: find the square"), TR("Training"), [this] {
-            vision_mode_ = CoordMode::Find;
-            startCoordinates();
-        });
-        add(TR("Coordinates: name the square"), TR("Training"), [this] {
-            vision_mode_ = CoordMode::Name;
-            startCoordinates();
-        });
-        add(TR("Blindfold against an engine"), TR("Training"), [this] { startBlindfold(); });
-        add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
-    }
+    // The endgames against the tables, the mates, board vision (#82), their modules' (#107): the parts, each endgame of
+    // the catalogue, the missed ones, those of the user's games, the tables' download; the coordinates, blindfold, a
+    // line read in one's head.
+    endgames_->addCommands(add, where(Page::Training));
+    vision_->addCommands(add, where(Page::Training));
     add("Lichess", where(Page::Lichess), page(Page::Lichess));
     // The practical moves against a human of a level (#94), in the Analysis tab.
     add(board_.settings.practical ? TR("Practical moves: off") : TR("Practical moves against a human of a level"),

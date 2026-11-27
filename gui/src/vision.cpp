@@ -8,6 +8,7 @@
 #include <json.hpp>
 
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -247,18 +248,28 @@ std::optional<chess::Piece> typedPiece(char key) {
 
 VisionRecord readVisionRecord(const fs::path& profile) {
     VisionRecord out;
-    std::ifstream in(profile / "vision.json", std::ios::binary);
+    const auto file = profile / "vision.json";
+    std::ifstream in(file, std::ios::binary);
     if (!in) return out;
     const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return out;
+    if (j.is_discarded() || !j.is_object()) {
+        // There but unreadable (cut short, written by hand): kept aside and said, rather than replaced in silence by
+        // the next save (#136).
+        sayUnreadableFile(file);
+        return out;
+    }
     if (const auto it = j.find("coordinates"); it != j.end() && it->is_object())
         for (const auto& [key, v] : it->items())
             if (v.is_number_integer()) out.coordinates[key] = v.get<int>();
-    out.lines       = j.value("lines", 0);
-    out.lines_right = j.value("lines_right", 0);
-    out.blind       = j.value("blind", 0);
-    out.where       = j.value("where", 0);
-    out.where_right = j.value("where_right", 0);
+    // A count of another type than a number (written by another version, edited by hand) is set aside, the readable
+    // ones kept (#136): said in the console, the file as it was kept beside it, which the next save replaces.
+    ProfileEntries entries(file);
+    entries.entry("lines", [&] { out.lines = j.value("lines", 0); });
+    entries.entry("lines_right", [&] { out.lines_right = j.value("lines_right", 0); });
+    entries.entry("blind", [&] { out.blind = j.value("blind", 0); });
+    entries.entry("where", [&] { out.where = j.value("where", 0); });
+    entries.entry("where_right", [&] { out.where_right = j.value("where_right", 0); });
+    entries.sayUnread();
     return out;
 }
 

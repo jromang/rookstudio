@@ -1,30 +1,39 @@
-// Board vision (#82, mockup M12, board 3; vision.hpp): the Training page's Vision part and its exercises on the Board
-// page, whose column becomes the exercise's: thirty seconds of coordinates (a square to find with a click on a board
-// without its letters and figures, or to name with two keys), a game played blindfold against an engine of the library
-// (the moves typed, the pieces hidden, shown two seconds on Shift held three times a game, F2 asking where a piece is),
-// a line read in one's head (six moves from a position, then the piece on a square they changed).
+// Board vision (#82, mockup M12, board 3), a module of its own out of App (#107; vision.hpp is its data): the Training
+// page's Vision part and its exercises on the Board page, whose column becomes the exercise's: thirty seconds of
+// coordinates (a square to find with a click on a board without its letters and figures, or to name with two keys), a
+// game played blindfold against an engine of the library (the moves typed, the pieces hidden, shown two seconds on
+// Shift held three times a game, F2 asking where a piece is), a line read in one's head (six moves from a position,
+// then the piece on a square they changed).
 //
 // The keys: Enter starts (and goes on), Escape stops; the coordinates' squares named by their two keys; blindfold, a
 // move typed, Shift held, F2; a line's answer as FEN writes the piece ("N" a white knight, "n" a black one, "-" none).
 
+#include "vision_page.hpp"
+
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <string>
+#include <utility>
+#include <vector>
 
-#include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/game_tree.hpp>
 
-#include "app.hpp"
+#include "board_game.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "console.hpp"
+#include "engine_play.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "model.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -141,22 +150,30 @@ std::array<chess::Piece, 64> piecesOfBoard(const chess::Board& board) { return s
 
 }  // namespace
 
+VisionPage::VisionPage(VisionContext& app) : app_(app) {}
+
+VisionPage::~VisionPage() = default;
+
+bool VisionPage::hidesAids() const { return vision_ && vision_->phase != VPhase::End; }
+
+const char* VisionPage::guideTopic() const { return guide::topics::Vision; }
+
 // ---------------------------------------------------------------------------
 // The record, the page's part
 
-VisionRecord& App::visionRecord() {
-    if (!vision_record_) vision_record_ = readVisionRecord(storage_.root());
+VisionRecord& VisionPage::visionRecord() {
+    if (!vision_record_) vision_record_ = readVisionRecord(app_.profileDir());
     return *vision_record_;
 }
 
-void App::saveVisionRecord() {
-    if (options_.scripted || !vision_record_) return;
-    if (!writeVisionRecord(storage_.root(), *vision_record_))
-        Console::instance().add(trf("The board vision's records could not be kept in {}", storage_.root().string()),
+void VisionPage::saveVisionRecord() {
+    if (app_.scripted() || !vision_record_) return;
+    if (!writeVisionRecord(app_.profileDir(), *vision_record_))
+        Console::instance().add(trf("The board vision's records could not be kept in {}", app_.profileDir().string()),
                                 true);
 }
 
-void App::drawTrainingVision() {
+void VisionPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::Vision);
     const bool enter = !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
                        (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
@@ -165,7 +182,7 @@ void App::drawTrainingVision() {
         ImGui::SetKeyOwner(ImGuiKey_Enter, owner);
         ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, owner);
     }
-    const auto lock = trainingLock();
+    const auto lock = app_.sessionLock();
     wrapped(TR("Seeing the board in your head: the coordinates, a game played blindfold against an engine, a line of "
                "moves read without the pieces moving. Nothing leaves the machine."),
             true);
@@ -236,23 +253,18 @@ void App::drawTrainingVision() {
     ImGui::TextUnformatted(TR("Blindfold"));
     ImGui::PopFont();
     // The engine, its strength and its openings are the Play page's (#83): one place to choose the opponent.
-    const auto& play          = playSettings();
-    const EngineEntry* engine = engineNamed(play.engine);
-    if (engine && engine->inactive) engine = nullptr;
-    if (!engine) engine = analysisEngine();
+    const auto& play          = app_.playSettings();
+    const EngineEntry* engine = app_.playEngine();
     if (!engine) {
         wrapped(TR("A game against an engine of your library: add one on the Engines page first."), true);
     } else {
-        std::string text, tag, note;
-        uint64_t least = 1;
-        (void)openingSource(play, vision_colour_ == 1 ? chess::Color::WHITE : chess::Color::BLACK, text, tag, note,
-                            least, false);
+        const auto text = app_.playOpenings(vision_colour_ == 1 ? chess::Color::WHITE : chess::Color::BLACK);
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(
             trf("Against {} · {} · its openings: {}", engine->name, strengthText(strengthFor(play, *engine)), text)
                 .c_str());
         ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Change on the Play page"))) page_ = Page::Play;
+        if (ImGui::SmallButton(TR("Change on the Play page"))) app_.showPlayPage();
         for (int c = 0; c < 3; ++c) {
             const char* label = c == 0 ? TR("You: White") : c == 1 ? TR("You: Black") : TR("You: either, at random");
             if (c > 0) ui::sameLineOrWrap(label);
@@ -310,22 +322,19 @@ void App::drawTrainingVision() {
 // ---------------------------------------------------------------------------
 // The sessions
 
-void App::startVisionRun(std::unique_ptr<VisionRun> run) {
-    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
+void VisionPage::startVisionRun(std::unique_ptr<VisionRun> run, const std::string& title) {
+    // The session that holds the Board closed first, whatever its kind (#76, #80–#82); the game on it put aside.
+    const auto taken = app_.takeBoard(title, false);
     vision_error_.clear();
-    run->flip     = board_.flip;
-    run->tab      = board_side_tab_;
-    const auto& b = board_;
-    run->aside    = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
-    toStudyBoard();
-    openOnBoard(ReplayGame{}, 0, false, TR("Board vision"), false);
-    board_back_.reset();
+    run->aside = taken.aside;
+    run->flip  = taken.flip;
+    run->tab   = taken.tab;
     run->began = Clock::now();
     vision_    = std::move(run);
 }
 
-void App::startCoordinates() {
-    if (!trainingLock().empty()) return;
+void VisionPage::startCoordinates() {
+    if (!app_.sessionLock().empty()) return;
     auto run           = std::make_unique<VisionRun>();
     run->kind          = VKind::Coordinates;
     run->mode          = vision_mode_;
@@ -335,17 +344,15 @@ void App::startCoordinates() {
     const auto it      = record.find(coordKey(run->mode, run->side));
     run->record_before = it == record.end() ? 0 : it->second;
     run->flipped       = run->side == CoordSide::Black;
-    startVisionRun(std::move(run));
-    board_.flip = vision_->flipped;
+    startVisionRun(std::move(run), TR("Board vision"));
+    app_.setFlip(vision_->flipped);
 }
 
-void App::startBlindfold() {
-    if (!trainingLock().empty()) return;
+void VisionPage::startBlindfold() {
+    if (!app_.sessionLock().empty()) return;
     // The engine, its strength and its openings as the Play page chose them (#83).
-    auto play                = playSettings();
-    const EngineEntry* found = engineNamed(play.engine);
-    if (found && found->inactive) found = nullptr;
-    if (!found) found = analysisEngine();
+    auto play                = app_.playSettings();
+    const EngineEntry* found = app_.playEngine();
     if (!found) {
         vision_error_ = TR("A game against an engine of your library: add one on the Engines page first.");
         return;
@@ -367,15 +374,7 @@ void App::startBlindfold() {
     BoardMatchSetup setup;
     const bool white = run->you == chess::Color::WHITE;
     setup.nodes      = white ? std::array<uint64_t, 2>{0, strength.nodes} : std::array<uint64_t, 2>{strength.nodes, 0};
-    {
-        std::string text, tag, note;
-        uint64_t least = 1;
-        if (auto source =
-                openingSource(play, white ? chess::Color::BLACK : chess::Color::WHITE, text, tag, note, least)) {
-            auto book  = std::make_shared<OpeningBook>(std::move(source), play.vary, least, run->rng());
-            setup.book = [book](const chess::Board& board) { return book->move(board); };
-        }
-    }
+    setup.book       = app_.playBook(white ? chess::Color::BLACK : chess::Color::WHITE, run->rng);
     setup.first      = white ? you.name : engine.name;
     setup.second     = white ? engine.name : you.name;
     // The user's clock is long, the engine's short: a game seen in the head is not a race.
@@ -385,7 +384,7 @@ void App::startBlindfold() {
     setup.fen          = std::string(chess::constants::STARTPOS);
     setup.human        = white ? 0 : 1;
     std::error_code ec;
-    const auto dir = storage_.root() / "games";
+    const auto dir = app_.profileDir() / "games";
     std::filesystem::create_directories(dir, ec);
     run->match = std::make_unique<BoardMatch>();
     std::string error;
@@ -394,13 +393,12 @@ void App::startBlindfold() {
         return;
     }
     run->phase = VPhase::Asking;
-    startVisionRun(std::move(run));
-    board_.flip  = !white;
-    board_.title = trf("Blindfold · {}", engine.name);
+    startVisionRun(std::move(run), trf("Blindfold · {}", engine.name));
+    app_.setFlip(!white);
 }
 
-void App::startHeadLines() {
-    if (!trainingLock().empty()) return;
+void VisionPage::startHeadLines() {
+    if (!app_.sessionLock().empty()) return;
     auto run  = std::make_unique<VisionRun>();
     run->kind = VKind::Line;
     for (std::size_t i = 0; i < LINES; ++i) {
@@ -410,19 +408,19 @@ void App::startHeadLines() {
     }
     if (run->lines.empty()) return;
     run->phase = VPhase::Asking;
-    startVisionRun(std::move(run));
-    board_.flip = chess::Board(vision_->lines.front().fen).sideToMove() == chess::Color::BLACK;
+    startVisionRun(std::move(run), TR("Board vision"));
+    app_.setFlip(chess::Board(vision_->lines.front().fen).sideToMove() == chess::Color::BLACK);
 }
 
-void App::visionNextSquare() {
+void VisionPage::visionNextSquare() {
     auto& v   = *vision_;
     v.asked   = nextCoordinate(v.rng, v.asked == chess::Square::NO_SQ ? std::nullopt : std::optional(v.asked));
     v.flipped = v.side == CoordSide::Random ? v.rng() % 2 == 1 : v.side == CoordSide::Black;
     v.typed.clear();
-    board_.flip = v.flipped;
+    app_.setFlip(v.flipped);
 }
 
-void App::visionSquare(chess::Square square) {
+void VisionPage::visionSquare(chess::Square square) {
     auto& v = *vision_;
     if (v.kind == VKind::Coordinates && v.phase == VPhase::Asking && v.mode == CoordMode::Find) {
         if (square == v.asked) {
@@ -445,18 +443,18 @@ void App::visionSquare(chess::Square square) {
     }
 }
 
-void App::visionAnswer(chess::Move move) {
+void VisionPage::visionAnswer(chess::Move move) {
     if (!vision_) return;
     auto& v = *vision_;
     if (v.kind != VKind::Blindfold || !v.match || !v.state.running || !v.state.you || v.state.thinking != v.state.you ||
         v.where)
         return;
     v.match->play(chess::uci::moveToUci(move, false));
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
 }
 
-void App::finishVision(bool stopped) {
+void VisionPage::finishVision(bool stopped) {
     auto& v = *vision_;
     if (v.phase == VPhase::End) return;
     v.phase      = VPhase::End;
@@ -483,40 +481,40 @@ void App::finishVision(bool stopped) {
             saveVisionRecord();
             break;
     }
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
 }
 
-void App::closeVision(bool to_training) {
+void VisionPage::closeVision(bool to_training) {
     if (!vision_) return;
     if (vision_->match) vision_->match->stop();
-    if (to_training) training_tab_ = 5;  // back to the Vision part
-    const bool aside = vision_->aside, flip = vision_->flip;
-    board_side_tab_ = vision_->tab;
+    if (to_training) app_.showTrainingPage(5);  // back to the Vision part
+    BoardTaken taken;
+    taken.aside = vision_->aside;
+    taken.flip  = vision_->flip;
+    taken.tab   = vision_->tab;
     vision_.reset();
-    forget_board_game_ = true;
-    if (aside && !recent_games_.empty())
-        restoreRecentGame(0);
-    else
-        newBoardGame();
-    forget_board_game_ = false;
-    board_.flip        = flip;
-    board_back_.reset();
-    page_ = to_training ? Page::Training : Page::Board;
+    app_.giveBoardBack(taken, to_training);  // the exercise's position is no game to remember
 }
 
-void App::dropVision() {
+void VisionPage::dropVision() {
     if (vision_->match) vision_->match->stop();
-    board_.flip     = vision_->flip;
-    board_side_tab_ = vision_->tab;
+    BoardTaken taken;
+    taken.aside = vision_->aside;
+    taken.flip  = vision_->flip;
+    taken.tab   = vision_->tab;
     vision_.reset();
-    forget_board_game_ = true;
+    app_.leaveBoard(taken);  // the game that comes takes the board; the one put aside stays among the recent ones
 }
 
-void App::pollVision() {
+void VisionPage::poll() {
+    if (vision_) pollVision();
+}
+
+void VisionPage::pollVision() {
     auto& v = *vision_;
     // Fair play (#48): an engine that computes waits for a live game's end; the blindfold game stops there.
-    if (v.kind == VKind::Blindfold && liveGameOn() && v.phase != VPhase::End) {
+    if (v.kind == VKind::Blindfold && app_.liveGameOn() && v.phase != VPhase::End) {
         vision_error_ = TR("The blindfold game stopped: one of your games is played live on Lichess.");
         return finishVision(true);
     }
@@ -526,12 +524,7 @@ void App::pollVision() {
     if (v.match->state(v.state, v.version)) {
         if (!v.state.running) v.match->reap();
         // The board's game follows the one played: the moves typed are read on its position.
-        auto& b = board_;
-        b.game  = v.state.current;
-        b.tree  = GameTree{b.game, {}};
-        b.line  = -1;
-        b.ply   = static_cast<int>(b.game.moves.size());
-        b.selected.reset();
+        app_.followSessionGame(v.state.current);
         if (!v.state.running && v.phase != VPhase::End) finishVision(false);
     }
 }
@@ -539,7 +532,7 @@ void App::pollVision() {
 // ---------------------------------------------------------------------------
 // The Board page during an exercise
 
-void App::visionKeys() {
+void VisionPage::visionKeys() {
     auto& v        = *vision_;
     const auto& io = ImGui::GetIO();
     // A field has the keys (the move typed): Enter and Escape are its own.
@@ -616,10 +609,10 @@ void App::visionKeys() {
             }
             if (v.peeking && Clock::now() >= v.peek_until) v.peeking = false;
             if (ImGui::IsKeyPressed(ImGuiKey_F2, false) && !v.where) {
-                v.where = pieceQuestion(boardAt(board_.game, false, board_.ply), v.rng);
+                v.where = pieceQuestion(boardAt(app_.sessionGame(), false, app_.sessionPly()), v.rng);
                 v.where_said.reset();
                 v.typed.clear();
-                board_.move_typed.reset();
+                app_.dropTypedMove();
             } else if (v.where && !v.where_said && !io.WantTextInput) {
                 for (const ImWchar c : io.InputQueueCharacters) {
                     const char k = static_cast<char>(std::tolower(static_cast<int>(c)));
@@ -633,7 +626,7 @@ void App::visionKeys() {
                 v.where.reset();
                 v.where_said.reset();
             } else if (!v.where && v.state.running && v.state.you && v.state.thinking == v.state.you) {
-                boardMoveKeys();
+                app_.moveKeys();
             }
             break;
         }
@@ -653,19 +646,16 @@ void App::visionKeys() {
                 ++v.line;
                 v.said.reset();
                 if (v.line >= v.lines.size()) return finishVision(false);
-                v.phase     = VPhase::Asking;
-                board_.flip = chess::Board(v.lines[v.line].fen).sideToMove() == chess::Color::BLACK;
+                v.phase = VPhase::Asking;
+                app_.setFlip(chess::Board(v.lines[v.line].fen).sideToMove() == chess::Color::BLACK);
             }
             break;
         }
     }
 }
 
-void App::drawVisionPage() {
-    ui::pageTitle(TR("Board"), guideSection());
-    if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        !SDL_TextInputActive(window_))
-        SDL_StartTextInput(window_);
+void VisionPage::drawVisionPage() {
+    app_.beginSessionPage();
     visionKeys();
     if (!vision_) return;
     auto& v            = *vision_;
@@ -729,12 +719,10 @@ void App::drawVisionPage() {
     ImGui::EndChild();
 }
 
-void App::drawVisionBoard(float size) {
+void VisionPage::drawVisionBoard(float size) {
     auto& v = *vision_;
-    auto& b = board_;
+    // The side below, the last move of the game played blindfold: the Board's (context::FlatBoard).
     BoardDecor decor;
-    decor.flipped     = b.flip;
-    decor.eval_white  = -1.0f;
     const auto green  = markColour('G', true);
     const auto orange = IM_COL32(236, 140, 52, 150);
     const auto blue   = markColour('B', true);
@@ -753,15 +741,14 @@ void App::drawVisionBoard(float size) {
             }
             break;
         case VKind::Blindfold: {
-            board  = boardAt(b.game, false, b.ply);
+            board  = boardAt(app_.sessionGame(), false, app_.sessionPly());
             pieces = shownPieces(board, v.hidden, v.peeking || v.phase == VPhase::End);
-            if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
             if (v.where && v.where_said) {
                 decor.tints.push_back({v.where->square, green});
                 if (*v.where_said != v.where->square) decor.tints.push_back({*v.where_said, orange});
             }
             moves = !v.where && v.phase != VPhase::End && v.state.running && v.state.you &&
-                    v.state.thinking == v.state.you && !liveGameOn();
+                    v.state.thinking == v.state.you && !app_.liveGameOn();
             break;
         }
         case VKind::Line:
@@ -776,23 +763,12 @@ void App::drawVisionBoard(float size) {
             }
             break;
     }
-    decor.selected = moves ? b.selected : std::nullopt;
-    if (decor.selected)
-        for (const auto& m : movesFrom(board, *decor.selected)) decor.targets.push_back(shownTarget(m));
-    const ImVec2 top = ImGui::GetCursorScreenPos();
-    // The flat board always: the 3D one has no hidden pieces nor a board without its letters.
-    drawBoard(atlas_, pieces, size, decor);
-    const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
-    const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left);
-    if (moves) {
-        boardPointer(board, left ? hover : std::nullopt, hover, ImGui::IsItemClicked(ImGuiMouseButton_Right));
-        drawPromotionPopup(board);
-    } else if (left && hover) {
-        visionSquare(*hover);
-    }
+    // The flat board always: the 3D one has no hidden pieces nor a board without its letters. Its moves when the game
+    // takes one, else a square clicked.
+    if (const auto clicked = app_.drawFlatBoard(size, pieces, decor, moves ? &board : nullptr)) visionSquare(*clicked);
 }
 
-void App::drawVisionColumn() {
+void VisionPage::drawVisionColumn() {
     auto& v = *vision_;
     const ui::TopicRegion topic(guide::topics::Vision);
     ImGui::PushTextWrapPos();
@@ -864,14 +840,14 @@ void App::drawVisionColumn() {
             }
             if (v.phase != VPhase::End) {
                 if (v.state.running && v.state.you && v.state.thinking == v.state.you && !v.where) {
-                    const auto board = boardAt(board_.game, false, board_.ply);
+                    const auto board = boardAt(app_.sessionGame(), false, app_.sessionPly());
                     ImGui::AlignTextToFramePadding();
                     ImGui::TextUnformatted(fmt::format("{}{}", board.fullMoveNumber(),
                                                        board.sideToMove() == chess::Color::WHITE ? "." : "…")
                                                .c_str());
                     ImGui::SameLine();
-                    if (!board_.move_typed) ImGui::TextDisabled("%s", TR("type your move, Enter"));
-                    drawMoveField();
+                    if (!app_.typingMove()) ImGui::TextDisabled("%s", TR("type your move, Enter"));
+                    app_.drawMoveField();
                 } else if (v.state.running && !v.where) {
                     ImGui::TextDisabled("%s", trf("{} thinks…", v.engine).c_str());
                 }
@@ -967,8 +943,8 @@ void App::drawVisionColumn() {
                     if (v.line >= v.lines.size()) {
                         finishVision(false);
                     } else {
-                        v.phase     = VPhase::Asking;
-                        board_.flip = chess::Board(v.lines[v.line].fen).sideToMove() == chess::Color::BLACK;
+                        v.phase = VPhase::Asking;
+                        app_.setFlip(chess::Board(v.lines[v.line].fen).sideToMove() == chess::Color::BLACK);
                     }
                 }
             }
@@ -1003,6 +979,43 @@ void App::drawVisionColumn() {
         finishVision(true);
     }
     ImGui::PopTextWrapPos();
+}
+
+// ---------------------------------------------------------------------------
+// The Home page, the palette, the --focus words
+
+void VisionPage::drawHomeLine() {
+    if (!vision_) return;
+    ImGui::TextUnformatted(TR("Board vision"));
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Back to the exercise"))) app_.showSession();
+}
+
+void VisionPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
+    add(TR("Vision"), training_view, [this] { app_.showTrainingPage(5); });
+    if (app_.sessionLock().empty()) {
+        add(TR("Coordinates: find the square"), TR("Training"), [this] {
+            vision_mode_ = CoordMode::Find;
+            startCoordinates();
+        });
+        add(TR("Coordinates: name the square"), TR("Training"), [this] {
+            vision_mode_ = CoordMode::Name;
+            startCoordinates();
+        });
+        add(TR("Blindfold against an engine"), TR("Training"), [this] { startBlindfold(); });
+        add(TR("A line read in your head"), TR("Training"), [this] { startHeadLines(); });
+    }
+}
+
+void VisionPage::addFocusWords(FocusWords& words, const std::string& word) {
+    words.on({"vision-coordinates", "vision-blindfold", "vision-lines"}, [&] {
+        if (word == "vision-coordinates")
+            startCoordinates();
+        else if (word == "vision-blindfold")
+            startBlindfold();
+        else
+            startHeadLines();
+    });
 }
 
 }  // namespace fcg

@@ -23,10 +23,12 @@
 #include "board_session.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
+#include "endgames_page.hpp"
 #include "guess_page.hpp"
 #include "i18n.hpp"
 #include "mistakes_page.hpp"
 #include "ui.hpp"
+#include "vision_page.hpp"
 
 namespace fcg {
 
@@ -1234,22 +1236,9 @@ void App::drawTrainingHome() {
     // A session of exercises, a game guessed (#81): their modules' (#107).
     mistakes_->drawHomeLine();
     guessing_->drawHomeLine();
-    // An endgame against the tables, a vision exercise (#82).
-    if (endgame_) {
-        const auto& r = *endgame_;
-        const auto label =
-            r.phase != EndgameRun::Phase::End && r.tasks.size() > 1
-                ? trf("Endgames “{}”: {} of {}", r.title, std::min(r.current + 1, r.tasks.size()), r.tasks.size())
-                : trf("Endgame “{}”", r.title);
-        ImGui::TextUnformatted(label.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Back to the endgame"))) page_ = Page::Board;
-    }
-    if (vision_) {
-        ImGui::TextUnformatted(TR("Board vision"));
-        ImGui::SameLine();
-        if (ImGui::SmallButton(TR("Back to the exercise"))) page_ = Page::Board;
-    }
+    // An endgame against the tables, a vision exercise (#82): their modules' (#107).
+    endgames_->drawHomeLine();
+    vision_->drawHomeLine();
     // The day's review (#80): one count for every kind, a click reviewing them all.
     drawReviewHome();
 }

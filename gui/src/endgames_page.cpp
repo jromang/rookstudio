@@ -1,36 +1,45 @@
-// Endgames against the tablebases and the mates (#82, mockup M12, board 3; endgames.hpp): the Training page's Endgames
-// part (the tables there, the catalogue, the endgames of the user's games, the mates of Lichess's puzzles), the tables
-// missing (download those of 3 to 5 pieces, a folder already on the disk, Lichess's online), and an endgame played on
-// the Board page, whose column becomes the endgame's: the tables answer each move, a fault is said with the moves that
-// kept the result, the position before it comes back in the day's review.
+// Endgames against the tablebases and the mates (#82, mockup M12, board 3), a module of its own out of App (#107;
+// endgames.hpp is their data): the Training page's Endgames part (the tables there, the catalogue, the endgames of the
+// user's games, the mates of Lichess's puzzles), the tables missing (download those of 3 to 5 pieces, a folder already
+// on the disk, Lichess's online), and an endgame played on the Board page, whose column becomes the endgame's: the
+// tables answer each move, a fault is said with the moves that kept the result, the position before it comes back in
+// the day's review.
 //
 // The keys: on the page, ↑ ↓ choose an endgame once one was clicked, Enter plays it; during an endgame, a move on the
 // board or typed, Ctrl+Z takes a move back, Alt+H shows the right move, Escape stops; after a fault, Enter takes it
 // back.
 
+#include "endgames_page.hpp"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <future>
 #include <string>
+#include <string_view>
+#include <utility>
 
-#include <SDL3/SDL.h>
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 #include <imgui_internal.h>  // SetKeyOwner
 
 #include <study/game_tree.hpp>
 
-#include "app.hpp"
+#include "board_page.hpp"
 #include "board_text.hpp"
 #include "board_view.hpp"
 #include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "jobs.hpp"
+#include "lichess_settings.hpp"
 #include "machines.hpp"
-#include "mistakes_page.hpp"
+#include "mistakes.hpp"
 #include "online_cache.hpp"
-#include "puzzles_page.hpp"
+#include "puzzles.hpp"
+#include "tablebases.hpp"
+#include "training.hpp"
 #include "ui.hpp"
 
 namespace fcg {
@@ -158,14 +167,6 @@ ImU32 verdictTone(int user_result, EndgameGoal goal) {
     return meetsGoal(user_result, goal) ? ui::GOOD : user_result < 0 ? ui::BAD : ui::WARN;
 }
 
-const char* separator() {
-#ifdef _WIN32
-    return ";";
-#else
-    return ":";
-#endif
-}
-
 // The pieces of the board after `moves` from `fen`, its history played (repetitions).
 chess::Board playedBoard(const std::string& fen, const std::vector<chess::Move>& moves) {
     chess::Board board(fen);
@@ -182,129 +183,64 @@ chess::Board askedBoard(const EndgameRun& r) {
 
 }  // namespace
 
+EndgamesPage::EndgamesPage(EndgamesContext& app) : app_(app) {}
+
+EndgamesPage::~EndgamesPage() = default;
+
+bool EndgamesPage::hidesAids() const {
+    // An endgame being played against the tables.
+    return endgame_ && endgame_->phase != EgPhase::Done && endgame_->phase != EgPhase::End;
+}
+
+const char* EndgamesPage::guideTopic() const { return guide::topics::Endgames; }
+
 // ---------------------------------------------------------------------------
 // The record, the tables
 
-EndgameRecord& App::endgameRecord() {
+EndgameRecord& EndgamesPage::endgameRecord() {
     if (!endgame_record_) endgame_record_ = readEndgameRecord(endgamesFolder());
     return *endgame_record_;
 }
 
-void App::saveEndgameRecord() {
-    if (options_.scripted || !endgame_record_) return;
+void EndgamesPage::saveEndgameRecord() {
+    if (app_.scripted() || !endgame_record_) return;
     if (!writeEndgameRecord(endgamesFolder(), *endgame_record_))
         Console::instance().add(trf("The endgames' results could not be kept in {}", endgamesFolder().string()), true);
 }
 
-const SyzygyDownload::State& App::syzygyState() {
-    // Read again now and then (a folder's files, their marks), not while the download writes them: its progress says.
-    const bool busy = syzygy_download_ && syzygy_download_->busy();
-    if (!syzygy_state_ || (!busy && since(syzygy_state_at_) > 10.0)) {
-        syzygy_state_    = syzygy_download_ ? syzygy_download_->state() : SyzygyDownload::State{};
-        syzygy_state_at_ = Clock::now();
-    }
-    return *syzygy_state_;
-}
-
-std::string App::endgameTablesPaths() {
-    std::string paths = setup_.tb_paths;
-    if (syzygy_download_ && (syzygy_download_->busy() || syzygyState().files > 0)) {
-        const auto own  = syzygy_download_->folder().string();
-        const auto dirs = splitTablebasePath(paths);
-        if (std::find(dirs.begin(), dirs.end(), own) == dirs.end()) paths += (paths.empty() ? "" : separator()) + own;
-    }
-    return paths;
-}
-
-int App::diskTablesPieces() {
-    const auto paths = endgameTablesPaths();
-    if (paths.empty()) return 0;
-    // The most pieces whose WDL tables are all there, those of fewer pieces too (a capture leads to them): a set half
-    // downloaded covers what it covers whole.
-    const auto covered = [](const TablebaseCheck& c) {
-        int n = 0;
-        for (int k = 3; k <= c.largest; ++k) {
-            if (const auto it = c.missing.find(k); it != c.missing.end() && !it->second.empty()) break;
-            n = k;
-        }
-        return n;
-    };
-    // Checked again off the interface's thread every few seconds; the first time at once (names and sizes only), so
-    // that an endgame chosen at once finds its tables.
-    if (const auto* check = tb_checks_.get(paths)) return covered(*check);
-    if (disk_tables_of_ != paths) {
-        disk_tables_of_     = paths;
-        disk_tables_pieces_ = covered(checkTablebases(paths));
-    }
-    return disk_tables_pieces_;
-}
-
-bool App::diskTablesLocked() const {
-    if (run_->running() && !run_->remote()) return true;
-    for (const auto& r : runs_)
-        if (r.run->running() && !r.run->remote()) return true;
-    return false;
-}
-
-std::string App::endgameNeed(const std::string& fen) {
+std::string EndgamesPage::endgameNeed(const std::string& fen) {
     const int pieces = piecesOf(fen);
-    if (!diskTablesLocked() && diskTablesPieces() >= pieces) return {};
-    if (pieces <= 7 && lichess_.tablebase == 1) return {};
+    if (!app_.diskTablesLocked() && app_.diskTablesPieces() >= pieces) return {};
+    if (pieces <= 7 && app_.lichessSettings().tablebase == 1) return {};
     if (pieces > 7) return trf("{} pieces: more than any table knows", pieces);
-    if (diskTablesLocked() && diskTablesPieces() >= pieces)
+    if (app_.diskTablesLocked() && app_.diskTablesPieces() >= pieces)
         return TR("Lichess's tables online, the tournament holding those of your disk while it plays");
     return pieces <= 5 ? trf("the tables of {} pieces, on the disk or Lichess's online", pieces)
                        : trf("Lichess's tables online ({} pieces)", pieces);
 }
 
-std::string App::endgameLock() const { return trainingLock(); }
+std::string EndgamesPage::endgameLock() const { return app_.sessionLock(); }
 
-void App::startSyzygyDownload() {
-    if (!syzygy_download_ || syzygy_download_->busy()) return;
-    syzygy_error_.clear();
+void EndgamesPage::startSyzygyDownload() {
+    const auto* download = app_.tablesDownload();
+    if (!download || download->busy()) return;
     syzygy_since_ = Clock::now();
     syzygy_from_  = 0;
-    syzygy_download_->start();
+    app_.startTablesDownload();  // the reason it last stopped forgotten
 }
 
-void App::pollEndgames() {
-    // The download: its end, and the tables loaded again as each piece count's files are all there.
-    if (syzygy_download_) {
-        if (const auto why = syzygy_download_->finished()) {
-            syzygy_state_.reset();
-            if (why->empty()) {
-                // The set is whole: offered to the tournaments, the setup's folders taking it in.
-                const auto own  = syzygy_download_->folder().string();
-                const auto dirs = splitTablebasePath(setup_.tb_paths);
-                if (std::find(dirs.begin(), dirs.end(), own) == dirs.end()) {
-                    setup_.tb_paths += (setup_.tb_paths.empty() ? "" : separator()) + own;
-                    saveSetupSoon();
-                }
-                Console::instance().add(trf("The Syzygy tables of 3 to 5 pieces are on the disk: {}", own));
-            } else if (*why != "cancelled") {
-                syzygy_error_ = *why;
-                Console::instance().add(trf("The Syzygy tables' download stopped: {}", *why), true);
-            }
-        }
-        if (syzygy_download_->generation() != syzygy_generation_ && !diskTablesLocked()) {
-            syzygy_generation_ = syzygy_download_->generation();
-            syzygy_state_.reset();
-            const auto lock = lockSyzygy();
-            forgetSyzygy();
-        }
-    }
-    if (vision_) pollVision();
+void EndgamesPage::poll() {
     const auto ready = [](auto& f) {
         return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     };
     // Fair play (#48): the tables are an aid; the endgame waits for a live game's end, where it is.
-    if (!endgame_ || liveGameOn()) return;
+    if (!endgame_ || app_.liveGameOn()) return;
     auto& r = *endgame_;
     // Lichess's answer.
     if (ready(r.asking)) {
         auto answer = r.asking.get();
         if (answer.value && answer.value->outcome != lichess::Outcome::Unknown) {
-            keepTablebase(storage_.root(), r.asking_fen, *answer.value);
+            keepTablebase(app_.profileDir(), r.asking_fen, *answer.value);
             r.answers[r.asking_fen] = *answer.value;
             r.waiting.clear();
             r.waiting_net = lichess::NetError::None;
@@ -315,10 +251,10 @@ void App::pollEndgames() {
                 endgameAnswered();
             }
         } else {
-            r.waiting        = answer.value      ? std::string(TR("Lichess's tables do not know this position."))
-                               : answer.failed() ? lichess::describe(answer)
-                                                 : std::string(TR("no answer"));
-            r.waiting_net    = answer.net;
+            r.waiting     = answer.value      ? std::string(TR("Lichess's tables do not know this position."))
+                            : answer.failed() ? lichess::describe(answer)
+                                              : std::string(TR("no answer"));
+            r.waiting_net = answer.net;
             r.retry_at =
                 Clock::now() + std::chrono::seconds(answer.net == lichess::NetError::RateLimited ? 61 : RETRY_SECONDS);
         }
@@ -344,9 +280,9 @@ void App::pollEndgames() {
 // ---------------------------------------------------------------------------
 // The Training page's part
 
-std::vector<EndgameTask> App::gameEndgames() {
+std::vector<EndgameTask> EndgamesPage::gameEndgames() {
     std::vector<EndgameTask> out;
-    for (const auto* e : mistakes_->mistakeExercises()) {
+    for (const auto* e : app_.mistakeExercises()) {
         const auto board = e->board();
         if (piecesOf(board) > 7 || !board.castlingRights().isEmpty()) continue;
         EndgameTask t;
@@ -362,14 +298,14 @@ std::vector<EndgameTask> App::gameEndgames() {
     return out;
 }
 
-std::string App::endgameState(const EndgameEntry& entry) {
+std::string EndgamesPage::endgameState(const EndgameEntry& entry) {
     std::string out;
     const auto add  = [&](const std::string& part) { out += (out.empty() ? "" : " · ") + part; };
     const int n     = piecesOf(entry.fen);
     const auto need = endgameNeed(entry.fen);
     if (!need.empty())
         add(trf("{} pieces", n));
-    else if (diskTablesLocked() || diskTablesPieces() < n)
+    else if (app_.diskTablesLocked() || app_.diskTablesPieces() < n)
         add(trf("{} pieces · Lichess", n));
     const auto& results = endgameRecord().results;
     const auto it       = results.find(entry.id);
@@ -388,7 +324,7 @@ std::string App::endgameState(const EndgameEntry& entry) {
     return out;
 }
 
-void App::drawTrainingEndgames() {
+void EndgamesPage::drawPart() {
     const ui::TopicRegion topic(guide::topics::Endgames);
     bool enter = enterPressed();
     if (enter) {
@@ -397,9 +333,9 @@ void App::drawTrainingEndgames() {
         ImGui::SetKeyOwner(ImGuiKey_KeypadEnter, owner);
     }
     // What answers: the tables of the disk, Lichess's, neither.
-    const int disk     = diskTablesPieces();
-    const bool locked  = diskTablesLocked();
-    const bool lichess = lichess_.tablebase == 1;
+    const int disk     = app_.diskTablesPieces();
+    const bool locked  = app_.diskTablesLocked();
+    const bool lichess = app_.lichessSettings().tablebase == 1;
     std::string tables;
     if (disk > 0 && locked)
         tables =
@@ -437,9 +373,9 @@ void App::drawTrainingEndgames() {
     // now (a folder chosen, the download's files), the card goes.
     if (const auto* e = endgame_need_.empty() ? nullptr : endgameEntry(endgame_need_); e && endgameNeed(e->fen).empty())
         endgame_need_.clear();
-    const auto& state = syzygyState();
-    if ((syzygy_download_ && syzygy_download_->busy()) || !syzygy_error_.empty() ||
-        (state.files > 0 && !state.complete)) {
+    const auto& state    = app_.tablesHeld();
+    const auto* download = app_.tablesDownload();
+    if ((download && download->busy()) || !app_.tablesDownloadError().empty() || (state.files > 0 && !state.complete)) {
         drawSyzygyDownloadCard();
         ImGui::Dummy(ImVec2(0, px(4)));
     }
@@ -460,7 +396,7 @@ void App::drawTrainingEndgames() {
     drawMatesCard();
 }
 
-void App::drawEndgameCatalogue(bool& enter) {
+void EndgamesPage::drawEndgameCatalogue(bool& enter) {
     const auto& all   = endgameCatalogue();
     const auto lock   = endgameLock();
     endgame_selected_ = std::clamp(endgame_selected_, 0, static_cast<int>(all.size()) - 1);
@@ -541,7 +477,7 @@ void App::drawEndgameCatalogue(bool& enter) {
     }
 }
 
-void App::drawEndgameTablesCard(bool& enter) {
+void EndgamesPage::drawEndgameTablesCard(bool& enter) {
     const ui::TopicRegion topic(guide::topics::EndgameTables);
     const auto* entry = endgame_need_.empty() ? nullptr : endgameEntry(endgame_need_);
     const int pieces  = entry ? piecesOf(entry->fen) : 5;
@@ -554,7 +490,7 @@ void App::drawEndgameTablesCard(bool& enter) {
                        entry ? trf("No tables for “{}”", TR(entry->name)).c_str() : TR("No tables yet"));
     ImGui::PopFont();
     if (entry) {
-        if (diskTablesLocked() && diskTablesPieces() >= pieces)
+        if (app_.diskTablesLocked() && app_.diskTablesPieces() >= pieces)
             wrapped(
                 TR("The tables of your disk are the tournament's while it plays: Lichess's online answer meanwhile."));
         else
@@ -580,13 +516,14 @@ void App::drawEndgameTablesCard(bool& enter) {
         option(0, trf("Download the tables of 3 to 5 pieces · {}", formatBytes(total)),
                TR("Syzygy, from Lichess's mirror; a download cut short goes on, each file checked; in the profile, and "
                   "offered to the tournaments."));
-    if (pieces <= 5)
+    if (pieces <= 5) {
+        const auto setting = app_.tablesSetting();
         option(1, TR("A folder of tables already on the disk…"),
-               setup_.tb_paths.empty()
-                   ? std::string(TR("The tournaments' setting (Settings › Adjudication): no folder yet."))
-                   : trf("The tournaments' setting (Settings › Adjudication): {}.", setup_.tb_paths));
+               setting.empty() ? std::string(TR("The tournaments' setting (Settings › Adjudication): no folder yet."))
+                               : trf("The tournaments' setting (Settings › Adjudication): {}.", setting));
+    }
     option(2, TR("Lichess's, online"),
-           lichess_.tablebase == 2
+           app_.lichessSettings().tablebase == 2
                ? std::string(TR("Up to 7 pieces, a request a position played; you said never on the Lichess page "
                                 "(Online for the analysis): choosing it here allows them."))
                : std::string(TR("Up to 7 pieces, a request a position played; the online tables' consent, once (the "
@@ -597,7 +534,8 @@ void App::drawEndgameTablesCard(bool& enter) {
                                  : endgame_tables_choice_ == 1 ? TR("Choose the folder…")
                                                                : TR("Use Lichess's tables");
     const std::string download = trf("Download · {}", formatBytes(total));
-    const bool busy            = syzygy_download_ && syzygy_download_->busy();
+    const auto* tables         = app_.tablesDownload();
+    const bool busy            = tables && tables->busy();
     if (primaryButton(label ? label : download.c_str(), !busy || endgame_tables_choice_ != 0) || (enter && !busy)) {
         enter = false;
         switch (endgame_tables_choice_) {
@@ -605,11 +543,11 @@ void App::drawEndgameTablesCard(bool& enter) {
                 startSyzygyDownload();
                 break;
             case 1:
-                dialogs_.openFolder(Dialogs::Purpose::Tablebases);
+                app_.chooseTablesFolder();
                 break;
             default:
-                lichess_.tablebase = 1;
-                saveLichessSettings();
+                app_.lichessSettings().tablebase = 1;
+                app_.saveLichessSettings();
                 break;
         }
         if (endgame_tables_choice_ == 2 && entry) {
@@ -637,10 +575,11 @@ void App::drawEndgameTablesCard(bool& enter) {
     endTinted();
 }
 
-void App::drawSyzygyDownloadCard() {
-    if (!syzygy_download_) return;
+void EndgamesPage::drawSyzygyDownloadCard() {
+    auto* download = app_.tablesDownload();
+    if (!download) return;
     const ui::TopicRegion topic(guide::topics::EndgameTables);
-    auto& d          = *syzygy_download_;
+    auto& d          = *download;
     const auto total = syzygy345Bytes();
     ui::beginCard("##syzygy_download");
     ImGui::PushTextWrapPos();
@@ -679,7 +618,7 @@ void App::drawSyzygyDownloadCard() {
                                                   "ready within seconds."));
         if (ImGui::Button(TR("Cancel##syzygy_download"))) d.cancel();
     } else {
-        const auto& state = syzygyState();
+        const auto& state = app_.tablesHeld();
         if (state.complete) {
             ui::inlineIcon(ui::Icon::Check, ui::GOOD);
             ImGui::SameLine();
@@ -690,8 +629,8 @@ void App::drawSyzygyDownloadCard() {
             ImGui::TextUnformatted(trf("The download stopped at {} of {}: {} files of {}.", formatBytes(state.bytes),
                                        formatBytes(total), state.files, syzygy345Files().size())
                                        .c_str());
-            if (!syzygy_error_.empty())
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", syzygy_error_.c_str());
+            if (const auto& error = app_.tablesDownloadError(); !error.empty())
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", error.c_str());
             if (ImGui::Button(TR("Go on##syzygy_download"))) startSyzygyDownload();
             tip(TR("The files missing, one after the other; a file cut short goes on from where it stopped."));
         }
@@ -701,7 +640,7 @@ void App::drawSyzygyDownloadCard() {
     ui::endCard();
 }
 
-void App::drawEndgamesFromGames() {
+void EndgamesPage::drawEndgamesFromGames() {
     const auto tasks = gameEndgames();
     beginTinted("##endgames_games", ui::ACCENT);
     ImGui::PushTextWrapPos();
@@ -732,7 +671,7 @@ void App::drawEndgamesFromGames() {
     endTinted();
 }
 
-void App::drawMatesCard() {
+void EndgamesPage::drawMatesCard() {
     const ui::TopicRegion topic(guide::topics::Mates);
     ui::beginCard("##mates_card");
     ImGui::PushTextWrapPos();
@@ -744,18 +683,17 @@ void App::drawMatesCard() {
     wrapped(TR("Lichess's mate puzzles, in 1 to 5 moves, and by pattern: back rank, smothered, Anastasia's, Arabian, "
                "Boden's… And the elementary mates above, counted against the tables."),
             true);
-    auto& puzzles   = *puzzles_;  // their module (puzzles_page.hpp, #107)
+    // The puzzles are their module's (puzzles_page.hpp, #107): context::Puzzles.
     const auto rate = [&](std::string_view key) -> std::string {
-        const auto& themes = puzzles.puzzleRecord().themes;
-        const auto it      = themes.find(std::string(key));
-        if (it == themes.end() || it->second.tried < 5) return {};
-        return fmt::format(" {} %", 100 * it->second.won / it->second.tried);
+        const auto results = app_.puzzleTheme(std::string(key));
+        if (results.tried < 5) return {};
+        return fmt::format(" {} %", 100 * results.won / results.tried);
     };
-    const auto store = puzzles.store();
-    const auto lock  = trainingLock();
+    const bool store = app_.puzzlesOnDisk();
+    const auto lock  = app_.sessionLock();
     const auto play  = [&](std::string_view key) {
         // Neither the database nor the account: the Puzzles part says how to have them.
-        if (!puzzles.startTheme(std::string(key))) training_tab_ = 1;
+        if (!app_.startPuzzleTheme(std::string(key))) app_.showTrainingPage(1);
     };
     ImGui::BeginDisabled(!lock.empty());
     static constexpr std::string_view MATES[]    = {"mateIn1", "mateIn2", "mateIn3", "mateIn4", "mateIn5"};
@@ -777,13 +715,12 @@ void App::drawMatesCard() {
     }
     ImGui::EndDisabled();
     if (!lock.empty()) ImGui::TextDisabled("%s", lock.c_str());
-    ImGui::TextDisabled("%s", store
-                                  ? TR("A click starts 20 puzzles of the database on your disk; Ctrl+K “puzzles mate”.")
-                              : puzzles.puzzleScopes()
-                                  ? TR("A click starts a batch of your Lichess puzzles; the database offline is on "
-                                       "the Puzzles part.")
-                                  : TR("Lichess's puzzle database first, on the Puzzles part (a click leads there), "
-                                       "or your account online."));
+    ImGui::TextDisabled(
+        "%s", store ? TR("A click starts 20 puzzles of the database on your disk; Ctrl+K “puzzles mate”.")
+              : app_.puzzlesOnline() ? TR("A click starts a batch of your Lichess puzzles; the database offline is on "
+                                          "the Puzzles part.")
+                                     : TR("Lichess's puzzle database first, on the Puzzles part (a click leads there), "
+                                          "or your account online."));
     ImGui::PopTextWrapPos();
     ui::endCard();
 }
@@ -791,7 +728,7 @@ void App::drawMatesCard() {
 // ---------------------------------------------------------------------------
 // A session
 
-bool App::startEndgame(const EndgameEntry& entry) {
+bool EndgamesPage::startEndgame(const EndgameEntry& entry) {
     if (!endgameLock().empty()) return false;
     auto run    = std::make_unique<EndgameRun>();
     run->source = EndgameRun::Source::Catalogue;
@@ -801,7 +738,7 @@ bool App::startEndgame(const EndgameEntry& entry) {
     return true;
 }
 
-bool App::startEndgameReview() {
+bool EndgamesPage::startReview() {
     if (!endgameLock().empty()) return false;
     const auto day = trainingDay(epochNow());
     std::vector<const EndgameCard*> due;
@@ -830,7 +767,7 @@ bool App::startEndgameReview() {
     return true;
 }
 
-bool App::startGameEndgames() {
+bool EndgamesPage::startGameEndgames() {
     if (!endgameLock().empty()) return false;
     auto tasks = gameEndgames();
     std::erase_if(tasks, [&](const auto& t) { return !endgameNeed(t.fen).empty(); });
@@ -846,24 +783,20 @@ bool App::startGameEndgames() {
     return true;
 }
 
-void App::startEndgameRun(std::unique_ptr<EndgameRun> run) {
-    const bool chained = review_running_;
-    closeBoardSession();  // the session that holds the Board, whatever its kind (#76, #80–#82)
-    review_running_ = chained;
+void EndgamesPage::startEndgameRun(std::unique_ptr<EndgameRun> run) {
+    // The session that holds the Board closed first, whatever its kind (#76, #80–#82), the day's review going on; the
+    // game on it put aside.
+    const auto taken = app_.takeBoard(trf("Endgames · {}", run->title), false);
     endgame_error_.clear();
-    run->flip     = board_.flip;
-    run->tab      = board_side_tab_;
-    const auto& b = board_;
-    run->aside    = !b.game.moves.empty() || !b.tree.variations.empty() || !b.title.empty();
-    toStudyBoard();
-    openOnBoard(ReplayGame{}, 0, false, trf("Endgames · {}", run->title), false);
-    board_back_.reset();
+    run->aside   = taken.aside;
+    run->flip    = taken.flip;
+    run->tab     = taken.tab;
     run->started = Clock::now();
     endgame_     = std::move(run);
     beginEndgameTask();
 }
 
-void App::beginEndgameTask() {
+void EndgamesPage::beginEndgameTask() {
     auto& r = *endgame_;
     if (r.current >= r.tasks.size()) return finishEndgames(false);
     const auto& t = r.tasks[r.current];
@@ -884,14 +817,13 @@ void App::beginEndgameTask() {
     r.waiting.clear();
     r.phase        = EgPhase::Asking;
     r.task_started = Clock::now();
-    board_.flip    = r.user == chess::Color::BLACK;
+    app_.setFlip(r.user == chess::Color::BLACK);
     showEndgamePosition();
     askEndgameTables();
 }
 
-void App::showEndgamePosition() {
+void EndgamesPage::showEndgamePosition() {
     auto& r = *endgame_;
-    auto& b = board_;
     ReplayGame game;
     game.start_fen = r.start_fen;
     chess::Board board(r.start_fen);
@@ -903,27 +835,10 @@ void App::showEndgamePosition() {
         game.moves.push_back(std::move(rm));
         board.makeMove(m);
     }
-    b.game     = std::move(game);
-    b.tree     = GameTree{b.game, {}};
-    b.line     = -1;
-    b.ply      = static_cast<int>(b.game.moves.size());
-    b.chess960 = false;
-    b.selected.reset();
-    b.promotion.reset();
-    b.preview.reset();
-    b.drag.reset();
-    b.drag_over.reset();
-    b.move_typed.reset();
-    b.move_error.clear();
-    b.comment_edit.reset();
-    b.undo.clear();
-    b.redo.clear();
-    b.changes     = {};
-    b.start_notes = {};
-    b.new_game    = true;
+    app_.showSessionGame(std::move(game));
 }
 
-void App::askEndgameTables() {
+void EndgamesPage::askEndgameTables() {
     auto& r          = *endgame_;
     const auto board = askedBoard(r);
     const auto fen   = board.getFen();
@@ -938,8 +853,8 @@ void App::askEndgameTables() {
     r.answer_fen.clear();
     const int pieces = piecesOf(board);
     // The disk's tables, at once.
-    if (!diskTablesLocked() && diskTablesPieces() >= pieces) {
-        const auto paths = endgameTablesPaths();
+    if (!app_.diskTablesLocked() && app_.diskTablesPieces() >= pieces) {
+        const auto paths = app_.diskTablesPaths();
         std::optional<lichess::Tablebase> answer;
         {
             const auto lock = lockSyzygy();
@@ -955,8 +870,8 @@ void App::askEndgameTables() {
         }
     }
     // Lichess's, with the user's consent: kept in the profile, else asked in the background.
-    if (pieces <= 7 && lichess_.tablebase == 1) {
-        if (auto kept = cachedTablebase(storage_.root(), fen); kept && kept->outcome != lichess::Outcome::Unknown) {
+    if (pieces <= 7 && app_.lichessSettings().tablebase == 1) {
+        if (auto kept = cachedTablebase(app_.profileDir(), fen); kept && kept->outcome != lichess::Outcome::Unknown) {
             r.answers[fen] = *kept;
             r.answer       = std::move(*kept);
             r.answer_fen   = fen;
@@ -976,7 +891,7 @@ void App::askEndgameTables() {
     if (r.missing.empty()) r.missing = trf("the tables of {} pieces", pieces);
 }
 
-void App::endgameAnswered() {
+void EndgamesPage::endgameAnswered() {
     auto& r = *endgame_;
     if (!r.answer) return;
     // The start's verdict: the goal it gives, and the mate the tables give (a move kept, played before it came, aside).
@@ -1004,13 +919,13 @@ void App::endgameAnswered() {
     }
 }
 
-void App::endgameAnswer(chess::Move move) {
-    if (!endgame_ || liveGameOn()) return;
+void EndgamesPage::endgameAnswer(chess::Move move) {
+    if (!endgame_ || app_.liveGameOn()) return;
     auto& r = *endgame_;
     if (r.phase != EgPhase::Asking || r.kept) return;
     const auto board = playedBoard(r.start_fen, r.moves);
     if (board.sideToMove() != r.user) return;
-    if (board_.ply != static_cast<int>(r.moves.size())) return;  // the position asked only
+    if (app_.sessionPly() != static_cast<int>(r.moves.size())) return;  // the position asked only
     r.hint = false;
     r.win_line.clear();
     if (!r.answer || r.answer_fen != board.getFen()) {
@@ -1023,7 +938,7 @@ void App::endgameAnswer(chess::Move move) {
     endgameJudge(move);
 }
 
-void App::endgameJudge(chess::Move move) {
+void EndgamesPage::endgameJudge(chess::Move move) {
     auto& r          = *endgame_;
     const auto board = playedBoard(r.start_fen, r.moves);
     const auto& t    = r.tasks[r.current];
@@ -1062,7 +977,7 @@ void App::endgameJudge(chess::Move move) {
     askEndgameTables();
 }
 
-void App::endgameTablesMove() {
+void EndgamesPage::endgameTablesMove() {
     auto& r          = *endgame_;
     const auto board = playedBoard(r.start_fen, r.moves);
     const auto move  = tablesMove(*r.answer);
@@ -1089,7 +1004,7 @@ void App::endgameTablesMove() {
     askEndgameTables();
 }
 
-void App::endgameTakeBack() {
+void EndgamesPage::endgameTakeBack() {
     if (!endgame_) return;
     auto& r = *endgame_;
     if (r.phase != EgPhase::Asking && r.phase != EgPhase::Fault) return;
@@ -1127,7 +1042,7 @@ void App::endgameTakeBack() {
     askEndgameTables();
 }
 
-void App::endgameRestart() {
+void EndgamesPage::endgameRestart() {
     if (!endgame_ || endgame_->phase == EgPhase::Done || endgame_->phase == EgPhase::End) return;
     auto& r           = *endgame_;
     const bool review = r.tasks[r.current].review;
@@ -1140,31 +1055,31 @@ void App::endgameRestart() {
     }
 }
 
-void App::endgameContinue() {
+void EndgamesPage::endgameContinue() {
     if (!endgame_ || endgame_->phase != EgPhase::Fault) return;
     endgame_->phase = EgPhase::Asking;
     askEndgameTables();
 }
 
-void App::endgameSeeWin() {
+void EndgamesPage::endgameSeeWin() {
     if (!endgame_ || endgame_->phase != EgPhase::Fault) return;
     endgameTakeBack();
     auto& r          = *endgame_;
     const auto board = playedBoard(r.start_fen, r.moves);
     r.helped         = true;
     // The tables' line from there: the disk's at once, else Lichess's in one request.
-    if (!diskTablesLocked() && diskTablesPieces() >= piecesOf(board)) {
-        const auto paths = endgameTablesPaths();
+    if (!app_.diskTablesLocked() && app_.diskTablesPieces() >= piecesOf(board)) {
+        const auto paths = app_.diskTablesPaths();
         const auto lock  = lockSyzygy();
         r.win_line       = tablesLine(board, [&](const chess::Board& b) { return probeDiskTables(b, paths); }, 16);
-    } else if (lichess_.tablebase == 1 && !r.win_line_job.valid()) {
+    } else if (app_.lichessSettings().tablebase == 1 && !r.win_line_job.valid()) {
         r.win_line_job = std::async(std::launch::async, [fen = board.getFen(), cancel = r.cancel] {
             return lichess::tablebaseMainline(fen, cancel.get());
         });
     }
 }
 
-void App::endgameEnded(EndgameOutcome outcome) {
+void EndgamesPage::endgameEnded(EndgameOutcome outcome) {
     auto& r        = *endgame_;
     auto& t        = r.tasks[r.current];
     r.outcome      = outcome;
@@ -1211,73 +1126,67 @@ void App::endgameEnded(EndgameOutcome outcome) {
         saveEndgameRecord();
     }
     r.results.push_back({r.current, lost_anyway ? EndgameOutcome::Going : outcome, r.fault, r.helped, user_moves});
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
     if (lost_anyway) endgameNext();  // a game's position lost anyway: nothing to play
 }
 
-void App::endgameNext() {
+void EndgamesPage::endgameNext() {
     auto& r = *endgame_;
     ++r.current;
     if (r.current >= r.tasks.size()) return finishEndgames(false);
     beginEndgameTask();
 }
 
-void App::finishEndgames(bool stopped) {
+void EndgamesPage::finishEndgames(bool stopped) {
     auto& r   = *endgame_;
     r.phase   = EgPhase::End;
     r.stopped = stopped;
     r.took    = since(r.started);
-    board_.selected.reset();
-    board_.move_typed.reset();
+    app_.dropPick();
+    app_.dropTypedMove();
 }
 
-void App::closeEndgame(bool to_training) {
+void EndgamesPage::closeEndgame(bool to_training) {
     if (!endgame_) return;
     if (to_training) {
         // Back where it was started: the Endgames part, or Today for the day's review.
-        if (!review_running_ && endgame_->source != EndgameRun::Source::Review) training_tab_ = 4;
-        review_running_ = false;
-        review_chain_.clear();
-        training_enter_puzzles_ = false;
+        if (!app_.reviewRunning() && endgame_->source != EndgameRun::Source::Review) app_.showTrainingPage(4);
+        app_.stopReview();
+        app_.setEnterStartsPuzzles(false);  // back on the page, Enter reviews again
     }
-    const bool aside = endgame_->aside, flip = endgame_->flip;
-    board_side_tab_ = endgame_->tab;
+    BoardTaken taken;
+    taken.aside = endgame_->aside;
+    taken.flip  = endgame_->flip;
+    taken.tab   = endgame_->tab;
     leaveEndgameQuestions();
     endgame_.reset();
-    forget_board_game_ = true;
-    if (aside && !recent_games_.empty())
-        restoreRecentGame(0);
-    else
-        newBoardGame();
-    forget_board_game_ = false;
-    board_.flip        = flip;
-    board_back_.reset();
-    page_ = to_training ? Page::Training : Page::Board;
+    app_.giveBoardBack(taken, to_training);  // the endgame's position is no game to remember
 }
 
-void App::leaveEndgameQuestions() {
+void EndgamesPage::leaveEndgameQuestions() {
     if (!endgame_) return;
     *endgame_->cancel = true;
     // Ending out of sight (a future of std::async waits for its task when it goes).
-    jobs_.park(std::move(endgame_->asking));
-    jobs_.park(std::move(endgame_->win_line_job));
+    app_.jobs().park(std::move(endgame_->asking));
+    app_.jobs().park(std::move(endgame_->win_line_job));
 }
 
-void App::dropEndgame() {
-    board_.flip     = endgame_->flip;
-    board_side_tab_ = endgame_->tab;
+void EndgamesPage::dropEndgame() {
+    BoardTaken taken;
+    taken.aside = endgame_->aside;
+    taken.flip  = endgame_->flip;
+    taken.tab   = endgame_->tab;
     leaveEndgameQuestions();
     endgame_.reset();
-    review_running_ = false;
-    review_chain_.clear();
-    forget_board_game_ = true;
+    app_.stopReview();
+    app_.leaveBoard(taken);  // the game that comes takes the board; the one put aside stays among the recent ones
 }
 
 // ---------------------------------------------------------------------------
 // The Board page during an endgame
 
-void App::endgameKeys() {
+void EndgamesPage::endgameKeys() {
     auto& r        = *endgame_;
     const auto& io = ImGui::GetIO();
     if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) return;
@@ -1295,13 +1204,13 @@ void App::endgameKeys() {
             if (escape) {
                 endgameEnded(EndgameOutcome::Going);
                 r.stopped = true;
-            } else if (!liveGameOn()) {
+            } else if (!app_.liveGameOn()) {
                 if (undo)
                     endgameTakeBack();
                 else if (ImGui::IsKeyChordPressed(ImGuiMod_Alt | ImGuiKey_H) && r.answer && !r.answer->moves.empty())
                     r.hint = r.helped = true;
                 else
-                    boardMoveKeys();
+                    app_.moveKeys();
             }
             break;
         case EgPhase::Reply:
@@ -1321,14 +1230,14 @@ void App::endgameKeys() {
         case EgPhase::Done: {
             const bool last = r.current + 1 >= r.tasks.size();
             if (escape) {
-                if (r.source == EndgameRun::Source::Catalogue && !review_running_)
+                if (r.source == EndgameRun::Source::Catalogue && !app_.reviewRunning())
                     closeEndgame(true);
                 else
                     finishEndgames(true);
             } else if (enter) {
                 if (r.source == EndgameRun::Source::Catalogue) {
-                    if (review_running_) {
-                        if (!nextReview()) closeEndgame(true);
+                    if (app_.reviewRunning()) {
+                        if (!app_.nextReview()) closeEndgame(true);
                     } else {
                         r.results.clear();
                         r.current = 0;
@@ -1343,10 +1252,10 @@ void App::endgameKeys() {
             break;
         }
         case EgPhase::End:
-            if (review_running_) {
+            if (app_.reviewRunning()) {
                 if (escape)
                     closeEndgame(true);
-                else if (enter && !nextReview())
+                else if (enter && !app_.nextReview())
                     closeEndgame(true);
             } else if (escape || enter) {
                 closeEndgame(true);
@@ -1355,11 +1264,8 @@ void App::endgameKeys() {
     }
 }
 
-void App::drawEndgamePage() {
-    ui::pageTitle(TR("Board"), guideSection());
-    if (!ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
-        !SDL_TextInputActive(window_))
-        SDL_StartTextInput(window_);
+void EndgamesPage::drawEndgamePage() {
+    app_.beginSessionPage();
     endgameKeys();
     if (!endgame_) return;  // left by a key
     auto& r            = *endgame_;
@@ -1400,14 +1306,12 @@ void App::drawEndgamePage() {
     ImGui::EndChild();
 }
 
-void App::drawEndgameBoard(float size) {
-    auto& b          = board_;
+void EndgamesPage::drawEndgameBoard(float size) {
     auto& r          = *endgame_;
-    const auto board = boardAt(b.game, b.chess960, b.ply);
+    const int ply    = app_.sessionPly();
+    const auto board = boardAt(app_.sessionGame(), false, ply);
+    // The side below, the last move, the user's pick and drag: the Board's (context::SessionBoard).
     BoardDecor decor;
-    decor.flipped    = b.flip;
-    decor.eval_white = -1.0f;
-    if (b.ply > 0) decor.last_move = b.game.moves[static_cast<std::size_t>(b.ply - 1)].move;
     const auto green  = markColour('G', true);
     const auto orange = IM_COL32(236, 140, 52, 150);
     if (r.phase == EgPhase::Fault && r.judged && r.moves.size() >= 2) {
@@ -1430,40 +1334,15 @@ void App::drawEndgameBoard(float size) {
                 decor.arrows.push_back({m, markColour('G', false)});
     }
     const bool moves = r.phase == EgPhase::Asking && !r.kept && board.sideToMove() == r.user &&
-                       b.ply == static_cast<int>(r.moves.size()) && !liveGameOn();
-    decor.selected   = moves ? b.selected : std::nullopt;
-    if (decor.selected)
-        for (const auto& m : movesFrom(board, *decor.selected)) decor.targets.push_back(shownTarget(m));
-    const bool dragging = moves && b.drag && b.drag->moved && b.selected == b.drag->from;
-    if (dragging) {
-        decor.lifted = b.drag->from;
-        if (b.drag_over && std::find(decor.targets.begin(), decor.targets.end(), *b.drag_over) != decor.targets.end())
-            decor.drop = b.drag_over;
-    }
-    const ImVec2 top = ImGui::GetCursorScreenPos();
-    if (appearance::current().board3d.on && board3d_.available()) {
-        board3d_.setMarks(Board3d::Marks::Off);
-        const auto input = board3d_.draw(board, size, decor);
-        if (moves) boardPointer(board, input.clicked, input.hovered, input.right_click);
-    } else {
-        if (!appearance::current().board3d.on) board3d_.release();
-        drawBoard(atlas_, board, size, decor);
-        const auto hover = boardSquareAt(ImGui::GetMousePos(), top, size, decor);
-        if (moves) {
-            const bool left  = ImGui::IsItemClicked(ImGuiMouseButton_Left),
-                       right = ImGui::IsItemClicked(ImGuiMouseButton_Right);
-            boardPointer(board, left ? hover : std::nullopt, hover, right);
-            if (dragging && b.drag) drawDraggedPiece(atlas_, board.at(b.drag->from), size);
-        }
-    }
-    drawPromotionPopup(board);
+                       ply == static_cast<int>(r.moves.size()) && !app_.liveGameOn();
+    app_.drawSessionBoard(size, decor, moves);
 }
 
-void App::drawEndgameColumn() {
+void EndgamesPage::drawEndgameColumn() {
     auto& r = *endgame_;
     const ui::TopicRegion topic(guide::topics::Endgames);
-    if (liveGameOn()) {  // fair play (#48): the tables are an aid; the endgame waits for the live game's end
-        drawFairPlayBanner();
+    if (app_.liveGameOn()) {  // fair play (#48): the tables are an aid; the endgame waits for the live game's end
+        app_.drawFairPlayBanner();
         if (ImGui::Button(TR("Stop · Esc"))) finishEndgames(true);
         return;
     }
@@ -1510,7 +1389,7 @@ void App::drawEndgameColumn() {
                         : TR("The tables attack with the move that leaves you the fewest ways to hold. Each move is "
                              "judged at once: the verdict stays, or it changes, and you know before going on."),
                     true);
-            if (r.phase == EgPhase::Asking) drawMoveField();
+            if (r.phase == EgPhase::Asking) app_.drawMoveField();
             if (ImGui::Button(TR("Take back · Ctrl+Z"))) endgameTakeBack();
             ImGui::SameLine();
             ImGui::BeginDisabled(!r.answer || r.answer->moves.empty() || r.phase != EgPhase::Asking);
@@ -1640,10 +1519,10 @@ void App::drawEndgameColumn() {
             }
             const bool last_task = r.current + 1 >= r.tasks.size();
             if (r.source == EndgameRun::Source::Catalogue) {
-                if (review_running_) {
+                if (app_.reviewRunning()) {
                     ImGui::PopTextWrapPos();
                     endTinted();
-                    drawReviewNext(false);
+                    app_.drawReviewNext(false);
                     break;
                 }
                 if (primaryButton((std::string(TR("Again")) + " · " + TR("Enter")).c_str())) {
@@ -1753,7 +1632,7 @@ void App::drawEndgameColumn() {
                 ? std::string(TR("The tables: Lichess's online; each position played goes to tablebase.lichess.ovh "
                                  "as its FEN."))
                 : trf("The tables: those of the disk (Syzygy, up to {} pieces); nothing leaves the machine.",
-                      diskTablesPieces()),
+                      app_.diskTablesPieces()),
             true);
     wrapped(t.mate ? TR("The mate counts, set against the tables' own from the start. Syzygy gives the distance to the "
                         "next capture or pawn move (DTZ), Lichess the distance to mate up to 6 pieces.")
@@ -1768,7 +1647,7 @@ void App::drawEndgameColumn() {
     ImGui::PopTextWrapPos();
 }
 
-void App::drawEndgameEnd() {
+void EndgamesPage::drawEndgameEnd() {
     auto& r        = *endgame_;
     std::size_t ok = 0, played = 0;
     for (const auto& res : r.results) {
@@ -1795,11 +1674,94 @@ void App::drawEndgameEnd() {
                                    .c_str());
     }
     ImGui::Dummy(ImVec2(0, px(4)));
-    if (review_running_) {
-        drawReviewNext(false);
+    if (app_.reviewRunning()) {
+        app_.drawReviewNext(false);
         return;
     }
     if (primaryButton((std::string(TR("Back to the Training page")) + " · " + TR("Enter")).c_str())) closeEndgame(true);
+}
+
+// ---------------------------------------------------------------------------
+// The day's review, the Training page's cards, the Home page, the palette, the --focus words
+
+ReviewCount EndgamesPage::reviewCount() {
+    ReviewCount out;
+    out.kind       = ReviewKind::Endgames;
+    const auto day = trainingDay(epochNow());
+    const auto& r  = endgameRecord();
+    out.due        = endgameCardsDue(r, day.end);
+    out.tomorrow   = endgameCardsDue(r, day.end + study::fsrs::DAY) - out.due;
+    out.three_days = endgameCardsDue(r, day.end + 3 * study::fsrs::DAY) - out.due;
+    out.answer_ms  = r.answer_ms;
+    return out;
+}
+
+std::size_t EndgamesPage::doneCount() {
+    std::size_t done = 0;
+    for (const auto& e : endgameCatalogue())
+        if (const auto it = endgameRecord().results.find(e.id);
+            it != endgameRecord().results.end() && it->second.done > 0)
+            ++done;
+    return done;
+}
+
+void EndgamesPage::drawHomeLine() {
+    if (!endgame_) return;
+    const auto& r = *endgame_;
+    const auto label =
+        r.phase != EndgameRun::Phase::End && r.tasks.size() > 1
+            ? trf("Endgames “{}”: {} of {}", r.title, std::min(r.current + 1, r.tasks.size()), r.tasks.size())
+            : trf("Endgame “{}”", r.title);
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::SameLine();
+    if (ImGui::SmallButton(TR("Back to the endgame"))) app_.showSession();
+}
+
+void EndgamesPage::addCommands(const PaletteAdd& add, const std::string& training_view) {
+    add(TR("Endgames"), training_view, [this] { app_.showTrainingPage(4); });
+    add(TR("Mates"), training_view, [this] {
+        app_.showTrainingPage(4);
+        endgame_scroll_mates_ = true;
+    });
+    if (endgameLock().empty()) {
+        for (const auto& e : endgameCatalogue())
+            add(trf("Endgame: {}", TR(e.name)), TR("Training"), [this, &e] {
+                if (endgameNeed(e.fen).empty() && startEndgame(e)) return;
+                app_.showTrainingPage(4);
+                endgame_need_ = e.id;
+            });
+        if (const auto n = reviewCount().due; n > 0)
+            add(trn("Review the missed endgames · {} due", "Review the missed endgames · {} due", n, ui::exactCount(n)),
+                TR("Training"), [this] { app_.reviewOnly(ReviewKind::Endgames); });
+        if (!gameEndgames().empty())
+            add(TR("Endgames of my games"), TR("Training"), [this] { (void)startGameEndgames(); });
+    }
+    if (const auto* download = app_.tablesDownload()) {
+        if (download->busy())
+            add(TR("Cancel the download of the Syzygy tables"), TR("Training"), [this] {
+                if (auto* d = app_.tablesDownload()) d->cancel();
+            });
+        else if (!app_.tablesHeld().complete)
+            add(trf("Download the Syzygy tables of 3 to 5 pieces · {}", formatBytes(syzygy345Bytes())), TR("Training"),
+                [this] {
+                    app_.showTrainingPage(4);
+                    startSyzygyDownload();
+                });
+    }
+}
+
+void EndgamesPage::addFocusWords(FocusWords& words, const std::string& word) {
+    words.on({"endgame=*"}, [&] {  // endgame=ID: that endgame of the catalogue against the tables
+        if (const auto* e = endgameEntry(word.substr(8))) {
+            if (!endgameNeed(e->fen).empty() || !startEndgame(*e)) {
+                app_.showTrainingPage(4);
+                endgame_need_ = e->id;
+            }
+        }
+    });
+    words.on({"endgames-review"}, [&] {  // the endgames missed, due today (#82)
+        if (!startReview()) app_.showTrainingPage(4);
+    });
 }
 
 }  // namespace fcg

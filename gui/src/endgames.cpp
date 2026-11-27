@@ -12,6 +12,7 @@
 #include <matchmaking/syzygy.hpp>
 
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 #include "tablebases.hpp"
 
@@ -449,55 +450,69 @@ std::string positionKey(const std::string& fen) {
 
 EndgameRecord readEndgameRecord(const fs::path& folder) {
     EndgameRecord out;
-    std::ifstream in(folder / "record.json", std::ios::binary);
+    const auto file = folder / "record.json";
+    std::ifstream in(file, std::ios::binary);
     if (!in) return out;
     const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return out;
-    out.answer_ms = j.value("answer_ms", int64_t{0});
+    if (j.is_discarded() || !j.is_object()) {
+        // There but unreadable (cut short, written by hand): kept aside and said, rather than replaced in silence by
+        // the next save (#136).
+        sayUnreadableFile(file);
+        return out;
+    }
+    // An entry of another type than the one expected (written by another version, edited by hand) is set aside, the
+    // readable ones kept (#136): said in the console, the file as it was kept beside it, which the next save replaces.
+    ProfileEntries entries(file);
+    entries.entry("answer_ms", [&] { out.answer_ms = j.value("answer_ms", int64_t{0}); });
     if (const auto it = j.find("results"); it != j.end() && it->is_object()) {
         for (const auto& [id, r] : it->items()) {
             if (!r.is_object()) continue;
-            EndgameResult e;
-            e.tries         = r.value("tries", 0);
-            e.done          = r.value("done", 0);
-            e.clean         = r.value("clean", false);
-            e.best          = r.value("best", 0);
-            e.tables        = r.value("tables", 0);
-            e.last          = r.value("last", int64_t{0});
-            e.missed_last   = r.value("missed_last", false);
-            out.results[id] = e;
+            entries.entry("results/" + id, [&] {
+                EndgameResult e;
+                e.tries         = r.value("tries", 0);
+                e.done          = r.value("done", 0);
+                e.clean         = r.value("clean", false);
+                e.best          = r.value("best", 0);
+                e.tables        = r.value("tables", 0);
+                e.last          = r.value("last", int64_t{0});
+                e.missed_last   = r.value("missed_last", false);
+                out.results[id] = e;  // read whole first: nothing kept of an entry set aside
+            });
         }
     }
     if (const auto it = j.find("cards"); it != j.end() && it->is_object()) {
         for (const auto& [key, c] : it->items()) {
             if (!c.is_object()) continue;
-            EndgameCard card;
-            card.fen             = c.value("fen", "");
-            card.entry           = c.value("entry", "");
-            card.title           = c.value("title", "");
-            card.goal            = c.value("goal", "win") == "draw" ? EndgameGoal::Draw : EndgameGoal::Win;
-            card.mate            = c.value("mate", false);
-            card.since           = c.value("since", int64_t{0});
-            const int state      = c.value("state", 1);
-            card.card.state      = state == 2   ? study::fsrs::State::Review
-                                   : state == 3 ? study::fsrs::State::Relearning
-                                                : study::fsrs::State::Learning;
-            card.card.step       = c.value("step", 0);
-            card.card.stability  = c.value("stability", 0.0);
-            card.card.difficulty = c.value("difficulty", 0.0);
-            card.card.due        = c.value("due", int64_t{0});
-            card.card.last       = c.value("last", int64_t{0});
-            card.card.reps       = c.value("reps", 0);
-            card.card.lapses     = c.value("lapses", 0);
-            if (card.fen.empty()) continue;
-            try {
-                (void)chess::Board(card.fen);
-            } catch (...) {
-                continue;
-            }
-            out.cards[key] = std::move(card);
+            entries.entry("cards/" + key, [&] {
+                EndgameCard card;
+                card.fen             = c.value("fen", "");
+                card.entry           = c.value("entry", "");
+                card.title           = c.value("title", "");
+                card.goal            = c.value("goal", "win") == "draw" ? EndgameGoal::Draw : EndgameGoal::Win;
+                card.mate            = c.value("mate", false);
+                card.since           = c.value("since", int64_t{0});
+                const int state      = c.value("state", 1);
+                card.card.state      = state == 2   ? study::fsrs::State::Review
+                                       : state == 3 ? study::fsrs::State::Relearning
+                                                    : study::fsrs::State::Learning;
+                card.card.step       = c.value("step", 0);
+                card.card.stability  = c.value("stability", 0.0);
+                card.card.difficulty = c.value("difficulty", 0.0);
+                card.card.due        = c.value("due", int64_t{0});
+                card.card.last       = c.value("last", int64_t{0});
+                card.card.reps       = c.value("reps", 0);
+                card.card.lapses     = c.value("lapses", 0);
+                if (card.fen.empty()) return;
+                try {
+                    (void)chess::Board(card.fen);
+                } catch (...) {
+                    return;
+                }
+                out.cards[key] = std::move(card);
+            });
         }
     }
+    entries.sayUnread();
     return out;
 }
 

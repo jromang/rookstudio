@@ -121,6 +121,56 @@ inline int64_t unzigzag(uint64_t v) { return static_cast<int64_t>(v >> 1) ^ -sta
 // The annex: what the columns do not hold.
 enum AnnexPart : uint8_t { ANNEX_FEN = 1, ANNEX_TAGS = 2, ANNEX_TEXT = 4, ANNEX_CLOCKS = 8, ANNEX_EVALS = 16 };
 
+// A game's signature as sig.bin keeps it: the ply each home pawn left at (16 bytes), the material at the end (a byte a
+// kind, White's count in its low four bits and Black's in its high four), then SIG_KNOWN, with SIG_PROMOTED when a
+// pawn was promoted; the last two bytes 0.
+inline std::array<uint8_t, SIG_BYTES> packSignature(const GameSignature& signature) {
+    std::array<uint8_t, SIG_BYTES> out{};
+    std::memcpy(out.data(), signature.home.data(), 16);
+    for (int j = 0; j < 5; ++j)
+        out[16 + j] = static_cast<uint8_t>((signature.material[2 * j] & 0x0F) |
+                                           (std::min<uint8_t>(signature.material[2 * j + 1], 15) << 4));
+    out[21] = static_cast<uint8_t>(SIG_KNOWN | (signature.promoted ? SIG_PROMOTED : 0));
+    return out;
+}
+
+// A new segment's files made in memory, a record after the other: its columns laid out for its games and their header
+// written (cols.bin), its moves, annex, names and signatures (none known until set). Each record starts where the
+// moves and annex before it end (start()); finish() writes where the last one ends and the count of the names it adds.
+struct SegmentBytes {
+    explicit SegmentBytes(std::size_t n) : games(n), at(layout(n)), cols(at[COLUMNS], '\0'), sig(n * SIG_BYTES, '\0') {
+        std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
+        header(8, VERSION);
+        header(12, static_cast<uint32_t>(n));
+    }
+    template <typename T>
+    void put(Column column, std::size_t i, T v) {
+        std::memcpy(cols.data() + at[column] + i * sizeof v, &v, sizeof v);
+    }
+    void start(std::size_t i) {
+        put(MOVES, i, static_cast<uint64_t>(moves.size()));
+        put(ANNEX, i, static_cast<uint64_t>(annex.size()));
+    }
+    // Record i's signature: one made from its moves, or the bytes a segment keeps.
+    void signature(std::size_t i, const GameSignature& signature) {
+        signatureBytes(i, packSignature(signature).data());
+    }
+    void signatureBytes(std::size_t i, const uint8_t* bytes) {
+        std::memcpy(sig.data() + i * SIG_BYTES, bytes, SIG_BYTES);
+    }
+    void finish(uint32_t name_count) {
+        start(games);
+        header(16, name_count);
+    }
+
+    std::size_t games;
+    std::array<std::size_t, COLUMNS + 1> at;
+    std::string cols, moves, annex, names, sig;
+
+   private:
+    void header(std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, sizeof v); }
+};
+
 void syncFolder(const std::filesystem::path& dir);
 
 // What a write the system refused tells the window: the disk full (errno), or another reason.

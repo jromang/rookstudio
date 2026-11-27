@@ -79,63 +79,51 @@ CompactPlan Database::compactPlan() const {
 
 namespace {
 
-// A segment's files written in folder `tmp`: `n` records, each copied from (segment, record) or emptied when deleted,
-// its names those of `names`. A record without a segment is a game set aside whose record could not be read: no
-// headers, its names `blank_name`.
+// Where a record of a segment written again comes from: a segment and its place there, emptied for a deleted game. A
+// record without a segment is a game set aside whose record could not be read.
 struct RecordSource {
     const Segment* segment = nullptr;
     std::size_t index      = 0;
     bool emptied           = false;  // a deleted game: its headers only
 };
 
-void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records, std::string_view names,
-                  uint32_t name_count, const std::atomic<bool>& cancel, std::atomic<uint64_t>& done,
-                  uint32_t blank_name = 0) {
-    const auto n  = records.size();
-    const auto at = layout(n);
-    std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
-    std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
-    const auto put32 = [&](std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, 4); };
-    const auto put   = [&](Column column, std::size_t i, auto v) {
-        std::memcpy(cols.data() + at[column] + i * sizeof(v), &v, sizeof(v));
-    };
-    put32(8, VERSION);
-    put32(12, static_cast<uint32_t>(n));
-    put32(16, name_count);
-    for (std::size_t k = 0; k < n; ++k) {
+// A segment written again: its records copied from their sources (a deleted game's headers alone, a game set aside
+// without headers, its names `blank_name`), its names `names`, `name_count` of them. Each record counted in `done`;
+// StoreError (Cancelled) once `cancel` is set.
+SegmentBytes copiedSegment(const std::vector<RecordSource>& records, std::string_view names, uint32_t name_count,
+                           const std::atomic<bool>& cancel, std::atomic<uint64_t>& done, uint32_t blank_name = 0) {
+    SegmentBytes out(records.size());
+    for (std::size_t k = 0; k < records.size(); ++k) {
         if ((k & 0xFFF) == 0 && cancel.load(std::memory_order_relaxed))
             throw StoreError(StoreErrc::Cancelled, "cancelled");
         const auto& r = records[k];
+        out.start(k);
         if (!r.segment) {  // set aside: nothing kept of it but its number
-            for (int c = 0; c < NAME_COLUMNS; ++c) put(static_cast<Column>(c), k, blank_name);
-            put(RESULT, k, static_cast<uint8_t>('*'));
-            put(MOVES, k, static_cast<uint64_t>(moves.size()));
-            put(ANNEX, k, static_cast<uint64_t>(annex.size()));
+            for (int c = 0; c < NAME_COLUMNS; ++c) out.put(static_cast<Column>(c), k, blank_name);
+            out.put(RESULT, k, static_cast<uint8_t>('*'));
             ++done;
             continue;
         }
         const auto& seg = *r.segment;
         for (int c = 0; c < NAME_COLUMNS; ++c)
-            put(static_cast<Column>(c), k, seg.value<uint32_t>(static_cast<Column>(c), r.index));
-        put(DATE, k, seg.value<uint32_t>(DATE, r.index));
-        put(WHITE_ELO, k, seg.value<uint16_t>(WHITE_ELO, r.index));
-        put(BLACK_ELO, k, seg.value<uint16_t>(BLACK_ELO, r.index));
-        put(ECO, k, seg.value<uint16_t>(ECO, r.index));
-        put(RESULT, k, seg.value<uint8_t>(RESULT, r.index));
-        put(KEY, k, seg.value<uint64_t>(KEY, r.index));
-        put(MOVES, k, static_cast<uint64_t>(moves.size()));
-        put(ANNEX, k, static_cast<uint64_t>(annex.size()));
+            out.put(static_cast<Column>(c), k, seg.value<uint32_t>(static_cast<Column>(c), r.index));
+        out.put(DATE, k, seg.value<uint32_t>(DATE, r.index));
+        out.put(WHITE_ELO, k, seg.value<uint16_t>(WHITE_ELO, r.index));
+        out.put(BLACK_ELO, k, seg.value<uint16_t>(BLACK_ELO, r.index));
+        out.put(ECO, k, seg.value<uint16_t>(ECO, r.index));
+        out.put(RESULT, k, seg.value<uint8_t>(RESULT, r.index));
+        out.put(KEY, k, seg.value<uint64_t>(KEY, r.index));
         if (r.emptied) {
-            put(PLIES, k, uint32_t{0});
-            put(FLAGS, k, uint16_t{0});
+            out.put(PLIES, k, uint32_t{0});
+            out.put(FLAGS, k, uint16_t{0});
         } else {
-            put(PLIES, k, seg.value<uint32_t>(PLIES, r.index));
-            put(FLAGS, k, seg.value<uint16_t>(FLAGS, r.index));
+            out.put(PLIES, k, seg.value<uint32_t>(PLIES, r.index));
+            out.put(FLAGS, k, seg.value<uint16_t>(FLAGS, r.index));
             const auto m = seg.moves(r.index), a = seg.annex(r.index);
-            moves.append(reinterpret_cast<const char*>(m.data()), m.size());
-            annex.append(reinterpret_cast<const char*>(a.data()), a.size());
+            out.moves.append(reinterpret_cast<const char*>(m.data()), m.size());
+            out.annex.append(reinterpret_cast<const char*>(a.data()), a.size());
             if (const auto* bytes = seg.signatureBytes(r.index)) {
-                std::memcpy(sig.data() + k * SIG_BYTES, bytes, SIG_BYTES);
+                out.signatureBytes(k, bytes);
             } else {
                 // A segment of the first format: the signature made from the moves.
                 ScanBoard start;
@@ -148,30 +136,28 @@ void writeSegment(const fs::path& tmp, const std::vector<RecordSource>& records,
                 }
                 if (start.setFen(fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(fen),
                                  flags & GAME_CHESS960))
-                    if (const auto signature = signatureOf(start, m, seg.value<uint32_t>(PLIES, r.index))) {
-                        char* out = sig.data() + k * SIG_BYTES;
-                        std::memcpy(out, signature->home.data(), 16);
-                        for (int j = 0; j < 5; ++j)
-                            out[16 + j] =
-                                static_cast<char>((signature->material[2 * j] & 0x0F) |
-                                                  (std::min<uint8_t>(signature->material[2 * j + 1], 15) << 4));
-                        out[21] = static_cast<char>(SIG_KNOWN | (signature->promoted ? SIG_PROMOTED : 0));
-                    }
+                    if (const auto signature = signatureOf(start, m, seg.value<uint32_t>(PLIES, r.index)))
+                        out.signature(k, *signature);
             }
         }
         ++done;
     }
-    put(MOVES, n, static_cast<uint64_t>(moves.size()));
-    put(ANNEX, n, static_cast<uint64_t>(annex.size()));
+    out.names.assign(names);
+    out.finish(name_count);
+    return out;
+}
+
+// A segment's files written in folder `tmp`, synced.
+void writeSegment(const fs::path& tmp, const SegmentBytes& segment) {
     std::error_code ec;
     fs::remove_all(tmp, ec);
     fs::create_directories(tmp, ec);
     if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
-    writeFile(tmp / "cols.bin", cols);
-    writeFile(tmp / "moves.bin", moves);
-    writeFile(tmp / "annex.bin", annex);
-    writeFile(tmp / "names.bin", names);
-    writeFile(tmp / "sig.bin", sig);
+    writeFile(tmp / "cols.bin", segment.cols);
+    writeFile(tmp / "moves.bin", segment.moves);
+    writeFile(tmp / "annex.bin", segment.annex);
+    writeFile(tmp / "names.bin", segment.names);
+    writeFile(tmp / "sig.bin", segment.sig);
     syncFolder(tmp);
 }
 
@@ -264,7 +250,8 @@ Compacted Database::compact(CompactProgress& progress, const std::atomic<bool>& 
                     name = segmentName(next_segment_++);
                 }
                 tmp_now = name + ".tmp";
-                writeSegment(dir_ / tmp_now, records, seg.namesText(), seg.nameCount(), cancel, progress.games);
+                writeSegment(dir_ / tmp_now,
+                             copiedSegment(records, seg.namesText(), seg.nameCount(), cancel, progress.games));
                 step("rename segment");
                 std::error_code ec;
                 fs::rename(dir_ / tmp_now, dir_ / name, ec);
@@ -446,7 +433,7 @@ uint64_t Database::keepReadable(std::span<const GameId> damaged) {
             tmp_now = name + ".tmp";
             std::atomic<bool> go_on{false};
             std::atomic<uint64_t> done{0};
-            writeSegment(dir_ / tmp_now, records, names, count, go_on, done, blank_name);
+            writeSegment(dir_ / tmp_now, copiedSegment(records, names, count, go_on, done, blank_name));
             step("rename segment");
             std::error_code ec;
             fs::rename(dir_ / tmp_now, dir_ / name, ec);

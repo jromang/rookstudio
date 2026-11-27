@@ -46,6 +46,104 @@ uint16_t number16(std::string_view s) {
     return ok ? static_cast<uint16_t>(v) : uint16_t{0};
 }
 
+// Game `g` as record k of a new segment: the ids of its names (`name_id`, which adds those the database has not), its
+// numbers, its moves and its signature (made from its moves when the import has not), and in its annex the tags the
+// columns do not hold, its start position, text, clocks and evaluations.
+template <typename NameId>
+void putGame(SegmentBytes& segment, std::size_t k, const ImportedGame& g, uint64_t key, NameId&& name_id) {
+    std::array<std::string, NAME_COLUMNS> names;
+    std::string date, white_elo, black_elo, eco;
+    std::vector<std::pair<std::string, std::string>> others;
+    for (const auto& [tag, value] : g.tags) {
+        const auto column = std::find(NAME_TAGS.begin(), NAME_TAGS.end(), tag);
+        // A site that is the game's own address (Lichess's) would add a name for each game: kept in the annex with the
+        // other tags.
+        const bool own_address = tag == "Site" && (value.rfind("https://", 0) == 0 || value.rfind("http://", 0) == 0);
+        if (column != NAME_TAGS.end() && !own_address) {
+            auto& slot = names[static_cast<std::size_t>(column - NAME_TAGS.begin())];
+            if (slot.empty()) {
+                slot = value;
+                std::replace(slot.begin(), slot.end(), '\n', ' ');
+                continue;
+            }
+        }
+        if (tag == "Date" && date.empty() && packDate(value) && dateText(packDate(value)) == value) {
+            date = value;
+            continue;
+        }
+        if (tag == "WhiteElo" && white_elo.empty() && number16(value)) {
+            white_elo = value;
+            continue;
+        }
+        if (tag == "BlackElo" && black_elo.empty() && number16(value)) {
+            black_elo = value;
+            continue;
+        }
+        if (tag == "ECO" && eco.empty() && packEco(value)) {
+            eco = value;
+            continue;
+        }
+        if (tag == "Result" || tag == "FEN") continue;  // the result's column, the annex's FEN
+        others.emplace_back(tag, value);
+    }
+    for (int c = 0; c < NAME_COLUMNS; ++c)
+        segment.put(static_cast<Column>(c), k, name_id(names[static_cast<std::size_t>(c)]));
+    segment.put(DATE, k, packDate(date));
+    segment.put(PLIES, k, g.plies);
+    segment.put(WHITE_ELO, k, number16(white_elo));
+    segment.put(BLACK_ELO, k, number16(black_elo));
+    segment.put(ECO, k, packEco(eco));
+    uint16_t flags = 0;
+    if (g.annotated) flags |= GAME_ANNOTATED;
+    if (g.damaged) flags |= GAME_DAMAGED;
+    if (g.chess960) flags |= GAME_CHESS960;
+    if (!g.start_fen.empty()) flags |= GAME_FEN;
+    if (!g.clocks.empty()) flags |= GAME_CLOCKS;
+    if (!g.evals.empty()) flags |= GAME_EVALS;
+    segment.put(FLAGS, k, flags);
+    segment.put(RESULT, k, static_cast<uint8_t>(g.result));
+    segment.put(KEY, k, key);
+    segment.start(k);
+    segment.moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
+    auto signature = g.signature;
+    if (!signature) {
+        ScanBoard start;
+        if (start.setFen(
+                g.start_fen.empty() ? std::string_view(chess::constants::STARTPOS) : std::string_view(g.start_fen),
+                g.chess960))
+            signature = signatureOf(start, g.moves, g.plies);
+    }
+    if (signature) segment.signature(k, *signature);
+    uint8_t parts = 0;
+    if (!g.start_fen.empty()) parts |= ANNEX_FEN;
+    if (!others.empty()) parts |= ANNEX_TAGS;
+    if (!g.text.empty()) parts |= ANNEX_TEXT;
+    if (!g.clocks.empty()) parts |= ANNEX_CLOCKS;
+    if (!g.evals.empty()) parts |= ANNEX_EVALS;
+    if (parts) {
+        auto& annex = segment.annex;
+        annex += static_cast<char>(parts);
+        if (parts & ANNEX_FEN) putText(annex, g.start_fen);
+        if (parts & ANNEX_TAGS) {
+            putVarint(annex, others.size());
+            for (const auto& [tag, value] : others) {
+                putText(annex, tag);
+                putText(annex, value);
+            }
+        }
+        if (parts & ANNEX_TEXT) putText(annex, g.text);
+        if (parts & ANNEX_CLOCKS) {
+            putVarint(annex, g.clocks.size());
+            for (std::size_t c = 0; c < g.clocks.size(); ++c)
+                putVarint(annex, zigzag(int64_t{g.clocks[c]} - (c >= 2 ? g.clocks[c - 2] : 0)));
+        }
+        if (parts & ANNEX_EVALS) {
+            putVarint(annex, g.evals.size());
+            for (const auto e : g.evals) putVarint(annex, zigzag(e));
+        }
+    }
+}
+
 std::string playersName(uint64_t generation) {
     char name[32];
     std::snprintf(name, sizeof name, "players-%06llu.bin", static_cast<unsigned long long>(generation));
@@ -947,123 +1045,13 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
         for (std::size_t from = 0; from < games.size(); from += SEGMENT_GAMES) {
             const std::size_t n     = std::min(SEGMENT_GAMES, games.size() - from);
             const auto names_before = added.size();
-            const auto at           = layout(n);
-            std::string cols(at[COLUMNS], '\0'), moves, annex, sig(n * SIG_BYTES, '\0');
-            std::memcpy(cols.data(), MAGIC.data(), MAGIC.size());
-            const auto put32 = [&](std::size_t offset, uint32_t v) { std::memcpy(cols.data() + offset, &v, 4); };
-            const auto put   = [&](Column column, std::size_t i, auto v) {
-                std::memcpy(cols.data() + at[column] + i * sizeof(v), &v, sizeof(v));
-            };
-            put32(8, VERSION);
-            put32(12, static_cast<uint32_t>(n));
-            for (std::size_t k = 0; k < n; ++k) {
-                const auto& g = games[from + k];
-                std::array<std::string, NAME_COLUMNS> names;
-                std::string date, white_elo, black_elo, eco;
-                std::vector<std::pair<std::string, std::string>> others;
-                for (const auto& [tag, value] : g.tags) {
-                    const auto column = std::find(NAME_TAGS.begin(), NAME_TAGS.end(), tag);
-                    // A site that is the game's own address (Lichess's) would add a name for each game: kept in
-                    // the annex with the other tags.
-                    const bool own_address =
-                        tag == "Site" && (value.rfind("https://", 0) == 0 || value.rfind("http://", 0) == 0);
-                    if (column != NAME_TAGS.end() && !own_address) {
-                        auto& slot = names[static_cast<std::size_t>(column - NAME_TAGS.begin())];
-                        if (slot.empty()) {
-                            slot = value;
-                            std::replace(slot.begin(), slot.end(), '\n', ' ');
-                            continue;
-                        }
-                    }
-                    if (tag == "Date" && date.empty() && packDate(value) && dateText(packDate(value)) == value) {
-                        date = value;
-                        continue;
-                    }
-                    if (tag == "WhiteElo" && white_elo.empty() && number16(value)) {
-                        white_elo = value;
-                        continue;
-                    }
-                    if (tag == "BlackElo" && black_elo.empty() && number16(value)) {
-                        black_elo = value;
-                        continue;
-                    }
-                    if (tag == "ECO" && eco.empty() && packEco(value)) {
-                        eco = value;
-                        continue;
-                    }
-                    if (tag == "Result" || tag == "FEN") continue;  // the result's column, the annex's FEN
-                    others.emplace_back(tag, value);
-                }
-                for (int c = 0; c < NAME_COLUMNS; ++c)
-                    put(static_cast<Column>(c), k, nameId(names[static_cast<std::size_t>(c)], added));
-                put(DATE, k, packDate(date));
-                put(PLIES, k, g.plies);
-                put(WHITE_ELO, k, number16(white_elo));
-                put(BLACK_ELO, k, number16(black_elo));
-                put(ECO, k, packEco(eco));
-                uint16_t flags = 0;
-                if (g.annotated) flags |= GAME_ANNOTATED;
-                if (g.damaged) flags |= GAME_DAMAGED;
-                if (g.chess960) flags |= GAME_CHESS960;
-                if (!g.start_fen.empty()) flags |= GAME_FEN;
-                if (!g.clocks.empty()) flags |= GAME_CLOCKS;
-                if (!g.evals.empty()) flags |= GAME_EVALS;
-                put(FLAGS, k, flags);
-                put(RESULT, k, static_cast<uint8_t>(g.result));
-                put(KEY, k, keys[from + k]);
-                put(MOVES, k, static_cast<uint64_t>(moves.size()));
-                moves.append(reinterpret_cast<const char*>(g.moves.data()), g.moves.size());
-                auto signature = g.signature;
-                if (!signature) {
-                    ScanBoard start;
-                    if (start.setFen(g.start_fen.empty() ? std::string_view(chess::constants::STARTPOS)
-                                                         : std::string_view(g.start_fen),
-                                     g.chess960))
-                        signature = signatureOf(start, g.moves, g.plies);
-                }
-                if (signature) {
-                    char* out = sig.data() + k * SIG_BYTES;
-                    std::memcpy(out, signature->home.data(), 16);
-                    for (int j = 0; j < 5; ++j)
-                        out[16 + j] = static_cast<char>((signature->material[2 * j] & 0x0F) |
-                                                        (std::min<uint8_t>(signature->material[2 * j + 1], 15) << 4));
-                    out[21] = static_cast<char>(SIG_KNOWN | (signature->promoted ? SIG_PROMOTED : 0));
-                }
-                put(ANNEX, k, static_cast<uint64_t>(annex.size()));
-                uint8_t parts = 0;
-                if (!g.start_fen.empty()) parts |= ANNEX_FEN;
-                if (!others.empty()) parts |= ANNEX_TAGS;
-                if (!g.text.empty()) parts |= ANNEX_TEXT;
-                if (!g.clocks.empty()) parts |= ANNEX_CLOCKS;
-                if (!g.evals.empty()) parts |= ANNEX_EVALS;
-                if (parts) {
-                    annex += static_cast<char>(parts);
-                    if (parts & ANNEX_FEN) putText(annex, g.start_fen);
-                    if (parts & ANNEX_TAGS) {
-                        putVarint(annex, others.size());
-                        for (const auto& [tag, value] : others) {
-                            putText(annex, tag);
-                            putText(annex, value);
-                        }
-                    }
-                    if (parts & ANNEX_TEXT) putText(annex, g.text);
-                    if (parts & ANNEX_CLOCKS) {
-                        putVarint(annex, g.clocks.size());
-                        for (std::size_t c = 0; c < g.clocks.size(); ++c)
-                            putVarint(annex, zigzag(int64_t{g.clocks[c]} - (c >= 2 ? g.clocks[c - 2] : 0)));
-                    }
-                    if (parts & ANNEX_EVALS) {
-                        putVarint(annex, g.evals.size());
-                        for (const auto e : g.evals) putVarint(annex, zigzag(e));
-                    }
-                }
-            }
-            put(MOVES, n, static_cast<uint64_t>(moves.size()));
-            put(ANNEX, n, static_cast<uint64_t>(annex.size()));
+            SegmentBytes segment(n);
+            for (std::size_t k = 0; k < n; ++k)
+                putGame(segment, k, games[from + k], keys[from + k],
+                        [&](const std::string& name) { return nameId(name, added); });
             const auto new_names = static_cast<uint32_t>(added.size() - names_before);
-            put32(16, new_names);
-            std::string names_text;
-            for (std::size_t a = names_before; a < added.size(); ++a) names_text += added[a] + "\n";
+            for (std::size_t a = names_before; a < added.size(); ++a) segment.names += added[a] + "\n";
+            segment.finish(new_names);
 
             std::string name;
             {
@@ -1076,11 +1064,11 @@ void Database::commit(std::vector<ImportedGame>& games, const std::vector<uint64
             fs::create_directories(tmp, ec);
             if (ec) throw StoreError(writeErrc(ec), "cannot create " + tmp.string());
             made.push_back(name);
-            writeFile(tmp / "cols.bin", cols);
-            writeFile(tmp / "moves.bin", moves);
-            writeFile(tmp / "annex.bin", annex);
-            writeFile(tmp / "names.bin", names_text);
-            writeFile(tmp / "sig.bin", sig);
+            writeFile(tmp / "cols.bin", segment.cols);
+            writeFile(tmp / "moves.bin", segment.moves);
+            writeFile(tmp / "annex.bin", segment.annex);
+            writeFile(tmp / "names.bin", segment.names);
+            writeFile(tmp / "sig.bin", segment.sig);
             syncFolder(tmp);
             step("rename segment");
             fs::rename(tmp, dir_ / name, ec);

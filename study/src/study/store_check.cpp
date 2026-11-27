@@ -65,13 +65,10 @@ bool recordSound(const Snapshot& snap, const Segment& segment, std::size_t i) {
             // Every ply read, and nothing after them.
             if (cursor.ply() < game.plies || cursor.bytes() != game.moves.size()) return false;
             if (const auto* stored = segment.signatureBytes(i); stored && (stored[21] & SIG_KNOWN)) {
-                const auto again = signature.finish(board);
-                if (std::memcmp(stored, again.home.data(), 16) != 0) return false;
-                for (int j = 0; j < 5; ++j)
-                    if (stored[16 + j] != static_cast<uint8_t>((again.material[2 * j] & 0x0F) |
-                                                               (std::min<uint8_t>(again.material[2 * j + 1], 15) << 4)))
-                        return false;
-                if (((stored[21] & SIG_PROMOTED) != 0) != again.promoted) return false;
+                // Its plies and material as made again, and whether a pawn was promoted (its flags' other bits left).
+                const auto again = packSignature(signature.finish(board));
+                if (std::memcmp(stored, again.data(), 21) != 0 || ((stored[21] ^ again[21]) & SIG_PROMOTED))
+                    return false;
             }
         }
         // A name lost with a segment that cannot be read reads "?": the key made of it cannot be made again.

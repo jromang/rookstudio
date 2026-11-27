@@ -405,7 +405,7 @@ void App::drawEmptyDatabase(std::size_t index) {
                                  "or:"));
     if (ui::iconButton("db_empty_import", ui::Icon::Folder, TR("Import a file…"))) {
         db_selected_ = static_cast<int>(index);
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+        openGamesImport(gameFiles());
     }
     ImGui::SameLine();
     if (ui::iconButton("db_empty_paste", ui::Icon::Paste, TR("Paste games"))) pasteGamesInto(static_cast<int>(index));
@@ -627,7 +627,7 @@ void App::drawDatabases() {
         ImGui::BeginDisabled(s.import() != nullptr);
         if (ui::iconButton("db_import", ui::Icon::Folder, import) ||
             (!s.import() && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_I)))
-            dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+            openGamesImport(gameFiles());
         ImGui::EndDisabled();
         ImGui::SameLine(0, px(4));
         ImGui::TextDisabled("Ctrl+I");
@@ -641,7 +641,15 @@ void App::drawDatabases() {
                                  "broadcasts and monthly files, a chess.com player's games, Lumbra's Gigabase."));
         drawSourcesMenu();
         ImGui::SameLine();
-        if (ui::iconButton("db_add", ui::Icon::Database, add)) dialogs_.openFolder(Dialogs::Purpose::AddDatabase);
+        if (ui::iconButton("db_add", ui::Icon::Database, add)) {
+            dialogs_.openFolder([this](const std::string& path) {
+                try {
+                    db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
+                } catch (const std::exception& e) {
+                    db_message_ = e.what();
+                }
+            });
+        }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", TR("A database folder (Name.fcgdb) made elsewhere: listed here, its files left "
                                        "where they are."));
@@ -924,7 +932,7 @@ void App::drawDatabases() {
     ImGui::SameLine();
     ImGui::BeginDisabled(s.import() != nullptr || !facts.error.empty());
     if (ui::iconButton("db_import_here", ui::Icon::Folder, TR("Import into this database…")))
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, gameFiles());
+        openGamesImport(gameFiles());
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ui::iconButton("db_folder", ui::Icon::FolderClosed, TR("Open the folder"))) ui::openPath(entries[index].folder);

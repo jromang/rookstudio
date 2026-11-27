@@ -390,8 +390,13 @@ void App::drawLichessOfflineEvals() {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("Enter"));
     ImGui::SameLine();
-    if (ImGui::Button(TR("A file already downloaded…")))
-        dialogs_.openFile(Dialogs::Purpose::OfflineEvalsFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
+    if (ImGui::Button(TR("A file already downloaded…"))) {
+        dialogs_.openFile(
+            [this](const std::string& path) {
+                startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
+            },
+            {{"zstd", "zst"}, {TR("All files"), "*"}});
+    }
     tip(TR("lichess_db_eval.jsonl.zst, from database.lichess.org: read from the disk, nothing is downloaded."));
     ImGui::TextDisabled("%s", TR("What leaves the machine: the request for the file to database.lichess.org, its size "
                                  "said before. Then nothing."));

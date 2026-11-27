@@ -1104,7 +1104,8 @@ void App::drawFideListCard() {
         ImGui::PopStyleColor();
         ImGui::SameLine();
         if (ImGui::Button(TR("A file already downloaded…")))
-            dialogs_.openFile(Dialogs::Purpose::FideList, {{TR("FIDE's list"), "zip;txt"}});
+            dialogs_.openFile([this](const std::string& path) { startFideList(std::filesystem::path(path)); },
+                              {{TR("FIDE's list"), "zip;txt"}});
     }
     // What went wrong last (M13, board 1, errors), and its gesture.
     if (!fide_job_ && fide_outcome_) {

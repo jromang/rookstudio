@@ -140,7 +140,7 @@ void App::drawChessHome() {
     if (bases) {
         if (ui::iconButton("chess_import", ui::Icon::Database, TR("Import into a database…"))) {
             page_ = Page::Databases;
-            dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+            openGamesImport({{"PGN", "pgn;zst;gz;zip"}});
         }
         ImGui::SameLine(0, px(14));
     }
@@ -200,7 +200,7 @@ void App::drawChessHome() {
         ImGui::SameLine(std::max(ImGui::GetCursorPosX() + px(10), ImGui::GetContentRegionMax().x - import_w));
         if (ImGui::SmallButton(import_label)) {
             page_ = Page::Databases;
-            dialogs_.openFile(Dialogs::Purpose::ImportGames, {{"PGN", "pgn;zst;gz;zip"}});
+            openGamesImport({{"PGN", "pgn;zst;gz;zip"}});
         }
         std::size_t linked = 0, shown = 0;
         for (std::size_t i = 0; i < shelf_.entries().size(); ++i) {

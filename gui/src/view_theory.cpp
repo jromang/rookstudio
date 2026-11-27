@@ -343,7 +343,8 @@ void App::showTheoryPart(std::optional<std::size_t> chosen) {
 }
 
 void App::openTheoryDialog() {
-    dialogs_.openFile(Dialogs::Purpose::TheoryPgn, {{"PGN", "pgn"}}, storage_.root().string());
+    dialogs_.openFile([this](const std::string& path) { addTheoryFile(path); }, {{"PGN", "pgn"}},
+                      storage_.root().string());
 }
 
 void App::openTheoryCopy(const TheorySource& s) {
@@ -615,8 +616,14 @@ void App::drawTheoryStudy(std::size_t index, std::optional<std::size_t>& open, s
                     .c_str());
         }
         ImGui::PopTextWrapPos();
-        if (s.kind == TheorySource::Kind::File && ImGui::SmallButton(TR("Find it…")))
-            dialogs_.openFile(Dialogs::Purpose::TheoryFind, {{"PGN", "pgn"}}, s.file.parent_path().string());
+        if (s.kind == TheorySource::Kind::File && ImGui::SmallButton(TR("Find it…"))) {
+            dialogs_.openFile(
+                [this](const std::string& path) {
+                    if (theory_chosen_ >= 0 && static_cast<std::size_t>(theory_chosen_) < theory().studies().size())
+                        theory().relocate(static_cast<std::size_t>(theory_chosen_), path);
+                },
+                {{"PGN", "pgn"}}, s.file.parent_path().string());
+        }
         if (s.kind == TheorySource::Kind::Lichess && ImGui::SmallButton(TR("Your Lichess studies…"))) {
             page_          = Page::Lichess;
             studies_.shown = studies_.opened = true;

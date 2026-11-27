@@ -622,7 +622,8 @@ void App::exportSave() {
     std::error_code ec;
     fs::path folder = st.folder.empty() ? fs::path() : fs::path(st.folder);
     if (folder.empty() || !fs::is_directory(folder, ec)) folder = storage_.root();
-    dialogs_.saveFile(Dialogs::Purpose::Export, filters, pathText(folder / exportFileName(format)));
+    dialogs_.saveFile([this](const std::string& path) { exportTo(path); }, filters,
+                      pathText(folder / exportFileName(format)));
 }
 
 void App::exportTo(const fs::path& chosen) {

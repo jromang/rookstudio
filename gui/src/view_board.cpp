@@ -1191,7 +1191,8 @@ void App::saveBoardPgn() {
     const auto& main = board_.tree.main;
     const auto white = main.header("White"), black = main.header("Black");
     const auto name = white.empty() && black.empty() ? std::string("game") : fileNameOf(white + " - " + black);
-    dialogs_.saveFile(Dialogs::Purpose::SaveBoardPgn, {{"PGN", "pgn"}}, (storage_.root() / (name + ".pgn")).string());
+    dialogs_.saveFile([this](const std::string& path) { saveBoardPgnAs(path); }, {{"PGN", "pgn"}},
+                      (storage_.root() / (name + ".pgn")).string());
 }
 
 void App::readOnBoard(const std::string& text, const std::string& name) {

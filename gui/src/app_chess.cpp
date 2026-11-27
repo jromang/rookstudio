@@ -509,7 +509,8 @@ class App::ModulesContext final : public AppContext {
 
     // The file dialogs.
     void choosePuzzleFile() override {
-        app_.dialogs_.openFile(Dialogs::Purpose::OfflinePuzzlesFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
+        app_.dialogs_.openFile([&app = app_](const std::string& path) { app.puzzles_->startOffline(path); },
+                               {{"zstd", "zst"}, {TR("All files"), "*"}});
     }
 
     // The user's names.
@@ -1377,64 +1378,14 @@ bool App::applyChessFocusWord(const std::string& w) {
     return words.applied();
 }
 
-void App::handleChessDialog(const Dialogs::Answer& answer) {
-    const auto& path = answer.path;
-    switch (answer.purpose) {
-        case Dialogs::Purpose::Export:  // the Export sheet's file (#93)
-            exportTo(path);
-            break;
-        case Dialogs::Purpose::TheoryPgn:  // a theory study (#77)
-            addTheoryFile(path);
-            break;
-        case Dialogs::Purpose::TheoryFind:
-            if (theory_chosen_ >= 0 && static_cast<std::size_t>(theory_chosen_) < theory().studies().size())
-                theory().relocate(static_cast<std::size_t>(theory_chosen_), path);
-            break;
-        case Dialogs::Purpose::CtgPolyglotBook:
-            if (selected_book_ >= 0 && selected_book_ < static_cast<int>(books_.size()) &&
-                study::isCtg(books_[selected_book_].path))
-                startCtgJob(CtgJobKind::Polyglot, books_[selected_book_].path, path);
-            break;
-        case Dialogs::Purpose::OpeningSuiteBook:
-            writeOpeningSuiteBook(path);
-            break;
-        case Dialogs::Purpose::EvaluatedSuiteBook:
-            writeEvaluatedSuiteBook(path);
-            break;
-        case Dialogs::Purpose::EvalsFile:
-            startEvalsReading(path);
-            break;
-        case Dialogs::Purpose::OfflineEvalsFile:
-            startOfflineEvals(path, offline_evals_choice_ == 1 ? study::EVALS_OPENING_MEN : 0);
-            break;
-        case Dialogs::Purpose::OfflinePuzzlesFile:
-            puzzles_->startOffline(path);
-            break;
-        case Dialogs::Purpose::LichessMonthFile:
-            startMonthReading(path);
-            break;
-        case Dialogs::Purpose::AppendBoardPgn:
-            try {
-                // After the file's games, a blank line between.
-                if (chessBoard()) fillBoardEco();
-                std::string text;
-                {
-                    std::ifstream in(std::filesystem::path(path), std::ios::binary);
-                    text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-                }
-                while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' '))
-                    text.pop_back();
-                if (!text.empty()) text += "\n\n";
-                text += gamePgn(board_.tree, board_.chess960);
-                tour::replaceFile(std::filesystem::path(path), text);
-                board_.changes.saved(std::filesystem::path(path).filename().string());
-                boardToast(trf("Saved at the end of “{}”", std::filesystem::path(path).filename().string()));
-            } catch (const std::exception& e) {
-                board_.message       = trf("Cannot write {}: {}", path, e.what());
-                board_.message_error = true;
-            }
-            break;
-        case Dialogs::Purpose::AssistantModel: {
+void App::openGamesImport(const std::vector<std::pair<std::string, std::string>>& filters) {
+    dialogs_.openFile(
+        [this](const std::string& path) { importIntoDatabase(db_selected_, std::filesystem::path(path)); }, filters);
+}
+
+void App::openAssistantModel() {
+    dialogs_.openFile(
+        [this](const std::string& path) {
             // A GGUF file in place of the catalogue's model: loaded at the next question.
             auto settings       = assistant_->settings();
             settings.model_file = path;
@@ -1442,76 +1393,41 @@ void App::handleChessDialog(const Dialogs::Answer& answer) {
             assistant_->setSettings(settings);
             assistant_->unload();  // after: a request that starts meanwhile loads the file chosen
             assistant_->saveSettings();
-            break;
+        },
+        {{"GGUF", "gguf"}});
+}
+
+void App::saveBoardPgnAs(const std::string& path) {
+    try {
+        if (chessBoard()) fillBoardEco();
+        tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
+        board_.changes.saved(std::filesystem::path(path).filename().string());
+        board_.message       = trf("Saved in {}", path);
+        board_.message_error = false;
+    } catch (const std::exception& e) {
+        board_.message       = trf("Cannot write {}: {}", path, e.what());
+        board_.message_error = true;
+    }
+}
+
+void App::appendBoardPgnTo(const std::string& path) {
+    try {
+        // After the file's games, a blank line between.
+        if (chessBoard()) fillBoardEco();
+        std::string text;
+        {
+            std::ifstream in(std::filesystem::path(path), std::ios::binary);
+            text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
-        case Dialogs::Purpose::SaveBoardPgn:
-            try {
-                if (chessBoard()) fillBoardEco();
-                tour::replaceFile(std::filesystem::path(path), gamePgn(board_.tree, board_.chess960));
-                board_.changes.saved(std::filesystem::path(path).filename().string());
-                board_.message       = trf("Saved in {}", path);
-                board_.message_error = false;
-            } catch (const std::exception& e) {
-                board_.message       = trf("Cannot write {}: {}", path, e.what());
-                board_.message_error = true;
-            }
-            break;
-        case Dialogs::Purpose::ImportGames:
-            importIntoDatabase(db_selected_, std::filesystem::path(path));
-            break;
-        case Dialogs::Purpose::AddDatabase:
-            try {
-                db_selected_ = static_cast<int>(shelf().add(std::filesystem::path(path)));
-            } catch (const std::exception& e) {
-                db_message_ = e.what();
-            }
-            break;
-        case Dialogs::Purpose::FideList:
-            startFideList(std::filesystem::path(path));
-            break;
-        // fastchess-gui's, answered by handleDialogs() before it calls this: named rather than a default, so that
-        // the compiler tells of a purpose added without its case in either function (-Wswitch).
-        case Dialogs::Purpose::AddEngine:
-        case Dialogs::Purpose::EngineCommand:
-        case Dialogs::Purpose::EngineDir:
-        case Dialogs::Purpose::Book:
-        case Dialogs::Purpose::Tablebases:
-        case Dialogs::Purpose::TablebasesFolder:
-        case Dialogs::Purpose::ExportGames:
-        case Dialogs::Purpose::ExportAll:
-        case Dialogs::Purpose::OpenTournament:
-        case Dialogs::Purpose::ExportStandings:
-        case Dialogs::Purpose::ImportEngineList:
-        case Dialogs::Purpose::ImportEngineFolder:
-        case Dialogs::Purpose::ImportRatingList:
-        case Dialogs::Purpose::ExportRatings:
-        case Dialogs::Purpose::ExportRatingHtml:
-        case Dialogs::Purpose::ExportRatingMarkdown:
-        case Dialogs::Purpose::ExportRatingPgn:
-        case Dialogs::Purpose::ImportRatingPgn:
-        case Dialogs::Purpose::ExportHeadToHead:
-        case Dialogs::Purpose::ExportOpenings:
-        case Dialogs::Purpose::AddBook:
-        case Dialogs::Purpose::BookFile:
-        case Dialogs::Purpose::SaveCleanBook:
-        case Dialogs::Purpose::Chess324Book:
-        case Dialogs::Purpose::Chess324SymmetricalBook:
-        case Dialogs::Purpose::BuildBookPgn:
-        case Dialogs::Purpose::BuildBookBin:
-        case Dialogs::Purpose::SuiteFile:
-        case Dialogs::Purpose::ExportSuiteCsv:
-        case Dialogs::Purpose::TournamentsFolder:
-        case Dialogs::Purpose::PgnOut:
-        case Dialogs::Purpose::ExportSubmission:
-        case Dialogs::Purpose::EngineOption:
-        case Dialogs::Purpose::ConsoleLog:
-        case Dialogs::Purpose::BoardPgn:
-        case Dialogs::Purpose::EngineLogo:
-        case Dialogs::Purpose::PieceFolder:
-        case Dialogs::Purpose::MachineKey:
-        case Dialogs::Purpose::MachineProgram:
-        case Dialogs::Purpose::MachineEngineBuild:
-            break;
+        while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' ')) text.pop_back();
+        if (!text.empty()) text += "\n\n";
+        text += gamePgn(board_.tree, board_.chess960);
+        tour::replaceFile(std::filesystem::path(path), text);
+        board_.changes.saved(std::filesystem::path(path).filename().string());
+        boardToast(trf("Saved at the end of “{}”", std::filesystem::path(path).filename().string()));
+    } catch (const std::exception& e) {
+        board_.message       = trf("Cannot write {}: {}", path, e.what());
+        board_.message_error = true;
     }
 }
 

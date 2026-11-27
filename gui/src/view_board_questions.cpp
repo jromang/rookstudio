@@ -132,8 +132,7 @@ void App::drawAssistantFirstUse() {
         if (ui::iconButton("assistant_download", ui::Icon::Download, trf("Download the model ({})", size).c_str()))
             a.download();
         ImGui::SameLine();
-        if (ImGui::Button(TR("A GGUF file on the disk…")))
-            dialogs_.openFile(Dialogs::Purpose::AssistantModel, {{"GGUF", "gguf"}});
+        if (ImGui::Button(TR("A GGUF file on the disk…"))) openAssistantModel();
     } else {
         ImGui::TextUnformatted(
             TR("An assistant that comments on your games and answers your questions, on your machine"));
@@ -167,8 +166,7 @@ void App::drawAssistantFirstUse() {
         if (ui::iconButton("assistant_download", ui::Icon::Download, trf("Download the model ({})", size).c_str()))
             a.download();
         ImGui::SameLine();
-        if (ImGui::Button(TR("A GGUF file on the disk…")))
-            dialogs_.openFile(Dialogs::Purpose::AssistantModel, {{"GGUF", "gguf"}});
+        if (ImGui::Button(TR("A GGUF file on the disk…"))) openAssistantModel();
         ImGui::SameLine();
         if (ImGui::Button(TR("Not now"))) {
             auto settings    = a.settings();
@@ -645,8 +643,7 @@ void App::drawAssistantSettings(float label) {
         }
         ImGui::SameLine();
     }
-    if (ImGui::SmallButton(TR("A GGUF file on the disk…")))
-        dialogs_.openFile(Dialogs::Purpose::AssistantModel, {{"GGUF", "gguf"}});
+    if (ImGui::SmallButton(TR("A GGUF file on the disk…"))) openAssistantModel();
     ImGui::PopTextWrapPos();
     ImGui::EndGroup();
 

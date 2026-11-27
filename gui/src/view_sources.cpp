@@ -989,7 +989,8 @@ void App::drawMonthSheet() {
             startMonthReading(lichess::monthUrl(m));
         ImGui::SameLine();
         if (ImGui::Button(TR("Read a file already downloaded…")))
-            dialogs_.openFile(Dialogs::Purpose::LichessMonthFile, {{TR("A month of Lichess (.pgn.zst)"), "zst"}});
+            dialogs_.openFile([this](const std::string& path) { startMonthReading(path); },
+                              {{TR("A month of Lichess (.pgn.zst)"), "zst"}});
         ImGui::EndDisabled();
         if (month_run_ && !month_stopped_.empty() && month_run_->filter == month_filter_) {
             ImGui::SameLine();
@@ -1036,7 +1037,7 @@ void App::drawLumbraSheet() {
     ImGui::SameLine();
     ImGui::BeginDisabled(shelf().import() != nullptr || monthReading());
     if (ImGui::Button(TR("Import the downloaded file…")))
-        dialogs_.openFile(Dialogs::Purpose::ImportGames, {{TR("Lumbra's Gigabase (.7z, .pgn)"), "7z;pgn"}});
+        openGamesImport({{TR("Lumbra's Gigabase (.7z, .pgn)"), "7z;pgn"}});
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button(TR("Close##lumbra"))) lumbra_sheet_ = false;

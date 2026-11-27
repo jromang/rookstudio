@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -10,9 +11,14 @@ struct SDL_Window;
 namespace fcg {
 
 // Native file dialogs (SDL3: portal or zenity on Linux, the shell dialogs on Windows).
-// SDL may answer on another thread, so answers are queued and picked up with take().
+// SDL may answer on another thread, so answers are queued and picked up with take(). A dialog opened with a callback
+// (RookStudio's) is answered by it, called from App::handleDialogs() on the main thread; one opened for a purpose
+// (fastchess-gui's) by that purpose's case there.
 class Dialogs {
    public:
+    // The file chosen, as the dialog gives it (none when it is cancelled: never called).
+    using Chosen = std::function<void(const std::string& path)>;
+
     enum class Purpose {
         AddEngine,
         EngineCommand,
@@ -37,15 +43,8 @@ class Dialogs {
         AddBook,
         BookFile,
         SaveCleanBook,
-        CtgPolyglotBook,  // a CTG book's Polyglot copy for engines (#68)
         Chess324Book,
         Chess324SymmetricalBook,
-        OpeningSuiteBook,    // a book from Lichess's named openings (#53)
-        EvaluatedSuiteBook,  // a book from Lichess's evaluated positions (#53)
-        EvalsFile,           // Lichess's evaluations database downloaded before (#53)
-        OfflineEvalsFile,    // the same, read for the evaluations kept offline (#58)
-        OfflinePuzzlesFile,  // Lichess's puzzle database downloaded before (#80)
-        LichessMonthFile,    // a month of Lichess's games downloaded before (#72)
         BuildBookPgn,
         BuildBookBin,
         SuiteFile,
@@ -53,28 +52,20 @@ class Dialogs {
         TournamentsFolder,
         PgnOut,
         ExportSubmission,
-        EngineOption,    // a file or a folder for a UCI option (EvalFile, SyzygyPath)
-        ConsoleLog,      // the engine console's log
-        BoardPgn,        // a PGN file for the Board page
-        SaveBoardPgn,    // the Board page's game saved as a PGN file
-        AppendBoardPgn,  // the same, after the games of a PGN file
-        TheoryPgn,       // an annotated PGN added to the theory (#77)
-        TheoryFind,      // a theory study's file found where it went
-        AssistantModel,  // a GGUF file for the assistant, instead of the catalogue's model
+        EngineOption,  // a file or a folder for a UCI option (EvalFile, SyzygyPath)
+        ConsoleLog,    // the engine console's log
+        BoardPgn,      // a PGN file for the Board page
         EngineLogo,
         PieceFolder,
-        MachineKey,          // a remote machine's key file (Settings)
-        MachineProgram,      // the fastchess-gui to install on a remote machine of another system
-        MachineEngineBuild,  // an engine's build for a remote machine's system, copied there
-        ImportGames,         // a PGN (.pgn, .zst, .gz, .zip) imported into a database
-        AddDatabase,         // a database folder made elsewhere, added to the list
-        FideList,            // FIDE's rating list downloaded before (#88)
-        Export               // where the Export sheet's file goes (#93)
+        MachineKey,         // a remote machine's key file (Settings)
+        MachineProgram,     // the fastchess-gui to install on a remote machine of another system
+        MachineEngineBuild  // an engine's build for a remote machine's system, copied there
     };
 
     struct Answer {
-        Purpose purpose;
+        Purpose purpose{};
         std::string path;
+        Chosen chosen;  // set for a dialog opened with a callback, which answers in place of the purpose
     };
 
     explicit Dialogs(SDL_Window* window) : window_(window) {}
@@ -83,6 +74,12 @@ class Dialogs {
                   const std::string& start = {});
     void openFolder(Purpose purpose, const std::string& start = {});
     void saveFile(Purpose purpose, const std::vector<std::pair<std::string, std::string>>& filters,
+                  const std::string& start = {});
+    // The same, the file chosen given to `chosen`.
+    void openFile(Chosen chosen, const std::vector<std::pair<std::string, std::string>>& filters = {},
+                  const std::string& start = {});
+    void openFolder(Chosen chosen, const std::string& start = {});
+    void saveFile(Chosen chosen, const std::vector<std::pair<std::string, std::string>>& filters,
                   const std::string& start = {});
 
     [[nodiscard]] std::optional<Answer> take();
@@ -93,6 +90,7 @@ class Dialogs {
     struct Request;
 
     static void callback(void* userdata, const char* const* files, int filter);
+    void show(Request* request, int kind);  // kind: 0 open a file, 1 a folder, 2 save a file
 
     SDL_Window* window_;
 

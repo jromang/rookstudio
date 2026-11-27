@@ -156,7 +156,8 @@ void App::drawEvaluatedSuite() {
             if (ImGui::Button(label.c_str())) startEvalsReading(lichess::evalsUrl());
             ImGui::SameLine();
             if (ImGui::Button(TR("Read a file already downloaded…")))
-                dialogs_.openFile(Dialogs::Purpose::EvalsFile, {{"zstd", "zst"}, {TR("All files"), "*"}});
+                dialogs_.openFile([this](const std::string& path) { startEvalsReading(path); },
+                                  {{"zstd", "zst"}, {TR("All files"), "*"}});
             tip(
                 TR("lichess_db_eval.jsonl.zst, from database.lichess.org: read from the disk, nothing is "
                    "downloaded."));
@@ -256,7 +257,7 @@ void App::drawEvaluatedSuite() {
     }
     ImGui::BeginDisabled(kept.empty());
     if (ImGui::Button(TR("Make the book…##evals")))
-        dialogs_.saveFile(Dialogs::Purpose::EvaluatedSuiteBook, {{"EPD", "epd"}},
+        dialogs_.saveFile([this](const std::string& path) { writeEvaluatedSuiteBook(path); }, {{"EPD", "epd"}},
                           newBookPath(fmt::format("lichess-{:+.2f}-{:+.2f}.epd", o.from_cp / 100.0, o.to_cp / 100.0)));
     ImGui::EndDisabled();
     tip(

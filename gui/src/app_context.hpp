@@ -471,7 +471,7 @@ class Puzzles {
     [[nodiscard]] virtual bool puzzlesOnline() const                         = 0;
 };
 
-// The file dialogs a module opens, the file chosen given back to the module by App (App::handleChessDialog()).
+// The file dialogs a module opens, the file chosen given back to the module by the dialog's callback.
 class FileDialogs {
    public:
     virtual ~FileDialogs() = default;

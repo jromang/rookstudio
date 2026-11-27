@@ -14,6 +14,7 @@
 #include <study/result_char.hpp>
 
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg {
@@ -107,13 +108,23 @@ CrosstableSettings settingsFrom(const nlohmann::json& j) {
 }  // namespace
 
 CrosstableStore::CrosstableStore(fs::path profile) : file_(std::move(profile) / "crosstables.json") {
-    const auto json = readJson<nlohmann::json>(file_);
-    if (!json || !json->is_object()) return;
+    // Each crosstable's settings read with their types checked (#136): those with a value of another type than written
+    // (another version, a hand edit) are set aside and the others kept, said in the console with the file as it was
+    // kept beside it; a file cut short is kept aside and said rather than replaced in silence by the next change.
+    const auto json = readProfileJson(file_);
+    if (!json) return;
+    ProfileEntries entries(file_);
     if (const auto it = json->find("crosstables"); it != json->end() && it->is_object())
         for (const auto& [place, value] : it->items()) {
-            auto s = settingsFrom(value);
-            if (!s.empty()) settings_[place] = std::move(s);
+            // A place is the database's folder and the tournament on two lines: said on one.
+            auto said = place;
+            std::replace(said.begin(), said.end(), '\n', ' ');
+            entries.entry(said, [&] {
+                auto s = settingsFrom(value);
+                if (!s.empty()) settings_[place] = std::move(s);
+            });
         }
+    entries.sayUnread();
 }
 
 CrosstableSettings CrosstableStore::get(const std::string& place) const {

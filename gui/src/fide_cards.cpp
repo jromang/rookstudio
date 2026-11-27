@@ -2,13 +2,13 @@
 
 #include <cctype>
 #include <chrono>
-#include <fstream>
 
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
 #include <tour/files.hpp>
 
 #include "https.hpp"
+#include "profile_entries.hpp"
 
 namespace fcg::lichess {
 
@@ -95,21 +95,27 @@ std::string fideUrl(const FideCard& card) {
 }
 
 FideCards::FideCards(std::filesystem::path file) : file_(std::move(file)) {
-    std::ifstream in(file_, std::ios::binary);
-    if (!in) return;
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return;
-    if (const auto cards = j.find("cards"); cards != j.end() && cards->is_array()) {
-        for (const auto& c : *cards) {
+    // Read with its types checked (#136): a card with a value of another type than written (another version, a hand
+    // edit) is set aside, the others kept, said in the console with the file as it was kept beside it; a file cut short
+    // is kept aside and said. A card set aside is asked of Lichess again when it is wanted.
+    const auto j = readProfileJson(file_);
+    if (!j) return;
+    ProfileEntries entries(file_);
+    if (const auto cards = j->find("cards"); cards != j->end() && cards->is_array()) {
+        for (std::size_t i = 0; i < cards->size(); ++i) {
+            const auto& c = (*cards)[i];
             if (!c.is_object()) continue;
-            auto card  = cardOf(c);
-            card.asked = c.value("asked", int64_t{0});
-            if (card.id > 0) cards_[card.id] = std::move(card);
+            entries.entry(fmt::format("cards/{}", i + 1), [&] {
+                auto card  = cardOf(c);
+                card.asked = c.value("asked", int64_t{0});
+                if (card.id > 0) cards_[card.id] = std::move(card);
+            });
         }
     }
-    if (const auto names = j.find("names"); names != j.end() && names->is_object())
+    if (const auto names = j->find("names"); names != j->end() && names->is_object())
         for (const auto& [name, id] : names->items())
             if (id.is_number_integer()) names_[name] = id.get<int64_t>();
+    entries.sayUnread();
 }
 
 const FideCard* FideCards::byName(std::string_view name) const {

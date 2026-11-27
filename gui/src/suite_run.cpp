@@ -12,7 +12,10 @@
 
 #include <fmt/include/fmt/format.h>
 
+#include "console.hpp"
 #include "i18n.hpp"
+#include "portable.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
 
@@ -129,16 +132,26 @@ std::vector<std::pair<fs::path, std::string>> savedSuiteRuns(const fs::path& dir
     std::error_code ec;
     for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
         if (it->path().extension() != ".json") continue;
-        const auto j = readJson<nlohmann::json>(it->path());
-        if (!j || j->value("suite", std::string{}) != suite_file.filename().string() ||
-            j->value("positions", std::size_t{0}) != positions) {
+        const auto j  = readJson<nlohmann::json>(it->path());
+        bool readable = j && j->is_object();
+        std::optional<std::string> label;  // none for another suite's run
+        try {
+            if (readable && j->value("suite", std::string{}) == suite_file.filename().string() &&
+                j->value("positions", std::size_t{0}) == positions) {
+                std::string engines;
+                for (const auto& c : j->value("columns", nlohmann::json::array()))
+                    engines += (engines.empty() ? "" : ", ") + c.value("engine", std::string{});
+                label = fmt::format("{} · {}", j->value("when", std::string{}), engines);
+            }
+        } catch (const std::exception&) {
+            readable = false;
+        }
+        if (!readable) {
+            // Cut short, or a value of another type than written (#136): not offered; the file stays as it is.
+            Console::instance().add(trf("{} could not be read", it->path().string()), true);
             continue;
         }
-        std::string engines;
-        for (const auto& c : j->value("columns", nlohmann::json::array())) {
-            engines += (engines.empty() ? "" : ", ") + c.value("engine", std::string{});
-        }
-        out.emplace_back(it->path(), fmt::format("{} · {}", j->value("when", std::string{}), engines));
+        if (label) out.emplace_back(it->path(), std::move(*label));
     }
     std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
     return out;
@@ -146,19 +159,36 @@ std::vector<std::pair<fs::path, std::string>> savedSuiteRuns(const fs::path& dir
 
 std::vector<SuiteColumn> loadSuiteRun(const fs::path& file) {
     std::vector<SuiteColumn> out;
-    const auto j = readJson<nlohmann::json>(file);
+    const auto j = readProfileJson(file);
     if (!j) return out;
-    for (const auto& c : j->value("columns", nlohmann::json::array())) {
-        SuiteColumn col;
-        col.engine = c.value("engine", std::string{});
-        col.limit  = c.value("limit", std::string{});
-        col.when   = j->value("when", std::string{});
-        for (const auto& a : c.value("answers", nlohmann::json::array())) {
-            col.answers.push_back(a.is_null() ? std::nullopt : std::optional(a.get<tour::SuiteAnswer>()));
-        }
-        out.push_back(std::move(col));
-    }
+    ProfileEntries entries(file);
+    if (const auto columns = j->find("columns"); columns != j->end() && columns->is_array())
+        for (std::size_t i = 0; i < columns->size(); ++i)
+            entries.entry(fmt::format("columns/{}", i + 1), [&] {
+                const auto& c = (*columns)[i];
+                SuiteColumn col;
+                col.engine = c.value("engine", std::string{});
+                col.limit  = c.value("limit", std::string{});
+                col.when   = j->value("when", std::string{});
+                for (const auto& a : c.value("answers", nlohmann::json::array()))
+                    col.answers.push_back(a.is_null() ? std::nullopt : std::optional(a.get<tour::SuiteAnswer>()));
+                out.push_back(std::move(col));
+            });
+    entries.sayUnread();
     return out;
+}
+
+std::optional<SuiteSetup> readSuiteSetup(const fs::path& file) {
+    const auto j = readProfileJson(file);
+    if (!j) return std::nullopt;
+    try {
+        auto setup = j->get<SuiteSetup>();
+        setup.file = portable::resolved(setup.file);
+        return setup;
+    } catch (const std::exception&) {
+        sayUnreadableFile(file);
+        return std::nullopt;
+    }
 }
 
 SuiteRunner::~SuiteRunner() {

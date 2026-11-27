@@ -7,17 +7,20 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <string>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
+#include <json.hpp>
 #include <study/import.hpp>
 #include <study/pgn_reader.hpp>
 #include <study/store.hpp>
 
 #include "answering_server.hpp"
 #include "assistant_notes.hpp"
+#include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -589,4 +592,49 @@ TEST_CASE("Lichess studies: each failure of a study's requests told by its kind"
     std::atomic<bool> cancel{true};
     CHECK(userStudies("rs_sample_0000", "", &cancel).net == NetError::Cancelled);
     CHECK(studyModified("AbCdEfGh", "", &cancel).net == NetError::Cancelled);
+}
+
+TEST_CASE("Lichess studies: a state of the wrong types keeps what reads, the rest said; cut short too (#136)") {
+    const test::ScratchDir profile("lichess-studies-types");
+    StudiesState state;
+    state.opened                                  = true;
+    state.record("AbCdEfGh", "Openings").chapters = 12;
+    state.record("IjKlMnOp", "Endings").chapters  = 3;
+    SentRecord s;
+    s.study   = "AbCdEfGh";
+    s.chapter = "Chap0042";
+    s.pgn     = "[Event \"Club\"]\n\n1. e4 *\n";
+    state.sent.push_back(s);
+    saveStudies(profile, state);
+    const auto file = profile / "lichess-studies.json";
+    // A number for a boolean, a text for a number, a number for a text (an older or newer version, a hand edit): each
+    // used to stop the program as soon as the Lichess page read the studies.
+    auto j                      = nlohmann::json::parse(test::readFile(file));
+    j["shown"]                  = 1;
+    j["studies"][1]["chapters"] = "three";
+    j["sent"][0]["pgn"]         = 5;
+    const auto written          = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    StudiesState back;
+    REQUIRE_NOTHROW(back = loadStudies(profile));
+    CHECK(back.opened);
+    CHECK_FALSE(back.shown);
+    REQUIRE(back.studies.size() == 1);
+    CHECK(back.studies[0].id == "AbCdEfGh");
+    CHECK(back.studies[0].chapters == 12);
+    CHECK(back.sent.empty());
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("3 entries could not be read and were set aside (shown, studies/IjKlMnOp, sent/1)") !=
+          std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A file cut short: kept aside, said, rather than replaced in silence by the next save.
+    std::ofstream(file, std::ios::binary) << "{\"opened\": true, \"studies\": [{\"id\": \"AbC";
+    const auto cut = Console::instance().added();
+    CHECK(loadStudies(profile).studies.empty());
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

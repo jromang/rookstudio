@@ -89,7 +89,17 @@ bool writeJson(const fs::path& file, const nlohmann::json& value, std::string* e
 }
 
 bool appendJsonLine(const fs::path& file, const nlohmann::json& line) {
+    bool cut = false;  // the last line does not end
+    {
+        std::ifstream in(file, std::ios::binary | std::ios::ate);
+        if (in && in.tellg() > 0) {
+            in.seekg(-1, std::ios::end);
+            char last = '\n';
+            cut       = in.get(last) && last != '\n';
+        }
+    }
     std::ofstream out(file, std::ios::binary | std::ios::app);
+    if (cut) out << '\n';
     out << line.dump() << '\n';
     out.close();
     if (!out.fail()) return true;
@@ -98,12 +108,18 @@ bool appendJsonLine(const fs::path& file, const nlohmann::json& line) {
     return false;
 }
 
-void forEachJsonLine(const fs::path& file, const std::function<void(const nlohmann::json&)>& line) {
+std::size_t forEachJsonLine(const fs::path& file, const std::function<void(const nlohmann::json&)>& line) {
     std::ifstream in(file, std::ios::binary);
+    std::size_t passed = 0;
     for (std::string text; std::getline(in, text);) {
+        if (text.empty() || text == "\r") continue;
         const auto j = nlohmann::json::parse(text, nullptr, false);
-        if (!j.is_discarded() && j.is_object()) line(j);
+        if (!j.is_discarded() && j.is_object())
+            line(j);
+        else
+            ++passed;
     }
+    return passed;
 }
 
 namespace {

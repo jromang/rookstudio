@@ -67,10 +67,16 @@ struct SuiteColumn {
 // A finished run, kept in `dir` to compare later versions with: <suite>-<date>.json. Returns the file.
 std::filesystem::path saveSuiteRun(const std::filesystem::path& dir, const std::filesystem::path& suite_file,
                                    std::size_t positions, const std::vector<SuiteColumn>& columns);
-// The runs of `suite_file` kept in `dir` (same name and number of positions), newest first: (file, its label).
+// The runs of `suite_file` kept in `dir` (same name and number of positions), newest first: (file, its label). A run
+// whose file does not read (cut short, a value of another type than written) is left out, said in the console (#136).
 [[nodiscard]] std::vector<std::pair<std::filesystem::path, std::string>> savedSuiteRuns(
     const std::filesystem::path& dir, const std::filesystem::path& suite_file, std::size_t positions);
+// A run's columns; one whose values are of another type than written is left out, said in the console (#136).
 [[nodiscard]] std::vector<SuiteColumn> loadSuiteRun(const std::filesystem::path& file);
+// The Suites page's setup kept in `file` (suite.json); none without one. A value of another type than written (another
+// version, a hand edit) leaves the page's defaults, the file as it was kept beside it and said, as a file cut short
+// is (#136).
+[[nodiscard]] std::optional<SuiteSetup> readSuiteSetup(const std::filesystem::path& file);
 
 class SuiteRunner {
    public:

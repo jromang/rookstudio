@@ -6,15 +6,20 @@
 
 #include <atomic>
 #include <filesystem>
+#include <fstream>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
+#include <json.hpp>
 #include <study/crosstable.hpp>
 #include <study/import.hpp>
 #include <study/store.hpp>
 
+#include "console.hpp"
 #include "crosstables.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
 namespace fs = std::filesystem;
@@ -291,4 +296,46 @@ TEST_CASE("crosstables: Ctrl+K's names; the games missing found in another datab
     REQUIRE(autumn);
     CHECK(autumn->shape.games == 4);
     CHECK(autumn->shape.players == 4);
+}
+
+TEST_CASE("crosstables: settings of the wrong type set aside, the others kept, said; a file cut short too (#136)") {
+    const test::ScratchDir profile("ct-types");
+    const auto place = crosstablePlace(profile / "databases" / "Base 2026.fcgdb", "autumn open|2026");
+    const auto other = broadcastPlace("abcd1234");
+    {
+        CrosstableStore store(profile);
+        CrosstableSettings s;
+        s.system = study::SystemChoice{study::TournamentSystem::RoundRobin, 2};
+        s.hand.push_back(study::HandResult{"Rossi, Clara", "Schmidt, Owen", 6, '0', 0});
+        store.set(place, s);
+        CrosstableSettings swiss;
+        swiss.system = study::SystemChoice{study::TournamentSystem::Swiss, 1};
+        store.set(other, swiss);
+    }
+    const auto file = profile / "crosstables.json";
+    // A text for the round of a result set by hand (an older or newer version, a hand edit): it used to stop the
+    // program as soon as the crosstables' settings were read.
+    auto j                                      = nlohmann::json::parse(test::readFile(file));
+    j["crosstables"][place]["hand"][0]["round"] = "six";
+    const auto written                          = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    std::optional<CrosstableStore> store;
+    REQUIRE_NOTHROW(store.emplace(profile));
+    CHECK(store->get(place).empty());
+    REQUIRE(store->get(other).system);
+    CHECK(store->get(other).system->system == study::TournamentSystem::Swiss);
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("1 entry could not be read and was set aside") != std::string::npos);
+    CHECK(said[0].find("autumn open|2026") != std::string::npos);  // the place on one line
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A file cut short: kept aside, said, rather than replaced in silence by the next change.
+    std::ofstream(file, std::ios::binary) << "{\"crosstables\": {\"lichess:abcd";
+    const auto cut = Console::instance().added();
+    CHECK(CrosstableStore(profile).get(other).empty());
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

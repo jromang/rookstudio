@@ -4,7 +4,6 @@
 #include <array>
 #include <cctype>
 #include <charconv>
-#include <fstream>
 #include <set>
 
 #include <fmt/include/fmt/format.h>
@@ -19,6 +18,7 @@
 #include "https.hpp"
 #include "lichess_links.hpp"
 #include "portable.hpp"
+#include "profile_entries.hpp"
 
 namespace fcg::lichess {
 
@@ -581,51 +581,60 @@ StudyRecord& StudiesState::record(const std::string& id, const std::string& name
 
 StudiesState loadStudies(const fs::path& profile) {
     StudiesState state;
-    std::ifstream in(profile / STATE_FILE, std::ios::binary);
-    if (!in) return state;
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return state;
-    state.opened        = j.value("opened", false);
-    state.read_declined = j.value("read_declined", false);
-    state.shown         = j.value("shown", false);
-    state.last_study    = j.value("last_study", std::string());
+    // Read with its types checked (#136): a value of another type than written (another version, a hand edit) is set
+    // aside with its study or its chapter sent, the others kept, said in the console with the file as it was kept
+    // beside it; a file cut short is kept aside and said rather than replaced in silence by the next save.
+    const auto file = profile / STATE_FILE;
+    const auto read = readProfileJson(file);
+    if (!read) return state;
+    const auto& j = *read;
+    ProfileEntries entries(file);
+    entries.entry("opened", [&] { state.opened = j.value("opened", false); });
+    entries.entry("read_declined", [&] { state.read_declined = j.value("read_declined", false); });
+    entries.entry("shown", [&] { state.shown = j.value("shown", false); });
+    entries.entry("last_study", [&] { state.last_study = j.value("last_study", std::string()); });
     if (const auto m = j.find("made"); m != j.end() && m->is_array())
         for (const auto& t : *m)
             if (t.is_number_integer()) state.made.push_back(t.get<int64_t>());
     if (const auto all = j.find("studies"); all != j.end() && all->is_array()) {
         for (const auto& s : *all) {
             if (!s.is_object() || !s.contains("id") || !s["id"].is_string()) continue;
-            StudyRecord r;
-            r.id         = s["id"].get<std::string>();
-            r.name       = s.value("name", r.id);
-            r.visibility = s.value("visibility", std::string());
-            r.chapters   = s.value("chapters", -1);
-            r.followed   = s.value("followed", false);
-            r.read_at    = s.value("read_at", int64_t{0});
-            r.modified   = s.value("modified", std::string());
-            r.checked    = s.value("checked", std::string());
-            if (const auto read = s.find("read"); read != s.end() && read->is_array()) {
-                for (const auto& c : *read) {
-                    if (!c.is_object()) continue;
-                    r.read.push_back({c.value("id", std::string()), c.value("name", std::string()),
-                                      unhex(c.value("hash", std::string())), c.value("changed", false)});
+            entries.entry("studies/" + s["id"].get<std::string>(), [&] {
+                StudyRecord r;
+                r.id         = s["id"].get<std::string>();
+                r.name       = s.value("name", r.id);
+                r.visibility = s.value("visibility", std::string());
+                r.chapters   = s.value("chapters", -1);
+                r.followed   = s.value("followed", false);
+                r.read_at    = s.value("read_at", int64_t{0});
+                r.modified   = s.value("modified", std::string());
+                r.checked    = s.value("checked", std::string());
+                if (const auto chapters = s.find("read"); chapters != s.end() && chapters->is_array()) {
+                    for (const auto& c : *chapters) {
+                        if (!c.is_object()) continue;
+                        r.read.push_back({c.value("id", std::string()), c.value("name", std::string()),
+                                          unhex(c.value("hash", std::string())), c.value("changed", false)});
+                    }
                 }
-            }
-            if (const auto db = s.value("database", std::string()); !db.empty())
-                r.database = fs::path(portable::resolved(db));
-            if (const auto games = s.find("games"); games != s.end() && games->is_object()) {
-                for (const auto& [key, g] : games->items()) {
-                    if (!g.is_object()) continue;
-                    r.games[key] = {g.value("game", uint64_t{0}), unhex(g.value("hash", std::string()))};
+                if (const auto db = s.value("database", std::string()); !db.empty())
+                    r.database = fs::path(portable::resolved(db));
+                if (const auto games = s.find("games"); games != s.end() && games->is_object()) {
+                    for (const auto& [key, g] : games->items()) {
+                        if (!g.is_object()) continue;
+                        r.games[key] = {g.value("game", uint64_t{0}), unhex(g.value("hash", std::string()))};
+                    }
                 }
-            }
-            state.studies.push_back(std::move(r));
+                state.studies.push_back(std::move(r));  // read whole first: nothing kept of a study set aside
+            });
         }
     }
     if (const auto all = j.find("sent"); all != j.end() && all->is_array()) {
-        for (const auto& s : *all)
-            if (auto r = sentOf(s)) state.sent.push_back(std::move(*r));
+        for (std::size_t i = 0; i < all->size(); ++i)
+            entries.entry(fmt::format("sent/{}", i + 1), [&] {
+                if (auto r = sentOf((*all)[i])) state.sent.push_back(std::move(*r));
+            });
     }
+    entries.sayUnread();
     return state;
 }
 

@@ -10,6 +10,7 @@
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "search_fields.hpp"
 #include "storage.hpp"
 
@@ -134,13 +135,26 @@ KeptSearch keptSearchFrom(const nlohmann::json& j) {
     return k;
 }
 
+std::vector<KeptSearch> readKeptSearches(const std::filesystem::path& file) {
+    std::vector<KeptSearch> out;
+    const auto json = readProfileJson(file, nlohmann::json::value_t::array);
+    if (!json) return out;
+    ProfileEntries entries(file);
+    for (std::size_t i = 0; i < json->size(); ++i) {
+        const auto& j = (*json)[i];
+        if (!j.is_object()) continue;
+        const auto name =
+            j.contains("name") && j["name"].is_string() ? j["name"].get<std::string>() : "#" + std::to_string(i + 1);
+        entries.entry(name, [&] { out.push_back(keptSearchFrom(j)); });
+    }
+    entries.sayUnread();
+    return out;
+}
+
 void App::loadKeptSearches() {
     kept_searches_.clear();
     if (options_.scripted) return;  // the screenshots show the same panel whatever the profile keeps
-    const auto json = readJson<nlohmann::json>(storage_.root() / "searches.json");
-    if (!json || !json->is_array()) return;
-    for (const auto& j : *json)
-        if (j.is_object()) kept_searches_.push_back(keptSearchFrom(j));
+    kept_searches_ = readKeptSearches(storage_.root() / "searches.json");
 }
 
 void App::saveKeptSearches() {

@@ -4,9 +4,11 @@
 // tests: random games of our own.
 #include <doctest/doctest.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <random>
 #include <set>
@@ -14,11 +16,14 @@
 #include <vector>
 
 #include <fmt/include/fmt/format.h>
+#include <json.hpp>
 
+#include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "puzzles.hpp"
 #include "scripted_server.hpp"
+#include "test_support.hpp"
 #include "training.hpp"
 
 using namespace fcg;
@@ -427,4 +432,106 @@ TEST_CASE("puzzles: the themes' names, the openings', the difficulties") {
     CHECK(difficultyOffset(PuzzleDifficulty::Easier) == -300);
     CHECK(difficultyOffset(PuzzleDifficulty::Normal) == 0);
     CHECK(std::string(difficultyKey(PuzzleDifficulty::Harder)) == "harder");
+}
+
+namespace {
+
+// The console's lines added since `before` that hold `words`.
+std::size_t saidWith(uint64_t before, const std::string& words) {
+    const auto said = Console::instance().since(before);
+    return static_cast<std::size_t>(std::count_if(
+        said.begin(), said.end(), [&](const std::string& line) { return line.find(words) != line.npos; }));
+}
+
+}  // namespace
+
+TEST_CASE("puzzles: a rating of the wrong type keeps the readable values, the rest said; a file cut short too (#136)") {
+    const test::ScratchDir folder("puzzles-rating-types");
+    PuzzleRating rating = startingRating(1905, 62);
+    rating.games        = 40;
+    rating.last         = 1'800'000'000;
+    REQUIRE(writePuzzleRating(folder, rating));
+    const auto file = folder / "rating.json";
+    // A text for a number, a boolean for a text (an older or newer version, a hand edit): each used to stop the program
+    // as soon as the puzzles were read.
+    auto j             = nlohmann::json::parse(test::readFile(file));
+    j["games"]         = "forty";
+    j["from"]          = true;
+    const auto written = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    PuzzleRecord back;
+    REQUIRE_NOTHROW(back = readPuzzleRecord(folder));
+    REQUIRE(back.rating);
+    CHECK(back.rating->glicko.rating == 1905);
+    CHECK(back.rating->glicko.deviation == 62);
+    CHECK(back.rating->last == rating.last);
+    CHECK(back.rating->games == 0);
+    CHECK(back.rating->from == "default");
+    CHECK(saidWith(before, "2 entries could not be read and were set aside (games, from)") == 1);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A file cut short: kept aside, said, rather than replaced in silence by the next save.
+    std::ofstream(file, std::ios::binary) << "{\"rating\": 1905, \"devia";
+    const auto cut = Console::instance().added();
+    CHECK_FALSE(readPuzzleRecord(folder).rating);
+    CHECK(saidWith(cut, "could not be read: kept as") == 1);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
+}
+
+TEST_CASE("puzzles: a result of the wrong type or cut short left out and said, the next one kept whole (#136)") {
+    const test::ScratchDir folder("puzzles-results-types");
+    const auto all    = puzzles(3, 136);
+    const int64_t now = 1'800'000'000;
+    PuzzleResult won{all[0].id, now, true, all[0].rating, 1500, 1620, {"fork"}, 9000, false, false};
+    PuzzleResult missed{all[1].id, now + 20, false, all[1].rating, 1620, 1580, {"pin"}, 30000, true, false};
+    appendPuzzleResult(folder, won);
+    const auto file = folder / "results.jsonl";
+    // A line whose win is a text, then a line cut short by a crash while it was written (no end of line).
+    std::ofstream(file, std::ios::binary | std::ios::app) << R"({"id":"x1","at":1,"win":"yes","rating":1500})" << '\n'
+                                                          << R"({"id":"x2","at":2,"win":tr)";
+    const auto before = Console::instance().added();
+    PuzzleRecord back;
+    REQUIRE_NOTHROW(back = readPuzzleRecord(folder));
+    CHECK(back.results == std::vector<PuzzleResult>{won});
+    CHECK(saidWith(before, "results.jsonl: 2 lines could not be read and were left out") == 1);
+    // The next result starts a line of its own: not lost glued to the line cut short.
+    appendPuzzleResult(folder, missed);
+    const auto again = Console::instance().added();
+    CHECK(readPuzzleRecord(folder).results == std::vector<PuzzleResult>{won, missed});
+    CHECK(saidWith(again, "2 lines could not be read") == 1);  // the file, only added to, keeps them
+}
+
+TEST_CASE("puzzles: a review card of the wrong type set aside, the others kept, said; a file cut short too (#136)") {
+    const test::ScratchDir folder("puzzles-review-types");
+    const auto all    = puzzles(3, 1361);
+    const int64_t now = 1'800'000'000;
+    const auto day    = trainingDayEnd(now);
+    std::map<std::string, PuzzleCard> cards;
+    cards[all[0].id] = missedCard(all[0], now, day, trainingScheduler());
+    cards[all[1].id] = missedCard(all[1], now, day, trainingScheduler());
+    REQUIRE(writePuzzleCards(folder, cards));
+    const auto file = folder / "review.json";
+    // The first card's due a text, the second's puzzle a number: each used to stop the program.
+    auto j                              = nlohmann::json::parse(test::readFile(file));
+    j["cards"][all[0].id]["due"]        = "tomorrow";
+    j["cards"][all[1].id]["puzzle"]     = 7;
+    j["cards"]["extra"]                 = j["cards"][all[0].id];
+    j["cards"]["extra"]["due"]          = cards[all[0].id].card.due;
+    j["cards"]["extra"]["puzzle"]["id"] = "extra";
+    const auto written                  = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    PuzzleRecord back;
+    REQUIRE_NOTHROW(back = readPuzzleRecord(folder));
+    REQUIRE(back.cards.size() == 1);
+    CHECK(back.cards.count("extra") == 1);
+    CHECK(saidWith(before, "2 entries could not be read and were set aside") == 1);
+    CHECK(saidWith(before, "cards/" + all[0].id) == 1);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A file cut short: kept aside, said.
+    std::ofstream(file, std::ios::binary) << "{\"version\": 1, \"cards\": {";
+    const auto cut = Console::instance().added();
+    CHECK(readPuzzleRecord(folder).cards.empty());
+    CHECK(saidWith(cut, "could not be read: kept as") == 1);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

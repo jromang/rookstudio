@@ -7,8 +7,12 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <optional>
 #include <set>
 #include <thread>
+#include <vector>
+
+#include <json.hpp>
 
 #include <core/config/config.hpp>
 #include <core/globals/globals.hpp>
@@ -19,6 +23,7 @@
 
 #include "../../tournament/tests/polyglot_writer.hpp"
 #include "app.hpp"
+#include "console.hpp"
 #include "engines.hpp"
 #include "free_ports.hpp"
 #include "headless.hpp"
@@ -1321,6 +1326,70 @@ TEST_CASE("EPD suite runs: every engine on every position, the totals, CSV and s
     REQUIRE(back[1].answers[0]);
     CHECK(back[1].answers[0]->move == "Kxb2");
     fcg::test::removeAll(dir);
+}
+
+TEST_CASE("EPD suite runs: a setup or a saved run with values of the wrong type said, what reads kept (#136)") {
+    const fcg::test::ScratchDir profile("suite-types");
+    // The Suites page's setup: its depth a text (an older or newer version, a hand edit) leaves the page's defaults,
+    // the file kept as it was and said; cut short, the same.
+    const auto setup_file = profile / "suite.json";
+    SuiteSetup setup;
+    setup.file  = (profile / "bk.epd").string();
+    setup.depth = 20;
+    REQUIRE(writeJson(setup_file, setup));
+    REQUIRE(readSuiteSetup(setup_file));
+    CHECK(readSuiteSetup(setup_file)->depth == 20);
+    auto j             = nlohmann::json::parse(fcg::test::readFile(setup_file));
+    j["depth"]         = "twenty";
+    const auto written = j.dump();
+    std::ofstream(setup_file, std::ios::binary) << written;
+    auto before = Console::instance().added();
+    std::optional<SuiteSetup> back;
+    REQUIRE_NOTHROW(back = readSuiteSetup(setup_file));
+    CHECK_FALSE(back);
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fcg::test::readFile(fs::path(setup_file).concat(".unreadable")) == written);
+    std::ofstream(setup_file, std::ios::binary) << "{\"file\": \"bk";
+    before = Console::instance().added();
+    CHECK_FALSE(readSuiteSetup(setup_file));
+    CHECK(Console::instance().since(before).size() == 1);
+    CHECK(fs::exists(fs::path(setup_file).concat(".unreadable2")));
+
+    // A saved run: a column whose answer was solved as a text is left out, the other read; a run cut short is not
+    // offered. Both said, neither stops the page.
+    std::vector<SuiteColumn> columns(2);
+    columns[0].engine = "first";
+    columns[1].engine = "second";
+    tour::SuiteAnswer answer;
+    answer.solved  = true;
+    answer.move    = "Kxb2";
+    answer.time_ms = 120;
+    for (auto& c : columns) c.answers.emplace_back(answer);
+    const auto dir   = profile / "suites";
+    const auto saved = saveSuiteRun(dir, "/books/bk.epd", 1, columns);
+    REQUIRE_FALSE(saved.empty());
+    auto run                                  = nlohmann::json::parse(fcg::test::readFile(saved));
+    run["columns"][1]["answers"][0]["solved"] = "yes";
+    std::ofstream(saved, std::ios::binary) << run.dump();
+    std::ofstream(dir / "bk-cut.json", std::ios::binary) << "{\"suite\": \"bk.epd\", \"posi";
+    before = Console::instance().added();
+    std::vector<std::pair<fs::path, std::string>> runs;
+    REQUIRE_NOTHROW(runs = savedSuiteRuns(dir, "/books/bk.epd", 1));
+    REQUIRE(runs.size() == 1);
+    CHECK(runs[0].first == saved);
+    said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("bk-cut.json could not be read") != std::string::npos);
+    before = Console::instance().added();
+    std::vector<SuiteColumn> read;
+    REQUIRE_NOTHROW(read = loadSuiteRun(saved));
+    REQUIRE(read.size() == 1);
+    CHECK(read[0].engine == "first");
+    said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("1 entry could not be read and was set aside (columns/2)") != std::string::npos);
 }
 
 #ifdef _WIN32

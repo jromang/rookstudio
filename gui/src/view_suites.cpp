@@ -103,13 +103,7 @@ void App::startSuite() {
 void App::loadSuiteSetup() {
     if (suite_loaded_) return;
     suite_loaded_ = true;
-    if (auto s = readJson<nlohmann::json>(storage_.root() / "suite.json")) {
-        try {
-            suite_setup_      = s->get<SuiteSetup>();
-            suite_setup_.file = portable::resolved(suite_setup_.file);
-        } catch (...) {
-        }
-    }
+    if (auto setup = readSuiteSetup(storage_.root() / "suite.json")) suite_setup_ = std::move(*setup);
     loadSuite();
 }
 

@@ -6,13 +6,18 @@
 // was is copied beside it (<file>.unreadable, then .unreadable2…), since the next save writes it without them. A file
 // there but unreadable as a whole (cut short) is copied aside and said the same way, rather than replaced in silence by
 // the next save. The user's mistakes (mistakes.hpp), the endgames' record (endgames.hpp), board vision's (vision.hpp),
-// the training's settings and each repertoire's training (training.hpp) are read so.
+// the training's settings and each repertoire's training (training.hpp), the puzzles' record (puzzles.hpp), the kept
+// searches (search_fields.hpp), the crosstables' settings (crosstables.hpp), the Lichess studies (lichess_studies.hpp),
+// the FIDE cards' cache (fide_cards.hpp) and the Suites page's setup are read so.
 
 #include <exception>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <json.hpp>
 
 namespace fcg {
 
@@ -41,5 +46,11 @@ class ProfileEntries {
 // A file of the profile there but unreadable as a whole (cut short, not a JSON object): copied beside it and said in
 // the console; nothing when there is no file.
 void sayUnreadableFile(const std::filesystem::path& file);
+
+// A file of the profile read whole as JSON of the `type` it is written as (an object, an array): none when it is not
+// there, nor when it is there but unreadable as a whole (cut short, of another type), which sayUnreadableFile() then
+// copies aside and says.
+[[nodiscard]] std::optional<nlohmann::json> readProfileJson(
+    const std::filesystem::path& file, nlohmann::json::value_t type = nlohmann::json::value_t::object);
 
 }  // namespace fcg

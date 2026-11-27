@@ -3,14 +3,20 @@
 #include <doctest/doctest.hpp>
 
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <string>
+#include <vector>
 
 #include <json.hpp>
 #include <study/patterns.hpp>
 
+#include "console.hpp"
 #include "search_fields.hpp"
+#include "test_support.hpp"
 
 using namespace fcg;
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -100,4 +106,41 @@ TEST_CASE("kept searches: what is missing or out of range reads as the panel's d
     CHECK_FALSE(k.fields.position);
     CHECK(k.fields.pattern[0] == -1);
     CHECK_FALSE(k.fields.structure.taken);
+}
+
+TEST_CASE("kept searches: a search of the wrong type set aside, the others kept, said; a file cut short too (#136)") {
+    const test::ScratchDir profile("kept-searches-types");
+    const auto file = profile / "searches.json";
+    CHECK(readKeptSearches(file).empty());  // none yet, nothing said
+    KeptSearch first, second, third;
+    first.name  = "Najdorfs";
+    second.name = "Endings";
+    third.name  = "Club";
+    put(first.fields.player, "Moreau");
+    nlohmann::json all = nlohmann::json::array({keptSearchJson(first), keptSearchJson(second), keptSearchJson(third)});
+    // A number for a text, a text among the pattern's squares (an older or newer version, a hand edit): each used to
+    // stop the program as soon as the searches were read.
+    all[1]["player"]  = 7;
+    all[2]["pattern"] = nlohmann::json::array();
+    for (int i = 0; i < 64; ++i) all[2]["pattern"].push_back(i == 3 ? nlohmann::json("x") : nlohmann::json(-1));
+    const auto written = all.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    std::vector<KeptSearch> back;
+    REQUIRE_NOTHROW(back = readKeptSearches(file));
+    REQUIRE(back.size() == 1);
+    CHECK(back[0].name == "Najdorfs");
+    CHECK(std::string(back[0].fields.player.data()) == "Moreau");
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("2 entries could not be read and were set aside (Endings, Club)") != std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A file cut short: kept aside, said, rather than replaced in silence when a search is kept.
+    std::ofstream(file, std::ios::binary) << R"([{"name": "Najdorfs", "player": "Mor)";
+    const auto cut = Console::instance().added();
+    CHECK(readKeptSearches(file).empty());
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }

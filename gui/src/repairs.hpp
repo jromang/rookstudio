@@ -56,7 +56,8 @@ struct LichessAccess {
 [[nodiscard]] Notice engineOfferNotice(const lichess::Failure& failure, std::string text, const std::string& engine,
                                        bool in_library, const LichessAccess& access);
 
-// A site's or a download's failure as a notice, in the page's words (`text`, at `level`): an outage, the host's pause,
+// A site's or a download's failure as a notice, in the page's words (`text`, at `level`, a warning for the host's
+// pause however asked): an outage, the host's pause,
 // a site in trouble (5xx) or a file that did not come whole offer the page's Try again; a file that could not be
 // written or read is named in the tooltip of the words (never in them), with Open the folder after the repair; a 404
 // or another refusal, no button.

@@ -100,6 +100,8 @@ Notice engineOfferNotice(const lichess::Failure& failure, std::string text, cons
 }
 
 Notice netNotice(const NetFailure& failure, std::string text, const RetryState& retry, Notice::Level level) {
+    // The host's pause is a wait, not a fault: a warning, as on the Lichess pages (the mockup's 429).
+    if (failure.kind == NetFailure::Kind::RateLimited && level == Notice::Level::Error) level = Notice::Level::Warning;
     Notice n{level, std::move(text), {}, {}};
     const auto host = retry.host.empty() ? failure.host : retry.host;
     switch (failure.kind) {

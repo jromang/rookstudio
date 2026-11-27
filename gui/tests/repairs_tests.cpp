@@ -175,6 +175,7 @@ TEST_CASE("repairs: a 429 counts its pause down on Try again, which a click queu
     // TWIC's own pause, from its NetFailure's host.
     const auto twic = netNotice(netFailure(NetFailure::Kind::RateLimited, 429), "theweekinchess.com asks to wait.",
                                 RetryState{Retry::TwicIndex, {}, 75s, false});
+    CHECK(twic.level == Notice::Level::Warning);  // a wait, not a fault, though the page says its errors in red
     REQUIRE(twic.fixes.size() == 1);
     CHECK(twic.fixes[0].label == "Try again in 1:15");
     CHECK(twic.fixes[0].path == "theweekinchess.com");

@@ -801,7 +801,11 @@ void App::drawDatabases() {
     }
     if (!facts.error.empty()) {  // with its repair: the check of a damaged file, the folder of a full disk (#141)
         ImGui::PushTextWrapPos();
-        drawRepairNotice(storeNotice(facts.error, linked ? -1 : static_cast<int>(index),
+        // The store's words are a phrase ("a file of the database is damaged"): said in the sentence the Guess page
+        // already uses for a database that does not open.
+        auto said = facts.error;
+        said.said = trf("“{}” cannot be opened: {}", entries[index].name, facts.error.said);
+        drawRepairNotice(storeNotice(said, linked ? -1 : static_cast<int>(index),
                                      linked ? std::filesystem::path() : entries[index].folder),
                          "db_error");
         ImGui::PopTextWrapPos();

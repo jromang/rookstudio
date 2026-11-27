@@ -6,7 +6,9 @@
 
 #include <atomic>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -16,6 +18,7 @@
 #include <json.hpp>
 
 #include "answering_server.hpp"
+#include "console.hpp"
 #include "free_ports.hpp"
 #include "https.hpp"
 #include "lichess_api.hpp"
@@ -297,6 +300,46 @@ TEST_CASE("lichess puzzles: the batch kept in the profile with its answers") {
     CHECK(kept->complete());
     forgetOnlineBatch(folder);
     CHECK_FALSE(loadOnlineBatch(folder));
+}
+
+TEST_CASE("lichess puzzles: a batch of the wrong types keeps what reads, the rest said; a file cut short too (#136)") {
+    const test::ScratchDir folder("online-batch-types");
+    OnlineBatch batch;
+    batch.angle    = "pin";
+    batch.received = 1'800'000'000;
+    batch.puzzles  = readPuzzleBatch(batchJson(3, 136)).puzzles;
+    batch.answer(batch.puzzles[0].id, true);
+    batch.answer(batch.puzzles[1].id, false);
+    REQUIRE(saveOnlineBatch(folder, batch));
+    const auto file = folder / "online.json";
+    // A text for a boolean, a number for a text (an older or newer version, a hand edit): each used to stop the program
+    // as soon as the puzzles' page read the batch.
+    auto j                 = nlohmann::json::parse(test::readFile(file));
+    j["results"][1]["win"] = "no";
+    j["sent_status"]       = 7;
+    const auto written     = j.dump();
+    std::ofstream(file, std::ios::binary) << written;
+    const auto before = Console::instance().added();
+    std::optional<OnlineBatch> back;
+    REQUIRE_NOTHROW(back = loadOnlineBatch(folder));
+    REQUIRE(back);
+    CHECK(back->angle == "pin");
+    CHECK(back->puzzles == batch.puzzles);
+    REQUIRE(back->results.size() == 1);
+    CHECK(back->results[0].id == batch.puzzles[0].id);
+    CHECK(back->sent_status.empty());
+    auto said = Console::instance().since(before);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("2 entries could not be read and were set aside (results/2, sent_status)") != std::string::npos);
+    CHECK(test::readFile(fs::path(file).concat(".unreadable")) == written);
+    // A file cut short: kept aside, said; a new batch is asked for.
+    std::ofstream(file, std::ios::binary) << "{\"angle\": \"pin\", \"puzzles\": [{\"id\": ";
+    const auto cut = Console::instance().added();
+    CHECK_FALSE(loadOnlineBatch(folder));
+    said = Console::instance().since(cut);
+    REQUIRE(said.size() == 1);
+    CHECK(said[0].find("could not be read: kept as") != std::string::npos);
+    CHECK(fs::exists(fs::path(file).concat(".unreadable2")));
 }
 
 TEST_CASE("lichess puzzles: each failure of a batch, its answers or the dashboard told by its kind") {

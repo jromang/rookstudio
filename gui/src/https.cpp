@@ -4,11 +4,8 @@
 #include <cctype>
 #include <charconv>
 #include <chrono>
-#include <cstdio>
 #include <cstdlib>
-#include <fstream>
 #include <optional>
-#include <thread>
 #include <vector>
 
 #include <mbedtls/error.h>
@@ -18,8 +15,6 @@
 #include <psa/crypto.h>
 
 #include <fmt/include/fmt/format.h>
-
-#include <tour/files.hpp>
 
 #include "console.hpp"
 #include "net.hpp"
@@ -241,26 +236,6 @@ class Connection {
         return true;
     }
 
-    // Everything the server sends until it closes the connection; false on a timeout or an error.
-    bool receiveAll(std::string& out) {
-        unsigned char buffer[4096];
-        while (true) {
-            const int n = tls_ ? mbedtls_ssl_read(&ssl_, buffer, sizeof(buffer))
-                               : mbedtls_net_recv_timeout(&net_, buffer, sizeof(buffer), timeout_ms_);
-            if (n > 0) {
-                out.append(reinterpret_cast<const char*>(buffer), static_cast<std::size_t>(n));
-                continue;
-            }
-            if (n == 0 || n == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) return true;
-            if (n == MBEDTLS_ERR_SSL_WANT_READ || n == MBEDTLS_ERR_SSL_WANT_WRITE ||
-                n == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) {
-                continue;
-            }
-            // Some servers just close the socket once the answer is sent.
-            return n == MBEDTLS_ERR_NET_CONN_RESET && !out.empty();
-        }
-    }
-
     // Up to `size` bytes, waiting `wait_ms` at most for the first: their number, 0 once the server closed, -1 when
     // nothing came in time, -2 on an error. A TLS read that times out leaves the connection unusable, so the socket
     // is awaited instead, and a record that has begun to come is read whole (within the timeout of open()).
@@ -331,6 +306,57 @@ class Connection {
     bool tls_            = false;
     uint32_t timeout_ms_ = 20000;
 };
+
+// The connection to `url`'s server opened, through the proxy the environment names for it (HTTPS only: plain HTTP is
+// for the tests, on this machine). An error message, empty once open; "cancelled" when `cancel` ended the wait.
+std::string connect(Connection& connection, const Url& url, int timeout_s, const std::atomic<bool>* cancel) {
+    const auto proxy = url.tls ? proxyFor(url.host) : std::nullopt;
+    if (proxy && !proxy->error.empty()) return proxy->error;
+    return connection.open(url, proxy, timeout_s * 1000, cancel);
+}
+
+// How a request's body goes: of a length its Content-Length gives, or in chunks as it is made (httpUpload).
+enum class Body { Sized, Chunked };
+
+// The head of `request` to `url`: its request line and its headers, up to the blank line that ends them. A body of a
+// length is announced by its Content-Length, but for a method that sends none (GET, HEAD, DELETE…) when it has none:
+// a Content-Length there is what RFC 9110 (8.6) asks a client not to send. POST, PUT and PATCH say 0.
+std::string requestHead(const HttpRequest& request, const Url& url, Body body) {
+    std::string head =
+        fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url.path, url.host, USER_AGENT);
+    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
+    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
+    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
+    if (body == Body::Chunked) {
+        head += "Transfer-Encoding: chunked\r\n";
+    } else if (!request.body.empty() || request.method == "POST" || request.method == "PUT" ||
+               request.method == "PATCH") {
+        head += fmt::format("Content-Length: {}\r\n", request.body.size());
+    }
+    return head + "Connection: close\r\n\r\n";
+}
+
+// What leaves the machine, in the log (R16): the address asked, with what it carries (a FEN, a player's name), and
+// whether the account's token went with it, never the token itself.
+void logRequest(const HttpRequest& request) {
+    Console::instance().add(
+        fmt::format("{} {}{}", request.method, request.url, request.token.empty() ? "" : " (with the account's token)"),
+        false, "network");
+}
+
+// `request` sent to `url` on `connection`, the one way every request starts: in the log first (unless it is not
+// `logged`), then the connection opened (connect()), its head written (requestHead()), and its body when it is of a
+// length (a chunked one is the caller's to send). An error message, empty once sent; "cancelled", and nothing sent nor
+// logged, when `cancel` is set already.
+std::string sendRequest(Connection& connection, const HttpRequest& request, const Url& url, Body body,
+                        const std::atomic<bool>* cancel) {
+    if (cancel && cancel->load()) return "cancelled";
+    if (request.logged) logRequest(request);
+    if (auto error = connect(connection, url, request.timeout_s, cancel); !error.empty()) return error;
+    if (!connection.send(requestHead(request, url, body)) || (body == Body::Sized && !connection.send(request.body)))
+        return "the request could not be sent to " + url.host;
+    return {};
+}
 
 }  // namespace
 
@@ -427,61 +453,24 @@ HttpResult httpPost(const HttpRequest& request) {
     return httpRequest(post);
 }
 
-HttpResult httpRequest(const HttpRequest& request) {
-    HttpResult result;
-    const auto url = parseUrl(request.url);
-    if (!url) {
-        result.error = "not an http or https URL: " + request.url;
-        return result;
-    }
-
-    // HTTPS only: plain HTTP is for the tests, on this machine.
-    const auto proxy = url->tls ? proxyFor(url->host) : std::nullopt;
-    if (proxy && !proxy->error.empty()) {
-        result.error = proxy->error;
-        return result;
-    }
-    Connection connection;
-    if (auto error = connection.open(*url, proxy, request.timeout_s * 1000); !error.empty()) {
-        result.error = std::move(error);
-        return result;
-    }
-    std::string head = fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url->path,
-                                   url->host, USER_AGENT);
-    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
-    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
-    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    if ((request.method != "GET" && request.method != "HEAD") || !request.body.empty()) {
-        head += fmt::format("Content-Length: {}\r\n", request.body.size());
-    }
-    head += "Connection: close\r\n\r\n";
-    if (!connection.send(head) || !connection.send(request.body)) {
-        result.error = "the request could not be sent to " + url->host;
-        return result;
-    }
-    std::string answer;
-    if (!connection.receiveAll(answer) && answer.empty()) {
-        result.error = "no answer from " + url->host + " in time";
-        return result;
-    }
-
-    // "HTTP/1.1 200 OK", headers, a blank line, the body.
-    const auto headers_end = answer.find("\r\n\r\n");
-    const auto space       = answer.find(' ');
-    if (answer.rfind("HTTP/", 0) != 0 || headers_end == std::string::npos || space == std::string::npos) {
-        result.error = "not an HTTP answer from " + url->host;
-        return result;
-    }
-    try {
-        result.status = std::stoi(answer.substr(space + 1, 3));
-    } catch (...) {
-        result.error = "not an HTTP answer from " + url->host;
-        return result;
-    }
-    result.head        = answer.substr(0, headers_end);
-    const auto headers = lower(result.head);
-    result.body        = answer.substr(headers_end + 4);
-    if (headers.find("\r\ntransfer-encoding: chunked") != std::string::npos) result.body = unchunk(result.body);
+HttpResult httpRequest(const HttpRequest& request, const std::atomic<bool>* cancel) {
+    // The stream's way, which a cancel ends at once: its answer kept whole, a redirection's as it is.
+    std::string head, body;
+    HttpStream stream;
+    stream.cancel    = cancel;
+    stream.idle_s    = request.timeout_s;
+    stream.redirects = 0;
+    stream.on_head   = [&](int, std::string_view h) {
+        head = h;
+        return true;
+    };
+    stream.on_data = [&](std::string_view data) {
+        body.append(data);
+        return true;
+    };
+    auto result = httpStream(request, stream);
+    result.head = std::move(head);
+    result.body = std::move(body);
     return result;
 }
 
@@ -509,27 +498,9 @@ bool redirection(int status) {
 HttpResult streamOnce(const HttpRequest& request, const Url& url, const HttpStream& stream, bool follow,
                       std::string& location) {
     HttpResult result;
-    const auto proxy = url.tls ? proxyFor(url.host) : std::nullopt;
-    if (proxy && !proxy->error.empty()) {
-        result.error = proxy->error;
-        return result;
-    }
     Connection connection;
-    if (auto error = connection.open(url, proxy, request.timeout_s * 1000, stream.cancel); !error.empty()) {
+    if (auto error = sendRequest(connection, request, url, Body::Sized, stream.cancel); !error.empty()) {
         result.error = std::move(error);
-        return result;
-    }
-    std::string head =
-        fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url.path, url.host, USER_AGENT);
-    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
-    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
-    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    if (request.method != "GET" || !request.body.empty()) {
-        head += fmt::format("Content-Length: {}\r\n", request.body.size());
-    }
-    head += "Connection: close\r\n\r\n";
-    if (!connection.send(head) || !connection.send(request.body)) {
-        result.error = "the request could not be sent to " + url.host;
         return result;
     }
 
@@ -704,24 +675,9 @@ HttpResult httpUpload(const HttpRequest& request, const HttpUpload& upload, bool
         result.error = "not an http or https URL: " + request.url;
         return result;
     }
-    const auto proxy = url->tls ? proxyFor(url->host) : std::nullopt;
-    if (proxy && !proxy->error.empty()) {
-        result.error = proxy->error;
-        return result;
-    }
     Connection connection;
-    if (auto error = connection.open(*url, proxy, request.timeout_s * 1000, upload.cancel); !error.empty()) {
+    if (auto error = sendRequest(connection, request, *url, Body::Chunked, upload.cancel); !error.empty()) {
         result.error = std::move(error);
-        return result;
-    }
-    std::string head = fmt::format("{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\n", request.method, url->path,
-                                   url->host, USER_AGENT);
-    if (!request.token.empty()) head += "Authorization: Bearer " + request.token + "\r\n";
-    if (!request.content_type.empty()) head += "Content-Type: " + request.content_type + "\r\n";
-    for (const auto& [name, value] : request.headers) head += name + ": " + value + "\r\n";
-    head += "Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
-    if (!connection.send(head)) {
-        result.error = "the request could not be sent to " + url->host;
         return result;
     }
     const auto stopped = [&] { return upload.cancel && upload.cancel->load(std::memory_order_relaxed); };
@@ -871,246 +827,9 @@ bool LineSplitter::flush() {
     return line.empty() || on_line_(line);
 }
 
-std::string sha256File(const std::filesystem::path& file) {
-    if (psa_crypto_init() != PSA_SUCCESS) return {};
-    std::ifstream in(file, std::ios::binary);
-    if (!in) return {};
-    psa_hash_operation_t operation = PSA_HASH_OPERATION_INIT;
-    if (psa_hash_setup(&operation, PSA_ALG_SHA_256) != PSA_SUCCESS) return {};
-    std::vector<char> buffer(std::size_t{1} << 20);
-    while (in) {
-        in.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-        const auto n = static_cast<std::size_t>(in.gcount());
-        if (n > 0 && psa_hash_update(&operation, reinterpret_cast<const uint8_t*>(buffer.data()), n) != PSA_SUCCESS) {
-            psa_hash_abort(&operation);
-            return {};
-        }
-    }
-    if (in.bad()) {
-        psa_hash_abort(&operation);
-        return {};
-    }
-    uint8_t digest[32];
-    std::size_t size = 0;
-    if (psa_hash_finish(&operation, digest, sizeof(digest), &size) != PSA_SUCCESS || size != sizeof(digest)) return {};
-    std::string out;
-    for (const auto b : digest) out += fmt::format("{:02x}", b);
-    return out;
-}
-
-Download httpDownload(const std::string& url, const std::filesystem::path& file, DownloadProgress* progress,
-                      const std::atomic<bool>* cancel, std::string_view sha256) {
-    namespace fs = std::filesystem;
-    Download out;
-    std::error_code ec;
-    if (file.has_parent_path()) fs::create_directories(file.parent_path(), ec);
-    const auto part = fs::path(file).concat(".part");
-    const auto tag  = fs::path(file).concat(".part.tag");  // what tells the file on the server has not changed
-    // A second try only when the part kept turned out to be of another file.
-    for (int attempt = 0;; ++attempt) {
-        uint64_t have = fs::is_regular_file(part, ec) ? fs::file_size(part, ec) : 0;
-        if (ec) have = 0;
-        HttpRequest request;
-        request.url       = url;
-        request.method    = "GET";
-        request.timeout_s = 30;
-        if (have > 0) {
-            request.headers.emplace_back("Range", fmt::format("bytes={}-", have));
-            std::string validator;
-            std::ifstream in(tag);
-            if (std::getline(in, validator) && !validator.empty()) request.headers.emplace_back("If-Range", validator);
-        }
-        bool other_file = false;
-        out             = Download{};
-        std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(nullptr, &std::fclose);
-        HttpStream stream;
-        stream.cancel  = cancel;
-        stream.on_head = [&](int status, std::string_view head) {
-            // "bytes 100-199/200", or "bytes */200" with a 416.
-            uint64_t from = 0, total = 0;
-            bool ranged = false;
-            if (const auto range = httpHeader(head, "Content-Range"); range && range->rfind("bytes ", 0) == 0) {
-                const auto slash = range->find('/');
-                if (slash != std::string::npos) {
-                    ranged = true;
-                    if ((*range)[6] != '*') std::from_chars(range->data() + 6, range->data() + range->size(), from);
-                    std::from_chars(range->data() + slash + 1, range->data() + range->size(), total);
-                }
-            }
-            if (status == 206 && have > 0) {
-                if (!ranged || from != have) {
-                    other_file = true;
-                    return false;
-                }
-                out.resumed = true;
-                f.reset(tour::openFile(part, "ab"));
-            } else if (status == 200) {
-                have  = 0;  // the whole file, from its start
-                total = 0;
-                if (const auto length = httpHeader(head, "Content-Length")) {
-                    std::from_chars(length->data(), length->data() + length->size(), total);
-                }
-                // A strong ETag, or the file's date, to resume from later.
-                auto validator = httpHeader(head, "ETag");
-                if (validator && validator->rfind("W/", 0) == 0) validator.reset();
-                if (!validator) validator = httpHeader(head, "Last-Modified");
-                if (validator) {
-                    std::ofstream(tag, std::ios::trunc) << *validator << '\n';
-                } else {
-                    fs::remove(tag, ec);
-                }
-                f.reset(tour::openFile(part, "wb"));
-            } else if (status == 416 && have > 0) {
-                // Nothing after what was kept: the whole file when it is its size, else the file has changed.
-                other_file = !ranged || total != have;
-                return false;
-            } else {
-                out.error = fmt::format("the server answered {} for {}", status, url);
-                return false;
-            }
-            if (!f) {
-                out.error = "cannot write " + part.string();
-                return false;
-            }
-            if (progress) {
-                progress->size  = total;
-                progress->bytes = have;
-            }
-            return true;
-        };
-        stream.on_data = [&](std::string_view data) {
-            if (std::fwrite(data.data(), 1, data.size(), f.get()) != data.size()) {
-                out.error = "cannot write " + part.string() + " (is the disk full?)";
-                return false;
-            }
-            have += data.size();
-            if (progress) progress->bytes = have;
-            return true;
-        };
-        const auto result = httpStream(request, stream);
-        const bool closed = !f || std::fclose(f.release()) == 0;
-        if (other_file) {
-            fs::remove(part, ec);
-            fs::remove(tag, ec);
-            if (attempt == 0) continue;
-            out.error = "the server does not send the rest of " + url + " as asked";
-            return out;
-        }
-        if (out.error.empty()) out.error = result.error;
-        if (out.error.empty() && result.status == 0) out.error = "no answer for " + url;
-        if (out.error.empty() && !closed) out.error = "cannot write " + part.string();
-        out.bytes = have;
-        if (!out.error.empty()) return out;  // the part kept: the next call goes on from there
-        break;
-    }
-    if (!sha256.empty()) {
-        std::string want(sha256);
-        for (auto& c : want) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (sha256File(part) != want) {
-            fs::remove(part, ec);
-            fs::remove(tag, ec);
-            out.error = "the file downloaded from " + url + " is not the one expected: its SHA-256 differs";
-            return out;
-        }
-    }
-    fs::rename(part, file, ec);
-    if (ec) {
-        out.error = "cannot rename " + part.string() + ": " + ec.message();
-        return out;
-    }
-    fs::remove(tag, ec);
-    out.ok = true;
-    return out;
-}
-
-HostGate& HostGate::instance() {
-    static HostGate gate;
-    return gate;
-}
-
-HostGate::Host& HostGate::host(const std::string& name) {
-    std::lock_guard lock(mutex_);
-    auto& h = hosts_[name];
-    if (!h) h = std::make_unique<Host>();
-    return *h;
-}
-
-std::unique_lock<std::timed_mutex> HostGate::turn(const std::string& name, const std::atomic<bool>* cancel) {
-    auto& h = host(name);
-    std::unique_lock lock(h.turn, std::defer_lock);
-    while (!lock.try_lock_for(std::chrono::milliseconds(100))) {
-        if (cancel && cancel->load()) return lock;
-    }
-    if (!waitPause(name, cancel)) lock.unlock();
-    return lock;
-}
-
-bool HostGate::waitPause(const std::string& name, const std::atomic<bool>* cancel) {
-    for (;;) {
-        const auto left = pausedFor(name);
-        if (left.count() == 0) return true;
-        if (cancel && cancel->load()) return false;
-        std::this_thread::sleep_for(std::min(left, std::chrono::milliseconds(100)));
-    }
-}
-
-void HostGate::tooMany(const std::string& name) {
-    auto& h = host(name);
-    std::lock_guard lock(mutex_);
-    h.until = std::chrono::steady_clock::now() + pause_;
-}
-
-std::chrono::milliseconds HostGate::pausedFor(const std::string& name) const {
-    std::lock_guard lock(mutex_);
-    const auto it = hosts_.find(name);
-    if (it == hosts_.end()) return std::chrono::milliseconds(0);
-    const auto left =
-        std::chrono::duration_cast<std::chrono::milliseconds>(it->second->until - std::chrono::steady_clock::now());
-    return std::max(std::chrono::milliseconds(0), left + std::chrono::milliseconds(left.count() > 0 ? 1 : 0));
-}
-
-void HostGate::setPause(std::chrono::milliseconds pause) {
-    std::lock_guard lock(mutex_);
-    pause_ = pause;
-}
-
-// What leaves the machine, in the log (R16): the address asked, with what it carries (a FEN, a player's name), and
-// whether the account's token went with it, never the token itself.
-static void logRequest(const HttpRequest& request) {
-    Console::instance().add(
-        fmt::format("{} {}{}", request.method, request.url, request.token.empty() ? "" : " (with the account's token)"),
-        false, "network");
-}
-
-HttpResult politeRequest(const HttpRequest& request, const std::atomic<bool>* cancel) {
-    const auto url = parseUrl(request.url);
-    if (!url) return httpRequest(request);
-    auto& gate      = HostGate::instance();
-    const auto lock = gate.turn(url->host, cancel);
-    if (!lock.owns_lock()) {
-        HttpResult result;
-        result.error = "cancelled";
-        return result;
-    }
-    logRequest(request);
-    auto result = httpRequest(request);
-    if (result.status == 429) gate.tooMany(url->host);
-    return result;
-}
-
-HttpResult politeStream(const HttpRequest& request, const HttpStream& stream) {
-    const auto url = parseUrl(request.url);
-    if (!url) return httpStream(request, stream);
-    auto& gate = HostGate::instance();
-    if (!gate.waitPause(url->host, stream.cancel)) {
-        HttpResult result;
-        result.error = "cancelled";
-        return result;
-    }
-    logRequest(request);
-    auto result = httpStream(request, stream);
-    if (result.status == 429) gate.tooMany(url->host);
-    return result;
+std::string urlHost(std::string_view url) {
+    const auto u = parseUrl(url);
+    return u ? u->host : std::string();
 }
 
 }  // namespace fcg

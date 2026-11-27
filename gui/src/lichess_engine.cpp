@@ -604,6 +604,7 @@ void EngineService::run() {
         request.content_type = "application/json";
         request.body         = nlohmann::json{{"providerSecret", setup_.secret}}.dump();
         request.timeout_s    = 20;
+        request.logged       = false;  // said once above: a long poll goes again as soon as it ends
         request.headers.emplace_back("Accept", "application/json");
         std::string body;
         HttpStream stream;
@@ -722,6 +723,7 @@ void EngineService::answer(const EngineWork& w) {
     request.method       = "POST";
     request.content_type = "text/plain";
     request.timeout_s    = 20;
+    request.logged       = false;  // each job is on the service's card, which says what was answered
     const auto finish    = [&](bool counted) {
         last_job_ = Clock::now();
         const auto ms =

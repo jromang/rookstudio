@@ -2,10 +2,11 @@
 
 // The Syzygy tables of 3 to 5 pieces (#82, mockup M12, board 3): 290 files (WDL and DTZ, 939 MB), downloaded on the
 // user's click from Lichess's mirror (tablebase.lichess.ovh/tables/standard/3-4-5/) into the profile's syzygy folder,
-// for the endgames against the tables and offered to the tournaments (Settings' tablebases). One file at a time, in the
-// host's turn (HostGate); the smallest piece counts first, so that the endgames of 3 and 4 pieces are ready within
-// seconds. A file cut short goes on from where it stopped; each is checked: its size and Syzygy's mark (both variants
-// of the 3-piece files in circulation are valid, so no single hash is). Nothing else leaves the machine.
+// for the endgames against the tables and offered to the tournaments (Settings' tablebases). One file at a time, after
+// the host's pause (HostGate), taking no turn: a file may take minutes, which the online tables' questions do not wait
+// for. The smallest piece counts first, so that the endgames of 3 and 4 pieces are ready within seconds. A file cut
+// short goes on from where it stopped; each is checked: its size and Syzygy's mark (both variants of the 3-piece files
+// in circulation are valid, so no single hash is). Nothing else leaves the machine.
 
 #include <atomic>
 #include <cstdint>

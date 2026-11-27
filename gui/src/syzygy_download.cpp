@@ -114,14 +114,6 @@ const std::vector<SyzygyFile> FILES = {
     {"KRRvKR.rtbw", 334224ull},   {"KRRvKR.rtbz", 7700816ull},
 };
 
-// The host of an address: "tablebase.lichess.ovh".
-std::string hostOf(const std::string& url) {
-    auto at        = url.find("://");
-    at             = at == std::string::npos ? 0 : at + 3;
-    const auto end = url.find_first_of(":/", at);
-    return url.substr(at, end == std::string::npos ? std::string::npos : end - at);
-}
-
 }  // namespace
 
 const std::vector<SyzygyFile>& syzygy345Files() { return FILES; }
@@ -179,10 +171,9 @@ std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, 
         const int first = next < todo.size() ? syzygyFilePieces(todo[next]->name) : 6;
         return first <= 3 ? 0 : first - 1;
     };
-    progress.done   = done;
-    progress.files  = count;
-    progress.ready  = readyBefore(0);
-    const auto host = hostOf(base_url);
+    progress.done  = done;
+    progress.files = count;
+    progress.ready = readyBefore(0);
     for (std::size_t i = 0; i < todo.size(); ++i) {
         if (job.cancel) {
             why = "cancelled";
@@ -191,16 +182,9 @@ std::string downloadSyzygy(const fs::path& folder, const std::string& base_url, 
         const auto& f          = *todo[i];
         progress.current.bytes = 0;
         progress.current.size  = 0;
-        Download got;
-        {
-            // One request at a time to the host, as Lichess asks: the online tables' questions wait between files.
-            const auto turn = HostGate::instance().turn(host, &job.cancel);
-            if (!turn.owns_lock()) {
-                why = "cancelled";
-                break;
-            }
-            got = httpDownload(base_url + f.name, folder / f.name, &progress.current, &job.cancel);
-        }
+        // After the host's pause, taking no turn: a file may take minutes, which the online tables' questions to the
+        // same host do not wait for.
+        const auto got = politeDownload(base_url + f.name, folder / f.name, &progress.current, &job.cancel);
         if (!got.ok) {
             why = got.error.empty() ? std::string("the download stopped") : got.error;
             break;

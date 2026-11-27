@@ -126,9 +126,9 @@ struct Response : Failure {
     std::string asked_for;  // the method and the address, for the log
 };
 // `request` sent politely: in its host's turn (one request at a time), once the host's pause after a 429 is over;
-// `cancel` stops the wait for the turn. The network's words go to the log, never to the interface: no answer once, when
-// the host's outage starts (not at each try until it answers again); an answer cut short, or a body that cannot be read
-// later, each time.
+// `cancel` stops the wait for the turn, or the request. The network's words go to the log, never to the interface: no
+// answer once, when the host's outage starts (not at each try until it answers again); an answer cut short, or a body
+// that cannot be read later, each time.
 [[nodiscard]] Response send(const HttpRequest& request, const std::atomic<bool>* cancel = nullptr);
 // A result had otherwise (a stream's, an upload's) read the same way, for `request`.
 [[nodiscard]] Response responseOf(const HttpRequest& request, HttpResult result);

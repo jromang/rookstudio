@@ -4,6 +4,7 @@
 // is asked for at launch, at most once a day, in the background; a newer one is shown as a notice with its notes and
 // the link to its page. Nothing is downloaded nor installed.
 
+#include <atomic>
 #include <cstdint>
 #include <future>
 #include <optional>
@@ -54,7 +55,7 @@ class Checker {
     Checker()                          = default;
     Checker(const Checker&)            = delete;
     Checker& operator=(const Checker&) = delete;
-    ~Checker();  // waits for a question in flight: it gives up within its timeout
+    ~Checker();  // cancels a question in flight, and waits for it to end
 
     void start();
     [[nodiscard]] bool running() const { return future_.valid(); }
@@ -67,6 +68,7 @@ class Checker {
     [[nodiscard]] std::optional<Answer> poll();
 
    private:
+    std::atomic<bool> cancel_{false};
     std::future<Answer> future_;
 };
 

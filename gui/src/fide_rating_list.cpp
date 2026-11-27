@@ -200,7 +200,7 @@ std::unique_ptr<Job> start(const fs::path& profile, const fs::path& file) {
             HttpRequest request;
             request.url       = url;
             request.method    = "GET";
-            const auto answer = httpStream(request, stream);
+            const auto answer = politeStream(request, stream);
             if (j->cancel) {
                 out.cancelled = true;
                 return out;
@@ -218,7 +218,7 @@ std::unique_ptr<Job> start(const fs::path& profile, const fs::path& file) {
                 return out;
             }
             j->phase       = Job::Phase::Downloading;
-            const auto got = httpDownload(url, zip, &j->download, &j->cancel);
+            const auto got = politeDownload(url, zip, &j->download, &j->cancel);
             if (!got.ok) {
                 std::error_code ec;
                 const auto part = fs::path(zip.string() + ".part");

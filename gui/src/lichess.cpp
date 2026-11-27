@@ -1,11 +1,13 @@
 #include "lichess.hpp"
 
 #include <ctime>
+#include <set>
 
 #include <tour/pgn_file.hpp>
 
 #include <fmt/include/fmt/format.h>
 
+#include "console.hpp"
 #include "i18n.hpp"
 #include "storage.hpp"
 
@@ -174,14 +176,18 @@ struct LichessRelay::Session {
     bool prepare();  // the broadcast and its first round, made or read; false when it cannot be
     bool newRound();
     void push();
-    lichess::Response post(const std::string& path, const std::string& type, const std::string& body);
+    // Sent at once, not in the host's turns; a 429 pauses the host (HostGate), which the loop waits for. In the log
+    // unless not `logged` (a push: said once for each round).
+    lichess::Response post(const std::string& path, const std::string& type, const std::string& body,
+                           bool logged = true);
     void save();
     void fail(LichessRelay::Step step, const lichess::Failure& why);  // said by the status
 
     Settings settings_;
+    std::string host_;  // settings_.base's, as HostGate names it
     LichessTarget target_;
     std::atomic<bool> running_{true};
-    std::chrono::steady_clock::time_point not_before_{};  // after a "too many requests"
+    std::set<std::string> pushed_to_;  // the rounds whose pushes the log has said
 
     std::mutex mutex_;  // what follows
     std::condition_variable wake_, ended_;
@@ -247,14 +253,15 @@ void LichessRelay::offer(std::vector<LichessGame> live, std::vector<LichessGame>
     for (auto& g : finished) session_->pending_[g.key] = std::move(g);
 }
 
-lichess::Response LichessRelay::Session::post(const std::string& path, const std::string& type,
-                                              const std::string& body) {
+lichess::Response LichessRelay::Session::post(const std::string& path, const std::string& type, const std::string& body,
+                                              bool logged) {
     auto asked         = lichess::request("POST", settings_.base + path, settings_.token);
     asked.content_type = type;
     asked.body         = body;
-    // Sent at once, as it always was: not in the host's turns, which log every request (a push every few seconds
-    // would fill the log); the relay keeps its own minute after a 429.
-    return lichess::responseOf(asked, httpRequest(asked));
+    asked.logged       = logged;
+    auto response      = lichess::responseOf(asked, httpRequest(asked));
+    if (response.net == lichess::NetError::RateLimited) HostGate::instance().tooMany(host_);
+    return response;
 }
 
 void LichessRelay::Session::save() { writeJson(settings_.dir / "lichess.json", target_); }
@@ -375,10 +382,17 @@ void LichessRelay::Session::push() {
     for (const auto& [round, list] : by_round) {
         std::string body;
         for (const auto* g : list) body += g->pgn(target_.annotated[g->key]);
-        const auto r = post("/api/broadcast/round/" + round + "/push", "text/plain", body);
-        if (r.net == lichess::NetError::RateLimited) {  // a minute's wait, the host's too
-            not_before_ = std::chrono::steady_clock::now() + std::chrono::minutes(1);
-            failure     = r;
+        const auto path = "/api/broadcast/round/" + round + "/push";
+        // What leaves the machine (R16), said once for each round: a push goes every few seconds.
+        if (pushed_to_.insert(round).second) {
+            Console::instance().add(
+                fmt::format("POST {}{} (with the account's token), then at most every {} s while games are played",
+                            settings_.base, path, PUSH_EVERY.count()),
+                false, "network");
+        }
+        const auto r = post(path, "text/plain", body, false);
+        if (r.net == lichess::NetError::RateLimited) {  // the host's pause, which the loop waits for
+            failure = r;
             break;
         }
         if (r.failed()) {
@@ -415,19 +429,25 @@ void LichessRelay::Session::push() {
 }
 
 void LichessRelay::Session::loop() {
+    host_ = urlHost(settings_.base);
     if (!prepare()) {
         running_ = false;
         return;
     }
-    auto next = std::chrono::steady_clock::now();
+    // After a 429, the pushes wait for the host's pause: HostGate's, which the window's other requests to Lichess share
+    // when the relay runs in the window's process; a tournament process's own otherwise. The last push, at the stop,
+    // goes all the same: it carries the results.
+    const auto paused = [&] { return HostGate::instance().pausedFor(host_); };
+    auto next         = std::chrono::steady_clock::now();
     while (true) {
         bool last = false;
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            wake_.wait_until(lock, std::max(next, not_before_), [&] { return stopping_; });
+            wake_.wait_until(lock, std::max(next, std::chrono::steady_clock::now() + paused()),
+                             [&] { return stopping_; });
             last = stopping_;
         }
-        if (!last && std::chrono::steady_clock::now() < not_before_) continue;
+        if (!last && paused().count() > 0) continue;
         push();
         if (last) break;
         next = std::chrono::steady_clock::now() + PUSH_EVERY;

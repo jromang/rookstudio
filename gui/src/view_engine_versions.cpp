@@ -19,6 +19,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -38,11 +39,7 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
+using ui::mix;
 
 int64_t nowSeconds() { return static_cast<int64_t>(std::time(nullptr)); }
 

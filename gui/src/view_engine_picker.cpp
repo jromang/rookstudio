@@ -19,6 +19,7 @@
 #include "i18n.hpp"
 #include "ui.hpp"
 #include "update_check.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -85,14 +86,8 @@ std::string releaseDay(const std::string& published) {
     return day == today ? std::string(TR("today")) : day;
 }
 
-bool primaryButton(const char* label) {
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool pressed = ImGui::Button(label);
-    ImGui::PopStyleColor(3);
-    return pressed;
-}
+// The picker's primary buttons keep the same colour under the mouse until a mockup settles it (#110).
+bool primaryButton(const char* label) { return ui::primaryButton(label, true, 0, ui::PrimaryHover::Flat); }
 
 void progressBar(float fraction, float width) {
     const ImVec2 at = ImGui::GetCursorScreenPos();

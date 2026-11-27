@@ -24,6 +24,7 @@
 #include "online_cache.hpp"
 #include "tablebases.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -36,10 +37,7 @@ bool ready(const std::future<T>& f) {
     return f.valid() && f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
 }
 
-// A move numbered from the position before it: "52.Txh7", "52…Rxh7", `san` already in the letters wanted.
-std::string numbered(const chess::Board& before, const std::string& san) {
-    return fmt::format("{}{}{}", before.fullMoveNumber(), before.sideToMove() == chess::Color::WHITE ? "." : "…", san);
-}
+using ui::numbered;
 
 // The moves a group shows at most, and the spoiling moves whose main line is asked of Lichess by itself (the others
 // when hovered).

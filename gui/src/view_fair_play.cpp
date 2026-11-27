@@ -28,6 +28,7 @@
 #include "i18n.hpp"
 #include "lichess_arenas_page.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -85,25 +86,9 @@ void chip(const char* text, ImU32 tone) {
     ImGui::Dummy(ImVec2(size.x + pad.x * 2, size.y));
 }
 
-// A card tinted with `tone`: the fair play's banners.
-void beginBanner(const char* id, ImU32 tone) {
-    const auto bg  = ImGui::ColorConvertU32ToFloat4(ui::CARD_BG);
-    const auto t   = ImGui::ColorConvertU32ToFloat4(tone);
-    const auto mix = [&](float k) {
-        return ImVec4(bg.x + (t.x - bg.x) * k, bg.y + (t.y - bg.y) * k, bg.z + (t.z - bg.z) * k, 1.0f);
-    };
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, mix(0.08f));
-    ImGui::PushStyleColor(ImGuiCol_Border, mix(0.45f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(14), px(12)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endBanner() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
+// The fair play's banners: cards tinted with their tone, the border drawn from the background, softer than the
+// training's.
+constexpr ui::Tint BANNER{.edge = 0.45f, .soft_edge = true, .padding = ImVec2(14, 12)};
 
 }  // namespace
 
@@ -261,7 +246,7 @@ void App::drawFairPlayBanner(bool whole_game) {
     if (!g) return;
     const ui::TopicRegion topic(guide::topics::FairPlay);
     const ImU32 tone = g->live() ? ui::ACCENT : ui::WARN;
-    beginBanner("fair_play", tone);
+    const ui::Tinted banner("fair_play", tone, BANNER);
     ui::inlineIcon(ui::Icon::Lock, tone);
     ImGui::SameLine();
     ImGui::BeginGroup();
@@ -300,7 +285,6 @@ void App::drawFairPlayBanner(bool whole_game) {
     }
     ImGui::PopTextWrapPos();
     ImGui::EndGroup();
-    endBanner();
 }
 
 void App::drawPlayingGames() {
@@ -546,7 +530,7 @@ void App::drawFinishedBanner(bool home) {
             return;
         }
     }
-    beginBanner("finished_game", ui::GOOD);
+    const ui::Tinted banner("finished_game", ui::GOOD, BANNER);
     ui::inlineIcon(ui::Icon::Check, ui::GOOD);
     ImGui::SameLine();
     ImGui::BeginGroup();
@@ -568,7 +552,6 @@ void App::drawFinishedBanner(bool home) {
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TR("Esc"));
     ImGui::EndGroup();
-    endBanner();
 }
 
 }  // namespace fcg

@@ -15,6 +15,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -22,24 +23,11 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-// A card tinted with `tone`.
-void beginTinted(const char* id, ImU32 tone) {
-    const auto bg  = ImGui::ColorConvertU32ToFloat4(ui::CARD_BG);
-    const auto t   = ImGui::ColorConvertU32ToFloat4(tone);
-    const auto mix = [&](float k) {
-        return ImVec4(bg.x + (t.x - bg.x) * k, bg.y + (t.y - bg.y) * k, bg.z + (t.z - bg.z) * k, 1.0f);
-    };
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, mix(0.07f));
-    ImGui::PushStyleColor(ImGuiCol_Border, mix(0.4f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(14), px(10)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
+using ui::endTinted;
 
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
+// A card tinted with `tone`, its border drawn from the background, softer than the training's.
+void beginTinted(const char* id, ImU32 tone) {
+    ui::beginTinted(id, tone, {.fill = 0.07f, .edge = 0.4f, .soft_edge = true, .padding = ImVec2(14, 10)});
 }
 
 }  // namespace

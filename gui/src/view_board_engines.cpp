@@ -18,6 +18,7 @@
 #include "i18n.hpp"
 #include "notation_view.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -64,10 +65,7 @@ float drawRuns(ImDrawList* dl, ImVec2 at, float width, const std::vector<TextRun
     return y + ImGui::GetTextLineHeight();
 }
 
-// "7…Be7", "8.Qf3": a move from `board` with its number, in the reader's letters.
-std::string numbered(const chess::Board& board, const std::string& san) {
-    return std::to_string(board.fullMoveNumber()) + (board.sideToMove() == chess::Color::WHITE ? "." : "…") + san;
-}
+using ui::numbered;
 
 }  // namespace
 

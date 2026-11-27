@@ -18,6 +18,7 @@
 #include "mistakes.hpp"
 #include "mistakes_page.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -25,11 +26,8 @@ namespace {
 
 float px(float v) { return v * ImGui::GetFontSize() / 16.0f; }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
+using ui::chip;
+using ui::mix;
 
 void tip(const std::string& text) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) return;
@@ -38,24 +36,6 @@ void tip(const std::string& text) {
     ImGui::TextUnformatted(text.c_str());
     ImGui::PopTextWrapPos();
     ImGui::EndTooltip();
-}
-
-bool chip(const char* label, bool chosen, const char* id) {
-    const auto& style = ImGui::GetStyle();
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, px(12));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(10), style.FramePadding.y * 0.8f));
-    if (chosen) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, ui::ACCENT, 0.30f)));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::CARD_BG));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(ui::CARD_BD));
-    }
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-    const bool clicked = ImGui::Button(fmt::format("{}##{}", label, id).c_str());
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
-    return clicked;
 }
 
 }  // namespace

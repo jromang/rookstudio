@@ -41,6 +41,7 @@
 #include "tablebases.hpp"
 #include "training.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -60,45 +61,13 @@ constexpr double REPLY_SECONDS = 0.5;
 // A question to Lichess that gave nothing is asked again after this.
 constexpr int RETRY_SECONDS = 10;
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
-
-void beginTinted(const char* id, ImU32 tone) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, tone, 0.08f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BD, tone, 0.55f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(16), px(14)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
-
-bool primaryButton(const char* label, bool enabled = true) {
-    ImGui::BeginDisabled(!enabled);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(255, 255, 255, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(0, 0, 0, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(4);
-    ImGui::EndDisabled();
-    return clicked;
-}
-
-void wrapped(const std::string& text, bool grey = false) {
-    if (grey) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text.c_str());
-    if (grey) ImGui::PopStyleColor();
-}
+using ui::beginTinted;
+using ui::chip;
+using ui::endTinted;
+using ui::mix;
+using ui::numbered;
+using ui::primaryButton;
+using ui::wrapped;
 
 void tip(const std::string& text) {
     if (!ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) return;
@@ -109,29 +78,9 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-bool chip(const char* label, bool chosen, const char* id) {
-    const auto& style = ImGui::GetStyle();
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, px(12));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(10), style.FramePadding.y * 0.8f));
-    ImGui::PushStyleColor(ImGuiCol_Button,
-                          ImGui::ColorConvertU32ToFloat4(chosen ? mix(ui::CARD_BG, ui::ACCENT, 0.30f) : ui::CARD_BG));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(chosen ? ui::ACCENT : ui::CARD_BD));
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-    const bool clicked = ImGui::Button(fmt::format("{}##{}", label, id).c_str());
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
-    return clicked;
-}
-
 bool enterPressed() {
     return !ImGui::GetIO().WantTextInput && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId) &&
            (ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false));
-}
-
-// A move with its number as the interface writes it: "24.Nc7+", "23…Qxd4".
-std::string numbered(const chess::Board& before, chess::Move move) {
-    return fmt::format("{}{}{}", before.fullMoveNumber(), before.sideToMove() == chess::Color::WHITE ? "." : "…",
-                       localSan(chess::uci::moveToSan(before, move)));
 }
 
 // "win", "mate", "hold the draw": what a task asks.

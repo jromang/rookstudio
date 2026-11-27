@@ -29,6 +29,7 @@
 #include "i18n.hpp"
 #include "live.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -52,46 +53,14 @@ void tip(const std::string& text) {
     ImGui::EndTooltip();
 }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
+using ui::endTinted;
+using ui::mix;
+using ui::primaryButton;
+using ui::wrapped;
 
-void beginTinted(const char* id, ImU32 tone) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, tone, 0.08f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BD, tone, 0.55f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(16), px(12)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
-
-bool primaryButton(const char* label, bool enabled = true, ImU32 tone = 0) {
-    if (!tone) tone = ui::ACCENT;
-    ImGui::BeginDisabled(!enabled);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(tone));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4(mix(tone, IM_COL32(255, 255, 255, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImGui::ColorConvertU32ToFloat4(mix(tone, IM_COL32(0, 0, 0, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(4);
-    ImGui::EndDisabled();
-    return clicked;
-}
-
-void wrapped(const std::string& text, bool grey = false) {
-    if (grey) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text.c_str());
-    if (grey) ImGui::PopStyleColor();
-}
+// The bot's tinted boxes are a little less tall than the training's.
+constexpr ui::Tint TINT{.padding = ImVec2(16, 12)};
+void beginTinted(const char* id, ImU32 tone) { ui::beginTinted(id, tone, TINT); }
 
 void coloured(const std::string& text, ImU32 tone) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(tone));

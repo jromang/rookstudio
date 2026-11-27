@@ -30,6 +30,7 @@
 #include "i18n.hpp"
 #include "repertoires.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -49,11 +50,17 @@ chess::Board startBoard(const std::string& fen) {
     return board;
 }
 
+using ui::endTinted;
+using ui::mix;
+using ui::primaryButton;
+using ui::wrapped;
+
+// A card tinted: the training's colour, a right answer's, a wrong one's; a little more than the other pages'.
+constexpr ui::Tint TINT{.fill = 0.10f};
+void beginTinted(const char* id, ImU32 tone) { ui::beginTinted(id, tone, TINT); }
+
 // A move of the line as the interface writes it: "6.Bg5", "6…e6".
-std::string numbered(const chess::Board& before, const std::string& san) {
-    return fmt::format("{}{}{}", before.fullMoveNumber(), before.sideToMove() == chess::Color::WHITE ? "." : "…",
-                       localSan(san));
-}
+std::string numbered(const chess::Board& before, const std::string& san) { return ui::numbered(before, localSan(san)); }
 
 // The move of a SAN on the board, NO_MOVE when it is not legal there.
 chess::Move moveOf(const chess::Board& board, const std::string& san) {
@@ -107,42 +114,6 @@ ReplayGame gameOf(const std::string& start_fen, const std::vector<std::string>& 
     return game;
 }
 
-ImU32 mix(ImU32 a, ImU32 b, float t) {
-    const auto fa = ImGui::ColorConvertU32ToFloat4(a), fb = ImGui::ColorConvertU32ToFloat4(b);
-    return ImGui::ColorConvertFloat4ToU32(
-        ImVec4(fa.x + (fb.x - fa.x) * t, fa.y + (fb.y - fa.y) * t, fa.z + (fb.z - fa.z) * t, 1.0f));
-}
-
-// A card tinted: the training's colour, a right answer's, a wrong one's.
-void beginTinted(const char* id, ImU32 tone) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BG, tone, 0.10f)));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(mix(ui::CARD_BD, tone, 0.55f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(16), px(14)));
-    ImGui::BeginChild(id, ImVec2(0, 0),
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY);
-}
-
-void endTinted() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor(2);
-}
-
-// The button of the main gesture, filled with the accent.
-bool primaryButton(const char* label, bool enabled = true) {
-    ImGui::BeginDisabled(!enabled);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(ui::ACCENT));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(255, 255, 255, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImGui::ColorConvertU32ToFloat4(mix(ui::ACCENT, IM_COL32(0, 0, 0, 255), 0.15f)));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
-    const bool clicked = ImGui::Button(label);
-    ImGui::PopStyleColor(4);
-    ImGui::EndDisabled();
-    return clicked;
-}
-
 // A count in large figures over what it counts.
 void bigCount(std::size_t n, const char* what) {
     ImGui::BeginGroup();
@@ -158,13 +129,6 @@ std::string whenText(int64_t seconds) {
     const auto days = std::max<int64_t>(1, (seconds + study::fsrs::DAY / 2) / study::fsrs::DAY);
     if (days == 1) return TR("tomorrow");
     return trn("in {} day", "in {} days", static_cast<uint64_t>(days), days);
-}
-
-// A wrapped line of text, greyed or not.
-void wrapped(const std::string& text, bool grey = false) {
-    if (grey) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", text.c_str());
-    if (grey) ImGui::PopStyleColor();
 }
 
 }  // namespace

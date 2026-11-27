@@ -29,6 +29,7 @@
 #include "i18n.hpp"
 #include "publish_reports.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -80,44 +81,8 @@ std::string fitted(const std::string& text, float room) {
     return shown + "…";
 }
 
-// A source as a chip: filled when it is in, outlined in dashes when a click adds it. True when clicked.
-bool chip(const char* id, const std::string& text, bool on) {
-    const ImVec2 pad(px(10), px(3));
-    const ImVec2 label = ImGui::CalcTextSize(text.c_str());
-    const ImVec2 size(label.x + pad.x * 2, label.y + pad.y * 2);
-    const ImVec2 pos     = ImGui::GetCursorScreenPos();
-    const bool clicked   = ImGui::InvisibleButton(id, size);
-    const bool hovered   = ImGui::IsItemHovered();
-    auto* dl             = ImGui::GetWindowDrawList();
-    const ImVec2 end     = ImVec2(pos.x + size.x, pos.y + size.y);
-    const float rounding = size.y * 0.5f;
-    if (on) {
-        dl->AddRectFilled(pos, end, (ui::ACCENT & 0x00ffffff) | (hovered ? 0x55000000 : 0x33000000), rounding);
-        dl->AddRect(pos, end, ui::ACCENT, rounding);
-    } else {
-        if (hovered) dl->AddRectFilled(pos, end, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), rounding);
-        const ImU32 col  = ImGui::GetColorU32(ImGuiCol_TextDisabled);
-        const float dash = px(4), gap = px(3);
-        const auto line = [&](ImVec2 a, ImVec2 b) {
-            const float length = std::hypot(b.x - a.x, b.y - a.y);
-            for (float t = 0; t < length; t += dash + gap) {
-                const float u = std::min(t + dash, length);
-                dl->AddLine(ImVec2(a.x + (b.x - a.x) * t / length, a.y + (b.y - a.y) * t / length),
-                            ImVec2(a.x + (b.x - a.x) * u / length, a.y + (b.y - a.y) * u / length), col);
-            }
-        };
-        line(ImVec2(pos.x + rounding, pos.y), ImVec2(end.x - rounding, pos.y));
-        line(ImVec2(pos.x + rounding, end.y - 1), ImVec2(end.x - rounding, end.y - 1));
-        constexpr float pi = 3.14159265f;
-        dl->PathArcTo(ImVec2(pos.x + rounding, pos.y + rounding), rounding - 0.5f, pi * 0.5f, pi * 1.5f, 10);
-        dl->PathStroke(col, 0);
-        dl->PathArcTo(ImVec2(end.x - rounding, pos.y + rounding), rounding - 0.5f, -pi * 0.5f, pi * 0.5f, 10);
-        dl->PathStroke(col, 0);
-    }
-    dl->AddText(ImVec2(pos.x + pad.x, pos.y + pad.y), on ? ui::ACCENT : ImGui::GetColorU32(ImGuiCol_Text),
-                text.c_str());
-    return clicked;
-}
+using ui::dashedChip;
+using ui::numbered;
 
 // A list said as the interface's language joins its items.
 std::string listed(const std::vector<std::string>& items) {
@@ -292,13 +257,6 @@ std::string lineText(const chess::Board& from, const std::vector<chess::Move>& m
         board.makeMove(moves[i]);
     }
     return out;
-}
-
-// A move numbered from its board, in the interface's letters: "11.Rab1", "14…Ng6".
-std::string numbered(const chess::Board& before, const chess::Move& move) {
-    const auto san = localSan(chess::uci::moveToSan(before, move));
-    return before.sideToMove() == chess::Color::WHITE ? fmt::format("{}.{}", before.fullMoveNumber(), san)
-                                                      : fmt::format("{}…{}", before.fullMoveNumber(), san);
 }
 
 std::string evalText(const ReportEval& e) {
@@ -804,7 +762,7 @@ void App::drawOpeningReport() {
         const auto text = r.bases.empty() ? std::string(TR("Your databases · no tree"))
                           : r.report      ? trf("Your databases · {}", ui::exactCount(mine))
                                           : std::string(TR("Your databases"));
-        chip("##report_bases", text, !r.bases.empty());
+        dashedChip("##report_bases", text, !r.bases.empty());
         if (ImGui::IsItemHovered()) {
             std::vector<std::string> each;
             for (std::size_t i = 0; i < r.bases.size(); ++i)
@@ -835,7 +793,7 @@ void App::drawOpeningReport() {
             label += " · …";
         }
         const std::string id = fmt::format("##report_lichess{}", source);
-        if (chip(id.c_str(), label, on) && linked) {
+        if (dashedChip(id.c_str(), label, on) && linked) {
             (source == 0 ? r.masters : r.players) = !on;
             r.rows_of.clear();
         }

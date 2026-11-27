@@ -330,10 +330,10 @@ void App::drawOnlineTablebase(const chess::Board& board, int pieces) {
         ImGui::TextDisabled(
             "%s", trf("· {} pieces · Lichess · asked at {}, kept in your profile", pieces, clockText(online_tb_->when))
                       .c_str());
-        if (!a.value) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               trouble(a, "tablebase.lichess.ovh").c_str());
-            if (ImGui::SmallButton(TR("Try again"))) online_tb_.reset();
+        if (!a.value) {  // the pause counted down on Try again, which waits for it (#141)
+            drawRepairNotice(lichessNotice(a, trouble(a, "tablebase.lichess.ovh"), lichessAccess(),
+                                           retryState(Retry::OnlineTablebase, urlHost(lichess::servers().tablebase))),
+                             "online_tb");
             return;
         }
         // The verdict and how far, in the Endgames tab's words (#42).
@@ -363,8 +363,9 @@ void App::drawOnlineCloud(const chess::Board& board) {
         const ui::Card card("online_cloud");
         const ui::TextWrap wrap;
         if (!a.value) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", trouble(a, "lichess.org").c_str());
-            if (ImGui::SmallButton(TR("Try again"))) online_cloud_.reset();
+            drawRepairNotice(lichessNotice(a, trouble(a, "lichess.org"), lichessAccess(),
+                                           retryState(Retry::OnlineCloud, lichess::apiHost())),
+                             "online_cloud");
             return;
         }
         const auto& c = *a.value;

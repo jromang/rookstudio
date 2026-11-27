@@ -619,8 +619,8 @@ void App::drawDossier() {
                                       .c_str());
     }
     if (prep_ && d.lichess && lower(prep_->opponent) == lower(d.subject.lichess) && prep_->error.failed())
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                           lichess::describeAlone(prep_->error).c_str());
+        drawRepairNotice(lichessNotice(prep_->error, lichess::describeAlone(prep_->error), lichessAccess(), {}),
+                         "prep_error");  // a token refused: Link Lichess again… (#141)
     if (!d.said.empty()) {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::ACCENT), "%s", d.said.c_str());
     }

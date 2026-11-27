@@ -79,8 +79,15 @@ void App::drawLichessAccountPanel() {
     if (!lichess_account_) return;
     askLichessProfile();
     if (!lichess_profile_.value) {
-        ImGui::TextDisabled(
-            "%s", lichess_profile_.failed() ? lichess::gaveNothing(lichess_profile_).c_str() : TR("Asking Lichess…"));
+        if (lichess_profile_.failed()) {  // a token refused: Link Lichess again… (#141); asked again when due
+            ImGui::PushTextWrapPos();
+            drawRepairNotice(
+                lichessNotice(lichess_profile_, lichess::gaveNothing(lichess_profile_), lichessAccess(), {}),
+                "lichess_profile");
+            ImGui::PopTextWrapPos();
+        } else {
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
+        }
         return;
     }
     const auto& p = *lichess_profile_.value;

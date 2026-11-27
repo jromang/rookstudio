@@ -153,12 +153,16 @@ App::App(SDL_Window* window, Storage storage, CpuTopology topology, AppOptions o
 }
 
 App::~App() {
+    // No request waits any more for a host's turn or its pause after a 429 (#148): a minute or more, at each request
+    // of those that ask again and again.
+    HostGate::instance().close();
     // The windows go first: the main loop has stopped drawing them, and what ends below (a task cancelled finishing
     // its step, a hung engine, the question to GitHub) ends out of sight rather than in a frozen window (#98).
     hideWindows();
     // Every job asked to stop at once (#105): the shelf's import, tree and refreshes, the background readings and
     // downloads, the books being converted, the list of a database's tournaments; parked when their owner goes, and
-    // waited for at the very end, by jobs_.
+    // waited for at the very end, by jobs_. With them, the requests given its flags (cancelFlag()): those of the
+    // Lichess page, TV, the tournaments, the mosaic (#148).
     jobs_.cancelAll();
     ui::setGuideOpener(nullptr);
     closeFileLines();  // a file being read stops within a megabyte

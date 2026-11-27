@@ -79,8 +79,18 @@ class JobGroup {
 
     // Every task of the group's jobs asked to stop, at once: at shutdown, before what waits for them.
     void cancelAll() noexcept {
+        cancelled_ = true;
         for (const auto& weak : cancels_)
             if (const auto cancel = weak.lock()) *cancel = true;
+    }
+
+    // A cancel flag for a task that is not a Job's (a request of std::async whose future its owner keeps): set by
+    // cancelAll() with the jobs' (#148), and by the owner when it no longer wants the task. Set already once the group
+    // is cancelled. The task holds it: it may outlive its owner.
+    [[nodiscard]] std::shared_ptr<std::atomic<bool>> cancelFlag() {
+        auto flag = std::make_shared<std::atomic<bool>>(cancelled_);
+        enrol(flag);
+        return flag;
     }
 
     // A future nobody wants any more, its task asked to stop first by the caller when it can be, kept until the task
@@ -114,7 +124,8 @@ class JobGroup {
         std::erase_if(cancels_, [](const auto& weak) { return weak.expired(); });
         cancels_.push_back(std::move(cancel));
     }
-    std::vector<std::weak_ptr<std::atomic<bool>>> cancels_;  // of the jobs' states
+    std::vector<std::weak_ptr<std::atomic<bool>>> cancels_;  // of the jobs' states, and the flags given (cancelFlag())
+    bool cancelled_ = false;                                 // cancelAll() was called
     Graveyard graveyard_;                                    // waits for the tasks parked when it goes
 };
 

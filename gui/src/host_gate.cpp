@@ -99,8 +99,9 @@ HostGate::Host& HostGate::host(const std::string& name) {
 std::unique_lock<std::timed_mutex> HostGate::turn(const std::string& name, const std::atomic<bool>* cancel) {
     auto& h = host(name);
     std::unique_lock lock(h.turn, std::defer_lock);
-    while (!lock.try_lock_for(std::chrono::milliseconds(100))) {
-        if (cancel && cancel->load()) return lock;
+    // Closed: the turn taken only when it is free, never waited for.
+    while (closed_ ? !lock.try_lock() : !lock.try_lock_for(std::chrono::milliseconds(100))) {
+        if ((cancel && cancel->load()) || closed_) return lock;
     }
     if (!waitPause(name, cancel)) lock.unlock();
     return lock;
@@ -110,7 +111,7 @@ bool HostGate::waitPause(const std::string& name, const std::atomic<bool>* cance
     for (;;) {
         const auto left = pausedFor(name);
         if (left.count() == 0) return true;
-        if (cancel && cancel->load()) return false;
+        if ((cancel && cancel->load()) || closed_) return false;
         std::this_thread::sleep_for(std::min(left, std::chrono::milliseconds(100)));
     }
 }

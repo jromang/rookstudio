@@ -1040,6 +1040,13 @@ void App::drawBoardPage() {
     if (!b.message.empty() && b.message == board_message_fix_for_) {
         // No engine to analyse: the Board's engine picker, a click away (#141).
         drawRepairNotice(Notice{Notice::Level::Warning, b.message, {}, {chooseEngineFix()}}, "board_message");
+    } else if (!b.message.empty() && b.message == board_message_file_for_) {
+        // A game that could not be written: the file out of the words, its folder a click away (#146).
+        drawRepairNotice(Notice{Notice::Level::Error,
+                                b.message,
+                                board_message_file_.string(),
+                                {openFolderFix(board_message_file_.parent_path().string())}},
+                         "board_unwritten");
     } else if (!b.message.empty() && b.message == TR("Locked while one of your games is played on Lichess.")) {
         // A fair-play lock: a notice without a button, nothing gets round it (#141, R17).
         drawNotice(Notice{Notice::Level::Warning, b.message, {}, {}}, "board_lock");

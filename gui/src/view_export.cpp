@@ -243,6 +243,13 @@ std::string pathText(const fs::path& path) {
     return std::string(u8.begin(), u8.end());
 }
 
+// A file the export could not write, in a sentence without its path (#146): its name only, the path beside the words.
+std::string unwrittenSaid(const fs::path& file) {
+    NetFailure unwritable;
+    unwritable.kind = NetFailure::Kind::Unwritable;
+    return trf("“{}” could not be saved: {}.", pathText(file.filename()), describe(unwritable));
+}
+
 // A long path by its last folders: "…/p4-93/out/ro".
 std::string shortPath(const fs::path& path) {
     const auto whole = pathText(path);
@@ -590,6 +597,7 @@ void App::exportSave() {
     const auto format = static_cast<ExportFormat>(st.format);
     e.problem         = ExportSheet::Problem::None;
     e.error.clear();
+    e.unwritten.clear();
     if (format == ExportFormat::Pdf && e.subject == ExportSheet::Subject::Repertoire) {
         auto& r = repertoires();
         if (e.repertoire < 0 || static_cast<std::size_t>(e.repertoire) >= r.entries().size() ||
@@ -648,8 +656,10 @@ void App::exportTo(const fs::path& chosen) {
             e.saved = written;
             e.said  = trf("Saved: {}", shortPath(written));
             e.error.clear();
+            e.unwritten.clear();
         } else {
-            e.error = trf("Cannot write {}", pathText(written));
+            e.error     = unwrittenSaid(written);
+            e.unwritten = written;
         }
     };
     const auto look = exportLook();
@@ -711,7 +721,7 @@ void App::exportTo(const fs::path& chosen) {
                                    }
                                    return writeFile(target, publish::gamesHtml(games, o, l, title))
                                               ? std::string()
-                                              : trf("Cannot write {}", pathText(target));
+                                              : unwrittenSaid(target);
                                });
             break;
         }
@@ -747,7 +757,7 @@ void App::exportTo(const fs::path& chosen) {
             e.job = std::async(std::launch::async, [g, options, path, progress, cancel = e.cancel]() -> std::string {
                 const auto bytes = publish::makeGif(g, options, progress.get(), cancel.get());
                 if (bytes.empty()) return TR("Cancelled.");
-                return writeFile(path, bytes) ? std::string() : trf("Cannot write {}", pathText(path));
+                return writeFile(path, bytes) ? std::string() : unwrittenSaid(path);
             });
             break;
         }
@@ -772,13 +782,13 @@ void App::exportTo(const fs::path& chosen) {
                                   [snap = e.snapshot, ids = e.ids, names = st.write_names, path, cancel = e.cancel,
                                    count = e.done]() -> std::string {
                                    std::ofstream out(path, std::ios::binary | std::ios::trunc);
-                                   if (!out) return trf("Cannot write {}", pathText(path));
+                                   if (!out) return unwrittenSaid(path);
                                    for (const auto id : ids) {
                                        if (*cancel) return TR("Cancelled.");
                                        out << study::exportedPgn(*snap, id, names) << "\n";
                                        ++*count;
                                    }
-                                   return out ? std::string() : trf("Cannot write {}", pathText(path));
+                                   return out ? std::string() : unwrittenSaid(path);
                                   });
             break;
         }
@@ -850,8 +860,10 @@ void App::pollExport() {
             e.saved = e.saving;
             e.said  = trf("Saved: {}", shortPath(e.saving));
             e.error.clear();
+            e.unwritten.clear();
         } else {
-            e.error = error;
+            e.error     = error;
+            e.unwritten = error == unwrittenSaid(e.saving) ? e.saving : fs::path();  // its folder offered (#146)
         }
     }
     if (isReady(e.estimate_job)) {
@@ -1517,8 +1529,14 @@ void App::drawExportOptions() {
     // What happened last.
     if (!export_) return;
     if (!e.error.empty()) {
+        // A notice (#146): a file that could not be written named in the tooltip, its folder a click away.
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + px(360));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", e.error.c_str());
+        Notice notice{e.unwritten.empty() ? Notice::Level::Warning : Notice::Level::Error, e.error, {}, {}};
+        if (!e.unwritten.empty()) {
+            notice.detail = pathText(e.unwritten);
+            notice.fixes.push_back(openFolderFix(pathText(e.unwritten.parent_path())));
+        }
+        if (const auto* fix = drawNotice(notice, "export_error")) applyFix(*fix);
         ImGui::PopTextWrapPos();
     } else if (!e.said.empty()) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + px(360));

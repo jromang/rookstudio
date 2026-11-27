@@ -150,7 +150,7 @@ bool App::saveBoardInPgnFile() {
     try {
         tour::replaceFile(file, text);
     } catch (const std::exception& e) {
-        boardToast(trf("Cannot write {}: {}", name, e.what()));
+        sayBoardUnwritten(file, e.what());  // on the Board's line, its folder offered, rather than a toast (#146)
         return false;
     }
     std::istringstream written(text);

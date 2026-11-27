@@ -1415,8 +1415,7 @@ void App::saveBoardPgnAs(const std::string& path) {
         board_.message       = trf("Saved in {}", path);
         board_.message_error = false;
     } catch (const std::exception& e) {
-        board_.message       = trf("Cannot write {}: {}", path, e.what());
-        board_.message_error = true;
+        sayBoardUnwritten(std::filesystem::path(path), e.what());
     }
 }
 
@@ -1436,9 +1435,18 @@ void App::appendBoardPgnTo(const std::string& path) {
         board_.changes.saved(std::filesystem::path(path).filename().string());
         boardToast(trf("Saved at the end of “{}”", std::filesystem::path(path).filename().string()));
     } catch (const std::exception& e) {
-        board_.message       = trf("Cannot write {}: {}", path, e.what());
-        board_.message_error = true;
+        sayBoardUnwritten(std::filesystem::path(path), e.what());
     }
+}
+
+void App::sayBoardUnwritten(const std::filesystem::path& file, const std::string& why) {
+    Console::instance().add(trf("The game could not be saved: {}", why), true);
+    NetFailure unwritable;
+    unwritable.kind         = NetFailure::Kind::Unwritable;
+    board_.message          = trf("“{}” could not be saved: {}.", file.filename().string(), describe(unwritable));
+    board_.message_error    = true;
+    board_message_file_     = file;
+    board_message_file_for_ = board_.message;
 }
 
 }  // namespace fcg

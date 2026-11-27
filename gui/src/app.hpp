@@ -1729,7 +1729,8 @@ class App {
         std::future<std::vector<FoundMissing>> looking;
         std::optional<std::vector<FoundMissing>> found;
         std::vector<MissingAsked> asked;
-        std::string said, error;
+        std::string said;
+        StoreFailure error;  // its database's, with the store's code: a damaged file offers its check (#146)
     };
     std::optional<CrosstableView> crosstable_;
     std::vector<Care::Undo> crosstable_undo_;  // its changes to the database, Ctrl+Z
@@ -1744,6 +1745,7 @@ class App {
     void startCrosstable();
     void pollCrosstable();
     void remakeCrosstable();  // its settings changed: computed again from its games read
+    [[nodiscard]] int crosstableDatabase();  // the shelf's index of its database, -1 when gone (its check, #146)
     void keepCrosstableSettings();
     void drawStudyCrosstable();
     void crosstableUndo();
@@ -1911,6 +1913,7 @@ class App {
         Problem problem = Problem::None;
         std::string said, error;
         std::filesystem::path saved, problem_path;  // the last file or folder written; the folder refused
+        std::filesystem::path unwritten;            // the file `error` could not write: its folder offered (#146)
         int split        = 0;      // past MAX_GAMES_PER_PAGE games: 0 not chosen, 1 a page per game, 2 the first ones
         bool focus_range = false;  // "Only from … to …": the GIF's first move chosen
     };
@@ -3174,6 +3177,11 @@ class App {
     [[nodiscard]] LichessAccess lichessAccess(const std::string& needs = {}) const;
     void drawRepairNotice(const Notice& notice, const char* id);
     std::string board_message_fix_for_;  // the Board's message that offers Choose an engine…
+    // A game the Board could not write to `file` (#146): said on its message line, the file out of the words and its
+    // folder a click away (board_message_file_for_: the message that offers it); the system's words in the log.
+    void sayBoardUnwritten(const std::filesystem::path& file, const std::string& why);
+    std::filesystem::path board_message_file_;
+    std::string board_message_file_for_;
     TablebaseChecks tb_checks_;
     void drawTemplates();
     void setupEngines();

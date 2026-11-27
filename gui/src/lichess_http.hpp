@@ -98,7 +98,8 @@ template <typename T>
 // refuses: ".
 [[nodiscard]] std::string describeAlone(const Failure& failure);
 // Why nothing is shown where Lichess's answer would be, as a sentence: "Lichess cannot be reached from here." when no
-// answer came, else "Lichess gave nothing (…)." with describe()'s words.
+// answer came, else "Lichess gave nothing (…)." with describe()'s words; a problem of the program's own in its own
+// words, Lichess not having been asked.
 [[nodiscard]] std::string gaveNothing(const Failure& failure);
 
 // The kind of failure an HTTP result is: None for a whole 2xx; Cancelled when the program stopped it.

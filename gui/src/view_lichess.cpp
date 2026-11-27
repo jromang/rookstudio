@@ -348,9 +348,8 @@ void App::drawLichessScopeAsk() {
     } else {
         if (ask.error.failed())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               lichess::linkRefused(ask.error)
-                                   ? TR("You refused it on Lichess: nothing changed.")
-                                   : trf("Lichess gave nothing ({}).", lichess::describe(ask.error)).c_str());
+                               lichess::linkRefused(ask.error) ? TR("You refused it on Lichess: nothing changed.")
+                                                               : lichess::gaveNothing(ask.error).c_str());
         if (ui::iconButton("lichess_scope_allow", ui::Icon::External, TR("Allow on Lichess…"))) {
             auto scopes = lichess_account_->scopes;
             if (!lichess_account_->has(ask.scope)) scopes.push_back(ask.scope);
@@ -465,20 +464,9 @@ void App::drawLichessAccount() {
             ImGui::TextWrapped("%s", line);
         }
         // What went wrong last, and the gesture that mends it (M4, board 2).
-        if (lichess_error_.failed()) {
-            const bool refused = lichess::linkRefused(lichess_error_);
-            const bool late    = lichess_error_.net == lichess::NetError::TimedOut;
-            const bool offline = lichess_error_.net == lichess::NetError::Offline;
+        if (lichess_error_.failed())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                               refused ? TR("You refused the access on Lichess: nothing is linked.")
-                               : late ? TR("No answer from Lichess in 5 minutes: the link stopped, the port is closed.")
-                               : offline ? TR("Lichess cannot be reached from here: the link waits for a connection. "
-                                              "Everything else works without it.")
-                                         : trf("Lichess cannot be reached from here ({}): the link waits for a "
-                                               "connection. Everything else works without it.",
-                                               lichess::describe(lichess_error_))
-                                               .c_str());
-        }
+                               lichess::linkFailed(lichess_error_).c_str());
         if (ui::iconButton("lichess_link", ui::Icon::External,
                            !lichess_error_.failed() ? TR("Link the account…") : TR("Try again")))
             startLichessLink();

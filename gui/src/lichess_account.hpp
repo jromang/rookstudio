@@ -105,6 +105,10 @@ struct TokenState {
 [[nodiscard]] inline bool linkRefused(const Failure& failure) noexcept {
     return failure.net == NetError::Forbidden && failure.status == 0;
 }
+// What the Lichess account's card says of a link that failed (M4, board 2), as a sentence: the user's no on Lichess's
+// page, the five minutes over, Lichess out of reach (the link waits for a connection); else the failure in
+// gaveNothing()'s words: a token Lichess refuses, a code it does not take, a problem of the program's own.
+[[nodiscard]] std::string linkFailed(const Failure& failure);
 
 // In the profile, readable and writable by its owner alone: lichess-account.json, the user's account; a Lichess bot's
 // account has its own (#85), its token apart from the user's.

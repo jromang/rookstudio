@@ -33,6 +33,7 @@
 #include <study/tree.hpp>
 
 #include "assistant_process.hpp"
+#include "free_ports.hpp"
 #include "mock_engines.hpp"
 #include "opening_report.hpp"
 #include "repertoires.hpp"
@@ -389,6 +390,33 @@ TEST_CASE("opening report: Lichess's answers kept for offline, by the Tree tab's
     CHECK(rows[0].elo == 2560);
     CHECK(rows[0].score == static_cast<int>(std::lround(100.0 * (500 + 300.0) / 1300)));
     CHECK(rows[0].code == -1);
+}
+
+TEST_CASE("opening report: Lichess unanswered said offline only when it cannot be reached, another failure in words") {
+    // Nothing listens: the explorer out of reach.
+    const auto nobody  = fmt::format("http://127.0.0.1:{}", fcg::test::freePort());
+    lichess::servers() = lichess::Servers{nobody, nobody + "/tb", nobody + "/explorer"};
+    lichess::ExplorerQuery q;
+    q.fen              = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    const auto offline = lichess::explorer(q);
+    lichess::servers() = lichess::Servers{};
+    REQUIRE(offline.net == lichess::NetError::Offline);
+    CHECK(reportUnanswered(offline) == "Offline");
+    // A token refused, a 429, Lichess in trouble: no longer "Offline".
+    lichess::Failure refused;
+    refused.net    = lichess::NetError::Unauthorized;
+    refused.status = 401;
+    CHECK(reportUnanswered(refused) == "Lichess gave nothing (Lichess refused the token: link the account again).");
+    lichess::Failure too_many;
+    too_many.net    = lichess::NetError::RateLimited;
+    too_many.status = 429;
+    CHECK(reportUnanswered(too_many) == "Lichess gave nothing (Lichess asks to wait a minute: too many requests).");
+    lichess::Failure down;
+    down.net    = lichess::NetError::Server;
+    down.status = 502;
+    CHECK(reportUnanswered(down) == "Lichess gave nothing (Lichess answered 502).");
+    // No value and no failure: not what the explorer sends.
+    CHECK(reportUnanswered(lichess::Failure{}) == "Lichess gave nothing (Lichess's answer could not be read).");
 }
 
 TEST_CASE("opening summary by the model: measured on the processor") {

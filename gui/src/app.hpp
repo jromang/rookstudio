@@ -1792,7 +1792,7 @@ class App {
         bool masters = false, players = false;
         std::array<std::optional<lichess::Explorer>, 2> lichess;  // their answers, when they came
         std::array<int64_t, 2> lichess_when{};                    // an answer kept from before (offline): its date
-        std::array<std::string, 2> lichess_error;                 // why Lichess did not answer
+        std::array<std::optional<lichess::Failure>, 2> lichess_failure;  // why Lichess did not answer, as it failed
         // The moves as shown: the databases', with Lichess's sources ticked.
         std::vector<ReportRow> rows;
         std::string rows_of;
@@ -2050,7 +2050,9 @@ class App {
         lichess::OfferedEngine offer;  // what it registers, its secret drawn
     };
     std::vector<OfferCall> offer_calls_;
-    std::map<std::string, std::string> offer_errors_;  // by engine: why the last request about it gave nothing
+    // By engine: why the last request about it gave nothing, Lichess's failure or a problem of the program's own (kept
+    // as such: worded where it is shown, lichess::gaveNothing()).
+    std::map<std::string, lichess::Failure> offer_errors_;
     struct LichessService {
         std::unique_ptr<lichess::EngineService> service;
         lichess::ServiceStatus status;

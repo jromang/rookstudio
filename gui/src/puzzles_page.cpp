@@ -1525,9 +1525,8 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
                                TR("Waiting for Lichess: allow RookStudio in the browser's page, then come back here."));
         } else {
             if (app_.lichessLinkError().failed())
-                ImGui::TextColored(
-                    ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-                    trf("Lichess gave nothing ({}).", lichess::describe(app_.lichessLinkError())).c_str());
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
+                                   lichess::gaveNothing(app_.lichessLinkError()).c_str());
             if (primaryButton(TR("Allow on Lichess…")) || enter) {
                 enter = false;
                 askPuzzleScopes();

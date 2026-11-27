@@ -146,6 +146,30 @@ TEST_CASE("Lichess HTTP: the user's words for each kind, by what was asked") {
     CHECK(gaveNothing(refused) == "Lichess gave nothing (Lichess answered 503).");
 }
 
+TEST_CASE("Lichess HTTP: a failure kept as it was, worded where it is shown: the program's own never as Lichess's") {
+    // The program's own problem: in its words, without "Lichess gave nothing" before it (an engine offered to Lichess
+    // that left the library, its machine gone).
+    const auto own = Failure::own("Stockfish is no longer in the library.");
+    CHECK(gaveNothing(own) == "Stockfish is no longer in the library.");
+    // A 401, a 429 and an outage told apart, each in its words.
+    Failure refused;
+    refused.net    = NetError::Unauthorized;
+    refused.status = 401;
+    Failure too_many;
+    too_many.net    = NetError::RateLimited;
+    too_many.status = 429;
+    Failure offline;
+    offline.net = NetError::Offline;
+    CHECK(gaveNothing(refused) == "Lichess gave nothing (Lichess refused the token: link the account again).");
+    CHECK(gaveNothing(too_many) == "Lichess gave nothing (Lichess asks to wait a minute: too many requests).");
+    CHECK(gaveNothing(offline) == "Lichess cannot be reached from here.");
+    // An answer's failure, kept by the interface as the answer had it: its kind stays.
+    auto answer        = failedWith<int>(refused);
+    const Failure kept = answer;
+    CHECK(kept.net == NetError::Unauthorized);
+    CHECK(gaveNothing(kept) == gaveNothing(refused));
+}
+
 TEST_CASE("Lichess HTTP: one request builder, a form or JSON for its body") {
     const auto get = request("GET", "https://lichess.org/api/account", "lip_x");
     CHECK(get.method == "GET");

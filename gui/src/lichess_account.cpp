@@ -14,6 +14,7 @@
 #include <tour/files.hpp>
 
 #include "https.hpp"
+#include "i18n.hpp"
 
 namespace fcg::lichess {
 
@@ -284,6 +285,17 @@ Answer<Account> link(const std::function<bool(const std::string& url)>& open, co
         if (tested.value->expires > 0) a.value->expires = tested.value->expires;
     }
     return a;
+}
+
+std::string linkFailed(const Failure& failure) {
+    if (linkRefused(failure)) return TR("You refused the access on Lichess: nothing is linked.");
+    if (failure.net == NetError::TimedOut)
+        return TR("No answer from Lichess in 5 minutes: the link stopped, the port is closed.");
+    if (failure.net == NetError::Offline)
+        return TR(
+            "Lichess cannot be reached from here: the link waits for a connection. Everything else works "
+            "without it.");
+    return gaveNothing(failure);
 }
 
 std::optional<Account> loadAccount(const std::filesystem::path& profile, const char* file) {

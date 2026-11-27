@@ -44,6 +44,12 @@ class Journal {
     using Listener = std::function<void(uint64_t at, uint64_t end, const nlohmann::json& event)>;
     void setListener(Listener listener);
 
+    // Reads the complete lines of `file` from byte `from` on (where a line starts: where the lines read before ended),
+    // one at a time, repairing nothing: `line` is told about each as a listener is. A line that is not JSON is passed
+    // over, and so is a last line without its newline (being written). Returns where the lines read end, the next
+    // line's start: `from` when there is none, or the file cannot be read there.
+    static uint64_t readFrom(const std::filesystem::path& file, uint64_t from, const Listener& line);
+
    private:
     std::FILE* file_ = nullptr;
     bool failed_     = false;

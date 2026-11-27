@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstring>
 #include <future>
-#include <fstream>
 
 #include <fcntl.h>
 
@@ -15,6 +14,7 @@
 #endif
 
 #include <tour/files.hpp>
+#include <tour/journal.hpp>
 #include <tour/journal_events.hpp>
 
 namespace fcg {
@@ -258,20 +258,12 @@ bool SocketChannel::write(const std::string& line) {
 }
 
 void SocketChannel::replayJournal(uint64_t from) {
-    std::ifstream in(dir_ / tour::JOURNAL_FILE, std::ios::binary);
-    if (!in || !in.seekg(static_cast<std::streamoff>(from))) return;
-    uint64_t at = from;
-    for (std::string line; std::getline(in, line);) {
-        if (in.eof()) break;  // a last line without its end: not written yet, it comes as an event
-        const uint64_t end = at + line.size() + 1;
-        try {
-            if (line.find_first_not_of(" \t\r") != std::string::npos)
-                sendLocked("journal", {{"at", at}, {"end", end}, {"event", nlohmann::json::parse(line)}});
-        } catch (const nlohmann::json::exception&) {
-            // A damaged line: the window's copy reads the files again when it misses one.
-        }
-        at = end;
-    }
+    // A damaged line is passed over: the window's copy reads the files again when it misses one. A last line without
+    // its end is not written yet: it comes as an event.
+    (void)tour::Journal::readFrom(dir_ / tour::JOURNAL_FILE, from,
+                                  [this](uint64_t at, uint64_t end, const nlohmann::json& event) {
+                                      sendLocked("journal", {{"at", at}, {"end", end}, {"event", event}});
+                                  });
 }
 
 void SocketChannel::acceptLoop() {

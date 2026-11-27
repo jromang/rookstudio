@@ -23,6 +23,7 @@
 #include "i18n.hpp"
 #include "machines.hpp"
 #include "ui.hpp"
+#include "widgets.hpp"
 
 namespace fcg {
 
@@ -675,10 +676,9 @@ void App::drawCareDuplicates(std::size_t index) {
     }
     if (!c.duplicates) return;
     if (c.duplicates->cancelled) {
-        ui::beginCard("care_duplicates_stopped");
+        const ui::Card card("care_duplicates_stopped");
         ImGui::TextUnformatted(TR("The search for duplicates was cancelled."));
         if (ImGui::Button(TR("Look for them"))) c.duplicates_of = ~uint64_t{0};  // started again
-        ui::endCard();
         return;
     }
     const auto& found = *c.duplicates;
@@ -695,7 +695,7 @@ void App::drawCareDuplicates(std::size_t index) {
 
     if (found.groups.empty()) {
         // The empty state (M13, board 1, errors).
-        ui::beginCard("care_no_duplicates");
+        const ui::Card card("care_no_duplicates");
         ui::inlineIcon(ui::Icon::Info, ui::MUTED);
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -712,93 +712,94 @@ void App::drawCareDuplicates(std::size_t index) {
             c.since         = 0;
             c.duplicates_of = ~uint64_t{0};
         }
-        ui::endCard();
         return;
     }
 
     // What was found, and Merge all.
-    ui::beginCard("care_duplicates");
-    ImGui::PushTextWrapPos();
-    ImGui::TextUnformatted(c.since ? TR("The import's games already there from another source")
-                                   : TR("The same games from two sources"));
-    ImGui::TextDisabled("%s", trf("Looked for in the background: the same moves, the same players (read in the table "
-                                  "of names), the same year. The {} games looked at in {}; a game already there "
-                                  "exactly the same never came in twice.",
-                                  ui::exactCount(found.games), tookText(found.seconds))
-                                  .c_str());
-    ImGui::PopTextWrapPos();
-    ImGui::Dummy(ImVec2(0, px(2)));
-    const float w = px(170);
-    figure(ui::exactCount(same), TR("the same moves, headers written differently"), w);
-    ImGui::SameLine(0, px(28));
-    figure(ui::exactCount(shorter), TR("one is shorter (a broadcast cut short)"), w);
-    ImGui::SameLine(0, px(28));
-    figure(ui::exactCount(differ), TR("results that differ: to see one at a time"), w);
-    std::vector<study::DuplicateGroup> to_merge;
-    for (const auto g : live)
-        if (mergeable(found.groups[g])) to_merge.push_back(found.groups[g]);
-    ImGui::Dummy(ImVec2(0, px(2)));
-    ImGui::BeginDisabled(to_merge.empty() || !idle);
-    const auto merge_label = trf("Merge all · {}", ui::exactCount(to_merge.size()));
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(tinted(ui::ACCENT, 200)));
-    const bool enter = !ImGui::GetIO().WantTextInput && c.pair < 0 && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
-    if ((ImGui::Button(merge_label.c_str()) || enter) && !to_merge.empty() && idle)
-        startCareMerges(index, to_merge, {});
-    ImGui::PopStyleColor();
-    ImGui::EndDisabled();
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s", TR("Each group merged into one game, the fullest of each field; the others marked "
-                                   "deleted. The results that differ are left to you."));
-    ImGui::SameLine(0, px(6));
-    ImGui::TextDisabled("%s", TR("Enter · Ctrl+Z undoes"));
-    ImGui::SameLine(0, px(14));
-    if (ImGui::Button(TR("See in the list"))) {
-        std::vector<study::GameId> ids;
-        for (const auto g : live)
-            for (const auto id : found.groups[g].games) ids.push_back(id);
-        std::sort(ids.begin(), ids.end());
-        db_only_      = std::move(ids);
-        db_only_said_ = TR("the duplicate games");
-        db_list_      = true;
-        db_row_       = 0;
-        care_.reset();
-        return;
-    }
-    // Where they come from: the pairs of sources, the most first; counted once for each result.
-    const auto where_of = fmt::format("{}|{}", c.duplicates_of, live.size());
-    if (c.where_of != where_of) {
-        c.where_of = where_of;
-        std::map<std::string, std::size_t> pairs;
-        for (const auto g : live) {
-            std::set<std::string> sources;
-            std::set<std::string> files;
-            for (const auto id : found.groups[g].games) {
-                sources.insert(sourceOf(*snap, id));
-                files.insert(snap->source(id));
-            }
-            std::string key;
-            if (files.size() == 1 && !files.begin()->empty()) {
-                key = TR("the same file imported twice");
-            } else {
-                for (const auto& source : sources) key = key.empty() ? source : trf("{} and {}", key, source);
-                if (sources.size() == 1) key = trf("{}, twice", *sources.begin());
-            }
-            ++pairs[key];
-        }
-        std::vector<std::pair<std::size_t, std::string>> ranked;
-        for (const auto& [k, n] : pairs) ranked.emplace_back(n, k);
-        std::sort(ranked.rbegin(), ranked.rend());
-        c.where.clear();
-        for (std::size_t i = 0; i < ranked.size() && i < 4; ++i)
-            c.where += (c.where.empty() ? "" : " · ") +
-                       fmt::format("{} ({})", ranked[i].second, ui::exactCount(ranked[i].first));
-    }
-    if (!c.where.empty()) {
+    {
+        const ui::Card card("care_duplicates");
         ImGui::PushTextWrapPos();
-        ImGui::TextDisabled("%s", trf("Where they come from: {}.", c.where).c_str());
+        ImGui::TextUnformatted(c.since ? TR("The import's games already there from another source")
+                                       : TR("The same games from two sources"));
+        ImGui::TextDisabled("%s",
+                            trf("Looked for in the background: the same moves, the same players (read in the table "
+                                "of names), the same year. The {} games looked at in {}; a game already there "
+                                "exactly the same never came in twice.",
+                                ui::exactCount(found.games), tookText(found.seconds))
+                                .c_str());
         ImGui::PopTextWrapPos();
+        ImGui::Dummy(ImVec2(0, px(2)));
+        const float w = px(170);
+        figure(ui::exactCount(same), TR("the same moves, headers written differently"), w);
+        ImGui::SameLine(0, px(28));
+        figure(ui::exactCount(shorter), TR("one is shorter (a broadcast cut short)"), w);
+        ImGui::SameLine(0, px(28));
+        figure(ui::exactCount(differ), TR("results that differ: to see one at a time"), w);
+        std::vector<study::DuplicateGroup> to_merge;
+        for (const auto g : live)
+            if (mergeable(found.groups[g])) to_merge.push_back(found.groups[g]);
+        ImGui::Dummy(ImVec2(0, px(2)));
+        ImGui::BeginDisabled(to_merge.empty() || !idle);
+        const auto merge_label = trf("Merge all · {}", ui::exactCount(to_merge.size()));
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(tinted(ui::ACCENT, 200)));
+        const bool enter = !ImGui::GetIO().WantTextInput && c.pair < 0 && ImGui::IsKeyPressed(ImGuiKey_Enter, false);
+        if ((ImGui::Button(merge_label.c_str()) || enter) && !to_merge.empty() && idle)
+            startCareMerges(index, to_merge, {});
+        ImGui::PopStyleColor();
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("%s", TR("Each group merged into one game, the fullest of each field; the others marked "
+                                       "deleted. The results that differ are left to you."));
+        ImGui::SameLine(0, px(6));
+        ImGui::TextDisabled("%s", TR("Enter · Ctrl+Z undoes"));
+        ImGui::SameLine(0, px(14));
+        if (ImGui::Button(TR("See in the list"))) {
+            std::vector<study::GameId> ids;
+            for (const auto g : live)
+                for (const auto id : found.groups[g].games) ids.push_back(id);
+            std::sort(ids.begin(), ids.end());
+            db_only_      = std::move(ids);
+            db_only_said_ = TR("the duplicate games");
+            db_list_      = true;
+            db_row_       = 0;
+            care_.reset();
+            return;
+        }
+        // Where they come from: the pairs of sources, the most first; counted once for each result.
+        const auto where_of = fmt::format("{}|{}", c.duplicates_of, live.size());
+        if (c.where_of != where_of) {
+            c.where_of = where_of;
+            std::map<std::string, std::size_t> pairs;
+            for (const auto g : live) {
+                std::set<std::string> sources;
+                std::set<std::string> files;
+                for (const auto id : found.groups[g].games) {
+                    sources.insert(sourceOf(*snap, id));
+                    files.insert(snap->source(id));
+                }
+                std::string key;
+                if (files.size() == 1 && !files.begin()->empty()) {
+                    key = TR("the same file imported twice");
+                } else {
+                    for (const auto& source : sources) key = key.empty() ? source : trf("{} and {}", key, source);
+                    if (sources.size() == 1) key = trf("{}, twice", *sources.begin());
+                }
+                ++pairs[key];
+            }
+            std::vector<std::pair<std::size_t, std::string>> ranked;
+            for (const auto& [k, n] : pairs) ranked.emplace_back(n, k);
+            std::sort(ranked.rbegin(), ranked.rend());
+            c.where.clear();
+            for (std::size_t i = 0; i < ranked.size() && i < 4; ++i)
+                c.where += (c.where.empty() ? "" : " · ") +
+                           fmt::format("{} ({})", ranked[i].second, ui::exactCount(ranked[i].first));
+        }
+        if (!c.where.empty()) {
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("%s", trf("Where they come from: {}.", c.where).c_str());
+            ImGui::PopTextWrapPos();
+        }
     }
-    ui::endCard();
     ImGui::Dummy(ImVec2(0, px(6)));
 
     // The groups: a click opens one, compared field by field.

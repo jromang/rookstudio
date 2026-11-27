@@ -1208,7 +1208,8 @@ void App::drawReportShapes() {
     // What the players do in the next fifteen moves.
     if (s.plans.empty()) {
         ImGui::TextDisabled("%s", TR("No pawn push nor piece route is played in a tenth of the games."));
-    } else if (ImGui::BeginTable("##report_plans", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH)) {
+    } else if (const ui::Table table("##report_plans", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH);
+               table) {
         ImGui::TableSetupColumn(TR("What the players do in the next 15 moves"), ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn(TR("In"), ImGuiTableColumnFlags_WidthFixed, px(70));
         ImGui::TableSetupColumn(TR("White's score"), ImGuiTableColumnFlags_WidthFixed, px(110));
@@ -1240,7 +1241,6 @@ void App::drawReportShapes() {
                 return;
             }
         }
-        ImGui::EndTable();
     }
     ImGui::PushTextWrapPos();
     std::string note =

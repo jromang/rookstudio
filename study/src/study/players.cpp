@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "query.hpp"
+#include "store_error.hpp"
 
 namespace fcg::study {
 
@@ -65,7 +66,7 @@ struct Reader {
     std::size_t at = 0;
     template <typename T>
     T get() {
-        if (at + sizeof(T) > bytes.size()) throw std::runtime_error("damaged table of names");
+        if (at + sizeof(T) > bytes.size()) throw StoreError(StoreErrc::Damaged, "damaged table of names");
         T v;
         std::memcpy(&v, bytes.data() + at, sizeof v);
         at += sizeof v;
@@ -73,7 +74,7 @@ struct Reader {
     }
     std::string text() {
         const auto n = get<uint16_t>();
-        if (at + n > bytes.size()) throw std::runtime_error("damaged table of names");
+        if (at + n > bytes.size()) throw StoreError(StoreErrc::Damaged, "damaged table of names");
         std::string s(bytes.substr(at, n));
         at += n;
         return s;
@@ -109,13 +110,14 @@ std::string PlayerTable::bytes() const {
 }
 
 PlayerTable PlayerTable::fromBytes(std::string_view bytes) {
-    if (bytes.substr(0, TABLE_MAGIC.size()) != TABLE_MAGIC) throw std::runtime_error("not a table of names");
+    if (bytes.substr(0, TABLE_MAGIC.size()) != TABLE_MAGIC)
+        throw StoreError(StoreErrc::Damaged, "not a table of names");
     Reader r{bytes, TABLE_MAGIC.size()};
     const auto version = r.get<uint32_t>();
-    if (version > 2) throw std::runtime_error("a table of names of a newer program");
+    if (version > 2) throw StoreError(StoreErrc::NewerFormat, "a table of names of a newer program");
     const auto count = r.get<uint32_t>();
     const auto pairs = r.get<uint64_t>();
-    if (pairs > bytes.size() / 16) throw std::runtime_error("damaged table of names");
+    if (pairs > bytes.size() / 16) throw StoreError(StoreErrc::Damaged, "damaged table of names");
     std::vector<std::pair<GameId, GameId>> apart;
     for (uint64_t i = 0; i < pairs; ++i) {
         const auto a = r.get<uint64_t>();
@@ -138,12 +140,12 @@ PlayerTable PlayerTable::fromBytes(std::string_view bytes) {
         p.list       = r.text();
         if (version >= 2) p.lichess = r.text();
         const auto n = r.get<uint32_t>();
-        if (n > (bytes.size() - r.at) / 4) throw std::runtime_error("damaged table of names");
+        if (n > (bytes.size() - r.at) / 4) throw StoreError(StoreErrc::Damaged, "damaged table of names");
         p.spellings.reserve(n);
         for (uint32_t k = 0; k < n; ++k) p.spellings.push_back(r.get<uint32_t>());
         players.push_back(std::move(p));
     }
-    if (r.at != bytes.size()) throw std::runtime_error("damaged table of names");
+    if (r.at != bytes.size()) throw StoreError(StoreErrc::Damaged, "damaged table of names");
     return PlayerTable(std::move(players), std::move(apart));
 }
 

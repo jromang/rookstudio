@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdint>
 #include <ctime>
+#include <exception>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -67,6 +68,11 @@ struct DamageSummary {
     std::vector<std::filesystem::path> files;               // those files still there
 };
 [[nodiscard]] DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot);
+
+// A store's error in the user's language: a phrase for its code (study/store_error.hpp), the store's own text (English,
+// with its details) for an error no code names. In lower case without a final stop, for a sentence ("Not done: {}.").
+[[nodiscard]] std::string storeErrorText(study::StoreErrc code, const std::string& text);
+[[nodiscard]] std::string storeErrorText(const std::exception& e);
 
 // The quick filter of a game list, its words typed freely: a year (2024), an ECO code or its start (B90, B9, B), a
 // result (1-0, 0-1, 1/2 or ½) are told apart, the other words are looked for in the players, the event and the site.

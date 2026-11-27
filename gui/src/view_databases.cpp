@@ -208,7 +208,8 @@ void App::pollDatabases() {
             if (!report->error.empty()) {
                 std::error_code ec;
                 const auto space = std::filesystem::space(o.folder, ec);
-                o.disk_full      = !ec && space.available < (uint64_t{64} << 20);
+                o.disk_full =
+                    report->error_code == study::StoreErrc::DiskFull || (!ec && space.available < (uint64_t{64} << 20));
                 const auto now   = shelf_->facts(index).bytes;
                 if (read > 0 && total > read && now > start.bytes)
                     o.needed =
@@ -257,7 +258,7 @@ void App::pollDatabases() {
             db_message_ =
                 trf("Import stopped: {}. The games committed before stay; importing the file again adds the "
                     "missing ones only.",
-                    report->error);
+                    storeErrorText(report->error_code, report->error));
         } else if (!report->read.error.empty()) {
             db_message_ = trf("Import of {} stopped: {}.", file, report->read.error);
             if (report->added > 0)
@@ -430,8 +431,9 @@ void App::drawImportOutcome(std::size_t index) {
                 TR("Once room is made, resuming the import adds only the missing games.");
             ImGui::TextDisabled("%s", rest.c_str());
         } else {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
-                               trf("Import of {} stopped: {}.", file, o.report.error).c_str());
+            ImGui::TextColored(
+                ImGui::ColorConvertU32ToFloat4(ui::BAD), "%s",
+                trf("Import of {} stopped: {}.", file, storeErrorText(o.report.error_code, o.report.error)).c_str());
             ImGui::TextDisabled("%s", trf("The {} games committed before stay; resuming the import adds only the "
                                           "missing ones.",
                                           added)

@@ -13,6 +13,7 @@
 #include <study/names.hpp>
 #include <tour/files.hpp>
 
+#include "i18n.hpp"
 #include "portable.hpp"
 
 namespace fs = std::filesystem;
@@ -87,6 +88,30 @@ study::Filter quickFilter(std::string_view text) {
     filter.words = words;
     return filter;
 }
+
+std::string storeErrorText(study::StoreErrc code, const std::string& text) {
+    switch (code) {
+        case study::StoreErrc::ReadOnly:
+            return TR("the database is read-only while another program writes to it");
+        case study::StoreErrc::DiskFull:
+            return TR("the disk is full");
+        case study::StoreErrc::Cancelled:
+            return TR("cancelled");
+        case study::StoreErrc::Damaged:
+            return TR("a file of the database is damaged");
+        case study::StoreErrc::NotADatabase:
+            return TR("the folder holds no database");
+        case study::StoreErrc::NewerFormat:
+            return TR("the database was written by a newer version of RookStudio");
+        case study::StoreErrc::Busy:
+            return TR("another program writes to the database");
+        case study::StoreErrc::Other:
+            break;
+    }
+    return text;
+}
+
+std::string storeErrorText(const std::exception& e) { return storeErrorText(study::errorCode(e), e.what()); }
 
 DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot) {
     DamageSummary out;
@@ -348,7 +373,7 @@ std::shared_ptr<study::Database> DatabaseShelf::open(std::size_t index) {
                 }
             }
         } catch (const std::exception& e) {
-            errors_[index] = e.what();
+            errors_[index] = storeErrorText(e);
         }
     }
     if (entries_[index].source && links_[index].db) open_[index] = links_[index].db->database();

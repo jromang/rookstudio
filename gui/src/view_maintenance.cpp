@@ -283,7 +283,7 @@ void App::startCareMerges(std::size_t index, std::vector<study::DuplicateGroup> 
                 trn("Merged: {} game kept, its duplicate marked deleted. Ctrl+Z undoes.",
                     "Merged: {} games kept, their duplicates marked deleted. Ctrl+Z undoes.", n, ui::exactCount(n));
         } catch (const std::exception& e) {
-            j->error = e.what();
+            j->error = storeErrorText(e);
         }
     });
     care_job_    = std::move(job);
@@ -310,7 +310,7 @@ void App::startCarePlayers(std::size_t index, study::PlayerTable table, std::str
         try {
             db->setPlayers(std::move(table));
         } catch (const std::exception& e) {
-            j->error = e.what();
+            j->error = storeErrorText(e);
             j->undo.reset();
         }
     });
@@ -348,7 +348,7 @@ void App::startCareRestore(std::size_t index, Care::Undo undo, bool crosstable) 
             if (!undo.states.empty()) db->restore(undo.states);
             if (undo.players) db->setPlayers(std::move(*undo.players));
         } catch (const std::exception& e) {
-            j->error = e.what();
+            j->error = storeErrorText(e);
         }
     });
     care_job_ = std::move(job);
@@ -368,7 +368,7 @@ void App::startCareKeep(std::size_t index, std::vector<study::GameId> damaged) {
         try {
             j->set_aside = db->keepReadable(damaged);
         } catch (const std::exception& e) {
-            j->error = e.what();
+            j->error = storeErrorText(e);
         }
     });
     care_job_    = std::move(job);
@@ -425,10 +425,10 @@ void App::pollCare() {
             break;
         case CareJob::Kind::Compact:
             if (here) {
-                care_->disk_full = job->compacted.error == "disk full";
+                care_->disk_full = job->compacted.error_code == study::StoreErrc::DiskFull;
                 if (!job->compacted.error.empty() && !care_->disk_full)
-                    care_->error =
-                        trf("The compaction stopped: {}. Nothing changed in the database.", job->compacted.error);
+                    care_->error = trf("The compaction stopped: {}. Nothing changed in the database.",
+                                       storeErrorText(job->compacted.error_code, job->compacted.error));
                 if (job->compacted.done) {
                     care_->undo.clear();  // the versions they would put back are gone from the files
                     care_->said =

@@ -161,7 +161,7 @@ struct TournamentSpec {
     bool opening_per_round = false;
 
     // A PGN file of the user's, outside the folder, that every game is also appended to, in schedule order (see
-    // TournamentState::writeOut()); empty = none. Several tournaments may share it.
+    // pgn_out.hpp); empty = none. Several tournaments may share it.
     std::string pgn_out;
     bool pgn_out_chessbase = false;  // [%eval] [%emt] comments rather than cutechess' {+0.35/18 1.234s}
 

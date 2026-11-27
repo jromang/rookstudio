@@ -24,6 +24,7 @@
 #include "lichess_players.hpp"
 #include "lichess_settings.hpp"
 #include "pgn_store.hpp"
+#include "profile_entries.hpp"
 #include "refreshing.hpp"
 #include "storage.hpp"
 #include "ui.hpp"
@@ -154,18 +155,27 @@ std::vector<lichess::BroadcastGame> LichessTvPage::mosaicGames() {
 void LichessTvPage::loadKept() {
     if (tv_kept_loaded_) return;
     tv_kept_loaded_ = true;
-    const auto json = readJson<nlohmann::json>(app_.profileDir() / "lichess-tv.json");
-    if (!json || !json->is_object()) return;
+    // Read with its types checked (#136): a game of another type than written (another version, a hand edit) is set
+    // aside, the others kept, said in the console with the file as it was kept beside it; a file cut short is kept
+    // aside and said.
+    const auto file = app_.profileDir() / "lichess-tv.json";
+    const auto json = readProfileJson(file);
+    if (!json) return;
+    ProfileEntries entries(file);
     if (const auto it = json->find("kept"); it != json->end() && it->is_array())
-        for (const auto& k : *it) {
+        for (std::size_t i = 0; i < it->size(); ++i) {
+            const auto& k = (*it)[i];
             if (!k.is_object()) continue;
-            TvKept kept;
-            kept.id     = k.value("id", std::string());
-            kept.title  = k.value("title", std::string());
-            kept.folder = k.value("folder", std::string());
-            kept.base   = k.value("base", std::string());
-            if (!kept.id.empty() && !kept.folder.empty()) tv_kept_.push_back(std::move(kept));
+            entries.entry(fmt::format("kept/{}", i + 1), [&] {
+                TvKept kept;
+                kept.id     = k.value("id", std::string());
+                kept.title  = k.value("title", std::string());
+                kept.folder = k.value("folder", std::string());
+                kept.base   = k.value("base", std::string());
+                if (!kept.id.empty() && !kept.folder.empty()) tv_kept_.push_back(std::move(kept));
+            });
         }
+    entries.sayUnread();
 }
 
 void LichessTvPage::saveKept() {

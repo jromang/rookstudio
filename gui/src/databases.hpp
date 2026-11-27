@@ -75,6 +75,9 @@ struct DamageSummary {
 [[nodiscard]] std::string storeErrorText(study::StoreErrc code, const std::string& text);
 [[nodiscard]] std::string storeErrorText(const std::exception& e);
 [[nodiscard]] std::string storeErrorText(const std::exception_ptr& e);  // a thread's, kept (study::Search::error())
+// A store's error that one of the window's jobs received: `said`, the page's sentence for it (storeErrorText()'s words
+// in it), returned and added to the log, the store's own text (its details) after it when those words replaced it.
+std::string loggedStoreError(std::string said, const std::exception& e);
 
 // The quick filter of a game list, its words typed freely: a year (2024), an ECO code or its start (B90, B9, B), a
 // result (1-0, 0-1, 1/2 or ½) are told apart, the other words are looked for in the players, the event and the site.

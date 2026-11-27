@@ -344,7 +344,16 @@ void MistakesPage::poll() {
         }
     }
     if (mistake_scan_job_ && mistake_scan_job_->done.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto scan = mistake_scan_job_->done.get();
+        MistakeScan scan;
+        try {
+            scan = mistake_scan_job_->done.get();
+        } catch (const std::exception& e) {
+            // A database that cannot be read: the exercises found before kept, why said at the Board's corner and in
+            // the log; looked for again once the databases change.
+            app_.toast(loggedStoreError(trf("Your games could not be looked through: {}.", storeErrorText(e)), e));
+            mistake_scan_of_ = mistake_scan_job_->of;
+            scan.cancelled   = true;  // nothing of it taken
+        }
         if (!scan.cancelled) {
             // The cards as they are now: answers given while it looked are kept, those of exercises it no longer
             // finds kept apart.

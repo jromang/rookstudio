@@ -490,7 +490,14 @@ void GuessPage::pollGuess() {
     g.engine.poll();
     if (g.phase == GuessPhase::Preparing) {
         if (g.theory.valid() && g.theory.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            g.book = g.theory.get();
+            try {
+                g.book = g.theory.get();
+            } catch (const std::exception& e) {
+                // The database's tree that cannot be read: the game guessed from its start, no move passed as theory;
+                // why in the log.
+                g.book = 0;
+                (void)loggedStoreError(trf("The theory of the game could not be read: {}.", storeErrorText(e)), e);
+            }
             askGuess();
         }
         return;

@@ -198,7 +198,18 @@ const std::vector<study::TrainingCard>* RepertoireTrainingPage::plannedCards(std
     auto bases    = trainingBases(&bases_key, nullptr);
     const auto of = fmt::format("{}|{}|{}", e.file.string(), e.revision, bases_key);
     if (planning_ && planning_->cards.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        planned_[planning_->file] = {planning_->of, planning_->cards.get()};
+        try {
+            planned_[planning_->file] = {planning_->of, planning_->cards.get()};
+        } catch (const std::exception& ex) {
+            // A database's tree that cannot be read: the cards in the repertoire's own order, why said at the Board's
+            // corner and in the log; ordered again once the databases change.
+            if (const auto planned = repertoireOf(planning_->file)) {
+                const auto& p             = app_.repertoires().entries()[*planned];
+                planned_[planning_->file] = {planning_->of, study::trainingCards(p.lines, p.side)};
+            }
+            app_.toast(
+                loggedStoreError(trf("The new positions come in the repertoire's order: {}.", storeErrorText(ex)), ex));
+        }
         planning_.reset();
     }
     if (const auto it = planned_.find(e.file); it != planned_.end() && it->second.of == of) return &it->second.cards;

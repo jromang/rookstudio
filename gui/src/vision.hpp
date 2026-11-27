@@ -1,7 +1,7 @@
 #pragma once
 
 // Board vision (#82, mockup M12, board 3): the coordinates, blindfold play against an engine, a line read in one's
-// head. Each runs on the Board page as the other exercises of the Training page do (view_vision.cpp); the records are
+// head. Each runs on the Board page as the other exercises of the Training page do (vision_page.hpp); the records are
 // kept in the profile's vision.json. Nothing leaves the machine.
 
 #include <array>
@@ -93,7 +93,7 @@ struct VisionRecord {
 bool writeVisionRecord(const std::filesystem::path& profile, const VisionRecord& record);
 
 // ---------------------------------------------------------------------------
-// A session on the Board page (view_vision.cpp)
+// A session on the Board page (vision_page.hpp)
 
 struct VisionRun {
     enum class Kind { Coordinates, Blindfold, Line };

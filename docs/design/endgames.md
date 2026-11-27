@@ -3,8 +3,10 @@
 A catalogue of endgames played against the tablebases, the mates of Lichess's puzzles, and board vision (#82, mockup
 M12, board 3). The code: `gui/src/endgames.*` (the catalogue, the tables' answers from the disk or from Lichess, a move
 judged, how a game ends, the profile's files), `gui/src/syzygy_download.*` (the tables of 3 to 5 pieces downloaded),
-`gui/src/vision.*` (the coordinates, blindfold, a line read in one's head), `gui/src/view_endgames.cpp` and
-`gui/src/view_vision.cpp` (the Training page's parts, a session on the Board page).
+`gui/src/vision.*` (the coordinates, blindfold, a line read in one's head), `gui/src/endgames_page.*` and
+`gui/src/vision_page.*` (modules of their own, #107: the Training page's parts, a session on the Board page), and
+`gui/src/view_disk_tables.cpp` (the tables of the disk and their download, App's: the Board's Endgames tab and a
+tournament's endgame check probe them too).
 
 ## The tables' answers
 

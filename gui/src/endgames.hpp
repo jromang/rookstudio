@@ -188,7 +188,7 @@ bool writeEndgameRecord(const std::filesystem::path& folder, const EndgameRecord
 [[nodiscard]] study::fsrs::Rating endgameRating(bool reached, bool fault, bool helped);
 
 // ---------------------------------------------------------------------------
-// A session on the Board page (view_endgames.cpp)
+// A session on the Board page (endgames_page.hpp)
 
 struct EndgameRun {
     // Asking: the user's move (the tables' answer for the position there, or coming); Reply: the tables' move, half a

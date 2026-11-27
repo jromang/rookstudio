@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <map>
+#include <stdexcept>
 
 #include <fmt/include/fmt/format.h>
 #include <json.hpp>
@@ -21,6 +22,7 @@
 #include "i18n.hpp"
 #include "mistakes.hpp"
 #include "offline_evals.hpp"
+#include "profile_entries.hpp"
 
 namespace fcg {
 
@@ -400,31 +402,39 @@ void keepExplorer(const std::filesystem::path& profile, const std::string& key, 
 
 std::optional<std::pair<lichess::Explorer, int64_t>> keptExplorer(const std::filesystem::path& profile,
                                                                   const std::string& key) {
-    std::ifstream in(explorerFile(profile, key), std::ios::binary);
-    if (!in) return std::nullopt;
-    try {
-        const auto j = nlohmann::json::parse(in);
-        if (j.value("key", std::string()) != key) return std::nullopt;
-        lichess::Explorer e;
-        e.white   = j.value("white", uint64_t{0});
-        e.draws   = j.value("draws", uint64_t{0});
-        e.black   = j.value("black", uint64_t{0});
-        e.eco     = j.value("eco", std::string());
-        e.opening = j.value("opening", std::string());
-        for (const auto& m : j.value("moves", nlohmann::json::array())) {
-            lichess::ExplorerMove move;
-            move.uci            = m.value("uci", std::string());
-            move.san            = m.value("san", std::string());
-            move.white          = m.value("white", uint64_t{0});
-            move.draws          = m.value("draws", uint64_t{0});
-            move.black          = m.value("black", uint64_t{0});
-            move.average_rating = m.value("rating", 0);
-            e.moves.push_back(std::move(move));
+    // Entry by entry (#143): a figure or a move of another type is set aside and said, the others kept, the file as it
+    // was kept beside it; a file cut short is kept aside and said, and the explorer asked again.
+    const auto file = explorerFile(profile, key);
+    const auto j    = readProfileJson(file);
+    if (!j) return std::nullopt;
+    if (const auto kept = j->find("key"); kept == j->end() || !kept->is_string() || *kept != key) return std::nullopt;
+    ProfileEntries entries(file);
+    lichess::Explorer e;
+    int64_t when = 0;
+    entries.entry("white", [&] { e.white = j->value("white", uint64_t{0}); });
+    entries.entry("draws", [&] { e.draws = j->value("draws", uint64_t{0}); });
+    entries.entry("black", [&] { e.black = j->value("black", uint64_t{0}); });
+    entries.entry("eco", [&] { e.eco = j->value("eco", std::string()); });
+    entries.entry("opening", [&] { e.opening = j->value("opening", std::string()); });
+    entries.entry("when", [&] { when = j->value("when", int64_t{0}); });
+    if (const auto moves = j->find("moves"); moves != j->end()) {
+        if (!moves->is_array()) entries.entry("moves", [] { throw std::runtime_error("not a list"); });
+        for (std::size_t i = 0; moves->is_array() && i < moves->size(); ++i) {
+            entries.entry(fmt::format("moves/#{}", i + 1), [&] {
+                const auto& m = (*moves)[i];
+                lichess::ExplorerMove move;
+                move.uci            = m.value("uci", std::string());
+                move.san            = m.value("san", std::string());
+                move.white          = m.value("white", uint64_t{0});
+                move.draws          = m.value("draws", uint64_t{0});
+                move.black          = m.value("black", uint64_t{0});
+                move.average_rating = m.value("rating", 0);
+                e.moves.push_back(std::move(move));
+            });
         }
-        return std::pair{std::move(e), j.value("when", int64_t{0})};
-    } catch (const std::exception&) {
-        return std::nullopt;
     }
+    entries.sayUnread();
+    return std::pair{std::move(e), when};
 }
 
 std::string reportUnanswered(const lichess::Failure& failure) {

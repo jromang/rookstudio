@@ -7,11 +7,13 @@
 #include <mutex>
 #include <random>
 #include <set>
+#include <stdexcept>
 
 #include <psa/crypto.h>
 
 #include "i18n.hpp"
 #include "portable.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 #include "tablebases.hpp"
 
@@ -472,16 +474,24 @@ void from_json(const nlohmann::json& j, Machine& m) {
 
 std::vector<Machine> loadMachines(const fs::path& profile) {
     std::vector<Machine> out;
-    const auto json = readJson<nlohmann::json>(profile / "machines.json");
-    if (!json || !json->is_array()) return out;
-    for (const auto& j : *json) {
-        if (!j.is_object()) continue;
-        try {
+    // Machine by machine (#143): one with a value of another type (written by another version, by hand) is set aside
+    // and said, the others kept, the file as it was kept beside it, which the next save writes without it; a file cut
+    // short is kept aside and said.
+    const auto file = profile / "machines.json";
+    const auto json = readProfileJson(file, nlohmann::json::value_t::array);
+    if (!json) return out;
+    ProfileEntries entries(file);
+    for (std::size_t i = 0; i < json->size(); ++i) {
+        const auto& j    = (*json)[i];
+        const auto name  = j.is_object() ? j.find("name") : j.end();
+        const auto shown = j.is_object() && name != j.end() && name->is_string() ? name->get<std::string>()
+                                                                                 : fmt::format("#{}", i + 1);
+        entries.entry(shown, [&] {
+            if (!j.is_object()) throw std::runtime_error("not an object");
             out.push_back(j.get<Machine>());
-        } catch (const std::exception&) {
-            // A machine written by hand that cannot be read is left out, the others kept.
-        }
+        });
     }
+    entries.sayUnread();
     return out;
 }
 

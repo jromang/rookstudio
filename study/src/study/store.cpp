@@ -462,6 +462,48 @@ HeaderRow recordRow(const Snapshot& snap, const Segment& segment, std::size_t i)
     return row;
 }
 
+// Whether a segment's record i reads whole, as game() reads it: its offsets within its files, no more plies than its
+// codes' bytes, its annex read to the end of its parts without a length or a count past its bytes, and its start
+// position there when its flags say it has one. Nothing is made of what is read: the list asks it of the games it
+// shows and filters (#119).
+bool recordWhole(const Segment& segment, std::size_t i) {
+    if (!segment.offsetsSound(i)) return false;
+    const auto plies = segment.value<uint32_t>(PLIES, i);
+    if (plies > segment.moves(i).size()) return false;
+    const auto annex    = segment.annex(i);
+    const uint8_t* p    = annex.data();
+    const uint8_t* end  = p + annex.size();
+    const auto skipText = [&] {
+        const auto size = getVarint(p, end);
+        if (size > static_cast<uint64_t>(end - p)) throw std::runtime_error("damaged annex record");
+        p += size;
+        return size;
+    };
+    bool fen = false;
+    try {
+        const uint8_t parts = p == end ? uint8_t{0} : *p++;
+        if (parts & ANNEX_FEN) fen = skipText() > 0;
+        if (parts & ANNEX_TAGS) {
+            for (auto count = getVarint(p, end); count > 0; --count) {
+                skipText();
+                skipText();
+            }
+        }
+        if (parts & ANNEX_TEXT) skipText();
+        // The clocks, then the evaluations, as game() reads them: a count past the bytes left is a damaged one, and the
+        // values of no more plies than the game's are read.
+        for (const auto part : {ANNEX_CLOCKS, ANNEX_EVALS}) {
+            if (!(parts & part)) continue;
+            const auto count = getVarint(p, end);
+            if (count > static_cast<uint64_t>(end - p)) return false;
+            for (auto k = std::min<uint64_t>(count, plies); k > 0; --k) (void)getVarint(p, end);
+        }
+    } catch (const std::runtime_error&) {
+        return false;
+    }
+    return fen || !(segment.value<uint16_t>(FLAGS, i) & GAME_FEN);
+}
+
 }  // namespace
 
 ImportedGame store::recordGame(const Snapshot& snap, const Segment& segment, std::size_t i, bool strict) {
@@ -558,7 +600,19 @@ ImportedGame store::recordGame(const Snapshot& snap, const Segment& segment, std
 
 HeaderRow Snapshot::row(GameId id) const {
     const auto [segment, i] = locate(id);
-    return recordRow(*this, *segment, i);
+    auto row                = recordRow(*this, *segment, i);
+    // A record found damaged since it was imported (#102) said as a game damaged then is (#119), its plies no more than
+    // its codes' bytes, as gameMoves() gives them.
+    if (!recordWhole(*segment, i)) {
+        row.flags |= GAME_DAMAGED;
+        row.plies = static_cast<uint32_t>(std::min<uint64_t>(row.plies, segment->moves(i).size()));
+    }
+    return row;
+}
+
+bool Snapshot::damaged(GameId id) const {
+    const auto [segment, i] = locate(id);
+    return (segment->value<uint16_t>(FLAGS, i) & GAME_DAMAGED) || !recordWhole(*segment, i);
 }
 
 HeaderNumbers Snapshot::numbers(GameId id) const {

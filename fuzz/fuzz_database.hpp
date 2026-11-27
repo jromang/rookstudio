@@ -113,7 +113,7 @@ inline void readEverything(study::Database& db) {
     using namespace study;
     const auto snap = db.snapshot();
     for (GameId id = 0; id < snap->games(); ++id) {
-        (void)snap->row(id);
+        const auto row = snap->row(id);
         (void)snap->numbers(id);
         const auto names = snap->rowIds(id);
         if (names.white >= snap->names() || names.black >= snap->names() || names.event >= snap->names() ||
@@ -123,6 +123,8 @@ inline void readEverything(study::Database& db) {
         const auto game = snap->game(id);
         if (game.plies > game.moves.size() || game.clocks.size() > game.plies || game.evals.size() > game.plies)
             std::abort();
+        // The list says a game damaged as it reads (#119).
+        if (((row.flags & GAME_DAMAGED) != 0) != game.damaged || snap->damaged(id) != game.damaged) std::abort();
         (void)importedPgn(game);
         (void)snap->tag(id, "Site");
         (void)snap->signature(id);

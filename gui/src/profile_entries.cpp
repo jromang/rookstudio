@@ -1,8 +1,12 @@
 #include "profile_entries.hpp"
 
 #include <fstream>
+#include <functional>
+#include <iterator>
+#include <mutex>
 #include <optional>
 #include <system_error>
+#include <unordered_set>
 
 #include <fmt/include/fmt/format.h>
 
@@ -28,10 +32,21 @@ std::optional<fs::path> keptAside(const fs::path& file) {
     return std::nullopt;
 }
 
+// Whether `file`, as its bytes are now, was said before: a file read again and again while it stays as it is (the
+// engines installed, read as the pages show them; a cache of Lichess's answers) is said and copied aside once (#143).
+bool saidBefore(const fs::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    static std::mutex mutex;
+    static std::unordered_set<std::string> said;
+    const std::lock_guard lock(mutex);
+    return !said.insert(file.string() + '\n' + std::to_string(std::hash<std::string>{}(bytes))).second;
+}
+
 }  // namespace
 
 void ProfileEntries::sayUnread() const {
-    if (unread_.empty()) return;
+    if (unread_.empty() || saidBefore(file_)) return;
     std::string what;
     for (std::size_t i = 0; i < unread_.size() && i < 5; ++i) what += (i > 0 ? ", " : "") + unread_[i];
     if (unread_.size() > 5) what += ", …";
@@ -45,7 +60,7 @@ void ProfileEntries::sayUnread() const {
 
 void sayUnreadableFile(const fs::path& file) {
     std::error_code ec;
-    if (!fs::exists(file, ec)) return;
+    if (!fs::exists(file, ec) || saidBefore(file)) return;
     const auto aside = keptAside(file);
     Console::instance().add(aside ? trf("{} could not be read: kept as {}", file.string(), aside->string())
                                   : trf("{} could not be read", file.string()),

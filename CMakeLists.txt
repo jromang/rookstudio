@@ -934,8 +934,9 @@ endif()
 # - the tournament layer: a PGN book turned into a Polyglot book, an EPD book or suite, and a PGN book as fastchess'
 #   own reader takes it through the book inspection;
 # - the study layer: what a database is made of, changed after it was written (#102): a segment's files, its edits,
-#   its table of names; what the store imports: a PGN file plain or compressed, a ChessBase archive; and a game's PGN
-#   as the study layer reads and writes it;
+#   its table of names; what the store imports: a PGN file plain or compressed, a ChessBase archive, a ChessBase
+#   database in its own files, an archive enciphered with its password (#119); and a game's PGN as the study layer
+#   reads and writes it;
 # - the window's library, built with the window only: what others send the program: a web request, the tunnel
 #   server's text, a TLCS datagram.
 # Compiled as our sources are (C++20), whatever library they link.
@@ -943,7 +944,7 @@ if(FCG_FUZZ)
     set(FCG_FUZZ_LIBRARIES engine_info|fastchess_core
                            pgn_book|fcg_tournament epd_book|fcg_tournament app_pgn|fcg_tournament
                            segment|fcg_study edits|fcg_study players|fcg_study import|fcg_study chessbase|fcg_study
-                           pgn_reader|fcg_study)
+                           chessbase_files|fcg_study chessbase_enciphered|fcg_study pgn_reader|fcg_study)
     if(FCG_BUILD_GUI)
         list(APPEND FCG_FUZZ_LIBRARIES web_request|fcg_lib tunnel_text|fcg_lib tlcs_message|fcg_lib)
     endif()

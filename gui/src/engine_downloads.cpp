@@ -22,6 +22,7 @@
 #include "console.hpp"
 #include "i18n.hpp"
 #include "model.hpp"
+#include "profile_entries.hpp"
 
 namespace fcg::catalogue {
 
@@ -319,12 +320,18 @@ std::optional<std::vector<Release>> keptReleases(const fs::path& profile, std::s
                                                  std::chrono::seconds max_age) {
     const auto file = enginesFolder(profile) / "releases" / (tour::fileNameOf(std::string(id)) + ".json");
     if (!youngerThan(file, max_age)) return std::nullopt;
-    const auto j = nlohmann::json::parse(readWhole(file), nullptr, false);
-    if (j.is_discarded() || !j.is_array()) return std::nullopt;
+    // Release by release (#143): one with a value of another type is set aside and said, rather than json's type_error
+    // escaping to the page that asked; a file cut short is kept aside and said, and asked of GitHub again.
+    const auto j = readProfileJson(file, nlohmann::json::value_t::array);
+    if (!j) return std::nullopt;
+    ProfileEntries entries(file);
     std::vector<Release> out;
-    for (const auto& r : j) {
-        if (auto release = releaseOf(r)) out.push_back(std::move(*release));
+    for (std::size_t i = 0; i < j->size(); ++i) {
+        entries.entry(fmt::format("#{}", i + 1), [&] {
+            if (auto release = releaseOf((*j)[i])) out.push_back(std::move(*release));
+        });
     }
+    entries.sayUnread();
     return out;
 }
 
@@ -348,17 +355,24 @@ std::mutex& installedMutex() {
 
 std::vector<Installed> loadInstalled(const fs::path& profile) {
     std::vector<Installed> out;
-    std::ifstream in(enginesFolder(profile) / "installed.json", std::ios::binary);
-    if (!in) return out;
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_array()) return out;
-    for (const auto& e : j) {
-        try {
+    // Engine by engine (#143): one with a value of another type is set aside and said, the others kept, the file as it
+    // was kept beside it, which the next install writes without it; a file cut short is kept aside and said. Read as
+    // the pages show the engines, again and again: said once while the file stays as it is.
+    const auto file = enginesFolder(profile) / "installed.json";
+    const auto j    = readProfileJson(file, nlohmann::json::value_t::array);
+    if (!j) return out;
+    ProfileEntries entries(file);
+    for (std::size_t i = 0; i < j->size(); ++i) {
+        const auto& e = (*j)[i];
+        const auto id = e.is_object() ? e.find("id") : e.end();
+        const auto name =
+            e.is_object() && id != e.end() && id->is_string() ? id->get<std::string>() : fmt::format("#{}", i + 1);
+        entries.entry(name, [&] {
             auto installed = e.get<Installed>();
             if (!installed.id.empty() && !installed.program.empty()) out.push_back(std::move(installed));
-        } catch (const nlohmann::json::exception&) {
-        }
+        });
     }
+    entries.sayUnread();
     return out;
 }
 

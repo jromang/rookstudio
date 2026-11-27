@@ -913,6 +913,46 @@ TEST_CASE("ChessBase archive: a large deflated member read a piece at a time, fo
                          doctest::Contains("CRC-32"), chessbase::Damage);
 }
 
+TEST_CASE("ChessBase 2CBV archive: a table of names said to unpack to a gigabyte, refused before room is made for it") {
+    // A zip made here of the 2CBH database's files, its table of names deflated (in stored blocks: about as many bytes
+    // as it unpacks to), then said to unpack to more. A file of names is unpacked whole, up to 1 GiB: room was made for
+    // its size before its data was found to fall short. What its data can unpack to (deflate makes 1,032 bytes of a
+    // byte at most) now bounds that size, beyond which it is refused at once (#119).
+    std::vector<ZipFile> files;
+    for (const char* ext : {".2cbh", ".2cbg", ".2cba", ".2lid"})
+        files.push_back({std::string("Names") + ext, readFile(chessbaseData(std::string("cbtest2") + ext)), 8});
+    const auto sound = zipOf(files);
+    const auto dir   = fs::temp_directory_path() / "chessbase-names-size";
+    fs::create_directories(dir);
+    spit(dir / "Sound.2cbv", sound);
+    checkDatabase(dir / "Sound.2cbv", ChessBaseFormat::TwoCBH, false);
+    const auto names = static_cast<uint32_t>(readFile(chessbaseData("cbtest2.2lid")).size());
+    // The archive, the size of its table of names said `size` in its local header (8 bytes before its name) and in
+    // its directory entry (22 bytes before its name).
+    const auto said = [&](uint32_t size) {
+        auto crafted = sound;
+        for (const auto at : {crafted.find("Names.2lid") - 8, crafted.rfind("Names.2lid") - 22})
+            for (int k = 0; k < 4; ++k) crafted[at + k] = static_cast<char>(size >> (8 * k));
+        const auto file = dir / "Said.2cbv";
+        spit(file, crafted);
+        return file;
+    };
+    for (const uint32_t size : {uint32_t{1} << 30, names * 1033}) {
+        CAPTURE(size);
+        const auto file = said(size);
+        CHECK(throwsWith([&] { (void)ChessBaseDatabase(file); }, "bytes can)"));
+        ImportProgress progress;
+        std::atomic<bool> cancel{false};
+        const auto report =
+            importChessBase(file, ImportOptions{}, progress, cancel, [](std::vector<ImportedGame>&&) {});
+        CHECK(report.games == 0);
+        CHECK(report.error.find("damaged archive") != std::string::npos);
+    }
+    // A size its data can unpack to, more than it does: refused once unpacked, as before.
+    CHECK(throwsWith([&] { (void)ChessBaseDatabase(said(names + 1)); }, "fewer bytes than its size"));
+    CHECK(throwsWith([&] { (void)ChessBaseDatabase(said(names - 1)); }, "more bytes than its size"));
+}
+
 TEST_CASE("ChessBase databases: truncated and garbled copies are refused or read as damaged, never past their files") {
     struct Set {
         std::string from;

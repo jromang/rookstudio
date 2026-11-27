@@ -7,6 +7,7 @@
 #include <fmt/include/fmt/format.h>
 
 #include "https.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg::lichess {
@@ -614,15 +615,8 @@ void GameStream::run() {
 // The profile
 
 OnlinePlaySettings readOnlinePlay(const fs::path& folder) {
-    std::ifstream in(folder / "lichess.json", std::ios::binary);
-    if (!in) return {};
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return {};
-    try {
-        return j.get<OnlinePlaySettings>();
-    } catch (const std::exception&) {
-        return {};
-    }
+    // Setting by setting (#143): one of another type keeps its default, said, the file as it was kept beside it.
+    return readProfileEntries<OnlinePlaySettings>(folder / "lichess.json");
 }
 
 bool writeOnlinePlay(const fs::path& folder, const OnlinePlaySettings& settings) {

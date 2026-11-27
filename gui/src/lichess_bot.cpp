@@ -16,6 +16,7 @@
 #include "engine_play.hpp"
 #include "https.hpp"
 #include "i18n.hpp"
+#include "profile_entries.hpp"
 #include "storage.hpp"
 
 namespace fcg::lichess {
@@ -486,15 +487,8 @@ std::optional<int> botScore(const BotRecord& game) {
 }
 
 BotSettings readBotSettings(const fs::path& folder) {
-    std::ifstream in(folder / "bot.json", std::ios::binary);
-    if (!in) return {};
-    const auto j = nlohmann::json::parse(in, nullptr, false);
-    if (j.is_discarded() || !j.is_object()) return {};
-    try {
-        return j.get<BotSettings>();
-    } catch (const std::exception&) {
-        return {};
-    }
+    // Setting by setting (#143): one of another type keeps its default, said, the file as it was kept beside it.
+    return readProfileEntries<BotSettings>(folder / "bot.json");
 }
 
 bool writeBotSettings(const fs::path& folder, const BotSettings& settings) {

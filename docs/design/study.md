@@ -32,7 +32,9 @@ frames, `.gz`, `.zip` of `.pgn` entries, zip64 included), cut into pieces at the
 workers, and given back in the file's order. The memory it holds stays bounded whatever the file's size. A game's text
 is kept when it has comments, symbols or variations, or could not be read whole (damaged), its lines ended by `\n`
 whatever the file's. A zip archive's directory lies within the archive: a size or a place read in a damaged one is
-refused, never a buffer to make (#102).
+refused, never a buffer to make (#102). So is the size of a 2CBV's member past what its deflated data can unpack to
+(deflate makes 1,032 bytes of a byte at most): a table of names is unpacked whole, up to 1 GiB, and room was made for
+its size before its data was found to fall short (#119).
 
 `importInto` adds a file's games to a database, committed every 262 144 games: a crash or a cancel keeps what was
 committed, and the same file imported again adds only what is missing.
@@ -184,12 +186,17 @@ names reads as no name (`rowIds()`), an edits file's counts are compared with it
 manifest that gives a segment more games than a commit writes, or games without any name, is refused. The searches,
 the opening tree, a dossier and an opening report set a game's start with `startOf()`, which reads its FEN alone
 (`Snapshot::startFen()`) and tells a damaged one without an exception: their threads catch none. The check tells these
-games as damaged, as before. A table of names read with name ids past the names (a damaged file) leaves them out. A
-test changes a segment's offsets and annex bytes, sixty times at random and once each kind on purpose, then lists,
-reads and writes every game, searches, builds and asks the tree, makes a dossier and an opening report, and checks.
-libFuzzer targets do the same with what a database is made of (`fuzz/segment.cpp`, `edits.cpp`, `players.cpp`: changes
-applied to sound files made from games of our own, then every game read, the list, a search, a dossier and the check)
-and with what the store imports (`import.cpp`: PGN, plain or compressed; `chessbase.cpp`: a CBV or 2CBV archive).
+games as damaged, as before, and so does the list (#119): a record that does not read whole has `GAME_DAMAGED` in its
+row's flags (`Snapshot::row()`, its plies then no more than its codes' bytes) and the filter of damaged games finds it
+(`Snapshot::damaged()`), both reading its annex as `game()` does without making anything of it; `numbers()` keeps the
+flags as they were written, the filters and sorts that read every game reading no annex. A table of names read with
+name ids past the names (a damaged file) leaves them out. A test changes a segment's offsets and annex bytes, sixty
+times at random and once each kind on purpose, then lists, reads and writes every game, searches, builds and asks the
+tree, makes a dossier and an opening report, and checks. libFuzzer targets do the same with what a database is made of
+(`fuzz/segment.cpp`, `edits.cpp`, `players.cpp`: changes applied to sound files made from games of our own, then every
+game read, the list, a search, a dossier and the check, the list saying a game damaged as it reads) and with what the
+store imports (`import.cpp`: PGN, plain or compressed; `chessbase.cpp`: a CBV or 2CBV archive; `chessbase_files.cpp`: a
+CBH database in its own files; `chessbase_enciphered.cpp`: a .cbz or a .2cbz with its password, #119).
 
 ### The compaction
 

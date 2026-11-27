@@ -6,10 +6,11 @@
 //
 // Every request goes one way: its connection opened by one connect(), its head written by one requestHead(), its
 // answer read as it comes (httpStream), so that a cancel closes the connection within a quarter of a second whatever
-// the entry point. Each request sent is said in the log (R16: what leaves the machine is visible). The polite entry
-// points add what Lichess asks of its clients (HostGate): a short request waits for its host's turn, one at a time;
-// a stream or a download takes no turn, since it may last minutes, but waits as the others for the host's pause
-// after a 429, and a 429 it gets pauses the host.
+// the entry point, but for a TLS handshake under way or a proxy's answer to CONNECT, which the request's timeout
+// ends. Each request sent is said in the log (R16: what leaves the machine is visible). The polite entry points add
+// what Lichess asks of its clients (HostGate): a short request waits for its host's turn, one at a time; a stream or a
+// download takes no turn, since it may last minutes, but waits as the others for the host's pause after a 429, and a
+// 429 it gets pauses the host.
 
 #include <atomic>
 #include <chrono>
@@ -43,12 +44,13 @@ struct HttpRequest {
     std::string method = "POST";
     std::vector<std::pair<std::string, std::string>> headers;  // more of them: (name, value)
     // Said in the log when it is sent. False only for a request sent again every few seconds whose sender says once,
-    // in its own words, what it sends (the broadcast relay's pushes, the external engine's long polls).
+    // in its own words, what it sends (the broadcast relay's pushes, the external engine's long polls and answers).
     bool logged = true;
 };
 
 // The request, sent with the User-Agent "RookStudio/<version>", its answer whole (a redirection's too: not followed).
-// `cancel`, when set, stops it within a quarter of a second, the connection closed ("cancelled").
+// `cancel`, when set, stops it within a quarter of a second, the connection closed ("cancelled"); a TLS handshake under
+// way, or a proxy's answer to CONNECT, runs to the request's timeout first.
 [[nodiscard]] HttpResult httpRequest(const HttpRequest& request, const std::atomic<bool>* cancel = nullptr);
 // The same, as a POST.
 [[nodiscard]] HttpResult httpPost(const HttpRequest& request);
@@ -86,7 +88,7 @@ struct HttpStream {
     std::function<bool(int status, std::string_view head)> on_head;
     // A piece of the body; false stops.
     std::function<bool(std::string_view data)> on_data;
-    const std::atomic<bool>* cancel = nullptr;  // set: stops within a quarter of a second
+    const std::atomic<bool>* cancel = nullptr;  // set: stops within a quarter of a second (as httpRequest's)
     int idle_s                      = 30;       // nothing received for so long: the server is given up
     int redirects = 5;  // followed at most (301, 302, 303, 307, 308); the token goes to its own site only
 };

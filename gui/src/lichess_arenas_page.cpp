@@ -223,8 +223,8 @@ std::optional<Notice> LichessArenasPage::listNotice() const {
     // Without a list, why none came; with one, why it is not the latest.
     auto text =
         list.value ? trf("The list shown was read earlier: {}.", lichess::describe(list)) : lichess::gaveNothing(list);
-    return lichessNotice(list, std::move(text), app_.lichessAccess({}),
-                         retries_.state(Retry::ArenaList, lichess::apiHost()));
+    // Asked without the token: a 401 is Lichess refusing, which no link changes.
+    return lichessNotice(list, std::move(text), withoutToken(), retries_.state(Retry::ArenaList, lichess::apiHost()));
 }
 
 std::optional<Notice> LichessArenasPage::swissesNotice() const {
@@ -242,11 +242,52 @@ void LichessArenasPage::drawRepair(const Notice& notice, const char* id) {
     if (const auto* fix = drawNotice(notice, id)) repair(*fix);
 }
 
+std::optional<Notice> LichessArenasPage::standingNotice() const {
+    if (!tour_follow_) return std::nullopt;
+    const auto& f          = *tour_follow_;
+    lichess::Failure error = f.swiss ? static_cast<const lichess::Failure&>(f.swiss_info) : f.arena;
+    // A 429 of its players' status holds the standing too: its minute said the same way.
+    if (!error.failed() && Clock::now() < f.waits_until) {
+        error.net    = lichess::NetError::RateLimited;
+        error.status = 429;
+    }
+    if (!error.failed()) return std::nullopt;
+    return lichessNotice(error, lichess::describeAlone(error), app_.lichessAccess({}),
+                         retries_.state(Retry::TourStanding, lichess::apiHost()));
+}
+
+std::optional<Notice> LichessArenasPage::arenaNotice() const {
+    if (!arena_play_ || !arena_play_->state.failed()) return std::nullopt;
+    const auto& state = arena_play_->state;
+    return lichessNotice(state, lichess::gaveNothing(state), app_.lichessAccess({}),
+                         retries_.state(Retry::ArenaPage, lichess::apiHost()));
+}
+
+std::optional<Notice> LichessArenasPage::swissNotice(const lichess::Failure& failure) const {
+    if (!failure.failed()) return std::nullopt;
+    return lichessNotice(failure, lichess::gaveNothing(failure), app_.lichessAccess({}),
+                         retries_.state(Retry::SwissPage, lichess::apiHost()));
+}
+
+std::optional<Notice> LichessArenasPage::refusalNotice(const lichess::Failure& failure) const {
+    if (!failure.failed()) return std::nullopt;
+    // Joining, pausing and withdrawing need tournament:write; never sent again by a button.
+    return lichessNotice(failure, lichess::describeAlone(failure), app_.lichessAccess(lichess::SCOPE_TOURNAMENT_WRITE),
+                         {});
+}
+
 void LichessArenasPage::askAgain(Retry what) {
+    // Each asked at the next poll, as when its time comes.
     if (what == Retry::ArenaList) {
-        arena_card_.list.again();  // asked at the next poll, the card showing
+        arena_card_.list.again();  // the card showing
     } else if (what == Retry::TeamSwisses) {
-        arena_card_.swiss_token.clear();  // asked at once, as with a token they were not read with
+        arena_card_.swiss_token.clear();  // at once, as with a token they were not read with
+    } else if (what == Retry::TourStanding && tour_follow_) {
+        tour_follow_->asked = {};  // the mosaic showing
+    } else if (what == Retry::ArenaPage && arena_play_) {
+        arena_play_->asked = {};
+    } else if (what == Retry::SwissPage && swiss_play_) {
+        swiss_play_->asked = {};
     }
 }
 
@@ -1068,20 +1109,9 @@ void LichessArenasPage::drawMosaicHead() {
         stopFollowing();
         return;
     }
-    // Lichess refused too many requests: the standing waits its minute, the games go on.
-    const auto now = Clock::now();
-    if (now < f.waits_until) {
-        const auto left = std::chrono::duration_cast<std::chrono::seconds>(f.waits_until - now).count() + 1;
-        ImGui::TextColored(
-            ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s",
-            trf("Too many requests (429): the standing waits a minute ({} s left); the games go on, their "
-                "streams apart.",
-                left)
-                .c_str());
-    } else if (const auto& error = f.swiss ? static_cast<const lichess::Failure&>(f.swiss_info) : f.arena;
-               error.failed()) {
-        ImGui::TextDisabled("· %s", lichess::describeAlone(error).c_str());
-    }
+    // Why the standing is not the latest, with its repair (#146): Lichess's pause counted down on Try again (the games
+    // go on meanwhile, their streams apart), an outage, Lichess in trouble, a token refused.
+    if (const auto notice = standingNotice()) drawRepair(*notice, "tour_standing");
 }
 
 void LichessArenasPage::drawStanding() {
@@ -1468,7 +1498,10 @@ void LichessArenasPage::drawArenaPart() {
     tip(TR("The list of the arenas you can play; leaving this one pauses you in it."));
     ImGui::Dummy(ImVec2(0, px(4)));
     if (!state) {
-        ImGui::TextDisabled("%s", a.state.failed() ? lichess::gaveNothing(a.state).c_str() : TR("Asking Lichess…"));
+        if (const auto notice = arenaNotice())  // with its repair (#146)
+            drawRepair(*notice, "arena_page");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
         return;
     }
     // Over: its end, its games, their review.
@@ -1511,7 +1544,7 @@ void LichessArenasPage::drawArenaPart() {
             coloured(trf("Waiting for a game… joined again {} s ago", since), ui::ACCENT);
             wrapped(TR("The next game opens on the Board by itself."), true);
         }
-        if (a.error.failed()) coloured(lichess::describeAlone(a.error), ui::WARN);
+        if (const auto notice = refusalNotice(a.error)) drawRepair(*notice, "arena_error");
         // The games played from here.
         if (!a.games.empty()) {
             ImGui::TextDisabled("%s", trn("{} game played from here in this arena",
@@ -1566,7 +1599,7 @@ void LichessArenasPage::drawArenaPart() {
                 ImGui::TextDisabled("%s", a.join_job.valid() ? TR("Joining…") : TR("Enter"));
             }
             if (a.error.failed()) {
-                coloured(lichess::describeAlone(a.error), ui::WARN);
+                if (const auto notice = refusalNotice(a.error)) drawRepair(*notice, "arena_error");
                 if (team) {
                     for (const auto& c : state->info.conditions)
                         if (c.kind == lichess::TourCondition::Kind::Team) {
@@ -1823,7 +1856,10 @@ void LichessArenasPage::drawSwissPart() {
     }
     ImGui::Dummy(ImVec2(0, px(4)));
     if (!info) {
-        ImGui::TextDisabled("%s", s.info.failed() ? lichess::gaveNothing(s.info).c_str() : TR("Asking Lichess…"));
+        if (const auto notice = swissNotice(s.info))  // with its repair (#146)
+            drawRepair(*notice, "swiss_page");
+        else
+            ImGui::TextDisabled("%s", TR("Asking Lichess…"));
         return;
     }
     const bool over = info->state == lichess::TourState::Finished;
@@ -1883,9 +1919,10 @@ void LichessArenasPage::drawSwissPart() {
                 ImGui::TextDisabled("%s", r.performance > 0 ? std::to_string(r.performance).c_str() : "–");
             }
             ImGui::EndTable();
+        } else if (const auto notice = swissNotice(s.rows)) {
+            drawRepair(*notice, "swiss_rows");
         } else {
-            ImGui::TextDisabled("%s",
-                                s.rows.failed() ? lichess::gaveNothing(s.rows).c_str() : TR("No game played yet."));
+            ImGui::TextDisabled("%s", TR("No game played yet."));
         }
         ImGui::PopTextWrapPos();
         ui::endCard();
@@ -1999,7 +2036,7 @@ void LichessArenasPage::drawSwissPart() {
                 tip(TR("Lichess pairs you no more from the next round; your points stay."));
             }
             if (s.error.failed()) {
-                coloured(lichess::describeAlone(s.error), ui::WARN);
+                if (const auto notice = refusalNotice(s.error)) drawRepair(*notice, "swiss_error");
                 if (!s.team_id.empty()) {
                     wrapped(TR("Joining a team is done on lichess.org: RookStudio does not manage teams."), true);
                     if (ImGui::SmallButton(TR("Open the team on lichess.org##swiss")))

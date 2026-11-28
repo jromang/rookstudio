@@ -29,6 +29,7 @@
 #include "board_view.hpp"
 #include "databases.hpp"
 #include "focus_words.hpp"
+#include "guide.hpp"
 #include "https.hpp"
 #include "jobs.hpp"
 #include "lichess_account.hpp"
@@ -36,6 +37,7 @@
 #include "lichess_bot_page.hpp"
 #include "mock_engines.hpp"
 #include "model.hpp"
+#include "notice.hpp"
 #include "scripted_server.hpp"
 #include "test_support.hpp"
 
@@ -642,5 +644,16 @@ TEST_CASE("Lichess bot's module without App: a token Lichess refuses puts the bo
               std::vector<std::string>{"Put the Lichess bot online", "The Lichess bot's card"});
         frames.draw(app, [&] { bot.drawEnginePart(app.library[0], false); });
         CHECK(app.revoked.empty());  // its token stays: linking its account again replaces it
+        // Said as a notice in place of its line (#146), an error, with its own link: the bot's account, not the
+        // user's (never given to the program).
+        const auto notice = bot.onlineNotice();
+        REQUIRE(notice);
+        CHECK(notice->level == Notice::Level::Error);
+        CHECK(notice->text == "Lichess refused the bot's token: link its account again.");
+        REQUIRE(notice->fixes.size() == 1);
+        CHECK(notice->fixes[0].kind == Fix::Kind::LinkLichess);
+        CHECK(notice->fixes[0].label == "Link the bot's account…");
+        CHECK(notice->fixes[0].path == lichess::SCOPE_BOT_PLAY);
+        CHECK(noticeTopic(*notice) == std::string(guide::topics::LichessBot));
     }
 }

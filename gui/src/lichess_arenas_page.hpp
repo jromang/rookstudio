@@ -123,6 +123,14 @@ class LichessArenasPage {
     // module's own (queued through the host's pause), the others the program's.
     [[nodiscard]] std::optional<Notice> listNotice() const;
     [[nodiscard]] std::optional<Notice> swissesNotice() const;
+    // The same for the tournament followed in the mosaic (its standing not read, or not the latest: the host's pause
+    // counted down), the arena the user plays (its page) and the Swiss they play or look at (its page, its standing),
+    // each with Try again asking its page again; a join, a pause or a withdrawal Lichess refused, with the link or the
+    // permission it lacks, without a Try again (the user's gesture to make again). None while nothing failed.
+    [[nodiscard]] std::optional<Notice> standingNotice() const;
+    [[nodiscard]] std::optional<Notice> arenaNotice() const;
+    [[nodiscard]] std::optional<Notice> swissNotice(const lichess::Failure& failure) const;
+    [[nodiscard]] std::optional<Notice> refusalNotice(const lichess::Failure& failure) const;
     void repair(const Fix& fix);
 
    private:

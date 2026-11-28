@@ -290,6 +290,33 @@ void LichessBotPage::keepBotAccount(const lichess::Account& account) {
         app_.revokeToken(bot_account_->token);
     }
     bot_account_ = account;
+    // A token refused before: this one replaces it, its error goes.
+    if (bot_token_refused_) {
+        bot_online_error_.clear();
+        bot_token_refused_ = false;
+    }
+}
+
+std::optional<Notice> LichessBotPage::onlineNotice() const {
+    if (bot_online_error_.empty()) return std::nullopt;
+    Notice n{bot_token_refused_ ? Notice::Level::Error : Notice::Level::Warning, bot_online_error_, {}, {}};
+    n.topic = guide::topics::LichessBot;
+    if (bot_token_refused_ && !bot_link_ && !bot_check_.valid()) {
+        // Its own link: Lichess's page logged in with the bot's account, as its card's step 2 makes it.
+        Fix link;
+        link.kind  = Fix::Kind::LinkLichess;
+        link.label = TR("Link the bot's account…");
+        link.tooltip =
+            TR("Lichess's page opens: log in with the bot's account, not yours (a private window avoids "
+               "logging you out). The permission asked: play as a bot (bot:play).");
+        link.path = lichess::SCOPE_BOT_PLAY;
+        n.fixes.push_back(std::move(link));
+    }
+    return n;
+}
+
+void LichessBotPage::repair(const Fix& fix) {
+    if (fix.kind == Fix::Kind::LinkLichess) startBotLink();
 }
 
 void LichessBotPage::forgetBotAccount() {
@@ -329,7 +356,8 @@ void LichessBotPage::setBotOnline(bool online) {
     if (online) {
         if (!botReady()) return;
         bot_online_error_.clear();
-        bot_online_  = true;
+        bot_token_refused_ = false;
+        bot_online_        = true;
         bot_closing_ = false;
         if (!bot_events_ || bot_events_->token() != bot_account_->token)
             bot_events_ = std::make_unique<lichess::EventListener>(bot_account_->token);
@@ -539,7 +567,8 @@ void LichessBotPage::poll() {
         if (!isReady(c.reply)) continue;
         const auto r = c.reply.get();
         if (r.ok) continue;
-        bot_online_error_ = trf("{}: {}", c.what, lichess::describe(r));
+        bot_online_error_  = trf("{}: {}", c.what, lichess::describe(r));
+        bot_token_refused_ = false;
         if (!c.accepted.empty() && c.accepted == bot_accepted_) bot_accepted_.clear();  // not to be played
     }
     std::erase_if(bot_calls_, [](const auto& c) { return !c.reply.valid(); });
@@ -561,7 +590,8 @@ void LichessBotPage::poll() {
     // Its event stream: the challenges, its games' starts and ends.
     if (bot_events_) {
         if (bot_events_->refused()) {
-            bot_online_error_ = TR("Lichess refused the bot's token: link its account again.");
+            bot_online_error_  = TR("Lichess refused the bot's token: link its account again.");
+            bot_token_refused_ = true;
             bot_events_.reset();
             bot_online_ = bot_closing_ = false;
         } else {
@@ -1210,7 +1240,9 @@ void LichessBotPage::drawBotRules(const EngineEntry& e, bool enter_below) {
         TR("What leaves the machine: the engine's moves, its words in the chat, its answers to the challenges, with "
            "the bot's token; nothing of your account. Its profile (name, description) is set on lichess.org."),
         true);
-    if (!bot_online_error_.empty()) coloured(bot_online_error_, ui::WARN);
+    if (const auto notice = onlineNotice()) {
+        if (const auto* fix = drawNotice(*notice, "bot_online_error")) repair(*fix);
+    }
     const bool missing = e.program_state == ProgramState::Missing || e.program_state == ProgramState::MissingDir;
     if (missing) coloured(trf("{}'s program is missing: locate it above first.", e.name), ui::WARN);
     // Enter is the Lichess analysis part's when it shows a button of its own (#96).
@@ -1268,7 +1300,9 @@ void LichessBotPage::drawBotOnline() {
     } else {
         ImGui::TextDisabled("%s", TR("No new challenge; the game in progress goes on to its end."));
     }
-    if (!bot_online_error_.empty()) coloured(bot_online_error_, ui::WARN);
+    if (const auto notice = onlineNotice()) {
+        if (const auto* fix = drawNotice(*notice, "bot_online_error")) repair(*fix);
+    }
     if (const auto broke = bot_events_ ? bot_events_->failure() : lichess::Failure{};
         bot_events_ && !bot_events_->connected() && broke.failed())
         coloured(broke.net == lichess::NetError::Offline

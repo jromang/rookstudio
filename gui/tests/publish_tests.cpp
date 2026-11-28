@@ -601,4 +601,16 @@ TEST_CASE("publish: beyond a page's games, a page per game in a folder, and thei
     CHECK_FALSE(
         writeGamePages(folder / "again", games.size(), read, HtmlOptions{}, look, "Club 2026", &cancel).empty());
     CHECK_FALSE(fs::exists(folder / "again" / "index.html"));
+    // A page that cannot be written (a folder in its place): the file told, for the page to say its folder (#146).
+    fs::create_directories(folder / "blocked" / "0001-moreau-claire-lindqvist-erik.html");
+    fs::path unwritten;
+    CHECK_FALSE(writeGamePages(folder / "blocked", games.size(), read, HtmlOptions{}, look, "Club 2026", nullptr,
+                               nullptr, &unwritten)
+                    .empty());
+    CHECK(unwritten == folder / "blocked" / "0001-moreau-claire-lindqvist-erik.html");
+    unwritten.clear();
+    CHECK(writeGamePages(folder / "fine", games.size(), read, HtmlOptions{}, look, "Club 2026", nullptr, nullptr,
+                         &unwritten)
+              .empty());
+    CHECK(unwritten.empty());
 }

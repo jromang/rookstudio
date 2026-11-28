@@ -163,7 +163,10 @@ constexpr std::string_view OPENING_PREFIX = "opening:";
 }  // namespace
 
 PuzzlesPage::PuzzlesPage(PuzzlesContext& app)
-    : app_(app), offline_puzzles_(std::make_unique<OfflinePuzzles>(app.jobs(), app.profileDir() / "lichess-puzzles")) {}
+    : app_(app),
+      retries_([this](const std::string& host) { return app_.pausedFor(host); },
+               [this](Retry what) { askAgain(what); }),
+      offline_puzzles_(std::make_unique<OfflinePuzzles>(app.jobs(), app.profileDir() / "lichess-puzzles")) {}
 
 PuzzlesPage::~PuzzlesPage() = default;
 
@@ -223,6 +226,32 @@ void PuzzlesPage::saveOnlineBatch() {
                                 true);
 }
 
+std::optional<Notice> PuzzlesPage::onlineNotice() const {
+    if (online_error_.empty()) return std::nullopt;
+    // The batch's requests carry the token, which reads and writes puzzles; refused for want of a permission, the
+    // token lacks it as far as Lichess knows, whatever the account says.
+    auto access = app_.lichessAccess(lichess::SCOPE_PUZZLE_WRITE);
+    if (online_failure_.net == lichess::NetError::Forbidden) std::erase(access.scopes, access.needs);
+    return lichessNotice(online_failure_, online_error_, access,
+                         retries_.state(Retry::PuzzleBatch, lichess::apiHost()));
+}
+
+void PuzzlesPage::repair(const Fix& fix) {
+    if (!retries_.carryOut(fix)) app_.repair(fix);
+}
+
+void PuzzlesPage::askAgain(Retry what) {
+    if (what != Retry::PuzzleBatch) return;
+    // As "Try again now" did: the answers of a batch done sent again, else a batch asked.
+    online_retry_ = {};
+    online_error_.clear();
+    online_failure_ = {};
+    if (const auto* batch = onlineBatch(); batch && batch->complete())
+        sendOnlineResults();
+    else
+        askOnlineBatch();
+}
+
 bool PuzzlesPage::puzzleScopes() const {
     const auto* account = app_.lichessAccount();
     return account && account->has(lichess::SCOPE_PUZZLE_READ) && account->has(lichess::SCOPE_PUZZLE_WRITE);
@@ -243,7 +272,7 @@ void PuzzlesPage::askPuzzleScopes() {
 void PuzzlesPage::askOnlineBatch() {
     if (online_ask_.valid() || online_send_.valid() || !puzzleScopes()) return;
     online_error_.clear();
-    online_status_    = 0;
+    online_failure_   = {};
     std::string angle = puzzles_theme_.empty() ? std::string("mix") : puzzles_theme_;
     if (angle.rfind(OPENING_PREFIX, 0) == 0) angle = angle.substr(OPENING_PREFIX.size());
     online_ask_ = std::async(std::launch::async, [token      = app_.lichessAccount()->token, angle,
@@ -257,7 +286,7 @@ void PuzzlesPage::sendOnlineResults() {
     auto* batch = onlineBatch();
     if (!batch || batch->results.empty() || online_send_.valid() || online_ask_.valid() || !puzzleScopes()) return;
     online_error_.clear();
-    online_status_ = 0;
+    online_failure_ = {};
     // The next batch in the same answer, unless another theme or difficulty was chosen since: then asked after.
     std::string angle = puzzles_theme_.empty() ? std::string("mix") : puzzles_theme_;
     if (angle.rfind(OPENING_PREFIX, 0) == 0) angle = angle.substr(OPENING_PREFIX.size());
@@ -294,10 +323,11 @@ void PuzzlesPage::poll() {
             }
         }
     }
-    // Online: a batch asked for, results sent.
+    // Online: a Try again queued through the host's pause, asked once it is over; a batch asked for, results sent.
+    retries_.poll();
     if (isReady(online_ask_)) {
-        auto answer    = online_ask_.get();
-        online_status_ = answer.status;
+        auto answer     = online_ask_.get();
+        online_failure_ = answer.value ? lichess::Failure{} : static_cast<const lichess::Failure&>(answer);
         if (answer.value && !answer.value->puzzles.empty()) {
             lichess::OnlineBatch b;
             std::string angle = puzzles_theme_.empty() ? std::string("mix") : puzzles_theme_;
@@ -323,9 +353,9 @@ void PuzzlesPage::poll() {
         }
     }
     if (isReady(online_send_)) {
-        auto answer    = online_send_.get();
-        online_status_ = answer.status;
-        auto* batch    = onlineBatch();
+        auto answer     = online_send_.get();
+        online_failure_ = answer.value ? lichess::Failure{} : static_cast<const lichess::Failure&>(answer);
+        auto* batch     = onlineBatch();
         if (answer.value && batch) {
             const auto count = batch->results.size();
             lichess::OnlineBatch b;
@@ -350,7 +380,17 @@ void PuzzlesPage::poll() {
             // through stays said as it was.
             if (answer.net != lichess::NetError::Unauthorized && answer.net != lichess::NetError::Forbidden)
                 online_retry_ = Clock::now() + std::chrono::seconds(61);
+            else if (const auto* account = app_.lichessAccount())
+                online_refused_token_ = account->token;
         }
+    }
+    // The token Lichess refused, the account linked again since (Link Lichess again…): the answers kept go with the
+    // new one, by themselves, as they would have gone.
+    if (const auto* account = app_.lichessAccount();
+        account && !online_refused_token_.empty() && account->token != online_refused_token_) {
+        online_refused_token_.clear();
+        online_error_.clear();
+        online_failure_ = {};
     }
     // A batch done and not taken yet (a 429, a cut, the program closed meanwhile): sent again.
     if (app_.lichessAccount() && puzzleScopes() && !online_ask_.valid() && !online_send_.valid()) {
@@ -1234,14 +1274,17 @@ void PuzzlesPage::drawPuzzleEnd() {
     if (p.source == PuzzleRun::Source::Online) {
         ImGui::Dummy(ImVec2(0, px(4)));
         const auto* batch = onlineBatch();
-        if (online_send_.valid())
+        if (online_send_.valid()) {
             wrapped(TR("Sending the batch's answers to Lichess…"), true);
-        else if (!online_error_.empty())
+        } else if (!online_error_.empty()) {
             wrapped(trf("Lichess has not taken the batch's answers yet ({}): they are kept, and sent again by "
                         "themselves.",
                         online_error_),
                     true);
-        else if (batch && batch->sent_status == "accepted" && batch->results.empty() && batch->sent_at > 0)
+            // Its repair under the words (#146), as the Puzzles part offers it.
+            if (const auto notice = onlineNotice())
+                if (const auto* fix = drawFixes(*notice, "puzzle_send_fixes")) repair(*fix);
+        } else if (batch && batch->sent_status == "accepted" && batch->results.empty() && batch->sent_at > 0)
             wrapped(trf("Lichess took your {} answers; the next batch is here: {} puzzles.", batch->sent_count,
                         batch->puzzles.size()),
                     true);
@@ -1664,33 +1707,23 @@ void PuzzlesPage::drawOnlinePuzzles(bool& enter) {
                                        : trf("The last results sent: {}, {} answers.", text, batch->sent_count))
                                       .c_str());
     }
-    // What went wrong, and what is kept.
-    if (!online_error_.empty()) {
-        beginTinted("##puzzle_online_error", ui::WARN, PAGE_TINT);
+    // What went wrong, in place of its line with its repair (#146), and what is kept.
+    if (const auto notice = onlineNotice()) {
         ImGui::PushTextWrapPos();
-        ui::inlineIcon(ui::Icon::Alert, ui::WARN);
-        ImGui::SameLine();
-        const bool kept = batch && !batch->results.empty();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", online_error_.c_str());
-        if (online_status_ == 401 || online_status_ == 403) {
+        if (const auto* fix = drawNotice(*notice, "puzzle_online_error")) repair(*fix);
+        const bool kept    = batch && !batch->results.empty();
+        const auto net     = online_failure_.net;
+        const bool refused = net == lichess::NetError::Unauthorized || net == lichess::NetError::Forbidden;
+        if (kept && refused) {
             wrapped(TR("Your answers are kept. Link the account again (Lichess page), then they are sent."), true);
         } else if (kept) {
-            wrapped(online_status_ == 429
+            wrapped(net == lichess::NetError::RateLimited
                         ? TR("Too many requests: sent again by itself in a minute; your answers are kept, even if "
                              "RookStudio is closed meanwhile.")
                         : TR("Your answers are kept, and sent again by themselves in a minute."),
                     true);
         }
-        if (ImGui::SmallButton(TR("Try again now"))) {
-            online_retry_ = {};
-            online_error_.clear();
-            if (batch && batch->complete())
-                sendOnlineResults();
-            else
-                askOnlineBatch();
-        }
         ImGui::PopTextWrapPos();
-        endTinted();
     }
     ImGui::TextDisabled("%s", TR("What leaves the machine: the batch asked for (its theme, its difficulty), then each "
                                  "puzzle's id with right or wrong, rated or not; your last 30 days are asked once a "

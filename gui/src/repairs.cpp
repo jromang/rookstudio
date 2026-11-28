@@ -25,6 +25,12 @@ std::string lacksSentence(const std::string& scope) {
 
 }  // namespace
 
+LichessAccess withoutToken() {
+    LichessAccess access;
+    access.token = false;
+    return access;
+}
+
 Notice lichessNotice(const lichess::Failure& failure, std::string text, const LichessAccess& access,
                      const RetryState& retry, Notice::Level level) {
     using lichess::Asked;
@@ -36,6 +42,15 @@ Notice lichessNotice(const lichess::Failure& failure, std::string text, const Li
     switch (failure.net) {
         case NetError::Unauthorized:
             if (failure.asked == Asked::Page || failure.asked == Asked::Link) break;  // private; a link's own card
+            if (!access.token) {
+                // Asked without the token: no link changes it. Lichess refusing, as any refusal it gives a page (its
+                // words, else its status), not a token to link again; the page's Try again, when it has one.
+                auto refused = failure;
+                refused.net  = NetError::Server;
+                n.text       = lichess::gaveNothing(refused);
+                tryAgain(n, retry, host);
+                break;
+            }
             n.level = Notice::Level::Error;
             if (access.linked) {
                 n.text   = TR("Lichess refused the token: it was revoked or has expired.");

@@ -730,17 +730,25 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     };
     const auto listAsked = [&] { return static_cast<int>(lichess.seen("/api/tournament").size()); };
 
-    // A token refused (401): the arenas and the teams' Swiss tournaments say it alike, as the studies card does, with
-    // Link Lichess again…, which the program carries out.
+    // A token refused (401): the teams' Swiss tournaments, asked with the token, say it as the studies card does, with
+    // Link Lichess again…, which the program carries out. The arenas' list is asked without it: Lichess refusing, which
+    // no link changes, with the module's Try again.
     lichess.refuse = 401;
     REQUIRE(drawn([&] { return arenas.listNotice() && arenas.swissesNotice(); }));
-    for (const auto& n : {*arenas.listNotice(), *arenas.swissesNotice()}) {
+    {
+        const auto n = *arenas.swissesNotice();
         CHECK(n.level == Notice::Level::Error);
         CHECK(n.text == "Lichess refused the token: it was revoked or has expired.");
         REQUIRE(n.fixes.size() == 1);
         CHECK(n.fixes[0].kind == Fix::Kind::LinkLichess);
         CHECK(n.fixes[0].label == "Link Lichess again…");
         CHECK(n.fixes[0].path.empty());  // the account has team:read already
+        const auto list = *arenas.listNotice();
+        CHECK(list.level == Notice::Level::Warning);
+        CHECK(list.text == "Lichess gave nothing (Lichess answered 401).");
+        REQUIRE(list.fixes.size() == 1);
+        CHECK(list.fixes[0].kind == Fix::Kind::RetryAfterPause);
+        CHECK(list.fixes[0].label == "Try again");
     }
     arenas.repair(arenas.swissesNotice()->fixes[0]);
     REQUIRE(app.repairs.size() == 1);
@@ -763,7 +771,7 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     arenas.repair(retryAfterPauseFix(Retry::ArenaList, host));
     REQUIRE(drawn([&] {
         const auto n = arenas.listNotice();
-        return listAsked() == asked + 1 && n && n->level == Notice::Level::Warning;
+        return listAsked() == asked + 1 && n && n->text == "Lichess gave nothing (Lichess answered 503).";
     }));
     auto notice = *arenas.listNotice();
     CHECK(notice.text == "Lichess gave nothing (Lichess answered 503).");
@@ -805,6 +813,66 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     }
     CHECK(listAsked() == asked + 1);
     CHECK(app.repairs.size() == 1);
+}
+
+TEST_CASE("Lichess arenas' module without App: the followed tournament's standing said with its repair (#146)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(50ms);  // the host's minute after a 429, short for the test
+    const ScratchDir profile("arenas-standing-repairs");
+    FakeApp app(profile);
+    app.account = sampleAccount({});
+    Frames frames;
+    LichessArenasPage arenas(app);
+    const auto host  = lichess::apiHost();
+    const auto asked = [&] { return static_cast<int>(lichess.seen("/api/tournament/rap1d100").size()); };
+    const auto shown = [&] {
+        frames.draw(app, [&] { arenas.drawMosaicHead(); });
+        arenas.poll();
+    };
+
+    // Lichess in trouble (503): the mosaic's head says it, with Try again, the module's own, asked at once.
+    lichess.refuse = 503;
+    REQUIRE(applied(arenas, "arena-mosaic=rap1d100"));
+    REQUIRE(waitUntil([&] {
+        shown();
+        return arenas.standingNotice().has_value();
+    }));
+    auto notice = *arenas.standingNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Lichess answered 503");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::RetryAfterPause);
+    CHECK(notice.fixes[0].label == "Try again");
+    int before     = asked();
+    lichess.refuse = 429;
+    arenas.repair(notice.fixes[0]);
+    REQUIRE(waitUntil([&] {
+        shown();
+        const auto n = arenas.standingNotice();
+        return asked() == before + 1 && n && n->text == "Lichess asked for a pause after too many requests.";
+    }));
+    CHECK(app.repairs.empty());  // the module's own: not the program's
+
+    // Its pause (429), counted down on Try again; a click queues it.
+    app.pauses[host] = 42s;
+    notice           = *arenas.standingNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again in 0:42");
+    arenas.repair(notice.fixes[0]);
+    notice = *arenas.standingNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Asks again in 0:42");
+    CHECK(notice.fixes[0].disabled);
+    // The pause over: asked, and the standing comes.
+    app.pauses[host] = 0ms;
+    lichess.refuse   = 0;
+    REQUIRE(waitUntil([&] {
+        shown();
+        return !arenas.standingNotice();
+    }));
+    CHECK(app.repairs.empty());
 }
 
 TEST_CASE(

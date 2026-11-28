@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -35,6 +36,7 @@
 #include "mock_engines.hpp"
 #include "model.hpp"
 #include "noon_clock.hpp"
+#include "repairs.hpp"
 #include "test_support.hpp"
 #include "training.hpp"
 
@@ -140,6 +142,15 @@ class FakeApp final : public GuessContext {
 
     // Fair play; the analysis engine; the Board's own game and its tree.
     bool liveGameOn() const override { return live_game; }
+
+    // The repairs (#146): the fixes the program was given; no account, no host's pause.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess a;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string&) const override { return std::chrono::milliseconds(0); }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
     const EngineEntry* analysisEngine() override { return engine ? &*engine : nullptr; }
     const AnalysisSettings& analysisSettings() override { return analysis_; }
     context::ShownGame shownGame() const override {
@@ -166,6 +177,8 @@ class FakeApp final : public GuessContext {
     ReplayGame shown;  // the Board's own game
     int shown_ply = 0;
     std::string shown_title;
+
+    std::vector<Fix> repairs;
 
    private:
     fs::path profile_;
@@ -426,4 +439,51 @@ TEST_CASE("guess page: without an engine nothing starts, and a game at its last 
         },
         "Study");
     CHECK_FALSE(offered);
+}
+
+TEST_CASE("guess page: why a game did not start said with its repair, no engine or a damaged database (#146)") {
+    ScratchDir profile("guess-page-repairs");
+    fs::path folder;
+    {
+        JobGroup jobs;
+        DatabaseShelf shelf(jobs, profile);
+        folder = shelf.entries()[shelf.create("Damaged")].folder;
+    }
+    std::ofstream(folder / "manifest.json", std::ios::binary | std::ios::trunc) << "{ not json";
+    FakeApp app(profile);
+    app.shown = readGame(LONG_PGN);
+    GuessPage page(app);
+
+    // No engine to score with: said on the part too, with Choose an engine…, which the program carries out.
+    FocusWords words("guess-board");
+    page.addFocusWords(words, "guess-board");
+    CHECK_FALSE(page.onBoard());
+    REQUIRE(page.startNotice());
+    auto notice = *page.startNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "No engine to score with: add one on the Engines page.");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::ChooseEngine);
+    CHECK(notice.fixes[0].label == "Choose an engine…");
+    page.repair(notice.fixes[0]);
+    REQUIRE(app.repairs.size() == 1);
+    CHECK(app.repairs[0].kind == Fix::Kind::ChooseEngine);
+
+    // With one, a game of the database asked for, which does not open: a file of it is damaged, Check the database….
+    app.engine = mockEngine();
+    Frames frames;
+    frames.draw(app, [&] { page.drawPart(); });
+    runCommand(page, "Guess the moves: a random game");
+    CHECK_FALSE(page.onBoard());
+    REQUIRE(page.startNotice());
+    notice = *page.startNotice();
+    CHECK(notice.level == Notice::Level::Error);
+    CHECK(notice.text == "“Damaged” cannot be opened: a file of the database is damaged");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::CheckDatabase);
+    CHECK(notice.fixes[0].index == 0);
+    frames.draw(app, [&] { page.drawPart(); });
+    page.repair(notice.fixes[0]);
+    REQUIRE(app.repairs.size() == 2);
+    CHECK(app.repairs[1].kind == Fix::Kind::CheckDatabase);
 }

@@ -38,6 +38,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "keyboard.hpp"
+#include "repairs.hpp"
 #include "review_bridge.hpp"
 #include "training.hpp"
 #include "ui.hpp"
@@ -327,20 +328,24 @@ void MistakesPage::poll() {
         auto key              = mistakeScanKey();
         if (key != mistake_scan_of_) {
             std::vector<MistakeSource> sources;
+            MistakeScanJob job;
             auto& s = app_.shelf();
             for (std::size_t i = 0; i < s.entries().size(); ++i) {
                 const auto& e = s.entries()[i];
                 if (e.source) continue;
-                if (const auto db = s.open(i)) sources.push_back({e.name, e.folder, db->snapshot()});
+                if (const auto db = s.open(i)) {
+                    sources.push_back({e.name, e.folder, db->snapshot()});
+                    job.databases.push_back(i);
+                }
             }
-            MistakeScanJob job;
             job.of = std::move(key);
             job.done =
                 std::async(std::launch::async, [sources = std::move(sources), names = app_.userNames(),
                                                 analyses = app_.profileDir() / "analyses", before = mistakeRecord(),
-                                                language = lang(), cancel = job.cancel] {
+                                                language = lang(), cancel = job.cancel, reading = job.reading] {
                     study::enterBackground();
-                    return scanMistakes(sources, names, analyses, before, RECENT_GAMES, language, cancel.get());
+                    return scanMistakes(sources, names, analyses, before, RECENT_GAMES, language, cancel.get(),
+                                        reading.get());
                 });
             mistake_scan_job_ = std::move(job);
         }
@@ -349,12 +354,20 @@ void MistakesPage::poll() {
         MistakeScan scan;
         try {
             scan = mistake_scan_job_->done.get();
+            if (!scan.cancelled) mistake_scan_notice_.reset();
         } catch (const std::exception& e) {
-            // A database that cannot be read: the exercises found before kept, why said at the Board's corner and in
-            // the log; looked for again once the databases change.
-            app_.toast(loggedStoreError(trf("Your games could not be looked through: {}.", storeErrorText(e)), e));
-            mistake_scan_of_ = mistake_scan_job_->of;
-            scan.cancelled   = true;  // nothing of it taken
+            // A database that cannot be read: the exercises found before kept, why said at the Board's corner, in the
+            // log and on the part, a damaged file with the check of the database it came from (#146); looked for
+            // again once the databases change.
+            const auto said =
+                loggedStoreError(trf("Your games could not be looked through: {}.", storeErrorText(e)), e);
+            app_.toast(said);
+            const auto& job      = *mistake_scan_job_;
+            const auto reading   = *job.reading;
+            const int database   = reading < job.databases.size() ? static_cast<int>(job.databases[reading]) : -1;
+            mistake_scan_notice_ = storeNotice(StoreFailure{said, storeFailureOf(e).code}, database);
+            mistake_scan_of_     = mistake_scan_job_->of;
+            scan.cancelled       = true;  // nothing of it taken
         }
         if (!scan.cancelled) {
             // The cards as they are now: answers given while it looked are kept, those of exercises it no longer
@@ -618,6 +631,13 @@ void MistakesPage::drawPart() {
                       "clear. Your games: those you played as {} (Settings › Your names).",
                       who),
             true);
+    }
+    // Why the games could not be looked through, with its repair (#146).
+    if (mistake_scan_notice_) {
+        if (const auto* fix = drawNotice(*mistake_scan_notice_, "mistake_scan")) {
+            const auto clicked = *fix;
+            repair(clicked);
+        }
     }
     if (names.empty()) {
         beginTinted("##mistake_names", ui::ACCENT);

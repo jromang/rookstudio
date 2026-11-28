@@ -33,6 +33,7 @@
 #include "jobs.hpp"
 #include "mock_engines.hpp"
 #include "model.hpp"
+#include "repairs.hpp"
 #include "test_support.hpp"
 #include "training.hpp"
 #include "vision.hpp"
@@ -129,6 +130,15 @@ class FakeApp final : public VisionContext {
     // Fair play.
     bool liveGameOn() const override { return live_game; }
 
+    // The repairs (#146): the fixes the program was given; no account, no host's pause.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess a;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string&) const override { return std::chrono::milliseconds(0); }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
+
     // The Play page's opponent: the test's engine at full strength, its own openings.
     const PlaySettings& playSettings() override { return play_; }
     const EngineEntry* playEngine() override { return engines.empty() ? nullptr : &engines.front(); }
@@ -154,6 +164,8 @@ class FakeApp final : public VisionContext {
     std::optional<TrainingPart> training_part;
     bool live_game    = false;
     std::vector<EngineEntry> engines;
+
+    std::vector<Fix> repairs;
 
    private:
     fs::path profile_;
@@ -392,19 +404,29 @@ TEST_CASE(
     Frames frames;
     VisionPage page(app);
 
-    // Without an engine in the library: nothing starts, the part says why.
+    // Without an engine in the library: nothing starts, the part says why, with Choose an engine… (#146), which the
+    // program carries out.
     FocusWords none("vision-blindfold");
     page.addFocusWords(none, "vision-blindfold");
     REQUIRE(none.applied());
     CHECK_FALSE(page.onBoard());
     CHECK(app.taken == 0);
     frames.draw(app, [&] { page.drawPart(); });
+    REQUIRE(page.startNotice());
+    CHECK(page.startNotice()->level == Notice::Level::Warning);
+    CHECK(page.startNotice()->text == "A game against an engine of your library: add one on the Engines page first.");
+    REQUIRE(page.startNotice()->fixes.size() == 1);
+    CHECK(page.startNotice()->fixes[0].kind == Fix::Kind::ChooseEngine);
+    page.repair(page.startNotice()->fixes[0]);
+    REQUIRE(app.repairs.size() == 1);
+    CHECK(app.repairs[0].kind == Fix::Kind::ChooseEngine);
 
     // The mock engine, the Play page's: the user White, every piece hidden.
     app.engines.push_back(mockEngine());
     FocusWords words("vision-blindfold");
     page.addFocusWords(words, "vision-blindfold");
     REQUIRE(page.onBoard());
+    CHECK_FALSE(page.startNotice());  // it started: what stopped the last one is over
     CHECK(app.board_title == "Blindfold · Mock");
     CHECK_FALSE(app.flip);
     const auto* v = page.session();

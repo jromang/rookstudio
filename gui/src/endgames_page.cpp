@@ -31,9 +31,11 @@
 #include "board_view.hpp"
 #include "console.hpp"
 #include "guide.hpp"
+#include "https.hpp"
 #include "i18n.hpp"
 #include "jobs.hpp"
 #include "keyboard.hpp"
+#include "lichess_api.hpp"
 #include "lichess_settings.hpp"
 #include "machines.hpp"
 #include "mistakes.hpp"
@@ -131,7 +133,39 @@ chess::Board askedBoard(const EndgameRun& r) {
 
 }  // namespace
 
-EndgamesPage::EndgamesPage(EndgamesContext& app) : app_(app) {}
+EndgamesPage::EndgamesPage(EndgamesContext& app)
+    : app_(app),
+      retries_([this](const std::string& host) { return app_.pausedFor(host); },
+               [this](Retry what) { askAgain(what); }) {}
+
+std::optional<Notice> EndgamesPage::waitingNotice() const {
+    if (!endgame_ || endgame_->waiting.empty()) return std::nullopt;
+    const auto& r = *endgame_;
+    // The page's words, which say what is kept, at the notice's level, with its repair; the tables are asked without
+    // the token.
+    auto words = r.waiting_failure.net == lichess::NetError::RateLimited
+                     ? std::string(TR("Lichess asks to wait a minute: your moves are kept, the judging goes on by "
+                                      "itself."))
+                     : trf("Lichess's tables do not answer ({}): your moves are kept, the judging goes on when the "
+                           "network comes back.",
+                           r.waiting);
+    auto n     = lichessNotice(r.waiting_failure, words, withoutToken(),
+                               retries_.state(Retry::EndgameTables, urlHost(lichess::servers().tablebase)));
+    n.text     = std::move(words);
+    return n;
+}
+
+void EndgamesPage::repair(const Fix& fix) {
+    if (!retries_.carryOut(fix)) app_.repair(fix);
+}
+
+void EndgamesPage::askAgain(Retry what) {
+    if (what != Retry::EndgameTables || !endgame_ || endgame_->waiting.empty() || endgame_->asking.valid()) return;
+    // As "Try again now" did: asked at once.
+    endgame_->retry_at = Clock::now();
+    endgame_->waiting.clear();
+    askEndgameTables();
+}
 
 EndgamesPage::~EndgamesPage() = default;
 
@@ -180,6 +214,7 @@ void EndgamesPage::startSyzygyDownload() {
 void EndgamesPage::poll() {
     // Fair play (#48): the tables are an aid; the endgame waits for a live game's end, where it is.
     if (!endgame_ || app_.liveGameOn()) return;
+    retries_.poll();  // a Try again queued through the host's pause, asked once it is over
     auto& r = *endgame_;
     // Lichess's answer.
     if (isReady(r.asking)) {
@@ -188,7 +223,7 @@ void EndgamesPage::poll() {
             keepTablebase(app_.profileDir(), r.asking_fen, *answer.value);
             r.answers[r.asking_fen] = *answer.value;
             r.waiting.clear();
-            r.waiting_net = lichess::NetError::None;
+            r.waiting_failure = {};
             if (r.asking_fen == askedBoard(r).getFen()) {
                 r.answer     = std::move(*answer.value);
                 r.answer_fen = r.asking_fen;
@@ -199,7 +234,7 @@ void EndgamesPage::poll() {
             r.waiting     = answer.value      ? std::string(TR("Lichess's tables do not know this position."))
                             : answer.failed() ? lichess::describe(answer)
                                               : std::string(TR("no answer"));
-            r.waiting_net = answer.net;
+            r.waiting_failure = answer.value ? lichess::Failure{} : static_cast<const lichess::Failure&>(answer);
             r.retry_at =
                 Clock::now() + std::chrono::seconds(answer.net == lichess::NetError::RateLimited ? 61 : RETRY_SECONDS);
         }
@@ -1555,21 +1590,11 @@ void EndgamesPage::drawEndgameColumn() {
             closeEndgame(true);
             return;
         }
-    } else if (!r.waiting.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::WARN));
-        ImGui::TextWrapped("%s",
-                           (r.waiting_net == lichess::NetError::RateLimited
-                                ? std::string(TR("Lichess asks to wait a minute: your moves are kept, the judging goes "
-                                                 "on by itself."))
-                                : trf("Lichess's tables do not answer ({}): your moves are kept, the judging goes "
-                                      "on when the network comes back.",
-                                      r.waiting))
-                               .c_str());
-        ImGui::PopStyleColor();
-        if (ImGui::SmallButton(TR("Try again now##endgame_retry"))) {
-            r.retry_at = Clock::now();
-            r.waiting.clear();
-            askEndgameTables();
+    } else if (const auto notice = waitingNotice()) {
+        // Its repair under the words (#146): Try again, the pause counted down on it.
+        if (const auto* fix = drawNotice(*notice, "endgame_waiting")) {
+            const auto clicked = *fix;
+            repair(clicked);
         }
     } else if (r.asking.valid()) {
         ImGui::TextDisabled("%s", TR("Asking Lichess's tables…"));

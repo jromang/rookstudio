@@ -125,6 +125,11 @@ void App::retryNow(Retry what) {
         case Retry::TvChannels:
         case Retry::ArenaList:
         case Retry::TeamSwisses:
+        case Retry::PuzzleBatch:
+        case Retry::EndgameTables:
+        case Retry::TourStanding:
+        case Retry::ArenaPage:
+        case Retry::SwissPage:
             break;  // the modules' own, asked by them (OwnRetries)
     }
 }

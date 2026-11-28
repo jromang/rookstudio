@@ -33,6 +33,11 @@ enum class Retry : int {
     ArenaList,        // the Lichess tournaments card: the arenas in progress and to come (its module's)
     TeamSwisses,      // the same card: the user's teams' Swiss tournaments (its module's)
     ReviewTables,     // a review's endgame: the positions Lichess's tables did not answer, asked again
+    PuzzleBatch,      // the puzzles' batch online: its answers sent again, else a batch asked (its module's)
+    EndgameTables,    // an endgame played against the tables: its position asked of Lichess's again (its module's)
+    TourStanding,     // the tournament followed in the mosaic: its standing asked again (its module's)
+    ArenaPage,        // the arena the user plays: its page asked again (its module's)
+    SwissPage,        // the Swiss the user plays or looks at: its page asked again (its module's)
 };
 
 // What fixes a problem. The App carries it out (App::applyFix); the views only show its button.

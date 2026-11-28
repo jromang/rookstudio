@@ -5,7 +5,8 @@
 // file of puzzles of our own (random games); a series of it on the Board, as its --focus word starts it: a puzzle set,
 // a right answer and a wrong one, both kept in the profile (the rating, the results, the missed one's card of the day's
 // review), the Board given back at the end as it was taken; a batch of the Lichess account solved, its answers sent
-// back in one request; a token Lichess refuses: the answers kept, sent again only when the user asks.
+// back in one request; a token Lichess refuses: the answers kept, sent again only when the user asks, or once the
+// account is linked again; why they were not taken said with its repair, Try again queued through Lichess's pause.
 #include <doctest/doctest.hpp>
 
 #include <algorithm>
@@ -39,6 +40,7 @@
 #include "https.hpp"
 #include "jobs.hpp"
 #include "lichess_account.hpp"
+#include "lichess_api.hpp"
 #include "lichess_puzzles.hpp"
 #include "noon_clock.hpp"
 #include "puzzles.hpp"
@@ -140,6 +142,20 @@ class FakeApp final : public PuzzlesContext {
     void askLichessProfile() override {}
     bool liveGameOn() const override { return live_game; }
 
+    // The repairs (#146): the account the test links, the hosts' pauses it sets, the fixes the program was given.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess a;
+        a.linked = own.has_value();
+        if (own) a.scopes = own->scopes;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string& host) const override {
+        const auto it = pauses.find(host);
+        return it == pauses.end() ? std::chrono::milliseconds(0) : it->second;
+    }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
+
     // What the module was told, and what the test sets.
     int frame_ = 0;
     std::vector<std::string> toasts;
@@ -158,6 +174,8 @@ class FakeApp final : public PuzzlesContext {
     std::vector<std::vector<std::string>> links;
     std::optional<lichess::Account> own;
     bool live_game = false;
+    std::map<std::string, std::chrono::milliseconds> pauses;
+    std::vector<Fix> repairs;
 
    private:
     fs::path profile_;
@@ -354,9 +372,11 @@ class FakeLichess {
             if (s.method == method && s.path.rfind(prefix, 0) == 0) out.push_back(s);
         return out;
     }
-    void refuse(bool refused) {
+    void refuse(bool refused) { refuseWith(refused ? 401 : 0); }
+    // The status the answers are refused with (0: taken), Lichess refusing the token, in trouble or asking a pause.
+    void refuseWith(int status) {
         std::lock_guard lock(mutex_);
-        refused_ = refused;
+        refused_ = status;
     }
 
    private:
@@ -398,7 +418,7 @@ class FakeLichess {
         s.body          = requestBody(head, c);
         s.path          = requestPath(head);
         s.authorization = httpHeader(head, "Authorization").value_or("");
-        bool refused    = false;
+        int refused     = 0;
         {
             std::lock_guard lock(mutex_);
             seen_.push_back(s);
@@ -410,8 +430,10 @@ class FakeLichess {
         } else if (s.path.rfind("/api/puzzle/batch/", 0) == 0 && s.method == "GET") {
             c.sendAll(reply(200, batch(100)));
         } else if (s.path.rfind("/api/puzzle/batch/", 0) == 0 && s.method == "POST") {
-            if (refused)
+            if (refused == 401)
                 c.sendAll(reply(401, R"({"error": "No such token"})"));
+            else if (refused != 0)
+                c.sendAll(reply(refused, "{}"));
             else
                 c.sendAll(reply(200, batch(200)));
         } else {
@@ -421,7 +443,7 @@ class FakeLichess {
 
     std::mutex mutex_;
     std::vector<Seen> seen_;
-    bool refused_ = false;
+    int refused_ = 0;
     ScriptedServer server_;  // last: stopped first, its threads using what is above
 };
 
@@ -676,4 +698,115 @@ TEST_CASE("puzzles page: a token Lichess refuses, the batch's answers kept and s
     kept = keptBatch(profile);
     CHECK(kept["sent_count"] == 2);
     CHECK(kept["results"].empty());
+}
+
+TEST_CASE("puzzles page: a token refused offers Link Lichess again…, the answers sent once it is linked again (#146)") {
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    lichess.refuse(true);
+    ScratchDir profile("puzzles-page-relink");
+    FakeApp app(profile);
+    app.own = puzzleAccount();
+    PuzzlesPage page(app);
+    Frames frames;
+    solveBatch(app, page, frames);
+
+    // Refused (401): said as the Lichess page's cards say it, an error, with Link Lichess again…, which the program
+    // carries out; the answers kept, not sent again by themselves meanwhile.
+    REQUIRE(waitUntil([&] {
+        page.poll();
+        return page.onlineNotice().has_value();
+    }));
+    auto notice = *page.onlineNotice();
+    CHECK(notice.level == Notice::Level::Error);
+    CHECK(notice.text == "Lichess refused the token: it was revoked or has expired.");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::LinkLichess);
+    CHECK(notice.fixes[0].label == "Link Lichess again…");
+    CHECK(notice.fixes[0].path.empty());  // the account has the puzzles' permissions
+    frames.draw(app, [&] { page.drawPart(); });
+    page.repair(notice.fixes[0]);
+    REQUIRE(app.repairs.size() == 1);
+    CHECK(app.repairs[0].kind == Fix::Kind::LinkLichess);
+    for (int i = 0; i < 3; ++i) page.poll();
+    CHECK(lichess.seen("POST", "/api/puzzle/batch/").size() == 1);
+    CHECK(keptBatch(profile)["results"].size() == 2);
+
+    // The account linked again, another token: the answers go by themselves, with it, and are taken.
+    lichess.refuse(false);
+    app.own->token = "tok-puzzles-again";
+    REQUIRE(waitUntil([&] {
+        page.poll();
+        return keptBatch(profile).value("sent_status", "") == "accepted";
+    }));
+    const auto sent = lichess.seen("POST", "/api/puzzle/batch/");
+    REQUIRE(sent.size() == 2);
+    CHECK(sent[1].authorization == "Bearer tok-puzzles-again");
+    CHECK_FALSE(page.onlineNotice());
+    CHECK(app.repairs.size() == 1);
+}
+
+TEST_CASE("puzzles page: Lichess in trouble or its pause offer Try again, queued through the pause, sent once (#146)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(50ms);  // the host's minute after a 429, short for the test
+    lichess.refuseWith(503);
+    ScratchDir profile("puzzles-page-retry");
+    FakeApp app(profile);
+    app.own = puzzleAccount();
+    PuzzlesPage page(app);
+    Frames frames;
+    solveBatch(app, page, frames);
+    const auto host = lichess::apiHost();
+    const auto sent = [&] { return lichess.seen("POST", "/api/puzzle/batch/").size(); };
+
+    // Lichess in trouble (503): the page's words, with Try again, the module's own: the answers sent again at once.
+    REQUIRE(waitUntil([&] {
+        page.poll();
+        return page.onlineNotice().has_value();
+    }));
+    auto notice = *page.onlineNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Lichess answered 503");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::RetryAfterPause);
+    CHECK(notice.fixes[0].label == "Try again");
+    REQUIRE(sent() == 1);
+    lichess.refuseWith(429);
+    page.repair(notice.fixes[0]);
+    CHECK(app.repairs.empty());  // the module's own: not the program's
+    REQUIRE(waitUntil([&] {
+        page.poll();
+        const auto n = page.onlineNotice();
+        return sent() == 2 && n && n->text == "Lichess asked for a pause after too many requests.";
+    }));
+
+    // Its pause (429), counted down on Try again; a click queues it and nothing is sent before its end.
+    app.pauses[host] = 42s;
+    notice           = *page.onlineNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again in 0:42");
+    frames.draw(app, [&] { page.drawPart(); });
+    page.repair(notice.fixes[0]);
+    page.repair(notice.fixes[0]);  // a second click: still once
+    notice = *page.onlineNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Asks again in 0:42");
+    CHECK(notice.fixes[0].disabled);
+    const auto until = std::chrono::steady_clock::now() + 300ms;
+    while (std::chrono::steady_clock::now() < until) page.poll();
+    CHECK(sent() == 2);
+    // The pause over: sent once, and taken.
+    app.pauses[host] = 0ms;
+    lichess.refuseWith(0);
+    REQUIRE(waitUntil([&] {
+        page.poll();
+        return keptBatch(profile).value("sent_status", "") == "accepted";
+    }));
+    for (int i = 0; i < 20; ++i) page.poll();
+    CHECK(sent() == 3);
+    CHECK_FALSE(page.onlineNotice());
+    CHECK(app.repairs.empty());
 }

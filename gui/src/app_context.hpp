@@ -759,7 +759,8 @@ class PuzzlesContext : public virtual context::Program,
                        public virtual context::FileDialogs,
                        public virtual context::LinkedAccount,
                        public virtual context::Account,
-                       public virtual context::FairPlay {};
+                       public virtual context::FairPlay,
+                       public virtual context::Repairs {};
 
 // What the user's mistakes as exercises ask of the program (mistakes_page.hpp).
 class MistakesContext : public virtual context::Program,
@@ -771,7 +772,8 @@ class MistakesContext : public virtual context::Program,
                         public virtual context::Analysis,
                         public virtual context::Reviews,
                         public virtual context::Repertoires,
-                        public virtual context::GamesOnBoard {};
+                        public virtual context::GamesOnBoard,
+                        public virtual context::Repairs {};
 
 // What guessing the moves of a game asks of the program (guess_page.hpp).
 class GuessContext : public virtual context::Program,
@@ -781,7 +783,8 @@ class GuessContext : public virtual context::Program,
                      public virtual context::Training,
                      public virtual context::FairPlay,
                      public virtual context::Analysis,
-                     public virtual context::BoardGame {};
+                     public virtual context::BoardGame,
+                     public virtual context::Repairs {};
 
 // What the endgames against the tables and the mates ask of the program (endgames_page.hpp).
 class EndgamesContext : public virtual context::Program,
@@ -801,7 +804,8 @@ class VisionContext : public virtual context::Program,
                       public virtual context::FlatBoard,
                       public virtual context::Training,
                       public virtual context::FairPlay,
-                      public virtual context::Play {};
+                      public virtual context::Play,
+                      public virtual context::Repairs {};
 
 // What the repertoires' training asks of the program (repertoire_training_page.hpp).
 class RepertoireTrainingContext : public virtual context::Program,

@@ -579,6 +579,7 @@ TEST_CASE(
     "endgames page: without tables nothing starts, a live game holds it, Lichess's refusal said, a question left "
     "parked") {
     ScratchDir profile("endgames-page-failures");
+    HostGate::instance().setPause(std::chrono::milliseconds(50));  // the host's minute after a 429, short for the test
     Tables tables;
     FakeApp app(profile);
     Frames frames;
@@ -626,8 +627,29 @@ TEST_CASE(
             return !page.session()->waiting.empty();
         },
         30s));
-    CHECK(page.session()->waiting_net == lichess::NetError::RateLimited);
+    CHECK(page.session()->waiting_failure.net == lichess::NetError::RateLimited);
     CHECK_FALSE(page.session()->answer);
+    // Said in the column as a notice (#146), its words saying what is kept, with Try again, the module's own.
+    const auto notice = page.waitingNotice();
+    REQUIRE(notice);
+    CHECK(notice->level == Notice::Level::Warning);
+    CHECK(notice->text == "Lichess asks to wait a minute: your moves are kept, the judging goes on by itself.");
+    REQUIRE(notice->fixes.size() == 1);
+    CHECK(notice->fixes[0].kind == Fix::Kind::RetryAfterPause);
+    CHECK(notice->fixes[0].label == "Try again");
+    {
+        std::lock_guard lock(tables.mutex);
+        tables.refused = 1;  // asked again, refused again: the move played meanwhile is still kept below
+    }
+    const auto asked = tables.requests();
+    page.repair(notice->fixes[0]);
+    CHECK(app.repairs.empty());  // the module's own: not the program's
+    REQUIRE(waitUntil(
+        [&] {
+            page.poll();
+            return tables.requests() == asked + 1 && !page.session()->waiting.empty();
+        },
+        30s));
     page.sessionMove(move(app, "c7c8"));
     REQUIRE(page.session()->kept);
     CHECK(app.game.moves.size() == 1);

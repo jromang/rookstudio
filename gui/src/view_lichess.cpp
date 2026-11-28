@@ -652,9 +652,10 @@ void App::drawLichessBroadcasts() {
     }
     const auto& b = lichess_broadcasts_;
     if (!b.value && !broadcast_found_ && !broadcast_search_job_.valid()) {
-        // A token refused, the host's pause, an outage: each with its repair, as the studies card says them (#146).
+        // The host's pause, an outage: each with its repair, as the studies card says them (#146). The list is asked
+        // without the token: a 401 is Lichess refusing, which no link changes.
         if (b.failed())
-            drawRepairNotice(lichessNotice(b, lichess::gaveNothing(b), lichessAccess(),
+            drawRepairNotice(lichessNotice(b, lichess::gaveNothing(b), withoutToken(),
                                            retryState(Retry::Broadcasts, lichess::apiHost())),
                              "broadcasts");
         else

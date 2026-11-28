@@ -27,6 +27,7 @@
 #include "lichess_evals.hpp"
 #include "lichess_puzzles.hpp"
 #include "puzzles.hpp"
+#include "repairs.hpp"
 #include "review_queue.hpp"
 #include "training_kind.hpp"
 
@@ -86,6 +87,13 @@ class PuzzlesPage final : public TrainingKind {
     [[nodiscard]] bool puzzleScopes() const;  // the token may read and write puzzles
     // Why the last request of the batch online gave nothing (empty when it went through), as the Puzzles part says it.
     [[nodiscard]] const std::string& onlineError() const { return online_error_; }
+    // The same as a notice, in place of its line (#146): a token refused with Link Lichess again… (the answers kept go
+    // by themselves once the account is linked again), a permission Lichess says the token lacks with the button that
+    // asks for it, an outage, Lichess in trouble or its pause with Try again (the answers sent again, else the batch
+    // asked again), the pause counted down; none while nothing failed. A fix of it carried out: Try again the module's
+    // own (queued through the host's pause), the others the program's.
+    [[nodiscard]] std::optional<Notice> onlineNotice() const;
+    void repair(const Fix& fix);
 
     // A series holds the Board; it, while it does.
     [[nodiscard]] bool onBoard() const override { return puzzle_ != nullptr; }
@@ -136,8 +144,10 @@ class PuzzlesPage final : public TrainingKind {
     void askPuzzleScopes();
     void askOnlineBatch();
     void sendOnlineResults();
+    void askAgain(Retry what);  // its own Try again: the answers sent again, else a batch asked
 
     PuzzlesContext& app_;
+    OwnRetries retries_;
     // Lichess's database offline, in the profile.
     std::unique_ptr<OfflinePuzzles> offline_puzzles_;
     std::string offline_puzzles_error_;  // why the last preparation stopped
@@ -164,7 +174,8 @@ class PuzzlesPage final : public TrainingKind {
     std::future<lichess::Answer<lichess::PuzzleBatch>> online_ask_;
     std::future<lichess::Answer<lichess::PuzzleSolved>> online_send_;
     std::string online_error_;                              // why the last request gave nothing
-    int online_status_ = 0;                                 // its HTTP status
+    lichess::Failure online_failure_;                       // the failure it says (none: nothing Lichess refused)
+    std::string online_refused_token_;  // the token Lichess refused: once another is linked, the answers go with it
     std::chrono::steady_clock::time_point online_retry_{};  // a send that failed tried again then
     bool online_start_after_ = false;                       // the batch, once it comes, starts a series
     // The last 30 days on Lichess, by theme (puzzle:read): asked once a session, when the online choice shows.

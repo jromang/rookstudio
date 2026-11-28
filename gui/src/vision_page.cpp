@@ -153,10 +153,11 @@ void VisionPage::drawPart() {
     wrapped(TR("Seeing the board in your head: the coordinates, a game played blindfold against an engine, a line of "
                "moves read without the pieces moving. Nothing leaves the machine."),
             true);
-    if (!vision_error_.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(ui::WARN));
-        ImGui::TextWrapped("%s", vision_error_.c_str());
-        ImGui::PopStyleColor();
+    if (vision_notice_) {
+        if (const auto* fix = drawNotice(*vision_notice_, "vision_error")) {
+            const auto clicked = *fix;
+            repair(clicked);
+        }
     }
     ImGui::Dummy(ImVec2(0, px(2)));
     auto& record = visionRecord();
@@ -292,7 +293,7 @@ void VisionPage::drawPart() {
 void VisionPage::startVisionRun(std::unique_ptr<VisionRun> run, const std::string& title) {
     // The session that holds the Board closed first, whatever its kind (#76, #80–#82); the game on it put aside.
     const auto taken = app_.takeBoard(title, false);
-    vision_error_.clear();
+    vision_notice_.reset();
     run->aside = taken.aside;
     run->flip  = taken.flip;
     run->tab   = taken.tab;
@@ -321,7 +322,10 @@ void VisionPage::startBlindfold() {
     auto play                = app_.playSettings();
     const EngineEntry* found = app_.playEngine();
     if (!found) {
-        vision_error_ = TR("A game against an engine of your library: add one on the Engines page first.");
+        vision_notice_ = Notice{Notice::Level::Warning,
+                                TR("A game against an engine of your library: add one on the Engines page first."),
+                                {},
+                                {chooseEngineFix()}};
         return;
     }
     EngineEntry engine  = *found;
@@ -356,7 +360,7 @@ void VisionPage::startBlindfold() {
     run->match = std::make_unique<BoardMatch>();
     std::string error;
     if (!run->match->start(white ? you : engine, white ? engine : you, setup, dir / "blindfold.pgn", error)) {
-        vision_error_ = error;
+        vision_notice_ = Notice{Notice::Level::Warning, error, {}, {}};
         return;
     }
     run->phase = VPhase::Asking;
@@ -482,7 +486,11 @@ void VisionPage::pollVision() {
     auto& v = *vision_;
     // Fair play (#48): an engine that computes waits for a live game's end; the blindfold game stops there.
     if (v.kind == VKind::Blindfold && app_.liveGameOn() && v.phase != VPhase::End) {
-        vision_error_ = TR("The blindfold game stopped: one of your games is played live on Lichess.");
+        // The fair play's lock: no button gets round it (R17).
+        vision_notice_ = Notice{Notice::Level::Warning,
+                                TR("The blindfold game stopped: one of your games is played live on Lichess."),
+                                {},
+                                {}};
         return finishVision(true);
     }
     if (v.kind == VKind::Coordinates && v.phase == VPhase::Asking && since(v.began) >= COORD_SECONDS)

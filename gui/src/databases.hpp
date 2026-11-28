@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <ctime>
 #include <exception>
@@ -240,5 +241,16 @@ struct TreesAnswer {
     StoreFailure error;  // the first tree that could not be read: the sentence naming its database, the store's code
 };
 [[nodiscard]] TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t key);
+
+// Why a repertoire's coverage could not be measured on the databases' trees (the Openings page's, #149): the store's
+// error `e`, thrown while the tree at `reading` among those measured was read (study::treeMoves()), names that
+// database, whose index in `shelf` is in `databases` (in the trees' order); none read, the coverage's own sentence.
+// The sentence is also in the log, with the store's own words.
+struct CoverageFailure {
+    StoreFailure error;
+    int database = -1;  // the database whose tree could not be read, by the shelf's index; -1 when none was
+};
+[[nodiscard]] CoverageFailure coverageFailure(const DatabaseShelf& shelf, const std::vector<std::size_t>& databases,
+                                              std::size_t reading, const std::exception& e);
 
 }  // namespace fcg

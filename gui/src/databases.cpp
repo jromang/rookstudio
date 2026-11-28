@@ -175,6 +175,21 @@ TreesAnswer treesAt(std::vector<DatabaseShelf::TreeSource>& sources, uint64_t ke
     return out;
 }
 
+CoverageFailure coverageFailure(const DatabaseShelf& shelf, const std::vector<std::size_t>& databases,
+                                std::size_t reading, const std::exception& e) {
+    CoverageFailure out;
+    const auto& entries = shelf.entries();
+    if (reading < databases.size() && databases[reading] < entries.size()) {
+        out.database = static_cast<int>(databases[reading]);
+        out.error    = loggedStoreFailure(
+            trf("The opening tree of “{}” could not be read: {}.", entries[databases[reading]].name, storeErrorText(e)),
+            e);
+    } else {
+        out.error = loggedStoreFailure(trf("The coverage could not be measured: {}.", storeErrorText(e)), e);
+    }
+    return out;
+}
+
 DamageSummary damageSummary(const study::CheckReport& report, const study::Snapshot& snapshot) {
     DamageSummary out;
     for (const auto& bad : report.segments) {

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -13,10 +15,15 @@
 #include <vector>
 
 #include <study/chessbase.hpp>
+#include <study/pgn_reader.hpp>
+#include <study/repertoire.hpp>
 #include <study/scan_board.hpp>
+#include <study/store_error.hpp>
 
 #include "console.hpp"
 #include "databases.hpp"
+#include "notice.hpp"
+#include "repairs.hpp"
 #include "test_support.hpp"
 
 namespace fs = std::filesystem;
@@ -576,4 +583,84 @@ TEST_CASE("databases: a damaged opening tree read at a position is said, the oth
     CHECK_FALSE(none.answer);
     CHECK(none.error == read.error);
     CHECK(alone.empty());
+}
+
+TEST_CASE(
+    "databases: a coverage measured on a damaged tree among sound ones names its database, with its check (#149)") {
+    const ScratchDir profile("shelf-coverage-damaged-tree");
+    JobGroup jobs;
+    DatabaseShelf shelf(jobs, profile);
+    const auto first   = shelf.create("First");
+    const auto damaged = shelf.create("Damaged");
+    const auto third   = shelf.create("Third");
+    for (const auto index : {first, damaged, third}) {
+        REQUIRE(shelf.startImport(index, pgnFile(profile, 16)));
+        const auto report = imported(shelf);
+        REQUIRE(report);
+        REQUIRE(report->added == 16);
+        REQUIRE(shelf.facts(index).tree);
+    }
+    // The second's records overwritten, their header left: its tree opens, a position read in it is a damaged one.
+    fs::path records;
+    for (const auto& entry : fs::directory_iterator(shelf.entries()[damaged].folder))
+        if (entry.is_directory() && entry.path().filename().string().rfind("tree-", 0) == 0)
+            records = entry.path() / "records.bin";
+    REQUIRE(fs::exists(records));
+    {
+        const auto size = fs::file_size(records);
+        REQUIRE(size > 32);
+        std::fstream bytes(records, std::ios::in | std::ios::out | std::ios::binary);
+        bytes.seekp(32);
+        const std::string junk(static_cast<std::size_t>(size - 32), '\xff');
+        bytes.write(junk.data(), static_cast<std::streamsize>(junk.size()));
+    }
+    // Measured as the Openings page measures it: the trees in the shelf's order, their databases beside them.
+    std::vector<study::TreeBase> bases;
+    std::vector<std::size_t> databases;
+    for (const auto index : {first, damaged, third}) {
+        const auto source = shelf.treeSource(index);
+        REQUIRE(source);
+        REQUIRE(source->tree);
+        bases.push_back({source->snapshot, source->tree});
+        databases.push_back(index);
+    }
+    const auto lines = study::readPgnGame("[Event \"Repertoire\"]\n\n1. e4 e5 2. Nf3 *\n");
+    REQUIRE(lines.tree);
+    const study::Repertoire repertoire(*lines.tree, chess::Color::WHITE);
+    const auto logged   = Console::instance().added();
+    std::size_t reading = SIZE_MAX;
+    std::optional<CoverageFailure> failed;
+    try {
+        (void)study::coverage(repertoire, study::treeMoves(bases, &reading));
+    } catch (const std::exception& e) {
+        failed = coverageFailure(shelf, databases, reading, e);
+    }
+    REQUIRE(failed);
+    CHECK(failed->database == static_cast<int>(damaged));
+    CHECK(failed->error.said == "The opening tree of “Damaged” could not be read: a file of the database is damaged.");
+    CHECK(failed->error.code == study::StoreErrc::Damaged);
+    // In the log with the store's own words, which name the tree.
+    const auto said = Console::instance().since(logged);
+    CHECK(std::count_if(said.begin(), said.end(), [&](const std::string& line) {
+              return line.rfind(failed->error.said, 0) == 0 &&
+                     line.find(records.parent_path().filename().string()) != std::string::npos;
+          }) == 1);
+    // Its notice: an error, with the check of that database, and of no other.
+    const auto notice = storeNotice(failed->error, failed->database, shelf.entries()[damaged].folder);
+    CHECK(notice.level == Notice::Level::Error);
+    CHECK(notice.text == failed->error.said);
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::CheckDatabase);
+    CHECK(notice.fixes[0].index == static_cast<int>(damaged));
+    CHECK(notice.fixes[0].label == "Check the database…");
+
+    // The sound ones alone: measured.
+    reading = SIZE_MAX;
+    CHECK(study::coverage(repertoire, study::treeMoves({bases[0], bases[2]}, &reading)).known > 0);
+    // An error thrown before any tree was read: the coverage's own sentence, no database, no check.
+    const auto none =
+        coverageFailure(shelf, databases, SIZE_MAX, study::StoreError(study::StoreErrc::Damaged, "a damaged file"));
+    CHECK(none.database == -1);
+    CHECK(none.error.said == "The coverage could not be measured: a file of the database is damaged.");
+    CHECK(storeNotice(none.error, none.database).fixes.empty());
 }

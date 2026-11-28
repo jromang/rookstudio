@@ -99,7 +99,9 @@ struct TreeBase {
     std::shared_ptr<const Tree> tree;
 };
 // The opening trees of several databases, their numbers summed; a tree older than its database's edits is left out.
-[[nodiscard]] MovesAt treeMoves(std::vector<TreeBase> bases);
+// `reading`, when given, is set to the base being read, by its place in `bases`: the database a store's error the moves
+// throw comes from (a damaged tree, #149). It must outlive the moves.
+[[nodiscard]] MovesAt treeMoves(std::vector<TreeBase> bases, std::size_t* reading = nullptr);
 
 // The moves of a database's games where `player` (its name, whatever the case) had White, or Black: what the player
 // and their opponents played from each position, out of those games alone (#52, preparing a game against them).

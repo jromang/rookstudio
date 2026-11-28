@@ -143,12 +143,14 @@ bool addMove(GameTree& lines, bool chess960, std::span<const chess::Move> path, 
     return true;
 }
 
-MovesAt treeMoves(std::vector<TreeBase> bases) {
-    return [bases = std::move(bases)](const ScanBoard& position) -> std::optional<TreeAnswer> {
+MovesAt treeMoves(std::vector<TreeBase> bases, std::size_t* reading) {
+    return [bases = std::move(bases), reading](const ScanBoard& position) -> std::optional<TreeAnswer> {
         std::optional<TreeAnswer> out;
         std::map<int, TreeStats> by_code;
-        for (const auto& base : bases) {
+        for (std::size_t i = 0; i < bases.size(); ++i) {
+            const auto& base = bases[i];
             if (!base.snapshot || !base.tree || base.tree->stale(*base.snapshot)) continue;
+            if (reading) *reading = i;
             const auto here = base.tree->at(*base.snapshot, position.key());
             if (!here) continue;
             if (!out) out.emplace();

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cfloat>
 #include <chrono>
+#include <cstdint>
 #include <deque>
 #include <filesystem>
 #include <functional>
@@ -877,11 +878,16 @@ class App {
     struct CoverageJob {
         std::string of;
         std::future<study::Coverage> done;
+        // The databases it is measured on, by the shelf's index, and the one whose tree it was reading
+        // (study::treeMoves()): the database a damaged tree is (#149).
+        std::vector<std::size_t> databases;
+        std::shared_ptr<std::size_t> reading = std::make_shared<std::size_t>(SIZE_MAX);
     };
     std::optional<CoverageJob> coverage_job_;
     std::optional<study::Coverage> coverage_;
     std::string coverage_of_;
     StoreFailure coverage_error_;  // why the coverage of coverage_of_ could not be measured, with the store's code
+    int coverage_database_ = -1;   // the database whose tree could not be read, by the shelf's index; -1: not known
     int coverage_depth_ = 0;  // 0 the ends of the lines, 1 move 10, 2 move 15
     std::set<std::filesystem::path> coverage_left_;  // the databases the coverage is not measured on (folders)
     bool rep_naming_    = false;

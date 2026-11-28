@@ -566,7 +566,11 @@ TEST_CASE("Lichess TV's module without App: why its channels did not come said w
     int asked      = lichess.channelsAsked();
     lichess.refuse = 429;
     tv.repair(notice.fixes[0]);
-    REQUIRE(drawn([&] { return lichess.channelsAsked() == asked + 1 && tv.channelsNotice().has_value(); }));
+    // Until the 429's answer is read, not only asked: the 503's notice stays meanwhile (Windows CI, once).
+    REQUIRE(drawn([&] {
+        const auto n = tv.channelsNotice();
+        return lichess.channelsAsked() == asked + 1 && n && n->text != notice.text;
+    }));
 
     // Its pause (429), in orange, counted down on Try again; a click queues it and nothing is sent before its end.
     app.pauses[host] = 42s;

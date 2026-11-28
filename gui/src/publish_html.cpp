@@ -575,7 +575,7 @@ std::string gamesIndexHtml(const std::vector<IndexedPage>& pages, const HtmlLook
 std::string writeGamePages(const std::filesystem::path& folder, std::size_t count,
                            const std::function<std::optional<HtmlGame>(std::size_t)>& game, const HtmlOptions& options,
                            const HtmlLook& look, const std::string& title, const std::atomic<bool>* cancel,
-                           std::atomic<int>* done) {
+                           std::atomic<int>* done, std::filesystem::path* unwritten) {
     std::error_code ec;
     std::filesystem::create_directories(folder, ec);
     const auto write = [](const std::filesystem::path& path, const std::string& bytes) {
@@ -587,6 +587,10 @@ std::string writeGamePages(const std::filesystem::path& folder, std::size_t coun
         const auto u8 = path.u8string();
         return std::string(u8.begin(), u8.end());
     };
+    const auto failed = [&](const std::filesystem::path& path) {
+        if (unwritten) *unwritten = path;
+        return trf("Cannot write {}", text(path));
+    };
     std::vector<IndexedPage> pages;
     for (std::size_t i = 0; i < count; ++i) {
         if (cancel && *cancel) return TR("Cancelled.");
@@ -596,13 +600,11 @@ std::string writeGamePages(const std::filesystem::path& folder, std::size_t coun
         auto stem = fileStem(gameTitle(*g));
         if (stem.empty()) stem = "game";
         IndexedPage page{fmt::format("{:04}-{}.html", pages.size() + 1, stem), gameTitle(*g), gameSubtitle(*g)};
-        if (!write(folder / page.file, gamesHtml({*g}, options, look, page.title)))
-            return trf("Cannot write {}", text(folder / page.file));
+        if (!write(folder / page.file, gamesHtml({*g}, options, look, page.title))) return failed(folder / page.file);
         pages.push_back(std::move(page));
     }
-    return write(folder / "index.html", gamesIndexHtml(pages, look, title))
-               ? std::string()
-               : trf("Cannot write {}", text(folder / "index.html"));
+    return write(folder / "index.html", gamesIndexHtml(pages, look, title)) ? std::string()
+                                                                            : failed(folder / "index.html");
 }
 
 uint64_t estimateHtml(const std::vector<HtmlGame>& sample, std::size_t games, const HtmlOptions& options,

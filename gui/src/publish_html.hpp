@@ -69,11 +69,13 @@ struct IndexedPage {
                                          const std::string& title);
 // A page per game in `folder` (made when missing), "0001-moreau-claire-lindqvist-erik.html"…, and their list in
 // index.html: `count` games, each read when its page is written (none: left out), so that tens of thousands never are
-// in memory at once. The error, empty when written; `cancel` stops between two pages, `done` counts them.
+// in memory at once. The error, empty when written; `cancel` stops between two pages, `done` counts them; `unwritten`,
+// when given, is set to the file that could not be written (#146: the page says its folder, the file in the log).
 [[nodiscard]] std::string writeGamePages(const std::filesystem::path& folder, std::size_t count,
                                          const std::function<std::optional<HtmlGame>(std::size_t)>& game,
                                          const HtmlOptions& options, const HtmlLook& look, const std::string& title,
-                                         const std::atomic<bool>* cancel = nullptr, std::atomic<int>* done = nullptr);
+                                         const std::atomic<bool>* cancel = nullptr, std::atomic<int>* done = nullptr,
+                                         std::filesystem::path* unwritten = nullptr);
 
 // Pieces of a page shared with the reports' pages (publish_doc.hpp): the styles, the board's script and pieces, a
 // text made safe for HTML, a game's moves as the page writes them (`id` its number in the page's games).

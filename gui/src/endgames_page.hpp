@@ -27,6 +27,7 @@
 #include "endgames.hpp"
 #include "focus_words.hpp"
 #include "notice.hpp"
+#include "repairs.hpp"
 #include "review_queue.hpp"
 #include "training_kind.hpp"
 
@@ -78,6 +79,13 @@ class EndgamesPage final : public TrainingKind {
     [[nodiscard]] std::size_t doneCount();
     // The part brought to its mates at its next draw (the Today part's card "Mates").
     void showMates() { endgame_scroll_mates_ = true; }
+
+    // Why Lichess's tables did not answer the session's position, as its column says it (#146), its words saying what
+    // is kept: an outage, Lichess in trouble or its pause with Try again (the pause counted down, a click queued
+    // through it); none while they answer. A fix of it carried out: Try again the module's own, the others the
+    // program's.
+    [[nodiscard]] std::optional<Notice> waitingNotice() const;
+    void repair(const Fix& fix);
 
     // An endgame holds the Board; it, while it does.
     [[nodiscard]] bool onBoard() const override { return endgame_ != nullptr; }
@@ -133,8 +141,10 @@ class EndgamesPage final : public TrainingKind {
     void drawEndgameBoard(float size);
     void drawEndgameColumn();
     void drawEndgameEnd();
+    void askAgain(Retry what);  // its own Try again: the position asked of Lichess's tables now
 
     EndgamesContext& app_;
+    OwnRetries retries_;
     std::optional<EndgameRecord> endgame_record_;
     // The Training page's part.
     std::string endgame_need_;           // the endgame whose tables are missing: the card says what it needs

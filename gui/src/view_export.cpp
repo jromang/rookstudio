@@ -20,6 +20,7 @@
 
 #include "app.hpp"
 #include "board_text.hpp"
+#include "console.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "keyboard.hpp"
@@ -710,9 +711,16 @@ void App::exportTo(const fs::path& chosen) {
                                        g.black        = std::string(snap->shownName(rid.black));
                                        return g;
                                    };
-                                   if (split)
-                                       return publish::writeGamePages(target, ids.size(), read, o, l, title,
-                                                                      cancel.get(), count.get());
+                                   if (split) {
+                                       // A page or their list not written (#146): said as the folder's, as a file
+                                       // the export could not save, the file in the log, the folder a click away.
+                                       fs::path unwritten;
+                                       auto error = publish::writeGamePages(target, ids.size(), read, o, l, title,
+                                                                            cancel.get(), count.get(), &unwritten);
+                                       if (unwritten.empty()) return error;
+                                       Console::instance().add(error, true);
+                                       return unwrittenSaid(target);
+                                   }
                                    std::vector<publish::HtmlGame> games;
                                    for (std::size_t i = 0; i < ids.size(); ++i) {
                                        if (*cancel) return TR("Cancelled.");

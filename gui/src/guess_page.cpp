@@ -557,6 +557,11 @@ void GuessPage::guessScored() {
     g.shown_at = Clock::now();
 }
 
+std::optional<Notice> GuessPage::engineNotice() const {
+    if (!guess_ || guess_->error.empty()) return std::nullopt;
+    return Notice{Notice::Level::Warning, guess_->error, {}, {}};
+}
+
 void GuessPage::guessAdvance() {
     auto& g = *guess_;
     if (g.phase != GuessPhase::Shown) return;
@@ -799,8 +804,8 @@ void GuessPage::drawGuessColumn() {
                                         : trf("Your move, Black: move {}", before.fullMoveNumber()))
                                        .c_str());
             ImGui::PopFont();
-            if (!g.error.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", g.error.c_str());
+            if (const auto notice = engineNotice()) {
+                drawNotice(*notice, "guess_engine_error");  // no button: nothing here starts it again
             } else if (g.phase == GuessPhase::Checking) {
                 wrapped(trf("{}: {} weighs it against the game's move…", numbered(before, g.guess), g.engine_name));
             } else {

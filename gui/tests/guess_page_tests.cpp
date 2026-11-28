@@ -487,3 +487,35 @@ TEST_CASE("guess page: why a game did not start said with its repair, no engine 
     REQUIRE(app.repairs.size() == 2);
     CHECK(app.repairs[1].kind == Fix::Kind::CheckDatabase);
 }
+
+TEST_CASE("guess page: the engine's error during a game guessed said as a notice without a button (#149)") {
+    ScratchDir profile("guess-page-engine-error");
+    FakeApp app(profile);
+    auto gone  = mockEngine();
+    gone.name  = "Gone";
+    gone.cmd   = (profile.path() / "no-such-engine").string();  // a program that is not there: it does not start
+    app.engine = gone;
+    app.shown  = readGame(LONG_PGN);
+    GuessPage page(app);
+    CHECK_FALSE(page.engineNotice());
+    FocusWords words("guess-board");
+    page.addFocusWords(words, "guess-board");
+    REQUIRE(page.onBoard());
+    const auto* run = page.session();
+    REQUIRE(run);
+    // Said in the question's place, in orange, without a button: nothing there starts the engine again; Stop ends
+    // the game.
+    REQUIRE(waitUntil([&] {
+        page.poll();
+        return page.engineNotice().has_value();
+    }));
+    const auto notice = *page.engineNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == run->error);
+    CHECK(notice.text.rfind("Cannot start Gone: ", 0) == 0);
+    CHECK(notice.fixes.empty());
+    Frames frames;
+    frames.draw(app, boardPage(page));
+    CHECK(app.repairs.empty());
+    CHECK(page.onBoard());
+}

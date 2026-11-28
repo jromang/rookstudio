@@ -86,6 +86,13 @@ class MistakesPage final : public TrainingKind {
     // Check the database… for it; none while the last look went through. Its fix, carried out by the program.
     [[nodiscard]] const std::optional<Notice>& scanNotice() const { return mistake_scan_notice_; }
     void repair(const Fix& fix) { app_.repair(fix); }
+    // Why the games reviewed in the background stopped, as their card says it (#149): their engine gone from the
+    // library with none left, with Choose an engine… (they go on by themselves once there is one, with the Board's
+    // analysis engine); an engine's error, without a button. None while they go on.
+    [[nodiscard]] std::optional<Notice> reviewsNotice() const;
+    // Why a session's answer could not be judged, as its column says it (#149): no engine to judge it, or the judge's
+    // error, without a button (the session holds the Board, where an engine would be chosen). None once judged.
+    [[nodiscard]] std::optional<Notice> judgeNotice() const;
 
     // A session holds the Board; it, while it does.
     [[nodiscard]] bool onBoard() const override { return mistake_ != nullptr; }
@@ -168,6 +175,7 @@ class MistakesPage final : public TrainingKind {
         int processes = 1;
         std::string engine;
         std::string error;
+        bool engine_gone = false;  // that error: no engine left in the library to go on with (#149)
     };
     std::optional<MistakeReviews> mistake_reviews_;
     // A session on the Board page.

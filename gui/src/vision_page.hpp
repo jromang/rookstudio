@@ -16,6 +16,7 @@
 
 #include "app_context.hpp"
 #include "focus_words.hpp"
+#include "notice.hpp"
 #include "training_kind.hpp"
 #include "vision.hpp"
 
@@ -61,6 +62,12 @@ class VisionPage final : public TrainingKind {
     [[nodiscard]] bool keptAside() const override { return vision_ && vision_->aside; }
     [[nodiscard]] const char* guideTopic() const override;
 
+    // Why the last exercise asked for did not start, or stopped, as the part says it in place of its line (#146): no
+    // engine to play blindfold against with Choose an engine…; an engine that did not start, the fair play's stop,
+    // without a button. None once one started. Its fix, carried out by the program.
+    [[nodiscard]] const std::optional<Notice>& startNotice() const { return vision_notice_; }
+    void repair(const Fix& fix) { app_.repair(fix); }
+
    private:
     void startCoordinates();
     void startBlindfold();
@@ -87,7 +94,7 @@ class VisionPage final : public TrainingKind {
     Hidden vision_hidden_  = Hidden::All;
     int vision_colour_     = 0;  // blindfold: 0 White, 1 Black, 2 at random; its engine is the Play page's (#83)
     int vision_enter_      = 0;  // what Enter starts on the page: 0 the coordinates, 1 blindfold, 2 the lines
-    std::string vision_error_;
+    std::optional<Notice> vision_notice_;
     // An exercise on the Board page.
     std::unique_ptr<VisionRun> vision_;
 };

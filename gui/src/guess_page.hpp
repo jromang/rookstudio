@@ -23,6 +23,7 @@
 #include "app_context.hpp"
 #include "focus_words.hpp"
 #include "mistakes.hpp"
+#include "notice.hpp"
 #include "training_kind.hpp"
 
 namespace fcg {
@@ -67,6 +68,12 @@ class GuessPage final : public TrainingKind {
     [[nodiscard]] bool keptAside() const override { return guess_ && guess_->aside; }
     [[nodiscard]] const char* guideTopic() const override;
 
+    // Why the last game asked for did not start, as the part says it in place of its line (#146): a database that
+    // does not open with Check the database… when a file of it is damaged, no engine to score with Choose an engine…,
+    // no game passing the filter without a button; none once one started. Its fix, carried out by the program.
+    [[nodiscard]] const std::optional<Notice>& startNotice() const { return guess_notice_; }
+    void repair(const Fix& fix) { app_.repair(fix); }
+
    private:
     [[nodiscard]] std::filesystem::path guessFolder() const { return app_.profileDir() / "guess"; }
     bool startGuessRandom();  // a game of the chosen database and filter, drawn in the background
@@ -109,7 +116,7 @@ class GuessPage final : public TrainingKind {
     chess::Color guess_pick_side_ = chess::Color::WHITE;
     std::optional<GuessRecord> guess_last_;
     bool guess_last_read_ = false;
-    std::string guess_error_;
+    std::optional<Notice> guess_notice_;
     // A game guessed on the Board page.
     std::unique_ptr<GuessRun> guess_;
 };

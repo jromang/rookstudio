@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <thread>
@@ -379,6 +380,10 @@ TEST_CASE("mistakes: the user's games looked for in their databases, the reviewe
         CHECK(scan.unreviewed[1].id == 3);
         // Only the latest one counts when one game is asked for.
         CHECK(scanMistakes(sources, names, analyses, {}, 1, commentary::Lang::En).unreviewed.size() == 1);
+        // The source it reads told as it goes: the database a store's error would come from (#146).
+        std::size_t reading = SIZE_MAX;
+        (void)scanMistakes(sources, names, analyses, {}, 20, commentary::Lang::En, nullptr, &reading);
+        CHECK(reading == 0);
 
         // Scanned again with its card: kept, the review unchanged.
         auto before                                = scan.record;

@@ -218,11 +218,12 @@ struct MistakeScan {
 };
 // The user's games in `sources` under `names`, their reviews in `analyses` (the profile's analyses/), each game's
 // exercises found again when its review changed since `before`, else taken from it. The latest `recent` games tell
-// which wait for a review.
+// which wait for a review. `reading`, when given, is set to the source being read: the database a store's error it
+// throws comes from (#146).
 [[nodiscard]] MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::vector<std::string>& names,
                                        const std::filesystem::path& analyses, const MistakeRecord& before,
                                        std::size_t recent, commentary::Lang lang,
-                                       const std::atomic<bool>* cancel = nullptr);
+                                       const std::atomic<bool>* cancel = nullptr, std::size_t* reading = nullptr);
 // A game's exercises put in a record in place of those it gave before (a game reviewed in the background), their
 // cards kept, those of the exercises gone kept apart: `game` its review key, `exercises` as exercisesOf() gives them,
 // with their place.

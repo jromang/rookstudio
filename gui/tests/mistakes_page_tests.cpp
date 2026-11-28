@@ -45,6 +45,7 @@
 #include "mock_engines.hpp"
 #include "model.hpp"
 #include "noon_clock.hpp"
+#include "repairs.hpp"
 #include "review_runner.hpp"
 #include "test_support.hpp"
 #include "training.hpp"
@@ -146,6 +147,15 @@ class FakeApp final : public MistakesContext {
 
     // Fair play; the user's names.
     bool liveGameOn() const override { return live_game; }
+
+    // The repairs (#146): the fixes the program was given; no account, no host's pause.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess a;
+        a.needs = needs;
+        return a;
+    }
+    std::chrono::milliseconds pausedFor(const std::string&) const override { return std::chrono::milliseconds(0); }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
     std::vector<std::string> userNames() const override { return names; }
     void drawPlayerNames(const char* id) override { names_drawn.emplace_back(id); }
     void showNamesSettings() override { ++names_settings; }
@@ -205,6 +215,8 @@ class FakeApp final : public MistakesContext {
     std::vector<ReplayGame> reviewed;
     std::array<std::unordered_set<uint64_t>, 2> repertoire;
     std::vector<std::string> opened;
+
+    std::vector<Fix> repairs;
 
    private:
     fs::path profile_;

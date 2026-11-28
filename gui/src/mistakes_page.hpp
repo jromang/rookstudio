@@ -28,6 +28,7 @@
 #include "app_context.hpp"
 #include "focus_words.hpp"
 #include "mistakes.hpp"
+#include "notice.hpp"
 #include "review_queue.hpp"
 #include "review_runner.hpp"
 #include "training_kind.hpp"
@@ -80,6 +81,11 @@ class MistakesPage final : public TrainingKind {
     void lookAgain() { mistake_scan_checked_ = {}; }
     // The scan of the user's games stopped at its next game (the program closing).
     void cancelScan();
+
+    // Why the user's games could not be looked through, as the part says it (#146): a damaged file of a database with
+    // Check the database… for it; none while the last look went through. Its fix, carried out by the program.
+    [[nodiscard]] const std::optional<Notice>& scanNotice() const { return mistake_scan_notice_; }
+    void repair(const Fix& fix) { app_.repair(fix); }
 
     // A session holds the Board; it, while it does.
     [[nodiscard]] bool onBoard() const override { return mistake_ != nullptr; }
@@ -134,9 +140,13 @@ class MistakesPage final : public TrainingKind {
         std::string of;
         std::shared_ptr<std::atomic<bool>> cancel = std::make_shared<std::atomic<bool>>(false);
         std::future<MistakeScan> done;
+        // The databases it reads, by the shelf's index, and the one it was reading (scanMistakes()).
+        std::vector<std::size_t> databases;
+        std::shared_ptr<std::size_t> reading = std::make_shared<std::size_t>(SIZE_MAX);
     };
     std::optional<MistakeScanJob> mistake_scan_job_;
     std::string mistake_scan_of_;  // what the last scan looked at: the names, the databases, the reviews
+    std::optional<Notice> mistake_scan_notice_;  // why the last one stopped, with its repair
     std::chrono::steady_clock::time_point mistake_scan_checked_{};
     bool mistake_scanned_       = false;  // a scan came back this session
     std::size_t mistake_games_  = 0;      // the user's games it found

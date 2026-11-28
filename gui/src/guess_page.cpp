@@ -31,6 +31,7 @@
 #include "guide.hpp"
 #include "i18n.hpp"
 #include "keyboard.hpp"
+#include "repairs.hpp"
 #include "review_bridge.hpp"
 #include "training.hpp"
 #include "ui.hpp"
@@ -246,8 +247,12 @@ void GuessPage::drawPart() {
         tip(
             TR("The moves played by many games of your databases (their opening tree): the guessing starts where the "
                "game leaves them."));
-        if (!guess_error_.empty())
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", guess_error_.c_str());
+        if (guess_notice_) {
+            if (const auto* fix = drawNotice(*guess_notice_, "guess_error")) {
+                const auto clicked = *fix;
+                repair(clicked);
+            }
+        }
         const bool drawing = guess_pick_.valid();
         if (primaryButton(TR("Start · a random game"), lock.empty() && !drawing) ||
             (enter && lock.empty() && !drawing)) {
@@ -303,21 +308,27 @@ void GuessPage::poll() {
             startGuess(std::move(*pick.game), pick.chess960, std::move(pick.title), guess_pick_side_, 0,
                        std::make_pair(pick.folder, pick.id));
         else
-            guess_error_ = pick.error == "none" ? TR("No game of this database passes the filter.")
-                                                : TR("No game long enough passes the filter.");
+            guess_notice_ = Notice{Notice::Level::Warning,
+                                   pick.error == "none" ? TR("No game of this database passes the filter.")
+                                                        : TR("No game long enough passes the filter."),
+                                   {},
+                                   {}};
     }
     if (guess_) pollGuess();
 }
 
 bool GuessPage::startGuessRandom() {
-    guess_error_.clear();
+    guess_notice_.reset();
     if (!app_.sessionLock().empty() || guess_pick_.valid()) return false;
     auto& s = app_.shelf();
     if (guess_source_ < 0 || guess_source_ >= static_cast<int>(s.entries().size())) return false;
     const auto index = static_cast<std::size_t>(guess_source_);
     const auto db    = s.open(index);
     if (!db) {
-        guess_error_ = trf("“{}” cannot be opened: {}", s.entries()[index].name, s.facts(index).error.said);
+        // A damaged file offers the database's check (#146), in the part's sentence.
+        const auto& error   = s.facts(index).error;
+        guess_notice_       = storeNotice(error, static_cast<int>(index));
+        guess_notice_->text = trf("“{}” cannot be opened: {}", s.entries()[index].name, error.said);
         return false;
     }
     auto filter      = quickFilter(guess_words_.data());
@@ -373,10 +384,15 @@ void GuessPage::startGuess(ReplayGame game, bool chess960, std::string title, ch
     if (!app_.sessionLock().empty()) return;
     const auto* engine = app_.analysisEngine();
     if (!engine) {
-        guess_error_ = TR("No engine to score with: add one on the Engines page.");
-        app_.toast(guess_error_);
+        // Said where it was asked (a toast, the Board page's palette too) and on the part, with its repair (#146).
+        guess_notice_ = Notice{Notice::Level::Warning,
+                               TR("No engine to score with: add one on the Engines page."),
+                               {},
+                               {chooseEngineFix()}};
+        app_.toast(guess_notice_->text);
         return;
     }
+    guess_notice_.reset();  // it starts: what stopped the last one is over
     auto run      = std::make_unique<GuessRun>();
     run->game     = std::move(game);
     run->chess960 = chess960;

@@ -625,8 +625,11 @@ void putExercises(MistakeRecord& record, const std::string& game, const std::str
 
 MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::vector<std::string>& names,
                          const fs::path& analyses, const MistakeRecord& before, std::size_t recent,
-                         commentary::Lang lang, const std::atomic<bool>* cancel) {
+                         commentary::Lang lang, const std::atomic<bool>* cancel, std::size_t* reading) {
     MistakeScan out;
+    const auto read = [&](std::size_t source) {
+        if (reading) *reading = source;
+    };
     out.record.answer_ms = before.answer_ms;
     out.record.kept      = before.kept;
     const auto stopped   = [&] { return cancel && cancel->load(); };
@@ -651,6 +654,7 @@ MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::v
     for (std::size_t s = 0; s < sources.size() && !stopped(); ++s) {
         const auto& snapshot = sources[s].snapshot;
         if (!snapshot) continue;
+        read(s);
         // The games where a player has every word of a name: those the names' words find, then each told by its
         // players' whole words.
         std::set<uint64_t> ids;
@@ -684,6 +688,7 @@ MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::v
         if (!reviewed.contains(f.key)) continue;
         ++out.reviewed;
         const auto& source = sources[f.source];
+        read(f.source);
         const auto game    = gameOf(*source.snapshot, f.id);
         if (!game) continue;
         const auto review = loadReview(analyses, *game);
@@ -742,6 +747,7 @@ MistakeScan scanMistakes(const std::vector<MistakeSource>& sources, const std::v
         const auto& f = *latest[i];
         if (reviewed.contains(f.key)) continue;
         const auto& source = sources[f.source];
+        read(f.source);
         auto game          = gameOf(*source.snapshot, f.id);
         if (!game) continue;
         UnreviewedGame u;

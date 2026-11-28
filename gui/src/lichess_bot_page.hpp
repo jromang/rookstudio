@@ -29,6 +29,7 @@
 #include "app_context.hpp"
 #include "focus_words.hpp"
 #include "lichess_bot.hpp"
+#include "notice.hpp"
 
 namespace fcg {
 
@@ -80,6 +81,13 @@ class LichessBotPage {
     // told).
     [[nodiscard]] const lichess::BoardState& game() const { return bot_state_.game; }
     [[nodiscard]] std::optional<std::string> stripClock(chess::Color side) const;
+
+    // What went wrong online, as its card says it in place of its line (#146): its token refused, an error, with Link
+    // the bot's account… (its own link, Lichess's page for the bot's account, never the user's); an answer to a
+    // challenge Lichess did not take, without a button (an online action is never sent again blindly). None while
+    // nothing failed. A fix of it carried out by the module.
+    [[nodiscard]] std::optional<Notice> onlineNotice() const;
+    void repair(const Fix& fix);
 
    private:
     // The card's setup, on the engine it was started from: the account's steps, then the confirmation.
@@ -160,6 +168,7 @@ class LichessBotPage {
     bool bot_online_  = false;  // accepting the challenges its rules allow
     bool bot_closing_ = false;  // "Put offline": no new challenge, the game being played goes on to its end
     std::string bot_online_error_;
+    bool bot_token_refused_ = false;  // that error is its token refused: its account to link again
     std::unique_ptr<lichess::BotGame> bot_game_;
     lichess::BotGame::State bot_state_;
     uint64_t bot_version_ = 0;

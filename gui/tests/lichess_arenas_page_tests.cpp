@@ -815,6 +815,66 @@ TEST_CASE("Lichess arenas' module without App: why the card's lists did not come
     CHECK(app.repairs.size() == 1);
 }
 
+TEST_CASE("Lichess arenas' module without App: the followed tournament's standing said with its repair (#146)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(50ms);  // the host's minute after a 429, short for the test
+    const ScratchDir profile("arenas-standing-repairs");
+    FakeApp app(profile);
+    app.account = sampleAccount({});
+    Frames frames;
+    LichessArenasPage arenas(app);
+    const auto host  = lichess::apiHost();
+    const auto asked = [&] { return static_cast<int>(lichess.seen("/api/tournament/rap1d100").size()); };
+    const auto shown = [&] {
+        frames.draw(app, [&] { arenas.drawMosaicHead(); });
+        arenas.poll();
+    };
+
+    // Lichess in trouble (503): the mosaic's head says it, with Try again, the module's own, asked at once.
+    lichess.refuse = 503;
+    REQUIRE(applied(arenas, "arena-mosaic=rap1d100"));
+    REQUIRE(waitUntil([&] {
+        shown();
+        return arenas.standingNotice().has_value();
+    }));
+    auto notice = *arenas.standingNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Lichess answered 503");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::RetryAfterPause);
+    CHECK(notice.fixes[0].label == "Try again");
+    int before     = asked();
+    lichess.refuse = 429;
+    arenas.repair(notice.fixes[0]);
+    REQUIRE(waitUntil([&] {
+        shown();
+        const auto n = arenas.standingNotice();
+        return asked() == before + 1 && n && n->text == "Lichess asked for a pause after too many requests.";
+    }));
+    CHECK(app.repairs.empty());  // the module's own: not the program's
+
+    // Its pause (429), counted down on Try again; a click queues it.
+    app.pauses[host] = 42s;
+    notice           = *arenas.standingNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Try again in 0:42");
+    arenas.repair(notice.fixes[0]);
+    notice = *arenas.standingNotice();
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].label == "Asks again in 0:42");
+    CHECK(notice.fixes[0].disabled);
+    // The pause over: asked, and the standing comes.
+    app.pauses[host] = 0ms;
+    lichess.refuse   = 0;
+    REQUIRE(waitUntil([&] {
+        shown();
+        return !arenas.standingNotice();
+    }));
+    CHECK(app.repairs.empty());
+}
+
 TEST_CASE(
     "Lichess arenas' module without App: its readings in the host's pause end at once as the program quits "
     "(#148)") {

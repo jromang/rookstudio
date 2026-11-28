@@ -88,8 +88,15 @@ class LichessBotPage {
     // nothing failed. A fix of it carried out by the module.
     [[nodiscard]] std::optional<Notice> onlineNotice() const;
     void repair(const Fix& fix);
+    // Its event stream cut while online, and its game's stream, as their cards say it (#149): opened again by itself, a
+    // notice without a button; Lichess's pause after a 429 in orange, counted down in its words
+    // (context::Repairs::pausedFor()). None while the stream is open; for the event stream, none either when Lichess
+    // closed it without a failure.
+    [[nodiscard]] std::optional<Notice> streamNotice() const;
+    [[nodiscard]] std::optional<Notice> gameStreamNotice() const;
 
    private:
+    [[nodiscard]] Notice cutNotice(const lichess::Failure& broke) const;  // a stream's, broken as `broke` says
     // The card's setup, on the engine it was started from: the account's steps, then the confirmation.
     enum class BotStep { Card, Account, Confirm };
     struct BotLink {  // the bot's account linked through Lichess's page, then checked

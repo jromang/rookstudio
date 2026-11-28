@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -33,11 +34,13 @@
 #include "https.hpp"
 #include "jobs.hpp"
 #include "lichess_account.hpp"
+#include "lichess_api.hpp"
 #include "lichess_bot.hpp"
 #include "lichess_bot_page.hpp"
 #include "mock_engines.hpp"
 #include "model.hpp"
 #include "notice.hpp"
+#include "repairs.hpp"
 #include "scripted_server.hpp"
 #include "test_support.hpp"
 
@@ -105,6 +108,18 @@ class FakeApp final : public BotContext {
     void revokeToken(std::string token) override { revoked.push_back(std::move(token)); }
     void raiseWindow() override { ++raised; }
 
+    // The repairs (#149): the hosts' pauses the test sets, the fixes the program was given; no account asked.
+    LichessAccess lichessAccess(const std::string& needs) const override {
+        LichessAccess access;
+        access.needs = needs;
+        return access;
+    }
+    std::chrono::milliseconds pausedFor(const std::string& host) const override {
+        const auto it = pauses.find(host);
+        return it == pauses.end() ? std::chrono::milliseconds(0) : it->second;
+    }
+    void repair(const Fix& fix) override { repairs.push_back(fix); }
+
     // What the module was told, and what the test sets.
     int frame_ = 0;
     std::vector<EngineEntry> library;
@@ -117,6 +132,8 @@ class FakeApp final : public BotContext {
     std::optional<lichess::Account> own;
     bool live_game = false;
     std::vector<std::string> revoked;
+    std::map<std::string, std::chrono::milliseconds> pauses;
+    std::vector<Fix> repairs;
 
    private:
     std::filesystem::path profile_;
@@ -255,6 +272,7 @@ class FakeLichess {
         return refused_;
     }
     [[nodiscard]] int eventStreams() const { return event_streams_; }
+    std::atomic<int> event_status{0};  // a status the event stream is answered with (0: it opens), #149
     // Partner_3 thinks over the bot's first move until answer().
     void holdAnswer() {
         std::lock_guard lock(mutex_);
@@ -355,6 +373,10 @@ class FakeLichess {
         }
         const std::string game = "/api/bot/game/gBot0001";
         if (s.path == "/api/stream/event") {
+            if (const int status = event_status; status != 0) {
+                c.sendAll(reply(status, ""));
+                return;
+            }
             if (s.authorization != "Bearer tok-bot") {
                 c.sendAll(reply(401, R"({"error": "No such token"})"));
                 return;
@@ -655,5 +677,68 @@ TEST_CASE("Lichess bot's module without App: a token Lichess refuses puts the bo
         CHECK(notice->fixes[0].label == "Link the bot's account…");
         CHECK(notice->fixes[0].path == lichess::SCOPE_BOT_PLAY);
         CHECK(noticeTopic(*notice) == std::string(guide::topics::LichessBot));
+    }
+}
+
+TEST_CASE("Lichess bot's module without App: its event stream cut said as a notice without a button (#149)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(50ms);  // the host's minute after a 429, short for the test
+    const ScratchDir profile("bot-stream-cut");
+    linkBot(profile, "tok-bot");
+    FakeApp app(profile);
+    Frames frames;
+    const auto host = lichess::apiHost();
+    {
+        // Lichess asks for a pause on its event stream: online all the same, the stream opened again by itself.
+        lichess.event_status = 429;
+        LichessBotPage bot(app);
+        CHECK_FALSE(bot.streamNotice());
+        REQUIRE(applied(bot, "bot-online"));
+        REQUIRE(waitUntil([&] {
+            bot.poll();
+            return bot.streamNotice().has_value();
+        }));
+        CHECK(bot.running());
+        auto notice = *bot.streamNotice();
+        CHECK(notice.level == Notice::Level::Warning);
+        CHECK(notice.text ==
+              "The connection to Lichess is cut (Lichess asks to wait a minute: too many requests): tried again by "
+              "itself.");
+        CHECK(notice.fixes.empty());
+        // During the host's pause: in orange, counted down in its words; still nothing to click.
+        app.pauses[host] = 42s;
+        notice           = *bot.streamNotice();
+        CHECK(notice.level == Notice::Level::Warning);
+        CHECK(notice.text == "Too many requests in a short time: Lichess asked for a pause. Trying again in 0:42.");
+        CHECK(notice.fixes.empty());
+        CHECK(noticeTopic(notice) == nullptr);
+        frames.draw(app, [&] { bot.drawEnginePart(app.library[0], false); });
+        CHECK(app.repairs.empty());
+        app.pauses.clear();
+    }
+    {
+        // Lichess in trouble: its words, then, the stream back, nothing more said.
+        lichess.event_status = 503;
+        LichessBotPage bot(app);
+        REQUIRE(applied(bot, "bot-online"));
+        REQUIRE(waitUntil([&] {
+            bot.poll();
+            return bot.streamNotice().has_value();
+        }));
+        const auto notice = *bot.streamNotice();
+        CHECK(notice.level == Notice::Level::Warning);
+        CHECK(notice.text == "The connection to Lichess is cut (Lichess answered 503): tried again by itself.");
+        CHECK(notice.fixes.empty());
+        CHECK_FALSE(bot.gameStreamNotice());  // no game being played
+        lichess.event_status = 0;
+        REQUIRE(waitUntil(
+            [&] {
+                bot.poll();
+                return lichess.eventStreams() == 1 && !bot.streamNotice();
+            },
+            std::chrono::seconds(30)));
+        CHECK(bot.running());
     }
 }

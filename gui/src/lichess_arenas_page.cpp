@@ -269,6 +269,19 @@ std::optional<Notice> LichessArenasPage::swissNotice(const lichess::Failure& fai
                          retries_.state(Retry::SwissPage, lichess::apiHost()));
 }
 
+std::optional<Notice> LichessArenasPage::stripNotice() const {
+    if (!arena_play_) return std::nullopt;
+    const auto now = Clock::now();
+    if (now >= arena_play_->waits_until) return std::nullopt;
+    // Lichess's pause, in orange, counted down in its words; no button: its page is asked again by itself once the
+    // pause is over, and nothing the user does would ask it sooner.
+    const auto left = std::chrono::duration_cast<std::chrono::seconds>(arena_play_->waits_until - now).count() + 1;
+    return Notice{Notice::Level::Warning,
+                  trf("Too many requests (429): the standing waits a minute ({} s left); your games go on.", left),
+                  {},
+                  {}};
+}
+
 std::optional<Notice> LichessArenasPage::refusalNotice(const lichess::Failure& failure) const {
     if (!failure.failed()) return std::nullopt;
     // Joining, pausing and withdrawing need tournament:write; never sent again by a button.
@@ -1718,11 +1731,9 @@ void LichessArenasPage::drawArenaLine(bool board) {
                             : TR("Takes you out of the arena after the game being played: your points stay, the aids "
                                  "come back."));
     }
-    if (Clock::now() < a.waits_until) {
-        const auto left = std::chrono::duration_cast<std::chrono::seconds>(a.waits_until - Clock::now()).count() + 1;
+    if (const auto notice = stripNotice()) {  // a notice without a button (#149): it asks again by itself
         ImGui::PushTextWrapPos();
-        coloured(trf("Too many requests (429): the standing waits a minute ({} s left); your games go on.", left),
-                 ui::WARN);
+        drawRepair(*notice, board ? "arena_strip_pause_board" : "arena_strip_pause");
         ImGui::PopTextWrapPos();
     }
     ImGui::EndChild();

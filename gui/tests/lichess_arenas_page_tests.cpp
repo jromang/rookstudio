@@ -875,6 +875,40 @@ TEST_CASE("Lichess arenas' module without App: the followed tournament's standin
     CHECK(app.repairs.empty());
 }
 
+TEST_CASE("Lichess arenas' module without App: the arena line's pause said as a notice without a button (#149)") {
+    using namespace std::chrono_literals;
+    FakeLichess lichess;
+    REQUIRE(lichess.ok());
+    HostGate::instance().setPause(10s);  // the host's pause after a 429: long enough to be read while it lasts
+    const ScratchDir profile("arenas-strip-pause");
+    FakeApp app(profile);
+    app.account = sampleAccount({"board:play", "tournament:write"});
+    Frames frames;
+    LichessArenasPage arenas(app);
+    CHECK_FALSE(arenas.stripNotice());
+
+    // The arena the user plays, its page asked while the Play page shows it: Lichess asks for a pause. Said on the
+    // arena's line in orange, the seconds left in its words, without a button: its page is asked again by itself once
+    // the pause is over.
+    lichess.refuse = 429;
+    REQUIRE(applied(arenas, "play-arena=rap1d100@Hourly Rapid Arena"));
+    REQUIRE(waitUntil([&] {
+        arenas.poll();
+        return arenas.stripNotice().has_value();
+    }));
+    const auto notice = *arenas.stripNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text.rfind("Too many requests (429): the standing waits a minute (", 0) == 0);
+    CHECK(notice.text.find(" s left); your games go on.") != std::string::npos);
+    CHECK(notice.fixes.empty());
+    CHECK(noticeTopic(notice) == nullptr);
+    frames.draw(app, [&] {
+        arenas.drawArenaLine(true);
+        arenas.drawArenaLine(false);
+    });
+    CHECK(app.repairs.empty());
+}
+
 TEST_CASE(
     "Lichess arenas' module without App: its readings in the host's pause end at once as the program quits "
     "(#148)") {

@@ -400,7 +400,8 @@ void MistakesPage::poll() {
         mistake_scan_job_.reset();
     }
 
-    // The games reviewed in the background, one after the other.
+    // The games reviewed in the background, one after the other; waiting for an engine, they go on once there is one.
+    if (mistake_reviews_ && mistake_reviews_->engine_gone && app_.analysisEngine()) startMistakeReview();
     if (mistake_reviews_ && mistake_reviews_->runner) {
         auto& r = *mistake_reviews_;
         // The Board page's own analysis and review have the machine meanwhile; a live game of the user's on Lichess
@@ -493,10 +494,17 @@ void MistakesPage::startMistakeReview() {
         return;
     }
     const auto* engine = app_.engineNamed(r.engine);
+    // Theirs gone from the library: the Board's analysis engine goes on, as the Board page reviews a game (#149); none
+    // left, they wait for one, and go on by themselves once there is one (poll()).
+    if (!engine && (engine = app_.analysisEngine())) r.engine = engine->name;
     if (!engine) {
-        r.error = trf("{} is no longer in the library: add an engine on the Engines page.", r.engine);
+        if (!r.engine_gone)
+            r.error = trf("{} is no longer in the library: add an engine on the Engines page.", r.engine);
+        r.engine_gone = true;
         return;
     }
+    r.error.clear();
+    r.engine_gone = false;
     // As the Board page reviews a game in the Chess space (#61, #63): nodes, one thread, an empty table each
     // position, Lichess's evaluations kept offline taken as they are, the processes the tournaments leave.
     r.runner       = app_.reviewInBackground(*engine, r.games[r.done].game, r.processes);
@@ -509,6 +517,18 @@ void MistakesPage::cancelMistakeReviews() {
     if (!mistake_reviews_) return;
     if (mistake_reviews_->runner) mistake_reviews_->runner->stop();
     mistake_reviews_.reset();
+}
+
+std::optional<Notice> MistakesPage::reviewsNotice() const {
+    if (!mistake_reviews_ || mistake_reviews_->error.empty()) return std::nullopt;
+    Notice n{Notice::Level::Warning, mistake_reviews_->error, {}, {}};
+    if (mistake_reviews_->engine_gone) n.fixes.push_back(chooseEngineFix());  // one chosen, they go on by themselves
+    return n;
+}
+
+std::optional<Notice> MistakesPage::judgeNotice() const {
+    if (!mistake_ || mistake_->check_error.empty()) return std::nullopt;
+    return Notice{Notice::Level::Warning, mistake_->check_error, {}, {}};
 }
 
 void MistakesPage::drawMistakeReviewsCard() {
@@ -535,8 +555,11 @@ void MistakesPage::drawMistakeReviewsCard() {
                                               static_cast<double>(std::max<std::size_t>(1, total))),
                            ImVec2(-1, px(6)), "");
         ImGui::PopStyleColor();
-        if (!r.error.empty()) {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", r.error.c_str());
+        if (const auto notice = reviewsNotice()) {
+            if (const auto* fix = drawNotice(*notice, "mistake_reviews_error")) {
+                const auto clicked = *fix;
+                repair(clicked);
+            }
         } else {
             std::string left;
             if (r.plies_done > 0 && r.seconds > 0) {
@@ -1402,8 +1425,8 @@ void MistakesPage::drawMistakeColumn() {
             else
                 ImGui::TextUnformatted(trf("The review's move: {}", numbered(board, best)).c_str());
             ImGui::PopFont();
-            if (!r.check_error.empty()) {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::WARN), "%s", r.check_error.c_str());
+            if (const auto notice = judgeNotice()) {
+                drawNotice(*notice, "mistake_judge_error");  // no button: an engine is chosen out of the session
                 wrapped(TR("Not counted: Retry, or Next."), true);
             } else {
                 if (!r.played.empty()) {

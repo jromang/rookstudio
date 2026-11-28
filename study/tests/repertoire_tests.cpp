@@ -1,6 +1,10 @@
 #include <doctest/doctest.hpp>
 
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -9,6 +13,7 @@
 #include <study/pgn_reader.hpp>
 #include <study/repertoire.hpp>
 #include <study/scan_board.hpp>
+#include <study/store_error.hpp>
 #include <study/tree.hpp>
 
 #include "test_games.hpp"
@@ -279,6 +284,58 @@ TEST_CASE("repertoire: the trees of two databases summed") {
     CHECK_FALSE(played(scan));
     // None at all.
     CHECK_FALSE(treeMoves({})(scan));
+}
+
+TEST_CASE("repertoire: a damaged tree among sound ones, the base being read told (#149)") {
+    std::vector<Spec> specs;
+    repeat(specs, 12, "1. e4 e5 2. Nf3 Nc6");
+    repeat(specs, 8, "1. e4 c5 2. Nf3 d6");
+    const auto first = treeBase("repertoire-sound-first", specs);
+    const auto third = treeBase("repertoire-sound-third", specs);
+    // The second's records overwritten, their header left: its tree opens, a position read in it is a damaged one.
+    auto db = database("repertoire-damaged", make(specs));
+    TreeProgress progress;
+    std::atomic<bool> cancel{false};
+    REQUIRE(buildTree(*db, *db->snapshot(), {}, progress, cancel).error.empty());
+    std::string name;
+    {
+        const auto sound = Tree::open(db->folder());  // let go before its file is written (Windows maps it)
+        REQUIRE(sound);
+        name = sound->folderName();
+    }
+    const auto records = db->folder() / name / "records.bin";
+    {
+        const auto size = std::filesystem::file_size(records);
+        REQUIRE(size > 32);
+        std::fstream bytes(records, std::ios::in | std::ios::out | std::ios::binary);
+        bytes.seekp(32);
+        const std::string junk(static_cast<std::size_t>(size - 32), '\xff');
+        bytes.write(junk.data(), static_cast<std::streamsize>(junk.size()));
+    }
+    const TreeBase damaged{db->snapshot(), Tree::open(db->folder())};
+    REQUIRE(damaged.tree);
+    const Repertoire rep(linesOf("1. e4 e5 2. Nf3 *"), chess::Color::WHITE);
+
+    // Measured on the three: the store's error, the damaged tree told by its place among them.
+    std::size_t reading = SIZE_MAX;
+    bool refused        = false;
+    try {
+        (void)coverage(rep, treeMoves({first, damaged, third}, &reading));
+    } catch (const StoreError& e) {
+        refused = true;
+        CHECK(e.code() == StoreErrc::Damaged);
+    }
+    CHECK(refused);
+    CHECK(reading == 1);
+    // First among them, the same.
+    reading = SIZE_MAX;
+    CHECK_THROWS_AS((void)coverage(rep, treeMoves({damaged, first}, &reading)), StoreError);
+    CHECK(reading == 0);
+    // The sound ones alone: measured, the last one read told.
+    reading          = SIZE_MAX;
+    const auto cover = coverage(rep, treeMoves({first, third}, &reading));
+    CHECK(cover.known > 0);
+    CHECK(reading == 1);
 }
 
 TEST_CASE("repertoire: a player's moves, out of the games they had that colour, and a repertoire's gaps against them") {

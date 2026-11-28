@@ -131,6 +131,9 @@ class LichessArenasPage {
     [[nodiscard]] std::optional<Notice> arenaNotice() const;
     [[nodiscard]] std::optional<Notice> swissNotice(const lichess::Failure& failure) const;
     [[nodiscard]] std::optional<Notice> refusalNotice(const lichess::Failure& failure) const;
+    // The arena line's (the Board's, the Play page's) while its page waits for Lichess's pause after a 429 (#149): in
+    // orange, the seconds left in its words, without a button, its page asked again by itself once the pause is over.
+    [[nodiscard]] std::optional<Notice> stripNotice() const;
     void repair(const Fix& fix);
 
    private:

@@ -73,6 +73,9 @@ class GuessPage final : public TrainingKind {
     // no game passing the filter without a button; none once one started. Its fix, carried out by the program.
     [[nodiscard]] const std::optional<Notice>& startNotice() const { return guess_notice_; }
     void repair(const Fix& fix) { app_.repair(fix); }
+    // The engine's error during a game guessed, as its question says it (#149): a notice without a button, nothing
+    // starting it again from there (Stop ends the game, its points kept). None while it scores.
+    [[nodiscard]] std::optional<Notice> engineNotice() const;
 
    private:
     [[nodiscard]] std::filesystem::path guessFolder() const { return app_.profileDir() / "guess"; }

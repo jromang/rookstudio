@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
+#include <string>
 #include <string_view>
 
 #include <SDL3/SDL.h>
@@ -28,6 +29,7 @@
 #include "databases.hpp"
 #include "guide.hpp"
 #include "i18n.hpp"
+#include "lichess_api.hpp"
 #include "live.hpp"
 #include "ui.hpp"
 #include "widgets.hpp"
@@ -317,6 +319,36 @@ std::optional<Notice> LichessBotPage::onlineNotice() const {
 
 void LichessBotPage::repair(const Fix& fix) {
     if (fix.kind == Fix::Kind::LinkLichess) startBotLink();
+}
+
+Notice LichessBotPage::cutNotice(const lichess::Failure& broke) const {
+    // Opened again by itself (#149): nothing to click. Lichess's pause after a 429, which the stream waits for, in
+    // orange and counted down in its words.
+    const auto pause = app_.pausedFor(lichess::apiHost());
+    std::string words;
+    if (broke.net == lichess::NetError::RateLimited && pause.count() > 0) {
+        const auto s = std::chrono::ceil<std::chrono::seconds>(pause).count();
+        words = trf("Too many requests in a short time: Lichess asked for a pause. Trying again in {}:{:02}.", s / 60,
+                    s % 60);
+    } else if (!broke.failed() || broke.net == lichess::NetError::Offline) {
+        words = TR("The connection to Lichess is cut: tried again by itself.");
+    } else {
+        words = trf("The connection to Lichess is cut ({}): tried again by itself.", lichess::describe(broke));
+    }
+    return Notice{Notice::Level::Warning, std::move(words), {}, {}};
+}
+
+std::optional<Notice> LichessBotPage::streamNotice() const {
+    if (!bot_events_ || bot_events_->connected()) return std::nullopt;
+    const auto broke = bot_events_->failure();
+    if (!broke.failed()) return std::nullopt;
+    return cutNotice(broke);
+}
+
+std::optional<Notice> LichessBotPage::gameStreamNotice() const {
+    const auto& s = bot_state_.game;
+    if (!s.full || s.connected) return std::nullopt;
+    return cutNotice(s.failure);
 }
 
 void LichessBotPage::forgetBotAccount() {
@@ -711,7 +743,7 @@ void LichessBotPage::drawBoardCard() {
         wrapped(trf("{} against {}", gameKindText(s), botOpponent()));
     else
         wrapped(TR("Its game on Lichess, connecting…"), true);
-    if (s.full && !s.connected) coloured(TR("The connection to Lichess is cut: tried again by itself."), ui::WARN);
+    if (const auto notice = gameStreamNotice()) drawNotice(*notice, "bot_game_cut");  // no button: it opens by itself
     // Whose move, and what the engine searches (its own search: it plays this game), unless the user plays live.
     const bool its_turn = s.full && whiteToMove(s) == st.white;
     if (s.full) {
@@ -1303,12 +1335,7 @@ void LichessBotPage::drawBotOnline() {
     if (const auto notice = onlineNotice()) {
         if (const auto* fix = drawNotice(*notice, "bot_online_error")) repair(*fix);
     }
-    if (const auto broke = bot_events_ ? bot_events_->failure() : lichess::Failure{};
-        bot_events_ && !bot_events_->connected() && broke.failed())
-        coloured(broke.net == lichess::NetError::Offline
-                     ? std::string(TR("The connection to Lichess is cut: tried again by itself."))
-                     : trf("The connection to Lichess is cut ({}): tried again by itself.", lichess::describe(broke)),
-                 ui::WARN);
+    if (const auto notice = streamNotice()) drawNotice(*notice, "bot_stream_cut");  // no button: it opens by itself
     if (botCoresNeeded())
         coloured(TR("A tournament needs the cores: the challenges are declined “later” meanwhile."), ui::WARN);
     // Its game: on a small board, the Board a click away.

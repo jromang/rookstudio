@@ -748,7 +748,8 @@ class BotContext : public virtual context::Program,
                    public virtual context::LinkedAccount,
                    public virtual context::FairPlay,
                    public virtual context::Tokens,
-                   public virtual context::Window {};
+                   public virtual context::Window,
+                   public virtual context::Repairs {};
 
 // What the puzzles ask of the program (puzzles_page.hpp).
 class PuzzlesContext : public virtual context::Program,

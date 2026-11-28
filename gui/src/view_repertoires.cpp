@@ -3,13 +3,17 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <filesystem>
 #include <string>
+#include <vector>
 
 #include <fmt/include/fmt/format.h>
 #include <imgui.h>
 
 #include "app.hpp"
 #include "i18n.hpp"
+#include "repairs.hpp"
 #include "repertoire_training_page.hpp"
 #include "ui.hpp"
 
@@ -143,12 +147,16 @@ void App::drawOpeningsPage() {
     auto& shelf_ = shelf();
     // Measured on (M3, board 2): the databases whose tree is built, each a chip that leaves it out or takes it back.
     std::vector<study::TreeBase> bases;
+    std::vector<std::size_t> measured;  // their databases, by the shelf's index
     std::vector<std::pair<std::string, std::filesystem::path>> chips;
     for (std::size_t i = 0; i < shelf_.entries().size(); ++i) {
         if (shelf_.entries()[i].source) continue;
         if (const auto source = shelf_.treeSource(i); source && source->tree) {
             chips.push_back({source->name, shelf_.entries()[i].folder});
-            if (!coverage_left_.count(shelf_.entries()[i].folder)) bases.push_back({source->snapshot, source->tree});
+            if (!coverage_left_.count(shelf_.entries()[i].folder)) {
+                bases.push_back({source->snapshot, source->tree});
+                measured.push_back(i);
+            }
         }
     }
     if (chips.empty()) {
@@ -189,30 +197,45 @@ void App::drawOpeningsPage() {
     for (const auto& chip : chips) of += coverage_left_.count(chip.second) ? "-" : "+";  // which ones, not how many
     if (of != coverage_of_ && (!coverage_job_ || coverage_job_->of != of)) {
         CoverageJob job;
-        job.of = of;
+        job.of        = of;
+        job.databases = measured;
         study::CoverageOptions options;
         options.until_ply = coverage_depth_ == 1 ? 20 : coverage_depth_ == 2 ? 30 : 0;
-        job.done          = std::async(std::launch::async, [map = r.map(index), bases, options] {
-            return study::coverage(map, study::treeMoves(bases), options);
+        job.done          = std::async(std::launch::async, [map = r.map(index), bases, options, reading = job.reading] {
+            return study::coverage(map, study::treeMoves(bases, reading.get()), options);
         });
         coverage_job_     = std::move(job);
     }
     if (coverage_job_ && isReady(coverage_job_->done)) {
-        coverage_error_ = {};
+        coverage_error_    = {};
+        coverage_database_ = -1;
         try {
             coverage_ = coverage_job_->done.get();
         } catch (const std::exception& e) {
-            // A database's tree that cannot be read: not measured, why on its line and in the log; measured again
-            // once the repertoire or the databases change.
+            // A database's tree that cannot be read: not measured, why on its line, naming the database whose tree it
+            // is, with its check (#149), and in the log; measured again once the repertoire or the databases change.
             coverage_.reset();
-            coverage_error_ = loggedStoreFailure(trf("The coverage could not be measured: {}.", storeErrorText(e)), e);
+            auto failed        = coverageFailure(shelf_, coverage_job_->databases, *coverage_job_->reading, e);
+            coverage_error_    = std::move(failed.error);
+            coverage_database_ = failed.database;
         }
         coverage_of_ = coverage_job_->of;
         coverage_job_.reset();
     }
     if (!coverage_ || coverage_of_ != of) {
-        const bool failed = coverage_of_ == of && !coverage_error_.empty();
-        ImGui::TextDisabled("%s", failed ? coverage_error_.said.c_str() : TR("Measuring…"));
+        if (coverage_of_ == of && !coverage_error_.empty()) {
+            // A damaged tree with the check of its database (#149).
+            const auto& entries = shelf_.entries();
+            const bool one      = coverage_database_ >= 0 && coverage_database_ < static_cast<int>(entries.size());
+            ImGui::PushTextWrapPos();
+            drawRepairNotice(storeNotice(coverage_error_, one ? coverage_database_ : -1,
+                                         one ? entries[static_cast<std::size_t>(coverage_database_)].folder
+                                             : std::filesystem::path()),
+                             "coverage_error");
+            ImGui::PopTextWrapPos();
+        } else {
+            ImGui::TextDisabled("%s", TR("Measuring…"));
+        }
         ImGui::EndChild();
         return;
     }

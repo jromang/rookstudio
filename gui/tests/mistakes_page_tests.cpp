@@ -597,6 +597,18 @@ TEST_CASE("mistakes page: an answer no engine can judge is said and not counted;
     CHECK(run->phase == MistakeRun::Phase::Wrong);
     CHECK(run->check_error == "No engine to judge the move: add one on the Engines page.");
     CHECK(run->outcomes.empty());
+    // Said as a notice in its column (#149), in orange, without a button: the session holds the Board, where an engine
+    // would be chosen.
+    {
+        const auto notice = page.judgeNotice();
+        REQUIRE(notice);
+        CHECK(notice->level == Notice::Level::Warning);
+        CHECK(notice->text == "No engine to judge the move: add one on the Engines page.");
+        CHECK(notice->fixes.empty());
+        Frames column;
+        column.draw(app, boardPage(page));
+        CHECK(app.repairs.empty());
+    }
     CHECK(readMistakeRecord(profile / "mistakes").exercises.at(first.key).card.fresh());
     CHECK_FALSE(fs::exists(profile / "mistakes" / "answers.jsonl"));
     // A live game of the user's on Lichess: no session starts meanwhile.
@@ -625,4 +637,73 @@ TEST_CASE("mistakes page: an answer no engine can judge is said and not counted;
         },
         "Study");
     CHECK(app.names_settings == 1);
+}
+
+TEST_CASE(
+    "mistakes page: the reviews in the background, their engine gone and none left, said with Choose an engine…, "
+    "going on once there is one (#149)") {
+    ScopedEnv analysis("FCG_MOCK_ANALYSIS", "1");
+    ScratchDir profile("mistakes-page-reviews-engine-gone");
+    FakeApp app(profile);
+    app.engines.push_back(mockEngine());
+    // Two games of the user's without a review.
+    const auto file = profile.path() / "my-games.pgn";
+    std::ofstream(file, std::ios::binary)
+        << LATEST_PGN
+        << "[Event \"Club game\"]\n[Date \"2026.11.21\"]\n[White \"Tester, Sam\"]\n[Black \"Partner, Lee\"]\n"
+           "[Result \"*\"]\n\n1. d4 d5 2. c4 e6 3. Nc3 Nf6 *\n\n";
+    auto& shelf = app.shelf();
+    REQUIRE(shelf.startImport(shelf.create("My games"), file));
+    std::optional<study::DatabaseImport> report;
+    REQUIRE(waitUntil([&] { return (report = shelf.finishedImport()).has_value(); }, 60s));
+    REQUIRE(report->added == 2u);
+    MistakesPage page(app);
+    REQUIRE(scanned(app, page, [&] { return has(commands(page), "Review 2 recent games of mine in the background"); }));
+    page.addCommands(
+        [&](const std::string& label, const std::string&, const std::function<void()>& run) {
+            if (label == "Review 2 recent games of mine in the background") run();
+        },
+        "Study");
+    REQUIRE(app.reviewed.size() == 1);
+    CHECK_FALSE(page.reviewsNotice());
+
+    // The engine taken out of the library during the first game: that one reviewed, the second waits for an engine,
+    // said on the card with Choose an engine…, which the program carries out.
+    app.engines.clear();
+    REQUIRE(waitUntil(
+        [&] {
+            page.poll();
+            return page.reviewsNotice().has_value();
+        },
+        60s));
+    CHECK(app.reviewed.size() == 1);
+    const auto notice = *page.reviewsNotice();
+    CHECK(notice.level == Notice::Level::Warning);
+    CHECK(notice.text == "Mock is no longer in the library: add an engine on the Engines page.");
+    REQUIRE(notice.fixes.size() == 1);
+    CHECK(notice.fixes[0].kind == Fix::Kind::ChooseEngine);
+    CHECK(notice.fixes[0].label == "Choose an engine…");
+    Frames frames;
+    frames.draw(app, [&] { page.drawPart(); });
+    page.repair(notice.fixes[0]);
+    REQUIRE(app.repairs.size() == 1);
+    CHECK(app.repairs[0].kind == Fix::Kind::ChooseEngine);
+    page.poll();
+    CHECK(app.reviewed.size() == 1);  // still waiting
+
+    // An engine in the library again, another: the second game reviewed with it, by itself, nothing more said.
+    auto other = mockEngine();
+    other.name = "Other";
+    app.engines.push_back(other);
+    page.poll();
+    CHECK_FALSE(page.reviewsNotice());
+    REQUIRE(app.reviewed.size() == 2);
+    REQUIRE(waitUntil(
+        [&] {
+            page.poll();
+            return !has(commands(page), "Cancel the reviews of my games");
+        },
+        60s));
+    CHECK_FALSE(page.reviewsNotice());
+    CHECK(fs::exists(profile.path() / "analyses" / (reviewKey(readGame(LATEST_PGN)) + ".json")));
 }

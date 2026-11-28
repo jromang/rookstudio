@@ -3526,7 +3526,7 @@ dépasse les threads matériels (ou, avec une pendule, les cœurs physiques). *J
 le tournoi joue (voir [Un tournoi sur une machine](#un-tournoi-sur-une-machine)).
 
 ### Ouvertures
-<!-- en: openings 44656411 -->
+<!-- en: openings 19256fe4 -->
 
 Un livre EPD, PGN ou Polyglot (`.bin`) (une suite d'ouvertures), l'ordre aléatoire ou séquentiel, le nombre de
 demi-coups gardés d'un livre PGN, l'indice de départ et la graine aléatoire (0 = un nouvel ordre pour chaque tournoi).
@@ -3534,11 +3534,14 @@ Chaque ouverture est jouée deux fois, couleurs inversées (dans un match dont l
 depuis sa propre ouverture).
 
 Un livre Polyglot est suivi depuis la position initiale jusqu'à une profondeur (8 demi-coups sauf réglage contraire), en
-laissant de côté les coups qui pèsent moins d'un dixième du meilleur de leur position ; les positions atteintes sont
-écrites une fois dans `<book>-<N>plies.epd` dans le dossier du tournoi et jouées comme un livre EPD. En ordre aléatoire,
-elles sont écrites dans l'ordre où elles sont tirées, chacune une fois : une ligne vient d'autant plus tôt qu'elle est
-probable, selon les poids de ses coups, si bien qu'un tournoi qui ne joue qu'une partie du livre joue d'abord ses lignes
-principales ; la même graine reproduit le même ordre. En ordre séquentiel, elles gardent l'ordre du livre. *Hasard*
+laissant de côté les coups qui pèsent moins d'un dixième du meilleur de leur position ; ses lignes (une pour chaque
+position atteinte, la première qui l'atteint) sont écrites une fois dans `<book>-<N>plies.pgn` dans le dossier du
+tournoi et jouées comme un livre PGN : chaque partie part de la position initiale, et son PGN contient les coups du
+livre, marqués `{book}`. En ordre aléatoire, elles sont écrites dans l'ordre où elles sont tirées, chacune une fois :
+une ligne vient d'autant plus tôt qu'elle est probable, selon les poids de ses coups, si bien qu'un tournoi qui ne joue
+qu'une partie du livre joue d'abord ses lignes principales ; la même graine reproduit le même ordre. En ordre
+séquentiel, elles gardent l'ordre du livre. Un tournoi commencé par une version antérieure, qui écrivait les positions
+atteintes dans `<book>-<N>plies.epd`, continue de jouer depuis ces positions. *Hasard*
 (−100 à 100, 0 par défaut) dit comment comptent les poids, comme Polyglot et Cute Chess choisissent un coup de livre : 0
 les poids tels quels, −100 le meilleur coup de chaque position seulement (une seule ligne, à moins que plusieurs
 partagent le meilleur poids), 100 tous les coups à égalité (les coups rares reviennent) ; entre les deux, −50 élève les

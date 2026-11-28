@@ -3493,7 +3493,7 @@ thread hardware (o, con un orologio, i core fisici). *Gioca su* sceglie la macch
 torneo su una macchina](#un-torneo-su-una-macchina)).
 
 ### Aperture
-<!-- en: openings 44656411 -->
+<!-- en: openings 19256fe4 -->
 
 Un libro EPD, PGN o Polyglot (`.bin`) (una suite di aperture), ordine casuale o sequenziale, il numero di semimosse
 tenute da un libro PGN, l'indice di partenza e il seme casuale (0 = un nuovo ordine per ogni torneo). Ogni apertura
@@ -3501,17 +3501,20 @@ viene giocata due volte, a colori invertiti (in un match i cui *Colori* sono fis
 apertura).
 
 Un libro Polyglot viene seguito dalla posizione iniziale fino a una profondità (8 semimosse se non impostata),
-escludendo le mosse che pesano meno di un decimo della migliore della loro posizione; le posizioni raggiunte vengono
-scritte una volta in `<book>-<N>plies.epd` nella cartella del torneo e giocate come un libro EPD. In ordine casuale
-vengono scritte nell'ordine in cui vengono estratte, ciascuna una volta: una linea arriva tanto prima quanto è più
-probabile, secondo i pesi delle sue mosse, così un torneo che gioca solo una parte del libro gioca per prime le sue
-linee principali; il seme estrae di nuovo lo stesso ordine. In ordine sequenziale mantengono l'ordine del libro.
-*Casualità* (da −100 a 100, 0 per impostazione predefinita) dice come contano i pesi, come Polyglot e Cute Chess
-scelgono una mossa di libro: 0 i pesi così come sono, −100 solo la mossa migliore di ogni posizione (una sola linea, a
-meno che più mosse non condividano il peso migliore), 100 tutte le mosse allo stesso modo (le mosse rare tornano); a
-metà strada, −50 eleva i pesi al quadrato e 50 ne prende la radice quadrata. Sceglie anche le mosse dei libri propri
-dei partecipanti, e viene mostrata per loro anche con un libro EPD o PGN; il riepilogo la indica, e la riga sotto le
-copie della classifica dà il libro con la sua profondità e, per un libro Polyglot, questa casualità.
+escludendo le mosse che pesano meno di un decimo della migliore della loro posizione; le sue linee (una per ogni
+posizione raggiunta, la prima che la raggiunge) vengono scritte una volta in `<book>-<N>plies.pgn` nella cartella del
+torneo e giocate come un libro PGN: ogni partita parte dalla posizione iniziale, e il suo PGN contiene le mosse del
+libro, segnate con `{book}`. In ordine casuale vengono scritte nell'ordine in cui vengono estratte, ciascuna una volta:
+una linea arriva tanto prima quanto è più probabile, secondo i pesi delle sue mosse, così un torneo che gioca solo una
+parte del libro gioca per prime le sue linee principali; il seme estrae di nuovo lo stesso ordine. In ordine sequenziale
+mantengono l'ordine del libro. Un torneo avviato da una versione precedente, che scriveva le posizioni raggiunte in
+`<book>-<N>plies.epd`, continua a giocare da quelle. *Casualità* (da −100 a 100, 0 per impostazione predefinita) dice
+come contano i pesi, come Polyglot e Cute Chess scelgono una mossa di libro: 0 i pesi così come sono, −100 solo la mossa
+migliore di ogni posizione (una sola linea, a meno che più mosse non condividano il peso migliore), 100 tutte le mosse
+allo stesso modo (le mosse rare tornano); a metà strada, −50 eleva i pesi al quadrato e 50 ne prende la radice quadrata.
+Sceglie anche le mosse dei libri propri dei partecipanti, e viene mostrata per loro anche con un libro EPD o PGN; il
+riepilogo la indica, e la riga sotto le copie della classifica dà il libro con la sua profondità e, per un libro
+Polyglot, questa casualità.
 
 In un girone all'italiana, un gauntlet, un sistema svizzero o un incontro a squadre, *La stessa apertura per tutte le
 coppie di un turno* dà a ogni coppia di partite di un turno la stessa apertura (scacchiera per scacchiera, un ciclo è

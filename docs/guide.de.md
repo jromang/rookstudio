@@ -3604,7 +3604,7 @@ Hardware-Threads übersteigt (oder, mit einer Uhr, die physischen Kerne). *Spiel
 Turnier spielt (siehe [Ein Turnier auf einer Maschine](#ein-turnier-auf-einer-maschine)).
 
 ### Eröffnungen
-<!-- en: openings 44656411 -->
+<!-- en: openings 19256fe4 -->
 
 Ein EPD-, PGN- oder Polyglot-Buch (`.bin`), also eine Eröffnungssammlung, zufällige oder sequenzielle Reihenfolge, die
 Zahl der aus einem PGN-Buch übernommenen Halbzüge, der Startindex und der Zufallsstartwert (0 = eine neue Reihenfolge
@@ -3612,18 +3612,20 @@ für jedes Turnier). Jede Eröffnung wird zweimal gespielt, mit vertauschten Far
 festgelegt sind, jede Partie aus ihrer eigenen Eröffnung).
 
 Einem Polyglot-Buch wird von der Ausgangsstellung bis zu einer Tiefe gefolgt (8 Halbzüge, sofern nicht anders
-eingestellt), wobei die Züge wegfallen, die weniger als ein Zehntel des besten Zugs ihrer Stellung wiegen; die
-erreichten Stellungen werden einmal in `<book>-<N>plies.epd` im Turnierordner geschrieben und wie ein EPD-Buch
-gespielt. In zufälliger Reihenfolge werden sie in der Reihenfolge geschrieben, in der sie gezogen werden, jede einmal:
-Eine Linie kommt umso früher, je wahrscheinlicher sie nach den Gewichten ihrer Züge ist, so dass ein Turnier, das nur
-einen Teil des Buchs spielt, zuerst seine Hauptlinien spielt; derselbe Startwert zieht dieselbe Reihenfolge erneut. In
-sequenzieller Reihenfolge behalten sie die Reihenfolge des Buchs. *Zufall* (−100 bis 100, standardmäßig 0) legt fest,
-wie die Gewichte zählen, so wie Polyglot und Cute Chess einen Buchzug wählen: 0 die Gewichte, wie sie sind, −100 nur
-den besten Zug jeder Stellung (eine Linie, es sei denn, mehrere teilen das beste Gewicht), 100 jeden Zug gleich (die
-seltenen Züge kommen zurück); dazwischen quadriert −50 die Gewichte, und 50 nimmt die Quadratwurzel aus ihnen. Er wählt auch
-die Züge der eigenen Bücher der Teilnehmer und wird für sie auch bei einem EPD- oder PGN-Buch angezeigt; die
-Zusammenfassung nennt ihn, und die Schlusszeile der Tabellenkopien gibt das Buch mit seiner Tiefe an und, bei einem
-Polyglot-Buch, diesen Zufall.
+eingestellt), wobei die Züge wegfallen, die weniger als ein Zehntel des besten Zugs ihrer Stellung wiegen; seine Linien
+(eine für jede erreichte Stellung, die erste, die sie erreicht) werden einmal in `<book>-<N>plies.pgn` im Turnierordner
+geschrieben und wie ein PGN-Buch gespielt: Jede Partie beginnt aus der Ausgangsstellung, und ihr PGN enthält die Züge
+des Buchs, mit `{book}` markiert. In zufälliger Reihenfolge werden sie in der Reihenfolge geschrieben, in der sie
+gezogen werden, jede einmal: Eine Linie kommt umso früher, je wahrscheinlicher sie nach den Gewichten ihrer Züge ist, so
+dass ein Turnier, das nur einen Teil des Buchs spielt, zuerst seine Hauptlinien spielt; derselbe Startwert zieht
+dieselbe Reihenfolge erneut. In sequenzieller Reihenfolge behalten sie die Reihenfolge des Buchs. Ein Turnier, das von
+einer früheren Version gestartet wurde, die die erreichten Stellungen in `<book>-<N>plies.epd` schrieb, spielt weiter
+von diesen Stellungen aus. *Zufall* (−100 bis 100, standardmäßig 0) legt fest, wie die Gewichte zählen, so wie Polyglot
+und Cute Chess einen Buchzug wählen: 0 die Gewichte, wie sie sind, −100 nur den besten Zug jeder Stellung (eine Linie,
+es sei denn, mehrere teilen das beste Gewicht), 100 jeden Zug gleich (die seltenen Züge kommen zurück); dazwischen
+quadriert −50 die Gewichte, und 50 nimmt die Quadratwurzel aus ihnen. Er wählt auch die Züge der eigenen Bücher der
+Teilnehmer und wird für sie auch bei einem EPD- oder PGN-Buch angezeigt; die Zusammenfassung nennt ihn, und die
+Schlusszeile der Tabellenkopien gibt das Buch mit seiner Tiefe an und, bei einem Polyglot-Buch, diesen Zufall.
 
 In einem Rundenturnier, einem Gauntlet, einem Schweizer System oder einem Mannschaftskampf gibt *Dieselbe Eröffnung
 für alle Paare einer Runde* jedem Partiepaar einer Runde dieselbe Eröffnung (bei Brett gegen Brett ist ein Zyklus eine

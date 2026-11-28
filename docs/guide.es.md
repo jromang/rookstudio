@@ -3495,7 +3495,7 @@ físicos). *Jugar en* elige la máquina en la que se juega el torneo (consulta [
 máquina](#un-torneo-en-una-máquina)).
 
 ### Aperturas
-<!-- en: openings 44656411 -->
+<!-- en: openings 19256fe4 -->
 
 Un libro EPD, PGN o Polyglot (`.bin`) (una suite de aperturas), orden aleatorio o secuencial, el número de medias
 jugadas que se conservan de un libro PGN, el índice de inicio y la semilla aleatoria (0 = un orden nuevo para cada
@@ -3503,17 +3503,20 @@ torneo). Cada apertura se juega dos veces, con los colores invertidos (en un mat
 partida desde su propia apertura).
 
 Un libro Polyglot se sigue desde la posición inicial hasta una profundidad (8 medias jugadas si no se fija otra),
-dejando fuera las jugadas que pesan menos de una décima parte de la mejor de su posición; las posiciones alcanzadas se
-escriben una vez en `<book>-<N>plies.epd` en la carpeta del torneo y se juegan como un libro EPD. En orden aleatorio
-se escriben en el orden en que se sortean, cada una una vez: una línea sale tanto antes cuanto más probable es, según
-los pesos de sus jugadas, de modo que un torneo que solo juega parte del libro juega primero sus líneas principales;
-la semilla vuelve a sortear el mismo orden. En orden secuencial conservan el orden del libro. *Aleatoriedad* (de −100
-a 100, 0 por defecto) dice cómo cuentan los pesos, como cuando Polyglot y Cute Chess eligen una jugada de libro: 0 los
-pesos tal cual, −100 solo la mejor jugada de cada posición (una línea, salvo que varias compartan el mejor peso), 100
-todas las jugadas por igual (vuelven las jugadas raras); entre medias, −50 eleva los pesos al cuadrado y 50 toma sus
-raíces cuadradas. También elige las jugadas de los libros propios de los participantes, y se muestra para ellos
-incluso con un libro EPD o PGN; el resumen lo indica, y la línea bajo las copias de la clasificación da el libro con
-su profundidad y, para un libro Polyglot, esta aleatoriedad.
+dejando fuera las jugadas que pesan menos de una décima parte de la mejor de su posición; sus líneas (una por cada
+posición alcanzada, la primera que llega a ella) se escriben una vez en `<book>-<N>plies.pgn` en la carpeta del torneo
+y se juegan como un libro PGN: cada partida empieza desde la posición inicial, y su PGN contiene las jugadas del
+libro, marcadas con `{book}`. En orden aleatorio se escriben en el orden en que se sortean, cada una una vez: una
+línea sale tanto antes cuanto más probable es, según los pesos de sus jugadas, de modo que un torneo que solo juega
+parte del libro juega primero sus líneas principales; la semilla vuelve a sortear el mismo orden. En orden secuencial
+conservan el orden del libro. Un torneo empezado con una versión anterior, que escribía las posiciones alcanzadas en
+`<book>-<N>plies.epd`, sigue jugando desde ellas. *Aleatoriedad* (de −100 a 100, 0 por defecto) dice cómo cuentan los
+pesos, como cuando Polyglot y Cute Chess eligen una jugada de libro: 0 los pesos tal cual, −100 solo la mejor jugada
+de cada posición (una línea, salvo que varias compartan el mejor peso), 100 todas las jugadas por igual (vuelven las
+jugadas raras); entre medias, −50 eleva los pesos al cuadrado y 50 toma sus raíces cuadradas. También elige las
+jugadas de los libros propios de los participantes, y se muestra para ellos incluso con un libro EPD o PGN; el resumen
+lo indica, y la línea bajo las copias de la clasificación da el libro con su profundidad y, para un libro Polyglot,
+esta aleatoriedad.
 
 En un todos contra todos, un gauntlet, un suizo o un encuentro por equipos, *La misma apertura para todos los pares de
 una ronda* da a todos los pares de partidas de una ronda la misma apertura (tablero a tablero, un ciclo es una ronda:

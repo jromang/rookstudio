@@ -614,7 +614,9 @@ void App::pollCrosstable() {
         } catch (const std::exception& e) {
             // Its games not read (a database that cannot be read): said on its error line, read again once the
             // database changed.
-            if (!*c.cancel) c.error = loggedStoreFailure(trf("Its games could not be read: {}.", storeErrorText(e)), e);
+            if (!*c.cancel)
+                c.error =
+                    loggedStoreFailure(trf("The tournament's games could not be read: {}.", storeErrorText(e)), e);
         }
     }
     // The database changed (a merge, names brought together, a game copied in): read again.

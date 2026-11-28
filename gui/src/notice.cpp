@@ -138,9 +138,10 @@ std::string allowScopeLabel(std::string_view scope) {
     if (scope == "challenge:read") return TR("Allow reading challenges…");
     if (scope == "follow:read") return TR("Allow reading whom you follow…");
     if (scope == "team:read") return TR("Allow reading your teams…");
-    if (scope == "tournament:write") return TR("Allow making tournaments…");
+    if (scope == "tournament:write") return TR("Allow joining tournaments…");
     if (scope == "engine:read" || scope == "engine:write") return TR("Allow registering engines…");
-    if (scope == "puzzle:read" || scope == "puzzle:write") return TR("Allow reading puzzles…");
+    if (scope == "puzzle:read") return TR("Allow reading puzzles…");
+    if (scope == "puzzle:write") return TR("Allow sending puzzle results…");
     return trf("Allow {}…", scope);
 }
 
@@ -181,25 +182,30 @@ Fix retryAfterPauseFix(Retry what, const std::string& host, std::chrono::millise
     f.kind          = Fix::Kind::RetryAfterPause;
     f.value         = static_cast<int>(what);
     f.path          = host;
-    const auto site = host.empty() ? std::string(TR("the site")) : host;
+    // The host named when it is known, a sentence of its own otherwise: a word put in the host's place would need
+    // the grammar of each language around it (a preposition and an article that merge, for instance).
+    const bool named = !host.empty();
     if (pause.count() > 0 && queued) {
         f.label    = trf("Asks again in {}", pauseClock(pause));
-        f.tooltip  = trf("Asks {} again by itself once its pause is over; nothing is sent before.", site);
+        f.tooltip  = named ? trf("Asks {} again by itself once its pause is over; nothing is sent before.", host)
+                           : std::string(TR("Asks again by itself once the pause is over; nothing is sent before."));
         f.disabled = true;
     } else if (pause.count() > 0) {
         f.label   = trf("Try again in {}", pauseClock(pause));
-        f.tooltip = trf("Asks {} again once its pause is over; nothing is sent before.", site);
+        f.tooltip = named ? trf("Asks {} again once its pause is over; nothing is sent before.", host)
+                          : std::string(TR("Asks again once the pause is over; nothing is sent before."));
     } else {
         f.label   = TR("Try again");
-        f.tooltip = trf("Asks {} again what was asked; nothing else is sent.", site);
+        f.tooltip = named ? trf("Sends the same request to {} again; nothing else is sent.", host)
+                          : std::string(TR("Sends the same request again; nothing else is sent."));
     }
     return f;
 }
 
 Fix checkDatabaseFix(int database) {
     auto f  = make(Fix::Kind::CheckDatabase, TR("Check the database…"),
-                   TR("Opens the database's care at its checks, which find what can be kept. Nothing leaves the "
-                      "machine."));
+                   TR("Opens the database's maintenance at its checks, which find what can be kept. Nothing leaves "
+                      "the machine."));
     f.index = database;
     return f;
 }

@@ -52,9 +52,12 @@ void ProfileEntries::sayUnread() const {
     if (unread_.size() > 5) what += ", …";
     const auto aside = keptAside(file_);
     Console::instance().add(
-        trn("{}: {} entry could not be read and was set aside ({}); the file as it was is kept as {}",
-            "{}: {} entries could not be read and were set aside ({}); the file as it was is kept as {}",
-            unread_.size(), file_.string(), unread_.size(), what, aside ? aside->string() : std::string("-")),
+        aside ? trn("{}: {} entry could not be read and was set aside ({}); the file as it was is kept as {}",
+                    "{}: {} entries could not be read and were set aside ({}); the file as it was is kept as {}",
+                    unread_.size(), file_.string(), unread_.size(), what, aside->string())
+              : trn("{}: {} entry could not be read and was set aside ({})",
+                    "{}: {} entries could not be read and were set aside ({})", unread_.size(), file_.string(),
+                    unread_.size(), what),
         true);
 }
 

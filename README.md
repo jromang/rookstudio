@@ -439,12 +439,14 @@ RookStudio comes in previews, each a step of the plan:
   publishing (HTML, PNG and SVG, GIF, PDF), every move explained and the guided visit, practical moves, the Endgames
   tab, Lichess's arenas and Swiss tournaments, your engine on lichess.org's analysis board; and the repository made
   public.
+- Preview 5: what the first testers reported, the Chess space's errors said with the action that repairs them, and a
+  sturdier program (damaged databases and profile files, crashed engines).
 
-Next, a fifth preview of feedback and finishing touches: what testers report once the repository is public; DGT boards
-and voice input, to be decided after trying them on real hardware; the assistant's comments in the six other languages
-of the interface, which needs phrasebooks for each and a new training of its model; more of Lichess (the token's
-permissions, bookmarks synced both ways, notes on players). Then 1.0, when RookStudio replaces fastchess-gui: a last
-fastchess-gui release pointing here, and its repository archived.
+Next, more feedback and finishing touches: what testers report; DGT boards and voice input, to be decided after trying
+them on real hardware; the assistant's comments in the six other languages of the interface, which needs phrasebooks for
+each and a new training of its model; more of Lichess (the token's permissions, bookmarks synced both ways, notes on
+players). Then 1.0, when RookStudio replaces fastchess-gui: a last fastchess-gui release pointing here, and its
+repository archived.
 
 ## Licence and credits
 
